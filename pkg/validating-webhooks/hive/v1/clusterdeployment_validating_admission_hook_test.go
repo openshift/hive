@@ -811,6 +811,32 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name: "ClusterInstallRef is set with Provisioning",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.ClusterInstallRef = &hivev1.ClusterInstallLocalReference{
+					Group:   "hive.openshift.io",
+					Version: "v1",
+					Kind:    "FakeClusterInstall",
+					Name:    "dummy",
+				}
+				return cd
+			}(),
+			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+		},
+		{
+			name: "ClusterInstallRef and Provisioning both not set",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
 			name:            "valid GCP clusterdeployment",
 			newObject:       validGCPClusterDeployment(),
 			operation:       admissionv1beta1.Create,

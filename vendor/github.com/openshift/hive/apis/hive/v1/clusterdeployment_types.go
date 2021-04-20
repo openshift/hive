@@ -119,6 +119,13 @@ type ClusterDeploymentSpec struct {
 	// May be unset in the case of adopted clusters.
 	Provisioning *Provisioning `json:"provisioning,omitempty"`
 
+	// ClusterInstallLocalReference provides reference to an object that implements
+	// the hivecontract ClusterInstall. The namespace of the object is same as the
+	// ClusterDeployment.
+	// This cannot be set when Provisioning is also set.
+	// +optional
+	ClusterInstallRef *ClusterInstallLocalReference `json:"clusterInstallRef,omitempty"`
+
 	// ClusterPoolRef is a reference to the ClusterPool that this ClusterDeployment originated from.
 	// +optional
 	ClusterPoolRef *ClusterPoolReference `json:"clusterPoolRef,omitempty"`
@@ -149,6 +156,17 @@ type ClusterDeploymentSpec struct {
 	// provision AWS clusters to use Amazon's Security Token Service.
 	// +optional
 	BoundServiceAccountSignkingKeySecretRef *corev1.LocalObjectReference `json:"boundServiceAccountSigningKeySecretRef,omitempty"`
+}
+
+// ClusterInstallLocalReference provides reference to an object that implements
+// the hivecontract ClusterInstall. The namespace of the object is same as the
+// ClusterDeployment.
+type ClusterInstallLocalReference struct {
+	Group   string `json:"group"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+
+	Name string `json:"name"`
 }
 
 // MachineManagement contains settings used for machine management.
@@ -401,6 +419,12 @@ const (
 	// AWSPrivateLinkFailedClusterDeploymentCondition is true controller fails to setup private link access
 	// for the cluster.
 	AWSPrivateLinkFailedClusterDeploymentCondition ClusterDeploymentConditionType = "AWSPrivateLinkFailed"
+
+	// These are conditions that are copied from ClusterInstall on to the ClusterDeployment object.
+	ClusterInstallFailedClusterDeploymentCondition          ClusterDeploymentConditionType = "ClusterInstallFailed"
+	ClusterInstallCompletedClusterDeploymentCondition       ClusterDeploymentConditionType = "ClusterInstallCompleted"
+	ClusterInstallStoppedClusterDeploymentCondition         ClusterDeploymentConditionType = "ClusterInstallStopped"
+	ClusterInstallRequirementsMetClusterDeploymentCondition ClusterDeploymentConditionType = "ClusterInstallRequirementsMet"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with

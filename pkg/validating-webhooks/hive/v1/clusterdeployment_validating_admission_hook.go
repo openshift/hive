@@ -260,11 +260,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	specPath := field.NewPath("spec")
 
 	if !cd.Spec.Installed {
-		if cd.Spec.Provisioning == nil {
+		if cd.Spec.Provisioning != nil && cd.Spec.ClusterInstallRef != nil {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("provisioning"), "provisioning and clusterInstallRef cannot be set at the same time"))
+		}
+
+		if cd.Spec.Provisioning == nil && cd.Spec.ClusterInstallRef == nil {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "provisioning is required if not installed"))
+		}
+	}
 
-		} else {
-
+	if !cd.Spec.Installed {
+		if cd.Spec.Provisioning != nil {
 			if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
 				// InstallConfigSecretRef is not required for agent install strategy
 				if cd.Spec.Provisioning.InstallStrategy == nil || cd.Spec.Provisioning.InstallStrategy.Agent == nil {
@@ -408,6 +414,7 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
 	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.provisioning.installStrategy.agent", hivev1.FeatureGateAgentInstallStrategy)...)
 	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.machineManagement", hivev1.FeatureGateMachineManagement)...)
+	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.clusterInstallRef", hivev1.FeatureGateAgentInstallStrategy)...)
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()

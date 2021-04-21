@@ -557,20 +557,18 @@ func SetClusterInstallConditionWithChangeCheck(
 	now := metav1.Now()
 	existingCondition := FindClusterInstallCondition(conditions, conditionType)
 	if existingCondition == nil {
-		if status == corev1.ConditionTrue {
-			conditions = append(
-				conditions,
-				hivev1.ClusterInstallCondition{
-					Type:               conditionType,
-					Status:             status,
-					Reason:             reason,
-					Message:            message,
-					LastTransitionTime: now,
-					LastProbeTime:      now,
-				},
-			)
-			changed = true
-		}
+		conditions = append(
+			conditions,
+			hivev1.ClusterInstallCondition{
+				Type:               conditionType,
+				Status:             status,
+				Reason:             reason,
+				Message:            message,
+				LastTransitionTime: now,
+				LastProbeTime:      now,
+			},
+		)
+		changed = true
 	} else {
 		if shouldUpdateCondition(
 			existingCondition.Status, existingCondition.Reason, existingCondition.Message,

@@ -1654,6 +1654,11 @@ data:
       - "failed to initialize the cluster: Some cluster operators are still updating:"
       installFailingReason: GeneralClusterOperatorsStillUpdating
       installFailingMessage: Timeout waiting for all cluster operators to become ready
+    - name: KubeAPIWaitFailed
+      searchRegexStrings:
+      - "Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane"
+      installFailingReason: KubeAPIWaitFailed
+      installFailingMessage: Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane
     # Processing stops at the first match, so this more generic
     # message about the connection failure must always come after the
     # more specific message for LibvirtSSHKeyPermissionDenied.

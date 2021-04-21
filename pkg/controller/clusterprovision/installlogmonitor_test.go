@@ -33,6 +33,7 @@ const (
 	vpcLimitExceeded        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating VPC: VpcLimitExceeded: The maximum number of VPCs has been reached.\""
 	genericLimitExceeded    = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating Generic: GenericLimitExceeded: The maximum number of Generics has been reached.\""
 	invalidCredentials      = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: error waiting for Route53 Hosted Zone (Z1009177L956IM4ANFHL) creation: InvalidClientTokenId: The security token included in the request is invalid.\""
+	kubeAPIWaitFailedLog    = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane.\""
 	noMatchLog              = "an example of something that doesn't match the log regexes"
 )
 
@@ -92,6 +93,12 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(invalidCredentials),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "InvalidCredentials",
+		},
+		{
+			name:           "Failed waiting for Kubernetes API",
+			log:            pointer.StringPtr(kubeAPIWaitFailedLog),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "KubeAPIWaitFailed",
 		},
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",
@@ -324,6 +331,11 @@ func buildRegexConfigMap() *corev1.ConfigMap {
   - "InvalidClientTokenId: The security token included in the request is invalid."
   installFailingReason: InvalidCredentials
   installFailingMessage: Credentials are invalid
+- name: KubeAPIWaitFailed
+  searchRegexStrings:
+  - "Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane"
+  installFailingReason: KubeAPIWaitFailed
+  installFailingMessage: Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane
 `,
 		},
 	}

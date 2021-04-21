@@ -73,7 +73,6 @@ spec.clusterMetadata.adminKubeconfigSecretRef | LocalObjectReference | Admin kub
 spec.clusterMetadata.adminPasswordSecretRef | LocalObjectReference | Admin password secret for current install attempt underway, set as soon as known. Copied back to Hive automatically once Ready.
 spec.clusterMetadata.clusterID | string | Cluster UUID generated during install, set as soon as known. Copied back to Hive automatically once Ready.
 spec.clusterMetadata.infraID | string | Cluster infra ID generated during install, set as soon as known. Copied back to Hive automatically once Ready.
-spec.manifestsConfigMapRef | LocalObjectReference | ConfigMap containing manifests to inject into the cluster during installation. *TODO*: Hive technically doesn't need this to be there, do we require it to ensure consistent support or leave it up to install strategies?
 
 The following ClusterDeployment fields are not carrying over to this interface as they are not generic enough to assume for all ClusterInstall implementations. They can of course be used by specific stratgies, but Hive will not need to assume they are there.
 
@@ -82,6 +81,7 @@ The following ClusterDeployment fields are not carrying over to this interface a
   * InstallEnv: Too specific to openshift-install.
   * InstallConfigSecretRef: One of the more contentious parts of the current API.
   * ReleaseImage: Legacy Hive feature, use ClusterImageSet instead.
+  * ManifestsConfigMapRef: Too specific to openshift-install.
 
 All conditions should initialize to Unknown status as soon as possible, and then be set to True/False once known.
 

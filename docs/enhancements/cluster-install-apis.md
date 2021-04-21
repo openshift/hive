@@ -85,24 +85,26 @@ The following ClusterDeployment fields are not carrying over to this interface a
   * ReleaseImage: Legacy Hive feature, use ClusterImageSet instead.
   * ManifestsConfigMapRef: Too specific to openshift-install.
 
-All conditions should initialize to Unknown status as soon as possible, and then be set to True/False once known.
+All conditions should initialize to Unknown status as soon as possible per latest Kubernetes API guidelines, and then be set to True/False once more explicit status is known.
 
 Condition | Description
 --------- | -----------
-Ready | Important overall condition indicating if the cluster is ready or not. Reason and Message provide as much detail as possible for the user. Message could contain attempt x of y if the ClusterInstall support retries.
-RequirementsMet | True once we are ready to launch the install. False if we hit a problem and can't start. Reasons: ClusterImageSetNotFound, etc.
-Failed | True once an install attempt has failed. Remains true if retries are in play even if another attempt is in progress. Move to False once Ready goes to True. Reason/Message should contain details on what happened if it's possible to detect, otherwise Unknown. *TODO*: Unfortunate naming here, this matches current ProvisionFailed condition, which means a failure has been encountered, not necessarily that we've given up. Failing would be a better term, but it's risky to change the ProvisionFailed condition meaning on ClusterDeployment when we transfer. Thoughts?
-Retrying | Unknown initially, True if we've hit an error and are retrying, False if we've given up or don't support retries. Message should indicate attempt x of y.
+RequirementsMet | True once all pre-install requirements have been met. False if we hit a problem and can't start. Reasons: ClusterImageSetNotFound, ClusterDeploymentNotFound, etc.
+Completed | True once the cluster install has successfully completed. Reason and Message provide as much detail as possible for the user as install progresses. Message could contain attempt x of y if the ClusterInstall support retries.
+Failed | True once an install attempt has failed. Does not imply we've stopped trying, if retries are supported by the controller we may be re-trying. Returns to False if we later reach Completed=True.
+Stopped | True once the controller is no longer working to reach desired state. Does not imply success or failure by itself, but can be combined with Completed/Failed.
 
-These interface conditions will be copied back onto ClusterDeployment by Hive controllers with a "Provision" prefix, the ClusterInstall controller does not need to worry about this and in general should never write to ClusterDeployment. example: Failed becomes ProvisionFailed (which exists today on ClusterDeployment for this purpose)
+These interface conditions will be copied back onto ClusterDeployment by Hive controllers with a "ClusterInstall" prefix, the ClusterInstall controller does not need to worry about this and in general should never write to ClusterDeployment. example: Failed becomes ClusterInstallFailed (which exists today on ClusterDeployment for this purpose).
+
+In the case of ClusterInstallFailed, we will also copy this condition to ProvisionFailed to maintain the current contract and not affect callers monitoring for this condition.
 
 ClusterInstall controllers can add their own conditions, but these will not transfer back to the ClusterDeployment. UIs around this process may need to show ClusterInstall conditions explicitly.
 
 The core ClusterInstall CRDs and controllers discussed in this document should live in Hive. However, in theory, it would be possible for an external application to implement it's own ClusterInstall outside of Hive and still interface with ClusterDeployment using this system.
 
-#### ClusterInstall Implementation RBAC
+#### External ClusterInstall RBAC
 
-If we wish to support an external application providing their own ClusterInstall CRD implementation, Hive will need RBAC to be able to access those objects. This can be achieved by using [Aggregated ClusterRoles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
+To support an external application providing their own ClusterInstall CRD implementation, Hive will need RBAC to be able to access those objects. This can be achieved by using [Aggregated ClusterRoles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
 
 Hive will be updated to deploy an empty ClusterRole `hive-controllers-clusterinstall` which will contain no rules, but will match the label `hive.openshift.io/aggregate-to-hive-clusterinstall`. Integrating components will need to deploy a ClusterRole with this label and rules that provide Hive all permissions on their custom ClusterInstall CRD.
 

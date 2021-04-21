@@ -73,6 +73,8 @@ spec.clusterMetadata.adminKubeconfigSecretRef | LocalObjectReference | Admin kub
 spec.clusterMetadata.adminPasswordSecretRef | LocalObjectReference | Admin password secret for current install attempt underway, set as soon as known. Copied back to Hive automatically once Ready.
 spec.clusterMetadata.clusterID | string | Cluster UUID generated during install, set as soon as known. Copied back to Hive automatically once Ready.
 spec.clusterMetadata.infraID | string | Cluster infra ID generated during install, set as soon as known. Copied back to Hive automatically once Ready.
+status.installRestarts | int | Current number of install retries.
+status.conditions | []ClusterInstallCondition | Standard conditions array. See below for required conditions.
 
 The following ClusterDeployment fields are not carrying over to this interface as they are not generic enough to assume for all ClusterInstall implementations. They can of course be used by specific stratgies, but Hive will not need to assume they are there.
 

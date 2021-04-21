@@ -69,7 +69,6 @@ Field | Type | Description
 ----- | ---- | -----------
 spec.clusterDeploymentRef | LocalObjectReference | Link to the required ClusterDeployment for this install. Bidirectional reference. Common data should live on ClusterDeployment and never be duplicated on ClusterInstall.
 spec.imageSetRef | ClusterImageSetReference | Core mechanism in Hive for choosing what version of OpenShift to install.
-spec.stage | string | Enum string for stage of installation. (Initializing, RequirementsNotMet, Provisioning, RetryProvisioning, Complete, Failed) More details in conditions. *TODO*: Should we just work with conditions? Loss of state in disaster recovery?
 spec.clusterMetadata.adminKubeconfigSecretRef | LocalObjectReference | Admin kubeconfig secret for current install attempt underway, set as soon as known. Copied back to Hive automatically once Ready.
 spec.clusterMetadata.adminPasswordSecretRef | LocalObjectReference | Admin password secret for current install attempt underway, set as soon as known. Copied back to Hive automatically once Ready.
 spec.clusterMetadata.clusterID | string | Cluster UUID generated during install, set as soon as known. Copied back to Hive automatically once Ready.
@@ -140,7 +139,6 @@ metadata:
   name: mycluster
   namespace: hive
 spec:
-  stage: RetryProvisioning
   clusterDeploymentRef:
     name: mycluster
   imageSetRef:

@@ -267,24 +267,32 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 	platformPath := fldPath.Child("platform")
 	platforms := []string{}
 	numberOfMachineSets := 0
+
+	// set validZeroSizeAutoscalingMinReplicas to true for any platform where a zero-size minReplicas is allowed with autoscaling
+	validZeroSizeAutoscalingMinReplicas := false
+
 	if p := spec.Platform.AWS; p != nil {
 		platforms = append(platforms, "aws")
 		allErrs = append(allErrs, validateAWSMachinePoolPlatformInvariants(p, platformPath.Child("aws"))...)
 		numberOfMachineSets = len(p.Zones)
+		validZeroSizeAutoscalingMinReplicas = true
 	}
 	if p := spec.Platform.Azure; p != nil {
 		platforms = append(platforms, "azure")
 		allErrs = append(allErrs, validateAzureMachinePoolPlatformInvariants(p, platformPath.Child("azure"))...)
 		numberOfMachineSets = len(p.Zones)
+		validZeroSizeAutoscalingMinReplicas = true
 	}
 	if p := spec.Platform.GCP; p != nil {
 		platforms = append(platforms, "gcp")
 		allErrs = append(allErrs, validateGCPMachinePoolPlatformInvariants(p, platformPath.Child("gcp"))...)
 		numberOfMachineSets = len(p.Zones)
+		validZeroSizeAutoscalingMinReplicas = true
 	}
 	if p := spec.Platform.OpenStack; p != nil {
 		platforms = append(platforms, "openstack")
 		allErrs = append(allErrs, validateOpenStackMachinePoolPlatformInvariants(p, platformPath.Child("openstack"))...)
+		validZeroSizeAutoscalingMinReplicas = true
 	}
 	if p := spec.Platform.VSphere; p != nil {
 		platforms = append(platforms, "vsphere")
@@ -306,8 +314,8 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 	if spec.Autoscaling != nil {
 		autoscalingPath := fldPath.Child("autoscaling")
 		if numberOfMachineSets == 0 {
-			if spec.Autoscaling.MinReplicas < 1 {
-				allErrs = append(allErrs, field.Invalid(autoscalingPath.Child("minReplicas"), spec.Autoscaling.MinReplicas, "minimum replicas must at least 1"))
+			if spec.Autoscaling.MinReplicas < 1 && !validZeroSizeAutoscalingMinReplicas {
+				allErrs = append(allErrs, field.Invalid(autoscalingPath.Child("minReplicas"), spec.Autoscaling.MinReplicas, "minimum replicas must be at least 1"))
 			}
 		} else {
 			if spec.Autoscaling.MinReplicas < int32(numberOfMachineSets) {

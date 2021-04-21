@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -287,7 +288,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, nil
 	}
 
-	switch result, err := r.ensureEnoughReplicas(pool, generatedMachineSets, logger); {
+	switch result, err := r.ensureEnoughReplicas(pool, generatedMachineSets, cd, logger); {
 	case err != nil:
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not ensureEnoughReplicas")
 		return reconcile.Result{}, err
@@ -421,7 +422,7 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 
 // ensureEnoughReplicas ensures that the min replicas in the machine pool is
 // large enough to cover all of the zones for the machine pool. When using
-// auto-scaling, every machineset needs to have a minimum replicas of 1.
+// auto-scaling for some platforms, every machineset needs to have a minimum replicas of 1.
 // If the reconcile.Result returned in non-nil, then the reconciliation loop
 // should stop, returning that result. This is used to prevent re-queueing
 // a machine pool that will always fail with not enough replicas. There is
@@ -430,12 +431,13 @@ func (r *ReconcileRemoteMachineSet) generateMachineSets(
 func (r *ReconcileRemoteMachineSet) ensureEnoughReplicas(
 	pool *hivev1.MachinePool,
 	generatedMachineSets []*machineapi.MachineSet,
+	cd *hivev1.ClusterDeployment,
 	logger log.FieldLogger,
 ) (*reconcile.Result, error) {
 	if pool.Spec.Autoscaling == nil {
 		return nil, nil
 	}
-	if pool.Spec.Autoscaling.MinReplicas < int32(len(generatedMachineSets)) {
+	if pool.Spec.Autoscaling.MinReplicas < int32(len(generatedMachineSets)) && !platformAllowsZeroAutoscalingMinReplicas(cd) {
 		logger.WithField("machinesets", len(generatedMachineSets)).
 			WithField("minReplicas", pool.Spec.Autoscaling.MinReplicas).
 			Warning("when auto-scaling, the MachinePool must have at least one replica for each MachineSet")
@@ -461,7 +463,7 @@ func (r *ReconcileRemoteMachineSet) ensureEnoughReplicas(
 		hivev1.NotEnoughReplicasMachinePoolCondition,
 		corev1.ConditionFalse,
 		"EnoughReplicas",
-		"The MachinePool has at least one replica for each MachineSet",
+		"The MachinePool has sufficient replicas for each MachineSet",
 		controllerutils.UpdateConditionNever,
 	)
 	if changed {
@@ -948,4 +950,40 @@ func getClusterVersion(cd *hivev1.ClusterDeployment) (string, error) {
 		return "", errors.New("cluster version not set in clusterdeployment")
 	}
 	return version, nil
+}
+
+func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool {
+	// Since 4.5, AWS, Azure, and GCP allow zero-sized minReplicas for autoscaling
+	if cd.Spec.Platform.AWS != nil || cd.Spec.Platform.Azure != nil || cd.Spec.Platform.GCP != nil {
+		return true
+	}
+
+	// Since 4.7, OpenStack allows zero-sized minReplicas for autoscaling
+	if cd.Spec.Platform.OpenStack != nil {
+		majorMinor, ok := cd.Labels[constants.VersionMajorMinorLabel]
+		if !ok {
+			// can't determine whether to allow zero minReplicas
+			return false
+		}
+
+		currentVersion, err := semver.Make(majorMinor)
+		if err != nil {
+			// assume we can't set minReplicas to zero
+			return false
+		}
+
+		minimumOpenStackVersion, err := semver.Make("4.7.0")
+		if err != nil {
+			// something terrible has happened
+			return false
+		}
+
+		if currentVersion.GTE(minimumOpenStackVersion) {
+			return true
+		}
+
+		return false
+	}
+
+	return false
 }

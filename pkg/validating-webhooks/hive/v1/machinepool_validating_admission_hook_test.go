@@ -17,6 +17,7 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 )
 
 func Test_MachinePoolAdmission_Validate_Kind(t *testing.T) {
@@ -208,6 +209,20 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 					MinReplicas: 0,
 					MaxReplicas: 1,
 				}
+				return pool
+			}(),
+			expectAllowed: true,
+		},
+		{
+			name: "zero min replicas unsupported",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 0,
+					MaxReplicas: 1,
+				}
+
+				pool.Spec.Platform.VSphere = validvSphereMachinePoolPlatform()
 				return pool
 			}(),
 		},
@@ -446,6 +461,18 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 				return pool
 			}(),
 		},
+		{
+			name: "zero autoscaling",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 0,
+					MaxReplicas: 0,
+				}
+				return pool
+			}(),
+			expectAllowed: true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -620,6 +647,14 @@ func testAzureMachinePool() *hivev1.MachinePool {
 	return pool
 }
 
+func testvSphereMachinePool() *hivev1.MachinePool {
+	pool := testMachinePool()
+	pool.Spec.Platform = hivev1.MachinePoolPlatform{
+		VSphere: validvSphereMachinePoolPlatform(),
+	}
+	return pool
+}
+
 func validAWSMachinePoolPlatform() *hivev1aws.MachinePoolPlatform {
 	return &hivev1aws.MachinePoolPlatform{
 		InstanceType: "test-instance-type",
@@ -641,6 +676,14 @@ func validAzureMachinePoolPlatform() *hivev1azure.MachinePool {
 	return &hivev1azure.MachinePool{
 		InstanceType: "test-instance-type",
 		OSDisk: hivev1azure.OSDisk{
+			DiskSizeGB: 1,
+		},
+	}
+}
+
+func validvSphereMachinePoolPlatform() *hivev1vsphere.MachinePool {
+	return &hivev1vsphere.MachinePool{
+		OSDisk: hivev1vsphere.OSDisk{
 			DiskSizeGB: 1,
 		},
 	}

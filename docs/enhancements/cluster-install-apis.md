@@ -2,7 +2,7 @@
 
 ## Summary
 
-Break install strategy out of ClusterDeployment.Spec and allow for multiple ClusterInstall CRD implementations that adhere to an interface, where Hive interacts with these CRDs dynamically via duck typing in the non-install related controllers.
+Break out ClusterDeployment.Spec.Provisioning.InstallStrategy and allow for multiple ClusterInstall CRD implementations that adhere to an interface, where Hive interacts with these CRDs dynamically via duck typing in the non-install related controllers.
 
 
 ## Motivation
@@ -98,6 +98,14 @@ These interface conditions will be copied back onto ClusterDeployment by Hive co
 ClusterInstall controllers can add their own conditions, but these will not transfer back to the ClusterDeployment. UIs around this process may need to show ClusterInstall conditions explicitly.
 
 The core ClusterInstall CRDs and controllers discussed in this document should live in Hive. However, in theory, it would be possible for an external application to implement it's own ClusterInstall outside of Hive and still interface with ClusterDeployment using this system.
+
+#### ClusterInstall Implementation RBAC
+
+If we wish to support an external application providing their own ClusterInstall CRD implementation, Hive will need RBAC to be able to access those objects. This can be achieved by using [Aggregated ClusterRoles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
+
+Hive will be updated to deploy an empty ClusterRole `hive-controllers-clusterinstall` which will contain no rules, but will match the label `hive.openshift.io/aggregate-to-hive-clusterinstall`. Integrating components will need to deploy a ClusterRole with this label and rules that provide Hive all permissions on their custom ClusterInstall CRD.
+
+This will not be required for ClusterInstall implementations that live within Hive. (including AgentClusterInstall)
 
 ### Cluster Deprovisioning
 

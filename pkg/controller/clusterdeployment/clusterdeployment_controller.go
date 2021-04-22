@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -20,8 +19,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
@@ -30,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -43,7 +41,6 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
-	"github.com/openshift/hive/pkg/install"
 	"github.com/openshift/hive/pkg/remoteclient"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
@@ -80,74 +77,6 @@ const (
 	regionUnknown = "unknown"
 )
 
-var (
-	metricCompletedInstallJobRestarts = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_completed_install_restart",
-			Help:    "Distribution of the number of restarts for all completed cluster installations.",
-			Buckets: []float64{0, 2, 10, 20, 50},
-		},
-		[]string{"cluster_type"},
-	)
-	metricInstallJobDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_install_job_duration_seconds",
-			Help:    "Distribution of the runtime of completed install jobs.",
-			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
-		},
-	)
-	metricInstallDelaySeconds = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_install_job_delay_seconds",
-			Help:    "Time between cluster deployment creation and creation of the job to install/provision the cluster.",
-			Buckets: []float64{30, 60, 120, 300, 600, 1200, 1800},
-		},
-	)
-	metricImageSetDelaySeconds = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_imageset_job_delay_seconds",
-			Help:    "Time between cluster deployment creation and creation of the job which resolves the installer image to use for a ClusterImageSet.",
-			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
-		},
-	)
-	metricClustersCreated = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_created_total",
-		Help: "Counter incremented every time we observe a new cluster.",
-	},
-		[]string{"cluster_type"},
-	)
-	metricClustersInstalled = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_installed_total",
-		Help: "Counter incremented every time we observe a successful installation.",
-	},
-		[]string{"cluster_type"},
-	)
-	metricClustersDeleted = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_deleted_total",
-		Help: "Counter incremented every time we observe a deleted cluster.",
-	},
-		[]string{"cluster_type"},
-	)
-	metricDNSDelaySeconds = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_dns_delay_seconds",
-			Help:    "Time between cluster deployment with spec.manageDNS creation and the DNSZone becoming ready.",
-			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
-		},
-	)
-)
-
-func init() {
-	metrics.Registry.MustRegister(metricInstallJobDuration)
-	metrics.Registry.MustRegister(metricCompletedInstallJobRestarts)
-	metrics.Registry.MustRegister(metricInstallDelaySeconds)
-	metrics.Registry.MustRegister(metricImageSetDelaySeconds)
-	metrics.Registry.MustRegister(metricClustersCreated)
-	metrics.Registry.MustRegister(metricClustersInstalled)
-	metrics.Registry.MustRegister(metricClustersDeleted)
-	metrics.Registry.MustRegister(metricDNSDelaySeconds)
-}
-
 // Add creates a new ClusterDeployment controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
@@ -166,6 +95,7 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flow
 		scheme:                                  mgr.GetScheme(),
 		logger:                                  logger,
 		expectations:                            controllerutils.NewExpectations(logger),
+		watchingClusterInstall:                  map[string]struct{}{},
 		validateCredentialsForClusterDeployment: controllerutils.ValidateCredentialsForClusterDeployment,
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
@@ -195,6 +125,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("could not create controller")
+		return err
+	}
+
+	// Inject watcher to the clusterdeployment reconciler.
+	controllerutils.InjectWatcher(cdReconciler, c)
+
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{},
+		clusterInstallIndexFieldName, indexClusterInstall); err != nil {
+		log.WithField("controller", ControllerName).WithError(err).Error("Error indexing cluster deployment for cluster install")
 		return err
 	}
 
@@ -266,6 +205,15 @@ type ReconcileClusterDeployment struct {
 	scheme *runtime.Scheme
 	logger log.FieldLogger
 
+	// watcher allows the reconciler to add new watches
+	// at runtime.
+	watcher controllerutils.Watcher
+
+	// this is a set of cluster install contracts that are currently
+	// being watched. this allows the reconciler to only add Watch for
+	// these once.
+	watchingClusterInstall map[string]struct{}
+
 	// A TTLCache of clusterprovision creates each clusterdeployment expects to see
 	expectations controllerutils.ExpectationsInterface
 
@@ -312,6 +260,10 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 	}
 
 	return r.reconcile(request, cd, cdLog)
+}
+
+func (r *ReconcileClusterDeployment) SetWatcher(w controllerutils.Watcher) {
+	r.watcher = w
 }
 
 func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
@@ -535,15 +487,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, err
 		}
 
-		// delete failed provisions which are more than 7 days old
-		existingProvisions, err := r.existingProvisions(cd, cdLog)
-		if err != nil {
-			return reconcile.Result{}, err
+		switch {
+		case cd.Spec.Provisioning != nil:
+			if r, err := r.reconcileInstalledClusterProvision(cd, cdLog); err != nil {
+				return r, err
+			}
 		}
-		r.deleteOldFailedProvisions(existingProvisions, cdLog)
-
-		cdLog.Debug("cluster is already installed, no processing of provision needed")
-		r.cleanupInstallLogPVC(cd, cdLog)
 
 		if cd.Spec.ClusterMetadata != nil &&
 			cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name != "" {
@@ -606,6 +555,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	imageSet, err := r.getClusterImageSet(cd, cdLog)
 	if err != nil {
+		cdLog.WithError(err).Error("failed to get cluster image set for the clusterdeployment")
 		return reconcile.Result{}, err
 	}
 
@@ -629,7 +579,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	switch result, err := r.resolveInstallerImage(cd, imageSet, releaseImage, cdLog); {
+	switch result, err := r.resolveInstallerImage(cd, releaseImage, cdLog); {
 	case err != nil:
 		return reconcile.Result{}, err
 	case result != nil:
@@ -640,47 +590,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		cdLog.Debug("waiting for expectations to be satisfied")
 		return reconcile.Result{}, nil
 	}
-
-	// Return early and stop processing if Agent install strategy is in play. The controllers that
-	// handle this portion of the API currently live in the assisted service repo, rather than hive.
-	// This will hopefully change in the future.
-	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallStrategy != nil && cd.Spec.Provisioning.InstallStrategy.Agent != nil {
-		cdLog.Info("skipping processing of agent install strategy cluster")
-		return reconcile.Result{}, nil
-	}
-
-	if cd.Status.ProvisionRef == nil {
-		return r.startNewProvision(cd, releaseImage, cdLog)
-	}
-
-	return r.reconcileExistingProvision(cd, cdLog)
-}
-
-func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, *hivev1.ClusterDeploymentCondition) {
-	dnsNotReadyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
-	return dnsNotReadyCondition != nil &&
-			dnsNotReadyCondition.Status == corev1.ConditionTrue &&
-			(dnsNotReadyCondition.Reason == dnsNotReadyReason || dnsNotReadyCondition.Reason == dnsNotReadyTimedoutReason),
-		dnsNotReadyCondition
-}
-
-func (r *ReconcileClusterDeployment) startNewProvision(
-	cd *hivev1.ClusterDeployment,
-	releaseImage string,
-	cdLog log.FieldLogger,
-) (result reconcile.Result, returnedErr error) {
-	existingProvisions, err := r.existingProvisions(cd, cdLog)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	for _, provision := range existingProvisions {
-		if provision.Spec.Stage != hivev1.ClusterProvisionStageFailed {
-			return reconcile.Result{}, r.adoptProvision(cd, provision, cdLog)
-		}
-	}
-
-	r.deleteStaleProvisions(existingProvisions, cdLog)
 
 	if cd.Spec.ManageDNS {
 		dnsZone, err := r.ensureManagedDNSZone(cd, cdLog)
@@ -704,248 +613,66 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		}
 	}
 
-	if cd.Status.InstallRestarts > 0 && cd.Annotations[tryInstallOnceAnnotation] == "true" {
-		cdLog.Debug("not creating new provision since the deployment is set to try install only once")
-		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
-			hivev1.ProvisionStoppedCondition,
-			corev1.ConditionTrue,
-			installOnlyOnceSetReason,
-			"Deployment is set to try install only once",
-			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		if changed {
-			cd.Status.Conditions = conditions
-			cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-				return reconcile.Result{}, err
-			}
-		}
-		return reconcile.Result{}, nil
+	switch {
+	case cd.Spec.Provisioning != nil:
+		return r.reconcileInstallingClusterProvision(cd, releaseImage, cdLog)
+	case cd.Spec.ClusterInstallRef != nil:
+		return r.reconcileInstallingClusterInstall(cd, cdLog)
+	default:
+		return reconcile.Result{}, errors.New("invalid provisioning configuration")
 	}
-	if cd.Spec.InstallAttemptsLimit != nil && cd.Status.InstallRestarts >= int(*cd.Spec.InstallAttemptsLimit) {
-		cdLog.Debug("not creating new provision since the install attempts limit has been reached")
-		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
-			hivev1.ProvisionStoppedCondition,
-			corev1.ConditionTrue,
-			installAttemptsLimitReachedReason,
-			"Install attempts limit reached",
-			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		if changed {
-			cd.Status.Conditions = conditions
-			cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-				return reconcile.Result{}, err
-			}
-		}
+}
+
+func (r *ReconcileClusterDeployment) reconcileInstallingClusterProvision(cd *hivev1.ClusterDeployment, releaseImage string, logger log.FieldLogger) (reconcile.Result, error) {
+	// Return early and stop processing if Agent install strategy is in play. The controllers that
+	// handle this portion of the API currently live in the assisted service repo, rather than hive.
+	// This will hopefully change in the future.
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallStrategy != nil && cd.Spec.Provisioning.InstallStrategy.Agent != nil {
+		logger.Info("skipping processing of agent install strategy cluster")
 		return reconcile.Result{}, nil
 	}
 
-	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-		cd.Status.Conditions,
-		hivev1.ProvisionStoppedCondition,
-		corev1.ConditionFalse,
-		provisionNotStoppedReason,
-		"Provision is not stopped",
-		controllerutils.UpdateConditionNever)
-	if changed {
-		cd.Status.Conditions = conditions
-		cdLog.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionFalse)
-		if err := r.Status().Update(context.TODO(), cd); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-			return reconcile.Result{}, err
-		}
-		return reconcile.Result{}, nil
+	if cd.Status.ProvisionRef == nil {
+		return r.startNewProvision(cd, releaseImage, logger)
 	}
+	return r.reconcileExistingProvision(cd, logger)
+}
 
-	if err := controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
-		return reconcile.Result{}, err
-	}
-
-	provisionName := apihelpers.GetResourceName(cd.Name, fmt.Sprintf("%d-%s", cd.Status.InstallRestarts, utilrand.String(5)))
-
-	labels := cd.Labels
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[constants.ClusterDeploymentNameLabel] = cd.Name
-
-	extraEnvVars := getInstallLogEnvVars(cd.Name)
-	extraEnvVars = append(extraEnvVars, getAWSServiceProviderEnvVars(cd, cd.Name)...)
-
-	podSpec, err := install.InstallerPodSpec(
-		cd,
-		provisionName,
-		releaseImage,
-		controllerutils.InstallServiceAccountName,
-		os.Getenv("HTTP_PROXY"),
-		os.Getenv("HTTPS_PROXY"),
-		os.Getenv("NO_PROXY"),
-		extraEnvVars,
-	)
+func (r *ReconcileClusterDeployment) reconcileInstalledClusterProvision(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
+	// delete failed provisions which are more than 7 days old
+	existingProvisions, err := r.existingProvisions(cd, logger)
 	if err != nil {
-		cdLog.WithError(err).Error("could not generate installer pod spec")
 		return reconcile.Result{}, err
 	}
+	r.deleteOldFailedProvisions(existingProvisions, logger)
 
-	provision := &hivev1.ClusterProvision{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      provisionName,
-			Namespace: cd.Namespace,
-			Labels:    labels,
-		},
-		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeploymentRef: corev1.LocalObjectReference{
-				Name: cd.Name,
-			},
-			PodSpec: *podSpec,
-			Attempt: cd.Status.InstallRestarts,
-			Stage:   hivev1.ClusterProvisionStageInitializing,
-		},
-	}
-
-	// Copy over the cluster ID and infra ID from previous provision so that a failed install can be removed.
-	if cd.Spec.ClusterMetadata != nil {
-		provision.Spec.PrevClusterID = &cd.Spec.ClusterMetadata.ClusterID
-		provision.Spec.PrevInfraID = &cd.Spec.ClusterMetadata.InfraID
-	}
-
-	cdLog.WithField("derivedObject", provision.Name).Debug("Setting label on derived object")
-	provision.Labels = k8slabels.AddLabel(provision.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
-	if err := controllerutil.SetControllerReference(cd, provision, r.scheme); err != nil {
-		cdLog.WithError(err).Error("could not set the owner ref on provision")
-		return reconcile.Result{}, err
-	}
-
-	if err := r.copyInstallLogSecret(provision.Namespace, extraEnvVars); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			// Couldn't copy the install log secret for a reason other than it already exists.
-			// If the secret already exists, then we should just use that secret.
-			cdLog.WithError(err).Error("could not copy install log secret")
-			return reconcile.Result{}, err
-		}
-	}
-
-	if err := install.CopyAWSServiceProviderSecret(r.Client, provision.Namespace, extraEnvVars, cd, r.scheme); err != nil {
-		cdLog.WithError(err).Error("could not copy AWS service provider secret")
-		return reconcile.Result{}, err
-	}
-
-	if err := r.setupAWSCredentialForAssumeRole(cd); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			// Couldn't create the assume role credential secret for a reason other than it already exists.
-			// If the secret already exists, then we should just use that secret.
-			cdLog.WithError(err).Error("could not create AWS assume role credential secret")
-			return reconcile.Result{}, err
-		}
-	}
-
-	r.expectations.ExpectCreations(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(), 1)
-	if err := r.Create(context.TODO(), provision); err != nil {
-		cdLog.WithError(err).Error("could not create provision")
-		r.expectations.CreationObserved(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String())
-		return reconcile.Result{}, err
-	}
-
-	cdLog.WithField("provision", provision.Name).Info("created new provision")
-
-	if cd.Status.InstallRestarts == 0 {
-		kickstartDuration := time.Since(cd.CreationTimestamp.Time)
-		cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to first provision seconds")
-		metricInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
-	}
-
+	logger.Debug("cluster is already installed, no processing of provision needed")
+	r.cleanupInstallLogPVC(cd, logger)
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterDeployment) copyInstallLogSecret(destNamespace string, extraEnvVars []corev1.EnvVar) error {
-	hiveNS := controllerutils.GetHiveNamespace()
-
-	srcSecretName, foundSrc := os.LookupEnv(constants.InstallLogsCredentialsSecretRefEnvVar)
-	if !foundSrc {
-		// If the src secret reference wasn't found, then don't attempt to copy the secret.
-		return nil
+func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
+	ref := cd.Spec.ClusterInstallRef
+	gvk := schema.GroupVersionKind{
+		Group:   ref.Group,
+		Version: ref.Version,
+		Kind:    ref.Kind,
 	}
 
-	foundDest := false
-	var destSecretName string
-	for _, envVar := range extraEnvVars {
-		if envVar.Name == constants.InstallLogsCredentialsSecretRefEnvVar {
-			destSecretName = envVar.Value
-			foundDest = true
-		}
+	if err := r.watchClusterInstall(gvk, logger); err != nil {
+		logger.WithField("gvk", gvk.String()).WithError(err).Error("failed to watch for cluster install contract")
+		return reconcile.Result{}, err
 	}
 
-	if !foundDest {
-		// If the dest secret reference wasn't found, then don't attempt to copy the secret.
-		return nil
-	}
-
-	src := types.NamespacedName{Name: srcSecretName, Namespace: hiveNS}
-	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(r, src, dest, nil, nil)
+	return r.reconcileExistingInstallingClusterInstall(cd, logger)
 }
 
-func getInstallLogEnvVars(secretPrefix string) []corev1.EnvVar {
-	extraEnvVars := []corev1.EnvVar{}
-
-	cloudProvider, found := os.LookupEnv(constants.InstallLogsUploadProviderEnvVar)
-	if !found {
-		return extraEnvVars
-	}
-
-	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
-		Name:  constants.InstallLogsUploadProviderEnvVar,
-		Value: cloudProvider,
-	})
-
-	if cloudProvider == constants.InstallLogsUploadProviderAWS {
-		secretName, foundSrc := os.LookupEnv(constants.InstallLogsCredentialsSecretRefEnvVar)
-		if foundSrc {
-			extraEnvVars = append(extraEnvVars, corev1.EnvVar{
-				Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
-				Value: secretPrefix + "-" + secretName,
-			})
-		}
-
-		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSRegionEnvVar, extraEnvVars)
-		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSServiceEndpointEnvVar, extraEnvVars)
-		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSS3BucketEnvVar, extraEnvVars)
-	}
-
-	return extraEnvVars
-}
-
-func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeployment, secretPrefix string) []corev1.EnvVar {
-	var extraEnvVars []corev1.EnvVar
-	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
-	if spSecretName == "" {
-		return extraEnvVars
-	}
-
-	if cd.Spec.Platform.AWS == nil {
-		return extraEnvVars
-	}
-
-	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
-		Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
-		Value: secretPrefix + "-" + spSecretName,
-	})
-	return extraEnvVars
-}
-
-func (r *ReconcileClusterDeployment) setupAWSCredentialForAssumeRole(cd *hivev1.ClusterDeployment) error {
-	if cd.Spec.Platform.AWS == nil ||
-		cd.Spec.Platform.AWS.CredentialsSecretRef.Name != "" ||
-		cd.Spec.Platform.AWS.CredentialsAssumeRole == nil {
-		// no setup required
-		return nil
-	}
-
-	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
+func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, *hivev1.ClusterDeploymentCondition) {
+	dnsNotReadyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+	return dnsNotReadyCondition != nil &&
+			dnsNotReadyCondition.Status == corev1.ConditionTrue &&
+			(dnsNotReadyCondition.Reason == dnsNotReadyReason || dnsNotReadyCondition.Reason == dnsNotReadyTimedoutReason),
+		dnsNotReadyCondition
 }
 
 func addEnvVarIfFound(name string, envVars []corev1.EnvVar) []corev1.EnvVar {
@@ -962,204 +689,11 @@ func addEnvVarIfFound(name string, envVars []corev1.EnvVar) []corev1.EnvVar {
 	return append(envVars, tmp)
 }
 
-func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnedErr error) {
-	cdLog = cdLog.WithField("provision", cd.Status.ProvisionRef.Name)
-	cdLog.Debug("reconciling existing provision")
-
-	provision := &hivev1.ClusterProvision{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.ProvisionRef.Name, Namespace: cd.Namespace}, provision); {
-	case apierrors.IsNotFound(err):
-		cdLog.Warn("linked provision not found")
-		return r.clearOutCurrentProvision(cd, cdLog)
-	case err != nil:
-		cdLog.WithError(err).Error("could not get provision")
-		return reconcile.Result{}, err
-	}
-
-	// Save the cluster ID and infra ID from the provision so that we can
-	// clean up partial installs on the next provision attempt in case of failure.
-	if provision.Spec.InfraID != nil {
-		clusterMetadata := &hivev1.ClusterMetadata{}
-		clusterMetadata.InfraID = *provision.Spec.InfraID
-		if provision.Spec.ClusterID != nil {
-			clusterMetadata.ClusterID = *provision.Spec.ClusterID
-		}
-		if provision.Spec.AdminKubeconfigSecretRef != nil {
-			clusterMetadata.AdminKubeconfigSecretRef = *provision.Spec.AdminKubeconfigSecretRef
-		}
-		if provision.Spec.AdminPasswordSecretRef != nil {
-			clusterMetadata.AdminPasswordSecretRef = *provision.Spec.AdminPasswordSecretRef
-		}
-		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
-			cd.Spec.ClusterMetadata = clusterMetadata
-			cdLog.Infof("Saving infra ID %q for cluster", cd.Spec.ClusterMetadata.InfraID)
-			err := r.Update(context.TODO(), cd)
-			if err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating clusterdeployment status with infra ID")
-			}
-			return reconcile.Result{}, err
-		}
-	}
-
-	switch provision.Spec.Stage {
-	case hivev1.ClusterProvisionStageInitializing:
-		return r.reconcileInitializingProvision(cd, provision, cdLog)
-	case hivev1.ClusterProvisionStageProvisioning:
-		return r.reconcileProvisioningProvision(cd, provision, cdLog)
-	case hivev1.ClusterProvisionStageFailed:
-		return r.reconcileFailedProvision(cd, provision, cdLog)
-	case hivev1.ClusterProvisionStageComplete:
-		return r.reconcileCompletedProvision(cd, provision, cdLog)
-	default:
-		cdLog.WithField("stage", provision.Spec.Stage).Error("unknown provision stage")
-		return reconcile.Result{}, errors.New("unknown provision stage")
-	}
-}
-
-func (r *ReconcileClusterDeployment) reconcileInitializingProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
-	cdLog.Debug("still initializing provision")
-	// Set condition on ClusterDeployment when install pod is stuck in pending phase
-	installPodStuckCondition := controllerutils.FindClusterProvisionCondition(provision.Status.Conditions, hivev1.InstallPodStuckCondition)
-	if installPodStuckCondition != nil && installPodStuckCondition.Status == corev1.ConditionTrue {
-		if err := r.setInstallLaunchErrorCondition(cd, corev1.ConditionTrue, installPodStuckCondition.Reason, installPodStuckCondition.Message, cdLog); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update InstallLaunchErrorCondition")
-			return reconcile.Result{}, err
-		}
-	}
-	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileClusterDeployment) reconcileProvisioningProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
-	cdLog.Debug("still provisioning")
-	if err := r.setInstallLaunchErrorCondition(cd, corev1.ConditionFalse, "InstallLaunchSuccessful", "Successfully launched install pod", cdLog); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update InstallLaunchErrorCondition")
-		return reconcile.Result{}, err
-	}
-	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
-	nextProvisionTime := time.Now()
-	reason := "MissingCondition"
-	message := fmt.Sprintf("Provision %s failed. Next provision will begin soon.", provision.Name)
-
-	failedCond := controllerutils.FindClusterProvisionCondition(provision.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
-	if failedCond != nil && failedCond.Status == corev1.ConditionTrue {
-		nextProvisionTime = calculateNextProvisionTime(failedCond.LastTransitionTime.Time, cd.Status.InstallRestarts, cdLog)
-		reason = failedCond.Reason
-		message = fmt.Sprintf("Provision %s failed. Next provision at %s.\n\n%s", provision.Name, nextProvisionTime.UTC().Format(time.RFC3339), failedCond.Message)
-	} else {
-		cdLog.Warnf("failed provision does not have a %s condition", hivev1.ClusterProvisionFailedCondition)
-	}
-
-	newConditions, condChange := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-		cd.Status.Conditions,
-		hivev1.ProvisionFailedCondition,
-		corev1.ConditionTrue,
-		reason,
-		message,
-		controllerutils.UpdateConditionIfReasonOrMessageChange,
-	)
-	cd.Status.Conditions = newConditions
-
-	timeUntilNextProvision := time.Until(nextProvisionTime)
-	if timeUntilNextProvision.Seconds() > 0 {
-		cdLog.WithField("nextProvision", nextProvisionTime).Info("waiting to start a new provision after failure")
-		if condChange {
-			if err := r.statusUpdate(cd, cdLog); err != nil {
-				return reconcile.Result{}, err
-			}
-		}
-		return reconcile.Result{RequeueAfter: timeUntilNextProvision}, nil
-	}
-
-	cdLog.Info("clearing current failed provision to make way for a new provision")
-	return r.clearOutCurrentProvision(cd, cdLog)
-}
-
-func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
-	cdLog.Info("provision completed successfully")
-
-	statusChange := false
-	if cd.Status.InstalledTimestamp == nil {
-		statusChange = true
-		now := metav1.Now()
-		cd.Status.InstalledTimestamp = &now
-	}
-	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-		cd.Status.Conditions,
-		hivev1.ProvisionFailedCondition,
-		corev1.ConditionFalse,
-		"ProvisionSucceeded",
-		fmt.Sprintf("Provision %s succeeded.", provision.Name),
-		controllerutils.UpdateConditionNever,
-	)
-	if changed {
-		statusChange = true
-		cd.Status.Conditions = conds
-	}
-	if statusChange {
-		if err := r.Status().Update(context.TODO(), cd); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-			return reconcile.Result{}, err
-		}
-	}
-
-	if cd.Spec.Installed {
-		return reconcile.Result{}, nil
-	}
-
-	cd.Spec.Installed = true
-
-	if r.protectedDelete {
-		// Set protected delete on for the ClusterDeployment.
-		// If the ClusterDeployment already has the ProtectedDelete annotation, do not overwrite it. This allows the
-		// user an opportunity to explicitly exclude a ClusterDeployment from delete protection at the time of
-		// creation of the ClusterDeployment.
-		if _, annotationPresent := cd.Annotations[constants.ProtectedDeleteAnnotation]; !annotationPresent {
-			initializeAnnotations(cd)
-			cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
-		}
-	}
-
-	if err := r.Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to set the Installed flag")
-		return reconcile.Result{}, err
-	}
-
-	// jobDuration calculates the time elapsed since the first clusterprovision was created
-	startTime := cd.CreationTimestamp
-	if firstProvision := r.getFirstProvision(cd, cdLog); firstProvision != nil {
-		startTime = firstProvision.CreationTimestamp
-	}
-	jobDuration := time.Since(startTime.Time)
-	cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
-	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
-
-	// Report a metric for the total number of install restarts:
-	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
-		Observe(float64(cd.Status.InstallRestarts))
-
-	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
-
-	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileClusterDeployment) clearOutCurrentProvision(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
-	cd.Status.ProvisionRef = nil
-	cd.Status.InstallRestarts = cd.Status.InstallRestarts + 1
-	if err := r.Status().Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not clear out current provision")
-		return reconcile.Result{}, err
-	}
-	return reconcile.Result{}, nil
-}
-
 // getReleaseImage looks for a a release image in clusterdeployment or its corresponding imageset in the following order:
 // 1 - specified in the cluster deployment spec.images.releaseImage
 // 2 - referenced in the cluster deployment spec.imageSet
 func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, cdLog log.FieldLogger) string {
-	if cd.Spec.Provisioning.ReleaseImage != "" {
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.ReleaseImage != "" {
 		return cd.Spec.Provisioning.ReleaseImage
 	}
 	if imageSet != nil {
@@ -1169,22 +703,43 @@ func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeploymen
 }
 
 func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
-	if cd.Spec.Provisioning.ImageSetRef == nil || len(cd.Spec.Provisioning.ImageSetRef.Name) == 0 {
-		return nil, nil
+	imageSetKey := types.NamespacedName{}
+
+	switch {
+	case cd.Spec.Provisioning != nil:
+		imageSetKey.Name = getClusterImageSetFromProvisioning(cd)
+		if imageSetKey.Name == "" {
+			return nil, nil
+		}
+	case cd.Spec.ClusterInstallRef != nil:
+		isName, err := getClusterImageSetFromClusterInstall(r.Client, cd)
+		if err != nil {
+			return nil, err
+		}
+		imageSetKey.Name = isName
+	default:
+		cdLog.Warning("clusterdeployment references no clusterimageset")
+		if err := r.setImageSetNotFoundCondition(cd, "unknown", true, cdLog); err != nil {
+			return nil, err
+		}
 	}
+
 	imageSet := &hivev1.ClusterImageSet{}
-	if err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Spec.Provisioning.ImageSetRef.Name}, imageSet); err != nil {
-		if apierrors.IsNotFound(err) {
-			cdLog.WithField("clusterimageset", cd.Spec.Provisioning.ImageSetRef.Name).Warning("clusterdeployment references non-existent clusterimageset")
-			if err := r.setImageSetNotFoundCondition(cd, true, cdLog); err != nil {
-				return nil, err
-			}
-		} else {
-			cdLog.WithError(err).WithField("clusterimageset", cd.Spec.Provisioning.ImageSetRef.Name).Error("unexpected error retrieving clusterimageset")
+	err := r.Get(context.TODO(), imageSetKey, imageSet)
+	if apierrors.IsNotFound(err) {
+		cdLog.WithField("clusterimageset", imageSetKey.Name).
+			Warning("clusterdeployment references non-existent clusterimageset")
+		if err := r.setImageSetNotFoundCondition(cd, imageSetKey.Name, true, cdLog); err != nil {
+			return nil, err
 		}
 		return nil, err
 	}
-	if err := r.setImageSetNotFoundCondition(cd, false, cdLog); err != nil {
+	if err != nil {
+		cdLog.WithError(err).WithField("clusterimageset", imageSetKey.Name).
+			Error("unexpected error retrieving clusterimageset")
+		return nil, err
+	}
+	if err := r.setImageSetNotFoundCondition(cd, imageSetKey.Name, false, cdLog); err != nil {
 		return nil, err
 	}
 	return imageSet, nil
@@ -1203,7 +758,7 @@ const (
 	imagesResolvedMsg    = "Images required for cluster deployment installations are resolved"
 )
 
-func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, releaseImage string, cdLog log.FieldLogger) (*reconcile.Result, error) {
+func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, releaseImage string, cdLog log.FieldLogger) (*reconcile.Result, error) {
 	areImagesResolved := cd.Status.InstallerImage != nil && cd.Status.CLIImage != nil
 
 	jobKey := client.ObjectKey{Namespace: cd.Namespace, Name: imageset.GetImageSetJobName(cd.Name)}
@@ -1394,14 +949,14 @@ func (r *ReconcileClusterDeployment) setDeprovisionLaunchErrorCondition(cd *hive
 	return r.Status().Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, isNotFound bool, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, name string, isNotFound bool, cdLog log.FieldLogger) error {
 	status := corev1.ConditionFalse
 	reason := clusterImageSetFoundReason
-	message := fmt.Sprintf("ClusterImageSet %s is available", cd.Spec.Provisioning.ImageSetRef.Name)
+	message := fmt.Sprintf("ClusterImageSet %s is available", name)
 	if isNotFound {
 		status = corev1.ConditionTrue
 		reason = clusterImageSetNotFoundReason
-		message = fmt.Sprintf("ClusterImageSet %s is not available", cd.Spec.Provisioning.ImageSetRef.Name)
+		message = fmt.Sprintf("ClusterImageSet %s is not available", name)
 	}
 	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,
@@ -1512,6 +1067,11 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 	// We do not yet support deprovision for BareMetal, for now skip deprovision and remove finalizer.
 	if cd.Spec.Platform.BareMetal != nil {
 		cdLog.Info("skipping deprovision for BareMetal cluster, removing finalizer")
+		return true, nil
+	}
+
+	if cd.Spec.ClusterInstallRef != nil {
+		cdLog.Info("skipping deprovision as it should be done by deleting the obj in cluster install reference")
 		return true, nil
 	}
 
@@ -1636,31 +1196,6 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil
-	}
-}
-
-func (r *ReconcileClusterDeployment) stopProvisioning(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*reconcile.Result, error) {
-	if cd.Status.ProvisionRef == nil {
-		return nil, nil
-	}
-	provision := &hivev1.ClusterProvision{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Status.ProvisionRef.Name, Namespace: cd.Namespace}, provision); {
-	case apierrors.IsNotFound(err):
-		cdLog.Debug("linked provision removed")
-		return nil, nil
-	case err != nil:
-		cdLog.WithError(err).Error("could not get provision")
-		return nil, err
-	case provision.DeletionTimestamp == nil:
-		if err := r.Delete(context.TODO(), provision); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not delete provision")
-			return nil, err
-		}
-		cdLog.Info("deleted outstanding provision")
-		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
-	default:
-		cdLog.Debug("still waiting for outstanding provision to be removed")
-		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	}
 }
 

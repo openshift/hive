@@ -94,7 +94,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		if cd.Spec.PullSecretRef != nil {
 			res = append(res, cd.Spec.PullSecretRef.Name)
 		}
-		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+		if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
 			res = append(res, cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name)
 		}
 		return res
@@ -235,7 +235,7 @@ func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hi
 		}
 
 		// Sync SSH key secret to targetNamespace
-		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+		if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
 			if err := r.createOrUpdateSecretInTargetNamespace(cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name, cd, cdLog); err != nil {
 				return reconcile.Result{}, err
 			}

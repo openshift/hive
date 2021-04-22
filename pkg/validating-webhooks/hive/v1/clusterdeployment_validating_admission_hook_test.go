@@ -22,8 +22,10 @@ import (
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
+	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/util/contracts"
 )
 
 var validTestManagedDomains = []string{
@@ -236,6 +238,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		gvr                 *metav1.GroupVersionResource
 		enabledFeatureGates []string
 		awsPrivateLink      *hivev1.AWSPrivateLinkConfig
+		supportedContracts  contracts.SupportedContractImplementationsList
 	}{
 		{
 			name:            "Test valid create",
@@ -811,6 +814,99 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name: "ClusterInstallRef is set with Provisioning",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.ClusterInstallRef = &hivev1.ClusterInstallLocalReference{
+					Group:   "hive.openshift.io",
+					Version: "v1",
+					Kind:    "FakeClusterInstall",
+					Name:    "dummy",
+				}
+				return cd
+			}(),
+			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+		},
+		{
+			name: "ClusterInstallRef is set when no supported",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning = nil
+				cd.Spec.ClusterInstallRef = &hivev1.ClusterInstallLocalReference{
+					Group:   "hive.openshift.io",
+					Version: "v1",
+					Kind:    "FakeClusterInstall",
+					Name:    "dummy",
+				}
+				return cd
+			}(),
+			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+		},
+		{
+			name: "ClusterInstallRef is set when not supported",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning = nil
+				cd.Spec.ClusterInstallRef = &hivev1.ClusterInstallLocalReference{
+					Group:   "hive.openshift.io",
+					Version: "v1",
+					Kind:    "FakeClusterInstall",
+					Name:    "dummy",
+				}
+				return cd
+			}(),
+			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
+			supportedContracts: contracts.SupportedContractImplementationsList{{
+				Name: hivecontractsv1alpha1.ClusterInstallContractName,
+				Supported: []contracts.ContractImplementation{{
+					Group:   "hive.openshift.io",
+					Version: "v1",
+					Kind:    "AgentClusterInstall",
+				}},
+			}},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "ClusterInstallRef is set when supported",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning = nil
+				cd.Spec.ClusterInstallRef = &hivev1.ClusterInstallLocalReference{
+					Group:   "hive.openshift.io",
+					Version: "v1",
+					Kind:    "FakeClusterInstall",
+					Name:    "dummy",
+				}
+				return cd
+			}(),
+			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
+			supportedContracts: contracts.SupportedContractImplementationsList{{
+				Name: hivecontractsv1alpha1.ClusterInstallContractName,
+				Supported: []contracts.ContractImplementation{{
+					Group:   "hive.openshift.io",
+					Version: "v1",
+					Kind:    "FakeClusterInstall",
+				}},
+			}},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "ClusterInstallRef and Provisioning both not set",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
 			name:            "valid GCP clusterdeployment",
 			newObject:       validGCPClusterDeployment(),
 			operation:       admissionv1beta1.Create,
@@ -1137,6 +1233,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					},
 				},
 				awsPrivateLinkConfig: tc.awsPrivateLink,
+				supportedContracts:   tc.supportedContracts,
 			}
 
 			if tc.gvr == nil {

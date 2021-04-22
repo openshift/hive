@@ -166,6 +166,10 @@ const (
 	// that is a direct child of one of the valid domains.
 	ManagedDomainsFileEnvVar = "MANAGED_DOMAINS_FILE"
 
+	// SupportedContractImplementationsFileEnvVar if present, points to a simple json
+	// file that includes a list of contracts and their supported implementations.
+	SupportedContractImplementationsFileEnvVar = "SUPPORTED_CONTRACT_IMPLEMENTATIONS_FILE"
+
 	// ManagedDomainsVolumeName is the name of the volume that will point
 	// to the configmap containing the managed domain configuration.
 	ManagedDomainsVolumeName = "managed-domains"

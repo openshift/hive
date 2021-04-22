@@ -108,6 +108,26 @@ spec:
                 - name
                 type: object
               type: array
+            clusterInstallRef:
+              description: ClusterInstallLocalReference provides reference to an object
+                that implements the hivecontract ClusterInstall. The namespace of
+                the object is same as the ClusterDeployment. This cannot be set when
+                Provisioning is also set.
+              properties:
+                group:
+                  type: string
+                kind:
+                  type: string
+                name:
+                  type: string
+                version:
+                  type: string
+              required:
+              - group
+              - kind
+              - name
+              - version
+              type: object
             clusterMetadata:
               description: ClusterMetadata contains metadata information about the
                 installed cluster.

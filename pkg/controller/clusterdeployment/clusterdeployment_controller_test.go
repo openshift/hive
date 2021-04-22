@@ -1122,6 +1122,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "SyncSet is Paused and ClusterSync object is missing",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testInstalledClusterDeployment(time.Now())
+					if cd.Annotations == nil {
+						cd.Annotations = make(map[string]string, 1)
+					}
+					cd.Annotations[constants.SyncsetPauseAnnotation] = "true"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.SyncSetFailedCondition)
+				if assert.NotNil(t, cond, "missing SyncSetFailedCondition status condition") {
+					assert.Equal(t, corev1.ConditionTrue, cond.Status, "did not get expected state for SyncSetFailedCondition condition")
+					assert.Equal(t, "SyncSetPaused", cond.Reason, "did not get expected reason for SyncSetFailedCondition condition")
+				}
+			},
+		},
+		{
 			name: "Add cluster platform label",
 			existing: []runtime.Object{
 				testClusterDeploymentWithoutPlatformLabel(),

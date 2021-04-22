@@ -72,10 +72,10 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 
 	// copy the required conditions
 	requiredConditions := []string{
-		hivecontractsv1alpha1.ClusterInstallFailed,
-		hivecontractsv1alpha1.ClusterInstallCompleted,
-		hivecontractsv1alpha1.ClusterInstallStopped,
-		hivecontractsv1alpha1.ClusterInstallRequirementsMet,
+		hivev1.ClusterInstallFailed,
+		hivev1.ClusterInstallCompleted,
+		hivev1.ClusterInstallStopped,
+		hivev1.ClusterInstallRequirementsMet,
 	}
 	for _, req := range requiredConditions {
 		cond := controllerutils.FindClusterInstallCondition(ci.Status.Conditions, req)

@@ -305,6 +305,11 @@ func (in *AgentClusterInstallSpec) DeepCopyInto(out *AgentClusterInstallSpec) {
 		*out = new(ClusterMetadata)
 		**out = **in
 	}
+	if in.ManifestsConfigMapRef != nil {
+		in, out := &in.ManifestsConfigMapRef, &out.ManifestsConfigMapRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	in.Networking.DeepCopyInto(&out.Networking)
 	out.ProvisionRequirements = in.ProvisionRequirements
 	return

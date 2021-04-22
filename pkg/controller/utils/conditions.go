@@ -5,7 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 )
 
 // UpdateConditionCheck tests whether a condition should be updated from the
@@ -678,7 +677,7 @@ func FindClusterDeprovisionCondition(conditions []hivev1.ClusterDeprovisionCondi
 
 // FindClusterInstallCondition finds in the condition that has the
 // specified condition type in the given list. If none exists, then returns nil.
-func FindClusterInstallCondition(conditions []hivecontractsv1alpha1.ClusterInstallCondition, conditionType string) *hivecontractsv1alpha1.ClusterInstallCondition {
+func FindClusterInstallCondition(conditions []hivev1.ClusterInstallCondition, conditionType string) *hivev1.ClusterInstallCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]

@@ -45,38 +45,11 @@ type ClusterInstallSpec struct {
 type ClusterInstallStatus struct {
 	// Conditions is a list of conditions associated with syncing to the cluster.
 	// +optional
-	Conditions []ClusterInstallCondition `json:"conditions,omitempty"`
+	Conditions []hivev1.ClusterInstallCondition `json:"conditions,omitempty"`
 
 	// InstallRestarts is the total count of container restarts on the clusters install job.
 	InstallRestarts int `json:"installRestarts,omitempty"`
 }
-
-// ClusterInstallCondition contains details for the current condition of a ClusterInstall
-type ClusterInstallCondition struct {
-	// Type is the type of the condition.
-	Type string `json:"type"`
-	// Status is the status of the condition.
-	Status corev1.ConditionStatus `json:"status"`
-	// LastProbeTime is the last time we probed the condition.
-	// +optional
-	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
-	// LastTransitionTime is the last time the condition transitioned from one status to another.
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
-	// +optional
-	Reason string `json:"reason,omitempty"`
-	// Message is a human-readable message indicating details about the last transition.
-	// +optional
-	Message string `json:"message,omitempty"`
-}
-
-const (
-	ClusterInstallFailed          = "Failed"
-	ClusterInstallCompleted       = "Completed"
-	ClusterInstallStopped         = "Stopped"
-	ClusterInstallRequirementsMet = "RequirementsMet"
-)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

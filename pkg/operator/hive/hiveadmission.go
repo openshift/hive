@@ -4,18 +4,22 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
+	"github.com/openshift/hive/pkg/util/contracts"
 
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -25,6 +29,7 @@ import (
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,6 +48,12 @@ const (
 const (
 	featureGateConfigMapName = "hive-feature-gates"
 	inputHashAnnotation      = "hive.openshift.io/hive-admission-input-sources-hash"
+)
+
+const (
+	supportedContractsConfigMapName      = "hive-supported-contracts"
+	supportedContractsConfigMapNameKey   = "supported-contracts"
+	supportedContractsConfigMapMountPath = "/data/supported-contracts-config"
 )
 
 var webhookAssets = []string{
@@ -122,6 +133,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 	addAWSPrivateLinkConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
+	addSupportedContractsConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
 
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
@@ -309,6 +321,103 @@ func (r *ReconcileHiveConfig) deployFeatureGatesConfigMap(hLog log.FieldLogger, 
 	hLog.WithField("result", result).Info("hive-feature-gates configmap applied")
 
 	return computeConfigHash(cm), nil
+}
+
+// allowedContracts is the list of operator whitelisted contracts that hive will accept
+// from CRDs.
+var allowedContracts = sets.NewString(
+	hivecontractsv1alpha1.ClusterInstallContractLabelKey,
+)
+
+func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (string, error) {
+	cm := &corev1.ConfigMap{}
+	cm.Name = supportedContractsConfigMapName
+	cm.Namespace = getHiveNamespace(instance)
+	cm.Data = make(map[string]string)
+
+	crdList := &apiextv1beta1.CustomResourceDefinitionList{}
+	if err := r.Client.List(context.TODO(), crdList); err != nil {
+		hLog.WithError(err).Error("error getting crds for collect contract implementations")
+		return "", err
+	}
+	supported := map[string][]contracts.ContractImplementation{}
+	for _, crd := range crdList.Items {
+		// collect all the possible implementations from this crd
+		var impls []contracts.ContractImplementation
+		for _, version := range crd.Spec.Versions {
+			impls = append(impls, contracts.ContractImplementation{
+				Group:   crd.Spec.Group,
+				Version: version.Name,
+				Kind:    crd.Spec.Names.Kind,
+			})
+		}
+
+		for label, val := range crd.ObjectMeta.Labels {
+			if strings.HasPrefix(label, "contracts.hive.openshift.io") &&
+				val == "true" &&
+				allowedContracts.Has(label) { // lets store impls for this contract
+				contract := strings.TrimPrefix(label, "contracts.hive.openshift.io/")
+				curr := supported[contract]
+				curr = append(curr, impls...)
+				supported[contract] = curr
+			}
+		}
+	}
+
+	if len(supported) > 0 {
+		var keys []string
+		for k := range supported {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		var config contracts.SupportedContractImplementationsList
+		for _, c := range keys {
+			config = append(config, contracts.SupportedContractImplementations{
+				Name:      c,
+				Supported: supported[c],
+			})
+		}
+
+		configRaw, err := json.Marshal(config)
+		if err != nil {
+			hLog.WithError(err).Error("failed to marshal the supported contracts config")
+			return "", err
+		}
+		cm.Data[supportedContractsConfigMapNameKey] = string(configRaw)
+	}
+
+	result, err := util.ApplyRuntimeObjectWithGC(h, cm, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error applying hive-supported-contracts configmap")
+		return "", err
+	}
+	hLog.WithField("result", result).Info("hive-supported-contracts configmap applied")
+
+	return computeConfigHash(cm), nil
+}
+
+func addSupportedContractsConfigVolume(podSpec *corev1.PodSpec) {
+	optional := true
+	volume := corev1.Volume{}
+	volume.Name = supportedContractsConfigMapName
+	volume.ConfigMap = &corev1.ConfigMapVolumeSource{
+		LocalObjectReference: corev1.LocalObjectReference{
+			Name: supportedContractsConfigMapName,
+		},
+		Optional: &optional,
+	}
+	volumeMount := corev1.VolumeMount{
+		Name:      supportedContractsConfigMapName,
+		MountPath: supportedContractsConfigMapMountPath,
+	}
+	envVar := corev1.EnvVar{
+		Name:  constants.SupportedContractImplementationsFileEnvVar,
+		Value: fmt.Sprintf("%s/%s", supportedContractsConfigMapMountPath, supportedContractsConfigMapNameKey),
+	}
+	podSpec.Volumes = append(podSpec.Volumes, volume)
+	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
+	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, envVar)
 }
 
 func computeConfigHash(cm *corev1.ConfigMap) string {

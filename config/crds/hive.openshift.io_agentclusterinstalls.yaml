@@ -91,7 +91,6 @@ spec:
                 description: AgentMachinePool is a pool of machines to be installed.
                 properties:
                   hyperthreading:
-                    default: Enabled
                     description: Hyperthreading determines the mode of hyperthreading
                       that machines in the pool will utilize. Default is for hyperthreading
                       to be enabled.
@@ -107,7 +106,6 @@ spec:
                 comprise the control plane.
               properties:
                 hyperthreading:
-                  default: Enabled
                   description: Hyperthreading determines the mode of hyperthreading
                     that machines in the pool will utilize. Default is for hyperthreading
                     to be enabled.

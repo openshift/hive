@@ -130,7 +130,6 @@ type AgentMachinePool struct {
 	// pool will utilize.
 	// Default is for hyperthreading to be enabled.
 	//
-	// +kubebuilder:default=Enabled
 	// +optional
 	Hyperthreading HyperthreadingMode `json:"hyperthreading,omitempty"`
 }

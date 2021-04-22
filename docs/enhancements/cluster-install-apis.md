@@ -114,17 +114,9 @@ This will not be required for ClusterInstall implementations that live within Hi
 
 Today in Hive each ClusterDeployment is given a finalizer automatically, and when the API resource is deleted we create a ClusterDeprovision resource, which launches a pod to run the openshift-install deprovision process until it completes, after which the finalizer is removed and the ClusterDeployment is removed.
 
-There is presently no deprovision implementation for agent based or bare metal clusters.
+There is presently no deprovision implementation for agent based or bare metal clusters but there likely will be in the future.
 
-It stands to reason that deprovision implementations are fully tied to ClusterInstall implementations.
-
-Option 1: Deleting ClusterInstall automatically deprovisions cluster. Clean in that we know exactly what implementation to use. Dangerous in that users might think it should be safe to delete a ClusterInstall to free up space in etcd after the cluster is provisioned, inadvertently destroying their cluster.
-
-Option 2: Deleting ClusterDeployment automatically deprovisions the cluster as we do today. (how do we know what implementation to call?
-
-Option 3: Caller must specify a ClusterDeprovision themselves. Discussed many times for safety reasons, but has never been popular with team due to unusual Kube behavior and a desire to instad mitigate risks of accidental deletion in other ways.
-
-
+It stands to reason that deprovision implementations are fully tied to ClusterInstall implementations, and thus deleting the ClusterInstall should trigger the controllers for that ClusterInstall to complete an uninstall/deprovision. *WARNING: Deleting a ClusterInstall will destroy the cluster.*
 
 
 ### Migration Plan

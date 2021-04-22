@@ -25,10 +25,12 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/awsprivatelink"
 	"github.com/openshift/hive/pkg/manageddns"
+	"github.com/openshift/hive/pkg/util/contracts"
 )
 
 const (
@@ -51,6 +53,7 @@ type ClusterDeploymentValidatingAdmissionHook struct {
 	validManagedDomains  []string
 	fs                   *featureSet
 	awsPrivateLinkConfig *hivev1.AWSPrivateLinkConfig
+	supportedContracts   contracts.SupportedContractImplementationsList
 }
 
 // NewClusterDeploymentValidatingAdmissionHook constructs a new ClusterDeploymentValidatingAdmissionHook
@@ -70,12 +73,19 @@ func NewClusterDeploymentValidatingAdmissionHook(decoder *admission.Decoder) *Cl
 		logger.WithError(err).Fatal("Unable to read AWS Private Link Config file")
 	}
 
+	supportContractsConfig, err := contracts.ReadSupportContractsFile()
+	if err != nil {
+		logger.WithError(err).Fatal("Unable to read Supported Contract Implementations file")
+
+	}
+
 	logger.WithField("managedDomains", domains).Info("Read managed domains")
 	return &ClusterDeploymentValidatingAdmissionHook{
 		decoder:              decoder,
 		validManagedDomains:  domains,
 		fs:                   newFeatureSet(),
 		awsPrivateLinkConfig: aplConfig,
+		supportedContracts:   supportContractsConfig,
 	}
 }
 
@@ -301,6 +311,19 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	if cd.Spec.Provisioning != nil {
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
+		}
+	}
+
+	if cd.Spec.ClusterInstallRef != nil {
+		supported := a.supportedContracts.SupportedImplementations(hivecontractsv1alpha1.ClusterInstallContractName)
+		if len(supported) == 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("clusterInstallRef"), "there are no supported implementations of clusterinstall contract"))
+		} else {
+			ref := cd.Spec.ClusterInstallRef
+			if !a.supportedContracts.IsSupported(hivecontractsv1alpha1.ClusterInstallContractName,
+				contracts.ContractImplementation{Group: ref.Group, Version: ref.Version, Kind: ref.Kind}) {
+				allErrs = append(allErrs, field.NotSupported(specPath.Child("clusterInstallRef", "kind"), ref.Kind, supported))
+			}
 		}
 	}
 

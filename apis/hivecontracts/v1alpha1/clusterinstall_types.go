@@ -7,6 +7,11 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
+const (
+	// ClusterInstallContractName is the name of cluster install contract.
+	ClusterInstallContractName = "clusterinstall"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterInstall is the contract definition of various installation strategies supported
@@ -81,6 +86,13 @@ type ClusterInstallList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterInstall `json:"items"`
 }
+
+const (
+	// ClusterInstallContractLabelKey is the label that must be set to "true" on the CRDs that
+	// implements the clusterinstall contract. Only these resources will be allowed to be
+	// used in Hive objects.
+	ClusterInstallContractLabelKey = "contracts.hive.openshift.io/" + ClusterInstallContractName
+)
 
 func init() {
 	SchemeBuilder.Register(&ClusterInstall{}, &ClusterInstallList{})

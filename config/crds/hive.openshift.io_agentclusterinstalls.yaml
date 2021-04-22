@@ -84,6 +84,39 @@ spec:
               - clusterID
               - infraID
               type: object
+            compute:
+              description: Compute is the configuration for the machines that comprise
+                the compute nodes.
+              items:
+                description: AgentMachinePool is a pool of machines to be installed.
+                properties:
+                  hyperthreading:
+                    default: Enabled
+                    description: Hyperthreading determines the mode of hyperthreading
+                      that machines in the pool will utilize. Default is for hyperthreading
+                      to be enabled.
+                    enum:
+                    - ""
+                    - Enabled
+                    - Disabled
+                    type: string
+                type: object
+              type: array
+            controlPlane:
+              description: ControlPlane is the configuration for the machines that
+                comprise the control plane.
+              properties:
+                hyperthreading:
+                  default: Enabled
+                  description: Hyperthreading determines the mode of hyperthreading
+                    that machines in the pool will utilize. Default is for hyperthreading
+                    to be enabled.
+                  enum:
+                  - ""
+                  - Enabled
+                  - Disabled
+                  type: string
+              type: object
             imageSetRef:
               description: ImageSetRef is a reference to a ClusterImageSet. The release
                 image specified in the ClusterImageSet will be used to install the

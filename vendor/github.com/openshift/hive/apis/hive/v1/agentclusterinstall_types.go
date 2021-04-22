@@ -20,6 +20,17 @@ type AgentClusterInstall struct {
 	Status AgentClusterInstallStatus `json:"status,omitempty"`
 }
 
+// HyperthreadingMode is the mode of hyperthreading for a machine.
+// +kubebuilder:validation:Enum="";Enabled;Disabled
+type HyperthreadingMode string
+
+const (
+	// HyperthreadingEnabled indicates that hyperthreading is enabled.
+	HyperthreadingEnabled HyperthreadingMode = "Enabled"
+	// HyperthreadingDisabled indicates that hyperthreading is disabled.
+	HyperthreadingDisabled HyperthreadingMode = "Disabled"
+)
+
 // AgentClusterInstallSpec defines the desired state of the AgentClusterInstall.
 type AgentClusterInstallSpec struct {
 
@@ -47,6 +58,16 @@ type AgentClusterInstallSpec struct {
 
 	// ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.
 	ProvisionRequirements ProvisionRequirements `json:"provisionRequirements"`
+
+	// ControlPlane is the configuration for the machines that comprise the
+	// control plane.
+	// +optional
+	ControlPlane *AgentMachinePool `json:"controlPlane,omitempty"`
+
+	// Compute is the configuration for the machines that comprise the
+	// compute nodes.
+	// +optional
+	Compute []AgentMachinePool `json:"compute,omitempty"`
 }
 
 // ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.
@@ -101,6 +122,17 @@ type ClusterNetworkEntry struct {
 	// field is not used by the plugin, it can be left unset.
 	// +optional
 	HostPrefix int32 `json:"hostPrefix,omitempty"`
+}
+
+// AgentMachinePool is a pool of machines to be installed.
+type AgentMachinePool struct {
+	// Hyperthreading determines the mode of hyperthreading that machines in the
+	// pool will utilize.
+	// Default is for hyperthreading to be enabled.
+	//
+	// +kubebuilder:default=Enabled
+	// +optional
+	Hyperthreading HyperthreadingMode `json:"hyperthreading,omitempty"`
 }
 
 // AgentClusterInstallStatus defines the observed state of the AgentClusterInstall.

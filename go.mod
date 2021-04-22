@@ -16,6 +16,7 @@ require (
 	github.com/go-logr/logr v0.3.0
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.31.0
+	github.com/google/go-cmp v0.5.2
 	github.com/google/uuid v1.1.2
 	github.com/gophercloud/utils v0.0.0-20210113034859-6f548432055a
 	github.com/heptio/velero v1.0.0

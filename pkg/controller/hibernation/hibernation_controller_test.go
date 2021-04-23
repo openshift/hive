@@ -81,11 +81,25 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "cluster not installed",
+			name: "hibernation condition initialized",
 			cd:   cdBuilder.Options(o.notInstalled, o.shouldHibernate).Build(),
 			cs:   csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				require.Nil(t, getHibernatingCondition(cd))
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionUnknown, cond.Status)
+				assert.Equal(t, hivev1.InitializedConditionReason, cond.Reason)
+			},
+		},
+		{
+			name: "do not hibernate unsupported versions",
+			cd:   cdBuilder.Options(testcd.WithClusterVersion("4.3.11")).Build(),
+			cs:   csBuilder.Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
 			},
 		},
 		{
@@ -431,7 +445,6 @@ func TestHibernateAfter(t *testing.T) {
 			expectedPowerState: hivev1.HibernatingClusterPowerState,
 		},
 		{
-			name: "cluster due for hibernate older version", // cluster that has never been hibernated and thus has no running condition
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
 				testcd.WithClusterVersion("4.3.11"),

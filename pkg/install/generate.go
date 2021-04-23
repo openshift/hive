@@ -372,7 +372,7 @@ func InstallerPodSpec(
 		{
 			Name:            "hive",
 			Image:           images.GetHiveImage(),
-			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			ImagePullPolicy: images.GetHiveClusterProvisionImagePullPolicy(),
 			Env:             append(env, cd.Spec.Provisioning.InstallerEnv...),
 			Command:         []string{"/bin/sh", "-c"},
 			Args:            []string{hiveArg},

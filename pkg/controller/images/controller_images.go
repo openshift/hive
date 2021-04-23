@@ -20,6 +20,12 @@ const (
 	// the pull policy to use for pulling the hive image. Typically this is the same
 	// pull policy used by the the hive operator and is set as an EnvVar on the deployment.
 	HiveImagePullPolicyEnvVar = "HIVE_IMAGE_PULL_POLICY"
+
+	// HiveClusterProvisionImagePullPolicyEnvVar = "HIVE_CLUSTER_PROVISION_IMAGE_PULL_POLICY"
+	// This pull policy differs from the pull policy used by the Hive operator as a temporary
+	// mitigation in the event the container registry serving the image is unavailable.
+	// ClusterProvisions should continue to function pulling the Hive image from the local cache.
+	HiveClusterProvisionImagePullPolicyEnvVar = "HIVE_CLUSTER_PROVISION_IMAGE_PULL_POLICY"
 )
 
 // GetHiveImage returns the hive image to use in controllers. Either the one
@@ -32,6 +38,13 @@ func GetHiveImage() string {
 // Either the one specified in the environment variable or the hardcoded default.
 func GetHiveImagePullPolicy() corev1.PullPolicy {
 	return corev1.PullPolicy(envVarOrDefault(HiveImagePullPolicyEnvVar, string(corev1.PullAlways)))
+}
+
+// GetHiveClusterProvisionImagePullPolicy returns the policy to use when pulling the hive image
+// for the ClusterProvision pod.
+// Either the one specified in the environment variable or the hardcoded default.
+func GetHiveClusterProvisionImagePullPolicy() corev1.PullPolicy {
+	return corev1.PullPolicy(envVarOrDefault(HiveClusterProvisionImagePullPolicyEnvVar, string(corev1.PullIfNotPresent)))
 }
 
 func envVarOrDefault(envVar string, defaultValue string) string {

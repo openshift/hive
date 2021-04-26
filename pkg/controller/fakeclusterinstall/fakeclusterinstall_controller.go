@@ -187,11 +187,8 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 
 	// Simulate 30 second wait for RequirementsMet condition to go True:
 	reqsCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallRequirementsMet)
-	if reqsCond == nil {
-		errMsg := fmt.Sprintf("%s condition is nil but should be set", hivev1.ClusterInstallRequirementsMet)
-		return reconcile.Result{}, errors.New(errMsg)
-	}
-	if reqsCond.Status == corev1.ConditionUnknown {
+	switch reqsCond.Status {
+	case corev1.ConditionUnknown:
 		logger.Info("setting RequirementsMet condition to False")
 		newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
 			fci.Status.Conditions,
@@ -205,36 +202,33 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 			err := updateClusterInstallStatus(r.Client, fci, logger)
 			return reconcile.Result{}, err
 		}
-	} else if reqsCond.Status == corev1.ConditionFalse {
+	case corev1.ConditionFalse:
 		// Check if it's been 30 seconds since we set condition to False:
 		delta := time.Now().Sub(reqsCond.LastTransitionTime.Time)
-		if delta >= 30*time.Second {
-			logger.Info("setting RequirementsMet condition to True")
-			newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
-				fci.Status.Conditions,
-				hivev1.ClusterInstallRequirementsMet,
-				corev1.ConditionTrue,
-				"AllRequirementsMet",
-				"All requirements met",
-				controllerutils.UpdateConditionIfReasonOrMessageChange)
-			if changed {
-				fci.Status.Conditions = newConditions
-				err := updateClusterInstallStatus(r.Client, fci, logger)
-				return reconcile.Result{}, err
-			}
-		} else {
+		if delta < 30*time.Second {
 			// requeue for remainder of delta
 			return reconcile.Result{RequeueAfter: 30*time.Second - delta}, nil
+		}
+
+		logger.Info("setting RequirementsMet condition to True")
+		newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
+			fci.Status.Conditions,
+			hivev1.ClusterInstallRequirementsMet,
+			corev1.ConditionTrue,
+			"AllRequirementsMet",
+			"All requirements met",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changed {
+			fci.Status.Conditions = newConditions
+			err := updateClusterInstallStatus(r.Client, fci, logger)
+			return reconcile.Result{}, err
 		}
 	}
 
 	// Simulate 30 second wait for Completed condition to go True:
 	completedCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallCompleted)
-	if completedCond == nil {
-		errMsg := fmt.Sprintf("%s condition is nil but should be set", hivev1.ClusterInstallCompleted)
-		return reconcile.Result{}, errors.New(errMsg)
-	}
-	if completedCond.Status == corev1.ConditionUnknown {
+	switch completedCond.Status {
+	case corev1.ConditionUnknown:
 		logger.Info("setting Completed condition to False")
 		newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
 			fci.Status.Conditions,
@@ -248,8 +242,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 			err := updateClusterInstallStatus(r.Client, fci, logger)
 			return reconcile.Result{}, err
 		}
-	} else if completedCond.Status == corev1.ConditionFalse {
-
+	case corev1.ConditionFalse:
 		// Set ClusterMetadata if install is underway:
 		if fci.Spec.ClusterMetadata == nil {
 			fci.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
@@ -265,39 +258,38 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 
 		// Check if it's been 30 seconds since we set condition to False:
 		delta := time.Now().Sub(completedCond.LastTransitionTime.Time)
-		if delta >= 30*time.Second {
-			logger.Info("setting Completed condition to True")
-			newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
-				fci.Status.Conditions,
-				hivev1.ClusterInstallCompleted,
-				corev1.ConditionTrue,
-				"ClusterInstalled",
-				"Cluster install completed successfully",
-				controllerutils.UpdateConditionIfReasonOrMessageChange)
-			// Set Stopped=True
-			newConditions, changedStopped := controllerutils.SetClusterInstallConditionWithChangeCheck(
-				newConditions,
-				hivev1.ClusterInstallStopped,
-				corev1.ConditionTrue,
-				"ClusterInstalled",
-				"Cluster install completed successfully",
-				controllerutils.UpdateConditionIfReasonOrMessageChange)
-			// Set Failed=False
-			newConditions, changedFailed := controllerutils.SetClusterInstallConditionWithChangeCheck(
-				newConditions,
-				hivev1.ClusterInstallFailed,
-				corev1.ConditionFalse,
-				"ClusterInstalled",
-				"Cluster install completed successfully",
-				controllerutils.UpdateConditionIfReasonOrMessageChange)
-			if changed || changedStopped || changedFailed {
-				fci.Status.Conditions = newConditions
-				err := updateClusterInstallStatus(r.Client, fci, logger)
-				return reconcile.Result{}, err
-			}
-		} else {
+		if delta < 30*time.Second {
 			// requeue for remainder of delta
 			return reconcile.Result{RequeueAfter: 30*time.Second - delta}, nil
+		}
+		logger.Info("setting Completed condition to True")
+		newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
+			fci.Status.Conditions,
+			hivev1.ClusterInstallCompleted,
+			corev1.ConditionTrue,
+			"ClusterInstalled",
+			"Cluster install completed successfully",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		// Set Stopped=True
+		newConditions, changedStopped := controllerutils.SetClusterInstallConditionWithChangeCheck(
+			newConditions,
+			hivev1.ClusterInstallStopped,
+			corev1.ConditionTrue,
+			"ClusterInstalled",
+			"Cluster install completed successfully",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		// Set Failed=False
+		newConditions, changedFailed := controllerutils.SetClusterInstallConditionWithChangeCheck(
+			newConditions,
+			hivev1.ClusterInstallFailed,
+			corev1.ConditionFalse,
+			"ClusterInstalled",
+			"Cluster install completed successfully",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changed || changedStopped || changedFailed {
+			fci.Status.Conditions = newConditions
+			err := updateClusterInstallStatus(r.Client, fci, logger)
+			return reconcile.Result{}, err
 		}
 	}
 

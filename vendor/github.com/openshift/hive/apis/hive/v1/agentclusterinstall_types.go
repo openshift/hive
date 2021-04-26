@@ -139,6 +139,21 @@ type AgentClusterInstallStatus struct {
 	// Conditions includes more detailed status for the cluster install.
 	// +optional
 	Conditions []ClusterInstallCondition `json:"conditions,omitempty"`
+
+	// ControlPlaneAgentsDiscovered is the number of Agents currently linked to this ClusterDeployment.
+	// +optional
+	ControlPlaneAgentsDiscovered int `json:"controlPlaneAgentsDiscovered,omitempty"`
+	// ControlPlaneAgentsDiscovered is the number of Agents currently linked to this ClusterDeployment that are ready for use.
+	// +optional
+	ControlPlaneAgentsReady int `json:"controlPlaneAgentsReady,omitempty"`
+	// WorkerAgentsDiscovered is the number of worker Agents currently linked to this ClusterDeployment.
+	// +optional
+	WorkerAgentsDiscovered int `json:"workerAgentsDiscovered,omitempty"`
+	// WorkerAgentsDiscovered is the number of worker Agents currently linked to this ClusterDeployment that are ready for use.
+	// +optional
+	WorkerAgentsReady int `json:"workerAgentsReady,omitempty"`
+
+	ConnectivityMajorityGroups string `json:"connectivityMajorityGroups,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

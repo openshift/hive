@@ -251,6 +251,24 @@ spec:
                 - type
                 type: object
               type: array
+            connectivityMajorityGroups:
+              type: string
+            controlPlaneAgentsDiscovered:
+              description: ControlPlaneAgentsDiscovered is the number of Agents currently
+                linked to this ClusterDeployment.
+              type: integer
+            controlPlaneAgentsReady:
+              description: ControlPlaneAgentsDiscovered is the number of Agents currently
+                linked to this ClusterDeployment that are ready for use.
+              type: integer
+            workerAgentsDiscovered:
+              description: WorkerAgentsDiscovered is the number of worker Agents currently
+                linked to this ClusterDeployment.
+              type: integer
+            workerAgentsReady:
+              description: WorkerAgentsDiscovered is the number of worker Agents currently
+                linked to this ClusterDeployment that are ready for use.
+              type: integer
           type: object
       required:
       - spec

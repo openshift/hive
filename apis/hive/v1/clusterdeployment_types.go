@@ -226,11 +226,6 @@ type Provisioning struct {
 	// additional features of the installer.
 	// +optional
 	InstallerEnv []corev1.EnvVar `json:"installerEnv,omitempty"`
-
-	// InstallStrategy provides platform agnostic configuration for the use of alternate install strategies.
-	// Defaults to openshift-install if none specified.
-	// +optional
-	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
 }
 
 // ClusterImageSetReference is a reference to a ClusterImageSet
@@ -312,22 +307,10 @@ type ClusterDeploymentStatus struct {
 	// +optional
 	ProvisionRef *corev1.LocalObjectReference `json:"provisionRef,omitempty"`
 
-	// InstallStrategy contains observed state from specific install strategies.
-	// +optional
-	InstallStrategy *InstallStrategyStatus `json:"installStrategy,omitempty"`
-
 	// Platform contains the observed state for the specific platform upon which to
 	// perform the installation.
 	// +optional
 	Platform *PlatformStatus `json:"platformStatus,omitempty"`
-}
-
-// InstallStrategyStatus contains observed state from specific install strategies.
-type InstallStrategyStatus struct {
-
-	// Agent defines the observed state of the Agent install strategy for this cluster.
-	// +optional
-	Agent *agent.InstallStrategyStatus `json:"agent,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment
@@ -535,7 +518,7 @@ type Platform struct {
 	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
 
 	// AgentBareMetal is the configuration used when performing an Assisted Agent based installation
-	// to bare metal. Can only be used with the Assisted InstallStrategy.
+	// to bare metal.
 	AgentBareMetal *agent.BareMetalPlatform `json:"agentBareMetal,omitempty"`
 }
 
@@ -544,14 +527,6 @@ type Platform struct {
 type PlatformStatus struct {
 	// AWS is the observed state on AWS.
 	AWS *aws.PlatformStatus `json:"aws,omitempty"`
-}
-
-// InstallStrategy provides configuration for optional alternative install strategies.
-type InstallStrategy struct {
-
-	// Agent is the install strategy configuration for provisioning a cluster with the
-	// Agent based assisted installer.
-	Agent *agent.InstallStrategy `json:"agent,omitempty"`
 }
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects

@@ -69,6 +69,14 @@ type AgentClusterInstallSpec struct {
 	// compute nodes.
 	// +optional
 	Compute []AgentMachinePool `json:"compute,omitempty"`
+
+	// APIVIP is the virtual IP used to reach the OpenShift cluster's API.
+	// +optional
+	APIVIP string `json:"apiVIP,omitempty"`
+
+	// IngressVIP is the virtual IP used for cluster ingress traffic.
+	// +optional
+	IngressVIP string `json:"ingressVIP,omitempty"`
 }
 
 // ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.

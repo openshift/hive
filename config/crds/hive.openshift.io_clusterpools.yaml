@@ -183,14 +183,6 @@ spec:
                             only "value". The requirements are ANDed.
                           type: object
                       type: object
-                    apiVIP:
-                      description: APIVIP is the virtual IP used to reach the OpenShift
-                        cluster's API.
-                      type: string
-                    ingressVIP:
-                      description: IngressVIP is the virtual IP used for cluster ingress
-                        traffic.
-                      type: string
                   required:
                   - agentSelector
                   type: object

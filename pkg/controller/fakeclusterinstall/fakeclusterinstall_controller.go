@@ -2,8 +2,6 @@ package fakeclusterinstall
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -144,29 +142,50 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
-	// Check if we're already Stopped=True and return if so.
-	// If not, we should be Stopped=False as we're actively working.
-	stoppedCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallStopped)
-	if stoppedCond == nil {
-		errMsg := fmt.Sprintf("%s condition is nil but should be set", hivev1.ClusterInstallStopped)
-		return reconcile.Result{}, errors.New(errMsg)
-	}
-	if stoppedCond.Status == corev1.ConditionTrue {
-		logger.Info("Stopped=True no processing necessary")
-		return reconcile.Result{}, nil
-	} else if stoppedCond.Status == corev1.ConditionUnknown {
-		newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
+	// Check if we're Completed and can exit reconcile early.
+	completedCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallCompleted)
+	if completedCond.Status == corev1.ConditionTrue {
+		// Ensure Stopped=True
+		newConditions, changedStopped := controllerutils.SetClusterInstallConditionWithChangeCheck(
 			fci.Status.Conditions,
 			hivev1.ClusterInstallStopped,
-			corev1.ConditionFalse,
-			"InProgress",
-			"Cluster install in progress",
+			corev1.ConditionTrue,
+			"ClusterInstalled",
+			"Cluster install completed successfully",
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		if changed {
+		// Ensure Failed=False
+		newConditions, changedFailed := controllerutils.SetClusterInstallConditionWithChangeCheck(
+			newConditions,
+			hivev1.ClusterInstallFailed,
+			corev1.ConditionFalse,
+			"ClusterInstalled",
+			"Cluster install completed successfully",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changedStopped || changedFailed {
 			fci.Status.Conditions = newConditions
 			err := updateClusterInstallStatus(r.Client, fci, logger)
 			return reconcile.Result{}, err
 		}
+	} else {
+		logger.Info("cluster install completed, no work left to be done")
+		return reconcile.Result{}, err
+	}
+
+	// NOTE: While this controller does not support a Stopped=True Completed=False state (it will try
+	// forever), most real implementations would want to check if it's time to give up here.
+
+	// Ensure Stopped=False as we are actively working to reconcile:
+	newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
+		fci.Status.Conditions,
+		hivev1.ClusterInstallStopped,
+		corev1.ConditionFalse,
+		"InProgress",
+		"Cluster install in progress",
+		controllerutils.UpdateConditionIfReasonOrMessageChange)
+	if changed {
+		fci.Status.Conditions = newConditions
+		err := updateClusterInstallStatus(r.Client, fci, logger)
+		return reconcile.Result{}, err
 	}
 
 	// Fetch corresponding ClusterDeployment instance
@@ -226,7 +245,6 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 	}
 
 	// Simulate 30 second wait for Completed condition to go True:
-	completedCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallCompleted)
 	switch completedCond.Status {
 	case corev1.ConditionUnknown:
 		logger.Info("setting Completed condition to False")
@@ -270,23 +288,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 			"ClusterInstalled",
 			"Cluster install completed successfully",
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		// Set Stopped=True
-		newConditions, changedStopped := controllerutils.SetClusterInstallConditionWithChangeCheck(
-			newConditions,
-			hivev1.ClusterInstallStopped,
-			corev1.ConditionTrue,
-			"ClusterInstalled",
-			"Cluster install completed successfully",
-			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		// Set Failed=False
-		newConditions, changedFailed := controllerutils.SetClusterInstallConditionWithChangeCheck(
-			newConditions,
-			hivev1.ClusterInstallFailed,
-			corev1.ConditionFalse,
-			"ClusterInstalled",
-			"Cluster install completed successfully",
-			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		if changed || changedStopped || changedFailed {
+		if changed {
 			fci.Status.Conditions = newConditions
 			err := updateClusterInstallStatus(r.Client, fci, logger)
 			return reconcile.Result{}, err

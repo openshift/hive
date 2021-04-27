@@ -39,3 +39,38 @@ type ClusterNetworkEntry struct {
 	// +optional
 	HostPrefix int32 `json:"hostPrefix,omitempty"`
 }
+
+// ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.
+type ProvisionRequirements struct {
+
+	// ControlPlaneAgents is the number of matching approved and ready Agents with the control plane role
+	// required to launch the install. Must be either 1 or 3.
+	ControlPlaneAgents int `json:"controlPlaneAgents"`
+
+	// WorkerAgents is the minimum number of matching approved and ready Agents with the worker role
+	// required to launch the install.
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	WorkerAgents int `json:"workerAgents,omitempty"`
+}
+
+// HyperthreadingMode is the mode of hyperthreading for a machine.
+// +kubebuilder:validation:Enum="";Enabled;Disabled
+type HyperthreadingMode string
+
+const (
+	// HyperthreadingEnabled indicates that hyperthreading is enabled.
+	HyperthreadingEnabled HyperthreadingMode = "Enabled"
+	// HyperthreadingDisabled indicates that hyperthreading is disabled.
+	HyperthreadingDisabled HyperthreadingMode = "Disabled"
+)
+
+// AgentMachinePool is a pool of machines to be installed.
+type AgentMachinePool struct {
+	// Hyperthreading determines the mode of hyperthreading that machines in the
+	// pool will utilize.
+	// Default is for hyperthreading to be enabled.
+	//
+	// +optional
+	Hyperthreading HyperthreadingMode `json:"hyperthreading,omitempty"`
+}

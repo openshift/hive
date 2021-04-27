@@ -21,17 +21,6 @@ type AgentClusterInstall struct {
 	Status AgentClusterInstallStatus `json:"status,omitempty"`
 }
 
-// HyperthreadingMode is the mode of hyperthreading for a machine.
-// +kubebuilder:validation:Enum="";Enabled;Disabled
-type HyperthreadingMode string
-
-const (
-	// HyperthreadingEnabled indicates that hyperthreading is enabled.
-	HyperthreadingEnabled HyperthreadingMode = "Enabled"
-	// HyperthreadingDisabled indicates that hyperthreading is disabled.
-	HyperthreadingDisabled HyperthreadingMode = "Disabled"
-)
-
 // AgentClusterInstallSpec defines the desired state of the AgentClusterInstall.
 type AgentClusterInstallSpec struct {
 
@@ -58,17 +47,17 @@ type AgentClusterInstallSpec struct {
 	SSHPublicKey string `json:"sshPublicKey,omitempty"`
 
 	// ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.
-	ProvisionRequirements ProvisionRequirements `json:"provisionRequirements"`
+	ProvisionRequirements hivev1agent.ProvisionRequirements `json:"provisionRequirements"`
 
 	// ControlPlane is the configuration for the machines that comprise the
 	// control plane.
 	// +optional
-	ControlPlane *AgentMachinePool `json:"controlPlane,omitempty"`
+	ControlPlane *hivev1agent.AgentMachinePool `json:"controlPlane,omitempty"`
 
 	// Compute is the configuration for the machines that comprise the
 	// compute nodes.
 	// +optional
-	Compute []AgentMachinePool `json:"compute,omitempty"`
+	Compute []hivev1agent.AgentMachinePool `json:"compute,omitempty"`
 
 	// APIVIP is the virtual IP used to reach the OpenShift cluster's API.
 	// +optional
@@ -77,30 +66,6 @@ type AgentClusterInstallSpec struct {
 	// IngressVIP is the virtual IP used for cluster ingress traffic.
 	// +optional
 	IngressVIP string `json:"ingressVIP,omitempty"`
-}
-
-// ProvisionRequirements defines configuration for when the installation is ready to be launched automatically.
-type ProvisionRequirements struct {
-
-	// ControlPlaneAgents is the number of matching approved and ready Agents with the control plane role
-	// required to launch the install. Must be either 1 or 3.
-	ControlPlaneAgents int `json:"controlPlaneAgents"`
-
-	// WorkerAgents is the minimum number of matching approved and ready Agents with the worker role
-	// required to launch the install.
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	WorkerAgents int `json:"workerAgents,omitempty"`
-}
-
-// AgentMachinePool is a pool of machines to be installed.
-type AgentMachinePool struct {
-	// Hyperthreading determines the mode of hyperthreading that machines in the
-	// pool will utilize.
-	// Default is for hyperthreading to be enabled.
-	//
-	// +optional
-	Hyperthreading HyperthreadingMode `json:"hyperthreading,omitempty"`
 }
 
 // AgentClusterInstallStatus defines the observed state of the AgentClusterInstall.

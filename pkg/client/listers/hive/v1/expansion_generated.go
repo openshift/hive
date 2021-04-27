@@ -2,14 +2,6 @@
 
 package v1
 
-// AgentClusterInstallListerExpansion allows custom methods to be added to
-// AgentClusterInstallLister.
-type AgentClusterInstallListerExpansion interface{}
-
-// AgentClusterInstallNamespaceListerExpansion allows custom methods to be added to
-// AgentClusterInstallNamespaceLister.
-type AgentClusterInstallNamespaceListerExpansion interface{}
-
 // CheckpointListerExpansion allows custom methods to be added to
 // CheckpointLister.
 type CheckpointListerExpansion interface{}

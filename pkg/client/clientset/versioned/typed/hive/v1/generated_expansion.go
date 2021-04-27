@@ -2,8 +2,6 @@
 
 package v1
 
-type AgentClusterInstallExpansion interface{}
-
 type CheckpointExpansion interface{}
 
 type ClusterClaimExpansion interface{}

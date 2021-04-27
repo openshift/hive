@@ -12,10 +12,6 @@ type FakeHiveV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeHiveV1) AgentClusterInstalls(namespace string) v1.AgentClusterInstallInterface {
-	return &FakeAgentClusterInstalls{c, namespace}
-}
-
 func (c *FakeHiveV1) Checkpoints(namespace string) v1.CheckpointInterface {
 	return &FakeCheckpoints{c, namespace}
 }

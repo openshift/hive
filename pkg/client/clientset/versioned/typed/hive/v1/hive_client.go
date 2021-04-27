@@ -10,7 +10,6 @@ import (
 
 type HiveV1Interface interface {
 	RESTClient() rest.Interface
-	AgentClusterInstallsGetter
 	CheckpointsGetter
 	ClusterClaimsGetter
 	ClusterDeploymentsGetter
@@ -34,10 +33,6 @@ type HiveV1Interface interface {
 // HiveV1Client is used to interact with features provided by the hive.openshift.io group.
 type HiveV1Client struct {
 	restClient rest.Interface
-}
-
-func (c *HiveV1Client) AgentClusterInstalls(namespace string) AgentClusterInstallInterface {
-	return newAgentClusterInstalls(c, namespace)
 }
 
 func (c *HiveV1Client) Checkpoints(namespace string) CheckpointInterface {

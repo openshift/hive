@@ -38,8 +38,6 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=hive.openshift.io, Version=v1
-	case v1.SchemeGroupVersion.WithResource("agentclusterinstalls"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().AgentClusterInstalls().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("checkpoints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hive().V1().Checkpoints().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clusterclaims"):

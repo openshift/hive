@@ -100,7 +100,7 @@ In the case of ClusterInstallFailed, we will also copy this condition to Provisi
 
 ClusterInstall controllers can add their own conditions, but these will not transfer back to the ClusterDeployment. UIs around this process may need to show ClusterInstall conditions explicitly.
 
-The core ClusterInstall CRDs and controllers discussed in this document should live in Hive. However, in theory, it would be possible for an external application to implement it's own ClusterInstall outside of Hive and still interface with ClusterDeployment using this system.
+It will be possible for a ClusterInstall CRD and it's controllers to be entirely external to Hive.
 
 #### External ClusterInstall RBAC
 

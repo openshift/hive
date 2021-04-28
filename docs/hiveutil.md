@@ -78,8 +78,20 @@ bin/hiveutil create-cluster --cloud=ovirt --ovirt-api-vip=192.168.1.10  --ovirt-
 
 Set credentials/connection information in the following environment variables. `GOVC_USERNAME` should hold the vSphere username, `GOVC_PASSWORD` should be set to the vSphere user's password. If the vCenter instance is using self-signed certificates or is otherwise untrusted by the system being used to connect to vCenter, `GOVC_TLS_CA_CERTS` should be set to the path of a file containing the CA certificate for the vCenter instance. 
 
+The following parameters are required and must be provided via environment variable or command line parameter:
+
+| Environment Variable | Command line parameter                    |
+| -------------------- | ----------------------------------------- |
+| `GOVC_USERNAME `     | Must be provided as environment variable. |
+| `GOVC_PASSWORD`      | Must be provided as environment variable. |
+| `GOVC_TLS_CA_CERTS`  | `--vsphere-ca-certs`                      |
+| `GOVC_DATACENTER`    | `--vsphere-datacenter`                    |
+| `GOVC_DATASTORE`     | `--vsphere-default-datastore`             |
+| `GOVC_HOST`          | `--vsphere-vcenter`                       |
+
+
 ```bash
-bin/hiveutil create-cluster --cloud=vsphere --vsphere-vcenter=vcenter.example.com --vsphere-datacenter=dc1 --vsphere-default-datastore=ds1 --vsphere-api-vip=192.168.10.10 --vsphere-ingress-vip=192.168.10.11 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-folder=/dc1/vm/mycluster --base-domain vmware.hive.example.com mycluster
+bin/hiveutil create-cluster --cloud=vsphere --vsphere-vcenter=vcenter.example.com --vsphere-datacenter=dc1 --vsphere-default-datastore=ds1 --vsphere-api-vip=192.168.10.10 --vsphere-ingress-vip=192.168.10.11 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-folder=/dc1/vm/mycluster --vsphere-ca-certs="/tmp/cert1.crt:/tmp/cert2.crt" --base-domain vmware.hive.example.com mycluster
 ```
 
 #### Create Cluster on OpenStack

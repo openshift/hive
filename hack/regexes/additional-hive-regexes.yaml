@@ -14,3 +14,8 @@ objects:
             - "EIP: AddressLimitExceeded"
           installFailingReason: EIPAddressLimitExceeded
           installFailingMessage: EIP Address limit exceeded
+        - name: InvalidSubnetCIDRConfig
+          searchRegexStrings:
+            - "subnet\'s CIDR range"
+          installFailingReason: InvalidSubnetCIDRConfig
+          installFailingMessage: Invalid subnet CIDR provided in install config.

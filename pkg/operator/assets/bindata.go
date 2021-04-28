@@ -1565,6 +1565,11 @@ data:
       - "LimitExceeded"
       installFailingReason: ResourceLimitExceeded
       installFailingMessage: Resource limit exceeded
+    - name: InvalidSubnetCIDRConfig
+      searchRegexStrings:
+      - "subnet\'s CIDR range"
+      installFailingReason: InvalidSubnetCIDRConfig
+      installFailingMessage: Invalid subnet CIDR provided in install config.
     # https://bugzilla.redhat.com/show_bug.cgi?id=1844320
     - name: AWSUnableToFindMatchingRouteTable
       searchRegexStrings:

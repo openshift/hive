@@ -1787,10 +1787,17 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	switch err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync); {
 	case apierrors.IsNotFound(err):
-		cdLog.Info("ClusterSync has not yet been created")
-		status = corev1.ConditionTrue
-		reason = "MissingClusterSync"
-		message = "ClusterSync has not yet been created"
+		if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused {
+			cdLog.Info("SyncSet is paused. ClusterSync will not be created")
+			status = corev1.ConditionTrue
+			reason = "SyncSetPaused"
+			message = "SyncSet is paused. ClusterSync will not be created"
+		} else {
+			cdLog.Info("ClusterSync has not yet been created")
+			status = corev1.ConditionTrue
+			reason = "MissingClusterSync"
+			message = "ClusterSync has not yet been created"
+		}
 	case err != nil:
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return err

@@ -3,11 +3,12 @@ package v1
 import (
 	"fmt"
 	"net/http"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -615,9 +616,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
-	hasChangedImmutableField, changedFieldName := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
+	hasChangedImmutableField, unsupportedDiff := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
 	if hasChangedImmutableField {
-		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec.%v. ClusterDeployment.Spec is immutable except for %v", changedFieldName, mutableFields)
+		message := fmt.Sprintf("Attempted to change ClusterDeployment.Spec which is immutable except for %s fields. Unsupported change: \n%s", strings.Join(mutableFields, ","), unsupportedDiff)
 		contextLogger.Infof("Failed validation: %v", message)
 
 		return &admissionv1beta1.AdmissionResponse{
@@ -767,34 +768,43 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admis
 	}
 }
 
-// isFieldMutable says whether the ClusterDeployment.spec field is meant to be mutable or not.
-func isFieldMutable(value string) bool {
-	for _, mutableField := range mutableFields {
-		if value == mutableField {
-			return true
-		}
+// hasChangedImmutableField determines if a ClusterDeployment.spec immutable field was changed.
+// it returns the diff string that shows the changes that are not supported
+func hasChangedImmutableField(oldObject, cd *hivev1.ClusterDeploymentSpec) (bool, string) {
+	r := &diffReporter{}
+	opts := cmp.Options{
+		cmpopts.EquateEmpty(),
+		cmpopts.IgnoreFields(hivev1.ClusterDeploymentSpec{}, mutableFields...),
+		cmp.Reporter(r),
 	}
-
-	return false
+	return !cmp.Equal(oldObject, cd, opts), r.String()
 }
 
-// hasChangedImmutableField determines if a ClusterDeployment.spec immutable field was changed.
-func hasChangedImmutableField(oldObject, cd *hivev1.ClusterDeploymentSpec) (bool, string) {
-	ooElem := reflect.ValueOf(oldObject).Elem()
-	noElem := reflect.ValueOf(cd).Elem()
+// diffReporter is a simple custom reporter that only records differences
+// detected during comparison.
+type diffReporter struct {
+	path  cmp.Path
+	diffs []string
+}
 
-	for i := 0; i < ooElem.NumField(); i++ {
-		ooFieldName := ooElem.Type().Field(i).Name
-		ooValue := ooElem.Field(i).Interface()
-		noValue := noElem.Field(i).Interface()
+func (r *diffReporter) PushStep(ps cmp.PathStep) {
+	r.path = append(r.path, ps)
+}
 
-		if !isFieldMutable(ooFieldName) && !reflect.DeepEqual(ooValue, noValue) {
-			// The field isn't mutable -and- has been changed. DO NOT ALLOW.
-			return true, ooFieldName
-		}
+func (r *diffReporter) Report(rs cmp.Result) {
+	if !rs.Equal() {
+		p := r.path.String()
+		vx, vy := r.path.Last().Values()
+		r.diffs = append(r.diffs, fmt.Sprintf("\t%s: (%+v => %+v)", p, vx, vy))
 	}
+}
 
-	return false, ""
+func (r *diffReporter) PopStep() {
+	r.path = r.path[:len(r.path)-1]
+}
+
+func (r *diffReporter) String() string {
+	return strings.Join(r.diffs, "\n")
 }
 
 func hasClearedOutPreviouslyDefinedIngressList(oldObject, cd *hivev1.ClusterDeploymentSpec) bool {

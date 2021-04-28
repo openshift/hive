@@ -17,7 +17,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -297,8 +296,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) error {
 	additionalCA := &bytes.Buffer{}
 	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
-		caSecret := &corev1.Secret{}
-		err := r.Get(context.TODO(), types.NamespacedName{Namespace: getHiveNamespace(instance), Name: clientCARef.Name}, caSecret)
+		caSecret, err := r.hiveSecretLister.Secrets(getHiveNamespace(instance)).Get(clientCARef.Name)
 		if err != nil {
 			hLog.WithError(err).WithField("secret", clientCARef.Name).Errorf("Cannot read client CA secret")
 			continue
@@ -311,8 +309,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 	}
 
 	if additionalCA.Len() == 0 {
-		caSecret := &corev1.Secret{}
-		err := r.Get(context.TODO(), types.NamespacedName{Namespace: getHiveNamespace(instance), Name: hiveAdditionalCASecret}, caSecret)
+		caSecret, err := r.hiveSecretLister.Secrets(getHiveNamespace(instance)).Get(hiveAdditionalCASecret)
 		if err == nil {
 			err = r.Delete(context.TODO(), caSecret)
 			if err != nil {

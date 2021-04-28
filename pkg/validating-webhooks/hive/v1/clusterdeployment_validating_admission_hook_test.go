@@ -188,6 +188,7 @@ func validClusterDeploymentSameValues() *hivev1.ClusterDeployment {
 func validClusterDeploymentDifferentImmutableValue() *hivev1.ClusterDeployment {
 	cd := validAWSClusterDeployment()
 	cd.Spec.ClusterName = "DifferentClusterName"
+	cd.Spec.BaseDomain = "DifferenceBaseDomain"
 	return cd
 }
 

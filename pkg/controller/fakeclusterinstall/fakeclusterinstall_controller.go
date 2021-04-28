@@ -166,7 +166,6 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 			err := updateClusterInstallStatus(r.Client, fci, logger)
 			return reconcile.Result{}, err
 		}
-	} else {
 		logger.Info("cluster install completed, no work left to be done")
 		return reconcile.Result{}, err
 	}

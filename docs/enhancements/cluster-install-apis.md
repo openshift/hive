@@ -104,11 +104,7 @@ The core ClusterInstall CRDs and controllers discussed in this document should l
 
 #### External ClusterInstall RBAC
 
-To support an external application providing their own ClusterInstall CRD implementation, Hive will need RBAC to be able to access those objects. This can be achieved by using [Aggregated ClusterRoles](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
-
-Hive will be updated to deploy an empty ClusterRole `hive-controllers-clusterinstall` which will contain no rules, but will match the label `hive.openshift.io/aggregate-to-hive-clusterinstall`. Integrating components will need to deploy a ClusterRole with this label and rules that provide Hive all permissions on their custom ClusterInstall CRD.
-
-This will not be required for ClusterInstall implementations that live within Hive. (including AgentClusterInstall)
+To support an external application providing their own ClusterInstall CRD implementation, Hive will need RBAC to be able to access those objects. Hive will ship with a role granting full access to the apigroup "extensions.hive.openshift.io". CRDs which implement the interface should use this apigroup regardless if they are in Hive or external.
 
 ### Cluster Deprovisioning
 

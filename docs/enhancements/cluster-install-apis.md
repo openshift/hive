@@ -114,6 +114,9 @@ There is presently no deprovision implementation for agent based or bare metal c
 
 It stands to reason that deprovision implementations are fully tied to ClusterInstall implementations, and thus deleting the ClusterInstall should trigger the controllers for that ClusterInstall to complete an uninstall/deprovision. *WARNING: Deleting a ClusterInstall will destroy the cluster.*
 
+Hive will add an OwnerReference from ClusterInstall CR to the owning ClusterDeployment, so deleting a ClusterDeployment will cascade to delete the ClusterInstall.
+
+ClusterInstall controllers who wish to take action on deprovision will add their own finalizer to their ClusterInstall CRs and use this to ensure their deprovision steps complete successfully. The normal Hive ClusterDeployment hive.openshift.io/deprovision finalizer will be skipped for ClusterDeployments which have a ClusterInstallRef.
 
 ### Migration Plan
 

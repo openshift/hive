@@ -452,6 +452,10 @@ const (
 	SyncSetsNotAppliedReason = "SyncSetsNotApplied"
 )
 
+// InitializedConditionReason is used when a condition is initialized for the first time, and the status of the
+// condition is still Unknown
+const InitializedConditionReason = "Initialized"
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

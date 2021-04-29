@@ -64,6 +64,12 @@ var (
 	// actuators is a list of available actuators for this controller
 	// It is populated via the RegisterActuator function
 	actuators []HibernationActuator
+
+	// clusterDeploymentHibernationConditions are the cluster deployment conditions controlled by
+	// hibernation controller
+	clusterDeploymentHibernationConditions = []hivev1.ClusterDeploymentConditionType{
+		hivev1.ClusterHibernatingCondition,
+	}
 )
 
 // Add creates a new Hibernation controller and adds it to the manager with default RBAC.
@@ -155,6 +161,17 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
+	// Initialize cluster deployment conditions if not present
+	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentHibernationConditions)
+	if len(newConditions) > len(cd.Status.Conditions) {
+		cd.Status.Conditions = newConditions
+		cdLog.Info("initializing hibernating controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+	}
+
 	// If cluster is not installed, skip any processing
 	if !cd.Spec.Installed {
 		return reconcile.Result{}, nil
@@ -164,16 +181,17 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
+	// set hibernating condition to false for unsupported clouds
+	if supported, msg := r.hibernationSupported(cd); !supported {
+		return r.setHibernatingCondition(cd, hivev1.UnsupportedHibernationReason, msg, corev1.ConditionFalse, cdLog)
+	}
+
 	shouldHibernate := cd.Spec.PowerState == hivev1.HibernatingClusterPowerState
 	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 
-	// Signal a problem if we should be hibernating or have requested hibernate after and the cluster does not support it or
+	// Signal a problem if we should be hibernating or have requested hibernate after and the
 	// SyncSets have not yet been applied.
 	if shouldHibernate || cd.Spec.HibernateAfter != nil {
-		if supported, msg := r.hibernationSupported(cd); !supported {
-			return r.setHibernatingCondition(cd, hivev1.UnsupportedHibernationReason, msg, corev1.ConditionFalse, cdLog)
-		}
-
 		// Determine if SyncSets have been applied
 		clusterSync := &hiveintv1alpha1.ClusterSync{}
 		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync)
@@ -191,7 +209,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	}
 
 	// Clear any lingering unsupported hibernation condition
-	if hibernatingCondition != nil && hibernatingCondition.Reason == hivev1.UnsupportedHibernationReason {
+	if hibernatingCondition.Reason == hivev1.UnsupportedHibernationReason {
 		if supported, msg := r.hibernationSupported(cd); supported {
 			return r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, msg, corev1.ConditionFalse, cdLog)
 		}
@@ -208,8 +226,8 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		var isRunning bool
 
 		cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-		if cond == nil {
-			hibLog.Debug("cluster has no hibernating condition (never hibernated), using installed time")
+		if cond.Status == corev1.ConditionUnknown {
+			hibLog.Debug("cluster has never been hibernated, using installed time")
 			isRunning = true
 		} else if cond.Status == corev1.ConditionFalse {
 			runningSince = cond.LastTransitionTime.Time
@@ -249,7 +267,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	}
 
 	if !shouldHibernate {
-		if hibernatingCondition == nil || hibernatingCondition.Status == corev1.ConditionFalse {
+		if hibernatingCondition.Status == corev1.ConditionUnknown || hibernatingCondition.Status == corev1.ConditionFalse {
 			return reconcile.Result{}, nil
 		}
 		switch hibernatingCondition.Reason {
@@ -261,7 +279,8 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
-	if hibernatingCondition == nil || hibernatingCondition.Status == corev1.ConditionFalse ||
+	if (hibernatingCondition.Status == corev1.ConditionUnknown || hibernatingCondition.Status == corev1.ConditionFalse &&
+		hibernatingCondition.Reason != hivev1.UnsupportedHibernationReason) ||
 		hibernatingCondition.Reason == hivev1.ResumingHibernationReason ||
 		(cd.Spec.PowerState == hivev1.HibernatingClusterPowerState && hibernatingCondition.Reason == hivev1.FailedToStartHibernationReason) {
 		return r.stopMachines(cd, cdLog)
@@ -362,27 +381,14 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 
 func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeployment, reason, message string, status corev1.ConditionStatus, logger log.FieldLogger) (result reconcile.Result, returnErr error) {
 	changed := false
-	if status == corev1.ConditionFalse && controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition) == nil {
-		now := metav1.Now()
-		cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
-			Type:               hivev1.ClusterHibernatingCondition,
-			Status:             corev1.ConditionFalse,
-			Reason:             reason,
-			Message:            message,
-			LastProbeTime:      now,
-			LastTransitionTime: now,
-		})
-		changed = true
-	} else {
-		cd.Status.Conditions, changed = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
-			hivev1.ClusterHibernatingCondition,
-			status,
-			reason,
-			message,
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		)
-	}
+	cd.Status.Conditions, changed = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.ClusterHibernatingCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
 
 	if reason == hivev1.SyncSetsNotAppliedReason {
 		defer func() {

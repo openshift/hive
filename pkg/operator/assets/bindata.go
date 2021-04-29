@@ -1565,6 +1565,11 @@ data:
       - "LimitExceeded"
       installFailingReason: ResourceLimitExceeded
       installFailingMessage: Resource limit exceeded
+    - name: InvalidInstallConfigSubnet
+      searchRegexStrings:
+      - "CIDR range start.*is outside of the specified machine networks"
+      installFailingReason: InvalidInstallConfigSubnet
+      installFailingMessage: Invalid subnet in install config. Subnet's CIDR range start is outside of the specified machine networks
     # https://bugzilla.redhat.com/show_bug.cgi?id=1844320
     - name: AWSUnableToFindMatchingRouteTable
       searchRegexStrings:
@@ -1662,6 +1667,11 @@ data:
     # Processing stops at the first match, so this more generic
     # message about the connection failure must always come after the
     # more specific message for LibvirtSSHKeyPermissionDenied.
+    - name: InvalidInstallConfig
+      searchRegexStrings:
+      - "failed to load asset \\\"Install Config\\\""
+      installFailingReason: InvalidInstallConfig
+      installFailingMessage: Installer failed to load install config
     - name: LibvirtConnectionFailed
       searchRegexStrings:
       - "could not connect to libvirt"

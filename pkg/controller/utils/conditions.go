@@ -703,3 +703,13 @@ func FindClusterInstallCondition(conditions []hivev1.ClusterInstallCondition, co
 	}
 	return nil
 }
+
+// IsConditionWithPositivePolarity checks if cluster deployment condition has positive polarity
+func IsConditionWithPositivePolarity(conditionType hivev1.ClusterDeploymentConditionType) bool {
+	for _, condition := range hivev1.PositivePolarityClusterDeploymentConditions {
+		if condition == conditionType {
+			return true
+		}
+	}
+	return false
+}

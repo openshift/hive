@@ -18,6 +18,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 )
 
@@ -46,7 +47,7 @@ var (
 	}, []string{"cluster_type", "age_lt", "deprovisioning_gt"})
 	metricClusterDeploymentsWithConditionTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments_conditions",
-		Help: "Total number of cluster deployments by type with conditions.",
+		Help: "Total number of cluster deployments by type with conditions in their undesired state",
 	}, []string{"cluster_type", "age_lt", "condition"})
 	metricInstallJobsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_install_jobs",
@@ -454,9 +455,6 @@ func newClusterAccumulator(ageFilter string, durationBuckets []string) (*cluster
 		ca.deprovisioning[durStr] = map[string]int{}
 	}
 
-	for _, cdct := range hivev1.AllClusterDeploymentConditions {
-		ca.conditions[cdct] = map[string]int{}
-	}
 	return ca, nil
 }
 
@@ -537,15 +535,16 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 
 	// Process conditions regardless if installed or not:
 	for _, cond := range cd.Status.Conditions {
-		if cond.Status == corev1.ConditionTrue {
-			// Should have been handled by the initialization above which ensures we have 0's in the metrics for
-			// conditions that are not currently present on any clusters. This is a safety check to avoid crashing Hive
-			// in the event a developer adds a new condition but misses the list of all types.
-			if ca.conditions[cond.Type] == nil {
-				log.Warnf("condition type %s missing from AllClusterDeploymentConditions slice", cond.Type)
-				ca.conditions[cond.Type] = map[string]int{}
+		// Conditions with positive polarity are in their undesired state when status = False
+		if controllerutils.IsConditionWithPositivePolarity(cond.Type) {
+			if cond.Status == corev1.ConditionFalse {
+				ca.addConditionToMap(cond.Type, clusterType)
 			}
-			ca.conditions[cond.Type][clusterType]++
+		} else {
+			// Assume all other conditions have negative polarity
+			if cond.Status == corev1.ConditionTrue {
+				ca.addConditionToMap(cond.Type, clusterType)
+			}
 		}
 	}
 }
@@ -635,6 +634,13 @@ func (ro *ReconcileObserver) ObserveControllerReconcileTime() {
 
 func (ro *ReconcileObserver) SetOutcome(outcome ReconcileOutcome) {
 	ro.outcome = outcome
+}
+
+func (ca *clusterAccumulator) addConditionToMap(cond hivev1.ClusterDeploymentConditionType, clusterType string) {
+	if ca.conditions[cond] == nil {
+		ca.conditions[cond] = map[string]int{}
+	}
+	ca.conditions[cond][clusterType]++
 }
 
 var elapsedDurationBuckets = []time.Duration{2 * time.Minute, time.Minute, 30 * time.Second, 10 * time.Second, 5 * time.Second, time.Second, 0}

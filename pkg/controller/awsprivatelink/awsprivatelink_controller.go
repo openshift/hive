@@ -1124,6 +1124,9 @@ func ec2TagSpecification(metadata *hivev1.ClusterMetadata, resource string) *ec2
 		Tags: []*ec2.Tag{{
 			Key:   aws.String("hive.openshift.io/private-link-access-for"),
 			Value: aws.String(metadata.InfraID),
+		}, {
+			Key:   aws.String("Name"),
+			Value: aws.String(metadata.InfraID + "-" + resource),
 		}},
 	}
 }

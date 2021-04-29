@@ -683,7 +683,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			vSphereDatastore = o.VSphereDefaultDataStore
 		}
 		if vSphereDatastore == "" {
-			return nil, fmt.Errorf("must provide --vsphere-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
+			return nil, fmt.Errorf("must provide --vsphere-default-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
 		}
 
 		vSphereVCenter := os.Getenv(constants.VSphereVCenterEnvVar)

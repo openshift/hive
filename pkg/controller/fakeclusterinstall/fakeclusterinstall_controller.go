@@ -43,10 +43,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterInstall{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
-		scheme:       mgr.GetScheme(),
-		logger:       log.WithField("controller", ControllerName),
-		updateStatus: updateClusterInstallStatus,
+		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+		scheme: mgr.GetScheme(),
+		logger: log.WithField("controller", ControllerName),
 	}
 	return r
 }
@@ -80,9 +79,6 @@ type ReconcileClusterInstall struct {
 	client.Client
 	scheme *runtime.Scheme
 	logger log.FieldLogger
-
-	// updateStatus updates a given cluster state's status, exposed for testing
-	updateStatus func(client.Client, *hiveint.FakeClusterInstall, log.FieldLogger) error
 }
 
 // Reconcile ensures that a given FakeClusterInstall resource exists and reflects the state of cluster operators from its target cluster

@@ -329,18 +329,33 @@ var allowedContracts = sets.NewString(
 	hivecontractsv1alpha1.ClusterInstallContractLabelKey,
 )
 
+// knowContracts is a list of contracts and their implementations that doesn't
+// require discovery using CRDs
+var knowContracts = contracts.SupportedContractImplementationsList{{
+	Name: hivecontractsv1alpha1.ClusterInstallContractName,
+	Supported: []contracts.ContractImplementation{{
+		Group:   "extensions.hive.openshift.io",
+		Version: "v1beta1",
+		Kind:    "AgentClusterInstall",
+	}},
+}}
+
 func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (string, error) {
 	cm := &corev1.ConfigMap{}
 	cm.Name = supportedContractsConfigMapName
 	cm.Namespace = getHiveNamespace(instance)
 	cm.Data = make(map[string]string)
 
+	supported := map[string][]contracts.ContractImplementation{}
+	for _, k := range knowContracts {
+		supported[k.Name] = k.Supported
+	}
+
 	crdList := &apiextv1beta1.CustomResourceDefinitionList{}
 	if err := r.Client.List(context.TODO(), crdList); err != nil {
 		hLog.WithError(err).Error("error getting crds for collect contract implementations")
 		return "", err
 	}
-	supported := map[string][]contracts.ContractImplementation{}
 	for _, crd := range crdList.Items {
 		// collect all the possible implementations from this crd
 		var impls []contracts.ContractImplementation

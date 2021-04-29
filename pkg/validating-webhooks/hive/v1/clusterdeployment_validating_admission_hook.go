@@ -282,7 +282,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 
 	if !cd.Spec.Installed && cd.Spec.Provisioning != nil {
 		// InstallConfigSecretRef is not required for anyone using the new ClusterInstall interface:
-		if (cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "") && cd.Spec.ClusterInstallRef == nil {
+		if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
 		}
 	}

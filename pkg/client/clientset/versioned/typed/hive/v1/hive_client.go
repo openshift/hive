@@ -20,7 +20,6 @@ type HiveV1Interface interface {
 	ClusterRelocatesGetter
 	ClusterStatesGetter
 	DNSZonesGetter
-	FakeClusterInstallsGetter
 	HiveConfigsGetter
 	MachinePoolsGetter
 	MachinePoolNameLeasesGetter
@@ -73,10 +72,6 @@ func (c *HiveV1Client) ClusterStates(namespace string) ClusterStateInterface {
 
 func (c *HiveV1Client) DNSZones(namespace string) DNSZoneInterface {
 	return newDNSZones(c, namespace)
-}
-
-func (c *HiveV1Client) FakeClusterInstalls(namespace string) FakeClusterInstallInterface {
-	return newFakeClusterInstalls(c, namespace)
 }
 
 func (c *HiveV1Client) HiveConfigs() HiveConfigInterface {

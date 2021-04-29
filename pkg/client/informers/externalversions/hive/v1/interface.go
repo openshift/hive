@@ -28,8 +28,6 @@ type Interface interface {
 	ClusterStates() ClusterStateInformer
 	// DNSZones returns a DNSZoneInformer.
 	DNSZones() DNSZoneInformer
-	// FakeClusterInstalls returns a FakeClusterInstallInformer.
-	FakeClusterInstalls() FakeClusterInstallInformer
 	// HiveConfigs returns a HiveConfigInformer.
 	HiveConfigs() HiveConfigInformer
 	// MachinePools returns a MachinePoolInformer.
@@ -105,11 +103,6 @@ func (v *version) ClusterStates() ClusterStateInformer {
 // DNSZones returns a DNSZoneInformer.
 func (v *version) DNSZones() DNSZoneInformer {
 	return &dNSZoneInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// FakeClusterInstalls returns a FakeClusterInstallInformer.
-func (v *version) FakeClusterInstalls() FakeClusterInstallInformer {
-	return &fakeClusterInstallInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // HiveConfigs returns a HiveConfigInformer.

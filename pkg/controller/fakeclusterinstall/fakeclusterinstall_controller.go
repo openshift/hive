@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveint "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -63,7 +64,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for changes to FakeClusterInstall
-	err = c.Watch(&source.Kind{Type: &hivev1.FakeClusterInstall{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &hiveint.FakeClusterInstall{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching FakeClusterInstall")
 		return err
@@ -81,7 +82,7 @@ type ReconcileClusterInstall struct {
 	logger log.FieldLogger
 
 	// updateStatus updates a given cluster state's status, exposed for testing
-	updateStatus func(client.Client, *hivev1.FakeClusterInstall, log.FieldLogger) error
+	updateStatus func(client.Client, *hiveint.FakeClusterInstall, log.FieldLogger) error
 }
 
 // Reconcile ensures that a given FakeClusterInstall resource exists and reflects the state of cluster operators from its target cluster
@@ -92,7 +93,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the FakeClusterInstall instance
-	fci := &hivev1.FakeClusterInstall{}
+	fci := &hiveint.FakeClusterInstall{}
 	err := r.Get(context.TODO(), request.NamespacedName, fci)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -299,7 +300,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 	return reconcile.Result{}, nil
 }
 
-func updateClusterInstallStatus(c client.Client, fci *hivev1.FakeClusterInstall, logger log.FieldLogger) error {
+func updateClusterInstallStatus(c client.Client, fci *hiveint.FakeClusterInstall, logger log.FieldLogger) error {
 	// TODO: deepequals check
 	logger.Info("updating status")
 	return c.Status().Update(context.Background(), fci)

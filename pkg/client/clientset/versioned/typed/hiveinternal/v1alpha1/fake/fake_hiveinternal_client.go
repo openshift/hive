@@ -20,6 +20,10 @@ func (c *FakeHiveinternalV1alpha1) ClusterSyncLeases(namespace string) v1alpha1.
 	return &FakeClusterSyncLeases{c, namespace}
 }
 
+func (c *FakeHiveinternalV1alpha1) FakeClusterInstalls(namespace string) v1alpha1.FakeClusterInstallInterface {
+	return &FakeFakeClusterInstalls{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeHiveinternalV1alpha1) RESTClient() rest.Interface {

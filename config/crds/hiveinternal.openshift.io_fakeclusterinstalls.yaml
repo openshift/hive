@@ -4,9 +4,9 @@ metadata:
   creationTimestamp: null
   labels:
     contracts.hive.openshift.io/clusterinstall: "true"
-  name: fakeclusterinstalls.hive.openshift.io
+  name: fakeclusterinstalls.hiveinternal.openshift.io
 spec:
-  group: hive.openshift.io
+  group: hiveinternal.openshift.io
   names:
     kind: FakeClusterInstall
     listKind: FakeClusterInstallList
@@ -144,9 +144,9 @@ spec:
           type: object
       required:
       - spec
-  version: v1
+  version: v1alpha1
   versions:
-  - name: v1
+  - name: v1alpha1
     served: true
     storage: true
 status:

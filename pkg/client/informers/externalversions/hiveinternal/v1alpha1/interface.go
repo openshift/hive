@@ -12,6 +12,8 @@ type Interface interface {
 	ClusterSyncs() ClusterSyncInformer
 	// ClusterSyncLeases returns a ClusterSyncLeaseInformer.
 	ClusterSyncLeases() ClusterSyncLeaseInformer
+	// FakeClusterInstalls returns a FakeClusterInstallInformer.
+	FakeClusterInstalls() FakeClusterInstallInformer
 }
 
 type version struct {
@@ -33,4 +35,9 @@ func (v *version) ClusterSyncs() ClusterSyncInformer {
 // ClusterSyncLeases returns a ClusterSyncLeaseInformer.
 func (v *version) ClusterSyncLeases() ClusterSyncLeaseInformer {
 	return &clusterSyncLeaseInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// FakeClusterInstalls returns a FakeClusterInstallInformer.
+func (v *version) FakeClusterInstalls() FakeClusterInstallInformer {
+	return &fakeClusterInstallInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

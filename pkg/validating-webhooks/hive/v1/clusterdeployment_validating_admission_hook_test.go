@@ -146,8 +146,6 @@ func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
 func validAgentBareMetalClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.AgentBareMetal = &hivev1agent.BareMetalPlatform{
-		APIVIP:     "127.0.0.1",
-		IngressVIP: "127.0.0.1",
 		AgentSelector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"foo": "bar",

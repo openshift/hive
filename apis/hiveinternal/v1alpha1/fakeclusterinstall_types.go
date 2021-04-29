@@ -1,6 +1,7 @@
-package v1
+package v1alpha1
 
 import (
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -10,20 +11,20 @@ type FakeClusterInstallSpec struct {
 
 	// ImageSetRef is a reference to a ClusterImageSet. The release image specified in the ClusterImageSet will be used
 	// to install the cluster.
-	ImageSetRef ClusterImageSetReference `json:"imageSetRef"`
+	ImageSetRef hivev1.ClusterImageSetReference `json:"imageSetRef"`
 
 	// ClusterDeploymentRef is a reference to the ClusterDeployment associated with this AgentClusterInstall.
 	ClusterDeploymentRef corev1.LocalObjectReference `json:"clusterDeploymentRef"`
 
 	// ClusterMetadata contains metadata information about the installed cluster. It should be populated once the cluster install is completed. (it can be populated sooner if desired, but Hive will not copy back to ClusterDeployment until the Installed condition goes True.
-	ClusterMetadata *ClusterMetadata `json:"clusterMetadata,omitempty"`
+	ClusterMetadata *hivev1.ClusterMetadata `json:"clusterMetadata,omitempty"`
 }
 
 // FakeClusterInstallStatus defines the observed state of the FakeClusterInstall.
 type FakeClusterInstallStatus struct {
 	// Conditions includes more detailed status for the cluster install.
 	// +optional
-	Conditions []ClusterInstallCondition `json:"conditions,omitempty"`
+	Conditions []hivev1.ClusterInstallCondition `json:"conditions,omitempty"`
 }
 
 // +genclient

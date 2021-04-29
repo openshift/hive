@@ -52,10 +52,6 @@ func (c *FakeHiveV1) DNSZones(namespace string) v1.DNSZoneInterface {
 	return &FakeDNSZones{c, namespace}
 }
 
-func (c *FakeHiveV1) FakeClusterInstalls(namespace string) v1.FakeClusterInstallInterface {
-	return &FakeFakeClusterInstalls{c, namespace}
-}
-
 func (c *FakeHiveV1) HiveConfigs() v1.HiveConfigInterface {
 	return &FakeHiveConfigs{c}
 }

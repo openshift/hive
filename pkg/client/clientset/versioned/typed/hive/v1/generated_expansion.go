@@ -22,8 +22,6 @@ type ClusterStateExpansion interface{}
 
 type DNSZoneExpansion interface{}
 
-type FakeClusterInstallExpansion interface{}
-
 type HiveConfigExpansion interface{}
 
 type MachinePoolExpansion interface{}

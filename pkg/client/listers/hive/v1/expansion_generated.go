@@ -74,14 +74,6 @@ type DNSZoneListerExpansion interface{}
 // DNSZoneNamespaceLister.
 type DNSZoneNamespaceListerExpansion interface{}
 
-// FakeClusterInstallListerExpansion allows custom methods to be added to
-// FakeClusterInstallLister.
-type FakeClusterInstallListerExpansion interface{}
-
-// FakeClusterInstallNamespaceListerExpansion allows custom methods to be added to
-// FakeClusterInstallNamespaceLister.
-type FakeClusterInstallNamespaceListerExpansion interface{}
-
 // HiveConfigListerExpansion allows custom methods to be added to
 // HiveConfigLister.
 type HiveConfigListerExpansion interface{}

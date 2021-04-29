@@ -624,14 +624,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 }
 
 func (r *ReconcileClusterDeployment) reconcileInstallingClusterProvision(cd *hivev1.ClusterDeployment, releaseImage string, logger log.FieldLogger) (reconcile.Result, error) {
-	// Return early and stop processing if ClusterInstallRef is in play. The controllers that
-	// handle this portion of the API currently live in the assisted service repo, rather than hive.
-	// This will hopefully change in the future.
-	if cd.Spec.ClusterInstallRef != nil {
-		logger.Info("ClusterInstallRef specified, skipping creation of ClusterProvision")
-		return reconcile.Result{}, nil
-	}
-
 	if cd.Status.ProvisionRef == nil {
 		return r.startNewProvision(cd, releaseImage, logger)
 	}

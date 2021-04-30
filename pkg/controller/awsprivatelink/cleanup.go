@@ -119,39 +119,53 @@ func (r *ReconcileAWSPrivateLink) cleanupPrivateLink(cd *hivev1.ClusterDeploymen
 func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,
 	logger log.FieldLogger) error {
-	apiDomain, err := initialURL(r.Client,
-		client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name})
-	if err != nil {
-		logger.WithError(err).Error("could not get API URL from kubeconfig")
-		return err
+
+	var hzID string
+	if cd.Status.Platform != nil &&
+		cd.Status.Platform.AWS != nil &&
+		cd.Status.Platform.AWS.PrivateLink != nil &&
+		cd.Status.Platform.AWS.PrivateLink.HostedZoneID != "" {
+		hzID = cd.Status.Platform.AWS.PrivateLink.HostedZoneID
 	}
 
-	idLog := logger.WithField("infraID", metadata.InfraID)
-	endpointResp, err := awsClient.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-		Filters: []*ec2.Filter{ec2FilterForCluster(metadata)},
-	})
-	if err != nil {
-		idLog.WithError(err).Error("error getting the VPC Endpoint")
-		return err
-	}
-	if len(endpointResp.VpcEndpoints) == 0 {
-		return nil // no work
-	}
+	if hzID == "" { // since we don't have the hz ID, we will discover it to prevent leaks
+		apiDomain, err := initialURL(r.Client,
+			client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name})
+		if err != nil {
+			logger.WithError(err).Error("could not get API URL from kubeconfig")
+			return err
+		}
 
-	vpcEndpoint := endpointResp.VpcEndpoints[0]
-	hzID, err := findHostedZone(awsClient, *vpcEndpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain, logger)
-	if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
-		return nil // no work
-	}
-	if err != nil {
-		idLog.WithError(err).Error("error getting the Hosted Zone")
-		return err
+		idLog := logger.WithField("infraID", metadata.InfraID)
+		endpointResp, err := awsClient.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
+			Filters: []*ec2.Filter{ec2FilterForCluster(metadata)},
+		})
+		if err != nil {
+			idLog.WithError(err).Error("error getting the VPC Endpoint")
+			return err
+		}
+		if len(endpointResp.VpcEndpoints) == 0 {
+			return nil // no work
+		}
+
+		vpcEndpoint := endpointResp.VpcEndpoints[0]
+		hzID, err = findHostedZone(awsClient, *vpcEndpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain, logger)
+		if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
+			return nil // no work
+		}
+		if err != nil {
+			idLog.WithError(err).Error("error getting the Hosted Zone")
+			return err
+		}
 	}
 
 	hzLog := logger.WithField("hostedZoneID", hzID)
 	recordsResp, err := awsClient.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 		HostedZoneId: aws.String(hzID),
 	})
+	if awsErrCodeEquals(err, "NoSuchHostedZone") {
+		return nil // no more work
+	}
 	if err != nil {
 		hzLog.WithError(err).Error("failed to list the hosted zone")
 		return err

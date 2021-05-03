@@ -5,7 +5,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 )
 
 // UpdateConditionCheck tests whether a condition should be updated from the
@@ -540,6 +539,54 @@ func SetClusterDeprovisionConditionWithChangeCheck(
 	return conditions, changed
 }
 
+// SetClusterInstallConditionWithChangeCheck sets a condition in the list of status conditions
+// for a ClusterInstall implementation.
+// It returns the resulting conditions as well a boolean indicating whether there was a change made
+// to the conditions.
+func SetClusterInstallConditionWithChangeCheck(
+	conditions []hivev1.ClusterInstallCondition,
+	conditionType string,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	updateConditionCheck UpdateConditionCheck,
+) ([]hivev1.ClusterInstallCondition, bool) {
+
+	changed := false
+	now := metav1.Now()
+	existingCondition := FindClusterInstallCondition(conditions, conditionType)
+	if existingCondition == nil {
+		conditions = append(
+			conditions,
+			hivev1.ClusterInstallCondition{
+				Type:               conditionType,
+				Status:             status,
+				Reason:             reason,
+				Message:            message,
+				LastTransitionTime: now,
+				LastProbeTime:      now,
+			},
+		)
+		changed = true
+	} else {
+		if shouldUpdateCondition(
+			existingCondition.Status, existingCondition.Reason, existingCondition.Message,
+			status, reason, message,
+			updateConditionCheck,
+		) {
+			if existingCondition.Status != status {
+				existingCondition.LastTransitionTime = now
+			}
+			existingCondition.Status = status
+			existingCondition.Reason = reason
+			existingCondition.Message = message
+			existingCondition.LastProbeTime = now
+			changed = true
+		}
+	}
+	return conditions, changed
+}
+
 // FindClusterDeploymentCondition finds in the condition that has the
 // specified condition type in the given list. If none exists, then returns nil.
 func FindClusterDeploymentCondition(conditions []hivev1.ClusterDeploymentCondition, conditionType hivev1.ClusterDeploymentConditionType) *hivev1.ClusterDeploymentCondition {
@@ -630,7 +677,7 @@ func FindClusterDeprovisionCondition(conditions []hivev1.ClusterDeprovisionCondi
 
 // FindClusterInstallCondition finds in the condition that has the
 // specified condition type in the given list. If none exists, then returns nil.
-func FindClusterInstallCondition(conditions []hivecontractsv1alpha1.ClusterInstallCondition, conditionType string) *hivecontractsv1alpha1.ClusterInstallCondition {
+func FindClusterInstallCondition(conditions []hivev1.ClusterInstallCondition, conditionType string) *hivev1.ClusterInstallCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]

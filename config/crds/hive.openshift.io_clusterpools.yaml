@@ -135,8 +135,7 @@ spec:
               properties:
                 agentBareMetal:
                   description: AgentBareMetal is the configuration used when performing
-                    an Assisted Agent based installation to bare metal. Can only be
-                    used with the Assisted InstallStrategy.
+                    an Assisted Agent based installation to bare metal.
                   properties:
                     agentSelector:
                       description: AgentSelector is a label selector used for associating
@@ -184,14 +183,6 @@ spec:
                             only "value". The requirements are ANDed.
                           type: object
                       type: object
-                    apiVIP:
-                      description: APIVIP is the virtual IP used to reach the OpenShift
-                        cluster's API.
-                      type: string
-                    ingressVIP:
-                      description: IngressVIP is the virtual IP used for cluster ingress
-                        traffic.
-                      type: string
                   required:
                   - agentSelector
                   type: object

@@ -395,8 +395,7 @@ spec:
               properties:
                 agentBareMetal:
                   description: AgentBareMetal is the configuration used when performing
-                    an Assisted Agent based installation to bare metal. Can only be
-                    used with the Assisted InstallStrategy.
+                    an Assisted Agent based installation to bare metal.
                   properties:
                     agentSelector:
                       description: AgentSelector is a label selector used for associating
@@ -444,14 +443,6 @@ spec:
                             only "value". The requirements are ANDed.
                           type: object
                       type: object
-                    apiVIP:
-                      description: APIVIP is the virtual IP used to reach the OpenShift
-                        cluster's API.
-                      type: string
-                    ingressVIP:
-                      description: IngressVIP is the virtual IP used for cluster ingress
-                        traffic.
-                      type: string
                   required:
                   - agentSelector
                   type: object
@@ -755,95 +746,6 @@ spec:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
-                installStrategy:
-                  description: InstallStrategy provides platform agnostic configuration
-                    for the use of alternate install strategies. Defaults to openshift-install
-                    if none specified.
-                  properties:
-                    agent:
-                      description: Agent is the install strategy configuration for
-                        provisioning a cluster with the Agent based assisted installer.
-                      properties:
-                        networking:
-                          description: Networking is the configuration for the pod
-                            network provider in the cluster.
-                          properties:
-                            clusterNetwork:
-                              description: ClusterNetwork is the list of IP address
-                                pools for pods. Default is 10.128.0.0/14 and a host
-                                prefix of /23.
-                              items:
-                                description: ClusterNetworkEntry is a single IP address
-                                  block for pod IP blocks. IP blocks are allocated
-                                  with size 2^HostSubnetLength.
-                                properties:
-                                  cidr:
-                                    description: CIDR is the IP block address pool.
-                                    type: string
-                                  hostPrefix:
-                                    description: HostPrefix is the prefix size to
-                                      allocate to each node from the CIDR. For example,
-                                      24 would allocate 2^8=256 adresses to each node.
-                                      If this field is not used by the plugin, it
-                                      can be left unset.
-                                    format: int32
-                                    type: integer
-                                required:
-                                - cidr
-                                type: object
-                              type: array
-                            machineNetwork:
-                              description: MachineNetwork is the list of IP address
-                                pools for machines.
-                              items:
-                                description: MachineNetworkEntry is a single IP address
-                                  block for node IP blocks.
-                                properties:
-                                  cidr:
-                                    description: CIDR is the IP block address pool
-                                      for machines within the cluster.
-                                    type: string
-                                required:
-                                - cidr
-                                type: object
-                              type: array
-                            serviceNetwork:
-                              description: 'ServiceNetwork is the list of IP address
-                                pools for services. Default is 172.30.0.0/16. NOTE:
-                                currently only one entry is supported.'
-                              items:
-                                type: string
-                              maxItems: 1
-                              type: array
-                          type: object
-                        provisionRequirements:
-                          description: ProvisionRequirements defines configuration
-                            for when the installation is ready to be launched automatically.
-                          properties:
-                            controlPlaneAgents:
-                              description: ControlPlaneAgents is the number of matching
-                                approved and ready Agents with the control plane role
-                                required to launch the install. Must be either 1 or
-                                3.
-                              type: integer
-                            workerAgents:
-                              description: WorkerAgents is the minimum number of matching
-                                approved and ready Agents with the worker role required
-                                to launch the install.
-                              minimum: 0
-                              type: integer
-                          required:
-                          - controlPlaneAgents
-                          type: object
-                        sshPublicKey:
-                          description: SSHPublicKey will be added to all cluster hosts
-                            for use in debugging.
-                          type: string
-                      required:
-                      - networking
-                      - provisionRequirements
-                      type: object
-                  type: object
                 installerEnv:
                   description: InstallerEnv are extra environment variables to pass
                     through to the installer. This may be used to enable additional
@@ -1075,36 +977,6 @@ spec:
                 were met and cluster installation was launched.
               format: date-time
               type: string
-            installStrategy:
-              description: InstallStrategy contains observed state from specific install
-                strategies.
-              properties:
-                agent:
-                  description: Agent defines the observed state of the Agent install
-                    strategy for this cluster.
-                  properties:
-                    connectivityMajorityGroups:
-                      type: string
-                    controlPlaneAgentsDiscovered:
-                      description: ControlPlaneAgentsDiscovered is the number of Agents
-                        currently linked to this ClusterDeployment.
-                      type: integer
-                    controlPlaneAgentsReady:
-                      description: ControlPlaneAgentsDiscovered is the number of Agents
-                        currently linked to this ClusterDeployment that are ready
-                        for use.
-                      type: integer
-                    workerAgentsDiscovered:
-                      description: WorkerAgentsDiscovered is the number of worker
-                        Agents currently linked to this ClusterDeployment.
-                      type: integer
-                    workerAgentsReady:
-                      description: WorkerAgentsDiscovered is the number of worker
-                        Agents currently linked to this ClusterDeployment that are
-                        ready for use.
-                      type: integer
-                  type: object
-              type: object
             installVersion:
               description: InstallVersion is the version of OpenShift as reported
                 by the release image resolved for the installation.

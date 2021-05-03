@@ -12,6 +12,7 @@ type HiveinternalV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ClusterSyncsGetter
 	ClusterSyncLeasesGetter
+	FakeClusterInstallsGetter
 }
 
 // HiveinternalV1alpha1Client is used to interact with features provided by the hiveinternal.openshift.io group.
@@ -25,6 +26,10 @@ func (c *HiveinternalV1alpha1Client) ClusterSyncs(namespace string) ClusterSyncI
 
 func (c *HiveinternalV1alpha1Client) ClusterSyncLeases(namespace string) ClusterSyncLeaseInterface {
 	return newClusterSyncLeases(c, namespace)
+}
+
+func (c *HiveinternalV1alpha1Client) FakeClusterInstalls(namespace string) FakeClusterInstallInterface {
+	return newFakeClusterInstalls(c, namespace)
 }
 
 // NewForConfig creates a new HiveinternalV1alpha1Client for the given config.

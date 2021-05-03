@@ -146,33 +146,9 @@ func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
 func validAgentBareMetalClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.AgentBareMetal = &hivev1agent.BareMetalPlatform{
-		APIVIP:     "127.0.0.1",
-		IngressVIP: "127.0.0.1",
 		AgentSelector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"foo": "bar",
-			},
-		},
-	}
-	cd.Spec.Provisioning.InstallStrategy = &hivev1.InstallStrategy{
-		Agent: &hivev1agent.InstallStrategy{
-			ProvisionRequirements: hivev1agent.ProvisionRequirements{
-				ControlPlaneAgents: 3,
-				WorkerAgents:       3,
-			},
-			Networking: hivev1agent.Networking{
-				MachineNetwork: []hivev1agent.MachineNetworkEntry{
-					{
-						CIDR: "10.0.0.0/16",
-					},
-				},
-				ClusterNetwork: []hivev1agent.ClusterNetworkEntry{
-					{
-						CIDR:       "10.128.0.0/14",
-						HostPrefix: 23,
-					},
-				},
-				ServiceNetwork: []string{"172.60.0.0/16"},
 			},
 		},
 	}
@@ -998,93 +974,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject:       validOvirtClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
-		},
-		{
-			name:            "Test reject agent install strategy without feature gate enabled",
-			newObject:       validAgentBareMetalClusterDeployment(),
-			operation:       admissionv1beta1.Create,
-			expectedAllowed: false,
-		},
-		{
-			name:                "Test accept agent install strategy with feature gate enabled",
-			newObject:           validAgentBareMetalClusterDeployment(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     true,
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-		},
-		{
-			name: "Test reject agent install strategy without agent bare metal platform",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAWSClusterDeployment()
-				cd.Spec.Provisioning.InstallStrategy = &hivev1.InstallStrategy{
-					Agent: &hivev1agent.InstallStrategy{
-						ProvisionRequirements: hivev1agent.ProvisionRequirements{
-							ControlPlaneAgents: 3,
-							WorkerAgents:       3,
-						},
-					},
-				}
-				return cd
-			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-		},
-		{
-			name: "Test reject agent bare metal platform without agent install strategy",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAgentBareMetalClusterDeployment()
-				cd.Spec.Provisioning.InstallStrategy.Agent = nil
-				cd.Spec.Provisioning.InstallConfigSecretRef = &corev1.LocalObjectReference{Name: "foo"}
-				return cd
-			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-		},
-		{
-			name: "Test reject agent install strategy with install config",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAgentBareMetalClusterDeployment()
-				cd.Spec.Provisioning.InstallConfigSecretRef = &corev1.LocalObjectReference{Name: "foo"}
-				return cd
-			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-		},
-		{
-			name: "Test reject agent install strategy with 2 required control plane agents",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAgentBareMetalClusterDeployment()
-				cd.Spec.Provisioning.InstallStrategy.Agent.ProvisionRequirements.ControlPlaneAgents = 2
-				return cd
-			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-		},
-		{
-			name: "Test accept agent install strategy with 0 required worker agents",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAgentBareMetalClusterDeployment()
-				cd.Spec.Provisioning.InstallStrategy.Agent.ProvisionRequirements.WorkerAgents = 0
-				return cd
-			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     true,
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-		},
-		{
-			name: "Test reject agent install strategy with 1 required worker agents", // not valid in assisted service for some reason
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAgentBareMetalClusterDeployment()
-				cd.Spec.Provisioning.InstallStrategy.Agent.ProvisionRequirements.WorkerAgents = 1
-				return cd
-			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
 		},
 		{
 			name: "Block create with targetNamespace set",

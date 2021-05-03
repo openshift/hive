@@ -280,25 +280,10 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	if !cd.Spec.Installed {
-		if cd.Spec.Provisioning != nil {
-			if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
-				// InstallConfigSecretRef is not required for agent install strategy
-				if cd.Spec.Provisioning.InstallStrategy == nil || cd.Spec.Provisioning.InstallStrategy.Agent == nil {
-					allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
-				}
-			}
-
-			// validate the agent install strategy:
-			if cd.Spec.Provisioning.InstallStrategy != nil &&
-				cd.Spec.Provisioning.InstallStrategy.Agent != nil {
-				allErrs = append(allErrs, validateAgentInstallStrategy(specPath, cd)...)
-			} else if cd.Spec.Platform.AgentBareMetal != nil {
-				// agent bare metal platform can only be used with agent install strategy:
-				allErrs = append(allErrs,
-					field.Forbidden(specPath.Child("platform", "agentBareMetal"),
-						"agent bare metal platform can only be used with agent install strategy"))
-			}
+	if !cd.Spec.Installed && cd.Spec.Provisioning != nil {
+		// InstallConfigSecretRef is not required for anyone using the new ClusterInstall interface:
+		if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
 		}
 	}
 
@@ -380,6 +365,8 @@ func validateAWSPrivateLink(path *field.Path, platform *hivev1aws.Platform, conf
 	return allErrs
 }
 
+/* TODO: move to explicit validation for AgentClusterInstall */
+/*
 func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeployment) field.ErrorList {
 	ais := cd.Spec.Provisioning.InstallStrategy.Agent
 	allErrs := field.ErrorList{}
@@ -417,6 +404,7 @@ func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeploy
 	}
 	return allErrs
 }
+*/
 
 func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
 	obj := &unstructured.Unstructured{}

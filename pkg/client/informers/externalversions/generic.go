@@ -78,6 +78,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hiveinternal().V1alpha1().ClusterSyncs().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clustersyncleases"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Hiveinternal().V1alpha1().ClusterSyncLeases().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("fakeclusterinstalls"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Hiveinternal().V1alpha1().FakeClusterInstalls().Informer()}, nil
 
 	}
 

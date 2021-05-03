@@ -37,7 +37,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
-	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -1598,8 +1597,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "clusterinstallref exists, requirements met set to false",
 			existing: []runtime.Object{
 				testClusterInstallRefClusterDeployment("test-fake"),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallRequirementsMet,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallRequirementsMet,
 					Status: corev1.ConditionFalse,
 				}}),
 				testClusterImageSet(),
@@ -1615,8 +1614,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "clusterinstallref exists, requirements met set to true",
 			existing: []runtime.Object{
 				testClusterInstallRefClusterDeployment("test-fake"),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallRequirementsMet,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallRequirementsMet,
 					Status: corev1.ConditionTrue,
 				}}),
 				testClusterImageSet(),
@@ -1633,8 +1632,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "clusterinstallref exists, failed true",
 			existing: []runtime.Object{
 				testClusterInstallRefClusterDeployment("test-fake"),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallFailed,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallFailed,
 					Status: corev1.ConditionTrue,
 				}}),
 				testClusterImageSet(),
@@ -1662,8 +1661,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					}}...)
 					return cd
 				}(),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallFailed,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallFailed,
 					Status: corev1.ConditionFalse,
 				}}),
 				testClusterImageSet(),
@@ -1681,8 +1680,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "clusterinstallref exists, stopped, completed not set",
 			existing: []runtime.Object{
 				testClusterInstallRefClusterDeployment("test-fake"),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallStopped,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallStopped,
 					Status: corev1.ConditionTrue,
 				}}),
 				testClusterImageSet(),
@@ -1701,11 +1700,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "clusterinstallref exists, stopped, completed false",
 			existing: []runtime.Object{
 				testClusterInstallRefClusterDeployment("test-fake"),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallStopped,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallStopped,
 					Status: corev1.ConditionTrue,
 				}, {
-					Type:   hivecontractsv1alpha1.ClusterInstallCompleted,
+					Type:   hivev1.ClusterInstallCompleted,
 					Status: corev1.ConditionFalse,
 				}}),
 				testClusterImageSet(),
@@ -1735,11 +1734,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					}}...)
 					return cd
 				}(),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallStopped,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallStopped,
 					Status: corev1.ConditionFalse,
 				}, {
-					Type:   hivecontractsv1alpha1.ClusterInstallCompleted,
+					Type:   hivev1.ClusterInstallCompleted,
 					Status: corev1.ConditionFalse,
 				}}),
 				testClusterImageSet(),
@@ -1808,8 +1807,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "clusterinstallref exists, completed",
 			existing: []runtime.Object{
 				testClusterInstallRefClusterDeployment("test-fake"),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallCompleted,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallCompleted,
 					Status: corev1.ConditionTrue,
 				}}),
 				testClusterImageSet(),
@@ -1828,11 +1827,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "clusterinstallref exists, stopped and completed",
 			existing: []runtime.Object{
 				testClusterInstallRefClusterDeployment("test-fake"),
-				testFakeClusterInstallWithConditions("test-fake", []hivecontractsv1alpha1.ClusterInstallCondition{{
-					Type:   hivecontractsv1alpha1.ClusterInstallCompleted,
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallCompleted,
 					Status: corev1.ConditionTrue,
 				}, {
-					Type:   hivecontractsv1alpha1.ClusterInstallStopped,
+					Type:   hivev1.ClusterInstallStopped,
 					Status: corev1.ConditionTrue,
 					Reason: "InstallComplete",
 				}}),
@@ -2276,7 +2275,7 @@ func testFakeClusterInstall(name string) *unstructured.Unstructured {
 	return fake
 }
 
-func testFakeClusterInstallWithConditions(name string, conditions []hivecontractsv1alpha1.ClusterInstallCondition) *unstructured.Unstructured {
+func testFakeClusterInstallWithConditions(name string, conditions []hivev1.ClusterInstallCondition) *unstructured.Unstructured {
 	fake := testFakeClusterInstall(name)
 
 	value := []interface{}{}

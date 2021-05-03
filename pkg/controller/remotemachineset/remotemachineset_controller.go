@@ -823,10 +823,13 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 			min, max = getMinMaxReplicasForMachineSet(pool, machineSets, i)
 		}
 		pool.Status.MachineSets[i] = hivev1.MachineSetStatus{
-			Name:        ms.Name,
-			Replicas:    *ms.Spec.Replicas,
-			MinReplicas: min,
-			MaxReplicas: max,
+			Name:          ms.Name,
+			Replicas:      *ms.Spec.Replicas,
+			ReadyReplicas: ms.Status.ReadyReplicas,
+			MinReplicas:   min,
+			MaxReplicas:   max,
+			ErrorReason:   (*string)(ms.Status.ErrorReason),
+			ErrorMessage:  ms.Status.ErrorMessage,
 		}
 		pool.Status.Replicas += *ms.Spec.Replicas
 	}

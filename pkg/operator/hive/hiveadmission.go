@@ -15,6 +15,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	hiveconstants "github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
@@ -134,6 +135,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
 	addAWSPrivateLinkConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
 	addSupportedContractsConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
+	addReleaseImageVerificationConfigMapEnv(&hiveAdmDeployment.Spec.Template.Spec, instance)
 
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
@@ -433,6 +435,19 @@ func addSupportedContractsConfigVolume(podSpec *corev1.PodSpec) {
 	podSpec.Volumes = append(podSpec.Volumes, volume)
 	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
 	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, envVar)
+}
+
+func addReleaseImageVerificationConfigMapEnv(podSpec *corev1.PodSpec, instance *hivev1.HiveConfig) {
+	if instance.Spec.ReleaseImageVerificationConfigMapRef == nil {
+		return
+	}
+	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, corev1.EnvVar{
+		Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar,
+		Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Namespace,
+	}, corev1.EnvVar{
+		Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNameEnvVar,
+		Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Name,
+	})
 }
 
 func computeConfigHash(cm *corev1.ConfigMap) string {

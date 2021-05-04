@@ -61,6 +61,30 @@ func TestClusterImageSetValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name: "Test valid ClusterImageSet.Spec with digest",
+			newSpec: hivev1.ClusterImageSetSpec{
+				ReleaseImage: "image@sha256:abc",
+			},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name: "Test invalid ClusterImageSet.Spec with digest",
+			newSpec: hivev1.ClusterImageSetSpec{
+				ReleaseImage: "image@SHA256:abc",
+			},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Test invalid ClusterImageSet.Spec with digest",
+			newSpec: hivev1.ClusterImageSetSpec{
+				ReleaseImage: "image@sh256:abc##",
+			},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
 			name:            "Test empty ClusterImageSet.Spec value",
 			newSpec:         hivev1.ClusterImageSetSpec{},
 			operation:       admissionv1beta1.Create,

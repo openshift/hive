@@ -21,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
@@ -33,6 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
+	"github.com/openshift/library-go/pkg/manifest"
+	"github.com/openshift/library-go/pkg/verify"
+	"github.com/openshift/library-go/pkg/verify/store/sigstore"
 
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -108,6 +113,14 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flow
 		r.protectedDelete = true
 	}
 
+	verifier, err := LoadReleaseImageVerifier(mgr.GetConfig())
+	if err == nil {
+		logger.Info("Release Image verification enabled")
+		r.releaseImageVerifier = verifier
+	} else {
+		logger.WithError(err).Error("Release Image verification failed to be configured")
+	}
+
 	return r
 }
 
@@ -118,13 +131,14 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return errors.New("reconciler supplied is not a ReconcileClusterDeployment")
 	}
 
+	logger := log.WithField("controller", ControllerName)
 	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{
 		Reconciler:              r,
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("could not create controller")
+		logger.WithError(err).Error("could not create controller")
 		return err
 	}
 
@@ -133,14 +147,14 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{},
 		clusterInstallIndexFieldName, indexClusterInstall); err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error indexing cluster deployment for cluster install")
+		logger.WithError(err).Error("Error indexing cluster deployment for cluster install")
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment")
+		logger.WithError(err).Error("Error watching cluster deployment")
 		return err
 	}
 
@@ -155,14 +169,14 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment job")
+		logger.WithError(err).Error("Error watching cluster deployment job")
 		return err
 	}
 
 	// Watch for pods created by an install job
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(selectorPodWatchHandler))
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment pods")
+		logger.WithError(err).Error("Error watching cluster deployment pods")
 		return err
 	}
 
@@ -172,7 +186,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error watching deprovision request created by cluster deployment")
+		logger.WithError(err).Error("Error watching deprovision request created by cluster deployment")
 		return err
 	}
 
@@ -182,7 +196,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment dnszones")
+		logger.WithError(err).Error("Error watching cluster deployment dnszones")
 		return err
 	}
 
@@ -224,6 +238,10 @@ type ReconcileClusterDeployment struct {
 	// validateCredentialsForClusterDeployment is what this controller will call to validate
 	// that the platform creds are good (used for testing)
 	validateCredentialsForClusterDeployment func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error)
+
+	// releaseImageVerifier, if provided, will be used to check an release image before it is executed.
+	// Any error will prevent an release image from being accessed.
+	releaseImageVerifier verify.Interface
 
 	protectedDelete bool
 }
@@ -577,6 +595,24 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		// The controller will not automatically requeue the cluster deployment
 		// since the controller is not watching for secrets. So, requeue manually.
 		return reconcile.Result{Requeue: true}, nil
+	}
+
+	// let's verify the release image before using it here.
+	if r.releaseImageVerifier != nil {
+		var releaseDigest string
+		if index := strings.LastIndex(releaseImage, "@"); index != -1 {
+			releaseDigest = releaseImage[index+1:]
+		}
+		cdLog.WithField("releaseImage", releaseImage).
+			WithField("releaseDigest", releaseDigest).Debugf("verifying the release image using %s", r.releaseImageVerifier)
+
+		err := r.releaseImageVerifier.Verify(context.TODO(), releaseDigest)
+		if err != nil {
+			cdLog.WithField("releaseImage", releaseImage).
+				WithField("releaseDigest", releaseDigest).
+				WithError(err).Error("Verification of release image failed")
+			return reconcile.Result{}, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionTrue, "ReleaseImageVerificationFailed", err.Error(), cdLog)
+		}
 	}
 
 	switch result, err := r.resolveInstallerImage(cd, releaseImage, cdLog); {
@@ -1895,4 +1931,49 @@ func getClusterRegion(cd *hivev1.ClusterDeployment) string {
 		return cd.Spec.Platform.GCP.Region
 	}
 	return regionUnknown
+}
+
+func LoadReleaseImageVerifier(config *rest.Config) (verify.Interface, error) {
+	ns := os.Getenv(constants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar)
+	name := os.Getenv(constants.HiveReleaseImageVerificationConfigMapNameEnvVar)
+
+	if name == "" {
+		return nil, nil
+	}
+	if ns == "" {
+		return nil, errors.New("namespace must be set for Release Image verifier ConfigMap")
+	}
+
+	client, err := dynamic.NewForConfig(config) // the verify lib expects unstructured style object for configuration and therefore dynamic makes more sense.
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create kube client")
+	}
+
+	cm, err := client.Resource(corev1.SchemeGroupVersion.WithResource("configmaps")).
+		Namespace(ns).
+		Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read ConfigMap for release image verification")
+	}
+
+	// verifier configuration expects the configmap to have certain annotations and
+	// ensuring that before passing it on ensures that it is used.
+	annos := cm.GetAnnotations()
+	if annos == nil {
+		annos = map[string]string{}
+	}
+	annos[verify.ReleaseAnnotationConfigMapVerifier] = "true"
+	cm.SetAnnotations(annos)
+
+	cmData, err := cm.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	m := manifest.Manifest{
+		OriginalFilename: "release-image-verifier-configmap",
+		GVK:              cm.GroupVersionKind(),
+		Obj:              cm,
+		Raw:              cmData,
+	}
+	return verify.NewFromManifests([]manifest.Manifest{m}, sigstore.NewCachedHTTPClientConstructor(sigstore.DefaultClient, nil).HTTPClient)
 }

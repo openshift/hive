@@ -119,6 +119,9 @@ crd: ensure-controller-gen ensure-yq
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 	@echo Patching CRD files for additional static information
 	$(foreach p,$(wildcard ./config/crdspatch/*.yaml),$(call patch-crd-yq,$(subst ./config/crdspatch/,./config/crds/,$(p)),$(p)))
+	# Patch ClusterProvision CRD to remove the massive PodSpec def we consider an internal implementation detail:
+	@echo Patching ClusterProvision CRD yaml to remove overly verbose PodSpec details:
+	$(YQ) d -i config/crds/hive.openshift.io_clusterprovisions.yaml "spec.validation.openAPIV3Schema.properties.spec.properties.podSpec"
 update: crd
 
 .PHONY: verify-crd

@@ -433,6 +433,15 @@ spec:
                 description: MachineSetStatus is the status of a machineset in the
                   remote cluster.
                 properties:
+                  errorMessage:
+                    type: string
+                  errorReason:
+                    description: In the event that there is a terminal problem reconciling
+                      the replicas, both ErrorReason and ErrorMessage will be set.
+                      ErrorReason will be populated with a succinct value suitable
+                      for machine interpretation, while ErrorMessage will contain
+                      a more verbose string suitable for logging and human consumption.
+                    type: string
                   maxReplicas:
                     description: MaxReplicas is the maximum number of replicas for
                       the machine set.
@@ -446,6 +455,13 @@ spec:
                   name:
                     description: Name is the name of the machine set.
                     type: string
+                  readyReplicas:
+                    description: The number of ready replicas for this MachineSet.
+                      A machine is considered ready when the node has been created
+                      and is "Ready". It is transferred as-is from the MachineSet
+                      from remote cluster.
+                    format: int32
+                    type: integer
                   replicas:
                     description: Replicas is the current number of replicas for the
                       machine set.

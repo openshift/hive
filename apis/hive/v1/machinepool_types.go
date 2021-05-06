@@ -104,11 +104,27 @@ type MachineSetStatus struct {
 	// Replicas is the current number of replicas for the machine set.
 	Replicas int32 `json:"replicas"`
 
+	// The number of ready replicas for this MachineSet. A machine is considered ready
+	// when the node has been created and is "Ready". It is transferred as-is from the
+	// MachineSet from remote cluster.
+	// +optional
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
 	// MinReplicas is the minimum number of replicas for the machine set.
 	MinReplicas int32 `json:"minReplicas"`
 
 	// MaxReplicas is the maximum number of replicas for the machine set.
 	MaxReplicas int32 `json:"maxReplicas"`
+
+	// In the event that there is a terminal problem reconciling the
+	// replicas, both ErrorReason and ErrorMessage will be set. ErrorReason
+	// will be populated with a succinct value suitable for machine
+	// interpretation, while ErrorMessage will contain a more verbose
+	// string suitable for logging and human consumption.
+	// +optional
+	ErrorReason *string `json:"errorReason,omitempty"`
+	// +optional
+	ErrorMessage *string `json:"errorMessage,omitempty"`
 }
 
 // MachinePoolCondition contains details for the current condition of a machine pool

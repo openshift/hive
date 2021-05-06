@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
@@ -316,7 +317,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 		return r.removeFinalizer(pool, logger)
 	}
 
-	return reconcile.Result{}, r.updatePoolStatusForMachineSets(pool, machineSets, logger)
+	return r.updatePoolStatusForMachineSets(pool, machineSets, logger)
 }
 
 func (r *ReconcileRemoteMachineSet) getMasterMachine(
@@ -809,7 +810,7 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 	pool *hivev1.MachinePool,
 	machineSets []*machineapi.MachineSet,
 	logger log.FieldLogger,
-) error {
+) (reconcile.Result, error) {
 	origPool := pool.DeepCopy()
 
 	pool.Status.MachineSets = make([]hivev1.MachineSetStatus, len(machineSets))
@@ -823,20 +824,34 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 			min, max = getMinMaxReplicasForMachineSet(pool, machineSets, i)
 		}
 		pool.Status.MachineSets[i] = hivev1.MachineSetStatus{
-			Name:        ms.Name,
-			Replicas:    *ms.Spec.Replicas,
-			MinReplicas: min,
-			MaxReplicas: max,
+			Name:          ms.Name,
+			Replicas:      *ms.Spec.Replicas,
+			ReadyReplicas: ms.Status.ReadyReplicas,
+			MinReplicas:   min,
+			MaxReplicas:   max,
+			ErrorReason:   (*string)(ms.Status.ErrorReason),
+			ErrorMessage:  ms.Status.ErrorMessage,
 		}
 		pool.Status.Replicas += *ms.Spec.Replicas
 	}
 
-	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
-		reflect.DeepEqual(origPool.Status, pool.Status) {
-		return nil
+	var requeueAfter time.Duration
+	for _, ms := range pool.Status.MachineSets {
+		if ms.Replicas != ms.ReadyReplicas {
+			// remote cluster machinesets cannot trigger reconcile and therefore
+			// since we know we are not steady state, we need to ensure that we
+			// requeue to keep the status in sync from remote cluster.
+			requeueAfter = 10 * time.Minute
+			break
+		}
 	}
 
-	return errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
+	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
+		reflect.DeepEqual(origPool.Status, pool.Status) {
+		return reconcile.Result{RequeueAfter: requeueAfter}, nil
+	}
+
+	return reconcile.Result{RequeueAfter: requeueAfter}, errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
 }
 
 func (r *ReconcileRemoteMachineSet) createActuator(

@@ -18,6 +18,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -193,6 +194,30 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Monitor CRDs so that we can keep latest list of supported contracts
+	err = c.Watch(&source.Kind{Type: &apiextv1beta1.CustomResourceDefinition{}},
+		handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
+			retval := []reconcile.Request{}
+
+			configList := &hivev1.HiveConfigList{}
+			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList) // reconcile all HiveConfigs
+			if err != nil {
+				log.WithError(err).Errorf("error listing hive configs for CRD reconcile")
+				return retval
+			}
+
+			for _, config := range configList.Items {
+				retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+					Name: config.Name,
+				}})
+			}
+			log.WithField("configs", retval).Debug("reconciled for change in CRD")
+			return retval
+		}))
+	if err != nil {
+		return err
+	}
+
 	// Lookup the hive-operator Deployment image, we will assume hive components should all be
 	// using the same image as the operator.
 	operatorDeployment := &appsv1.Deployment{}
@@ -353,6 +378,13 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	scConfigHash, err := r.deploySupportedContractsConfigMap(hLog, h, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying supported contracts configmap")
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
 	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance, plConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying controllers configmap")
@@ -386,7 +418,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash, plConfigHash)
+	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash, plConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)

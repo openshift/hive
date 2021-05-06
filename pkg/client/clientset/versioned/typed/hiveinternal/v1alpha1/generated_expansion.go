@@ -5,3 +5,5 @@ package v1alpha1
 type ClusterSyncExpansion interface{}
 
 type ClusterSyncLeaseExpansion interface{}
+
+type FakeClusterInstallExpansion interface{}

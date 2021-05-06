@@ -17,3 +17,11 @@ type ClusterSyncLeaseListerExpansion interface{}
 // ClusterSyncLeaseNamespaceListerExpansion allows custom methods to be added to
 // ClusterSyncLeaseNamespaceLister.
 type ClusterSyncLeaseNamespaceListerExpansion interface{}
+
+// FakeClusterInstallListerExpansion allows custom methods to be added to
+// FakeClusterInstallLister.
+type FakeClusterInstallListerExpansion interface{}
+
+// FakeClusterInstallNamespaceListerExpansion allows custom methods to be added to
+// FakeClusterInstallNamespaceLister.
+type FakeClusterInstallNamespaceListerExpansion interface{}

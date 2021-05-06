@@ -49,6 +49,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/controlplanecerts"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint"
 	"github.com/openshift/hive/pkg/controller/dnszone"
+	"github.com/openshift/hive/pkg/controller/fakeclusterinstall"
 	"github.com/openshift/hive/pkg/controller/hibernation"
 	"github.com/openshift/hive/pkg/controller/machinemanagement"
 	"github.com/openshift/hive/pkg/controller/metrics"
@@ -85,6 +86,7 @@ var controllerFuncs = map[hivev1.ControllerName]controllerSetupFunc{
 	controlplanecerts.ControllerName:    controlplanecerts.Add,
 	dnsendpoint.ControllerName:          dnsendpoint.Add,
 	dnszone.ControllerName:              dnszone.Add,
+	fakeclusterinstall.ControllerName:   fakeclusterinstall.Add,
 	metrics.ControllerName:              metrics.Add,
 	remoteingress.ControllerName:        remoteingress.Add,
 	remotemachineset.ControllerName:     remotemachineset.Add,

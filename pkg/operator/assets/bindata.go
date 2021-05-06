@@ -866,6 +866,12 @@ rules:
   verbs:
   - "*"
 - apiGroups:
+  - extensions.hive.openshift.io
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
   - batch
   resources:
   - jobs

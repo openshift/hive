@@ -584,6 +584,7 @@ github.com/openshift/hive/apis/hive/v1/gcp
 github.com/openshift/hive/apis/hive/v1/openstack
 github.com/openshift/hive/apis/hive/v1/ovirt
 github.com/openshift/hive/apis/hive/v1/vsphere
+github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
 github.com/openshift/hive/apis/scheme
 # github.com/openshift/installer v0.9.0-master.0.20210211002944-d237b9dee575

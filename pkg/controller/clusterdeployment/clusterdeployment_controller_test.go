@@ -17,6 +17,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -1557,6 +1558,297 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Zero(t, len(provisionList.Items), "expected no ClusterProvision objects when platform creds are bad")
 			},
 		},
+		{
+			name: "clusterinstallref not found",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+			},
+			expectErr: true,
+		},
+		{
+			name: "clusterinstallref exists, but no imagesetref",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstall("test-fake"),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+
+				assertConditionStatus(t, cd, hivev1.ClusterImageSetNotFoundCondition, corev1.ConditionTrue)
+			},
+		},
+		{
+			name: "clusterinstallref exists, no conditions set",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", nil),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+			},
+		},
+		{
+			name: "clusterinstallref exists, requirements met set to false",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallRequirementsMet,
+					Status: corev1.ConditionFalse,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+			},
+		},
+		{
+			name: "clusterinstallref exists, requirements met set to true",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallRequirementsMet,
+					Status: corev1.ConditionTrue,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition, corev1.ConditionTrue)
+			},
+		},
+		{
+			name: "clusterinstallref exists, failed true",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallFailed,
+					Status: corev1.ConditionTrue,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallFailedClusterDeploymentCondition, corev1.ConditionTrue)
+				assertConditionStatus(t, cd, hivev1.ProvisionFailedCondition, corev1.ConditionTrue)
+			},
+		},
+		{
+			name: "clusterinstallref exists, failed false, previously true",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterInstallRefClusterDeployment("test-fake")
+					cd.Status.Conditions = append(cd.Status.Conditions, []hivev1.ClusterDeploymentCondition{{
+						Type:   hivev1.ProvisionFailedCondition,
+						Status: corev1.ConditionTrue,
+					}, {
+						Type:   hivev1.ClusterInstallFailedClusterDeploymentCondition,
+						Status: corev1.ConditionTrue,
+					}}...)
+					return cd
+				}(),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallFailed,
+					Status: corev1.ConditionFalse,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallFailedClusterDeploymentCondition, corev1.ConditionFalse)
+				assertConditionStatus(t, cd, hivev1.ProvisionFailedCondition, corev1.ConditionFalse)
+			},
+		},
+		{
+			name: "clusterinstallref exists, stopped, completed not set",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallStopped,
+					Status: corev1.ConditionTrue,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallStoppedClusterDeploymentCondition, corev1.ConditionTrue)
+				assertConditionStatus(t, cd, hivev1.ProvisionStoppedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.ProvisionStoppedCondition, "InstallAttemptsLimitReached")
+			},
+		},
+		{
+			name: "clusterinstallref exists, stopped, completed false",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallStopped,
+					Status: corev1.ConditionTrue,
+				}, {
+					Type:   hivev1.ClusterInstallCompleted,
+					Status: corev1.ConditionFalse,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallStoppedClusterDeploymentCondition, corev1.ConditionTrue)
+				assertConditionStatus(t, cd, hivev1.ProvisionStoppedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.ProvisionStoppedCondition, "InstallAttemptsLimitReached")
+			},
+		},
+		{
+			name: "clusterinstallref exists, previously stopped, now progressing",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterInstallRefClusterDeployment("test-fake")
+					cd.Status.Conditions = append(cd.Status.Conditions, []hivev1.ClusterDeploymentCondition{{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "InstallAttemptsLimitReached",
+					}, {
+						Type:   hivev1.ClusterInstallStoppedClusterDeploymentCondition,
+						Status: corev1.ConditionTrue,
+					}}...)
+					return cd
+				}(),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallStopped,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.ClusterInstallCompleted,
+					Status: corev1.ConditionFalse,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallStoppedClusterDeploymentCondition, corev1.ConditionFalse)
+				assertConditionStatus(t, cd, hivev1.ProvisionStoppedCondition, corev1.ConditionFalse)
+			},
+		},
+		{
+			name: "clusterinstallref exists, cluster metadata available partially",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterInstallRefClusterDeployment("test-fake")
+					cd.Spec.ClusterMetadata = nil
+					return cd
+				}(),
+				testFakeClusterInstallWithClusterMetadata("test-fake", hivev1.ClusterMetadata{InfraID: testInfraID}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.Nil(t, cd.Spec.ClusterMetadata)
+			},
+		},
+		{
+			name: "clusterinstallref exists, cluster metadata available",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterInstallRefClusterDeployment("test-fake")
+					cd.Spec.ClusterMetadata = nil
+					return cd
+				}(),
+				testFakeClusterInstallWithClusterMetadata("test-fake", hivev1.ClusterMetadata{
+					InfraID:   testInfraID,
+					ClusterID: testClusterID,
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{
+						Name: adminKubeconfigSecret,
+					},
+					AdminPasswordSecretRef: corev1.LocalObjectReference{
+						Name: adminPasswordSecret,
+					},
+				}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				require.NotNil(t, cd.Spec.ClusterMetadata)
+				assert.Equal(t, testInfraID, cd.Spec.ClusterMetadata.InfraID)
+				assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID)
+				assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name)
+				assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name)
+			},
+		},
+		{
+			name: "clusterinstallref exists, completed",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallCompleted,
+					Status: corev1.ConditionTrue,
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallCompletedClusterDeploymentCondition, corev1.ConditionTrue)
+				assert.Equal(t, true, cd.Spec.Installed)
+				assert.NotNil(t, cd.Status.InstalledTimestamp)
+			},
+		},
+		{
+			name: "clusterinstallref exists, stopped and completed",
+			existing: []runtime.Object{
+				testClusterInstallRefClusterDeployment("test-fake"),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallCompleted,
+					Status: corev1.ConditionTrue,
+				}, {
+					Type:   hivev1.ClusterInstallStopped,
+					Status: corev1.ConditionTrue,
+					Reason: "InstallComplete",
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assertConditionStatus(t, cd, hivev1.ClusterInstallCompletedClusterDeploymentCondition, corev1.ConditionTrue)
+				assertConditionStatus(t, cd, hivev1.ClusterInstallStoppedClusterDeploymentCondition, corev1.ConditionTrue)
+				assertConditionStatus(t, cd, hivev1.ProvisionStoppedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.ProvisionStoppedCondition, "InstallComplete")
+				assert.Equal(t, true, cd.Spec.Installed)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1581,6 +1873,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				expectations:                            controllerExpectations,
 				remoteClusterAPIClientBuilder:           func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				validateCredentialsForClusterDeployment: test.platformCredentialsValidation,
+				watchingClusterInstall: map[string]struct{}{
+					(schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "FakeClusterInstall"}).String(): {},
+				},
 			}
 
 			if test.reconcilerSetup != nil {
@@ -1897,6 +2192,18 @@ func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeploy
 	return cd
 }
 
+func testClusterInstallRefClusterDeployment(name string) *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Spec.Provisioning = nil
+	cd.Spec.ClusterInstallRef = &hivev1.ClusterInstallLocalReference{
+		Group:   "hive.openshift.io",
+		Version: "v1",
+		Kind:    "FakeClusterInstall",
+		Name:    name,
+	}
+	return cd
+}
+
 func testClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.Finalizers = []string{}
@@ -1944,6 +2251,63 @@ func testClusterDeploymentWithProvision() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.Status.ProvisionRef = &corev1.LocalObjectReference{Name: provisionName}
 	return cd
+}
+
+func testEmptyFakeClusterInstall(name string) *unstructured.Unstructured {
+	fake := &unstructured.Unstructured{}
+	fake.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "hive.openshift.io",
+		Version: "v1",
+		Kind:    "FakeClusterInstall",
+	})
+	fake.SetNamespace(testNamespace)
+	fake.SetName(name)
+	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]interface{}{}, "spec")
+	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]interface{}{}, "status")
+	return fake
+}
+
+func testFakeClusterInstall(name string) *unstructured.Unstructured {
+	fake := testEmptyFakeClusterInstall(name)
+	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]interface{}{
+		"name": testClusterImageSetName,
+	}, "spec", "imageSetRef")
+	return fake
+}
+
+func testFakeClusterInstallWithConditions(name string, conditions []hivev1.ClusterInstallCondition) *unstructured.Unstructured {
+	fake := testFakeClusterInstall(name)
+
+	value := []interface{}{}
+	for _, c := range conditions {
+		value = append(value, map[string]interface{}{
+			"type":    c.Type,
+			"status":  string(c.Status),
+			"reason":  c.Reason,
+			"message": c.Message,
+		})
+	}
+
+	unstructured.SetNestedField(fake.UnstructuredContent(), value, "status", "conditions")
+	return fake
+}
+
+func testFakeClusterInstallWithClusterMetadata(name string, metadata hivev1.ClusterMetadata) *unstructured.Unstructured {
+	fake := testFakeClusterInstall(name)
+
+	value := map[string]interface{}{
+		"clusterID": metadata.ClusterID,
+		"infraID":   metadata.InfraID,
+		"adminKubeconfigSecretRef": map[string]interface{}{
+			"name": metadata.AdminKubeconfigSecretRef.Name,
+		},
+		"adminPasswordSecretRef": map[string]interface{}{
+			"name": metadata.AdminPasswordSecretRef.Name,
+		},
+	}
+
+	unstructured.SetNestedField(fake.UnstructuredContent(), value, "spec", "clusterMetadata")
+	return fake
 }
 
 func testProvision() *hivev1.ClusterProvision {

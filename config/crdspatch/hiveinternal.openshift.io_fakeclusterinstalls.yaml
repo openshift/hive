@@ -1,0 +1,3 @@
+metadata:
+  labels:
+    contracts.hive.openshift.io/clusterinstall: "true"

@@ -26,10 +26,12 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/awsprivatelink"
 	"github.com/openshift/hive/pkg/manageddns"
+	"github.com/openshift/hive/pkg/util/contracts"
 )
 
 const (
@@ -52,6 +54,7 @@ type ClusterDeploymentValidatingAdmissionHook struct {
 	validManagedDomains  []string
 	fs                   *featureSet
 	awsPrivateLinkConfig *hivev1.AWSPrivateLinkConfig
+	supportedContracts   contracts.SupportedContractImplementationsList
 }
 
 // NewClusterDeploymentValidatingAdmissionHook constructs a new ClusterDeploymentValidatingAdmissionHook
@@ -71,12 +74,19 @@ func NewClusterDeploymentValidatingAdmissionHook(decoder *admission.Decoder) *Cl
 		logger.WithError(err).Fatal("Unable to read AWS Private Link Config file")
 	}
 
+	supportContractsConfig, err := contracts.ReadSupportContractsFile()
+	if err != nil {
+		logger.WithError(err).Fatal("Unable to read Supported Contract Implementations file")
+
+	}
+
 	logger.WithField("managedDomains", domains).Info("Read managed domains")
 	return &ClusterDeploymentValidatingAdmissionHook{
 		decoder:              decoder,
 		validManagedDomains:  domains,
 		fs:                   newFeatureSet(),
 		awsPrivateLinkConfig: aplConfig,
+		supportedContracts:   supportContractsConfig,
 	}
 }
 
@@ -261,28 +271,19 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	specPath := field.NewPath("spec")
 
 	if !cd.Spec.Installed {
-		if cd.Spec.Provisioning == nil {
+		if cd.Spec.Provisioning != nil && cd.Spec.ClusterInstallRef != nil {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("provisioning"), "provisioning and clusterInstallRef cannot be set at the same time"))
+		}
+
+		if cd.Spec.Provisioning == nil && cd.Spec.ClusterInstallRef == nil {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "provisioning is required if not installed"))
+		}
+	}
 
-		} else {
-
-			if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
-				// InstallConfigSecretRef is not required for agent install strategy
-				if cd.Spec.Provisioning.InstallStrategy == nil || cd.Spec.Provisioning.InstallStrategy.Agent == nil {
-					allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
-				}
-			}
-
-			// validate the agent install strategy:
-			if cd.Spec.Provisioning.InstallStrategy != nil &&
-				cd.Spec.Provisioning.InstallStrategy.Agent != nil {
-				allErrs = append(allErrs, validateAgentInstallStrategy(specPath, cd)...)
-			} else if cd.Spec.Platform.AgentBareMetal != nil {
-				// agent bare metal platform can only be used with agent install strategy:
-				allErrs = append(allErrs,
-					field.Forbidden(specPath.Child("platform", "agentBareMetal"),
-						"agent bare metal platform can only be used with agent install strategy"))
-			}
+	if !cd.Spec.Installed && cd.Spec.Provisioning != nil {
+		// InstallConfigSecretRef is not required for anyone using the new ClusterInstall interface:
+		if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "installConfigSecretRef", "name"), "must specify an InstallConfig"))
 		}
 	}
 
@@ -296,6 +297,19 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	if cd.Spec.Provisioning != nil {
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
+		}
+	}
+
+	if cd.Spec.ClusterInstallRef != nil {
+		supported := a.supportedContracts.SupportedImplementations(hivecontractsv1alpha1.ClusterInstallContractName)
+		if len(supported) == 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("clusterInstallRef"), "there are no supported implementations of clusterinstall contract"))
+		} else {
+			ref := cd.Spec.ClusterInstallRef
+			if !a.supportedContracts.IsSupported(hivecontractsv1alpha1.ClusterInstallContractName,
+				contracts.ContractImplementation{Group: ref.Group, Version: ref.Version, Kind: ref.Kind}) {
+				allErrs = append(allErrs, field.NotSupported(specPath.Child("clusterInstallRef", "kind"), ref.Kind, supported))
+			}
 		}
 	}
 
@@ -351,6 +365,8 @@ func validateAWSPrivateLink(path *field.Path, platform *hivev1aws.Platform, conf
 	return allErrs
 }
 
+/* TODO: move to explicit validation for AgentClusterInstall */
+/*
 func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeployment) field.ErrorList {
 	ais := cd.Spec.Provisioning.InstallStrategy.Agent
 	allErrs := field.ErrorList{}
@@ -388,6 +404,7 @@ func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeploy
 	}
 	return allErrs
 }
+*/
 
 func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
 	obj := &unstructured.Unstructured{}
@@ -409,6 +426,7 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
 	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.provisioning.installStrategy.agent", hivev1.FeatureGateAgentInstallStrategy)...)
 	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.machineManagement", hivev1.FeatureGateMachineManagement)...)
+	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.clusterInstallRef", hivev1.FeatureGateAgentInstallStrategy)...)
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()

@@ -119,6 +119,13 @@ type ClusterDeploymentSpec struct {
 	// May be unset in the case of adopted clusters.
 	Provisioning *Provisioning `json:"provisioning,omitempty"`
 
+	// ClusterInstallLocalReference provides reference to an object that implements
+	// the hivecontract ClusterInstall. The namespace of the object is same as the
+	// ClusterDeployment.
+	// This cannot be set when Provisioning is also set.
+	// +optional
+	ClusterInstallRef *ClusterInstallLocalReference `json:"clusterInstallRef,omitempty"`
+
 	// ClusterPoolRef is a reference to the ClusterPool that this ClusterDeployment originated from.
 	// +optional
 	ClusterPoolRef *ClusterPoolReference `json:"clusterPoolRef,omitempty"`
@@ -149,6 +156,17 @@ type ClusterDeploymentSpec struct {
 	// provision AWS clusters to use Amazon's Security Token Service.
 	// +optional
 	BoundServiceAccountSignkingKeySecretRef *corev1.LocalObjectReference `json:"boundServiceAccountSigningKeySecretRef,omitempty"`
+}
+
+// ClusterInstallLocalReference provides reference to an object that implements
+// the hivecontract ClusterInstall. The namespace of the object is same as the
+// ClusterDeployment.
+type ClusterInstallLocalReference struct {
+	Group   string `json:"group"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+
+	Name string `json:"name"`
 }
 
 // MachineManagement contains settings used for machine management.
@@ -208,11 +226,6 @@ type Provisioning struct {
 	// additional features of the installer.
 	// +optional
 	InstallerEnv []corev1.EnvVar `json:"installerEnv,omitempty"`
-
-	// InstallStrategy provides platform agnostic configuration for the use of alternate install strategies.
-	// Defaults to openshift-install if none specified.
-	// +optional
-	InstallStrategy *InstallStrategy `json:"installStrategy,omitempty"`
 }
 
 // ClusterImageSetReference is a reference to a ClusterImageSet
@@ -294,22 +307,10 @@ type ClusterDeploymentStatus struct {
 	// +optional
 	ProvisionRef *corev1.LocalObjectReference `json:"provisionRef,omitempty"`
 
-	// InstallStrategy contains observed state from specific install strategies.
-	// +optional
-	InstallStrategy *InstallStrategyStatus `json:"installStrategy,omitempty"`
-
 	// Platform contains the observed state for the specific platform upon which to
 	// perform the installation.
 	// +optional
 	Platform *PlatformStatus `json:"platformStatus,omitempty"`
-}
-
-// InstallStrategyStatus contains observed state from specific install strategies.
-type InstallStrategyStatus struct {
-
-	// Agent defines the observed state of the Agent install strategy for this cluster.
-	// +optional
-	Agent *agent.InstallStrategyStatus `json:"agent,omitempty"`
 }
 
 // ClusterDeploymentCondition contains details for the current condition of a cluster deployment
@@ -401,6 +402,12 @@ const (
 	// AWSPrivateLinkFailedClusterDeploymentCondition is true controller fails to setup private link access
 	// for the cluster.
 	AWSPrivateLinkFailedClusterDeploymentCondition ClusterDeploymentConditionType = "AWSPrivateLinkFailed"
+
+	// These are conditions that are copied from ClusterInstall on to the ClusterDeployment object.
+	ClusterInstallFailedClusterDeploymentCondition          ClusterDeploymentConditionType = "ClusterInstallFailed"
+	ClusterInstallCompletedClusterDeploymentCondition       ClusterDeploymentConditionType = "ClusterInstallCompleted"
+	ClusterInstallStoppedClusterDeploymentCondition         ClusterDeploymentConditionType = "ClusterInstallStopped"
+	ClusterInstallRequirementsMetClusterDeploymentCondition ClusterDeploymentConditionType = "ClusterInstallRequirementsMet"
 )
 
 // AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
@@ -515,7 +522,7 @@ type Platform struct {
 	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
 
 	// AgentBareMetal is the configuration used when performing an Assisted Agent based installation
-	// to bare metal. Can only be used with the Assisted InstallStrategy.
+	// to bare metal.
 	AgentBareMetal *agent.BareMetalPlatform `json:"agentBareMetal,omitempty"`
 }
 
@@ -524,14 +531,6 @@ type Platform struct {
 type PlatformStatus struct {
 	// AWS is the observed state on AWS.
 	AWS *aws.PlatformStatus `json:"aws,omitempty"`
-}
-
-// InstallStrategy provides configuration for optional alternative install strategies.
-type InstallStrategy struct {
-
-	// Agent is the install strategy configuration for provisioning a cluster with the
-	// Agent based assisted installer.
-	Agent *agent.InstallStrategy `json:"agent,omitempty"`
 }
 
 // ClusterIngress contains the configurable pieces for any ClusterIngress objects

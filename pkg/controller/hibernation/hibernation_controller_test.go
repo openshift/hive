@@ -357,6 +357,21 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, "Hibernation capable", cond.Message)
 			},
 		},
+		{
+			name: "skip hibernation for fake cluster",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(1*time.Hour),
+				testcd.InstalledTimestamp(time.Now().Add(-1*time.Hour)),
+				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")),
+			cs: csBuilder.Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, "Skipping hibernation for fake cluster", cond.Message)
+			},
+		},
 	}
 
 	for _, test := range tests {

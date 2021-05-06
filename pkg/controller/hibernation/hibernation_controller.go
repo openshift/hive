@@ -176,9 +176,9 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if !cd.Spec.Installed {
 		return reconcile.Result{}, nil
 	}
-	// If cluster is fake, skip any processing
+	// If cluster is fake, set hibernating false and skip further processing
 	if controllerutils.IsFakeCluster(cd) {
-		return reconcile.Result{}, nil
+		return r.setHibernatingCondition(cd, hivev1.HibernatingHibernationReason, "Skipping hibernation for fake cluster", corev1.ConditionFalse, cdLog)
 	}
 
 	// set hibernating condition to false for unsupported clouds

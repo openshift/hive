@@ -235,7 +235,39 @@ type HiveConfigStatus struct {
 	// ConfigApplied will be set by the hive operator to indicate whether or not the LastGenerationObserved
 	// was successfully reconciled.
 	ConfigApplied bool `json:"configApplied,omitempty"`
+
+	// Conditions includes more detailed status for the HiveConfig
+	// +optional
+	Conditions []HiveConfigCondition `json:"conditions,omitempty"`
 }
+
+// HiveConfigCondition contains details for the current condition of a HiveConfig
+type HiveConfigCondition struct {
+	// Type is the type of the condition.
+	Type HiveConfigConditionType `json:"type"`
+	// Status is the status of the condition.
+	Status corev1.ConditionStatus `json:"status"`
+	// LastProbeTime is the last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty"`
+}
+
+// HiveConfigConditionType is a valid value for HiveConfigCondition.Type
+type HiveConfigConditionType string
+
+const (
+	// HiveReadyCondition is set when hive is deployed successfully and ready to provision clusters
+	HiveReadyCondition HiveConfigConditionType = "Ready"
+)
 
 // BackupConfig contains settings for the Velero backup integration.
 type BackupConfig struct {

@@ -523,6 +523,40 @@ spec:
                 client CA configmap data from the openshift-config-managed namespace.
                 When the configmap changes, admission is redeployed.
               type: string
+            conditions:
+              description: Conditions includes more detailed status for the HiveConfig
+              items:
+                description: HiveConfigCondition contains details for the current
+                  condition of a HiveConfig
+                properties:
+                  lastProbeTime:
+                    description: LastProbeTime is the last time we probed the condition.
+                    format: date-time
+                    type: string
+                  lastTransitionTime:
+                    description: LastTransitionTime is the last time the condition
+                      transitioned from one status to another.
+                    format: date-time
+                    type: string
+                  message:
+                    description: Message is a human-readable message indicating details
+                      about last transition.
+                    type: string
+                  reason:
+                    description: Reason is a unique, one-word, CamelCase reason for
+                      the condition's last transition.
+                    type: string
+                  status:
+                    description: Status is the status of the condition.
+                    type: string
+                  type:
+                    description: Type is the type of the condition.
+                    type: string
+                required:
+                - status
+                - type
+                type: object
+              type: array
             configApplied:
               description: ConfigApplied will be set by the hive operator to indicate
                 whether or not the LastGenerationObserved was successfully reconciled.

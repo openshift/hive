@@ -35,3 +35,14 @@ data:
               - __meta_kubernetes_endpoint_port_name
             action: keep
             regex: hive;hive-clustersync;metrics
+
+      - job_name: 'hive-operator'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_namespace
+              - __meta_kubernetes_pod_container_name
+              - __meta_kubernetes_pod_container_port_name
+            action: keep
+            regex: hive;hive-operator;metrics

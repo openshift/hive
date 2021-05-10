@@ -6,11 +6,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	librarygocontroller "github.com/openshift/library-go/pkg/controller"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -139,6 +143,37 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
+	// Fetch corresponding ClusterDeployment instance
+	cd := &hivev1.ClusterDeployment{}
+	switch err = r.Get(context.TODO(), request.NamespacedName, cd); {
+	case apierrors.IsNotFound(err):
+		// TODO: assuming same name, add explicit reference of some kind between cluster install and cluster deplopyment
+		logger.WithField("clusterDeployment", request.NamespacedName).Info("ClusterDeployment not found")
+		return reconcile.Result{}, nil
+	case err != nil:
+		logger.WithError(err).Error("Error getting ClusterDeployment")
+		return reconcile.Result{}, err
+	}
+	if !cd.DeletionTimestamp.IsZero() {
+		logger.Debug("ClusterDeployment has been deleted")
+		return reconcile.Result{}, nil
+	}
+
+	// Ensure the FakeClusterInstall has an OwnerReference to the ClusterDeployment, so it is
+	// automatically cleaned up if the owner is deleted.
+	cdRef := metav1.OwnerReference{
+		APIVersion:         cd.APIVersion,
+		Kind:               cd.Kind,
+		Name:               cd.Name,
+		UID:                cd.UID,
+		BlockOwnerDeletion: pointer.BoolPtr(true),
+	}
+	cdRefChanged := librarygocontroller.EnsureOwnerRef(fci, cdRef)
+	if cdRefChanged {
+		logger.Info("added owner reference to ClusterDeployment")
+		return reconcile.Result{}, r.Update(context.TODO(), fci)
+	}
+
 	// Check if we're Completed and can exit reconcile early.
 	completedCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallCompleted)
 	if completedCond.Status == corev1.ConditionTrue {
@@ -182,22 +217,6 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		fci.Status.Conditions = newConditions
 		err := updateClusterInstallStatus(r.Client, fci, logger)
 		return reconcile.Result{}, err
-	}
-
-	// Fetch corresponding ClusterDeployment instance
-	cd := &hivev1.ClusterDeployment{}
-	switch err = r.Get(context.TODO(), request.NamespacedName, cd); {
-	case apierrors.IsNotFound(err):
-		// TODO: assuming same name, add explicit reference of some kind between cluster install and cluster deplopyment
-		logger.WithField("clusterDeployment", request.NamespacedName).Info("ClusterDeployment not found")
-		return reconcile.Result{}, nil
-	case err != nil:
-		logger.WithError(err).Error("Error getting ClusterDeployment")
-		return reconcile.Result{}, err
-	}
-	if !cd.DeletionTimestamp.IsZero() {
-		logger.Debug("ClusterDeployment has been deleted")
-		return reconcile.Result{}, nil
 	}
 
 	// Simulate 30 second wait for RequirementsMet condition to go True:

@@ -35,6 +35,10 @@ spec:
       - image: registry.ci.openshift.org/openshift/hive-v4.0:hive
         imagePullPolicy: Always
         name: hive-operator
+        ports:
+        - name: metrics
+          containerPort: 2112
+          protocol: TCP
         resources:
           requests:
             cpu: 100m

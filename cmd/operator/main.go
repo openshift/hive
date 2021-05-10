@@ -108,7 +108,7 @@ func newRootCommand() *cobra.Command {
 			run := func(ctx context.Context) {
 				// Create a new Cmd to provide shared dependencies and start components
 				mgr, err := manager.New(cfg, manager.Options{
-					MetricsBindAddress: "0",
+					MetricsBindAddress: ":2112",
 					Logger:             utillogrus.NewLogr(log.StandardLogger()),
 				})
 				if err != nil {

@@ -57,12 +57,8 @@ func Test_setErrCondition(t *testing.T) {
 		err:    errors.New("failed to do something important"),
 		reason: "FailureToDoSomethingImportant",
 
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Status:  corev1.ConditionTrue,
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Reason:  "FailureToDoSomethingImportant",
-			Message: "failed to do something important",
-		}},
+		expectedConditions: getExpectedConditions(true, "FailureToDoSomethingImportant",
+			"failed to do something important"),
 	}, {
 		name: "previous failure",
 
@@ -75,12 +71,8 @@ func Test_setErrCondition(t *testing.T) {
 		err:    errors.New("failed to do something important"),
 		reason: "FailureToDoSomethingImportant",
 
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Status:  corev1.ConditionTrue,
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Reason:  "FailureToDoSomethingImportant",
-			Message: "failed to do something important",
-		}},
+		expectedConditions: getExpectedConditions(true, "FailureToDoSomethingImportant",
+			"failed to do something important"),
 	}, {
 		name: "previous ready",
 
@@ -93,17 +85,8 @@ func Test_setErrCondition(t *testing.T) {
 		err:    errors.New("failed to do something important"),
 		reason: "FailureToDoSomethingImportant",
 
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Status:  corev1.ConditionFalse,
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Reason:  "FailureToDoSomethingImportant",
-			Message: "failed to do something important",
-		}, {
-			Status:  corev1.ConditionTrue,
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Reason:  "FailureToDoSomethingImportant",
-			Message: "failed to do something important",
-		}},
+		expectedConditions: getExpectedConditions(true, "FailureToDoSomethingImportant",
+			"failed to do something important"),
 	}, {
 		name: "previous failure, ready",
 
@@ -121,17 +104,8 @@ func Test_setErrCondition(t *testing.T) {
 		err:    errors.New("failed to do something important"),
 		reason: "FailureToDoSomethingImportant",
 
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Status:  corev1.ConditionFalse,
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Reason:  "FailureToDoSomethingImportant",
-			Message: "failed to do something important",
-		}, {
-			Status:  corev1.ConditionTrue,
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Reason:  "FailureToDoSomethingImportant",
-			Message: "failed to do something important",
-		}},
+		expectedConditions: getExpectedConditions(true, "FailureToDoSomethingImportant",
+			"failed to do something important"),
 	}}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -157,7 +131,7 @@ func Test_setErrCondition(t *testing.T) {
 				cd.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 			}
 
-			assert.Equal(t, test.expectedConditions, cd.Status.Conditions)
+			assert.ElementsMatch(t, test.expectedConditions, cd.Status.Conditions)
 		})
 	}
 }
@@ -180,6 +154,12 @@ func Test_setProgressCondition(t *testing.T) {
 		completed: corev1.ConditionFalse,
 		message:   "progresing towards stage 1",
 		reason:    "InprogesStage1",
+		expectedConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "InprogesStage1",
+			Message: "progresing towards stage 1",
+		}},
 	}, {
 		name: "previous progress, not completed",
 
@@ -217,6 +197,11 @@ func Test_setProgressCondition(t *testing.T) {
 			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
 			Reason:  "FailureToDoSomethingImportantPreviously",
 			Message: "failed to do something important previously",
+		}, {
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "InprogesStage1",
+			Message: "progresing towards stage 1",
 		}},
 	}, {
 		name: "previous failure, previous progress no completed",
@@ -265,17 +250,8 @@ func Test_setProgressCondition(t *testing.T) {
 		message:   "All looking good",
 		reason:    "AllLookingGood",
 
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Status:  corev1.ConditionFalse,
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Reason:  "AllLookingGood",
-			Message: "All looking good",
-		}, {
-			Status:  corev1.ConditionTrue,
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Reason:  "AllLookingGood",
-			Message: "All looking good",
-		}},
+		expectedConditions: getExpectedConditions(false, "AllLookingGood",
+			"All looking good"),
 	}, {
 		name: "previous ready, now progressing",
 
@@ -308,12 +284,8 @@ func Test_setProgressCondition(t *testing.T) {
 		message:   "All looking good",
 		reason:    "AllLookingGoodVersion2",
 
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Status:  corev1.ConditionTrue,
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Reason:  "AllLookingGoodVersion2",
-			Message: "All looking good",
-		}},
+		expectedConditions: getExpectedConditions(false, "AllLookingGoodVersion2",
+			"All looking good"),
 	}}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -339,7 +311,7 @@ func Test_setProgressCondition(t *testing.T) {
 				cd.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 			}
 
-			assert.Equal(t, test.expectedConditions, cd.Status.Conditions)
+			assert.ElementsMatch(t, test.expectedConditions, cd.Status.Conditions)
 		})
 	}
 }
@@ -691,12 +663,8 @@ users:
 		},
 
 		hasFinalizer: true,
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "UnsupportedRegion",
-			Message: "cluster deployment region \"us-east-1\" is not supported as there is no inventory to create necessary resources",
-		}},
+		expectedConditions: getExpectedConditions(true, "UnsupportedRegion",
+			"cluster deployment region \"us-east-1\" is not supported as there is no inventory to create necessary resources"),
 	}, {
 		name: "cd with privatelink enabled, no inventory in given region",
 
@@ -711,12 +679,8 @@ users:
 		}},
 
 		hasFinalizer: true,
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "UnsupportedRegion",
-			Message: "cluster deployment region \"us-east-1\" is not supported as there is no inventory to create necessary resources",
-		}},
+		expectedConditions: getExpectedConditions(true, "UnsupportedRegion",
+			"cluster deployment region \"us-east-1\" is not supported as there is no inventory to create necessary resources"),
 	}, {
 		name: "cd with privatelink enabled, no provision started",
 
@@ -762,12 +726,8 @@ users:
 		},
 
 		hasFinalizer: true,
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "DiscoveringNLBFailed",
-			Message: "failed to describe load balancer for the cluster: AccessDenied: not authorized to DescribeLoadBalancers",
-		}},
+		expectedConditions: getExpectedConditions(true, "DiscoveringNLBFailed",
+			"failed to describe load balancer for the cluster: AccessDenied: not authorized to DescribeLoadBalancers"),
 		err: "failed to describe load balancer for the cluster: AccessDenied: not authorized to DescribeLoadBalancers",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb not found",
@@ -783,6 +743,12 @@ users:
 			m.EXPECT().DescribeLoadBalancers(gomock.Any()).
 				Return(nil, awserr.New("LoadBalancerNotFound", "Loadbalance could not be found", nil))
 		},
+		expectedConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "DiscoveringNLBNotYetFound",
+			Message: "discovering NLB for the cluster, but it does not exists yet",
+		}},
 
 		hasFinalizer: true,
 	}, {
@@ -807,12 +773,8 @@ users:
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "VPCEndpointReconcileFailed",
-			Message: "AccessDenied: not authorized to DescribeVpcEndpoints",
-		}},
+		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
+			"AccessDenied: not authorized to DescribeVpcEndpoints"),
 		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, acceptance required set to true, endpoint access denied",
@@ -844,12 +806,8 @@ users:
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "VPCEndpointReconcileFailed",
-			Message: "AccessDenied: not authorized to DescribeVpcEndpoints",
-		}},
+		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
+			"AccessDenied: not authorized to DescribeVpcEndpoints"),
 		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, additional NLB added, endpoint access denied",
@@ -882,12 +840,8 @@ users:
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "VPCEndpointReconcileFailed",
-			Message: "AccessDenied: not authorized to DescribeVpcEndpoints",
-		}},
+		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
+			"AccessDenied: not authorized to DescribeVpcEndpoints"),
 		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change, endpoint access denied",
@@ -923,12 +877,8 @@ users:
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "VPCEndpointReconcileFailed",
-			Message: "AccessDenied: not authorized to DescribeVpcEndpoints",
-		}},
+		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
+			"AccessDenied: not authorized to DescribeVpcEndpoints"),
 		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no matching az",
@@ -963,12 +913,8 @@ users:
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "NoSupportedAZsInInventory",
-			Message: "no supported VPC in inventory which support the AZs of the service",
-		}},
+		expectedConditions: getExpectedConditions(true, "NoSupportedAZsInInventory",
+			"no supported VPC in inventory which support the AZs of the service"),
 		err: "failed to reconcile the VPC Endpoint: no supported VPC in inventory which support the AZs of the service",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no quota in vpc",
@@ -1012,12 +958,8 @@ users:
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "NoVPCWithQuotaInInventory",
-			Message: "no supported VPC in inventory with available quota",
-		}},
+		expectedConditions: getExpectedConditions(true, "NoVPCWithQuotaInInventory",
+			"no supported VPC in inventory with available quota"),
 		err: "failed to reconcile the VPC Endpoint: no supported VPC in inventory with available quota",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no kubeconfig secret",
@@ -1041,12 +983,8 @@ users:
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
 			VPCEndpointID:      "vpce-12345",
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "CouldNotCalculateAPIDomain",
-			Message: "could not get admin kubeconfig secret: secrets \"test-cd-provision-0-kubeconfig\" not found",
-		}},
+		expectedConditions: getExpectedConditions(true, "CouldNotCalculateAPIDomain",
+			"could not get admin kubeconfig secret: secrets \"test-cd-provision-0-kubeconfig\" not found"),
 		err: "could not get admin kubeconfig secret: secrets \"test-cd-provision-0-kubeconfig\" not found",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no previous PHZ",
@@ -1084,12 +1022,8 @@ users:
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "PrivateLinkAccessReady",
-			Message: "private link access is ready for use",
-		}},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, existing PHZ, no record for endpoint",
 
@@ -1129,12 +1063,8 @@ users:
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "PrivateLinkAccessReady",
-			Message: "private link access is ready for use",
-		}},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
 	}, {
 		name: "cd with privatelink enabled, no previous private link, associate vpcs fails",
 
@@ -1188,12 +1118,8 @@ users:
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "AssociatingVPCsToHostedZoneFailed",
-			Message: "AccessDenied: AssociateVPCWithHostedZone access denied",
-		}},
+		expectedConditions: getExpectedConditions(true, "AssociatingVPCsToHostedZoneFailed",
+			"AccessDenied: AssociateVPCWithHostedZone access denied"),
 		err: "AccessDenied: AssociateVPCWithHostedZone access denied",
 	}, {
 		name: "cd with privatelink enabled, no previous private link, associate vpcs",
@@ -1248,12 +1174,8 @@ users:
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "PrivateLinkAccessReady",
-			Message: "private link access is ready for use",
-		}},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
 	}, {
 		name: "cd with privatelink enabled, no previous private link, associate vpcs remove some previous ones",
 
@@ -1317,12 +1239,8 @@ users:
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "PrivateLinkAccessReady",
-			Message: "private link access is ready for use",
-		}},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
 	}, {
 		name: "cd with privatelink enabled, no previous private link, associate vpcs across accounts",
 
@@ -1393,12 +1311,8 @@ users:
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
-		expectedConditions: []hivev1.ClusterDeploymentCondition{{
-			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "PrivateLinkAccessReady",
-			Message: "private link access is ready for use",
-		}},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
 	}, {
 		name: "cd with privatelink enabled, previous provision failed, new started",
 
@@ -1570,7 +1484,7 @@ users:
 				cd.Status.Conditions[i].LastProbeTime = metav1.Time{}
 				cd.Status.Conditions[i].LastTransitionTime = metav1.Time{}
 			}
-			assert.Equal(t, test.expectedConditions, cd.Status.Conditions)
+			assert.ElementsMatch(t, test.expectedConditions, cd.Status.Conditions)
 
 			if cd.Status.Platform == nil {
 				cd.Status.Platform = &hivev1.PlatformStatus{AWS: &hivev1aws.PlatformStatus{}}
@@ -1675,6 +1589,40 @@ func (m createHostedZoneInputMatcher) Matches(x interface{}) bool {
 	}
 	xT.CallerReference = nil
 	return spew.Sdump(m.input) != spew.Sdump(xT)
+}
+
+// getExpectedConditions should be called when only one of Ready and Failed conditions is true,
+// and both have the same reason and message
+func getExpectedConditions(failed bool, reason string, message string) []hivev1.ClusterDeploymentCondition {
+	var returnConditions []hivev1.ClusterDeploymentCondition
+	if failed {
+		returnConditions = append(returnConditions, hivev1.ClusterDeploymentCondition{
+			Status:  corev1.ConditionTrue,
+			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+			Reason:  reason,
+			Message: message,
+		})
+		returnConditions = append(returnConditions, hivev1.ClusterDeploymentCondition{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			Reason:  reason,
+			Message: message,
+		})
+	} else {
+		returnConditions = append(returnConditions, hivev1.ClusterDeploymentCondition{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+			Reason:  reason,
+			Message: message,
+		})
+		returnConditions = append(returnConditions, hivev1.ClusterDeploymentCondition{
+			Status:  corev1.ConditionTrue,
+			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			Reason:  reason,
+			Message: message,
+		})
+	}
+	return returnConditions
 }
 
 func Test_shouldSync(t *testing.T) {

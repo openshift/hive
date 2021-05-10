@@ -78,7 +78,9 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 		{
 			name: "default control plane certs",
 			existing: []runtime.Object{
-				fakeClusterDeployment().defaultCert("default-cert", "default-secret").obj(),
+				fakeClusterDeployment().
+					defaultCert("default-cert", "default-secret").
+					withNotFoundCondition(corev1.ConditionFalse).obj(),
 				fakeCertSecret("default-secret"),
 			},
 			expectedPatch:   `[ { "op": "add", "path": "/spec/servingCerts", "value": {} }, { "op": "add", "path": "/spec/servingCerts/namedCertificates", "value": [  ] }, { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  { "names": [ "test-api-url" ], "servingCertificate": { "name": "fake-cluster-default-secret" } } ] } ]`,
@@ -89,7 +91,8 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			existing: []runtime.Object{
 				fakeClusterDeployment().
 					namedCert("cert1", "foo.com", "secret1").
-					namedCert("cert2", "bar.com", "secret2").obj(),
+					namedCert("cert2", "bar.com", "secret2").
+					withNotFoundCondition(corev1.ConditionFalse).obj(),
 				fakeCertSecret("secret1"),
 				fakeCertSecret("secret2"),
 			},
@@ -103,6 +106,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 					defaultCert("default", "secret0").
 					namedCert("cert1", "foo.com", "secret1").
 					namedCert("cert2", "bar.com", "secret2").
+					withNotFoundCondition(corev1.ConditionFalse).
 					obj(),
 				fakeCertSecret("secret0"),
 				fakeCertSecret("secret1"),
@@ -127,7 +131,8 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 		{
 			name: "existing syncset remove certs",
 			existing: []runtime.Object{
-				fakeClusterDeployment().obj(),
+				fakeClusterDeployment().
+					withNotFoundCondition(corev1.ConditionFalse).obj(),
 				fakeSyncSet(),
 			},
 			expectedPatch: `[ { "op": "add", "path": "/spec/servingCerts", "value": {} }, { "op": "add", "path": "/spec/servingCerts/namedCertificates", "value": [  ] }, { "op": "replace", "path": "/spec/servingCerts/namedCertificates", "value": [  ] } ]`,
@@ -135,7 +140,8 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 		{
 			name: "existing not found condition changed to false",
 			existing: []runtime.Object{
-				fakeClusterDeployment().defaultCert("default", "test-secret").withNotFoundCondition().obj(),
+				fakeClusterDeployment().defaultCert("default", "test-secret").
+					withNotFoundCondition(corev1.ConditionTrue).obj(),
 				fakeCertSecret("test-secret"),
 			},
 			// no apply expected because we update the condition and return immediately, next reconcile would apply
@@ -211,7 +217,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				assert.NotNil(t, notFoundCondition, "expected a NotFound condition")
 				assert.Equal(t, test.expectedNotFoundStatus, notFoundCondition.Status, "unexpected NotFound status")
 			} else {
-				assert.Nil(t, notFoundCondition, "test did not specify an expectedNotFoundStatus but condition was present")
+				assert.Equal(t, corev1.ConditionFalse, notFoundCondition.Status)
 			}
 
 		})
@@ -368,11 +374,11 @@ func (f *fakeClusterDeploymentWrapper) namedCert(name, domain, secretName string
 	return f
 }
 
-func (f *fakeClusterDeploymentWrapper) withNotFoundCondition() *fakeClusterDeploymentWrapper {
+func (f *fakeClusterDeploymentWrapper) withNotFoundCondition(status corev1.ConditionStatus) *fakeClusterDeploymentWrapper {
 	f.cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
 		f.cd.Status.Conditions,
 		hivev1.ControlPlaneCertificateNotFoundCondition,
-		corev1.ConditionTrue,
+		status,
 		"",
 		"",
 		controllerutils.UpdateConditionNever,

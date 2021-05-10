@@ -921,6 +921,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateIncoming)),
 			),
+			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionFalse,
+				Reason: "NoMatchingRelocates",
+			},
 		},
 		{
 			name: "incoming with dnszone already released",
@@ -928,12 +932,21 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 				testcd.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateIncoming)),
 			),
 			dnsZone: dnsZoneBuilder.Build(),
+			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionFalse,
+				Reason: "NoMatchingRelocates",
+			},
 		},
 		{
 			name: "clusterdeployment deleted while outgoing",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateOutgoing)),
 				testcd.Generic(testgeneric.Deleted()),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Status: corev1.ConditionFalse,
+					Type:   hivev1.RelocationFailedCondition,
+					Reason: "DontUpdateCondition",
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation(crName, hivev1.RelocateOutgoing)),
@@ -942,12 +955,21 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 				crBuilder.Build(),
 			},
 			expectedDeletionTimestamp: true,
+			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionFalse,
+				Reason: "DontUpdateCondition",
+			},
 		},
 		{
 			name: "clusterdeployment deleted while incoming",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
 				testcd.Generic(testgeneric.Deleted()),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Status: corev1.ConditionFalse,
+					Type:   hivev1.RelocationFailedCondition,
+					Reason: "DontUpdateCondition",
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
@@ -956,12 +978,21 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 				crBuilder.Build(),
 			},
 			expectedDeletionTimestamp: true,
+			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionFalse,
+				Reason: "DontUpdateCondition",
+			},
 		},
 		{
 			name: "clusterdeployment deleted while outgoing",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateOutgoing)),
 				testcd.Generic(testgeneric.Deleted()),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Status: corev1.ConditionFalse,
+					Type:   hivev1.RelocationFailedCondition,
+					Reason: "DontUpdateCondition",
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation(crName, hivev1.RelocateOutgoing)),
@@ -970,6 +1001,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 				crBuilder.Build(),
 			},
 			expectedDeletionTimestamp: true,
+			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionFalse,
+				Reason: "DontUpdateCondition",
+			},
 		},
 	}
 	for _, tc := range cases {
@@ -1050,7 +1085,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 					assert.Equal(t, tc.expectedRelocationFailedCondition.Reason, cond.Reason, "unexpected condition reason")
 				}
 			} else {
-				assert.Nil(t, cond, "unexpected relocation failed condition")
+				assert.Equal(t, corev1.ConditionFalse, cond.Status, "unexpected condition status")
+				assert.Equal(t, "MoveSuccessful", cond.Reason, "unexpected condition reason")
 			}
 
 			if tc.validate != nil {

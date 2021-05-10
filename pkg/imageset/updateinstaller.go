@@ -207,14 +207,17 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 	cd.Status.InstallerImage = &installerImage
 	cd.Status.CLIImage = &cliImage
 	cd.Status.InstallVersion = &releaseVersion
-	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
-		cd.Status.Conditions,
-		hivev1.InstallerImageResolutionFailedCondition,
-		corev1.ConditionFalse,
-		installerImageResolvedReason,
-		installerImageResolvedMessage,
-		controllerutils.UpdateConditionNever)
-
+	// Set InstallerImageResolutionFailedCondition to false if it exists
+	if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+		hivev1.InstallerImageResolutionFailedCondition); cond != nil {
+		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+			cd.Status.Conditions,
+			hivev1.InstallerImageResolutionFailedCondition,
+			corev1.ConditionFalse,
+			installerImageResolvedReason,
+			installerImageResolvedMessage,
+			controllerutils.UpdateConditionNever)
+	}
 	logger.Debug("updating clusterdeployment status")
 	return errors.Wrap(
 		o.client.Status().Update(context.TODO(), cd),

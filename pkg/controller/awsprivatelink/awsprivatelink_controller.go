@@ -53,6 +53,13 @@ const (
 	defaultRequeueLater = 1 * time.Minute
 )
 
+// clusterDeploymentAWSPrivateLinkConditions are the cluster deployment conditions controlled by
+// AWS private link controller
+var clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentConditionType{
+	hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+	hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+}
+
 // Add creates a new AWSPrivateLink Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -161,6 +168,18 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 		// Error reading the object - requeue the request.
 		logger.WithError(err).Error("error getting ClusterDeployment")
 		return reconcile.Result{}, err
+	}
+
+	// Initialize cluster deployment conditions if not present
+	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentAWSPrivateLinkConditions)
+	if len(newConditions) > len(cd.Status.Conditions) {
+		cd.Status.Conditions = newConditions
+		logger.Info("initializing AWS private link controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	if cd.Spec.Platform.AWS == nil ||

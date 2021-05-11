@@ -54,6 +54,12 @@ const (
 
 var (
 	secretCheckInterval = 2 * time.Minute
+
+	// clusterDeploymentControlPlaneCertsConditions are the cluster deployment conditions controlled by
+	// Control Plane Certs controller
+	clusterDeploymentControlPlaneCertsConditions = []hivev1.ClusterDeploymentConditionType{
+		hivev1.ControlPlaneCertificateNotFoundCondition,
+	}
 )
 
 type applier interface {
@@ -135,6 +141,18 @@ func (r *ReconcileControlPlaneCerts) Reconcile(ctx context.Context, request reco
 			return reconcile.Result{}, nil
 		}
 		return reconcile.Result{}, err
+	}
+
+	// Initialize cluster deployment conditions if not present
+	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentControlPlaneCertsConditions)
+	if len(newConditions) > len(cd.Status.Conditions) {
+		cd.Status.Conditions = newConditions
+		cdLog.Info("initializing control plane certs controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	// Ensure owner references are correctly set

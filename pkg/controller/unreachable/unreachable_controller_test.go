@@ -34,9 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testassert "github.com/openshift/hive/pkg/test/assert"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 )
 
@@ -51,94 +51,133 @@ func init() {
 
 func TestReconcile(t *testing.T) {
 	tests := []struct {
-		name                          string
-		cd                            *hivev1.ClusterDeployment
-		errorConnecting               *bool
-		errorConnectingSecondary      *bool
-		expectedStatus                corev1.ConditionStatus
-		expectActiveOverrideCondition bool
-		expectedActiveOverrideStatus  corev1.ConditionStatus
-		expectRequeue                 bool
-		expectRequeueAfter            bool
+		name                         string
+		cd                           *hivev1.ClusterDeployment
+		errorConnecting              *bool
+		errorConnectingSecondary     *bool
+		expectedUnreachableStatus    corev1.ConditionStatus
+		expectedActiveOverrideStatus corev1.ConditionStatus
+		expectRequeue                bool
+		expectRequeueAfter           bool
 	}{
 		{
-			name:               "recent reachable condition",
-			cd:                 buildClusterDeployment(withUnreachableCondition(corev1.ConditionFalse, time.Now())),
-			expectedStatus:     corev1.ConditionFalse,
-			expectRequeueAfter: true,
+			name:                         "initialize conditions",
+			cd:                           buildClusterDeployment(),
+			expectedUnreachableStatus:    corev1.ConditionUnknown,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
 		},
 		{
-			name:            "unreachable with no condition",
-			cd:              buildClusterDeployment(),
-			errorConnecting: pointer.BoolPtr(true),
-			expectedStatus:  corev1.ConditionTrue,
-			expectRequeue:   true,
+			name: "recent reachable condition",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionFalse, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
+			expectRequeueAfter:           true,
 		},
 		{
-			name:            "unreachable with old reachable condition",
-			cd:              buildClusterDeployment(withUnreachableCondition(corev1.ConditionFalse, time.Now().Add(-maxUnreachableDuration))),
-			errorConnecting: pointer.BoolPtr(true),
-			expectedStatus:  corev1.ConditionTrue,
-			expectRequeue:   true,
+			name: "unreachable with unknown condition status",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionUnknown, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			errorConnecting:              pointer.BoolPtr(true),
+			expectedUnreachableStatus:    corev1.ConditionTrue,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
+			expectRequeue:                true,
 		},
 		{
-			name:            "unreachable with unreachable condition",
-			cd:              buildClusterDeployment(withUnreachableCondition(corev1.ConditionTrue, time.Now())),
-			errorConnecting: pointer.BoolPtr(true),
-			expectedStatus:  corev1.ConditionTrue,
-			expectRequeue:   true,
+			name: "unreachable with old reachable condition",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionFalse, time.Now().Add(-maxUnreachableDuration)),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			errorConnecting:              pointer.BoolPtr(true),
+			expectedUnreachableStatus:    corev1.ConditionTrue,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
+			expectRequeue:                true,
 		},
 		{
-			name:               "reachable with no condition",
-			cd:                 buildClusterDeployment(),
-			errorConnecting:    pointer.BoolPtr(false),
-			expectedStatus:     corev1.ConditionFalse,
-			expectRequeueAfter: true,
+			name: "unreachable with unreachable condition",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionTrue, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			errorConnecting:              pointer.BoolPtr(true),
+			expectedUnreachableStatus:    corev1.ConditionTrue,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
+			expectRequeue:                true,
 		},
 		{
-			name:               "reachable with old reachable condition",
-			cd:                 buildClusterDeployment(withUnreachableCondition(corev1.ConditionFalse, time.Now().Add(-maxUnreachableDuration))),
-			errorConnecting:    pointer.BoolPtr(false),
-			expectedStatus:     corev1.ConditionFalse,
-			expectRequeueAfter: true,
+			name: "reachable with no condition",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionUnknown, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			errorConnecting:              pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
+			expectRequeueAfter:           true,
 		},
 		{
-			name:               "reachable with unreachable condition",
-			cd:                 buildClusterDeployment(withUnreachableCondition(corev1.ConditionTrue, time.Now())),
-			errorConnecting:    pointer.BoolPtr(false),
-			expectedStatus:     corev1.ConditionFalse,
-			expectRequeueAfter: true,
+			name: "reachable with old reachable condition",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionFalse, time.Now().Add(-maxUnreachableDuration)),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			errorConnecting:              pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
+			expectRequeueAfter:           true,
 		},
 		{
-			name:                          "reachable to primary with no conditions",
-			cd:                            buildClusterDeployment(withAPIURLOverride()),
-			errorConnecting:               pointer.BoolPtr(false),
-			expectedStatus:                corev1.ConditionFalse,
-			expectActiveOverrideCondition: true,
-			expectedActiveOverrideStatus:  corev1.ConditionTrue,
-			expectRequeueAfter:            true,
+			name: "reachable with unreachable condition",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionTrue, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			errorConnecting:              pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionUnknown,
+			expectRequeueAfter:           true,
+		},
+		{
+			name: "reachable to primary with no conditions",
+			cd: buildClusterDeployment(
+				withUnreachableCondition(corev1.ConditionUnknown, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+				withAPIURLOverride(),
+			),
+			errorConnecting:              pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionTrue,
+			expectRequeueAfter:           true,
 		},
 		{
 			name: "reachable to primary with recent reachable condition",
 			cd: buildClusterDeployment(
 				withAPIURLOverride(),
 				withUnreachableCondition(corev1.ConditionFalse, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
 			),
-			errorConnecting:               pointer.BoolPtr(false),
-			expectedStatus:                corev1.ConditionFalse,
-			expectActiveOverrideCondition: true,
-			expectedActiveOverrideStatus:  corev1.ConditionTrue,
-			expectRequeueAfter:            true,
+			errorConnecting:              pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionTrue,
+			expectRequeueAfter:           true,
 		},
 		{
-			name:                          "reachable to secondary with no conditions",
-			cd:                            buildClusterDeployment(withAPIURLOverride()),
-			errorConnecting:               pointer.BoolPtr(true),
-			errorConnectingSecondary:      pointer.BoolPtr(false),
-			expectedStatus:                corev1.ConditionFalse,
-			expectActiveOverrideCondition: true,
-			expectedActiveOverrideStatus:  corev1.ConditionFalse,
-			expectRequeue:                 true,
+			name: "reachable to secondary with no conditions",
+			cd: buildClusterDeployment(
+				withAPIURLOverride(),
+				withUnreachableCondition(corev1.ConditionUnknown, time.Now()),
+				withActiveAPIURLOverrideCondition(corev1.ConditionUnknown),
+			),
+			errorConnecting:              pointer.BoolPtr(true),
+			errorConnectingSecondary:     pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionFalse,
+			expectRequeue:                true,
 		},
 		{
 			name: "reachable to secondary with recent reachable to secondary",
@@ -147,11 +186,10 @@ func TestReconcile(t *testing.T) {
 				withUnreachableCondition(corev1.ConditionFalse, time.Now()),
 				withActiveAPIURLOverrideCondition(corev1.ConditionFalse),
 			),
-			errorConnecting:               pointer.BoolPtr(true),
-			expectedStatus:                corev1.ConditionFalse,
-			expectActiveOverrideCondition: true,
-			expectedActiveOverrideStatus:  corev1.ConditionFalse,
-			expectRequeue:                 true,
+			errorConnecting:              pointer.BoolPtr(true),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionFalse,
+			expectRequeue:                true,
 		},
 		{
 			name: "reachable to secondary with old reachable to secondary",
@@ -160,12 +198,11 @@ func TestReconcile(t *testing.T) {
 				withUnreachableCondition(corev1.ConditionFalse, time.Now().Add(-maxUnreachableDuration)),
 				withActiveAPIURLOverrideCondition(corev1.ConditionFalse),
 			),
-			errorConnecting:               pointer.BoolPtr(true),
-			errorConnectingSecondary:      pointer.BoolPtr(false),
-			expectedStatus:                corev1.ConditionFalse,
-			expectActiveOverrideCondition: true,
-			expectedActiveOverrideStatus:  corev1.ConditionFalse,
-			expectRequeue:                 true,
+			errorConnecting:              pointer.BoolPtr(true),
+			errorConnectingSecondary:     pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionFalse,
+			expectRequeue:                true,
 		},
 		{
 			name: "reachable to primary with reachable to secondary condition",
@@ -174,11 +211,10 @@ func TestReconcile(t *testing.T) {
 				withUnreachableCondition(corev1.ConditionFalse, time.Now()),
 				withActiveAPIURLOverrideCondition(corev1.ConditionFalse),
 			),
-			errorConnecting:               pointer.BoolPtr(false),
-			expectedStatus:                corev1.ConditionFalse,
-			expectActiveOverrideCondition: true,
-			expectedActiveOverrideStatus:  corev1.ConditionTrue,
-			expectRequeueAfter:            true,
+			errorConnecting:              pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionTrue,
+			expectRequeueAfter:           true,
 		},
 		{
 			name: "reachable to secondary with old reachable to primary condition",
@@ -187,12 +223,11 @@ func TestReconcile(t *testing.T) {
 				withUnreachableCondition(corev1.ConditionFalse, time.Now().Add(-maxUnreachableDuration)),
 				withActiveAPIURLOverrideCondition(corev1.ConditionTrue),
 			),
-			errorConnecting:               pointer.BoolPtr(true),
-			errorConnectingSecondary:      pointer.BoolPtr(false),
-			expectedStatus:                corev1.ConditionFalse,
-			expectActiveOverrideCondition: true,
-			expectedActiveOverrideStatus:  corev1.ConditionFalse,
-			expectRequeue:                 true,
+			errorConnecting:              pointer.BoolPtr(true),
+			errorConnectingSecondary:     pointer.BoolPtr(false),
+			expectedUnreachableStatus:    corev1.ConditionFalse,
+			expectedActiveOverrideStatus: corev1.ConditionFalse,
+			expectRequeue:                true,
 		},
 	}
 
@@ -237,18 +272,8 @@ func TestReconcile(t *testing.T) {
 
 			cd := &hivev1.ClusterDeployment{}
 			if err := fakeClient.Get(context.TODO(), namespacedName, cd); assert.NoError(t, err, "missing clusterdeployment") {
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-				if assert.NotNil(t, cond, "missing unreachable condition") {
-					assert.Equal(t, string(test.expectedStatus), string(cond.Status), "unexpected status on unreachable condition")
-				}
-				cond = controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ActiveAPIURLOverrideCondition)
-				if !test.expectActiveOverrideCondition {
-					assert.Nil(t, cond, "expected no active override condition")
-				} else {
-					if assert.NotNil(t, cond, "missing active override condition") {
-						assert.Equal(t, string(test.expectedActiveOverrideStatus), string(cond.Status), "unexpected status on active override condition")
-					}
-				}
+				testassert.AssertConditionStatus(t, cd, hivev1.UnreachableCondition, test.expectedUnreachableStatus)
+				testassert.AssertConditionStatus(t, cd, hivev1.ActiveAPIURLOverrideCondition, test.expectedActiveOverrideStatus)
 			}
 
 			assert.Equal(t, test.expectRequeue, result.Requeue, "unexpected requeue")

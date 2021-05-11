@@ -69,9 +69,17 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 		expectedNotFoundStatus corev1.ConditionStatus
 	}{
 		{
-			name: "no control plane certs",
+			name: "initialize conditions",
 			existing: []runtime.Object{
 				fakeClusterDeployment().obj(),
+			},
+			expectNoSyncSet:        true,
+			expectedNotFoundStatus: corev1.ConditionUnknown,
+		},
+		{
+			name: "no control plane certs",
+			existing: []runtime.Object{
+				fakeClusterDeployment().withNotFoundCondition(corev1.ConditionUnknown).obj(),
 			},
 			expectNoSyncSet: true,
 		},
@@ -119,6 +127,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 			name: "missing secret",
 			existing: []runtime.Object{
 				fakeClusterDeployment().
+					withNotFoundCondition(corev1.ConditionUnknown).
 					defaultCert("default", "secret0").
 					namedCert("cert1", "foo.com", "secret1").
 					namedCert("cert2", "bar.com", "secret2").obj(),

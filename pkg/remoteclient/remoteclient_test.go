@@ -144,8 +144,11 @@ func Test_Unreachable(t *testing.T) {
 		expectedLastCheck   time.Time
 	}{
 		{
-			name:                "unreachable unset",
-			cd:                  testcd.Build(),
+			name: "unreachable still unknown",
+			cd: testcd.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionUnknown,
+				Type:   hivev1.UnreachableCondition,
+			})),
 			expectedUnreachable: true,
 		},
 		{

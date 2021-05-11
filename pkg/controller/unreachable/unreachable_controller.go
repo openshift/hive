@@ -51,6 +51,13 @@ const (
 	maxUnreachableDuration = 2 * time.Hour
 )
 
+// clusterDeploymentUnreachableConditions are the cluster deployment conditions controlled by
+// Unreachable controller
+var clusterDeploymentUnreachableConditions = []hivev1.ClusterDeploymentConditionType{
+	hivev1.ActiveAPIURLOverrideCondition,
+	hivev1.UnreachableCondition,
+}
+
 // Add creates a new Unreachable Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -130,6 +137,18 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, err
 	}
 
+	// Initialize cluster deployment conditions if not present
+	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentUnreachableConditions)
+	if len(newConditions) > len(cd.Status.Conditions) {
+		cd.Status.Conditions = newConditions
+		cdLog.Info("initializing unreachable controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
 		cdLog.Debug("cluster has deletion timestamp")
@@ -198,7 +217,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 	// Update conditions to reflect the current state of connectivity to the remote cluster.
 	unreachableChanged := false
 	if updateUnreachable {
-		unreachableChanged = setUnreachableCond(cd, unreachableError)
+		unreachableChanged = remoteclient.SetUnreachableCondition(cd, unreachableError)
 	}
 	overrideChanged := setActiveAPIURLOverrideCond(cd, primaryErr)
 
@@ -237,25 +256,9 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 	return result, err
 }
 
-func setUnreachableCond(cd *hivev1.ClusterDeployment, connectionError error) (condsChanged bool) {
-	if existingCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition); existingCond == nil {
-		// This adds a dummy Unreachable condition that will be updated when setting the condition later.
-		// The Unreachable condition needs to be present even when the cluster is reachable because the probe time
-		// on the condition determines when the controller should next check for connectivity.
-		cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{Type: hivev1.UnreachableCondition})
-	}
-	return remoteclient.SetUnreachableCondition(cd, connectionError)
-}
-
 func setActiveAPIURLOverrideCond(cd *hivev1.ClusterDeployment, connectionError error) (condsChanged bool) {
 	if !hasOverride(cd) {
 		return
-	}
-	if existingCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ActiveAPIURLOverrideCondition); existingCond == nil {
-		// This adds a dummy ActiveAPIURLOverride condition that will be updated when setting the condition later.
-		// We want an explicit ActiveAPIURLOverride condition even when the condition is false so that the user
-		// can see the details of the connection error.
-		cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{Type: hivev1.ActiveAPIURLOverrideCondition})
 	}
 	status := corev1.ConditionTrue
 	reason := "ClusterReachable"

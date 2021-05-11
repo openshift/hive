@@ -298,7 +298,7 @@ func Test_setProgressCondition(t *testing.T) {
 			}
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
-			err := reconciler.setProgressCondition(cd, test.completed, test.reason, test.message, logger)
+			err := reconciler.setReadyCondition(cd, test.completed, test.reason, test.message, logger)
 			require.NoError(t, err)
 
 			cd = &hivev1.ClusterDeployment{}

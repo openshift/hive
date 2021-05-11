@@ -35,7 +35,7 @@ func (r *ReconcileAWSPrivateLink) cleanupClusterDeployment(cd *hivev1.ClusterDep
 			return reconcile.Result{}, err
 		}
 
-		if err := r.setProgressCondition(cd, corev1.ConditionFalse,
+		if err := r.setReadyCondition(cd, corev1.ConditionFalse,
 			"DeprovisionCleanupComplete",
 			"successfully cleaned up private link resources created to deprovision cluster",
 			logger); err != nil {

@@ -250,14 +250,6 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 			logger.WithField("prevInfraID", *cp.Spec.PrevInfraID).
 				Info("cleaning up PrivateLink resources from previous attempt")
 
-			if err := r.setProgressCondition(cd, corev1.ConditionFalse,
-				"CleanupForProvisionReattempt",
-				"cleaning up resources from previous provision attempt so that next attempt can start",
-				logger); err != nil {
-				logger.WithError(err).Error("failed to update condition on cluster deployment")
-				return reconcile.Result{}, err
-			}
-
 			if err := r.cleanupPreviousProvisionAttempt(cd, cp, logger); err != nil {
 				logger.WithError(err).Error("error cleaning up PrivateLink resources for ClusterDeployment")
 
@@ -267,6 +259,15 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 				}
 				return reconcile.Result{}, err
 			}
+
+			if err := r.setProgressCondition(cd, corev1.ConditionFalse,
+				"PreviousAttemptCleanupComplete",
+				"successfully cleaned up resources from previous provision attempt so that next attempt can start",
+				logger); err != nil {
+				logger.WithError(err).Error("failed to update condition on cluster deployment")
+				return reconcile.Result{}, err
+			}
+
 			return reconcile.Result{Requeue: true}, nil
 		}
 	}
@@ -428,7 +429,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 
 			if err := r.setProgressCondition(cd, corev1.ConditionFalse,
 				"DiscoveringNLBNotYetFound",
-				"discovering NLB for the cluster, but it does not exists yet",
+				"discovering NLB for the cluster, but it does not exist yet",
 				logger); err != nil {
 				logger.WithError(err).Error("failed to update condition on cluster deployment")
 				return reconcile.Result{}, err

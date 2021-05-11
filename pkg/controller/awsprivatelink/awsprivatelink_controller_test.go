@@ -747,7 +747,7 @@ users:
 			Status:  corev1.ConditionFalse,
 			Type:    hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
 			Reason:  "DiscoveringNLBNotYetFound",
-			Message: "discovering NLB for the cluster, but it does not exists yet",
+			Message: "discovering NLB for the cluster, but it does not exist yet",
 		}},
 
 		hasFinalizer: true,

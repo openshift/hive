@@ -24,14 +24,6 @@ func (r *ReconcileAWSPrivateLink) cleanupClusterDeployment(cd *hivev1.ClusterDep
 		return reconcile.Result{}, nil
 	}
 
-	if err := r.setProgressCondition(cd, corev1.ConditionFalse,
-		"CleanupForDeprovisionInprogress",
-		"cleaning up all the resources created for private link access for deprovisioning the cluster",
-		logger); err != nil {
-		logger.WithError(err).Error("failed to update condition on cluster deployment")
-		return reconcile.Result{}, err
-	}
-
 	if metadata != nil && cleanupRequired(cd) {
 		if err := r.cleanupPrivateLink(cd, metadata, logger); err != nil {
 			logger.WithError(err).Error("error cleaning up PrivateLink resources for ClusterDeployment")
@@ -40,6 +32,14 @@ func (r *ReconcileAWSPrivateLink) cleanupClusterDeployment(cd *hivev1.ClusterDep
 				logger.WithError(err).Error("failed to update condition on cluster deployment")
 				return reconcile.Result{}, err
 			}
+			return reconcile.Result{}, err
+		}
+
+		if err := r.setReadyCondition(cd, corev1.ConditionFalse,
+			"DeprovisionCleanupComplete",
+			"successfully cleaned up private link resources created to deprovision cluster",
+			logger); err != nil {
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 			return reconcile.Result{}, err
 		}
 	}

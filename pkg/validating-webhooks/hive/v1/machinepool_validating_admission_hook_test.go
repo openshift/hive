@@ -237,6 +237,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 				}
 				return pool
 			}(),
+			expectAllowed: true,
 		},
 		{
 			name: "min replicas equal to number of AWS zones",
@@ -262,6 +263,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 				}
 				return pool
 			}(),
+			expectAllowed: true,
 		},
 		{
 			name: "min replicas equal to number of GCP zones",
@@ -287,6 +289,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 				}
 				return pool
 			}(),
+			expectAllowed: true,
 		},
 		{
 			name: "min replicas equal to number of Azure zones",
@@ -465,6 +468,19 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "zero autoscaling",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
+				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 0,
+					MaxReplicas: 0,
+				}
+				return pool
+			}(),
+			expectAllowed: true,
+		},
+		{
+			name: "zero autoscaling with defined zones",
+			provision: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zoneA", "zoneB"}
 				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
 					MinReplicas: 0,
 					MaxReplicas: 0,

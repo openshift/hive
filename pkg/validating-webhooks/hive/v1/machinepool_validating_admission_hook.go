@@ -318,7 +318,7 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 				allErrs = append(allErrs, field.Invalid(autoscalingPath.Child("minReplicas"), spec.Autoscaling.MinReplicas, "minimum replicas must be at least 1"))
 			}
 		} else {
-			if spec.Autoscaling.MinReplicas < int32(numberOfMachineSets) {
+			if spec.Autoscaling.MinReplicas < int32(numberOfMachineSets) && !validZeroSizeAutoscalingMinReplicas {
 				allErrs = append(allErrs, field.Invalid(autoscalingPath.Child("minReplicas"), spec.Autoscaling.MinReplicas, "minimum replicas must be at least the number of zones"))
 			}
 		}

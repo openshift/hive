@@ -468,6 +468,7 @@ const (
 	ClustersyncControllerName          ControllerName = "clustersync"
 	MachineManagementControllerName    ControllerName = "machineManagement"
 	AWSPrivateLinkControllerName       ControllerName = "awsprivatelink"
+	HiveControllerName                 ControllerName = "hive"
 )
 
 // SpecificControllerConfig contains the configuration for a specific controller

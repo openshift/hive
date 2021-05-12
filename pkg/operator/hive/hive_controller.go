@@ -41,6 +41,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/openshift/hive/pkg/operator/util"
 )
 
 const (
@@ -57,6 +59,14 @@ const (
 
 	// watchResyncInterval is used for a couple handcrafted watches we do with our own informers.
 	watchResyncInterval = 30 * time.Minute
+)
+
+var (
+	// HiveConfigConditions are the HiveConfig conditions controlled by
+	// hive controller
+	HiveConfigConditions = []hivev1.HiveConfigConditionType{
+		hivev1.HiveReadyCondition,
+	}
 )
 
 // Add creates a new Hive Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -301,7 +311,18 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	origHiveConfig := instance.DeepCopy()
 	hiveNSName := getHiveNamespace(instance)
 
+	// Initialize HiveConfig conditions if not present
+	newConditions := util.InitializeHiveConfigConditions(instance.Status.Conditions, HiveConfigConditions)
+	if len(newConditions) > len(origHiveConfig.Status.Conditions) {
+		instance.Status.Conditions = newConditions
+		hLog.Info("initializing hive controller conditions")
+		err = r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
 	if err := r.establishSecretWatch(hLog, hiveNSName); err != nil {
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorEstablishingSecretWatch", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
@@ -321,6 +342,8 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 			hLog.WithField("hiveNS", hiveNSName).Debug("target namespace already exists")
 		} else {
 			hLog.WithError(err).Error("error creating hive target namespace")
+			instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingHiveNamespace", err.Error())
+			r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 			return reconcile.Result{}, err
 		}
 	} else {
@@ -360,6 +383,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
 	if err != nil {
 		hLog.WithError(err).Error("error creating resource helper")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelper", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -367,6 +391,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error setting up managed domains")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorSettingUpManagedDomains", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -374,6 +399,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	plConfigHash, err := r.deployAWSPrivateLinkConfigMap(hLog, h, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying aws privatelink configmap")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingAWSPrivatelinkConfigmap", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -388,6 +414,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance, plConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying controllers configmap")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingControllersConfigmap", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -395,6 +422,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	fgConfigHash, err := r.deployFeatureGatesConfigMap(hLog, h, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying feature gates configmap")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingFeatureGatesConfigmap", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -402,6 +430,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap, confighash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHive", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -409,6 +438,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	err = r.deployClusterSync(hLog, h, instance, confighash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying ClusterSync")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingClusterSync", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -421,16 +451,19 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash, plConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHiveAdmission", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
 	if err := r.cleanupLegacySyncSetInstances(hLog); err != nil {
 		hLog.WithError(err).Error("error cleaning up legacy SyncSetInstances")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeletingLegacySyncSetInstances", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
+	instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionTrue, "DeploymentSuccess", "Hive is deployed successfully")
 	if err := r.updateHiveConfigStatus(origHiveConfig, instance, hLog, true); err != nil {
 		return reconcile.Result{}, err
 	}

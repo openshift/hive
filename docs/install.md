@@ -17,8 +17,8 @@ kind: HiveConfig
 metadata:
   name: hive
 spec:
- logLevel: debug
- targetNamespace: hive
+  logLevel: debug
+  targetNamespace: hive
 ```
 
 The hive-operator pod should now deploy the remaining components (hive-controllers, hive-clustersync, hiveadmission), and once running Hive is now ready to begin accepting ClusterDeployments.

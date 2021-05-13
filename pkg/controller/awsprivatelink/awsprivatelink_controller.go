@@ -1186,7 +1186,7 @@ func initialURL(c client.Client, key client.ObjectKey) (string, error) {
 		key,
 		kubeconfigSecret,
 	); err != nil {
-		return "", errors.Wrap(err, "could not get admin kubeconfig secret")
+		return "", err
 	}
 	cfg, err := restConfigFromSecret(kubeconfigSecret)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/route53"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -128,10 +129,13 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 		hzID = cd.Status.Platform.AWS.PrivateLink.HostedZoneID
 	}
 
-	if hzID == "" { // since we don't have the hz ID, we will discover it to prevent leaks
+	if hzID == "" { // since we don't have the hz ID, we try to discover it to prevent leaks
 		apiDomain, err := initialURL(r.Client,
 			client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name})
-		if err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Info("no hostedZoneID in status and admin kubeconfig does not exist, skipping hosted zone cleanup")
+			return nil
+		} else if err != nil {
 			logger.WithError(err).Error("could not get API URL from kubeconfig")
 			return err
 		}

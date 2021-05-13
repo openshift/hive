@@ -984,8 +984,8 @@ users:
 			VPCEndpointID:      "vpce-12345",
 		},
 		expectedConditions: getExpectedConditions(true, "CouldNotCalculateAPIDomain",
-			"could not get admin kubeconfig secret: secrets \"test-cd-provision-0-kubeconfig\" not found"),
-		err: "could not get admin kubeconfig secret: secrets \"test-cd-provision-0-kubeconfig\" not found",
+			"secrets \"test-cd-provision-0-kubeconfig\" not found"),
+		err: "secrets \"test-cd-provision-0-kubeconfig\" not found",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no previous PHZ",
 

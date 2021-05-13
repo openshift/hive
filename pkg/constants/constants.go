@@ -347,6 +347,9 @@ const (
 	// AWSPrivateLinkControllerConfigFileEnvVar if present, points to a simple text
 	// file that includes configuration for aws-private-link-controller
 	AWSPrivateLinkControllerConfigFileEnvVar = "AWS_PRIVATELINK_CONTROLLER_CONFIG_FILE"
+
+	// HiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
+	HiveConfigName = "hive"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

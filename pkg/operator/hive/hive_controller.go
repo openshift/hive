@@ -42,12 +42,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/operator/metrics"
 	"github.com/openshift/hive/pkg/operator/util"
 )
 
 const (
-	// hiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
-	hiveConfigName = "hive"
+	ControllerName = hivev1.HiveControllerName
 
 	hiveOperatorDeploymentName = "hive-operator"
 
@@ -280,13 +281,15 @@ type ReconcileHiveConfig struct {
 func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	hLog := log.WithField("controller", "hive")
 	hLog.Info("Reconciling Hive components")
+	recobsrv := metrics.NewReconcileObserver(ControllerName, hLog)
+	defer recobsrv.ObserveControllerReconcileTime()
 
 	// Fetch the Hive instance
 	instance := &hivev1.HiveConfig{}
 
 	// We only support one HiveConfig per cluster, and it must be called "hive". This prevents installing
 	// Hive more than once in the cluster.
-	if request.NamespacedName.Name != hiveConfigName {
+	if request.NamespacedName.Name != constants.HiveConfigName {
 		hLog.WithField("hiveConfig", request.NamespacedName.Name).Warn(
 			"invalid HiveConfig name, only one HiveConfig supported per cluster and must be named 'hive'")
 		return reconcile.Result{}, nil
@@ -492,11 +495,11 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 		err := r.ctrlr.Watch(&source.Informer{Informer: secretsInformer}, handler.Funcs{
 			CreateFunc: func(e event.CreateEvent, q workqueue.RateLimitingInterface) {
 				hLog.Debug("eventHandler CreateFunc")
-				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: hiveConfigName}})
+				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
 			},
 			UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 				hLog.Debug("eventHandler UpdateFunc")
-				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: hiveConfigName}})
+				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
 			},
 		}, predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
@@ -575,7 +578,7 @@ func (r *informerRunnable) Start(ctx context.Context) error {
 
 func aggregatorCAConfigMapHandler(o client.Object) []reconcile.Request {
 	if o.GetName() == aggregatorCAConfigMapName {
-		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: hiveConfigName}}}
+		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}}}
 	}
 	return nil
 }

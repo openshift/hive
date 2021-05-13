@@ -17,10 +17,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -113,6 +117,12 @@ func Add(mgr manager.Manager) error {
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler.EnqueueRequestsFromMapFunc(
 		r.clusterDeploymentWatchHandler,
 	))
+	if err != nil {
+		return err
+	}
+
+	// Periodically watch MachinePools for syncing status from external clusters
+	err = c.Watch(newPeriodicSource(r.Client, 30*time.Minute, r.logger), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -1001,4 +1011,68 @@ func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool
 	}
 
 	return false
+}
+
+// periodicSource uses the client to list the machinepools
+// every duration (including some jitter) and creates a Generic
+// event for each object.
+// this is useful to create a steady stream of reconcile requests
+// when some of the changes cannot be models in Watches.
+type periodicSource struct {
+	client   client.Client
+	duration time.Duration
+
+	logger log.FieldLogger
+}
+
+func newPeriodicSource(c client.Client, d time.Duration, logger log.FieldLogger) *periodicSource {
+	return &periodicSource{
+		client:   c,
+		duration: d,
+		logger:   logger,
+	}
+}
+
+// Start is internal and should be called only by the Controller to register an EventHandler with the Informer
+// to enqueue reconcile.Requests.
+func (ps *periodicSource) Start(ctx context.Context,
+	handler handler.EventHandler,
+	queue workqueue.RateLimitingInterface,
+	prcts ...predicate.Predicate) error {
+
+	go wait.JitterUntilWithContext(ctx, ps.syncFunc(handler, queue, prcts...), ps.duration, 0.1, true)
+	return nil
+}
+
+func (ps *periodicSource) syncFunc(handler handler.EventHandler,
+	queue workqueue.RateLimitingInterface,
+	prcts ...predicate.Predicate) func(context.Context) {
+
+	return func(ctx context.Context) {
+		mpList := &hivev1.MachinePoolList{}
+		err := ps.client.List(ctx, mpList)
+		if err != nil {
+			ps.logger.WithError(err).Error("failed to list MachinePools")
+			return
+		}
+
+		for idx := range mpList.Items {
+			evt := event.GenericEvent{Object: &mpList.Items[idx]}
+
+			shouldHandle := true
+			for _, p := range prcts {
+				if !p.Generic(evt) {
+					shouldHandle = false
+				}
+			}
+
+			if shouldHandle {
+				handler.Generic(evt, queue)
+			}
+		}
+	}
+}
+
+func (ps *periodicSource) String() string {
+	return fmt.Sprintf("periodic source for MachinePools every %s", ps.duration)
 }

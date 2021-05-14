@@ -561,7 +561,9 @@ func (a *AWSActuator) setInsufficientCredentialsConditionToTrue(message string) 
 		hivev1.InsufficientCredentialsCondition,
 		corev1.ConditionTrue,
 		accessDeniedReason,
-		message,
+		// FIXME: including the error message as is leads to status update hotloop when
+		// error message includes a dynamically generated AWS user https://issues.redhat.com/browse/HIVE-1542
+		"AccessDenied error encountered (see controller logs for details)",
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 

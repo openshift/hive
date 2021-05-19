@@ -124,6 +124,9 @@ const (
 	// SyncsetPauseAnnotation is a annotation used by clusterDeployment, if it's true, then we will disable syncing to a specific cluster
 	SyncsetPauseAnnotation = "hive.openshift.io/syncset-pause"
 
+	// NoAlertsLabel is a label used by clusterDeployment, if it's true, then we will disable alerts to a specific cluster
+	NoAlertsLabel = "ext-managed.openshift.io/noalerts"
+
 	// HiveManagedLabel is a label added to any resources we sync to the remote cluster to help identify that they are
 	// managed by Hive, and any manual changes may be undone the next time the resource is reconciled.
 	HiveManagedLabel = "hive.openshift.io/managed"

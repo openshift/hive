@@ -109,6 +109,18 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
+
+	// metricClusterDeploymentNoAlertLabel tracks ClusterDeployments in which
+	// alerts have been paused.  This is achieved by the presence
+	// of a ext-managed.openshift.io/noalerts="true" label.  The value is
+	// a boolean with "1" indicating the label is present.
+	metricClusterDeploymentNoAlertLabel = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_noalert_label",
+			Help: "Whether Hive has noalerts label present on the cluster",
+		},
+		[]string{"cluster_deployment", "namespace", "cluster_type"},
+	)
 )
 
 // ReconcileOutcome is used in controller "reconcile complete" log entries, and the metricControllerReconcileTime
@@ -142,6 +154,7 @@ func init() {
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
 	metrics.Registry.MustRegister(metricClusterDeploymentSyncsetPaused)
+	metrics.Registry.MustRegister(metricClusterDeploymentNoAlertLabel)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -225,6 +238,23 @@ func (mc *Calculator) Start(ctx context.Context) error {
 						mcLog.Infof("cleared metric: %v", metricClusterDeploymentSyncsetPaused)
 					}
 				}
+
+				if noalert, err := strconv.ParseBool(cd.Labels[constants.NoAlertsLabel]); err == nil && noalert {
+					metricClusterDeploymentNoAlertLabel.WithLabelValues(
+						cd.Name,
+						cd.Namespace,
+						clusterType).Set(1.0)
+				} else {
+					cleared := metricClusterDeploymentNoAlertLabel.Delete(map[string]string{
+						"cluster_deployment": cd.Name,
+						"namespace":          cd.Namespace,
+						"cluster_type":       clusterType,
+					})
+					if cleared {
+						mcLog.Infof("cleared metric: %v", metricClusterDeploymentNoAlertLabel)
+					}
+				}
+
 			}
 
 			accumulator.setMetrics(metricClusterDeploymentsTotal,

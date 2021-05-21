@@ -192,6 +192,17 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		})
 	}
 
+	if instance.Spec.ReleaseImageVerificationConfigMapRef != nil {
+		hLog.Info("Release Image verification enabled")
+		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
+			Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar,
+			Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Namespace,
+		}, corev1.EnvVar{
+			Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNameEnvVar,
+			Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Name,
+		})
+	}
+
 	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {
 		return err
 	}

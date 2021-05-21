@@ -348,6 +348,11 @@ const (
 	// file that includes configuration for aws-private-link-controller
 	AWSPrivateLinkControllerConfigFileEnvVar = "AWS_PRIVATELINK_CONTROLLER_CONFIG_FILE"
 
+	// HiveReleaseImageVerificationConfigMapNamespaceEnvVar is used to configure the config map that will be used
+	// to verify the release images being used for cluster deployments.
+	HiveReleaseImageVerificationConfigMapNamespaceEnvVar = "HIVE_RELEASE_IMAGE_VERIFICATION_CONFIGMAP_NS"
+	HiveReleaseImageVerificationConfigMapNameEnvVar      = "HIVE_RELEASE_IMAGE_VERIFICATION_CONFIGMAP_NAME"
+
 	// HiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
 	HiveConfigName = "hive"
 )

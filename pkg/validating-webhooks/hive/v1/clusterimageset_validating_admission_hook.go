@@ -2,16 +2,22 @@ package v1
 
 import (
 	"net/http"
+	"os"
+	"regexp"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -152,15 +158,17 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = newObject.Name
 
-	if newObject.Spec.ReleaseImage == "" {
-		message := "Failed validation: you must specify a release image"
-		contextLogger.Infof(message)
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+
+	allErrs = append(allErrs, validateReleaseImage(specPath.Child("releaseImage"), newObject.Spec.ReleaseImage)...)
+
+	if len(allErrs) > 0 {
+		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
+		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
-			Result: &metav1.Status{
-				Status: metav1.StatusFailure, Code: http.StatusBadRequest, Reason: metav1.StatusReasonBadRequest,
-				Message: message,
-			},
+			Result:  &status,
 		}
 	}
 
@@ -211,9 +219,48 @@ func (a *ClusterImageSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
+	allErrs := field.ErrorList{}
+	specPath := field.NewPath("spec")
+
+	allErrs = append(allErrs, validateReleaseImage(specPath.Child("releaseImage"), newObject.Spec.ReleaseImage)...)
+
+	if len(allErrs) > 0 {
+		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
+		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
+		return &admissionv1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &status,
+		}
+	}
+
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
+}
+
+// validReleaseDigest is a verification rule to filter clearly invalid digests.
+var validReleaseDigest = regexp.MustCompile(`^[a-z0-9]+(?:[.+_-][a-z0-9]+)*:[a-zA-Z0-9=_-]+$`)
+
+func validateReleaseImage(path *field.Path, releaseImage string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if releaseImage == "" {
+		return append(allErrs, field.Required(path, "release image must be specified"))
+	}
+
+	var releaseDigest string
+	if index := strings.LastIndex(releaseImage, "@"); index != -1 {
+		releaseDigest = releaseImage[index+1:]
+	}
+	if releaseDigest != "" && !validReleaseDigest.MatchString(releaseDigest) {
+		return append(allErrs, field.Invalid(path, releaseImage, "release image digest is invalid"))
+	}
+
+	name := os.Getenv(constants.HiveReleaseImageVerificationConfigMapNameEnvVar)
+	if name != "" && len(releaseDigest) == 0 {
+		return append(allErrs, field.Invalid(path, releaseImage, "only digest based release images are supported since release verification is required"))
+	}
+
+	return allErrs
 }

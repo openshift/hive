@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/openpgp"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 
@@ -32,6 +34,8 @@ import (
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	"github.com/openshift/library-go/pkg/verify"
+	"github.com/openshift/library-go/pkg/verify/store"
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -123,9 +127,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		return getJob(c, imageSetJobName)
 	}
 
+	imageVerifier := testReleaseVerifier{known: sets.NewString("sha256:digest1", "sha256:digest2", "sha256:digest3")}
+
 	tests := []struct {
 		name                          string
 		existing                      []runtime.Object
+		riVerifier                    verify.Interface
 		pendingCreation               bool
 		expectErr                     bool
 		expectedRequeueAfter          time.Duration
@@ -472,6 +479,86 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				for _, e := range envVars {
 					if e.Name == "RELEASE_IMAGE" {
 						if e.Value != testClusterImageSet().Spec.ReleaseImage {
+							t.Errorf("unexpected release image used in job: %s", e.Value)
+						}
+						break
+					}
+				}
+
+				// Ensure job type labels are set correctly
+				require.NotNil(t, job, "expected job")
+				assert.Equal(t, testClusterDeployment().Name, job.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Equal(t, constants.JobTypeImageSet, job.Labels[constants.JobTypeLabel], "incorrect job type label")
+			},
+		},
+		{
+			name: "failed verification of release image using tags should set InstallImagesNotResolvedCondition",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					return cd
+				}(),
+				testClusterImageSet(),
+				testCompletedFailedImageSetJob(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			riVerifier: verify.Reject,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.InstallImagesNotResolvedCondition, "ReleaseImageVerificationFailed")
+
+			},
+		},
+		{
+			name: "failed verification of release image using unknown digest should set InstallImagesNotResolvedCondition",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Provisioning.ReleaseImage = "test-image@sha256:unknowndigest1"
+					return cd
+				}(),
+				testClusterImageSet(),
+				testCompletedFailedImageSetJob(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			riVerifier: imageVerifier,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				assertConditionStatus(t, cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue)
+				assertConditionReason(t, cd, hivev1.InstallImagesNotResolvedCondition, "ReleaseImageVerificationFailed")
+
+			},
+		},
+		{
+			name: "Create job to resolve installer image using verified image",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Status.InstallerImage = nil
+					cd.Spec.Provisioning.ReleaseImage = "test-image@sha256:digest1"
+					return cd
+				}(),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			riVerifier: imageVerifier,
+			validate: func(c client.Client, t *testing.T) {
+				job := getImageSetJob(c)
+				if job == nil {
+					t.Errorf("did not find expected imageset job")
+				}
+				// Ensure that the release image from the imageset is used in the job
+				envVars := job.Spec.Template.Spec.Containers[0].Env
+				for _, e := range envVars {
+					if e.Name == "RELEASE_IMAGE" {
+						if e.Value != "test-image@sha256:digest1" {
 							t.Errorf("unexpected release image used in job: %s", e.Value)
 						}
 						break
@@ -1856,6 +1943,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				watchingClusterInstall: map[string]struct{}{
 					(schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "FakeClusterInstall"}).String(): {},
 				},
+				releaseImageVerifier: test.riVerifier,
 			}
 
 			if test.reconcilerSetup != nil {
@@ -3063,4 +3151,27 @@ func clusterDeploymentBase() testclusterdeployment.Option {
 		clusterDeployment.Name = testName
 		clusterDeployment.Spec.Platform.AWS = &hivev1aws.Platform{}
 	}
+}
+
+// testReleaseVerifier returns Verify true for only provided known digests.
+type testReleaseVerifier struct {
+	known sets.String
+}
+
+func (t testReleaseVerifier) Verify(ctx context.Context, releaseDigest string) error {
+	if !t.known.Has(releaseDigest) {
+		return fmt.Errorf("verification did not succeed")
+	}
+	return nil
+}
+
+func (testReleaseVerifier) Signatures() map[string][][]byte {
+	return nil
+}
+
+func (testReleaseVerifier) Verifiers() map[string]openpgp.EntityList {
+	return nil
+}
+
+func (testReleaseVerifier) AddStore(_ store.Store) {
 }

@@ -240,7 +240,7 @@ type ReconcileClusterDeployment struct {
 	validateCredentialsForClusterDeployment func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error)
 
 	// releaseImageVerifier, if provided, will be used to check an release image before it is executed.
-	// Any error will prevent an release image from being accessed.
+	// Any error will prevent a release image from being accessed.
 	releaseImageVerifier verify.Interface
 
 	protectedDelete bool

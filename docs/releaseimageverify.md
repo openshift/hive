@@ -19,11 +19,11 @@ best way to establish and enforce that trust.
 
 for details see https://github.com/openshift/cluster-update-keys
 
-The definition of trust is defined in an ConfigMap data keys,
+The definition of trust is defined in ConfigMap data keys:
 
 store-*:
-These define the ways in which signature(a) for specific release image
-digest can be fetched.
+These define the ways in which signature(s) for specific release image
+digests can be fetched.
 Multiple stores can be used to provide resilient source of signatures
 
 verifier-public-key-*:
@@ -33,8 +33,8 @@ Multiple keys imply that the digest and signatures must be trusted by
 every key.
 
 OpenShift publishes this config map by default in each cluster at
-openshift-config-managed/release-verification . So if Hive is running on
-OpenSHift 4 and it intends to allow only release images published by Red
+openshift-config-managed/release-verification . If Hive is running on
+OpenShift 4 and it intends to allow only release images published by Red
 Hat, it can use this config map as definitions of trust.
 
 The verification requires digest of the release image, the
@@ -52,15 +52,15 @@ When verification is enabled (it is disabled by default),
 Hive validation will reject ClusterImageSets that use release images
 with tags.
 
-Hive controllers will verify the release image before using the release
-image for extracting any information.
+Hive controllers will verify the release image before
+extracting any information.
 In cases when the verification fails, Hive will set the
 InstallImagesNotResolved condition to True with
 ReleaseImageVerificationFailed reason.
 
 How to configure Hive for verifying release images?
 
-By default no trust for release images is defined and therefore on
+By default no trust for release images is defined and therefore no
 verification occurs.
 
 Verification is turned on by defining a trust using HiveConfig.

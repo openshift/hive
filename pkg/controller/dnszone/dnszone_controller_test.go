@@ -801,7 +801,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 				Type:    hivev1.InsufficientCredentialsCondition,
 				Status:  corev1.ConditionTrue,
 				Reason:  accessDeniedReason,
-				Message: "AccessDenied error encountered (see controller logs for details)",
+				Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
 			},
 		},
 		{

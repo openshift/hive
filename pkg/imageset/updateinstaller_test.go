@@ -153,8 +153,9 @@ func validateSuccessfulExecution(t *testing.T, clusterDeployment *hivev1.Cluster
 		*clusterDeployment.Status.InstallerImage != testInstallerImage {
 		t.Errorf("did not get expected installer image in status")
 	}
-	if len(clusterDeployment.Status.Conditions) != 0 {
-		t.Errorf("conditions is not empty")
+	condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
+	if condition != nil && condition.Status != corev1.ConditionFalse {
+		t.Errorf("unexpected condition status")
 	}
 }
 

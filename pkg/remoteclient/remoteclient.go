@@ -140,7 +140,7 @@ func InitialURL(c client.Client, cd *hivev1.ClusterDeployment) (string, error) {
 // the ClusterDeployment to determine if the remote cluster is reachable.
 func Unreachable(cd *hivev1.ClusterDeployment) (unreachable bool, lastCheck time.Time) {
 	cond := utils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
-	if cond == nil {
+	if cond.Status == corev1.ConditionUnknown {
 		unreachable = true
 		return
 	}

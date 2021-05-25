@@ -50,8 +50,33 @@ import (
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+var (
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
+
+	// clusterDeploymentConditions are the cluster deployment conditions controlled or
+	// initialized by cluster deployment controller
+	clusterDeploymentConditions = []hivev1.ClusterDeploymentConditionType{
+		hivev1.ClusterImageSetNotFoundCondition,
+		hivev1.DNSNotReadyCondition,
+		hivev1.InstallImagesNotResolvedCondition,
+		hivev1.ProvisionFailedCondition,
+		hivev1.SyncSetFailedCondition,
+		hivev1.InstallLaunchErrorCondition,
+		hivev1.DeprovisionLaunchErrorCondition,
+		hivev1.ProvisionStoppedCondition,
+		hivev1.AuthenticationFailureClusterDeploymentCondition,
+
+		// ClusterInstall conditions copied over to cluster deployment
+		hivev1.ClusterInstallFailedClusterDeploymentCondition,
+		hivev1.ClusterInstallCompletedClusterDeploymentCondition,
+		hivev1.ClusterInstallStoppedClusterDeploymentCondition,
+		hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition,
+
+		// ImageSet condition initialized by cluster deployment
+		hivev1.InstallerImageResolutionFailedCondition,
+	}
+)
 
 const (
 	ControllerName     = hivev1.ClusterDeploymentControllerName
@@ -275,6 +300,18 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 	if err != nil {
 		cdLog.WithError(err).Error("Error reconciling object ownership")
 		return reconcile.Result{}, err
+	}
+
+	// Initialize cluster deployment conditions if not set
+	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentConditions)
+	if len(newConditions) > len(cd.Status.Conditions) {
+		cd.Status.Conditions = newConditions
+		cdLog.Info("initializing cluster deployment controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	return r.reconcile(request, cd, cdLog)
@@ -565,7 +602,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	// If the platform credentials are no good, return error and go into backoff
 	authCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.AuthenticationFailureClusterDeploymentCondition)
-	if authCondition != nil && authCondition.Status == corev1.ConditionTrue {
+	if authCondition.Status == corev1.ConditionTrue {
 		authError := errors.New(authCondition.Message)
 		cdLog.WithError(authError).Error("cannot proceed with provision while platform credentials authentication is failing.")
 		return reconcile.Result{}, authError
@@ -697,8 +734,7 @@ func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev
 
 func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, *hivev1.ClusterDeploymentCondition) {
 	dnsNotReadyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
-	return dnsNotReadyCondition != nil &&
-			dnsNotReadyCondition.Status == corev1.ConditionTrue &&
+	return dnsNotReadyCondition.Status == corev1.ConditionTrue &&
 			(dnsNotReadyCondition.Reason == dnsNotReadyReason || dnsNotReadyCondition.Reason == dnsNotReadyTimedoutReason),
 		dnsNotReadyCondition
 }

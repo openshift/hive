@@ -25,6 +25,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
+	testassert "github.com/openshift/hive/pkg/test/assert"
 )
 
 const (
@@ -66,9 +67,16 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 		},
 		{
 			name: "Test single ingress (only default)",
-			localObjects: []runtime.Object{
-				testClusterDeployment(),
-			},
+			localObjects: func() []runtime.Object {
+				objects := []runtime.Object{}
+				cd := testClusterDeployment()
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				objects = append(objects, cd)
+				return objects
+			}(),
 			expectedSyncSetIngressEntries: []SyncSetIngressEntry{
 				{
 					name:   testDefaultIngressName,
@@ -79,9 +87,16 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 
 		{
 			name: "Test multiple ingress",
-			localObjects: []runtime.Object{
-				addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, ""),
-			},
+			localObjects: func() []runtime.Object {
+				objects := []runtime.Object{}
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, "")
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				objects = append(objects, cd)
+				return objects
+			}(),
 			expectedSyncSetIngressEntries: []SyncSetIngressEntry{
 				{
 					name:   testDefaultIngressName,
@@ -95,10 +110,18 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 		},
 		{
 			name: "Test updating existing syncset",
-			localObjects: []runtime.Object{
-				addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, ""),
-				syncSetFromClusterDeployment(testClusterDeployment()),
-			},
+			localObjects: func() []runtime.Object {
+				objects := []runtime.Object{}
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, "")
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				objects = append(objects, cd)
+				ss := syncSetFromClusterDeployment(testClusterDeployment())
+				objects = append(objects, ss)
+				return objects
+			}(),
 			expectedSyncSetIngressEntries: []SyncSetIngressEntry{
 				{
 					name:   testDefaultIngressName,
@@ -127,6 +150,10 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 
 				// create the current cluster deployment with only a single ingress
 				cd = testClusterDeployment()
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
 				objects = append(objects, cd)
 
 				return objects
@@ -140,9 +167,16 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 		},
 		{
 			name: "Test setting routeSelector",
-			localObjects: []runtime.Object{
-				addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", testRouteSelector(), nil, ""),
-			},
+			localObjects: func() []runtime.Object {
+				objects := []runtime.Object{}
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", testRouteSelector(), nil, "")
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				objects = append(objects, cd)
+				return objects
+			}(),
 			expectedSyncSetIngressEntries: []SyncSetIngressEntry{
 				{
 					name:   testDefaultIngressName,
@@ -157,9 +191,16 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 		},
 		{
 			name: "Test setting namespaceSelector",
-			localObjects: []runtime.Object{
-				addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, testNamespaceSelector(), ""),
-			},
+			localObjects: func() []runtime.Object {
+				objects := []runtime.Object{}
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, testNamespaceSelector(), "")
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				objects = append(objects, cd)
+				return objects
+			}(),
 			expectedSyncSetIngressEntries: []SyncSetIngressEntry{
 				{
 					name:   testDefaultIngressName,
@@ -177,6 +218,10 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 			localObjects: func() []runtime.Object {
 				objects := []runtime.Object{}
 				cd := testClusterDeploymentWithManualCertificate()
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
 				objects = append(objects, cd)
 
 				// put the expected secrets to satisfy the list of certificateBundles
@@ -210,6 +255,10 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				// now add the extra ingress entry (use same certBundle)
 				addIngressToClusterDeployment(cd, "secondingress", "moreingress.example.com", nil, nil, testDefaultIngressServingCertificate)
 				cd.Spec.CertificateBundles = addCertificateBundlesForIngressList(cd)
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
 				objects = append(objects, cd)
 
 				// secrets for the clusterDeployment
@@ -249,6 +298,10 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 
 				// clusterDeployment with only one ingress
 				cd := testClusterDeploymentWithManualCertificate()
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
 				objects = append(objects, cd)
 
 				// secrets for the clusterDeployment
@@ -278,6 +331,10 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				cd := testClusterDeploymentWithManualCertificate()
 				addIngressToClusterDeployment(cd, "secondingress", "moreingress.example.com", nil, nil, "secondCertBundle")
 				cd.Spec.CertificateBundles = addCertificateBundlesForIngressList(cd)
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
 				objects = append(objects, cd)
 
 				// add the secrets for the certbundles
@@ -342,13 +399,23 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 	ingresscontroller.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name                    string
-		localObjects            []runtime.Object
-		expectClusterCondition  bool
-		expectedConditionReason string
-		expectedConditionStatus corev1.ConditionStatus
+		name                      string
+		localObjects              []runtime.Object
+		expectedClusterConditions []hivev1.ClusterDeploymentCondition
 	}{
 		{
+			name: "Test initialize conditions",
+			localObjects: []runtime.Object{
+				testClusterDeployment(),
+			},
+			expectedClusterConditions: []hivev1.ClusterDeploymentCondition{
+				{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+					Reason: hivev1.InitializedConditionReason,
+				},
+			},
+		}, {
 			name: "Test no issue no condition",
 			localObjects: func() []runtime.Object {
 				objects := []runtime.Object{}
@@ -361,27 +428,44 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 
 				return objects
 			}(),
-			expectClusterCondition: false,
 		},
 		{
 			name: "Test certbundle missing",
 			localObjects: func() []runtime.Object {
 				cd := testClusterDeploymentWithManualCertificate()
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Status: corev1.ConditionUnknown,
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+				})
 				cd.Spec.CertificateBundles = []hivev1.CertificateBundleSpec{}
 
 				return []runtime.Object{cd}
 			}(),
-			expectClusterCondition:  true,
-			expectedConditionReason: ingressCertificateNotFoundReason,
-			expectedConditionStatus: corev1.ConditionTrue,
+			expectedClusterConditions: []hivev1.ClusterDeploymentCondition{
+				{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionTrue,
+					Reason: ingressCertificateNotFoundReason,
+				},
+			},
 		},
 		{
 			name: "Test secret missing",
-			localObjects: []runtime.Object{
-				testClusterDeploymentWithManualCertificate(),
+			localObjects: func() []runtime.Object {
+				cd := testClusterDeploymentWithManualCertificate()
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Status: corev1.ConditionUnknown,
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+				})
+				return []runtime.Object{cd}
+			}(),
+			expectedClusterConditions: []hivev1.ClusterDeploymentCondition{
+				{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionTrue,
+					Reason: ingressCertificateNotFoundReason,
+				},
 			},
-			expectedConditionReason: ingressCertificateNotFoundReason,
-			expectedConditionStatus: corev1.ConditionTrue,
 		},
 		{
 			name: "Test clear previous condition",
@@ -399,9 +483,13 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 
 				return objects
 			}(),
-			expectClusterCondition:  true,
-			expectedConditionReason: ingressCertificateFoundReason,
-			expectedConditionStatus: corev1.ConditionFalse,
+			expectedClusterConditions: []hivev1.ClusterDeploymentCondition{
+				{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionFalse,
+					Reason: ingressCertificateFoundReason,
+				},
+			},
 		},
 	}
 
@@ -428,16 +516,11 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 
 			assert.NoError(t, err, "unexpected error returned from Reconcile()")
 
-			if test.expectClusterCondition {
+			if len(test.expectedClusterConditions) > 0 {
 				cd := hivev1.ClusterDeployment{}
 				searchKey := types.NamespacedName{Name: testClusterName, Namespace: testNamespace}
 				assert.NoError(t, fakeClient.Get(context.TODO(), searchKey, &cd), "error fetching resulting clusterDeployment")
-
-				condition := utils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.IngressCertificateNotFoundCondition)
-				assert.NotNil(t, condition, "didn't find expected condition")
-
-				assert.Equal(t, test.expectedConditionReason, condition.Reason)
-				assert.Equal(t, test.expectedConditionStatus, condition.Status)
+				testassert.AssertConditions(t, &cd, test.expectedClusterConditions)
 			}
 		})
 	}

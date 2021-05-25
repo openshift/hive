@@ -47,6 +47,12 @@ var (
 		}
 	}
 
+	// clusterDeploymentClusterRelocateConditions are the cluster deployment conditions controlled by
+	// Cluster Relocate controller
+	clusterDeploymentClusterRelocateConditions = []hivev1.ClusterDeploymentConditionType{
+		hivev1.RelocationFailedCondition,
+	}
+
 	metricSuccessfulClusterRelocations = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "hive_cluster_relocations",
 		Help: "Total number of successful cluster relocations.",
@@ -165,6 +171,19 @@ func (r *ReconcileClusterRelocate) Reconcile(ctx context.Context, request reconc
 		}
 		logger.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
+	}
+
+	// Initialize cluster deployment conditions if not present
+	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions,
+		clusterDeploymentClusterRelocateConditions)
+	if len(newConditions) > len(cd.Status.Conditions) {
+		cd.Status.Conditions = newConditions
+		logger.Info("initializing cluster relocate controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	currentRelocateName, relocateStatus, err := controllerutils.IsRelocating(cd)

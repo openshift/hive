@@ -56,6 +56,12 @@ const (
 	requeueAfter2 = time.Minute * 2
 )
 
+// clusterDeploymentRemoteIngressConditions are the cluster deployment conditions controlled by
+// Remote Ingress controller
+var clusterDeploymentRemoteIngressConditions = []hivev1.ClusterDeploymentConditionType{
+	hivev1.IngressCertificateNotFoundCondition,
+}
+
 // kubeCLIApplier knows how to ApplyRuntimeObject.
 type kubeCLIApplier interface {
 	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error)
@@ -151,6 +157,18 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 		return reconcile.Result{}, err
 	}
 	rContext.clusterDeployment = cd
+
+	// Initialize cluster deployment conditions if not present
+	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentRemoteIngressConditions)
+	if len(newConditions) > len(cd.Status.Conditions) {
+		cd.Status.Conditions = newConditions
+		cdLog.Info("initializing remote ingress controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, cdLog)

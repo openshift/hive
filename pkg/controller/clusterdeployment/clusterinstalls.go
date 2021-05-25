@@ -97,18 +97,16 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	}
 	// additionally copy failed to provision failed condition
 	failed := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallFailedClusterDeploymentCondition)
-	if failed != nil {
-		updated := false
-		conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
-			hivev1.ProvisionFailedCondition, // this transformation is part of the contract
-			failed.Status,
-			failed.Reason,
-			failed.Message,
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		)
-		if updated {
-			statusModified = true
-		}
+	updated := false
+	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
+		hivev1.ProvisionFailedCondition, // this transformation is part of the contract
+		failed.Status,
+		failed.Reason,
+		failed.Message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if updated {
+		statusModified = true
 	}
 
 	// take actions based on the conditions
@@ -118,8 +116,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	// update the installed timestamp when complete
 
 	requirementsMet := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition)
-	if requirementsMet != nil &&
-		requirementsMet.Status == corev1.ConditionTrue {
+	if requirementsMet.Status == corev1.ConditionTrue {
 		if !reflect.DeepEqual(cd.Status.InstallStartedTimestamp, &requirementsMet.LastTransitionTime) {
 			cd.Status.InstallStartedTimestamp = &requirementsMet.LastTransitionTime
 			statusModified = true
@@ -133,31 +130,28 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	completed := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
 	stopped := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallStoppedClusterDeploymentCondition)
 
-	if stopped != nil {
-		reason := stopped.Reason
-		msg := stopped.Message
-		if stopped.Status == corev1.ConditionTrue &&
-			(completed == nil || completed.Status != corev1.ConditionTrue) {
-			// we are must have reached the limit for retrying and therefore
-			// gave up with not completed
-			reason = installAttemptsLimitReachedReason
-			msg = "Install attempts limit reached"
-		}
-
-		updated := false
-		conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
-			hivev1.ProvisionStoppedCondition,
-			stopped.Status,
-			reason,
-			msg,
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		)
-		if updated {
-			statusModified = true
-		}
+	reason := stopped.Reason
+	msg := stopped.Message
+	if stopped.Status == corev1.ConditionTrue && completed.Status == corev1.ConditionFalse {
+		// we must have reached the limit for retrying and therefore
+		// gave up with not completed
+		reason = installAttemptsLimitReachedReason
+		msg = "Install attempts limit reached"
 	}
 
-	if completed != nil && completed.Status == corev1.ConditionTrue { // the cluster install is complete
+	updated = false
+	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
+		hivev1.ProvisionStoppedCondition,
+		stopped.Status,
+		reason,
+		msg,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if updated {
+		statusModified = true
+	}
+
+	if completed.Status == corev1.ConditionTrue { // the cluster install is complete
 		cd.Spec.Installed = true
 		cd.Status.InstalledTimestamp = &completed.LastTransitionTime
 		specModified = true

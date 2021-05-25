@@ -99,7 +99,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "only clusterdeployment",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
@@ -180,7 +183,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "existing namespace",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
@@ -196,7 +202,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "single dependent",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(testsecret.WithDataKeyValue("test-key", []byte("test-data"))),
@@ -211,7 +220,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "multiple dependents",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(
@@ -240,7 +252,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "dependent in other namespace",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(
@@ -266,7 +281,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "existing dependent",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(testsecret.WithDataKeyValue("test-key", []byte("test-data"))),
@@ -284,7 +302,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "out-of-date dependent",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(testsecret.WithDataKeyValue("test-key", []byte("test-data"))),
@@ -302,7 +323,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "existing dependent with different status",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				mpBuilder.Build(
@@ -324,7 +348,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "existing dependent with different instance-specific metadata",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(
@@ -350,7 +377,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "ignore service account token",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(
@@ -367,7 +397,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "ignore secret owned by service account token",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				secretBuilder.Build(
@@ -395,7 +428,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "configmap",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				cmBuilder.Build(testcm.WithDataKeyValue("test-key", "test-data")),
@@ -410,7 +446,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "machinepool",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				mpBuilder.Build(),
@@ -425,7 +464,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "syncset",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				ssBuilder.Build(),
@@ -440,7 +482,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "syncidentityprovider",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				sipBuilder.Build(),
@@ -455,7 +500,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "dnszone",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				dnsZoneBuilder.Build(),
@@ -472,7 +520,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "non-child dnszone",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				dnsZoneBuilder.Build(testdnszone.Generic(testgeneric.WithName("other-dnszone"))),
@@ -486,7 +537,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "non-dependent",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				jobBuilder.Build(),
@@ -500,7 +554,10 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name: "full",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 				cdBuilder.Build(testcd.WithName("other-cluster-deployment")),
@@ -779,8 +836,11 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 		validate                          func(t *testing.T, cd *hivev1.ClusterDeployment)
 	}{
 		{
-			name:    "fresh clusterdeployment",
-			cd:      cdBuilder.Build(),
+			name: "fresh clusterdeployment",
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			dnsZone: dnsZoneBuilder.Build(),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
@@ -790,7 +850,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 		},
 		{
 			name: "clusterdeployment with dnszone already relocating",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateOutgoing)),
 			),
@@ -804,6 +867,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			name: "switch relocates",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateOutgoing)),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.RelocationFailedCondition,
+					Status: corev1.ConditionUnknown,
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateOutgoing)),
@@ -815,8 +882,11 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			expectedDeletionTimestamp: true,
 		},
 		{
-			name:    "multiple relocates",
-			cd:      cdBuilder.Build(),
+			name: "multiple relocates",
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			dnsZone: dnsZoneBuilder.Build(),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
@@ -833,6 +903,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			name: "multiple relocates when already relocating",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateOutgoing)),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.RelocationFailedCondition,
+					Status: corev1.ConditionUnknown,
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateOutgoing)),
@@ -852,6 +926,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			name: "already relocated clusterdeployment",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateComplete)),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.RelocationFailedCondition,
+					Status: corev1.ConditionUnknown,
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation(crName, hivev1.RelocateComplete)),
@@ -863,8 +941,11 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			expectedDeletionTimestamp: true,
 		},
 		{
-			name:    "already moved clusterdeployment",
-			cd:      cdBuilder.Build(),
+			name: "already moved clusterdeployment",
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			dnsZone: dnsZoneBuilder.Build(),
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
@@ -877,7 +958,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 		},
 		{
 			name: "already moved clusterdeployment with dnszone already completed",
-			cd:   cdBuilder.Build(),
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation(crName, hivev1.RelocateComplete)),
 			),
@@ -895,6 +979,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			cd: cdBuilder.Build(
 				func(cd *hivev1.ClusterDeployment) {
 					cd.Spec.BaseDomain = "test-domain"
+					cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+						Status: corev1.ConditionUnknown,
+						Type:   hivev1.RelocationFailedCondition,
+					})
 				},
 			),
 			dnsZone: dnsZoneBuilder.Build(),
@@ -917,6 +1005,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			name: "incoming",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateIncoming)),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.RelocationFailedCondition,
+					Status: corev1.ConditionUnknown,
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(
 				testdnszone.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateIncoming)),
@@ -930,6 +1022,10 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			name: "incoming with dnszone already released",
 			cd: cdBuilder.Build(
 				testcd.Generic(withRelocateAnnotation("other-relocate", hivev1.RelocateIncoming)),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.RelocationFailedCondition,
+					Status: corev1.ConditionUnknown,
+				}),
 			),
 			dnsZone: dnsZoneBuilder.Build(),
 			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{

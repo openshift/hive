@@ -32,6 +32,8 @@ import (
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/awsclient/mock"
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	testassert "github.com/openshift/hive/pkg/test/assert"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	"github.com/openshift/hive/pkg/test/generic"
 )
@@ -448,7 +450,16 @@ func TestReconcile(t *testing.T) {
 	cdBuilder := testcd.FullBuilder(testNS, "test-cd", scheme)
 	enabledPrivateLinkBuilder := cdBuilder.
 		Options(testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
-			PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true}}))
+			PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true}}),
+			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionUnknown,
+				Type:   hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+			}),
+			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Status: corev1.ConditionUnknown,
+				Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+			}),
+		)
 	validInventory := []hivev1.AWSPrivateLinkInventory{{
 		AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 			Region: "us-east-1",
@@ -635,6 +646,12 @@ users:
 		expectedConditions  []hivev1.ClusterDeploymentCondition
 		err                 string
 	}{{
+		name: "cd without initialized conditions",
+
+		existing: []runtime.Object{
+			cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1"})),
+		},
+	}, {
 		name: "cd with gcp platform",
 
 		existing: []runtime.Object{
@@ -1480,11 +1497,18 @@ users:
 				assert.Equal(t, test.expectedAnnotations, cd.Annotations)
 			}
 
-			for i := range cd.Status.Conditions {
-				cd.Status.Conditions[i].LastProbeTime = metav1.Time{}
-				cd.Status.Conditions[i].LastTransitionTime = metav1.Time{}
+			for _, cond := range clusterDeploymentAWSPrivateLinkConditions {
+				if present := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+					cond); present == nil {
+					test.expectedConditions = append(test.expectedConditions, hivev1.ClusterDeploymentCondition{
+						Status:  corev1.ConditionUnknown,
+						Type:    cond,
+						Reason:  "Initialized",
+						Message: "Condition Initialized",
+					})
+				}
 			}
-			assert.ElementsMatch(t, test.expectedConditions, cd.Status.Conditions)
+			testassert.AssertConditions(t, cd, test.expectedConditions)
 
 			if cd.Status.Platform == nil {
 				cd.Status.Platform = &hivev1.PlatformStatus{AWS: &hivev1aws.PlatformStatus{}}

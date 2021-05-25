@@ -1,11 +1,6 @@
 .PHONY: all
 all: vendor update test build
 
-# Force build-machinery-go to grab an earlier version of controller-gen. The newer version adds annotations on pod
-# specs that will cause the CRDs to fail validation. The fix for that requires the CRDs to use v1, but we still need
-# to support users that are running kube versions that only have v1beta1.
-CONTROLLER_GEN_VERSION ?=v0.2.1-37-ga3cca5d
-
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
@@ -114,14 +109,14 @@ endef
 .PHONY: crd
 crd: ensure-controller-gen ensure-yq
 	rm -rf ./config/crds
-	(cd apis; '../$(CONTROLLER_GEN)' crd paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
+	(cd apis; '../$(CONTROLLER_GEN)' crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
 	@echo Stripping yaml breaks from CRD files
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 	@echo Patching CRD files for additional static information
 	$(foreach p,$(wildcard ./config/crdspatch/*.yaml),$(call patch-crd-yq,$(subst ./config/crdspatch/,./config/crds/,$(p)),$(p)))
 	# Patch ClusterProvision CRD to remove the massive PodSpec def we consider an internal implementation detail:
 	@echo Patching ClusterProvision CRD yaml to remove overly verbose PodSpec details:
-	$(YQ) d -i config/crds/hive.openshift.io_clusterprovisions.yaml "spec.validation.openAPIV3Schema.properties.spec.properties.podSpec"
+	$(YQ) d -i config/crds/hive.openshift.io_clusterprovisions.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.podSpec"
 update: crd
 
 .PHONY: verify-crd

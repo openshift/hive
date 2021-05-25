@@ -40,9 +40,9 @@ import (
 const (
 	defaultLogLevel             = "info"
 	leaderElectionConfigMap     = "hive-operator-leader"
-	leaderElectionLeaseDuration = "360s"
-	leaderElectionRenewDeadline = "270s"
-	leaderElectionRetryPeriod   = "90s"
+	leaderElectionLeaseDuration = "120s"
+	leaderElectionRenewDeadline = "90s"
+	leaderElectionRetryPeriod   = "30s"
 )
 
 type controllerManagerOptions struct {

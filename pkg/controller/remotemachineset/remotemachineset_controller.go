@@ -985,13 +985,13 @@ func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool
 
 	// Since 4.7, OpenStack allows zero-sized minReplicas for autoscaling
 	if cd.Spec.Platform.OpenStack != nil {
-		majorMinor, ok := cd.Labels[constants.VersionMajorMinorLabel]
+		majorMinorPatch, ok := cd.Labels[constants.VersionMajorMinorPatchLabel]
 		if !ok {
 			// can't determine whether to allow zero minReplicas
 			return false
 		}
 
-		currentVersion, err := semver.Make(majorMinor)
+		currentVersion, err := semver.Make(majorMinorPatch)
 		if err != nil {
 			// assume we can't set minReplicas to zero
 			return false

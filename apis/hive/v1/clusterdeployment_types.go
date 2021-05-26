@@ -336,7 +336,6 @@ type ClusterDeploymentCondition struct {
 // ClusterDeploymentConditionType is a valid value for ClusterDeploymentCondition.Type
 type ClusterDeploymentConditionType string
 
-// WARNING: All ClusterDeploymentConditionTypes should be added to the AllClusterDeploymentConditions slice below.
 const (
 	// ClusterImageSetNotFoundCondition is set when the ClusterImageSet referenced by the
 	// ClusterDeployment is not found.
@@ -410,23 +409,15 @@ const (
 	ClusterInstallRequirementsMetClusterDeploymentCondition ClusterDeploymentConditionType = "ClusterInstallRequirementsMet"
 )
 
-// AllClusterDeploymentConditions is a slice containing all condition types. This can be used for dealing with
-// cluster deployment conditions dynamically.
-var AllClusterDeploymentConditions = []ClusterDeploymentConditionType{
-	ClusterImageSetNotFoundCondition,
-	InstallerImageResolutionFailedCondition,
-	ControlPlaneCertificateNotFoundCondition,
-	IngressCertificateNotFoundCondition,
-	UnreachableCondition,
+// PositivePolarityClusterDeploymentConditions is a slice containing all condition types with positive polarity
+// For controllers that handle these conditions, the desired state is True
+// All cluster deployment condition types that are not in this slice are assumed to have negative polarity
+var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	ActiveAPIURLOverrideCondition,
-	DNSNotReadyCondition,
-	ProvisionFailedCondition,
-	SyncSetFailedCondition,
-	RelocationFailedCondition,
 	ClusterHibernatingCondition,
-	InstallLaunchErrorCondition,
 	AWSPrivateLinkReadyClusterDeploymentCondition,
-	AWSPrivateLinkFailedClusterDeploymentCondition,
+	ClusterInstallCompletedClusterDeploymentCondition,
+	ClusterInstallRequirementsMetClusterDeploymentCondition,
 }
 
 // Cluster hibernating reasons

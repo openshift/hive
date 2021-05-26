@@ -43,6 +43,10 @@ func TestClusterAccumulator(t *testing.T) {
 			[]hivev1.ClusterDeploymentConditionType{
 				hivev1.InstallLaunchErrorCondition,
 			}),
+		testClusterDeploymentWithConditions("b2", "managed", tenDaysAgo, true,
+			[]hivev1.ClusterDeploymentConditionType{
+				hivev1.ClusterHibernatingCondition,
+			}),
 		testClusterDeployment("c", "managed", tenMinsAgo, false),
 
 		// One managed cluster installing between 1h and 2h:
@@ -76,8 +80,8 @@ func TestClusterAccumulator(t *testing.T) {
 		accumulator.processCluster(&cd)
 	}
 
-	assert.Equal(t, 13, accumulator.total["managed"])
-	assert.Equal(t, 4, accumulator.installed["managed"])
+	assert.Equal(t, 14, accumulator.total["managed"])
+	assert.Equal(t, 5, accumulator.installed["managed"])
 	assert.Equal(t, 9, accumulator.uninstalled["0h"]["managed"])
 	assert.Equal(t, 5, accumulator.uninstalled["1h"]["managed"])
 	assert.Equal(t, 4, accumulator.uninstalled["2h"]["managed"])
@@ -105,6 +109,7 @@ func TestClusterAccumulator(t *testing.T) {
 	assert.Equal(t, 2, accumulator.conditions[hivev1.ClusterImageSetNotFoundCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.ControlPlaneCertificateNotFoundCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.IngressCertificateNotFoundCondition]["managed"])
+	assert.Equal(t, 1, accumulator.conditions[hivev1.ClusterHibernatingCondition]["managed"])
 
 	// Also test with a cluster age filter:
 	accumulator, _ = newClusterAccumulator("8h", []string{"0h", "1h", "2h", "8h", "24h", "72h"})
@@ -183,13 +188,23 @@ func testClusterDeploymentWithConditions(name, clusterType string, created metav
 
 	cd := testClusterDeployment(name, clusterType, created, installed)
 	for _, c := range conditions {
-		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
-			cd.Status.Conditions,
-			c,
-			corev1.ConditionTrue,
-			"NobodyCares",
-			"Really.",
-			controllerutils.UpdateConditionNever)
+		if controllerutils.IsConditionWithPositivePolarity(c) {
+			cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+				cd.Status.Conditions,
+				c,
+				corev1.ConditionFalse,
+				"NobodyCares",
+				"Really.",
+				controllerutils.UpdateConditionNever)
+		} else {
+			cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+				cd.Status.Conditions,
+				c,
+				corev1.ConditionTrue,
+				"NobodyCares",
+				"Really.",
+				controllerutils.UpdateConditionNever)
+		}
 	}
 	return cd
 

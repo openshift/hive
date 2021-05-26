@@ -8,7 +8,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -535,16 +534,8 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 
 	// Process conditions regardless if installed or not:
 	for _, cond := range cd.Status.Conditions {
-		// Conditions with positive polarity are in their undesired state when status = False
-		if controllerutils.IsConditionWithPositivePolarity(cond.Type) {
-			if cond.Status == corev1.ConditionFalse {
-				ca.addConditionToMap(cond.Type, clusterType)
-			}
-		} else {
-			// Assume all other conditions have negative polarity
-			if cond.Status == corev1.ConditionTrue {
-				ca.addConditionToMap(cond.Type, clusterType)
-			}
+		if !controllerutils.IsConditionInDesiredState(cond) {
+			ca.addConditionToMap(cond.Type, clusterType)
 		}
 	}
 }

@@ -151,6 +151,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		statusModified = true
 	}
 
+	completed = controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
 	if completed.Status == corev1.ConditionTrue { // the cluster install is complete
 		cd.Spec.Installed = true
 		cd.Status.InstalledTimestamp = &completed.LastTransitionTime

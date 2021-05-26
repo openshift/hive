@@ -8,13 +8,13 @@ ENV GIT_COMMITTER_EMAIL hive-team@redhat.com
 # Basic Debug Tools
 RUN yum -y install strace tcping && yum clean all
 
-# Install kubebuilder 1.0.8
-RUN export version=1.0.8 && \
+# Install kubebuilder tools for controller-runtime testenv (make test-integration)
+RUN K8S_VERSION=1.19.2 && \
     cd /tmp && \
-    curl -L -O https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_amd64.tar.gz && \
-    tar -zxvf /tmp/kubebuilder_${version}_linux_amd64.tar.gz && \
-    mv kubebuilder_${version}_linux_amd64 /usr/local/kubebuilder && \
-    rm /tmp/kubebuilder_${version}_linux_amd64.tar.gz
+    curl -sSLo envtest-bins.tar.gz "https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-${K8S_VERSION}-$(go env GOOS)-$(go env GOARCH).tar.gz" && \
+    mkdir /usr/local/kubebuilder && \
+    tar -C /usr/local/kubebuilder --strip-components=1 -zvxf envtest-bins.tar.gz && \
+    rm envtest-bins.tar.gz
 
 # Get rid of "go: disabling cache ..." errors.
 RUN mkdir -p /go && chgrp -R root /go && chmod -R g+rwX /go

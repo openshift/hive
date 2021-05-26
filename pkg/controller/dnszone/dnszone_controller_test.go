@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
@@ -505,6 +506,283 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 	}
 }
 
+func TestIsErrorUpdateEvent(t *testing.T) {
+	tests := []struct {
+		name string
+		evt  event.UpdateEvent
+
+		exp bool
+	}{{
+		name: "invalid type",
+		evt: event.UpdateEvent{
+			ObjectNew: &hivev1.ClusterDeployment{},
+		},
+		exp: false,
+	}, {
+		name: "empty conditions",
+		evt: event.UpdateEvent{
+			ObjectNew: validDNSZone(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: false,
+	}, {
+		name: "no error condition",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.DomainNotManaged,
+					Status: corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: false,
+	}, {
+		name: "error condition set to Unknown",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				return z
+			}(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: false,
+	}, {
+		name: "error condition set to False",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionFalse,
+				})
+				return z
+			}(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: false,
+	}, {
+		name: "error condition set to True, old empty",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: true,
+	}, {
+		name: "error condition set to True, old unknown",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				return z
+			}(),
+		},
+		exp: true,
+	}, {
+		name: "error condition set to True, old false",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionFalse,
+				})
+				return z
+			}(),
+		},
+		exp: true,
+	}, {
+		name: "error condition set to True, old True, message and reason same",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeReason",
+					Message: "some message",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeReason",
+					Message: "some message",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+		},
+		exp: false,
+	}, {
+		name: "error condition set to True, old True, message change",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeReason",
+					Message: "some message changed",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeReason",
+					Message: "some message",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+		},
+		exp: true,
+	}, {
+		name: "error condition set to True, old True, reason change",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeAnotherReason",
+					Message: "some message",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeReason",
+					Message: "some message",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+		},
+		exp: true,
+	}, {
+		name: "error condition set to True, old True, both message and reason change",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeAnotherReason",
+					Message: "some message changed",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Reason:  "SomeReason",
+					Message: "some message",
+					Status:  corev1.ConditionTrue,
+				})
+				return z
+			}(),
+		},
+		exp: true,
+	}, {
+		name: "multiple error condition, all set to False,",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionFalse,
+				}, hivev1.DNSZoneCondition{
+					Type:   hivev1.AuthenticationFailureCondition,
+					Status: corev1.ConditionFalse,
+				})
+				return z
+			}(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: false,
+	}, {
+		name: "multiple error condition, first set to True, old empty",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionTrue,
+				}, hivev1.DNSZoneCondition{
+					Type:   hivev1.AuthenticationFailureCondition,
+					Status: corev1.ConditionFalse,
+				})
+				return z
+			}(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: true,
+	}, {
+		name: "multiple error condition, second set to True, old empty",
+		evt: event.UpdateEvent{
+			ObjectNew: func() *hivev1.DNSZone {
+				z := validDNSZone()
+				z.Status.Conditions = append(z.Status.Conditions, hivev1.DNSZoneCondition{
+					Type:   hivev1.InsufficientCredentialsCondition,
+					Status: corev1.ConditionFalse,
+				}, hivev1.DNSZoneCondition{
+					Type:   hivev1.AuthenticationFailureCondition,
+					Status: corev1.ConditionTrue,
+				})
+				return z
+			}(),
+			ObjectOld: &hivev1.DNSZone{},
+		},
+		exp: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsErrorUpdateEvent(tt.evt)
+			assert.Equal(t, tt.exp, got)
+		})
+	}
+}
+
 func TestSetConditionsForErrorForAWS(t *testing.T) {
 
 	log.SetLevel(log.DebugLevel)
@@ -523,7 +801,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 				Type:    hivev1.InsufficientCredentialsCondition,
 				Status:  corev1.ConditionTrue,
 				Reason:  accessDeniedReason,
-				Message: "AccessDenied error encountered (see controller logs for details)",
+				Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
 			},
 		},
 		{

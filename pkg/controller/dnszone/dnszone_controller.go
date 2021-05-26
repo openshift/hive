@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -97,7 +98,7 @@ func add(mgr manager.Manager, r *ReconcileDNSZone, concurrentReconciles int, rat
 	}
 
 	// Watch for changes to DNSZone
-	if err := c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent)); err != nil {
 		return err
 	}
 
@@ -479,4 +480,45 @@ func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
 		return false, nil
 	}
 	return false, nil
+}
+
+// IsErrorUpdateEvent returns true when the update event is from
+// error state.
+func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
+	new, ok := evt.ObjectNew.(*hivev1.DNSZone)
+	if !ok {
+		return false
+	}
+	if len(new.Status.Conditions) == 0 {
+		return false
+	}
+
+	old, ok := evt.ObjectOld.(*hivev1.DNSZone)
+	if !ok {
+		return false
+	}
+
+	errorConds := []hivev1.DNSZoneConditionType{
+		hivev1.InsufficientCredentialsCondition,
+		hivev1.AuthenticationFailureCondition,
+	}
+
+	for _, cond := range errorConds {
+		cn := controllerutils.FindDNSZoneCondition(new.Status.Conditions, cond)
+		if cn != nil && cn.Status == corev1.ConditionTrue {
+			co := controllerutils.FindDNSZoneCondition(old.Status.Conditions, cond)
+			if co == nil {
+				return true // newly added failure condition
+			}
+			if co.Status != corev1.ConditionTrue {
+				return true // newly Failed failure condition
+			}
+			if cn.Message != co.Message ||
+				cn.Reason != co.Reason {
+				return true // already failing but change in error reported
+			}
+		}
+	}
+
+	return false
 }

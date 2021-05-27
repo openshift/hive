@@ -175,9 +175,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	// Set the serving cert CA secret hash as an annotation on the pod template to force a rollout in the event it changes:
 	servingCertSecret, err := r.hiveSecretLister.Secrets(hiveNSName).Get(hiveAdmissionServingCertSecretName)
-	if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: hiveNSName, Name: hiveAdmissionServingCertSecretName}, servingCertSecret); err != nil {
+	if err != nil {
 		hLog.WithError(err).WithField("secretName", hiveAdmissionServingCertSecretName).Log(
 			controllerutils.LogLevel(err), "error getting serving cert secret")
+		return err
 	}
 	hLog.Info("Hashing serving cert secret onto a hiveadmission deployment annotation")
 	certSecretHash := computeSecretDataHash(servingCertSecret.Data)

@@ -1206,13 +1206,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testInstalledClusterDeployment(time.Now()))
-					cd.Status.Conditions = append(
-						cd.Status.Conditions,
-						hivev1.ClusterDeploymentCondition{
-							Type:   hivev1.SyncSetFailedCondition,
-							Status: corev1.ConditionTrue,
-						},
-					)
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd,
+						hivev1.SyncSetFailedCondition,
+						corev1.ConditionTrue,
+						"test reason",
+						"test message")
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),

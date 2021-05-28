@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"sort"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -124,7 +126,32 @@ func SetClusterDeploymentConditionWithChangeCheck(
 			changed = true
 		}
 	}
+	if changed {
+		conditions = sortClusterDeploymentConditions(conditions)
+	}
 	return conditions, changed
+}
+
+// sortClusterDeploymentConditions sorts the cluster deployment conditions such that conditions in their undesired/error
+// state are at the top, followed by conditions in their desired/expected state, with conditions that have unknown status
+// at the last. All conditions that are undesired, desired or unknown are sorted in alphabetical order of their type
+func sortClusterDeploymentConditions(conditions []hivev1.ClusterDeploymentCondition) []hivev1.ClusterDeploymentCondition {
+	sort.SliceStable(conditions, func(i, j int) bool {
+		if conditions[i].Status != corev1.ConditionUnknown && conditions[j].Status == corev1.ConditionUnknown {
+			return true
+		}
+		if conditions[i].Status == corev1.ConditionUnknown && conditions[j].Status != corev1.ConditionUnknown {
+			return false
+		}
+		if !IsConditionInDesiredState(conditions[i]) && IsConditionInDesiredState(conditions[j]) {
+			return true
+		}
+		if IsConditionInDesiredState(conditions[i]) && !IsConditionInDesiredState(conditions[j]) {
+			return false
+		}
+		return conditions[i].Type < conditions[j].Type
+	})
+	return conditions
 }
 
 // SetClusterClaimCondition sets a condition on a ClusterClaim resource's status
@@ -712,4 +739,10 @@ func IsConditionWithPositivePolarity(conditionType hivev1.ClusterDeploymentCondi
 		}
 	}
 	return false
+}
+
+// IsConditionInDesiredState checks if the condition status is in its desired/expected state
+func IsConditionInDesiredState(condition hivev1.ClusterDeploymentCondition) bool {
+	return (IsConditionWithPositivePolarity(condition.Type) && condition.Status == corev1.ConditionTrue) ||
+		(!IsConditionWithPositivePolarity(condition.Type) && condition.Status == corev1.ConditionFalse)
 }

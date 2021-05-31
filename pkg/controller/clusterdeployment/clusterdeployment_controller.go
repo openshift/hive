@@ -67,6 +67,7 @@ var (
 		hivev1.DeprovisionLaunchErrorCondition,
 		hivev1.ProvisionStoppedCondition,
 		hivev1.AuthenticationFailureClusterDeploymentCondition,
+		hivev1.RequirementsMetCondition,
 
 		// ClusterInstall conditions copied over to cluster deployment
 		hivev1.ClusterInstallFailedClusterDeploymentCondition,
@@ -690,6 +691,75 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	switch {
 	case cd.Spec.Provisioning != nil:
+		// Ensure the install config matches the ClusterDeployment:
+		// TODO: Move with the openshift-installer ClusterInstall code when we implement https://issues.redhat.com/browse/HIVE-1522
+		if cd.Spec.Provisioning.InstallConfigSecretRef == nil {
+			cdLog.Info("install config not specified")
+			conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.RequirementsMetCondition,
+				corev1.ConditionFalse,
+				"InstallConfigRefNotSet",
+				"Install config reference is not set",
+				controllerutils.UpdateConditionIfReasonOrMessageChange)
+			if changed {
+				cd.Status.Conditions = conditions
+				return reconcile.Result{}, r.Status().Update(context.TODO(), cd)
+			}
+			return reconcile.Result{}, nil
+		}
+
+		icSecret := &corev1.Secret{}
+		err = r.Get(context.Background(),
+			types.NamespacedName{
+				Namespace: cd.Namespace,
+				Name:      cd.Spec.Provisioning.InstallConfigSecretRef.Name,
+			},
+			icSecret)
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error loading install config secret")
+			return reconcile.Result{}, err
+		}
+
+		err = ValidateInstallConfig(cd, icSecret.Data["install-config.yaml"])
+		if err != nil {
+			cdLog.WithError(err).Info("install config validation failed")
+			conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.RequirementsMetCondition,
+				corev1.ConditionFalse,
+				"InstallConfigValidationFailed",
+				err.Error(),
+				controllerutils.UpdateConditionIfReasonOrMessageChange)
+			if changed {
+				cd.Status.Conditions = conditions
+				return reconcile.Result{}, r.Status().Update(context.TODO(), cd)
+			}
+			return reconcile.Result{}, nil
+		}
+
+		// If we made it this far, RequirementsMet condition should be True:
+		//
+		// TODO: when https://github.com/openshift/hive/pull/1413 is implemented
+		// we'll want to remove this assumption as ClusterInstall implementations may
+		// later indicate their requirements are not met. Instead, we should explicitly clear
+		// the condition back to Unknown if we see our Reason set, but the problem is no longer
+		// present.
+		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.RequirementsMetCondition,
+			corev1.ConditionTrue,
+			"AllRequirementsMet",
+			"All pre-provision requirements met",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changed {
+			cd.Status.Conditions = conditions
+			err = r.Status().Update(context.TODO(), cd)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+
 		return r.reconcileInstallingClusterProvision(cd, releaseImage, cdLog)
 	case cd.Spec.ClusterInstallRef != nil:
 		return r.reconcileInstallingClusterInstall(cd, cdLog)

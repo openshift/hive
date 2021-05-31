@@ -2,6 +2,7 @@ package clusterdeployment
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"testing"
@@ -56,6 +57,7 @@ const (
 	testClusterName         = "bar"
 	testClusterID           = "testFooClusterUUID"
 	testInfraID             = "testFooInfraID"
+	installConfigSecretName = "install-config-secret"
 	provisionName           = "foo-lqmsh-random"
 	imageSetJobName         = "foo-lqmsh-imageset"
 	testNamespace           = "default"
@@ -169,6 +171,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Create provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
@@ -196,6 +199,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Adopt provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeployment()),
 				testProvision(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -213,6 +217,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "No-op Running provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())),
 				testProvision(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -292,6 +297,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Completed provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testSuccessfulProvision(),
 				testMetadataConfigMap(),
@@ -310,6 +316,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Completed provision with protected delete",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testSuccessfulProvision(),
 				testMetadataConfigMap(),
@@ -613,6 +620,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "clear InstallImagesNotResolved condition on success",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image")
@@ -636,6 +644,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Delete imageset job when complete",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image")
@@ -687,6 +696,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Ensure release image from clusterimageset is used as override image in install job",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image:latest")
@@ -909,6 +919,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Create provision when DNSZone is ready",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Spec.ManageDNS = true
@@ -979,6 +990,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Delete old provisions",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 4
@@ -1004,6 +1016,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Adopt provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeployment()),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
@@ -1021,6 +1034,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Do not adopt failed provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					return cd
@@ -1040,6 +1054,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Delete-after requeue",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.CreationTimestamp = metav1.Now()
@@ -1058,6 +1073,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Wait after failed provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.CreationTimestamp = metav1.Now()
@@ -1086,6 +1102,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Clear out provision after wait time",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testFailedProvisionTime(time.Now().Add(-2 * time.Minute)),
 				testMetadataConfigMap(),
@@ -1285,6 +1302,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Ensure cluster metadata set from provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.Spec.ClusterMetadata = nil
@@ -1309,6 +1327,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Ensure cluster metadata overwrites from provision",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
@@ -1338,6 +1357,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "set ClusterImageSet missing condition",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: "doesntexist"}
@@ -1361,6 +1381,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "clear ClusterImageSet missing condition",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
@@ -1558,6 +1579,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "set InstallLaunchErrorCondition when install pod is stuck in pending phase",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testProvisionWithStuckInstallPod(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1578,6 +1600,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "install attempts is less than the limit",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 1
@@ -1597,6 +1620,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "install attempts is equal to the limit",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 2
@@ -1621,6 +1645,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "install attempts is greater than the limit",
 			existing: []runtime.Object{
+				testInstallConfigSecret(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 3
@@ -2495,6 +2520,20 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
+func testInstallConfigSecret() *corev1.Secret {
+	encodedIC := base64.StdEncoding.EncodeToString([]byte(testAWSIC))
+	log.Info(encodedIC)
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: testNamespace,
+			Name:      installConfigSecretName,
+		},
+		Data: map[string][]byte{
+			"install-config.yaml": []byte(testAWSIC),
+		},
+	}
+}
+
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testEmptyClusterDeployment()
 
@@ -2512,7 +2551,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			},
 		},
 		Provisioning: &hivev1.Provisioning{
-			InstallConfigSecretRef: &corev1.LocalObjectReference{Name: "install-config-secret"},
+			InstallConfigSecretRef: &corev1.LocalObjectReference{Name: installConfigSecretName},
 		},
 		ClusterMetadata: &hivev1.ClusterMetadata{
 			ClusterID:                testClusterID,
@@ -2552,6 +2591,11 @@ func testClusterDeploymentWithDefaultConditions(cd *hivev1.ClusterDeployment) *h
 		corev1.ConditionFalse,
 		"ProvisionNotStopped",
 		"Provision is not stopped")
+	cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd,
+		hivev1.RequirementsMetCondition,
+		corev1.ConditionTrue,
+		"AllRequirementsMet",
+		"All pre-provision requirements met")
 	return cd
 }
 

@@ -9,7 +9,7 @@ ENV GIT_COMMITTER_EMAIL hive-team@redhat.com
 RUN yum -y install strace tcping && yum clean all
 
 # Install kubebuilder tools for controller-runtime testenv (make test-integration)
-RUN K8S_VERSION=1.19.2 && \
+RUN K8S_VERSION=1.20.2 && \
     cd /tmp && \
     curl -sSLo envtest-bins.tar.gz "https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-${K8S_VERSION}-$(go env GOOS)-$(go env GOARCH).tar.gz" && \
     mkdir /usr/local/kubebuilder && \

@@ -117,10 +117,6 @@ crd: ensure-controller-gen ensure-yq
 	# Patch ClusterProvision CRD to remove the massive PodSpec def we consider an internal implementation detail:
 	@echo Patching ClusterProvision CRD yaml to remove overly verbose PodSpec details:
 	$(YQ) d -i config/crds/hive.openshift.io_clusterprovisions.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.podSpec"
-	# Patch SyncSet CRD to remove openapi for non-structural Resources: https://github.com/kubernetes/kubernetes/issues/82651
-	@echo Patching SyncSet CRD yaml to remove non-structural Resources which is broken on some Kube versions
-	$(YQ) d -i config/crds/hive.openshift.io_syncsets.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.resources"
-	$(YQ) d -i config/crds/hive.openshift.io_selectorsyncsets.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.resources"
 update: crd
 
 .PHONY: verify-crd

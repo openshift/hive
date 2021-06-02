@@ -140,6 +140,13 @@ spec:
                   is "Upsert" (default) or "Sync". ApplyMode "Upsert" indicates create
                   and update. ApplyMode "Sync" indicates create, update and delete.
                 type: string
+              resources:
+                description: Resources is the list of objects to sync from RawExtension
+                  definitions.
+                items:
+                  type: object
+                type: array
+                x-kubernetes-preserve-unknown-fields: true
               secretMappings:
                 description: Secrets is the list of secrets to sync along with their
                   respective destinations.
@@ -185,7 +192,6 @@ spec:
                   type: object
                 type: array
             type: object
-            x-kubernetes-preserve-unknown-fields: true
           status:
             description: SelectorSyncSetStatus defines the observed state of a SelectorSyncSet
             type: object

@@ -206,6 +206,7 @@ type SyncStatus struct {
 type SyncSetCommonSpec struct {
 	// Resources is the list of objects to sync from RawExtension definitions.
 	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
 	Resources []runtime.RawExtension `json:"resources,omitempty"`
 
 	// ResourceApplyMode indicates if the Resource apply mode is "Upsert" (default) or "Sync".
@@ -279,7 +280,6 @@ type SelectorSyncSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// +kubebuilder:pruning:PreserveUnknownFields
 	Spec   SelectorSyncSetSpec   `json:"spec,omitempty"`
 	Status SelectorSyncSetStatus `json:"status,omitempty"`
 }
@@ -295,7 +295,6 @@ type SyncSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// +kubebuilder:pruning:PreserveUnknownFields
 	Spec   SyncSetSpec   `json:"spec,omitempty"`
 	Status SyncSetStatus `json:"status,omitempty"`
 }

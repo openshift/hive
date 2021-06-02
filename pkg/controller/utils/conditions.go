@@ -224,6 +224,27 @@ func SetClusterClaimConditionWithChangeCheck(
 	return conditions, changed
 }
 
+// InitializeClusterPoolConditions initializes the given set of conditions for the first time, set with Status Unknown
+func InitializeClusterPoolConditions(existingConditions []hivev1.ClusterPoolCondition,
+	conditionsToBeAdded []hivev1.ClusterPoolConditionType) []hivev1.ClusterPoolCondition {
+	now := metav1.Now()
+	for _, conditionType := range conditionsToBeAdded {
+		if FindClusterPoolCondition(existingConditions, conditionType) == nil {
+			existingConditions = append(
+				existingConditions,
+				hivev1.ClusterPoolCondition{
+					Type:               conditionType,
+					Status:             corev1.ConditionUnknown,
+					Reason:             hivev1.InitializedConditionReason,
+					Message:            "Condition Initialized",
+					LastTransitionTime: now,
+					LastProbeTime:      now,
+				})
+		}
+	}
+	return existingConditions
+}
+
 // SetClusterPoolCondition sets a condition on a ClusterPool resource's status
 func SetClusterPoolCondition(
 	conditions []hivev1.ClusterPoolCondition,
@@ -259,10 +280,6 @@ func SetClusterPoolConditionWithChangeCheck(
 	now := metav1.Now()
 	existingCondition := FindClusterPoolCondition(conditions, conditionType)
 	if existingCondition == nil {
-		// Deviating from other setter methods we use due to latest API conventions in Kube. They clarify that a
-		// True condition is not necessarily an abnormal state, and that conditions should be set asap even if Unknown.
-		// Previously we would not bother setting the condition if the status was false. With ClusterClaim we are
-		// beginning to adhere to these guidelines.
 		conditions = append(
 			conditions,
 			hivev1.ClusterPoolCondition{

@@ -1,6 +1,7 @@
 package remotemachineset
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -327,7 +328,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 		return r.removeFinalizer(pool, logger)
 	}
 
-	return r.updatePoolStatusForMachineSets(pool, machineSets, logger)
+	return r.updatePoolStatusForMachineSets(pool, machineSets, remoteClusterAPIClient, logger)
 }
 
 func (r *ReconcileRemoteMachineSet) getMasterMachine(
@@ -819,6 +820,7 @@ func (r *ReconcileRemoteMachineSet) syncClusterAutoscaler(
 func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 	pool *hivev1.MachinePool,
 	machineSets []*machineapi.MachineSet,
+	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
 ) (reconcile.Result, error) {
 	origPool := pool.DeepCopy()
@@ -833,7 +835,7 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 		} else {
 			min, max = getMinMaxReplicasForMachineSet(pool, machineSets, i)
 		}
-		pool.Status.MachineSets[i] = hivev1.MachineSetStatus{
+		s := hivev1.MachineSetStatus{
 			Name:          ms.Name,
 			Replicas:      *ms.Spec.Replicas,
 			ReadyReplicas: ms.Status.ReadyReplicas,
@@ -842,6 +844,13 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 			ErrorReason:   (*string)(ms.Status.ErrorReason),
 			ErrorMessage:  ms.Status.ErrorMessage,
 		}
+		if s.Replicas != s.ReadyReplicas && s.ErrorReason == nil {
+			r, m := summarizeMachinesError(remoteClusterAPIClient, ms, logger)
+			s.ErrorReason = &r
+			s.ErrorMessage = &m
+		}
+
+		pool.Status.MachineSets[i] = s
 		pool.Status.Replicas += *ms.Spec.Replicas
 	}
 
@@ -862,6 +871,64 @@ func (r *ReconcileRemoteMachineSet) updatePoolStatusForMachineSets(
 	}
 
 	return reconcile.Result{RequeueAfter: requeueAfter}, errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
+}
+
+// summarizeMachinesError returns reason and message for error state of machineSets by
+// summarizing error reasons and messages from machines the belong to the machineset.
+// If all the machines are in good state, it returns empty reason and message.
+func summarizeMachinesError(remoteClusterAPIClient client.Client, machineSet *machineapi.MachineSet, logger log.FieldLogger) (string, string) {
+	msLog := logger.WithField("machineSet", machineSet.Name)
+
+	sel, err := metav1.LabelSelectorAsSelector(&machineSet.Spec.Selector)
+	if err != nil {
+		msLog.WithError(err).Error("failed to create label selector")
+		return "", ""
+	}
+
+	list := &machineapi.MachineList{}
+	err = remoteClusterAPIClient.List(context.TODO(), list,
+		client.InNamespace(machineSet.GetNamespace()),
+		client.MatchingLabelsSelector{Selector: sel})
+	if err != nil {
+		msLog.WithError(err).Error("failed to list machines for the machineset")
+		return "", ""
+	}
+
+	type errSummary struct {
+		name    string
+		reason  string
+		message string
+	}
+
+	var errs []errSummary
+	for _, m := range list.Items {
+		if m.Status.ErrorReason == nil &&
+			m.Status.ErrorMessage == nil {
+			continue
+		}
+
+		err := errSummary{name: m.GetName()}
+		if m.Status.ErrorReason != nil {
+			err.reason = string(*m.Status.ErrorReason)
+		}
+		if m.Status.ErrorMessage != nil {
+			err.message = *m.Status.ErrorMessage
+		}
+		errs = append(errs, err)
+	}
+
+	if len(errs) == 1 {
+		return errs[0].reason, errs[0].message
+	}
+	if len(errs) > 1 {
+		r := "MultipleMachinesFailed"
+		m := &bytes.Buffer{}
+		for _, e := range errs {
+			fmt.Fprintf(m, "Machine %s failed (%s): %s,\n", e.name, e.reason, e.message)
+		}
+		return r, m.String()
+	}
+	return "", ""
 }
 
 func (r *ReconcileRemoteMachineSet) createActuator(

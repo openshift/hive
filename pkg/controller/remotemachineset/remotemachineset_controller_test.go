@@ -13,6 +13,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -777,6 +778,84 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 	}
 }
 
+func Test_summarizeMachinesError(t *testing.T) {
+	cases := []struct {
+		name     string
+		existing []runtime.Object
+
+		reason, message string
+	}{{
+		name: "no matching machines",
+		existing: []runtime.Object{
+			testMachine("machine-1", "worker"),
+			testMachine("machine-2", "worker"),
+			testMachine("machine-3", "worker"),
+			testMachineSet(testName, "worker", false, 3, 0),
+		},
+	}, {
+		name: "all matching machines ok",
+		existing: []runtime.Object{
+			testMachineSetMachine("machine-1", "worker", testName),
+			testMachineSetMachine("machine-2", "worker", testName),
+			testMachineSetMachine("machine-3", "worker", testName),
+			testMachineSet(testName, "worker", false, 3, 0),
+		},
+	}, {
+		name: "one machine failed",
+		existing: []runtime.Object{
+			testMachineSetMachine("machine-1", "worker", testName),
+			func() *machineapi.Machine {
+				m := testMachineSetMachine("machine-2", "worker", testName)
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.StringPtr("GoneNotComingBack"))
+				m.Status.ErrorMessage = pointer.StringPtr("The machine is not found")
+				return m
+			}(),
+			testMachineSetMachine("machine-3", "worker", testName),
+			testMachineSet(testName, "worker", false, 3, 0),
+		},
+
+		reason:  "GoneNotComingBack",
+		message: "The machine is not found",
+	}, {
+		name: "more than one machine failed",
+		existing: []runtime.Object{
+			testMachineSetMachine("machine-1", "worker", testName),
+			func() *machineapi.Machine {
+				m := testMachineSetMachine("machine-2", "worker", testName)
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.StringPtr("GoneNotComingBack"))
+				m.Status.ErrorMessage = pointer.StringPtr("The machine is not found")
+				return m
+			}(),
+			func() *machineapi.Machine {
+				m := testMachineSetMachine("machine-3", "worker", testName)
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.StringPtr("InsufficientResources"))
+				m.Status.ErrorMessage = pointer.StringPtr("No available quota")
+				return m
+			}(),
+			testMachineSet(testName, "worker", false, 3, 0),
+		},
+		reason: "MultipleMachinesFailed",
+		message: `Machine machine-2 failed (GoneNotComingBack): The machine is not found,
+Machine machine-3 failed (InsufficientResources): No available quota,
+`,
+	}}
+
+	machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			fake := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+
+			ms := &machineapi.MachineSet{}
+			err := fake.Get(context.TODO(), types.NamespacedName{Namespace: machineAPINamespace, Name: testName}, ms)
+			require.NoError(t, err)
+
+			reason, message := summarizeMachinesError(fake, ms, log.WithField("controller", "remotemachineset"))
+			assert.Equal(t, test.reason, reason)
+			assert.Equal(t, test.message, message)
+		})
+	}
+}
+
 func testMachinePool() *hivev1.MachinePool {
 	return &hivev1.MachinePool{
 		TypeMeta: metav1.TypeMeta{
@@ -867,10 +946,20 @@ func testMachineSpec(machineType string) machineapi.MachineSpec {
 func testMachine(name string, machineType string) *machineapi.Machine {
 	return &machineapi.Machine{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: machineAPINamespace,
+			Labels: map[string]string{
+				"machine.openshift.io/cluster-api-cluster": testInfraID,
+			},
 		},
 		Spec: testMachineSpec(machineType),
 	}
+}
+
+func testMachineSetMachine(name string, machineType string, machineSetName string) *machineapi.Machine {
+	m := testMachine(name, machineType)
+	m.ObjectMeta.Labels["machine.openshift.io/cluster-api-machineset"] = machineSetName
+	return m
 }
 
 func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *machineapi.MachineSet {
@@ -892,7 +981,19 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 		},
 		Spec: machineapi.MachineSetSpec{
 			Replicas: &msReplicas,
+			Selector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"machine.openshift.io/cluster-api-machineset": name,
+					"machine.openshift.io/cluster-api-cluster":    testInfraID,
+				},
+			},
 			Template: machineapi.MachineTemplateSpec{
+				ObjectMeta: machineapi.ObjectMeta{
+					Labels: map[string]string{
+						"machine.openshift.io/cluster-api-machineset": name,
+						"machine.openshift.io/cluster-api-cluster":    testInfraID,
+					},
+				},
 				Spec: testMachineSpec(machineType),
 			},
 		},

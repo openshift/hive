@@ -105,7 +105,10 @@ func add(mgr manager.Manager, r *ReconcileDNSZone, concurrentReconciles int, rat
 	// Watch for changes to ClusterDeployment
 	if err := c.Watch(
 		&source.Kind{Type: &hivev1.ClusterDeployment{}},
-		controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(r, r.logger),
+		controllerutils.NewRateLimitedUpdateEventHandler(
+			controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(r, r.logger),
+			IsClusterDeploymentDNSErrorUpdateEvent,
+		),
 	); err != nil {
 		return err
 	}
@@ -482,7 +485,7 @@ func lookupSOARecord(zone string, logger log.FieldLogger) (bool, error) {
 	return false, nil
 }
 
-// IsErrorUpdateEvent returns true when the update event is from
+// IsErrorUpdateEvent returns true when the update event for DNSZone is from
 // error state.
 func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 	new, ok := evt.ObjectNew.(*hivev1.DNSZone)
@@ -517,6 +520,40 @@ func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 				cn.Reason != co.Reason {
 				return true // already failing but change in error reported
 			}
+		}
+	}
+
+	return false
+}
+
+// IsClusterDeploymentDNSErrorUpdateEvent returns true when the update event in ClusterDeployment
+// is from DNS error state.
+func IsClusterDeploymentDNSErrorUpdateEvent(evt event.UpdateEvent) bool {
+	new, ok := evt.ObjectNew.(*hivev1.ClusterDeployment)
+	if !ok {
+		return false
+	}
+	if len(new.Status.Conditions) == 0 {
+		return false
+	}
+
+	old, ok := evt.ObjectOld.(*hivev1.ClusterDeployment)
+	if !ok {
+		return false
+	}
+
+	cn := controllerutils.FindClusterDeploymentCondition(new.Status.Conditions, hivev1.DNSNotReadyCondition)
+	if cn != nil && cn.Status == corev1.ConditionTrue {
+		co := controllerutils.FindClusterDeploymentCondition(old.Status.Conditions, hivev1.DNSNotReadyCondition)
+		if co == nil {
+			return true // newly added failure condition
+		}
+		if co.Status != corev1.ConditionTrue {
+			return true // newly Failed failure condition
+		}
+		if cn.Message != co.Message ||
+			cn.Reason != co.Reason {
+			return true // already failing but change in error reported
 		}
 	}
 

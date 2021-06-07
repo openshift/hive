@@ -154,6 +154,27 @@ func sortClusterDeploymentConditions(conditions []hivev1.ClusterDeploymentCondit
 	return conditions
 }
 
+// InitializeClusterClaimConditions initializes the given set of conditions for the first time, set with Status Unknown
+func InitializeClusterClaimConditions(existingConditions []hivev1.ClusterClaimCondition,
+	conditionsToBeAdded []hivev1.ClusterClaimConditionType) []hivev1.ClusterClaimCondition {
+	now := metav1.Now()
+	for _, conditionType := range conditionsToBeAdded {
+		if FindClusterClaimCondition(existingConditions, conditionType) == nil {
+			existingConditions = append(
+				existingConditions,
+				hivev1.ClusterClaimCondition{
+					Type:               conditionType,
+					Status:             corev1.ConditionUnknown,
+					Reason:             hivev1.InitializedConditionReason,
+					Message:            "Condition Initialized",
+					LastTransitionTime: now,
+					LastProbeTime:      now,
+				})
+		}
+	}
+	return existingConditions
+}
+
 // SetClusterClaimCondition sets a condition on a ClusterClaim resource's status
 func SetClusterClaimCondition(
 	conditions []hivev1.ClusterClaimCondition,
@@ -189,10 +210,6 @@ func SetClusterClaimConditionWithChangeCheck(
 	now := metav1.Now()
 	existingCondition := FindClusterClaimCondition(conditions, conditionType)
 	if existingCondition == nil {
-		// Deviating from other setter methods we use due to latest API conventions in Kube. They clarify that a
-		// True condition is not necessarily an abnormal state, and that conditions should be set asap even if Unknown.
-		// Previously we would not bother setting the condition if the status was false. With ClusterClaim we are
-		// beginning to adhere to these guidelines.
 		conditions = append(
 			conditions,
 			hivev1.ClusterClaimCondition{

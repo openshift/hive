@@ -699,7 +699,7 @@ oc get nodes
 
 Hive can optionally create delegated DNS zones for each cluster.
 
-NOTE: This feature is only currently available for AWS and GCP clusters.
+NOTE: This feature only works for provisioning to AWS, GCP, and Azure.
 
 To use this feature:
 
@@ -724,6 +724,16 @@ To use this feature:
        kind: Secret
        metadata:
          name: gcp-creds
+       type: Opaque
+       ```
+     - Azure
+       ```yaml
+       apiVersion: v1
+       data:
+         osServicePrincipal.json: REDACTED
+       kind: Secret
+       metadata:
+         name: azure-creds
        type: Opaque
        ```
   1. Update your HiveConfig to enable externalDNS and set the list of managed domains:
@@ -754,7 +764,21 @@ To use this feature:
                name: gcp-creds
            domains:
            - hive.example.com
-
+       ```
+     - Azure
+       ```yaml
+       apiVersion: hive.openshift.io/v1
+       kind: HiveConfig
+       metadata:
+         name: hive
+       spec:
+         managedDomains:
+         - azure:
+             credentialsSecretRef:
+               name: azure-creds
+           domains:
+           - hive.example.com
+       ```
   1. Specify which domains Hive is allowed to manage by adding them to the `.spec.managedDomains[].domains` list. When specifying `manageDNS: true` in a ClusterDeployment, the ClusterDeployment's baseDomain must be a direct child of one of these domains, otherwise the ClusterDeployment creation will result in a validation error. The baseDomain must also be unique to that cluster and must not be used in any other ClusterDeployment, including on separate Hive instances.
 
      As such, a domain may exist in the `.spec.managedDomains[].domains` list in multiple Hive instances. Note that the specified credentials must be valid to add and remove NS record entries for all domains listed in `.spec.managedDomains[].domains`.

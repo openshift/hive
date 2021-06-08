@@ -117,6 +117,15 @@ crd: ensure-controller-gen ensure-yq
 	# Patch ClusterProvision CRD to remove the massive PodSpec def we consider an internal implementation detail:
 	@echo Patching ClusterProvision CRD yaml to remove overly verbose PodSpec details:
 	$(YQ) d -i config/crds/hive.openshift.io_clusterprovisions.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.podSpec"
+
+	# This does not appear possible with controller-runtime flags when dealing with an array,
+	# kubebuilder:validation:EmbeddedResource adds the x-kubernetes-embedded-resource to the array,
+	# not the elements within it.
+	@echo Patching SyncSet CRDs to flag resource RawExtensions as embedded resources:
+	$(YQ) w -i config/crds/hive.openshift.io_syncsets.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.resources.items.x-kubernetes-embedded-resource" true
+	$(YQ) w -i config/crds/hive.openshift.io_syncsets.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.resources.items.x-kubernetes-preserve-unknown-fields" true
+	$(YQ) w -i config/crds/hive.openshift.io_selectorsyncsets.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.resources.items.x-kubernetes-embedded-resource" true
+	$(YQ) w -i config/crds/hive.openshift.io_selectorsyncsets.yaml "spec.versions[0].schema.openAPIV3Schema.properties.spec.properties.resources.items.x-kubernetes-preserve-unknown-fields" true
 update: crd
 
 .PHONY: verify-crd

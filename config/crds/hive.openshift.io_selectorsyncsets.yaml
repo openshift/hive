@@ -145,8 +145,9 @@ spec:
                   definitions.
                 items:
                   type: object
+                  x-kubernetes-embedded-resource: true
+                  x-kubernetes-preserve-unknown-fields: true
                 type: array
-                x-kubernetes-preserve-unknown-fields: true
               secretMappings:
                 description: Secrets is the list of secrets to sync along with their
                   respective destinations.

@@ -206,7 +206,6 @@ type SyncStatus struct {
 type SyncSetCommonSpec struct {
 	// Resources is the list of objects to sync from RawExtension definitions.
 	// +optional
-	// +kubebuilder:pruning:PreserveUnknownFields
 	Resources []runtime.RawExtension `json:"resources,omitempty"`
 
 	// ResourceApplyMode indicates if the Resource apply mode is "Upsert" (default) or "Sync".

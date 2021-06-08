@@ -5,9 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	testifyassert "github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
@@ -69,5 +73,27 @@ func AssertConditions(t *testing.T, cd *hivev1.ClusterDeployment, expectedCondit
 			testifyassert.Equal(t, expectedCond.Status, condition.Status, "condition found with unexpected status")
 			testifyassert.Equal(t, expectedCond.Reason, condition.Reason, "condition found with unexpected reason")
 		}
+	}
+}
+
+// AssertEqualWhereItCounts compares two runtime.Objects, ignoring their ResourceVersion and TypeMeta, asserting that they
+// are otherwise equal.
+// This and cleanRVAndTypeMeta were borrowed/adapted from:
+// https://github.com/openshift/ci-tools/blob/179a0edb6c003aa95ae1332692c5b4c79e58f674/pkg/testhelper/testhelper.go#L157-L175
+func AssertEqualWhereItCounts(t *testing.T, x, y runtime.Object, msg string) {
+	xCopy := x.DeepCopyObject()
+	yCopy := y.DeepCopyObject()
+	cleanRVAndTypeMeta(xCopy)
+	cleanRVAndTypeMeta(yCopy)
+	diff := cmp.Diff(xCopy, yCopy)
+	testifyassert.Empty(t, diff, msg)
+}
+
+func cleanRVAndTypeMeta(r runtime.Object) {
+	if metaObject, ok := r.(metav1.Object); ok {
+		metaObject.SetResourceVersion("")
+	}
+	if typeObject, ok := r.(interface{ SetGroupVersionKind(schema.GroupVersionKind) }); ok {
+		typeObject.SetGroupVersionKind(schema.GroupVersionKind{})
 	}
 }

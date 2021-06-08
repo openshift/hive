@@ -116,9 +116,9 @@ func TestReconcile(t *testing.T) {
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(clusterDeploymentBase()),
-				testsyncset.Build(syncSetBase()),
-				testdnszone.Build(dnsZoneBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
+				testsyncset.Build(syncSetBase(), testsyncset.WithResourceVersion("999")),
+				testdnszone.Build(dnsZoneBase(), testdnszone.WithResourceVersion("999")),
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 					[]runtime.Object{
 						testclusterdeployment.Build(clusterDeploymentBase()),
@@ -150,7 +150,7 @@ func TestReconcile(t *testing.T) {
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(clusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
 				testcheckpoint.Build(checkpointBase(),
 					testcheckpoint.WithLastBackupRef(hivev1.BackupReference{Name: "notarealbackup", Namespace: namespace}),
 					testcheckpoint.WithLastBackupTime(fiveHoursAgo),
@@ -186,8 +186,8 @@ func TestReconcile(t *testing.T) {
 				RequeueAfter: ((3 * time.Minute) - twoMinuteDuration),
 			},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(clusterDeploymentBase()),
-				testsyncset.Build(syncSetBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
+				testsyncset.Build(syncSetBase(), testsyncset.WithResourceVersion("999")),
 				testcheckpoint.Build(checkpointBase(),
 					testcheckpoint.WithLastBackupRef(hivev1.BackupReference{Name: "notarealbackup", Namespace: namespace}),
 					testcheckpoint.WithLastBackupTime(twoMinutesAgo),
@@ -218,8 +218,8 @@ func TestReconcile(t *testing.T) {
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(clusterDeploymentBase()),
-				testsyncset.Build(syncSetBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
+				testsyncset.Build(syncSetBase(), testsyncset.WithResourceVersion("999")),
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 					[]runtime.Object{
 						testclusterdeployment.Build(clusterDeploymentBase()),
@@ -249,8 +249,8 @@ func TestReconcile(t *testing.T) {
 			},
 			expectedResult: reconcile.Result{},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(clusterDeploymentBase()),
-				testsyncset.Build(syncSetBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
+				testsyncset.Build(syncSetBase(), testsyncset.WithResourceVersion("999")),
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum(calculateRuntimeObjectsChecksum(
 					[]runtime.Object{
 						testclusterdeployment.Build(clusterDeploymentBase()),
@@ -331,17 +331,17 @@ func TestGetRuntimeObjects(t *testing.T) {
 				testclusterdeployment.Build(clusterDeploymentBase()),
 			},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(clusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
 			},
 		},
 		{
 			name: "2 ClusterDeployments in different namespaces",
 			existingObjects: []runtime.Object{
 				testclusterdeployment.Build(clusterDeploymentBase()),
-				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.Generic(generic.WithNamespace("not the correct namespace"))),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.Generic(generic.WithNamespace("not the correct namespace")), testclusterdeployment.WithResourceVersion("999")),
 			},
 			expectedObjects: []runtime.Object{
-				testclusterdeployment.Build(clusterDeploymentBase()),
+				testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
 			},
 		},
 	}
@@ -383,7 +383,7 @@ func TestGetNamespaceCheckpoint(t *testing.T) {
 			name:               "Existing Checkpoint",
 			expectedFound:      true,
 			existingObjects:    []runtime.Object{testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL"))},
-			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL"), testcheckpoint.WithTypeMeta()),
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL"), testcheckpoint.WithTypeMeta(), testcheckpoint.WithResourceVersion("999")),
 			expectedError:      nil,
 		},
 	}
@@ -441,7 +441,7 @@ func TestCreateOrUpdateNamespaceCheckpoint(t *testing.T) {
 			existingObjects: []runtime.Object{
 				testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE")),
 			},
-			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE"), testcheckpoint.WithTypeMeta()),
+			expectedCheckpoint: testcheckpoint.Build(checkpointBase(), testcheckpoint.WithLastBackupChecksum("NOTREAL-BEFORE"), testcheckpoint.WithTypeMeta(), testcheckpoint.WithResourceVersion("999")),
 			expectedError:      statusErr,
 		},
 		{
@@ -480,7 +480,7 @@ func TestCalculateObjectsChecksumWithoutStatus(t *testing.T) {
 	}{
 		{
 			name:             "Valid ClusterDeployment Checksum",
-			object:           testclusterdeployment.Build(clusterDeploymentBase()),
+			object:           testclusterdeployment.Build(clusterDeploymentBase(), testclusterdeployment.WithResourceVersion("999")),
 			expectedChecksum: calculateClusterDeploymentChecksum(testclusterdeployment.Build(clusterDeploymentBase())),
 		},
 		{

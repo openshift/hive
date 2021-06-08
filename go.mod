@@ -54,22 +54,22 @@ require (
 	google.golang.org/api v0.33.0
 	gopkg.in/ini.v1 v1.61.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.0
-	k8s.io/apiextensions-apiserver v0.20.0
-	k8s.io/apimachinery v0.20.0
+	k8s.io/api v0.20.2
+	k8s.io/apiextensions-apiserver v0.20.2
+	k8s.io/apimachinery v0.20.2
 	k8s.io/cli-runtime v0.20.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
-	k8s.io/code-generator v0.20.0
+	k8s.io/code-generator v0.20.2
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.20.0
 	k8s.io/kubectl v0.20.0
-	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0
-	sigs.k8s.io/controller-runtime v0.7.0
-	sigs.k8s.io/controller-tools v0.4.1
+	sigs.k8s.io/controller-runtime v0.8.3
+	sigs.k8s.io/controller-tools v0.5.0
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -115,4 +115,4 @@ replace k8s.io/client-go => k8s.io/client-go v0.20.0
 replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0
 
 // point sigs.k8s.io/controller-runtime to forked version
-replace sigs.k8s.io/controller-runtime => github.com/openshift-hive/controller-runtime v0.7.0-openshift
+replace sigs.k8s.io/controller-runtime => github.com/openshift-hive/controller-runtime v0.8.3-openshift

@@ -2491,10 +2491,11 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 			Kind:       "ClusterDeployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       testName,
-			Namespace:  testNamespace,
-			Finalizers: []string{hivev1.FinalizerDeprovision},
-			UID:        types.UID("1234"),
+			Name:            testName,
+			Namespace:       testNamespace,
+			Finalizers:      []string{hivev1.FinalizerDeprovision},
+			UID:             types.UID("1234"),
+			ResourceVersion: "999",
 		},
 	}
 	return cd
@@ -2708,6 +2709,7 @@ func testProvision() *hivev1.ClusterProvision {
 			Labels: map[string]string{
 				constants.ClusterDeploymentNameLabel: testName,
 			},
+			ResourceVersion: "999",
 		},
 		Spec: hivev1.ClusterProvisionSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{

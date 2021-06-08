@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -58,7 +57,6 @@ import (
 	"github.com/openshift/hive/pkg/controller/syncidentityprovider"
 	"github.com/openshift/hive/pkg/controller/unreachable"
 	"github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/controller/velerobackup"
 	utillogrus "github.com/openshift/hive/pkg/util/logrus"
 	"github.com/openshift/hive/pkg/version"
 )
@@ -92,7 +90,6 @@ var controllerFuncs = map[hivev1.ControllerName]controllerSetupFunc{
 	remotemachineset.ControllerName:     remotemachineset.Add,
 	syncidentityprovider.ControllerName: syncidentityprovider.Add,
 	unreachable.ControllerName:          unreachable.Add,
-	velerobackup.ControllerName:         velerobackup.Add,
 	clusterpool.ControllerName:          clusterpool.Add,
 	hibernation.ControllerName:          hibernation.Add,
 	machinemanagement.ControllerName:    machinemanagement.Add,
@@ -198,10 +195,6 @@ func newRootCommand() *cobra.Command {
 				}
 
 				if err := crv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
 					log.Fatal(err)
 				}
 

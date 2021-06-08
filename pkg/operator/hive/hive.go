@@ -6,7 +6,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -148,38 +147,11 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Env = append(hiveContainer.Env, dnsServersEnvVar)
 	}
 
-	if instance.Spec.Backup.Velero.Enabled {
-		hLog.Infof("Velero Backup Enabled.")
-		tmpEnvVar := corev1.EnvVar{
-			Name:  hiveconstants.VeleroBackupEnvVar,
-			Value: "true",
-		}
-		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
-
-		if instance.Spec.Backup.Velero.Namespace != "" {
-			hLog.Infof("Velero Backup Namespace specified.")
-			tmpEnvVar := corev1.EnvVar{
-				Name:  hiveconstants.VeleroNamespaceEnvVar,
-				Value: instance.Spec.Backup.Velero.Namespace,
-			}
-			hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
-		}
-	}
-
 	if instance.Spec.DeprovisionsDisabled != nil && *instance.Spec.DeprovisionsDisabled {
 		hLog.Info("deprovisions disabled in hiveconfig")
 		tmpEnvVar := corev1.EnvVar{
 			Name:  hiveconstants.DeprovisionsDisabledEnvVar,
 			Value: "true",
-		}
-		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
-	}
-
-	if instance.Spec.Backup.MinBackupPeriodSeconds != nil {
-		hLog.Infof("MinBackupPeriodSeconds specified.")
-		tmpEnvVar := corev1.EnvVar{
-			Name:  hiveconstants.MinBackupPeriodSecondsEnvVar,
-			Value: strconv.Itoa(*instance.Spec.Backup.MinBackupPeriodSeconds),
 		}
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
 	}

@@ -44,11 +44,6 @@ type HiveConfigSpec struct {
 	// +optional
 	GlobalPullSecretRef *corev1.LocalObjectReference `json:"globalPullSecretRef,omitempty"`
 
-	// Backup specifies configuration for backup integration.
-	// If absent, backup integration will be disabled.
-	// +optional
-	Backup BackupConfig `json:"backup,omitempty"`
-
 	// FailedProvisionConfig is used to configure settings related to handling provision failures.
 	// +optional
 	FailedProvisionConfig FailedProvisionConfig `json:"failedProvisionConfig,omitempty"`
@@ -312,33 +307,6 @@ const (
 	HiveReadyCondition HiveConfigConditionType = "Ready"
 )
 
-// BackupConfig contains settings for the Velero backup integration.
-type BackupConfig struct {
-	// Velero specifies configuration for the Velero backup integration.
-	// +optional
-	Velero VeleroBackupConfig `json:"velero,omitempty"`
-
-	// MinBackupPeriodSeconds specifies that a minimum of MinBackupPeriodSeconds will occur in between each backup.
-	// This is used to rate limit backups. This potentially batches together multiple changes into 1 backup.
-	// No backups will be lost as changes that happen during this interval are queued up and will result in a
-	// backup happening once the interval has been completed.
-	// +optional
-	MinBackupPeriodSeconds *int `json:"minBackupPeriodSeconds,omitempty"`
-}
-
-// VeleroBackupConfig contains settings for the Velero backup integration.
-type VeleroBackupConfig struct {
-	// Enabled dictates if Velero backup integration is enabled.
-	// If not specified, the default is disabled.
-	// +optional
-	Enabled bool `json:"enabled,omitempty"`
-
-	// Namespace specifies in which namespace velero backup objects should be created.
-	// If not specified, the default is a namespace named "velero".
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-}
-
 // FailedProvisionConfig contains settings to control behavior undertaken by Hive when an installation attempt fails.
 type FailedProvisionConfig struct {
 
@@ -465,7 +433,7 @@ type ControllerConfig struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=clusterDeployment;clusterrelocate;clusterstate;clusterversion;controlPlaneCerts;dnsendpoint;dnszone;remoteingress;remotemachineset;syncidentityprovider;unreachable;velerobackup;clusterprovision;clusterDeprovision;clusterpool;clusterpoolnamespace;hibernation;clusterclaim;metrics;clustersync
+// +kubebuilder:validation:Enum=clusterDeployment;clusterrelocate;clusterstate;clusterversion;controlPlaneCerts;dnsendpoint;dnszone;remoteingress;remotemachineset;syncidentityprovider;unreachable;clusterprovision;clusterDeprovision;clusterpool;clusterpoolnamespace;hibernation;clusterclaim;metrics;clustersync
 type ControllerName string
 
 func (controllerName ControllerName) String() string {
@@ -506,7 +474,6 @@ const (
 	RemoteMachinesetControllerName     ControllerName = "remotemachineset"
 	SyncIdentityProviderControllerName ControllerName = "syncidentityprovider"
 	UnreachableControllerName          ControllerName = "unreachable"
-	VeleroBackupControllerName         ControllerName = "velerobackup"
 	MetricsControllerName              ControllerName = "metrics"
 	ClustersyncControllerName          ControllerName = "clustersync"
 	MachineManagementControllerName    ControllerName = "machineManagement"

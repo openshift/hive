@@ -19,7 +19,6 @@ require (
 	github.com/google/go-cmp v0.5.2
 	github.com/google/uuid v1.1.2
 	github.com/gophercloud/utils v0.0.0-20210113034859-6f548432055a
-	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go v1.1.10
 	github.com/miekg/dns v1.1.22

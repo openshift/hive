@@ -81,11 +81,6 @@ func WithName(name string) Option {
 	return Generic(generic.WithName(name))
 }
 
-// WithResourceVersion sets the specified resource version on the supplied object.
-func WithResourceVersion(resourceVersion string) Option {
-	return Generic(generic.WithResourceVersion(resourceVersion))
-}
-
 // WithNamespace sets the object.Namespace field when building an object with Build.
 func WithNamespace(namespace string) Option {
 	return Generic(generic.WithNamespace(namespace))

@@ -137,7 +137,7 @@ The most resilient method of deploying Hive is to build and publish a container 
 This method is quite slow, but reliable.
 
 ```bash
-export IMG="quay.io/{username}/hive:latest}"
+export IMG="quay.io/{username}/hive:latest"
 make image-hive docker-push deploy
 oc delete pods -n hive --all
 ```

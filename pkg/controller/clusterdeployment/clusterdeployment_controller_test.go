@@ -15,14 +15,12 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
@@ -223,17 +221,14 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "no clusterdeployment found") {
-					if e, a := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(
-						testClusterDeploymentWithProvision())), cd; !assert.True(t, apiequality.Semantic.DeepEqual(e, a),
-						"unexpected change in clusterdeployment") {
-						t.Logf("diff = %s", diff.ObjectReflectDiff(e, a))
-					}
+					e := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(
+						testClusterDeploymentWithProvision()))
+					testassert.AssertEqualWhereItCounts(t, e, cd, "unexpected change in clusterdeployment")
 				}
 				provisions := getProvisions(c)
 				if assert.Len(t, provisions, 1, "expected provision to exist") {
-					if e, a := testProvision(), provisions[0]; !assert.True(t, apiequality.Semantic.DeepEqual(e, a), "unexpected change in provision") {
-						t.Logf("diff = %s", diff.ObjectReflectDiff(e, a))
-					}
+					e := testProvision()
+					testassert.AssertEqualWhereItCounts(t, e, provisions[0], "unexpected change in provision")
 				}
 			},
 		},
@@ -2491,11 +2486,10 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 			Kind:       "ClusterDeployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            testName,
-			Namespace:       testNamespace,
-			Finalizers:      []string{hivev1.FinalizerDeprovision},
-			UID:             types.UID("1234"),
-			ResourceVersion: "999",
+			Name:       testName,
+			Namespace:  testNamespace,
+			Finalizers: []string{hivev1.FinalizerDeprovision},
+			UID:        types.UID("1234"),
 		},
 	}
 	return cd
@@ -2709,7 +2703,6 @@ func testProvision() *hivev1.ClusterProvision {
 			Labels: map[string]string{
 				constants.ClusterDeploymentNameLabel: testName,
 			},
-			ResourceVersion: "999",
 		},
 		Spec: hivev1.ClusterProvisionSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{

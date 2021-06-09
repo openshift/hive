@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	testassert "github.com/openshift/hive/pkg/test/assert"
 	"github.com/openshift/hive/pkg/test/generic"
 	"github.com/openshift/hive/pkg/test/manager/mock"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
@@ -282,7 +283,7 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, test.expectedResult.Requeue, actualResult.Requeue)
 			assert.InDelta(t, test.expectedResult.RequeueAfter, actualResult.RequeueAfter, tolerance)
 			assert.Equal(t, test.expectedError, actualError)
-			assert.Equal(t, test.expectedObjects, actualObjects)
+			assertObjectArraysMostlyEqual(t, test.expectedObjects, actualObjects)
 		})
 	}
 }
@@ -356,7 +357,7 @@ func TestGetRuntimeObjects(t *testing.T) {
 
 			// Assert
 			assert.NoError(t, actualError)
-			assert.Equal(t, test.expectedObjects, actualObjects)
+			assertObjectArraysMostlyEqual(t, test.expectedObjects, actualObjects)
 		})
 	}
 }
@@ -397,7 +398,7 @@ func TestGetNamespaceCheckpoint(t *testing.T) {
 			actualCheckpoint, actualFound, actualError := r.getNamespaceCheckpoint(namespace, r.logger)
 
 			// Assert
-			assert.Equal(t, test.expectedCheckpoint, actualCheckpoint)
+			testassert.AssertEqualWhereItCounts(t, test.expectedCheckpoint, actualCheckpoint, "")
 			assert.Equal(t, test.expectedFound, actualFound)
 			assertErrorsAreEqualType(t, test.expectedError, actualError)
 		})
@@ -466,7 +467,7 @@ func TestCreateOrUpdateNamespaceCheckpoint(t *testing.T) {
 			r.Get(context.TODO(), namespacedName, actualCheckpoint)
 
 			// Assert
-			assert.Equal(t, test.expectedCheckpoint, actualCheckpoint)
+			testassert.AssertEqualWhereItCounts(t, test.expectedCheckpoint, actualCheckpoint, "")
 			assertErrorsAreEqualType(t, test.expectedError, actualError)
 		})
 	}

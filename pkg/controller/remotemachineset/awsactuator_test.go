@@ -28,6 +28,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awshivev1 "github.com/openshift/hive/apis/hive/v1/aws"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 func TestAWSActuator(t *testing.T) {
@@ -341,14 +342,11 @@ func TestAWSActuator(t *testing.T) {
 				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet)
 			}
 			if test.expectedCondition != nil {
-				for _, cond := range pool.Status.Conditions {
-					assert.Equal(t, cond.Type, test.expectedCondition.Type)
-					assert.Equal(t, cond.Status, test.expectedCondition.Status)
-					assert.Equal(t, cond.Reason, test.expectedCondition.Reason)
+				cond := controllerutils.FindMachinePoolCondition(pool.Status.Conditions, test.expectedCondition.Type)
+				if assert.NotNilf(t, cond, "did not find expected condition type: %v", test.expectedCondition.Type) {
+					assert.Equal(t, test.expectedCondition.Status, cond.Status, "condition found with unexpected status")
+					assert.Equal(t, test.expectedCondition.Reason, cond.Reason, "condition found with unexpected reason")
 				}
-			} else {
-				// Assuming if you didn't expect a condition, there shouldn't be any.
-				assert.Equal(t, 0, len(pool.Status.Conditions))
 			}
 		})
 	}

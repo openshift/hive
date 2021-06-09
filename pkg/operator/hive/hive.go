@@ -166,6 +166,24 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		}
 	}
 
+	if instance.Spec.ArgoCD.Enabled {
+		hLog.Infof("ArgoCD integration enabled")
+		tmpEnvVar := corev1.EnvVar{
+			Name:  hiveconstants.ArgoCDEnvVar,
+			Value: "true",
+		}
+		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
+	}
+
+	if instance.Spec.ArgoCD.Namespace != "" {
+		hLog.Infof("ArgoCD namespace specified in hiveconfig")
+		tmpEnvVar := corev1.EnvVar{
+			Name:  hiveconstants.ArgoCDNamespaceEnvVar,
+			Value: instance.Spec.ArgoCD.Namespace,
+		}
+		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
+	}
+
 	if instance.Spec.DeprovisionsDisabled != nil && *instance.Spec.DeprovisionsDisabled {
 		hLog.Info("deprovisions disabled in hiveconfig")
 		tmpEnvVar := corev1.EnvVar{

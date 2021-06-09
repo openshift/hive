@@ -43,7 +43,7 @@ An existing ClusterImageSet can be specified with the --image-set
 flag. Otherwise, one will be generated using the image specified for the
 cluster pool using --release-image flag. If neither of these flags are 
 specified, default image is obtained from the following URL:
-https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest
+https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest
 
 ENVIRONMENT VARIABLES
 The command will use the following environment variables for its output:
@@ -133,7 +133,7 @@ create-pool CLUSTER_POOL_NAME --cloud=gcp`,
 	flags.StringVar(&opt.CloudSecretName, "cloud-secret", "", "Cloud secret name if already created")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster pool")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing the clusters in this pool")
-	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
+	flags.StringVar(&opt.ReleaseImageSource, "release-image-source", "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest", "URL to JSON describing the release image pull spec")
 	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster pool.")
 	flags.Int32Var(&opt.Size, "size", 1, "Size of cluster pool")
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")

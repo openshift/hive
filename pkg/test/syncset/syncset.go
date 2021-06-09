@@ -127,8 +127,3 @@ func WithPatches(patches ...hivev1.SyncObjectPatch) Option {
 		syncSet.Spec.Patches = patches
 	}
 }
-
-// WithResourceVersion sets the specified resource version on the supplied object.
-func WithResourceVersion(resourceVersion string) Option {
-	return Generic(generic.WithResourceVersion(resourceVersion))
-}

@@ -2,16 +2,19 @@
 
 ## Overview
 
-Starting with OpenShift version 4.4.8, clusters can be stopped and started by simply shutting
-down their machines and starting them back up. The only additional requirement to bring a cluster
-back up from a stopped state is that CSRs be approved for the cluster's nodes when certificates
-have expired since the cluster was active. This typically happens if the cluster is hibernated
-within the first 24 hours before initial cert rotation takes place. After this phase, certs will
-be valid for 30 days.
+Starting with OpenShift version 4.4.8, clusters can be stopped and
+started by simply shutting down their machines and starting them back
+up. The only additional requirement to bring a cluster back up from a
+stopped state is that CSRs be approved for the cluster's nodes when
+certificates have expired since the cluster was active. This typically
+happens if the cluster is hibernated within the first 24 hours before
+initial cert rotation takes place. After this phase, certs will be valid
+for 30 days.
 
-Hive can automate the process of stopping/starting clusters via its API by allowing the user to
-set a the desired state of the cluster in the ClusterDeployment spec. Both API and controller
-changes are required to support this feature.
+Hive can automate the process of stopping/starting clusters via its API
+by allowing the user to set a the desired state of the cluster in the
+ClusterDeployment spec. Both API and controller changes are required to
+support this feature.
 
 ## Example Commands
 

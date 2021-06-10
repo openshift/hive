@@ -424,7 +424,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Test PreserveOnDelete",
+			name: "Test PreserveOnDelete when cluster deployment is installed",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testDeletedClusterDeployment())
@@ -445,7 +445,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Test creation of uninstall job when PreserveOnDelete is true but cluster deployment is not installed",
+			name: "Test PreserveOnDelete when cluster deployment is not installed",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testDeletedClusterDeployment())
@@ -457,9 +457,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
 			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
+				}
 				deprovision := getDeprovision(c)
-				require.NotNil(t, deprovision, "expected deprovision request")
-				assert.Equal(t, testClusterDeployment().Name, deprovision.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				assert.Nil(t, deprovision, "expected no deprovision request")
 			},
 		},
 		{

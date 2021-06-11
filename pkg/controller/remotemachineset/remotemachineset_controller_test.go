@@ -891,6 +891,26 @@ func testMachinePool() *hivev1.MachinePool {
 				},
 			},
 		},
+		Status: hivev1.MachinePoolStatus{
+			Conditions: []hivev1.MachinePoolCondition{
+				{
+					Status: corev1.ConditionUnknown,
+					Type:   hivev1.NotEnoughReplicasMachinePoolCondition,
+				},
+				{
+					Status: corev1.ConditionUnknown,
+					Type:   hivev1.NoMachinePoolNameLeasesAvailable,
+				},
+				{
+					Status: corev1.ConditionUnknown,
+					Type:   hivev1.InvalidSubnetsMachinePoolCondition,
+				},
+				{
+					Status: corev1.ConditionUnknown,
+					Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
+				},
+			},
+		},
 	}
 }
 
@@ -900,6 +920,14 @@ func testAutoscalingMachinePool(min, max int) *hivev1.MachinePool {
 	p.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
 		MinReplicas: int32(min),
 		MaxReplicas: int32(max),
+	}
+	for i, cond := range p.Status.Conditions {
+		// Condition will always be present because it is initialized in testMachinePool
+		if cond.Type == hivev1.NotEnoughReplicasMachinePoolCondition {
+			cond.Status = corev1.ConditionFalse
+			cond.Reason = "EnoughReplicas"
+			p.Status.Conditions[i] = cond
+		}
 	}
 	return p
 }

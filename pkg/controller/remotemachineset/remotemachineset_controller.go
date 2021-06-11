@@ -50,8 +50,18 @@ const (
 	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = hivev1.SchemeGroupVersion.WithKind("MachinePool")
+var (
+	// controllerKind contains the schema.GroupVersionKind for this controller type.
+	controllerKind = hivev1.SchemeGroupVersion.WithKind("MachinePool")
+
+	// remoteMachineSetConditions are the Machine Pool conditions controlled by remote machineset controller
+	remoteMachineSetConditions = []hivev1.MachinePoolConditionType{
+		hivev1.NotEnoughReplicasMachinePoolCondition,
+		hivev1.NoMachinePoolNameLeasesAvailable,
+		hivev1.InvalidSubnetsMachinePoolCondition,
+		hivev1.UnsupportedConfigurationMachinePoolCondition,
+	}
+)
 
 // Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
@@ -207,6 +217,18 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 		// Error reading the object - requeue the request
 		logger.WithError(err).Error("error looking up machine pool")
 		return reconcile.Result{}, err
+	}
+
+	// Initialize machine pool conditions if not present
+	newConditions := controllerutils.InitializeMachinePoolConditions(pool.Status.Conditions, remoteMachineSetConditions)
+	if len(newConditions) > len(pool.Status.Conditions) {
+		pool.Status.Conditions = newConditions
+		logger.Info("initializing remote machineset controller conditions")
+		if err := r.Status().Update(context.TODO(), pool); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update machine pool status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	if !controllerutils.HasFinalizer(pool, finalizer) {

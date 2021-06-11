@@ -448,6 +448,26 @@ func SetDNSZoneConditionWithChangeCheck(
 	return conditions, changed
 }
 
+// InitializeMachinePoolConditions initializes the given set of conditions for the first time, set with Status Unknown
+func InitializeMachinePoolConditions(existingConditions []hivev1.MachinePoolCondition, conditionsToBeAdded []hivev1.MachinePoolConditionType) []hivev1.MachinePoolCondition {
+	now := metav1.Now()
+	for _, conditionType := range conditionsToBeAdded {
+		if FindMachinePoolCondition(existingConditions, conditionType) == nil {
+			existingConditions = append(
+				existingConditions,
+				hivev1.MachinePoolCondition{
+					Type:               conditionType,
+					Status:             corev1.ConditionUnknown,
+					Reason:             hivev1.InitializedConditionReason,
+					Message:            "Condition Initialized",
+					LastTransitionTime: now,
+					LastProbeTime:      now,
+				})
+		}
+	}
+	return existingConditions
+}
+
 // SetMachinePoolCondition sets a condition on a MachinePool resource's status
 func SetMachinePoolCondition(
 	conditions []hivev1.MachinePoolCondition,
@@ -483,20 +503,18 @@ func SetMachinePoolConditionWithChangeCheck(
 	now := metav1.Now()
 	existingCondition := FindMachinePoolCondition(conditions, conditionType)
 	if existingCondition == nil {
-		if status == corev1.ConditionTrue {
-			conditions = append(
-				conditions,
-				hivev1.MachinePoolCondition{
-					Type:               conditionType,
-					Status:             status,
-					Reason:             reason,
-					Message:            message,
-					LastTransitionTime: now,
-					LastProbeTime:      now,
-				},
-			)
-			changed = true
-		}
+		conditions = append(
+			conditions,
+			hivev1.MachinePoolCondition{
+				Type:               conditionType,
+				Status:             status,
+				Reason:             reason,
+				Message:            message,
+				LastTransitionTime: now,
+				LastProbeTime:      now,
+			},
+		)
+		changed = true
 	} else {
 		if shouldUpdateCondition(
 			existingCondition.Status, existingCondition.Reason, existingCondition.Message,

@@ -322,10 +322,10 @@ func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePo
 
 	results, err := a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: idPointers})
 	if err != nil || len(results.Subnets) == 0 {
-		if strings.Contains(err.Error(), "InvalidSubnetID.NotFound") {
-			var conditionMessage string
+		if strings.Contains(err.Error(), "InvalidSubnet") {
+			conditionMessage := err.Error()
 			if submatches := reg.FindStringSubmatch(err.Error()); submatches != nil {
-				// formatting error message before adding it to condition
+				// formatting error message before adding it to condition when
 				// sample error message: InvalidSubnetID.NotFound: The subnet ID 'subnet-1,subnet-2' does not exist\tstatus code: 400, request id: ea8b3bb7-de56-405f-9345-e5690a3ea8b2
 				// message after formatting: The subnet ID 'subnet-1,subnet-2' does not exist
 				conditionMessage = submatches[1]

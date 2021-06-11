@@ -16,6 +16,7 @@
     - [ClusterState](#clusterstate)
     - [DNSZone](#dnszone)
     - [HiveConfig](#hiveconfig)
+      - [Remove VeleroBackup Controller](#remove-velerobackup-controller)
     - [MachinePoolNameLease](#machinepoolnamelease)
     - [MachinePool](#machinepool)
     - [SelectorSyncIdentityProvider](#selectorsyncidentityprovider)
@@ -62,6 +63,14 @@ Merge once it's deemed feasible and at least somewhat desirable, and with enough
 ### DNSZone
 
 ### HiveConfig
+#### Remove VeleroBackup Controller
+This is not used or useful, so we should get rid of it.
+
+**Card:** [HIVE-1563](https://issues.redhat.com/browse/HIVE-1563)
+
+**Prototype:** https://github.com/openshift/hive/pull/1411
+
+...but we need to deprecate it properly first.
 
 ### MachinePoolNameLease
 

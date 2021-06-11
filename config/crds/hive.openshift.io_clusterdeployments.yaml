@@ -716,7 +716,8 @@ spec:
               type: string
             preserveOnDelete:
               description: PreserveOnDelete allows the user to disconnect a cluster
-                from Hive without deprovisioning it
+                from Hive without deprovisioning it. This can also be used to abandon
+                ongoing cluster deprovision.
               type: boolean
             provisioning:
               description: Provisioning contains settings used only for initial cluster

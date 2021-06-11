@@ -1114,15 +1114,10 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 }
 
 func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (deprovisioned bool, returnErr error) {
-	// Skips creation of deprovision request if PreserveOnDelete is true and cluster is installed
+	// Skips/terminates deprovision if PreserveOnDelete is true. If there is ongoing deprovision we abandon it
 	if cd.Spec.PreserveOnDelete {
-		if cd.Spec.Installed {
-			cdLog.Warn("skipping creation of deprovisioning request for installed cluster due to PreserveOnDelete=true")
-			return true, nil
-		}
-		// Overriding PreserveOnDelete because we might have deleted the cluster deployment before it finished
-		// installing, which can cause AWS resources to leak
-		cdLog.Info("PreserveOnDelete=true but creating deprovisioning request as cluster was never successfully provisioned")
+		cdLog.Warn("skipping/terminating deprovision for cluster due to PreserveOnDelete=true, removing finalizer")
+		return true, nil
 	}
 
 	if cd.Spec.ClusterMetadata == nil {

@@ -1,12 +1,14 @@
 package velerobackup
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	testassert "github.com/openshift/hive/pkg/test/assert"
 	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
@@ -151,5 +153,13 @@ func assertAggregateErrorsAreEqualType(t *testing.T, expected, actual utilerrors
 
 	for i := range expectedErrors {
 		assert.Equal(t, reflect.TypeOf(expectedErrors[i]), reflect.TypeOf(actualErrors[i]))
+	}
+}
+
+// assertObjectArraysMostlyEqual wraps AssertEqualWhereItCounts for lists of objects
+func assertObjectArraysMostlyEqual(t *testing.T, expected, actual []runtime.Object) {
+	assert.Equal(t, len(expected), len(actual), fmt.Sprintf("Expected (%d) and Actual (%d) are different sizes.", len(expected), len(actual)))
+	for i := 0; i < len(expected); i++ {
+		testassert.AssertEqualWhereItCounts(t, expected[i], actual[i], fmt.Sprintf("Mismatch in object #%d", i+1))
 	}
 }

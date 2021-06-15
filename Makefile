@@ -289,3 +289,7 @@ install-tools:
 	go install $(GO_MOD_FLAGS) github.com/golang/mock/mockgen
 	go install $(GO_MOD_FLAGS) golang.org/x/lint/golint
 	go install $(GO_MOD_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint
+
+.PHONY: coverage
+coverage:
+	hack/codecov.sh

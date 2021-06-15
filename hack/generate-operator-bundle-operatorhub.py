@@ -101,11 +101,11 @@ def generate_csv_base(version, prev_version, hive_image):
                 crd_csv = yaml.load(stream, Loader=yaml.SafeLoader)
                 owned_crds.append(
                         {
-                            'description': crd_csv['spec']['validation']['openAPIV3Schema']['description'],
+                            'description': crd_csv['spec']['versions'][0]['schema']['openAPIV3Schema']['description'],
                             'displayName': crd_csv['spec']['names']['kind'],
                             'kind': crd_csv['spec']['names']['kind'],
                             'name': crd_csv['metadata']['name'],
-                            'version': crd_csv['spec']['version'],
+                            'version': crd_csv['spec']['versions'][0]['name'],
                         })
 
     with open(csv_template, 'r') as stream:

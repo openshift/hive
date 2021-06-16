@@ -392,6 +392,10 @@ const (
 	// ProvisionStoppedCondition is set when cluster provisioning is stopped
 	ProvisionStoppedCondition ClusterDeploymentConditionType = "ProvisionStopped"
 
+	// RequirementsMetCondition is set True when all pre-provision requirements have been met,
+	// and the controllers can begin the cluster install.
+	RequirementsMetCondition ClusterDeploymentConditionType = "RequirementsMet"
+
 	// AuthenticationFailureCondition is true when platform credentials cannot be used because of authentication failure
 	AuthenticationFailureClusterDeploymentCondition ClusterDeploymentConditionType = "AuthenticationFailure"
 
@@ -419,6 +423,7 @@ var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionTy
 	AWSPrivateLinkReadyClusterDeploymentCondition,
 	ClusterInstallCompletedClusterDeploymentCondition,
 	ClusterInstallRequirementsMetClusterDeploymentCondition,
+	RequirementsMetCondition,
 }
 
 // Cluster hibernating reasons

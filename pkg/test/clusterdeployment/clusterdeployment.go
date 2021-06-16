@@ -8,6 +8,8 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/test/generic"
 )
@@ -162,5 +164,19 @@ func WithHibernateAfter(dur time.Duration) Option {
 func WithAWSPlatform(platform *hivev1aws.Platform) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.Platform.AWS = platform
+	}
+}
+
+// WithGCPPlatform sets the specified gcp platform on the supplied object.
+func WithGCPPlatform(platform *hivev1gcp.Platform) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Platform.GCP = platform
+	}
+}
+
+// WithAzurePlatform sets the specified azure platform on the supplied object.
+func WithAzurePlatform(platform *hivev1azure.Platform) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Platform.Azure = platform
 	}
 }

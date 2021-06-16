@@ -4,17 +4,17 @@ WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN make build
 
-FROM quay.io/app-sre/centos:7
+FROM quay.io/centos/centos:8
 
 # CentOS images do not get updates as they are meant to mirror ISO content, and thus this update
 # is strongly recommended for security updates.
-RUN yum -y update && yum clean all
+RUN dnf -y update && dnf clean all
 
 # ssh-agent required for gathering logs in some situations:
-RUN if ! rpm -q openssh-clients; then yum install -y openssh-clients && yum clean all && rm -rf /var/cache/yum/*; fi
+RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
 # libvirt libraries required for running bare metal installer.
-RUN if ! rpm -q libvirt-devel; then yum install -y libvirt-devel && yum clean all && rm -rf /var/cache/yum/*; fi
+RUN if ! rpm -q libvirt-devel; then dnf install -y libvirt-devel && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
 COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/

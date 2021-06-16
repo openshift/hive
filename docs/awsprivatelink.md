@@ -15,7 +15,7 @@ the API reachable over the Internet. There can be some restrictions setup to
 allow only Hive to access the API but these are usually not acceptable by
 security focused customers.
 
-AWS provides a feature called AWS Private Link ([see doc][aws-private-link-doc]) that allows
+AWS provides a feature called AWS Private Link ([see doc][aws-private-link-overview]) that allows
 accessing private services in customer VPCs from another account using AWS's internal
 networking and not the Internet. AWS Private Link involves creating a VPC
 Endpoint Service in customer's account that is backed by one or more internal

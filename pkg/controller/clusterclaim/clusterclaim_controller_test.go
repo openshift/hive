@@ -71,6 +71,21 @@ func TestReconcileClusterClaim(t *testing.T) {
 	claimBuilder := testclaim.FullBuilder(claimNamespace, claimName, scheme).Options(
 		testclaim.WithSubjects(subjects),
 	)
+	initializedClaimBuilder := testclaim.FullBuilder(claimNamespace, claimName, scheme).Options(
+		testclaim.WithSubjects(subjects),
+		testclaim.WithCondition(hivev1.ClusterClaimCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterClaimPendingCondition,
+		}),
+		testclaim.WithCondition(hivev1.ClusterClaimCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterClaimClusterDeletedCondition,
+		}),
+		testclaim.WithCondition(hivev1.ClusterClaimCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterRunningCondition,
+		}),
+	)
 	cdBuilder := testcd.FullBuilder(clusterName, clusterName, scheme).Options(
 		func(cd *hivev1.ClusterDeployment) {
 			cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
@@ -96,8 +111,29 @@ func TestReconcileClusterClaim(t *testing.T) {
 		expectedRequeueAfter                   *time.Duration
 	}{
 		{
-			name:  "new assignment",
+			name:  "initialize conditions",
 			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.Build(
+				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool")),
+			expectNoFinalizer: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{
+				{
+					Type:   hivev1.ClusterClaimPendingCondition,
+					Status: corev1.ConditionUnknown,
+				},
+				{
+					Type:   hivev1.ClusterClaimClusterDeletedCondition,
+					Status: corev1.ConditionUnknown,
+				},
+				{
+					Type:   hivev1.ClusterRunningCondition,
+					Status: corev1.ConditionUnknown,
+				},
+			},
+		},
+		{
+			name:  "new assignment",
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
@@ -124,7 +160,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:  "existing assignment",
-			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
@@ -151,7 +187,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:               "assignment conflict",
-			claim:              claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			claim:              initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd:                 cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
 			expectNoAssignment: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{{
@@ -163,7 +199,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:  "deleted cluster",
-			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			expectedConditions: []hivev1.ClusterClaimCondition{{
 				Type:    hivev1.ClusterClaimClusterDeletedCondition,
 				Status:  corev1.ConditionTrue,
@@ -174,7 +210,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "new assignment clears pending condition",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithCluster(clusterName),
 				testclaim.WithCondition(
 					hivev1.ClusterClaimCondition{
@@ -209,7 +245,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "deleted claim with no assignment",
-			claim: claimBuilder.GenericOptions(
+			claim: initializedClaimBuilder.GenericOptions(
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(),
@@ -219,7 +255,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "deleted claim with unclaimed assignment",
-			claim: claimBuilder.GenericOptions(
+			claim: initializedClaimBuilder.GenericOptions(
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
@@ -233,7 +269,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "deleted claim with claimed assignment",
-			claim: claimBuilder.GenericOptions(
+			claim: initializedClaimBuilder.GenericOptions(
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
@@ -248,7 +284,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "deleted claim with missing clusterdeployment",
-			claim: claimBuilder.GenericOptions(
+			claim: initializedClaimBuilder.GenericOptions(
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
@@ -257,7 +293,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "deleted claim with deleted clusterdeployment",
-			claim: claimBuilder.GenericOptions(
+			claim: initializedClaimBuilder.GenericOptions(
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
@@ -272,7 +308,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "deleted claim with clusterdeployment assigned to other claim",
-			claim: claimBuilder.GenericOptions(
+			claim: initializedClaimBuilder.GenericOptions(
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
@@ -281,7 +317,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:  "no RBAC when no subjects",
-			claim: claimBuilder.Build(testclaim.WithCluster(clusterName), testclaim.WithSubjects(nil)),
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName), testclaim.WithSubjects(nil)),
 			cd: cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterHibernatingCondition,
@@ -306,7 +342,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:  "update existing role",
-			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
@@ -340,7 +376,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:  "update existing rolebinding",
-			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
@@ -375,7 +411,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:  "new assignment bring cluster out of hibernation",
-			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
 				testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
@@ -404,7 +440,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name:  "existing assignment does not change power state",
-			claim: claimBuilder.Build(testclaim.WithCluster(clusterName)),
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
 				testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
@@ -433,7 +469,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "claim with elapsed lifetime is deleted",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithCluster(clusterName),
 				testclaim.WithLifetime(1*time.Hour),
 				testclaim.WithCondition(hivev1.ClusterClaimCondition{
@@ -467,7 +503,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "claim with elapsed pool lifetime is deleted as set by pool default",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithPool(testLeasePoolName),
 				testclaim.WithCluster(clusterName),
 				testclaim.WithCondition(hivev1.ClusterClaimCondition{
@@ -504,7 +540,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "claim with elapsed pool lifetime is deleted as set by pool maximum",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithPool(testLeasePoolName),
 				testclaim.WithCluster(clusterName),
 				testclaim.WithCondition(hivev1.ClusterClaimCondition{
@@ -541,7 +577,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "claim with elapsed smaller lifetime is deleted, where pool maximum is smaller",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithPool(testLeasePoolName),
 				testclaim.WithCluster(clusterName),
 				testclaim.WithLifetime(2*time.Hour),
@@ -579,7 +615,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "claim with elapsed smaller lifetime is deleted, where pool maximum is smaller than default",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithPool(testLeasePoolName),
 				testclaim.WithCluster(clusterName),
 				testclaim.WithCondition(hivev1.ClusterClaimCondition{
@@ -616,7 +652,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "claim with elapsed smaller lifetime is deleted, where claim is smaller",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithPool(testLeasePoolName),
 				testclaim.WithCluster(clusterName),
 				testclaim.WithLifetime(1*time.Hour),
@@ -654,7 +690,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		},
 		{
 			name: "claim with non-elapsed lifetime is not deleted",
-			claim: claimBuilder.Build(
+			claim: initializedClaimBuilder.Build(
 				testclaim.WithCluster(clusterName),
 				testclaim.WithLifetime(3*time.Hour),
 				testclaim.WithCondition(hivev1.ClusterClaimCondition{
@@ -770,12 +806,18 @@ func TestReconcileClusterClaim(t *testing.T) {
 				assert.NotEmpty(t, claim.Spec.Namespace, "expected assignment set on claim")
 			}
 
-			for i := range claim.Status.Conditions {
-				cond := &claim.Status.Conditions[i]
-				cond.LastTransitionTime = metav1.Time{}
-				cond.LastProbeTime = metav1.Time{}
+			for _, expectedCond := range test.expectedConditions {
+				cond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, expectedCond.Type)
+				if assert.NotNilf(t, cond, "did not find expected condition type: %v", expectedCond.Type) {
+					assert.Equal(t, expectedCond.Status, cond.Status, "condition found with unexpected status")
+					if expectedCond.Reason != "" {
+						assert.Equal(t, expectedCond.Reason, cond.Reason, "condition found with unexpected reason")
+					}
+					if expectedCond.Message != "" {
+						assert.Equal(t, expectedCond.Message, cond.Message, "condition found with unexpected message")
+					}
+				}
 			}
-			assert.ElementsMatch(t, test.expectedConditions, claim.Status.Conditions, "unexpected conditions")
 
 			if test.expectNoFinalizer {
 				assert.NotContains(t, claim.Finalizers, finalizer, "expected no finalizer on claim")

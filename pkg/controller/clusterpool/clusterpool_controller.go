@@ -48,6 +48,12 @@ const (
 var (
 	// controllerKind contains the schema.GroupVersionKind for this controller type.
 	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterPool")
+
+	// clusterPoolConditions are the cluster pool conditions controlled or initialized by cluster pool controller
+	clusterPoolConditions = []hivev1.ClusterPoolConditionType{
+		hivev1.ClusterPoolMissingDependenciesCondition,
+		hivev1.ClusterPoolCapacityAvailableCondition,
+	}
 )
 
 // Add creates a new ClusterPool Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -212,6 +218,18 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		// Error reading the object - requeue the request.
 		log.WithError(err).Error("error reading cluster pool")
 		return reconcile.Result{}, err
+	}
+
+	// Initialize cluster pool conditions if not set
+	newConditions := controllerutils.InitializeClusterPoolConditions(clp.Status.Conditions, clusterPoolConditions)
+	if len(newConditions) > len(clp.Status.Conditions) {
+		clp.Status.Conditions = newConditions
+		logger.Infof("initializing cluster pool conditions")
+		if err := r.Status().Update(context.TODO(), clp); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster pool status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
 	}
 
 	// If the pool is deleted, clear finalizer once all ClusterDeployments have been deleted.

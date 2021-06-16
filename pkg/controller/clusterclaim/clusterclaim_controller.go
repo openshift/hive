@@ -35,6 +35,13 @@ const (
 	hiveClaimOwnerRoleBindingName = "hive-claim-owner"
 )
 
+// clusterClaimConditions are the cluster claim conditions controlled or initialized by cluster claim controller
+var clusterClaimConditions = []hivev1.ClusterClaimConditionType{
+	hivev1.ClusterClaimPendingCondition,
+	hivev1.ClusterClaimClusterDeletedCondition,
+	hivev1.ClusterRunningCondition,
+}
+
 // Add creates a new ClusterClaim Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
@@ -169,6 +176,18 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, err
 	}
 
+	// Initialize cluster claim conditions if not set
+	newConditions := controllerutils.InitializeClusterClaimConditions(claim.Status.Conditions, clusterClaimConditions)
+	if len(newConditions) > len(claim.Status.Conditions) {
+		claim.Status.Conditions = newConditions
+		logger.Infof("initializing cluster claim conditions")
+		if err := r.Status().Update(context.TODO(), claim); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster claim status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
 	if claim.DeletionTimestamp != nil {
 		return r.reconcileDeletedClaim(claim, logger)
 	}
@@ -211,7 +230,7 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	if lifetime != nil {
 		logger.WithField("lifetime", lifetime).Debug("checking whether lifetime of ClusterClaim has elapsed")
 		pendingCond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
-		if pendingCond != nil && pendingCond.Status == corev1.ConditionFalse {
+		if pendingCond.Status == corev1.ConditionFalse {
 			if timeSinceAssigned := time.Since(pendingCond.LastTransitionTime.Time); timeSinceAssigned >= lifetime.Duration {
 				logger.WithField("timeSinceAssigned", timeSinceAssigned).
 					WithField("lifetime", lifetime).
@@ -422,7 +441,7 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 	statusChanged = statusChanged || changed
 
 	hc := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-	if hc == nil || hc.Status == corev1.ConditionFalse {
+	if hc.Status == corev1.ConditionFalse {
 		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
 			conds,
 			hivev1.ClusterRunningCondition,

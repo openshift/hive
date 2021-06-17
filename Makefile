@@ -1,7 +1,7 @@
 .PHONY: all
 all: vendor update test build
 
-# Include the library makefile
+# Include the library makefiles
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	lib/tmp.mk \

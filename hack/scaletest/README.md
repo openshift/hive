@@ -1,6 +1,12 @@
 # Goal
 
-Simulate 1000 clusters in Hive and observe performance. Because we do not have the budget or resources to actually provision 1000 clusters, Hive now supports a hive.openshift.io/fake-cluster=true annotation on the ClusterDeployment. When enabled, Hive will launch an install pod as normal, but skip the create-cluster stage and no resources should be provisioned in the cloud. It then reports fake data for admin kubeconfig, password, and various cluster status.
+Simulate 1000 clusters in Hive and observe performance. Because we do
+not have the budget or resources to actually provision 1000 clusters,
+Hive now supports a hive.openshift.io/fake-cluster=true annotation on
+the ClusterDeployment. When enabled, Hive will launch an install pod as
+normal, but skip the create-cluster stage and no resources should be
+provisioned in the cloud. It then reports fake data for admin
+kubeconfig, password, and various cluster status.
 
 Once provisioned all communication with the cluster should be faked and the ClusterDeployment should never be marked Unreachable.
 

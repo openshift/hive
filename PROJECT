@@ -1,3 +1,3 @@
-version: "1"
+version: "1.0"
 domain: openshift.io
 repo: github.com/openshift/hive

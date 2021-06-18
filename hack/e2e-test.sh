@@ -9,15 +9,21 @@ sleep_between_tries=10
 max_cluster_deployment_status_checks=90
 sleep_between_cluster_deployment_status_checks="1m"
 
-component=hive
-local_hive_image=$(eval "echo $IMAGE_FORMAT")
-export HIVE_IMAGE="${HIVE_IMAGE:-$local_hive_image}"
-
-# Replace stable:hive with release:latest in the IMAGE_FORMAT we're given by the ci-operator:
-local_release_image="${HIVE_IMAGE/stable:hive/release:latest}"
-export RELEASE_IMAGE="${RELEASE_IMAGE:-$local_release_image}"
-
 export CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-cluster-test}"
+
+# In CI, HIVE_IMAGE and RELEASE_IMAGE are set via the job's `dependencies`.
+if [[ -z "$HIVE_IMAGE" ]]; then
+    echo "The HIVE_IMAGE environment variable was not found." >&2
+    echo "It must be set to the fully-qualified pull spec of a hive container image." >&2
+    echo "E.g. quay.io/my-user/hive:latest" >&2
+    exit 1
+fi
+if [[ -z "$RELEASE_IMAGE" ]]; then
+    echo "The RELEASE_IMAGE environment variable was not found." >&2
+    echo "It must be set to the fully-qualified pull spec of an OCP release container image." >&2
+    echo "E.g. quay.io/openshift-release-dev/ocp-release:4.7.0-x86_64" >&2
+    exit 1
+fi
 
 echo "Running e2e with HIVE_IMAGE ${HIVE_IMAGE}"
 echo "Running e2e with RELEASE_IMAGE ${RELEASE_IMAGE}"

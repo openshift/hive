@@ -45,16 +45,16 @@ ProvisionStopped
 
 Focusing only on the 12 conditions controlled by the clusterdeployment controller:
 
-ClusterImageSetNotFound - Move to RequirementsMet or possibly ClusterInstallRequirementsMet.
-AuthenticationFailure - Move to RequirementsMet or ClusterInstallRequirementsMet.
-ClusterInstallCompleted - Merge into Installed.
+ClusterImageSetNotFound - Move to RequirementsMet
+AuthenticationFailure - Move to RequirementsMet
+ClusterInstallCompleted - Merge into Provisioned.
 ClusterInstallFailed - Merge into ProvisionFailed.
 ClusterInstallRequirementsMet - Merge into RequirementsMet.
 ClusterInstallStopped - Merge into ProvisionStopped.
 DNSNotReady - Move to RequirementsMet
 DeprovisionLaunchError -  Rename to DeprovisionError as a general bucket for any deprovision problems we can encounter.
-InstallLaunchError - Move to RequirementsMet or ProvisionFailed
-InstallerImageResolutionFailed - Move to RequirementsMet or ProvisionFailed
+InstallLaunchError - Move to ProvisionFailed
+InstallerImageResolutionFailed - Move to ProvisionFailed
 ProvisionFailed - Keep as a primary condition.
 ProvisionStopped - Keep as a primary condition.
 
@@ -63,9 +63,9 @@ Implied here is a new utility to check if a grouped condition reason is ours, an
 
 ### RequirementsMet
 
-Unknown until we're ready to launch an install, then True. False if we've found a problem.
+Indicates a problem with pre-flight checks. Unknown until we're ready to launch an install, then True. False if we've found a problem.
 
-Can be set via clusterdeployment_controller up until we hand over to a ClusterInstall, or when we detect a RequirementsMet condition on the ClusterInstall. Would need to ensure that the code that copies from ClusterInstall -> ClusterDeployment only runs after we've cleared all our possible Reasons for this condition to be False in the clusterdeployment controller.
+Can be set via clusterdeployment_controller up until we hand over to a ClusterInstall, or when we detect a RequirementsMet condition on the ClusterInstall. Would need to ensure that the code that copies from ClusterInstall -> ClusterDeployment only runs after we've cleared all our possible Reasons for this condition to be False in the clusterdeployment controller. ClusterDeployment controller should never set to True if we're using a ClusterInstallRef, leave unknown until the ClusterInstall says so.
 
 Possible Reasons when False from clusterdeployment_controller:
   - ClusterImageSetNotFound
@@ -74,17 +74,14 @@ Possible Reasons when False from clusterdeployment_controller:
   - InstallerImageResolutionFailed
   - InstallLaunchError
 
-TODO: should RequirementsMet status=False reasons also translate to a ProvisionFailed = True with the same Reason?
-
 Each of the above should use a utility to ensure they are not the reason the condition is False, once we know that problem is resolved. (set status back to Unknown)
-
-ProvisionStopped - True if we've given up. Normally should just be set via the ClusterInstall's ProvisionStopped condition.
 
 ### ProvisionFailed
 
-Unknown until we hit our first error, true as soon as we detect any problem, false once we successfully install.
+Indicates a problem provisioning the cluster, and only used when we encounter an error after all RequirementsMet. (i.e. ClusterProvision failures, or problems from a ClusterInstall)
 
-TODO: per above, should we set this for preflight'ish requirements met errors? Would give callers one place to watch to know something is wrong.
+State is unknown until we hit our first error, true as soon as we detect any problem, false once we successfully install.
+This condition is only used for errors
 
 ### ProvisionStopped
 

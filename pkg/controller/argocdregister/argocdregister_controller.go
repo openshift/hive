@@ -134,6 +134,12 @@ func (r *ArgoCDRegisterController) Reconcile(ctx context.Context, request reconc
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
 	defer recobsrv.ObserveControllerReconcileTime()
 
+	argoCDEnabled := os.Getenv(constants.ArgoCDEnvVar)
+	if len(argoCDEnabled) == 0 {
+		cdLog.Info("ArgoCD integration is not enabled in hive config")
+		return reconcile.Result{}, nil
+	}
+
 	cd := &hivev1.ClusterDeployment{}
 	err := r.Get(context.TODO(), request.NamespacedName, cd)
 	if err != nil {
@@ -222,7 +228,7 @@ func (r *ArgoCDRegisterController) reconcileCluster(cd *hivev1.ClusterDeployment
 	}
 
 	// Copy all ClusterDeployment labels onto the ArgoCD cluster secret. This will hopefully
-	// allow for dynamic generation of ArgoCD Applications. (separate tooling)
+	// allow for dynamic generation of ArgoCD Applications (via ArgoCD ApplicationSets).
 	for k, v := range cd.Labels {
 		argoClusterSecret.Labels[k] = v
 	}
@@ -236,9 +242,17 @@ func (r *ArgoCDRegisterController) reconcileCluster(cd *hivev1.ClusterDeployment
 		}
 	}
 	if err == nil {
+		changed := false
 		if !reflect.DeepEqual(existingArgoCDClusterSecret.Data, argoClusterSecret.Data) {
-			cdLog.Infof("updating ArgoCD cluster secret %s", existingArgoCDClusterSecret.Name)
 			existingArgoCDClusterSecret.Data = argoClusterSecret.Data
+			changed = true
+		}
+		if !reflect.DeepEqual(existingArgoCDClusterSecret.Labels, argoClusterSecret.Labels) {
+			existingArgoCDClusterSecret.Labels = argoClusterSecret.Labels
+			changed = true
+		}
+		if changed {
+			cdLog.Infof("updating ArgoCD cluster secret %s", existingArgoCDClusterSecret.Name)
 			err = r.Update(context.Background(), existingArgoCDClusterSecret)
 			if err != nil {
 				return reconcile.Result{}, fmt.Errorf("failed to update secret %s: %w", existingArgoCDClusterSecret.Name, err)

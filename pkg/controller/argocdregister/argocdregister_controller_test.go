@@ -2,6 +2,7 @@ package argocdregister
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -91,6 +92,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 		expectedRequeueAfter time.Duration
 		validate             func(client.Client, *testing.T)
 		reconcilerSetup      func(*ArgoCDRegisterController)
+		argoCDEnabled        bool
 	}{
 		{
 			name: "Create ArgoCD cluster secret",
@@ -106,6 +108,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 						Namespace: argoCDDefaultNamespace}),
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "argocd-token", argoCDDefaultNamespace, "token", "{}"),
 			},
+			argoCDEnabled: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				secretName, _ := getPredictableSecretName(cd.Status.APIURL)
@@ -128,13 +131,17 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 						Namespace: argoCDDefaultNamespace}),
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "argocd-token", argoCDDefaultNamespace, "token", "{}"),
 				// Existing ArgoCD cluster secret
-				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "cluster-test-api.test.com-2774145043", argoCDDefaultNamespace, corev1.DockerConfigJsonKey, "{}"),
+				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "cluster-test-api.test.com-2774145043", argoCDDefaultNamespace, "test", "{}"),
 			},
+			argoCDEnabled: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				secretName, _ := getPredictableSecretName(cd.Status.APIURL)
 				secret := getSecret(c, secretName, argoCDDefaultNamespace)
 				assert.NotNil(t, secret, "ArgoCD cluster secret not found")
+				// Existing secret is empty, expect secret.Data and secret.Labels updated
+				assert.Equal(t, secret.Labels[hivev1.HiveClusterPlatformLabel], "aws")
+				assert.Equal(t, secret.Data["server"], []byte(cd.Status.APIURL))
 			},
 		},
 		{
@@ -157,12 +164,35 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 				// Existing ArgoCD cluster secret
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "cluster-test-api.test.com-2774145043", argoCDDefaultNamespace, corev1.DockerConfigJsonKey, "{}"),
 			},
+			argoCDEnabled: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				secretName, _ := getPredictableSecretName(cd.Status.APIURL)
 				secret := getSecret(c, secretName, argoCDDefaultNamespace)
 				assert.Nil(t, secret, "found unexpected ArgoCD cluster secret")
 				assert.NotContains(t, cd.Finalizers, hivev1.FinalizerArgoCDCluster, "found unexpected ArgoCD cluster deployment finalizer")
+			},
+		},
+		{
+			name: "ArgoCD not enabled in hive config",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, "foo-lqmsh-admin-kubeconfig", "kubeconfig", "{}"),
+				testServiceAccount("argocd-server", argoCDDefaultNamespace,
+					corev1.ObjectReference{Kind: "Secret",
+						Name:      "argocd-token",
+						Namespace: argoCDDefaultNamespace}),
+				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "argocd-token", argoCDDefaultNamespace, "token", "{}"),
+			},
+			argoCDEnabled: false,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				secretName, _ := getPredictableSecretName(cd.Status.APIURL)
+				secret := getSecret(c, secretName, argoCDDefaultNamespace)
+				assert.Nil(t, secret, "found unexepcted ArgoCD cluster secret")
 			},
 		},
 	}
@@ -173,6 +203,13 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 			fakeClient := fake.NewFakeClient(test.existing...)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
+
+			if test.argoCDEnabled {
+				os.Setenv(constants.ArgoCDEnvVar, "true")
+				t.Log(os.Getenv(constants.ArgoCDEnvVar))
+			} else {
+				os.Unsetenv(constants.ArgoCDEnvVar)
+			}
 
 			rcd := &ArgoCDRegisterController{
 				Client:     fakeClient,

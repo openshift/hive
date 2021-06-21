@@ -32,11 +32,11 @@ func TestClusterAccumulator(t *testing.T) {
 		// Expect three managed clusters still installing within normal timeframe:
 		testClusterDeploymentWithConditions("a", "managed", fiveMinsAgo, false,
 			[]hivev1.ClusterDeploymentConditionType{
-				hivev1.ClusterImageSetNotFoundCondition,
+				hivev1.RequirementsMetCondition,
 			}),
 		testClusterDeploymentWithConditions("b", "managed", fiveMinsAgo, false,
 			[]hivev1.ClusterDeploymentConditionType{
-				hivev1.ClusterImageSetNotFoundCondition,
+				hivev1.RequirementsMetCondition,
 				hivev1.ControlPlaneCertificateNotFoundCondition,
 			}),
 		testClusterDeploymentWithConditions("b1", "managed", fiveMinsAgo, false,
@@ -106,7 +106,7 @@ func TestClusterAccumulator(t *testing.T) {
 	// are no deprovisioning clusters of that type right now:
 	assert.Equal(t, 0, accumulator.deprovisioning["0h"]["managed"])
 
-	assert.Equal(t, 2, accumulator.conditions[hivev1.ClusterImageSetNotFoundCondition]["managed"])
+	assert.Equal(t, 2, accumulator.conditions[hivev1.RequirementsMetCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.ControlPlaneCertificateNotFoundCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.IngressCertificateNotFoundCondition]["managed"])
 	assert.Equal(t, 1, accumulator.conditions[hivev1.ClusterHibernatingCondition]["managed"])

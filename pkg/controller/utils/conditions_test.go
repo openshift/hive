@@ -12,7 +12,7 @@ import (
 
 func TestSortedClusterDeploymentConditions(t *testing.T) {
 	addConditions := map[hivev1.ClusterDeploymentConditionType]corev1.ConditionStatus{
-		hivev1.ClusterImageSetNotFoundCondition:               corev1.ConditionFalse,
+		hivev1.RequirementsMetCondition:                       corev1.ConditionTrue,
 		hivev1.DNSNotReadyCondition:                           corev1.ConditionTrue,
 		hivev1.SyncSetFailedCondition:                         corev1.ConditionUnknown,
 		hivev1.ProvisionStoppedCondition:                      corev1.ConditionUnknown,
@@ -32,7 +32,7 @@ func TestSortedClusterDeploymentConditions(t *testing.T) {
 				hivev1.DNSNotReadyCondition,
 				// desired
 				hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-				hivev1.ClusterImageSetNotFoundCondition,
+				hivev1.RequirementsMetCondition,
 				// unknown
 				hivev1.ProvisionStoppedCondition,
 				hivev1.SyncSetFailedCondition,

@@ -338,10 +338,6 @@ type ClusterDeploymentCondition struct {
 type ClusterDeploymentConditionType string
 
 const (
-	// ClusterImageSetNotFoundCondition is set when the ClusterImageSet referenced by the
-	// ClusterDeployment is not found.
-	ClusterImageSetNotFoundCondition ClusterDeploymentConditionType = "ClusterImageSetNotFound"
-
 	// InstallerImageResolutionFailedCondition is a condition that indicates whether the job
 	// to determine the installer image based on a release image was successful.
 	InstallerImageResolutionFailedCondition ClusterDeploymentConditionType = "InstallerImageResolutionFailed"

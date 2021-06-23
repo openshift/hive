@@ -58,7 +58,6 @@ var (
 	// clusterDeploymentConditions are the cluster deployment conditions controlled or
 	// initialized by cluster deployment controller
 	clusterDeploymentConditions = []hivev1.ClusterDeploymentConditionType{
-		hivev1.ClusterImageSetNotFoundCondition,
 		hivev1.DNSNotReadyCondition,
 		hivev1.InstallImagesNotResolvedCondition,
 		hivev1.ProvisionFailedCondition,
@@ -310,6 +309,36 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 	if len(newConditions) > len(cd.Status.Conditions) {
 		cd.Status.Conditions = newConditions
 		cdLog.Info("initializing cluster deployment controller conditions")
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
+	// Remove legacy conditions if present:
+	legacyConditions := []string{
+		"ClusterImageSetNotFound",
+	}
+	newConditions = []hivev1.ClusterDeploymentCondition{}
+	var removedLegacyConditions bool
+	for _, c := range cd.Status.Conditions {
+		isLegacy := false
+		for _, lc := range legacyConditions {
+			if string(c.Type) == lc {
+				isLegacy = true
+				break
+			}
+		}
+		if !isLegacy {
+			newConditions = append(newConditions, c)
+		} else {
+			cdLog.Infof("removing legacy condition: %v", c)
+			removedLegacyConditions = true
+		}
+	}
+	if removedLegacyConditions {
+		cd.Status.Conditions = newConditions
 		if err := r.Status().Update(context.TODO(), cd); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
 			return reconcile.Result{}, err
@@ -855,7 +884,7 @@ func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeploy
 		imageSetKey.Name = isName
 	default:
 		cdLog.Warning("clusterdeployment references no clusterimageset")
-		if err := r.setImageSetNotFoundCondition(cd, "unknown", true, cdLog); err != nil {
+		if err := r.setReqsMetConditionImageSetNotFound(cd, "unknown", true, cdLog); err != nil {
 			return nil, err
 		}
 	}
@@ -865,7 +894,7 @@ func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeploy
 	if apierrors.IsNotFound(err) {
 		cdLog.WithField("clusterimageset", imageSetKey.Name).
 			Warning("clusterdeployment references non-existent clusterimageset")
-		if err := r.setImageSetNotFoundCondition(cd, imageSetKey.Name, true, cdLog); err != nil {
+		if err := r.setReqsMetConditionImageSetNotFound(cd, imageSetKey.Name, true, cdLog); err != nil {
 			return nil, err
 		}
 		return nil, err
@@ -875,7 +904,7 @@ func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeploy
 			Error("unexpected error retrieving clusterimageset")
 		return nil, err
 	}
-	if err := r.setImageSetNotFoundCondition(cd, imageSetKey.Name, false, cdLog); err != nil {
+	if err := r.setReqsMetConditionImageSetNotFound(cd, imageSetKey.Name, false, cdLog); err != nil {
 		return nil, err
 	}
 	return imageSet, nil
@@ -1085,27 +1114,39 @@ func (r *ReconcileClusterDeployment) setDeprovisionLaunchErrorCondition(cd *hive
 	return r.Status().Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) setImageSetNotFoundCondition(cd *hivev1.ClusterDeployment, name string, isNotFound bool, cdLog log.FieldLogger) error {
-	status := corev1.ConditionFalse
-	reason := clusterImageSetFoundReason
-	message := fmt.Sprintf("ClusterImageSet %s is available", name)
+func (r *ReconcileClusterDeployment) setReqsMetConditionImageSetNotFound(cd *hivev1.ClusterDeployment, name string, isNotFound bool, cdLog log.FieldLogger) error {
+	var changed bool
+	var conds []hivev1.ClusterDeploymentCondition
+
 	if isNotFound {
-		status = corev1.ConditionTrue
-		reason = clusterImageSetNotFoundReason
-		message = fmt.Sprintf("ClusterImageSet %s is not available", name)
+		conds, changed = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.RequirementsMetCondition,
+			corev1.ConditionFalse,
+			clusterImageSetNotFoundReason,
+			fmt.Sprintf("ClusterImageSet %s is not available", name),
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+	} else {
+		// Set the RequirementsMet condition status back to unknown if True and it's current reason matches
+		reqsCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+			hivev1.RequirementsMetCondition)
+		if reqsCond.Status == corev1.ConditionFalse && reqsCond.Reason == clusterImageSetNotFoundReason {
+			conds, changed = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.RequirementsMetCondition,
+				corev1.ConditionUnknown,
+				clusterImageSetFoundReason,
+				fmt.Sprintf("ClusterImageSet %s is available", name),
+				controllerutils.UpdateConditionIfReasonOrMessageChange)
+		}
 	}
-	conds, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-		cd.Status.Conditions,
-		hivev1.ClusterImageSetNotFoundCondition,
-		status,
-		reason,
-		message,
-		controllerutils.UpdateConditionNever)
 	if !changed {
 		return nil
 	}
-	cdLog.Infof("setting ClusterImageSetNotFoundCondition to %v", status)
 	cd.Status.Conditions = conds
+	reqsCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+		hivev1.RequirementsMetCondition)
+	cdLog.Infof("updating RequirementsMetCondition: status=%s reason=%s", reqsCond.Status, reqsCond.Reason)
 	err := r.Status().Update(context.TODO(), cd)
 	if err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot update status conditions")

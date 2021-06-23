@@ -2,7 +2,6 @@ package clusterdeployment
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"testing"
@@ -1374,9 +1373,34 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
 					{
-						Type:   hivev1.ClusterImageSetNotFoundCondition,
-						Status: corev1.ConditionTrue,
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionFalse,
 						Reason: clusterImageSetNotFoundReason,
+					},
+				})
+			},
+		},
+		{
+			name: "do not set ClusterImageSet missing condition for installed cluster",
+			existing: []runtime.Object{
+				testInstallConfigSecret(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(
+						testInstalledClusterDeployment(time.Now()))
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: "doesntexist"}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
 					},
 				})
 			},
@@ -1388,8 +1412,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
-					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.ClusterImageSetNotFoundCondition,
-						corev1.ConditionTrue, "test-reason", "test-message")
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.RequirementsMetCondition,
+						corev1.ConditionFalse, clusterImageSetNotFoundReason, "test-message")
 					return cd
 				}(),
 				testClusterImageSet(),
@@ -1401,11 +1425,37 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
 					{
-						Type:   hivev1.ClusterImageSetNotFoundCondition,
-						Status: corev1.ConditionFalse,
-						Reason: clusterImageSetFoundReason,
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "AllRequirementsMet",
 					},
 				})
+			},
+		},
+		{
+			name: "clear legacy conditions",
+			existing: []runtime.Object{
+				testInstallConfigSecret(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testInstalledClusterDeployment(time.Now())))
+					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
+					cd.Status.Conditions = append(cd.Status.Conditions,
+						hivev1.ClusterDeploymentCondition{
+							Type:    "ClusterImageSetNotFound",
+							Status:  corev1.ConditionFalse,
+							Reason:  clusterImageSetFoundReason,
+							Message: "test-message",
+						})
+					return cd
+				}(),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				lc := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, "ClusterImageSetNotFound")
+				assert.Nil(t, lc, "legacy condition was not cleared")
 			},
 		},
 		{
@@ -1727,7 +1777,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 
-				testassert.AssertConditionStatus(t, cd, hivev1.ClusterImageSetNotFoundCondition, corev1.ConditionTrue)
+				testassert.AssertConditionStatus(t, cd, hivev1.RequirementsMetCondition, corev1.ConditionFalse)
 			},
 		},
 		{
@@ -1829,8 +1879,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterInstallRefClusterDeployment("test-fake")))
-					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.ClusterImageSetNotFoundCondition,
-						corev1.ConditionFalse, clusterImageSetFoundReason, "test-message")
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.RequirementsMetCondition,
+						corev1.ConditionUnknown, clusterImageSetFoundReason, "test-message")
 					return cd
 				}(),
 				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
@@ -2524,8 +2574,6 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 }
 
 func testInstallConfigSecret() *corev1.Secret {
-	encodedIC := base64.StdEncoding.EncodeToString([]byte(testAWSIC))
-	log.Info(encodedIC)
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testNamespace,

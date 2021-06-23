@@ -81,11 +81,27 @@ fi
 CLUSTER_PROFILE_DIR="${CLUSTER_PROFILE_DIR:-/tmp/cluster}"
 
 # Create a new cluster deployment
-export CLOUD="${CLOUD:-aws}"
+CLOUD="${CLOUD:-aws}"
 export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 export ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp}"
-export SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLUSTER_PROFILE_DIR}/ssh-publickey}"
-export PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLUSTER_PROFILE_DIR}/pull-secret}"
+
+SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLUSTER_PROFILE_DIR}/ssh-publickey}"
+# If not specified or nonexistent, generate a keypair to use
+if ! [[ -s "${SSH_PUBLIC_KEY_FILE}" ]]; then
+    echo "Specified SSH public key file '${SSH_PUBLIC_KEY_FILE}' is invalid or nonexistent. Generating a single-use keypair."
+    WHERE=${SSH_PUBLIC_KEY_FILE%/*}
+    mkdir -p ${WHERE}
+    # Tell the installmanager where to find the private key
+    export SSH_PRIV_KEY_PATH=$(mktemp -p ${WHERE})
+    # ssh-keygen will put the public key here
+    TMP_PUB=${SSH_PRIV_KEY_PATH}.pub
+    # Answer 'y' to the overwrite prompt, since we touched the file
+    yes y | ssh-keygen -q -t rsa -N '' -f ${SSH_PRIV_KEY_PATH}
+    # Now put the pubkey where we expected it
+    mv ${TMP_PUB} ${SSH_PUBLIC_KEY_FILE}
+fi
+
+PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLUSTER_PROFILE_DIR}/pull-secret}"
 export HIVE_NS="hive-e2e"
 export HIVE_OPERATOR_NS="hive-operator"
 
@@ -133,11 +149,19 @@ make test-e2e-postdeploy
 
 SRC_ROOT=$(git rev-parse --show-toplevel)
 
-USE_MANAGED_DNS=true
+USE_MANAGED_DNS=${USE_MANAGED_DNS:-true}
 
 case "${CLOUD}" in
 "aws")
 	CREDS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        # Accept creds from the env if the file doesn't exist.
+        if ! [[ -f $CREDS_FILE ]] && [[ -n "${AWS_ACCESS_KEY_ID}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
+            # TODO: Refactor contrib/pkg/adm/managedns/enable::generateAWSCredentialsSecret to
+            # use contrib/pkg/utils/aws/aws::GetAWSCreds, which knows how to look for the env
+            # vars if the file isn't specified; and use this condition to generate (or not)
+            # the whole CREDS_FILE_ARG="--creds-file=${CREDS_FILE}".
+            printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > $CREDS_FILE
+        fi
 	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
 	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 	;;
@@ -236,9 +260,16 @@ INSTALL_RESULT=""
 
 i=1
 while [ $i -le ${max_cluster_deployment_status_checks} ]; do
-  IS_CLUSTER_DEPLOYMENT_INSTALLED=$(oc get cd ${CLUSTER_NAME} -n ${CLUSTER_NAMESPACE} -o json | jq .spec.installed )
-  if [[ "${IS_CLUSTER_DEPLOYMENT_INSTALLED}" == "true" ]] ; then
+  CD_JSON=$(oc get cd ${CLUSTER_NAME} -n ${CLUSTER_NAMESPACE} -o json)
+  if [[ $(jq .spec.installed <<<"${CD_JSON}") == "true" ]] ; then
     INSTALL_RESULT="success"
+    break
+  fi
+  PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionFailed")' <<<"${CD_JSON}")
+  if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
+    INSTALL_RESULT="failure"
+    FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
+    FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
     break
   fi
   sleep ${sleep_between_cluster_deployment_status_checks}
@@ -246,12 +277,19 @@ while [ $i -le ${max_cluster_deployment_status_checks} ]; do
   i=$((i + 1))
 done
 
-if [[ "${INSTALL_RESULT}" == "success" ]]
-then
-  echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
-else
-  echo "Timed out waiting for the ClusterDeployment ${CLUSTER_NAME} to install"
-fi
+case "${INSTALL_RESULT}" in
+    success)
+        echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
+        ;;
+    failure)
+        echo "ClusterDeployment ${CLUSTER_NAME} provision failed"
+        echo "Reason: $FAILURE_REASON"
+        echo "Message: $FAILURE_MESSAGE"
+        ;;
+    *)
+        echo "Timed out waiting for the ClusterDeployment ${CLUSTER_NAME} to install"
+        ;;
+esac
 
 # Capture install logs
 if IMAGESET_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/imageset=true" -o name -n ${CLUSTER_NAMESPACE}) && [ "${IMAGESET_JOB_NAME}" ]

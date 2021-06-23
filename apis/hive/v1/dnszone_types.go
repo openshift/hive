@@ -179,6 +179,9 @@ const (
 	// AuthenticationFailureCondition is true when credentials cannot be used to create a
 	// DNS zone because they fail authentication
 	AuthenticationFailureCondition DNSZoneConditionType = "AuthenticationFailure"
+	// GenericDNSErrorsCondition is true when there's some DNS Zone related error that isn't related to
+	// authentication or credentials, and needs to be bubbled up to ClusterDeployment
+	GenericDNSErrorsCondition DNSZoneConditionType = "DNSError"
 )
 
 // +genclient

@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/mock/gomock"
@@ -91,6 +92,12 @@ func mockAWSZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DN
 		return
 	}
 	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+}
+
+func mockAWSZoneCreationError(expect *mock.MockClientMockRecorder) {
+	expect.CreateHostedZone(gomock.Any()).
+		Return(nil, awserr.New(kinesis.ErrCodeKMSOptInRequired, "error creating hosted zone", fmt.Errorf("error creating hosted zone"))).Times(1)
+	return
 }
 
 func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {

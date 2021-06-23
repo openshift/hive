@@ -48,6 +48,8 @@ const (
 	accessGrantedReason             = "AccessGranted"
 	authenticationFailedReason      = "AuthenticationFailed"
 	authenticationSucceededReason   = "AuthenticationSucceeded"
+	dnsCloudErrorReason             = "CloudError"
+	dnsNoErrorReason                = "NoError"
 )
 
 var (
@@ -152,6 +154,19 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 	}
 
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {
+		var changed bool
+		desiredState.Status.Conditions, changed = controllerutils.SetDNSZoneConditionWithChangeCheck(
+			desiredState.Status.Conditions,
+			hivev1.GenericDNSErrorsCondition,
+			corev1.ConditionTrue,
+			"RelocationError",
+			controllerutils.ErrorScrub(err),
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changed {
+			if err := r.Status().Update(context.Background(), desiredState); err != nil {
+				dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update dnszone status")
+			}
+		}
 		return reconcile.Result{}, err
 	} else if result != nil {
 		return *result, nil
@@ -204,6 +219,19 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 		}
 
 		dnsLog.WithError(err).Error("error instantiating actuator")
+		var changed bool
+		desiredState.Status.Conditions, changed = controllerutils.SetDNSZoneConditionWithChangeCheck(
+			desiredState.Status.Conditions,
+			hivev1.GenericDNSErrorsCondition,
+			corev1.ConditionTrue,
+			"ActuatorNotInitialized",
+			"error instantiating actuator: "+controllerutils.ErrorScrub(err),
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if changed {
+			if err := r.Status().Update(context.Background(), desiredState); err != nil {
+				dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update dnszone status")
+			}
+		}
 		return reconcile.Result{}, err
 	}
 

@@ -13,6 +13,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/azureclient"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 // AzureActuator attempts to make the current state reflect the given desired state.
@@ -201,5 +202,30 @@ func (a *AzureActuator) UpdateMetadata() error {
 
 // SetConditionsForError sets conditions on the dnszone given a specific error. Returns true if conditions changed.
 func (a *AzureActuator) SetConditionsForError(err error) bool {
-	return false // Not implemented for Azure yet.
+	// other conditions not implemented for Azure yet, so set generic condition
+	var cloudErrorsConds []hivev1.DNSZoneCondition
+	var cloudErrorsCondsChanged bool
+	if err == nil {
+		cloudErrorsConds, cloudErrorsCondsChanged = controllerutils.SetDNSZoneConditionWithChangeCheck(
+			a.dnsZone.Status.Conditions,
+			hivev1.GenericDNSErrorsCondition,
+			corev1.ConditionFalse,
+			dnsNoErrorReason,
+			"No cloud errors occurred",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+	} else {
+		cloudErrorsConds, cloudErrorsCondsChanged = controllerutils.SetDNSZoneConditionWithChangeCheck(
+			a.dnsZone.Status.Conditions,
+			hivev1.GenericDNSErrorsCondition,
+			corev1.ConditionTrue,
+			dnsCloudErrorReason,
+			controllerutils.ErrorScrub(err),
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+	}
+	if cloudErrorsCondsChanged {
+		a.dnsZone.Status.Conditions = cloudErrorsConds
+	}
+	return cloudErrorsCondsChanged
 }

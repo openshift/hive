@@ -322,7 +322,9 @@ type ArgoCDConfig struct {
 	Enabled bool `json:"enabled"`
 
 	// Namespace specifies the namespace where ArgoCD is installed. Used for the location of cluster secrets.
-	Namespace string `json:"namespace"`
+	// Defaults to "argocd"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // BackupConfig contains settings for the Velero backup integration.

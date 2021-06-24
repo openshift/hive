@@ -61,11 +61,11 @@ spec:
                     type: boolean
                   namespace:
                     description: Namespace specifies the namespace where ArgoCD is
-                      installed. Used for the location of cluster secrets.
+                      installed. Used for the location of cluster secrets. Defaults
+                      to "argocd"
                     type: string
                 required:
                 - enabled
-                - namespace
                 type: object
               awsPrivateLink:
                 description: AWSPrivateLink defines the configuration for the aws-private-link

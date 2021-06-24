@@ -136,6 +136,9 @@ type HiveConfigSpec struct {
 	// If not set, no verification will be performed.
 	// +optional
 	ReleaseImageVerificationConfigMapRef *ReleaseImageVerificationConfigMapReference `json:"releaseImageVerificationConfigMapRef,omitempty"`
+	// ArgoCD specifies configuration for ArgoCD integration. If enabled, Hive will automatically add provisioned
+	// clusters to ArgoCD, and remove them when they are deprovisioned.
+	ArgoCD ArgoCDConfig `json:"argoCDConfig,omitempty"`
 
 	FeatureGates *FeatureGateSelection `json:"featureGates,omitempty"`
 }
@@ -311,6 +314,18 @@ const (
 	// HiveReadyCondition is set when hive is deployed successfully and ready to provision clusters
 	HiveReadyCondition HiveConfigConditionType = "Ready"
 )
+
+// ArgoCDConfig contains settings for integration with ArgoCD.
+type ArgoCDConfig struct {
+	// Enabled dictates if ArgoCD gitops integration is enabled.
+	// If not specified, the default is disabled.
+	Enabled bool `json:"enabled"`
+
+	// Namespace specifies the namespace where ArgoCD is installed. Used for the location of cluster secrets.
+	// Defaults to "argocd"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
 
 // BackupConfig contains settings for the Velero backup integration.
 type BackupConfig struct {

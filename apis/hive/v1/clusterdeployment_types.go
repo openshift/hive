@@ -49,6 +49,10 @@ const (
 	// FinalizerMachineManagementTargetNamespace is used on ClusterDeployments to
 	// ensure we clean up the machine management target namespace before cleaning up the API object.
 	FinalizerMachineManagementTargetNamespace string = "hive.openshift.io/machine-management-targetnamespace"
+
+	// FinalizerArgoCDCluster is used on ClusterDeployments to ensure we clean up the ArgoCD cluster
+	// secret before cleaning up the API object.
+	FinalizerArgoCDCluster = "hive.openshift.io/argocd-cluster"
 )
 
 // ClusterPowerState is used to indicate whether a cluster is running or in a

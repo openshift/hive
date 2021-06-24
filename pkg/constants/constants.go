@@ -355,6 +355,16 @@ const (
 
 	// HiveConfigName is the one and only name for a HiveConfig supported in the cluster. Any others will be ignored.
 	HiveConfigName = "hive"
+
+	// ArgoCDEnvVar is the name of the environment variable used to tell the controller manager to enable ArgoCD integration.
+	ArgoCDEnvVar = "HIVE_ARGOCD"
+
+	// ArgoCDNamespaceEnvVar is the name of the environment variable used to specify the ArgoCD namespace
+	ArgoCDNamespaceEnvVar = "HIVE_ARGOCD_NAMESPACE"
+
+	// CreatedByHiveLabel is the label used for artifacts for external systems we integrate with
+	// that were created by Hive. The value for this label should be "true".
+	CreatedByHiveLabel = "hive.openshift.io/created-by"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

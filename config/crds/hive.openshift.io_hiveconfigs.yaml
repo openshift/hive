@@ -50,6 +50,23 @@ spec:
                       type: string
                   type: object
                 type: array
+              argoCDConfig:
+                description: ArgoCD specifies configuration for ArgoCD integration.
+                  If enabled, Hive will automatically add provisioned clusters to
+                  ArgoCD, and remove them when they are deprovisioned.
+                properties:
+                  enabled:
+                    description: Enabled dictates if ArgoCD gitops integration is
+                      enabled. If not specified, the default is disabled.
+                    type: boolean
+                  namespace:
+                    description: Namespace specifies the namespace where ArgoCD is
+                      installed. Used for the location of cluster secrets. Defaults
+                      to "argocd"
+                    type: string
+                required:
+                - enabled
+                type: object
               awsPrivateLink:
                 description: AWSPrivateLink defines the configuration for the aws-private-link
                   controller. It provides 3 major pieces of information required by

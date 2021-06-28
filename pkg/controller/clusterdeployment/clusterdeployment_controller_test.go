@@ -838,6 +838,30 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Set condition when DNSZone cannot be created due to a cloud error",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testDNSZoneWithDNSErrorCondition(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:    hivev1.DNSNotReadyCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  "CloudError",
+						Message: "Some cloud error occurred",
+					},
+				})
+			},
+		},
+		{
 			name: "Clear condition when DNSZone is available",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -2966,6 +2990,22 @@ func testDNSZoneWithAuthenticationFailureCondition() *hivev1.DNSZone {
 		{
 			Type:   hivev1.AuthenticationFailureCondition,
 			Status: corev1.ConditionTrue,
+			LastTransitionTime: metav1.Time{
+				Time: time.Now(),
+			},
+		},
+	}
+	return zone
+}
+
+func testDNSZoneWithDNSErrorCondition() *hivev1.DNSZone {
+	zone := testDNSZone()
+	zone.Status.Conditions = []hivev1.DNSZoneCondition{
+		{
+			Type:    hivev1.GenericDNSErrorsCondition,
+			Status:  corev1.ConditionTrue,
+			Reason:  "CloudError",
+			Message: "Some cloud error occurred",
 			LastTransitionTime: metav1.Time{
 				Time: time.Now(),
 			},

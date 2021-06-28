@@ -607,18 +607,58 @@ func (a *AWSActuator) setAuthenticationFailureConditionToTrue(message string) bo
 	return authenticationFailureCondsChanged
 }
 
-// SetConditionsForError sets conditions on the dnszone given a specific error. Returns true if conditions changed.
-func (a *AWSActuator) SetConditionsForError(err error) bool {
-	awsErr, ok := err.(awserr.Error)
-	if !ok {
-		accessDeniedCondsChanged := a.setInsufficientCredentialsConditionToFalse()
-		authenticationFailureCondsChanged := a.setAuthenticationFailureConditionToFalse()
-
-		return accessDeniedCondsChanged || authenticationFailureCondsChanged
+func (a *AWSActuator) setCloudErrorsConditionToFalse() bool {
+	cloudErrorsConds, cloudErrorsCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.GenericDNSErrorsCondition,
+		corev1.ConditionFalse,
+		dnsNoErrorReason,
+		"No errors occurred",
+		controllerutils.UpdateConditionNever,
+	)
+	if cloudErrorsCondsChanged {
+		a.dnsZone.Status.Conditions = cloudErrorsConds
 	}
 
+	return cloudErrorsCondsChanged
+}
+
+func (a *AWSActuator) setCloudErrorsConditionToTrue(err error) bool {
+	var cloudErrorsConds []hivev1.DNSZoneCondition
+	cloudErrorsConds, cloudErrorsCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.GenericDNSErrorsCondition,
+		corev1.ConditionTrue,
+		dnsCloudErrorReason,
+		controllerutils.ErrorScrub(err),
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
+	if cloudErrorsCondsChanged {
+		// Conditions have changed. Update them in the object.
+		a.dnsZone.Status.Conditions = cloudErrorsConds
+	}
+
+	return cloudErrorsCondsChanged
+}
+
+// SetConditionsForError sets conditions on the dnszone given a specific error. Returns true if conditions changed.
+func (a *AWSActuator) SetConditionsForError(err error) bool {
 	accessDeniedCondsChanged := false
 	authenticationFailureCondsChanged := false
+	cloudErrorsCondsChanged := false
+
+	if err == nil {
+		cloudErrorsCondsChanged = a.setCloudErrorsConditionToFalse()
+	}
+	awsErr, ok := err.(awserr.Error)
+	if !ok {
+		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()
+		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
+	}
+	if accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged {
+		return true
+	}
 
 	if awsErr.Code() == "AccessDeniedException" || awsErr.Code() == "AccessDenied" {
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr.Message())
@@ -633,7 +673,11 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
 	}
 
-	return accessDeniedCondsChanged || authenticationFailureCondsChanged
+	if !(accessDeniedCondsChanged || authenticationFailureCondsChanged) {
+		cloudErrorsCondsChanged = a.setCloudErrorsConditionToTrue(err)
+	}
+
+	return accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged
 }
 
 func tagEquals(a, b *route53.Tag) bool {

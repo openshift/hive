@@ -236,7 +236,32 @@ func (a *GCPActuator) Refresh() error {
 
 // SetConditionsForError sets conditions on the dnszone given a specific error. Returns true if conditions changed.
 func (a *GCPActuator) SetConditionsForError(err error) bool {
-	return false // Not implemented for GCP yet.
+	// other conditions not implemented for GCP yet, so set generic condition
+	var cloudErrorsConds []hivev1.DNSZoneCondition
+	var cloudErrorsCondsChanged bool
+	if err == nil {
+		cloudErrorsConds, cloudErrorsCondsChanged = controllerutils.SetDNSZoneConditionWithChangeCheck(
+			a.dnsZone.Status.Conditions,
+			hivev1.GenericDNSErrorsCondition,
+			corev1.ConditionFalse,
+			dnsNoErrorReason,
+			"No cloud errors occurred",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+	} else {
+		cloudErrorsConds, cloudErrorsCondsChanged = controllerutils.SetDNSZoneConditionWithChangeCheck(
+			a.dnsZone.Status.Conditions,
+			hivev1.GenericDNSErrorsCondition,
+			corev1.ConditionTrue,
+			dnsCloudErrorReason,
+			controllerutils.ErrorScrub(err),
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+	}
+	if cloudErrorsCondsChanged {
+		a.dnsZone.Status.Conditions = cloudErrorsConds
+	}
+	return cloudErrorsCondsChanged
 }
 
 func generateManagedZoneName(zone string) string {

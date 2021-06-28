@@ -506,6 +506,119 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 	}
 }
 
+// TestReconcileDNSProviderForAWSWithConditions tests that expected conditions are set after calling ReconcileDNSProvider for AWS
+func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+
+	cases := []struct {
+		name               string
+		dnsZone            *hivev1.DNSZone
+		setupAWSMock       func(*awsmock.MockClientMockRecorder)
+		errorExpected      bool
+		expectDnsCondition bool
+		dnsCondition       hivev1.DNSZoneCondition
+		actuator           string
+		soaLookupResult    bool
+	}{
+		{
+			name:    "Fail to create hosted zone, set generic dns error condition",
+			dnsZone: validDNSZoneWithoutID(),
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
+				mockAWSZoneDoesntExist(expect, validDNSZoneWithoutID())
+				mockAWSZoneCreationError(expect)
+			},
+			errorExpected:      true,
+			expectDnsCondition: true,
+			dnsCondition: hivev1.DNSZoneCondition{
+				Type:    hivev1.GenericDNSErrorsCondition,
+				Status:  corev1.ConditionTrue,
+				Reason:  dnsCloudErrorReason,
+				Message: "KMSOptInRequired: error creating hosted zone\ncaused by: error creating hosted zone",
+			},
+		},
+		{
+			name: "Clear generic error condition",
+			dnsZone: func() *hivev1.DNSZone {
+				zone := validDNSZoneWithoutID()
+				zone.Status.Conditions = controllerutils.SetDNSZoneCondition(
+					zone.Status.Conditions,
+					hivev1.GenericDNSErrorsCondition,
+					corev1.ConditionTrue,
+					"RelocationError",
+					"Test error",
+					controllerutils.UpdateConditionIfReasonOrMessageChange)
+				return zone
+			}(),
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
+				mockAWSZoneExists(expect, validDNSZoneWithoutID())
+				mockExistingAWSTags(expect)
+				mockAWSGetNSRecord(expect)
+			},
+			expectDnsCondition: true,
+			dnsCondition: hivev1.DNSZoneCondition{
+				Type:    hivev1.GenericDNSErrorsCondition,
+				Status:  corev1.ConditionFalse,
+				Reason:  dnsNoErrorReason,
+				Message: "No errors occurred",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			mocks := setupDefaultMocks(t)
+
+			zr, _ := NewAWSActuator(
+				log.WithField("controller", ControllerName),
+				mocks.fakeKubeClient,
+				awsclient.CredentialsSource{},
+				tc.dnsZone,
+				fakeAWSClientBuilder(mocks.mockAWSClient),
+			)
+
+			r := ReconcileDNSZone{
+				Client: mocks.fakeKubeClient,
+				logger: zr.logger,
+				scheme: scheme.Scheme,
+			}
+
+			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
+			defer mocks.mockCtrl.Finish()
+
+			setFakeDNSZoneInKube(mocks, tc.dnsZone)
+
+			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
+				return tc.soaLookupResult, nil
+			}
+
+			if tc.setupAWSMock != nil {
+				tc.setupAWSMock(mocks.mockAWSClient.EXPECT())
+			}
+
+			// Act
+			_, err := r.reconcileDNSProvider(zr, tc.dnsZone)
+			zr.SetConditionsForError(err)
+
+			// Assert
+			if tc.errorExpected {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Validate
+			if tc.expectDnsCondition {
+				cond := controllerutils.FindDNSZoneCondition(zr.dnsZone.Status.Conditions, tc.dnsCondition.Type)
+				if assert.NotNil(t, cond, "expected condition not found") {
+					assert.Equal(t, tc.dnsCondition.Status, cond.Status, "condition in unexpected status")
+					assert.Equal(t, tc.dnsCondition.Reason, cond.Reason, "condition with unexpected reason")
+					assert.Equal(t, tc.dnsCondition.Message, cond.Message, "condition with unexpected message")
+				}
+			}
+		})
+	}
+}
+
 func TestIsErrorUpdateEvent(t *testing.T) {
 	tests := []struct {
 		name string
@@ -826,6 +939,17 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 				Message: "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
 			},
 		},
+		{
+			name:    "Set GenericDNSErrorsCondition on DNSZone",
+			dnsZone: validDNSZone(),
+			error:   testCloudError(),
+			expectCondition: &hivev1.DNSZoneCondition{
+				Type:    hivev1.GenericDNSErrorsCondition,
+				Status:  corev1.ConditionTrue,
+				Reason:  dnsCloudErrorReason,
+				Message: "ErrCodeKMSOptInRequired: The AWS Access Key Id needs a subscription for the service, status code: 403\ncaused by: some cloud error",
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -862,6 +986,13 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testCloudError() error {
+	dnsCloudErr := awserr.New("ErrCodeKMSOptInRequired",
+		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: 0604c1a4-0a68-4d1a-b8e6-cdcf68176d71",
+		fmt.Errorf("some cloud error"))
+	return dnsCloudErr
 }
 
 func testAccessDeniedExceptionError() error {

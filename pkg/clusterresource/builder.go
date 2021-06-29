@@ -432,6 +432,9 @@ func (o *Builder) mergeInstallConfigTemplate() (*corev1.Secret, error) {
 		return nil, fmt.Errorf("Error parsing installconfigtemplate: %s", err.Error())
 	}
 	ic.BaseDomain = o.BaseDomain
+	if ic.MetaData == nil {
+		ic.MetaData = &metav1.ObjectMeta{}
+	}
 	ic.MetaData.Name = o.Name
 
 	d, err := yaml.Marshal(ic)

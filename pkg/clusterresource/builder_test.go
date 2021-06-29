@@ -68,6 +68,14 @@ networking:
   serviceNetwork:
   - 172.30.0.0/16
 `
+	fakeMinimalInstallConfigYaml = `apiVersion: v1
+compute:
+- hyperthreading: Enabled
+  name: worker
+platform:
+  aws:
+    region: us-west-2
+`
 )
 
 func createTestBuilder() *Builder {
@@ -246,7 +254,8 @@ func TestBuildClusterResources(t *testing.T) {
 				require.NotNil(t, certSecret)
 				assert.Equal(t, certSecret.Name, cd.Spec.Platform.VSphere.CertificatesSecretRef.Name)
 			},
-		}, {
+		},
+		{
 			name: "merge InstallConfigTemplate",
 			builder: func() *Builder {
 				b := createAWSClusterBuilder()
@@ -265,6 +274,31 @@ func TestBuildClusterResources(t *testing.T) {
 
 				re := strings.NewReplacer("template.domain", baseDomain, "template-cluster-name", clusterName)
 				updatedYaml := re.Replace(fakeInstallConfigYaml)
+
+				assert.YAMLEq(t, updatedYaml, installConfigSecret.StringData["install-config.yaml"])
+			},
+		},
+		{
+			name: "merge MinimalInstallConfigTemplate",
+			builder: func() *Builder {
+				b := createAWSClusterBuilder()
+
+				b.Name = clusterName
+				b.BaseDomain = baseDomain
+				b.Namespace = namespace
+
+				b.InstallConfigTemplate = fakeMinimalInstallConfigYaml
+				yaml.Unmarshal([]byte(fakeMinimalInstallConfigYaml), b.InstallConfigTemplate)
+				return b
+			}(),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+
+				installConfigSecret := findSecret(allObjects, fmt.Sprintf("%s-install-config", clusterName))
+
+				updatedYaml := fakeMinimalInstallConfigYaml + fmt.Sprintf(`baseDomain: %s
+metadata:
+  creationTimestamp: null
+  name: %s`, baseDomain, clusterName)
 
 				assert.YAMLEq(t, updatedYaml, installConfigSecret.StringData["install-config.yaml"])
 			},

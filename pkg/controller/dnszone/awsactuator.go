@@ -650,16 +650,23 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 
 	if err == nil {
 		cloudErrorsCondsChanged = a.setCloudErrorsConditionToFalse()
+		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()
+		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
+		return accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged
 	}
+
+	// handle AWS vs non-AWS specific errors
 	awsErr, ok := err.(awserr.Error)
+
+	// non-AWS err
 	if !ok {
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()
 		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
-	}
-	if accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged {
-		return true
+		cloudErrorsCondsChanged = a.setCloudErrorsConditionToTrue(err)
+		return accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged
 	}
 
+	// AWS err condition handling
 	if awsErr.Code() == "AccessDeniedException" || awsErr.Code() == "AccessDenied" {
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr.Message())
 	} else {

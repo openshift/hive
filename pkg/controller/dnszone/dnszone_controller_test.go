@@ -901,53 +901,120 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	cases := []struct {
-		name            string
-		dnsZone         *hivev1.DNSZone
-		error           error
-		expectCondition *hivev1.DNSZoneCondition
+		name             string
+		dnsZone          *hivev1.DNSZone
+		error            error
+		expectConditions []hivev1.DNSZoneCondition
 	}{
 		{
 			name:    "Set InsufficientCredentialsCondition on DNSZone for AccessDeniedException error",
 			dnsZone: validDNSZone(),
 			error:   testAccessDeniedExceptionError(),
-			expectCondition: &hivev1.DNSZoneCondition{
-				Type:    hivev1.InsufficientCredentialsCondition,
-				Status:  corev1.ConditionTrue,
-				Reason:  accessDeniedReason,
-				Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+			expectConditions: []hivev1.DNSZoneCondition{
+				{
+					Type:    hivev1.InsufficientCredentialsCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  accessDeniedReason,
+					Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+				},
 			},
 		},
 		{
 			name:    "Set AuthenticationFailureCondition on DNSZone for UnrecognizedClientException error",
 			dnsZone: validDNSZone(),
 			error:   testUnrecognizedClientExceptionError(),
-			expectCondition: &hivev1.DNSZoneCondition{
-				Type:    hivev1.AuthenticationFailureCondition,
-				Status:  corev1.ConditionTrue,
-				Reason:  authenticationFailedReason,
-				Message: "The security token included in the request is invalid.",
+			expectConditions: []hivev1.DNSZoneCondition{
+				{
+					Type:    hivev1.AuthenticationFailureCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  authenticationFailedReason,
+					Message: "The security token included in the request is invalid.",
+				},
 			},
 		},
 		{
 			name:    "Set AuthenticationFailureCondition on DNSZone for InvalidSignatureException error",
 			dnsZone: validDNSZone(),
 			error:   testInvalidSignatureExceptionError(),
-			expectCondition: &hivev1.DNSZoneCondition{
-				Type:    hivev1.AuthenticationFailureCondition,
-				Status:  corev1.ConditionTrue,
-				Reason:  authenticationFailedReason,
-				Message: "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
+			expectConditions: []hivev1.DNSZoneCondition{
+				{
+					Type:    hivev1.AuthenticationFailureCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  authenticationFailedReason,
+					Message: "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
+				},
 			},
 		},
 		{
 			name:    "Set GenericDNSErrorsCondition on DNSZone",
 			dnsZone: validDNSZone(),
 			error:   testCloudError(),
-			expectCondition: &hivev1.DNSZoneCondition{
-				Type:    hivev1.GenericDNSErrorsCondition,
-				Status:  corev1.ConditionTrue,
-				Reason:  dnsCloudErrorReason,
-				Message: "ErrCodeKMSOptInRequired: The AWS Access Key Id needs a subscription for the service, status code: 403\ncaused by: some cloud error",
+			expectConditions: []hivev1.DNSZoneCondition{
+				{
+					Type:    hivev1.GenericDNSErrorsCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  dnsCloudErrorReason,
+					Message: "ErrCodeKMSOptInRequired: The AWS Access Key Id needs a subscription for the service, status code: 403\ncaused by: some cloud error",
+				},
+			},
+		},
+		{
+			name: "Clear conditions when no error",
+			dnsZone: func() *hivev1.DNSZone {
+				dz := validDNSZone()
+				dz.Status.Conditions = []hivev1.DNSZoneCondition{
+					{
+						Type:    hivev1.InsufficientCredentialsCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  accessDeniedReason,
+						Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+					},
+					{
+						Type:    hivev1.GenericDNSErrorsCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  dnsCloudErrorReason,
+						Message: "ErrCodeKMSOptInRequired: The AWS Access Key Id needs a subscription for the service, status code: 403\ncaused by: some cloud error",
+					},
+					{
+						Type:    hivev1.AuthenticationFailureCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  authenticationFailedReason,
+						Message: "The security token included in the request is invalid.",
+					},
+				}
+
+				return dz
+			}(),
+		},
+		{
+			name: "Process generic error",
+			dnsZone: func() *hivev1.DNSZone {
+				dz := validDNSZone()
+				dz.Status.Conditions = []hivev1.DNSZoneCondition{
+					{
+						Type:    hivev1.InsufficientCredentialsCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  accessDeniedReason,
+						Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+					},
+					{
+						Type:    hivev1.AuthenticationFailureCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  authenticationFailedReason,
+						Message: "The security token included in the request is invalid.",
+					},
+				}
+
+				return dz
+			}(),
+			error: fmt.Errorf("Just some generic error here"),
+			expectConditions: []hivev1.DNSZoneCondition{
+				{
+					Type:    hivev1.GenericDNSErrorsCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  dnsCloudErrorReason,
+					Message: "Just some generic error here",
+				},
 			},
 		},
 	}
@@ -973,18 +1040,26 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 			zr.SetConditionsForError(tc.error)
 
 			// Assert
-			if tc.expectCondition != nil {
-				for _, cond := range zr.dnsZone.Status.Conditions {
-					assert.Equal(t, cond.Type, tc.expectCondition.Type)
-					assert.Equal(t, cond.Status, tc.expectCondition.Status)
-					assert.Equal(t, cond.Reason, tc.expectCondition.Reason)
-					assert.Equal(t, cond.Message, tc.expectCondition.Message)
-				}
+			if tc.expectConditions != nil {
+				assertDNSZoneConditions(t, zr.dnsZone, tc.expectConditions)
 			} else {
-				// Assuming if you didn't expect a condition, there shouldn't be any.
-				assert.Equal(t, 0, len(zr.dnsZone.Status.Conditions))
+				// Assuming if you didn't expect a condition, there shouldn't be any set to True.
+				for _, cond := range zr.dnsZone.Status.Conditions {
+					assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				}
 			}
 		})
+	}
+}
+
+func assertDNSZoneConditions(t *testing.T, dnsZone *hivev1.DNSZone, expectedConditions []hivev1.DNSZoneCondition) {
+	assert.LessOrEqual(t, len(expectedConditions), len(dnsZone.Status.Conditions), "some conditions are not present")
+	for _, expectedCond := range expectedConditions {
+		condition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, expectedCond.Type)
+		if assert.NotNilf(t, condition, "did not find expected condition type: %v", expectedCond.Type) {
+			assert.Equal(t, expectedCond.Status, condition.Status, "condition found with unexpected status")
+			assert.Equal(t, expectedCond.Reason, condition.Reason, "condition found with unexpected reason")
+		}
 	}
 }
 

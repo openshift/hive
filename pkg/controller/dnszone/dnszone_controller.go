@@ -185,8 +185,8 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 		return reconcile.Result{}, nil
 	}
 
-	actuator, err := r.getActuator(desiredState, dnsLog)
-	if err != nil {
+	actuator, actErr := r.getActuator(desiredState, dnsLog)
+	if actErr != nil {
 		// Handle an edge case here where if the DNSZone has been deleted, it has its finalizer, the actuator couldn't be
 		// created (presumably because creds secret is absent), and our namespace is terminated, we know we've entered a bad state
 		// where we must give up and remove the finalizer. A followup fix should prevent this problem from
@@ -214,18 +214,18 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 				// This returns whether there was an error or not.
 				// This is desired so that on success, this dnszone is NOT requeued. Falling through
 				// would cause a requeue because of the actuator erroring.
-				return reconcile.Result{}, err
+				return reconcile.Result{}, actErr
 			}
 		}
 
-		dnsLog.WithError(err).Error("error instantiating actuator")
+		dnsLog.WithError(actErr).Error("error instantiating actuator")
 		var changed bool
 		desiredState.Status.Conditions, changed = controllerutils.SetDNSZoneConditionWithChangeCheck(
 			desiredState.Status.Conditions,
 			hivev1.GenericDNSErrorsCondition,
 			corev1.ConditionTrue,
 			"ActuatorNotInitialized",
-			"error instantiating actuator: "+controllerutils.ErrorScrub(err),
+			"error instantiating actuator: "+controllerutils.ErrorScrub(actErr),
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
 		if changed {
 			if err := r.Status().Update(context.Background(), desiredState); err != nil {

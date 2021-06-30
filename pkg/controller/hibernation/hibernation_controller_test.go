@@ -195,7 +195,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
-				assert.Equal(t, "Some machines have not yet stopped: pending-1,running-1,stopping-1", cond.Message)
+				assert.Equal(t, "Stopping cluster machines. Some machines have not yet stopped: pending-1,running-1,stopping-1", cond.Message)
 			},
 		},
 		{
@@ -283,7 +283,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
-				assert.Equal(t, "Some machines are not yet running: pending-1,stopped-1", cond.Message)
+				assert.Equal(t, "Starting cluster machines. Some machines are not yet running: pending-1,stopped-1", cond.Message)
 			},
 		},
 		{

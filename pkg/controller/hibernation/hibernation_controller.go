@@ -346,7 +346,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		}
 
 		sort.Strings(remaining) // we want to make sure the message is stable.
-		msg := fmt.Sprintf("Some machines have not yet stopped: %s", strings.Join(remaining, ","))
+		msg := fmt.Sprintf("Stopping cluster machines. Some machines have not yet stopped: %s", strings.Join(remaining, ","))
 		_, condErr := r.setHibernatingCondition(cd, hivev1.StoppingHibernationReason, msg, corev1.ConditionTrue, logger)
 		if condErr != nil {
 			return reconcile.Result{}, condErr
@@ -379,7 +379,7 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		}
 
 		sort.Strings(remaining) // we want to make sure the message is stable.
-		msg := fmt.Sprintf("Some machines are not yet running: %s", strings.Join(remaining, ","))
+		msg := fmt.Sprintf("Starting cluster machines. Some machines are not yet running: %s", strings.Join(remaining, ","))
 		_, condErr := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, msg, corev1.ConditionTrue, logger)
 		if condErr != nil {
 			return reconcile.Result{}, condErr

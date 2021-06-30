@@ -181,9 +181,9 @@ func TestGCPMachinesStoppedAndRunning(t *testing.T) {
 			var result bool
 			switch test.testFunc {
 			case "MachinesStopped":
-				result, err = actuator.MachinesStopped(testClusterDeployment(), nil, log.New())
+				result, _, err = actuator.MachinesStopped(testClusterDeployment(), nil, log.New())
 			case "MachinesRunning":
-				result, err = actuator.MachinesRunning(testClusterDeployment(), nil, log.New())
+				result, _, err = actuator.MachinesRunning(testClusterDeployment(), nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}

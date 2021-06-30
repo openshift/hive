@@ -171,9 +171,9 @@ func TestAzureMachinesStoppedAndRunning(t *testing.T) {
 			var result bool
 			switch test.testFunc {
 			case "MachinesStopped":
-				result, err = actuator.MachinesStopped(testAzureClusterDeployment(), nil, log.New())
+				result, _, err = actuator.MachinesStopped(testAzureClusterDeployment(), nil, log.New())
 			case "MachinesRunning":
-				result, err = actuator.MachinesRunning(testAzureClusterDeployment(), nil, log.New())
+				result, _, err = actuator.MachinesRunning(testAzureClusterDeployment(), nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}

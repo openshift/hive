@@ -172,7 +172,7 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.shouldHibernate, o.stopping).Build(),
 			cs:   csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().MachinesStopped(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil)
+				actuator.EXPECT().MachinesStopped(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond := getHibernatingCondition(cd)
@@ -186,13 +186,16 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.shouldHibernate, o.stopping).Build(),
 			cs:   csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().MachinesStopped(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(false, nil)
+				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
+				actuator.EXPECT().MachinesStopped(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).
+					Return(false, []string{"running-1", "pending-1", "stopping-1"}, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				assert.Equal(t, "Some machines have not yet stopped: pending-1,running-1,stopping-1", cond.Message)
 			},
 		},
 		{
@@ -272,13 +275,15 @@ func TestReconcile(t *testing.T) {
 			cs:   csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
 				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
-				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(false, nil)
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).
+					Return(false, []string{"stopped-1", "pending-1"}, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, "Some machines are not yet running: pending-1,stopped-1", cond.Message)
 			},
 		},
 		{
@@ -286,7 +291,7 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.resuming).Build(),
 			cs:   csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil)
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
 				c := fake.NewFakeClientWithScheme(scheme, readyNodes()...)
@@ -304,7 +309,7 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.resuming).Build(),
 			cs:   csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil)
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
 				fakeClient := fake.NewFakeClientWithScheme(scheme, unreadyNode()...)
@@ -324,7 +329,7 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.resuming).Build(),
 			cs:   csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil)
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
 				fakeClient := fake.NewFakeClientWithScheme(scheme, unreadyNode()...)
@@ -512,7 +517,8 @@ func TestHibernateAfter(t *testing.T) {
 			name: "cluster waking from hibernate",
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
 				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
-				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(false, nil)
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).
+					Return(false, []string{"no-running-1", "no-running-2"}, nil)
 			},
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),

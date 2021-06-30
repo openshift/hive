@@ -95,35 +95,37 @@ func (a *awsActuator) StartMachines(cd *hivev1.ClusterDeployment, c client.Clien
 }
 
 // MachinesRunning will return true if the machines associated with the given
-// ClusterDeployment are in a running state.
-func (a *awsActuator) MachinesRunning(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, error) {
+// ClusterDeployment are in a running state. It also returns a list of machines that
+// are not running.
+func (a *awsActuator) MachinesRunning(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "aws")
 	logger.Infof("checking whether machines are running")
 	awsClient, err := a.awsClientFn(cd, c, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	instanceIDs, err := getClusterInstanceIDs(cd, awsClient, notRunningStates, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return len(instanceIDs) == 0, nil
+	return len(instanceIDs) == 0, aws.StringValueSlice(instanceIDs), nil
 }
 
 // MachinesStopped will return true if the machines associated with the given
-// ClusterDeployment are in a stopped state.
-func (a *awsActuator) MachinesStopped(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, error) {
+// ClusterDeployment are in a stopped state. It also returns a list of machines
+// that have not stopped.
+func (a *awsActuator) MachinesStopped(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "aws")
 	logger.Infof("checking whether machines are stopped")
 	awsClient, err := a.awsClientFn(cd, c, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	instanceIDs, err := getClusterInstanceIDs(cd, awsClient, notStoppedStates, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return len(instanceIDs) == 0, nil
+	return len(instanceIDs) == 0, aws.StringValueSlice(instanceIDs), nil
 }
 
 func getAWSClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {

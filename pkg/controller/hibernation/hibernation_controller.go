@@ -176,10 +176,6 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if !cd.Spec.Installed {
 		return reconcile.Result{}, nil
 	}
-	// If cluster is fake, set hibernating false and skip further processing
-	if controllerutils.IsFakeCluster(cd) {
-		return r.setHibernatingCondition(cd, hivev1.HibernatingHibernationReason, "Skipping hibernation for fake cluster", corev1.ConditionFalse, cdLog)
-	}
 
 	// set hibernating condition to false for unsupported clouds
 	if supported, msg := r.hibernationSupported(cd); !supported {
@@ -242,6 +238,14 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 			if time.Now().After(expiry) {
 				hibLog.WithField("expiry", expiry).Debug("cluster has been running longer than hibernate-after duration, moving to hibernating powerState")
 				cd.Spec.PowerState = hivev1.HibernatingClusterPowerState
+				if controllerutils.IsFakeCluster(cd) {
+					controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions,
+						hivev1.ClusterHibernatingCondition,
+						corev1.ConditionTrue,
+						hivev1.HibernatingHibernationReason,
+						"Fake cluster is stopped",
+						controllerutils.UpdateConditionNever)
+				}
 				err := r.Update(context.TODO(), cd)
 				if err != nil {
 					hibLog.WithError(err).Log(controllerutils.LogLevel(err), "error hibernating cluster")
@@ -272,6 +276,22 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		}
 		switch hibernatingCondition.Reason {
 		case hivev1.StoppingHibernationReason, hivev1.HibernatingHibernationReason, hivev1.FailedToStartHibernationReason:
+			if controllerutils.IsFakeCluster(cd) {
+				cd.Spec.PowerState = hivev1.RunningClusterPowerState
+				if controllerutils.IsFakeCluster(cd) {
+					controllerutils.SetClusterDeploymentCondition(cd.Status.Conditions,
+						hivev1.ClusterHibernatingCondition,
+						corev1.ConditionFalse,
+						hivev1.RunningHibernationReason,
+						"Fake cluster is running",
+						controllerutils.UpdateConditionNever)
+				}
+				err := r.Update(context.TODO(), cd)
+				if err != nil {
+					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error resuming cluster")
+				}
+				return reconcile.Result{}, err
+			}
 			return r.startMachines(cd, cdLog)
 		case hivev1.ResumingHibernationReason:
 			return r.checkClusterResumed(cd, cdLog)

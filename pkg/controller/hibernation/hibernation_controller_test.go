@@ -358,7 +358,7 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "skip hibernation for fake cluster",
+			name: "hibernate fake cluster",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(1*time.Hour),
 				testcd.InstalledTimestamp(time.Now().Add(-1*time.Hour)),
@@ -368,8 +368,21 @@ func TestReconcile(t *testing.T) {
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, "Fake cluster is stopped", cond.Message)
+			},
+		},
+		{
+			name: "start hibernated fake cluster",
+			cd:   cdBuilder.Options(o.hibernating, testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")).Build(),
+			cs:   csBuilder.Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, hivev1.RunningClusterPowerState, cd.Spec.PowerState)
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, "Skipping hibernation for fake cluster", cond.Message)
+				assert.Equal(t, "Fake cluster is running", cond.Message)
 			},
 		},
 	}
@@ -559,13 +572,39 @@ func TestHibernateAfter(t *testing.T) {
 			expectedPowerState: hivev1.HibernatingClusterPowerState,
 		},
 		{
-			name: "skip hibernation for fake cluster",
+			name: "fake cluster due for hibernate but syncsets not applied",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Minute),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 8*time.Minute)),
+				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true"),
+				testcd.InstalledTimestamp(time.Now().Add(-8*time.Minute))),
+			cs: csBuilder.Options(
+				testcs.WithNoFirstSuccessTime(),
+			).Build(),
+			expectError:        true,
+			expectedPowerState: "",
+			expectRequeueAfter: time.Duration(time.Minute * 2),
+		},
+		{
+			name: "fake cluster due for hibernate, syncsets successfully applied",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Hour),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 9*time.Hour)),
+				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true"),
+				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			cs: csBuilder.Options(
+				testcs.WithFirstSuccessTime(time.Now()),
+			).Build(),
+			expectedPowerState: hivev1.HibernatingClusterPowerState,
+		},
+		{
+			name: "hibernate fake cluster",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(1*time.Hour),
 				testcd.InstalledTimestamp(time.Now().Add(-1*time.Hour)),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")),
 			cs:                 csBuilder.Build(),
-			expectedPowerState: "",
+			expectedPowerState: hivev1.HibernatingClusterPowerState,
 		},
 	}
 

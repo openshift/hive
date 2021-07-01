@@ -1,4 +1,10 @@
-self_dir :=$(dir $(lastword $(MAKEFILE_LIST)))
+ifndef _YAML_PATCH_MK_
+_YAML_PATCH_MK_ := defined
+
+include $(addprefix $(dir $(lastword $(MAKEFILE_LIST))), \
+	../../lib/golang.mk \
+	../../lib/tmp.mk \
+)
 
 YAML_PATCH ?=$(PERMANENT_TMP_GOPATH)/bin/yaml-patch
 yaml_patch_dir :=$(dir $(YAML_PATCH))
@@ -22,11 +28,4 @@ clean-yaml-patch:
 
 clean: clean-yaml-patch
 
-
-# We need to be careful to expand all the paths before any include is done
-# or self_dir could be modified for the next include by the included file.
-# Also doing this at the end of the file allows us to use self_dir before it could be modified.
-include $(addprefix $(self_dir), \
-	../../lib/golang.mk \
-	../../lib/tmp.mk \
-)
+endif

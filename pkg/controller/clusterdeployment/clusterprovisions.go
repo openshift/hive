@@ -319,7 +319,7 @@ func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.Cluster
 	if failedCond != nil && failedCond.Status == corev1.ConditionTrue {
 		nextProvisionTime = calculateNextProvisionTime(failedCond.LastTransitionTime.Time, cd.Status.InstallRestarts, cdLog)
 		reason = failedCond.Reason
-		message = fmt.Sprintf("Provision %s failed. Next provision at %s.\n\n%s", provision.Name, nextProvisionTime.UTC().Format(time.RFC3339), failedCond.Message)
+		message = failedCond.Message
 	} else {
 		cdLog.Warnf("failed provision does not have a %s condition", hivev1.ClusterProvisionFailedCondition)
 	}

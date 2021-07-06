@@ -9,7 +9,7 @@ IMAGE_BUILD_EXTRA_FLAGS ?=
 # $3 - Dockerfile path
 # $4 - context
 define build-image-internal
-image-$(1):
+image-$(1): ensure-imagebuilder
 	$(strip \
 		imagebuilder \
 		$(IMAGE_BUILD_DEFAULT_FLAGS) \

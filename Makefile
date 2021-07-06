@@ -4,12 +4,12 @@ all: vendor update test build
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
-	lib/tmp.mk \
 	targets/openshift/controller-gen.mk \
 	targets/openshift/yq.mk \
 	targets/openshift/bindata.mk \
 	targets/openshift/deps.mk \
 	targets/openshift/images.mk \
+	targets/openshift/kustomize.mk \
 )
 
 DOCKER_CMD ?= docker
@@ -180,7 +180,7 @@ install: crd
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 .PHONY: deploy
-deploy: install
+deploy: ensure-kustomize install
 	# Deploy the operator manifests:
 	oc create namespace ${HIVE_OPERATOR_NS} || true
 	mkdir -p overlays/deploy

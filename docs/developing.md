@@ -10,7 +10,6 @@
     - [Cloning the repository](#cloning-the-repository)
   - [Deploying with Kubernetes In Docker (kind)](#deploying-with-kubernetes-in-docker-kind)
   - [Deploying with kind and Podman (EXPERIMENTAL)](#deploying-with-kind-and-podman-experimental)
-  - [Adopting ClusterDeployments](#adopting-clusterdeployments)
   - [Writing/Testing Code](#writingtesting-code)
     - [Run Hive Operator](#run-hive-operator)
       - [Directly from source](#directly-from-source)
@@ -261,24 +260,6 @@ NOTE: The cluster name and domain used to create the certificate must match the 
 
 Example:
 `hiveutil create-cluster mycluster --serving-cert=$HOME/mycluster.crt --serving-cert-key=$HOME/mycluster.key`
-
-## Adopting ClusterDeployments
-
-It is possible to adopt cluster deployments into Hive, potentially even fake or kind clusters. This can be useful for developers who would like to work on functionality separate from actual provisioning.
-
-To create a kind cluster and adopt:
-
-```bash
-./hack/create-kind-cluster.sh cluster1
-bin/hiveutil create-cluster --base-domain=new-installer.openshift.com kind-cluster1 --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=fakeinfra --adopt-cluster-id=fakeid
-```
-
-NOTE: when using a kind cluster not all controllers will be functioning properly as it is not an OpenShift cluster and thus lacks some of the CRDs our controllers use. (ClusterState, RemoteMachineSet, etc)
-
-Alternatively you can use any valid kubeconfig for live or since deleted clusters.
-
-Deprovision will run but find nothing to delete if no resources are tagged with your fake infrastructure ID.
-
 
 ## Code editors and multi-module repositories
 

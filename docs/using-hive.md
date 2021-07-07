@@ -27,6 +27,9 @@
     - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
     - [Access the Web Console](#access-the-web-console)
   - [Managed DNS](#managed-dns-1)
+  - [Cluster Adoption](#cluster-adoption)
+    - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
+    - [Adopting with hiveutil](#adopting-with-hiveutil)
   - [Configuration Management](#configuration-management)
     - [SyncSet](#syncset)
     - [Scaling ClusterSync](#scaling-clustersync)
@@ -133,7 +136,7 @@ Hive requires credentials to the cloud account into which it will install OpenSh
 
 #### AWS
 
-Create a `secret` containing your AWS access key and secret access key:  
+Create a `secret` containing your AWS access key and secret access key:
 
 ```bash
 oc create secret generic <mycluster>-aws-creds -n hive --from-literal=aws_access_key_id=<AWS_ACCESS_KEY_ID> --from-literal=aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
@@ -460,14 +463,14 @@ oc create secret generic mycluster-ovirt-certs -n mynamespace --from-file=.cacer
 
 For vSphere, replace the contents of `spec.platform` with:
 ```yaml
-vsphere:                                                                    
-  certificatesSecretRef:         
+vsphere:
+  certificatesSecretRef:
     name: mycluster-vsphere-certs
   cluster: devel
-  credentialsSecretRef:                                                     
+  credentialsSecretRef:
     name: mycluster-vsphere-creds
   datacenter: dc1
-  defaultDatastore: ds1     
+  defaultDatastore: ds1
   folder: /dc1/vm/CLUSTER_NAME
   network: "VM Network"
   vCenter: vsphere.example.com
@@ -796,6 +799,50 @@ Hive will then:
   1. Wait for the SOA record for the new domain to be resolvable, indicating that DNS is functioning.
   1. Launch the install, which will create DNS entries for the new cluster ("\*.apps.mycluster.mydomain.hive.example.com", "api.mycluster.mydomain.hive.example.com", etc) in the new mydomain.hive.example.com DNS zone.
 
+## Cluster Adoption
+
+It is possible to adopt cluster deployments into Hive. To do so you will need to create a ClusterDeployment with Spec.Installed set to True, no Spec.Provisioning section, and include the following:
+
+  * cluster INFRAID (obtained from `oc get infrastructure cluster -o json | jq .status.infrastructureName`)
+  * cluster ID (obtained from `oc get clusterversion version -o json | jq .spec.clusterID`)
+  * reference to a properly formatted admin kubeconfig Secret:  `oc create secret generic mycluster-admin-kubeconfig --from-file=kubeconfig=/tmp/admin.kubeconfig`
+  * Spec.Platform.YourCloudProvider for your cluster, most importantly region and a properly formatted credentials Secret
+
+Use `Spec.PreserveOnDelete = true` if you do not want Hive to deprovision resources when the ClusterDeployment is deleted.
+
+### Example Adoption ClusterDeployment
+
+```yaml
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeployment
+metadata:
+  name: my-gcp-cluster
+  namespace: hive
+spec:
+  baseDomain: gcp.example.com
+  clusterMetadata:
+    adminKubeconfigSecretRef:
+      name: my-gcp-cluster-admin-kubeconfig
+    clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
+    infraID: my-gcp-cluster-wsvdn
+  clusterName: my-gcp-cluster
+  installed: true
+  platform:
+    gcp:
+      credentialsSecretRef:
+        name: my-gcp-creds
+      region: us-east1
+  pullSecretRef:
+    name: pull-secret
+```
+
+### Adopting with hiveutil
+
+[hiveutil](hiveutil.md) is a development focused CLI tool which can be built from the hive repo. To adopt a cluster specify the following flags:
+
+```bash
+bin/hiveutil create-cluster --base-domain=example.com mycluster --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=[INFRAID] --adopt-cluster-id=[CLUSTERID]
+```
 
 ## Configuration Management
 

@@ -3,6 +3,8 @@ package hibernation
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -39,10 +41,10 @@ const (
 
 	// stateCheckInterval is the time interval for polling
 	// whether a cluster's machines are stopped or are running
-	stateCheckInterval = 60 * time.Second
+	stateCheckInterval = 1 * time.Minute
 
 	// csrCheckInterval is the time interval for polling
-	// pending CSRs
+	// pending CertificateSigningRequests
 	csrCheckInterval = 30 * time.Second
 
 	// nodeCheckWaitTime is the minimum time to wait for a node
@@ -350,14 +352,29 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		logger.Warning("No compatible actuator found to check machine status")
 		return reconcile.Result{}, nil
 	}
-	stopped, err := actuator.MachinesStopped(cd, r.Client, logger)
+
+	stopped, remaining, err := actuator.MachinesStopped(cd, r.Client, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether machines are stopped.")
 		return reconcile.Result{}, err
 	}
 	if !stopped {
+		// Ensure all machines have been stopped. Should have been handled already but we've seen VMs left in running state.
+		if err := actuator.StopMachines(cd, r.Client, logger); err != nil {
+			logger.WithError(err).Error("error stopping machines")
+			return reconcile.Result{}, err
+		}
+
+		sort.Strings(remaining) // we want to make sure the message is stable.
+		msg := fmt.Sprintf("Stopping cluster machines. Some machines have not yet stopped: %s", strings.Join(remaining, ","))
+		_, condErr := r.setHibernatingCondition(cd, hivev1.StoppingHibernationReason, msg, corev1.ConditionTrue, logger)
+		if condErr != nil {
+			return reconcile.Result{}, condErr
+		}
+
 		return reconcile.Result{RequeueAfter: stateCheckInterval}, nil
 	}
+
 	logger.Info("Cluster has stopped and is in hibernating state")
 	return r.setHibernatingCondition(cd, hivev1.HibernatingHibernationReason, "Cluster is stopped", corev1.ConditionTrue, logger)
 }
@@ -368,7 +385,8 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		logger.Warning("No compatible actuator found to check machine status")
 		return reconcile.Result{}, nil
 	}
-	running, err := actuator.MachinesRunning(cd, r.Client, logger)
+
+	running, remaining, err := actuator.MachinesRunning(cd, r.Client, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether machines are running.")
 		return reconcile.Result{}, err
@@ -379,8 +397,17 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 			logger.WithError(err).Error("error starting machines")
 			return reconcile.Result{}, err
 		}
+
+		sort.Strings(remaining) // we want to make sure the message is stable.
+		msg := fmt.Sprintf("Starting cluster machines. Some machines are not yet running: %s", strings.Join(remaining, ","))
+		_, condErr := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, msg, corev1.ConditionTrue, logger)
+		if condErr != nil {
+			return reconcile.Result{}, condErr
+		}
+
 		return reconcile.Result{RequeueAfter: stateCheckInterval}, nil
 	}
+
 	remoteClient, err := r.remoteClientBuilder(cd).Build()
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to connect to target cluster")

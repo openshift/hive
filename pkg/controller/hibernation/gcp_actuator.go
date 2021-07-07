@@ -95,33 +95,35 @@ func (a *gcpActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient cli
 }
 
 // MachinesRunning will return true if the machines associated with the given
-// ClusterDeployment are in a running state.
-func (a *gcpActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, error) {
+// ClusterDeployment are in a running state. It also returns a list of machines that
+// are not running.
+func (a *gcpActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "GCP")
 	gcpClient, err := a.getGCPClientFn(cd, hiveClient, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	instances, err := gcpListComputeInstances(gcpClient, cd, gcpNotRunningStatuses, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return len(instances) == 0, nil
+	return len(instances) == 0, instanceNames(instances), nil
 }
 
 // MachinesStopped will return true if the machines associated with the given
-// ClusterDeployment are in a stopped state.
-func (a *gcpActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, error) {
+// ClusterDeployment are in a stopped state. It also returns a list of machines
+// that have not stopped.
+func (a *gcpActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "GCP")
 	gcpClient, err := a.getGCPClientFn(cd, hiveClient, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	instances, err := gcpListComputeInstances(gcpClient, cd, gcpNotStoppedStatuses, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return len(instances) == 0, nil
+	return len(instances) == 0, instanceNames(instances), nil
 }
 
 func getGCPClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (gcpclient.Client, error) {
@@ -163,4 +165,12 @@ func gcpListComputeInstances(gcpClient gcpclient.Client, cd *hivev1.ClusterDeplo
 		logger.WithField("count", len(instances)).WithField("statuses", statuses.List()).Debug("found instances")
 	}
 	return instances, err
+}
+
+func instanceNames(instances []*compute.Instance) []string {
+	ret := make([]string, len(instances))
+	for i, instance := range instances {
+		ret[i] = instance.Name
+	}
+	return ret
 }

@@ -78,12 +78,13 @@ func (mr *MockHibernationActuatorMockRecorder) StartMachines(cd, hiveClient, log
 }
 
 // MachinesRunning mocks base method
-func (m *MockHibernationActuator) MachinesRunning(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) (bool, error) {
+func (m *MockHibernationActuator) MachinesRunning(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) (bool, []string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MachinesRunning", cd, hiveClient, logger)
 	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].([]string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // MachinesRunning indicates an expected call of MachinesRunning
@@ -93,12 +94,13 @@ func (mr *MockHibernationActuatorMockRecorder) MachinesRunning(cd, hiveClient, l
 }
 
 // MachinesStopped mocks base method
-func (m *MockHibernationActuator) MachinesStopped(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) (bool, error) {
+func (m *MockHibernationActuator) MachinesStopped(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) (bool, []string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MachinesStopped", cd, hiveClient, logger)
 	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].([]string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // MachinesStopped indicates an expected call of MachinesStopped

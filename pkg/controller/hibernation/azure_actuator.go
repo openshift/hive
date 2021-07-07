@@ -106,33 +106,35 @@ func (a *azureActuator) StartMachines(cd *hivev1.ClusterDeployment, c client.Cli
 }
 
 // MachinesRunning will return true if the machines associated with the given
-// ClusterDeployment are in a running state.
-func (a *azureActuator) MachinesRunning(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, error) {
+// ClusterDeployment are in a running state. It also returns a list of machines that
+// are not running.
+func (a *azureActuator) MachinesRunning(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "azure")
 	azureClient, err := a.azureClientFn(cd, c, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	machines, err := listAzureMachines(cd, azureClient, azureNotRunningStates, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return len(machines) == 0, nil
+	return len(machines) == 0, azureMachineNames(machines), nil
 }
 
 // MachinesStopped will return true if the machines associated with the given
-// ClusterDeployment are in a stopped state.
-func (a *azureActuator) MachinesStopped(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, error) {
+// ClusterDeployment are in a stopped state. It also returns a list of machines
+// that have not stopped.
+func (a *azureActuator) MachinesStopped(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "azure")
 	azureClient, err := a.azureClientFn(cd, c, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	machines, err := listAzureMachines(cd, azureClient, azureNotStoppedStates, logger)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
-	return len(machines) == 0, nil
+	return len(machines) == 0, azureMachineNames(machines), nil
 }
 
 func listAzureMachines(cd *hivev1.ClusterDeployment, azureClient azureclient.Client, states sets.String, logger log.FieldLogger) ([]compute.VirtualMachine, error) {

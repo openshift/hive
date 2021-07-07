@@ -20,9 +20,11 @@ type HibernationActuator interface {
 	// StartMachines will select machines belonging to the given ClusterDeployment
 	StartMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error
 	// MachinesRunning will return true if the machines associated with the given
-	// ClusterDeployment are in a running state.
-	MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, error)
+	// ClusterDeployment are in a running state. It also returns a list of machines that
+	// are not running.
+	MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error)
 	// MachinesStopped will return true if the machines associated with the given
-	// ClusterDeployment are in a stopped state.
-	MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, error)
+	// ClusterDeployment are in a stopped state. it also returns a list of machines
+	// that have not stopped.
+	MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error)
 }

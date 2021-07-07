@@ -252,12 +252,31 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	}
 
 	cd := &hivev1.ClusterDeployment{}
-	switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {
-	case apierrors.IsNotFound(err):
+	err = r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd)
+	if shouldReconcileForDeletedCluster(err, cd) {
 		return r.reconcileForDeletedCluster(claim, logger)
-	case err != nil:
+	}
+	// shouldReconcileForDeletedCluster already took IsNotFound into account. Any other error is bad.
+	if err != nil {
 		logger.Log(controllerutils.LogLevel(err), "error getting ClusterDeployment")
 		return reconcile.Result{}, err
+	}
+
+	logger.Debug("ensuring ClusterDeleted condition is set to False")
+	conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
+		claim.Status.Conditions,
+		hivev1.ClusterClaimClusterDeletedCondition,
+		corev1.ConditionFalse,
+		"ClusterNotDeleted",
+		"Assigned cluster has not been deleted",
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if changed {
+		claim.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), claim); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status")
+			return reconcile.Result{}, err
+		}
 	}
 
 	switch cd.Spec.ClusterPoolRef.ClaimName {
@@ -268,6 +287,28 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	default:
 		return r.reconcileForAssignmentConflict(claim, logger)
 	}
+}
+
+func shouldReconcileForDeletedCluster(err error, cd *hivev1.ClusterDeployment) bool {
+	// This reports properly (false) for a nil error
+	if apierrors.IsNotFound(err) {
+		// The CD is already gone
+		return true
+	}
+	if err != nil {
+		// Any other error will be handled by the caller
+		return false
+	}
+	if cd.DeletionTimestamp != nil {
+		// Marked for deletion
+		return true
+	}
+	if controllerutils.IsClaimedClusterMarkedForRemoval(cd) {
+		// Annotated for removal
+		return true
+	}
+	// Common case: no error and a healthy CD
+	return false
 }
 
 // getClaimLifetime returns the lifetime for a claim taking into account the lifetime set on the pool

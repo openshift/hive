@@ -98,6 +98,11 @@ func WithAnnotation(key, value string) Option {
 	return Generic(generic.WithAnnotation(key, value))
 }
 
+// WithDeletionTimestamp sets a non-nil deletionTimestamp on the object.
+func WithDeletionTimestamp() Option {
+	return Generic(generic.WithDeletionTimestamp())
+}
+
 // WithCondition adds the specified condition to the ClusterDeployment
 func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {

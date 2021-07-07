@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
@@ -94,6 +95,26 @@ func TestReconcileClusterClaim(t *testing.T) {
 			}
 		},
 	)
+	claimedResumingNotDeleted := []hivev1.ClusterClaimCondition{
+		{
+			Type:    hivev1.ClusterClaimPendingCondition,
+			Status:  corev1.ConditionFalse,
+			Reason:  "ClusterClaimed",
+			Message: "Cluster claimed",
+		},
+		{
+			Type:    hivev1.ClusterRunningCondition,
+			Status:  corev1.ConditionFalse,
+			Reason:  "Resuming",
+			Message: "Waiting for cluster to be running",
+		},
+		{
+			Type:    hivev1.ClusterClaimClusterDeletedCondition,
+			Status:  corev1.ConditionFalse,
+			Reason:  "ClusterNotDeleted",
+			Message: "Assigned cluster has not been deleted",
+		},
+	}
 
 	tests := []struct {
 		name                                   string
@@ -143,20 +164,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				)),
 			expectCompletedClaim: true,
 			expectRBAC:           true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 		},
 		{
 			name:  "existing assignment",
@@ -170,20 +178,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			expectCompletedClaim: true,
 			expectRBAC:           true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 		},
 		{
 			name:               "assignment conflict",
@@ -209,6 +204,35 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
+			name:  "cluster marked for deletion",
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithDeletionTimestamp()),
+			expectedConditions: []hivev1.ClusterClaimCondition{{
+				Type:    hivev1.ClusterClaimClusterDeletedCondition,
+				Status:  corev1.ConditionTrue,
+				Reason:  "ClusterDeleted",
+				Message: "Assigned cluster has been deleted",
+			}},
+			expectCompletedClaim: true,
+		},
+		{
+			name:  "cluster annotated to be removed from pool",
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+				testcd.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "True")),
+			expectedConditions: []hivev1.ClusterClaimCondition{{
+				Type:    hivev1.ClusterClaimClusterDeletedCondition,
+				Status:  corev1.ConditionTrue,
+				Reason:  "ClusterDeleted",
+				Message: "Assigned cluster has been deleted",
+			}},
+			expectCompletedClaim:                   true,
+			expectAssignedClusterDeploymentDeleted: true,
+		},
+		{
 			name: "new assignment clears pending condition",
 			claim: initializedClaimBuilder.Build(
 				testclaim.WithCluster(clusterName),
@@ -227,21 +251,8 @@ func TestReconcileClusterClaim(t *testing.T) {
 				}),
 			),
 			expectCompletedClaim: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
-			expectRBAC: true,
+			expectedConditions:   claimedResumingNotDeleted,
+			expectRBAC:           true,
 		},
 		{
 			name: "deleted claim with no assignment",
@@ -325,20 +336,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				}),
 			),
 			expectCompletedClaim: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 		},
 		{
 			name:  "update existing role",
@@ -359,20 +357,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			},
 			expectCompletedClaim: true,
 			expectRBAC:           true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 		},
 		{
 			name:  "update existing rolebinding",
@@ -394,20 +379,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			},
 			expectCompletedClaim: true,
 			expectRBAC:           true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 		},
 		{
 			name:  "new assignment bring cluster out of hibernation",
@@ -423,20 +395,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectCompletedClaim: true,
 			expectRBAC:           true,
 			expectHibernating:    false,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 		},
 		{
 			name:  "existing assignment does not change power state",
@@ -452,20 +411,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectCompletedClaim: true,
 			expectRBAC:           true,
 			expectHibernating:    true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 		},
 		{
 			name: "claim with elapsed lifetime is deleted",
@@ -629,20 +575,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testRoleBinding(),
 			},
 			expectCompletedClaim: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectedConditions:   claimedResumingNotDeleted,
 			expectRBAC:           true,
 			expectedRequeueAfter: func(d time.Duration) *time.Duration { return &d }(2 * time.Hour),
 		},

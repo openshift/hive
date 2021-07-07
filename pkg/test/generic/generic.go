@@ -69,6 +69,14 @@ func WithAnnotation(key, value string) Option {
 	}
 }
 
+// WithDeletionTimestamp sets a non-nil deletionTimestamp on the object.
+func WithDeletionTimestamp() Option {
+	return func(meta hivev1.MetaRuntimeObject) {
+		stamp := metav1.Now()
+		meta.SetDeletionTimestamp(&stamp)
+	}
+}
+
 // WithControllerOwnerReference sets the controller owner reference to the supplied object.
 func WithControllerOwnerReference(owner metav1.Object) Option {
 	return func(meta hivev1.MetaRuntimeObject) {

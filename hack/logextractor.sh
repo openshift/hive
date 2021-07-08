@@ -4,8 +4,8 @@
 set -e
 
 if [ $# -eq 0 ]; then
-  echo "Usage: $(basename $0) ls <extra options to append to aws command>"
-  echo "Usage: $(basename $0) sync <s3_log_dir> <extra options to append to aws command>"
+  echo "Usage: $(basename $0) [--backplane] ls <extra options to append to aws command>"
+  echo "Usage: $(basename $0) [--backplane] sync <s3_log_dir> <extra options to append to aws command>"
   echo
   echo "ls lists the directories in s3 that contain install logs"
   echo "sync downloads the specified files in the specified s3_log_dir"
@@ -18,6 +18,13 @@ if [ $# -eq 0 ]; then
   echo "  $(basename $0) sync cluster1-6a85a345-cd5 /tmp/logs"
   echo
   exit 5
+fi
+
+# optionally run privileged commands via backplane elevation if needed
+backplane_arg=""
+if [ $1 == "--backplane" ]; then
+  backplane_arg="--as backplane-cluster-admin"
+  shift
 fi
 
 hiveconfig=$(oc get hiveconfig hive -o json)
@@ -49,7 +56,7 @@ if [ -z "$hive_ns" -o "$hive_ns" == "null" ] ; then
   hive_ns="hive" # default hive namespace to "hive"
 fi
 
-credentials_secret=$(oc get secret -n "$hive_ns" -o json "$secret_name")
+credentials_secret=$(oc get secret -n "$hive_ns" -o json "$secret_name" $backplane_arg)
 if [ -z "$credentials_secret" -o "$credentials_secret" == "null" ] ; then
   echo "Error: Unable to retrieve credentials secret [$secret_name]."
   exit 10

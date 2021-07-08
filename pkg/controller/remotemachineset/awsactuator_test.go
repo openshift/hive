@@ -31,6 +31,10 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
+const (
+	fakeKMSKeyARN = "fakearn"
+)
+
 func TestAWSActuator(t *testing.T) {
 	tests := []struct {
 		name                         string
@@ -42,6 +46,7 @@ func TestAWSActuator(t *testing.T) {
 		expectedSubnetIDInMachineSet bool
 		expectedErr                  bool
 		expectedCondition            *hivev1.MachinePoolCondition
+		expectedKMSKey               string
 	}{
 		{
 			name:              "generate single machineset for single zone",
@@ -268,6 +273,21 @@ func TestAWSActuator(t *testing.T) {
 			},
 		},
 		{
+			name:              "kms key disk encryption",
+			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				withKMSKey(testMachinePool()),
+			},
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeAvailabilityZones(client, []string{"zone1"})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 3,
+			},
+			expectedKMSKey: fakeKMSKeyARN,
+		},
+		{
 			name:              "unsupported configuration condition cleared",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.4.0"),
 			poolName:          testMachinePool().Name,
@@ -339,7 +359,7 @@ func TestAWSActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet)
+				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey)
 			}
 			if test.expectedCondition != nil {
 				cond := controllerutils.FindMachinePoolCondition(pool.Status.Conditions, test.expectedCondition.Type)
@@ -389,7 +409,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 }
 
-func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool) {
+func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -406,6 +426,8 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 		if assert.NotNil(t, awsProvider.AMI.ID, "missing AMI ID") {
 			assert.Equal(t, testAMI, *awsProvider.AMI.ID, "unexpected AMI ID")
 		}
+
+		assert.Equal(t, expectedKMSKey, *awsProvider.BlockDevices[0].EBS.KMSKey.ARN)
 
 		if expectedSubnetID {
 			providerConfig := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
@@ -549,5 +571,10 @@ func encodeAWSMachineProviderSpec(awsProviderSpec *awsprovider.AWSMachineProvide
 
 func withSpotMarketOptions(pool *hivev1.MachinePool) *hivev1.MachinePool {
 	pool.Spec.Platform.AWS.SpotMarketOptions = &awshivev1.SpotMarketOptions{}
+	return pool
+}
+
+func withKMSKey(pool *hivev1.MachinePool) *hivev1.MachinePool {
+	pool.Spec.Platform.AWS.EC2RootVolume.KMSKeyARN = fakeKMSKeyARN
 	return pool
 }

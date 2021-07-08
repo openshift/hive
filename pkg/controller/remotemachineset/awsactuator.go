@@ -137,9 +137,10 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		AMIID:        a.amiID,
 		InstanceType: pool.Spec.Platform.AWS.InstanceType,
 		EC2RootVolume: installertypesaws.EC2RootVolume{
-			IOPS: pool.Spec.Platform.AWS.EC2RootVolume.IOPS,
-			Size: pool.Spec.Platform.AWS.EC2RootVolume.Size,
-			Type: pool.Spec.Platform.AWS.EC2RootVolume.Type,
+			IOPS:      pool.Spec.Platform.AWS.EC2RootVolume.IOPS,
+			Size:      pool.Spec.Platform.AWS.EC2RootVolume.Size,
+			Type:      pool.Spec.Platform.AWS.EC2RootVolume.Type,
+			KMSKeyARN: pool.Spec.Platform.AWS.EC2RootVolume.KMSKeyARN,
 		},
 		Zones: pool.Spec.Platform.AWS.Zones,
 	}

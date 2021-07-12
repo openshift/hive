@@ -65,6 +65,7 @@ type Client interface {
 	DescribeRouteTables(*ec2.DescribeRouteTablesInput) (*ec2.DescribeRouteTablesOutput, error)
 	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
 	StopInstances(*ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error)
+	TerminateInstances(*ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error)
 	StartInstances(*ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error)
 	CreateVpcEndpointServiceConfiguration(*ec2.CreateVpcEndpointServiceConfigurationInput) (*ec2.CreateVpcEndpointServiceConfigurationOutput, error)
 	DescribeVpcEndpointServiceConfigurations(*ec2.DescribeVpcEndpointServiceConfigurationsInput) (*ec2.DescribeVpcEndpointServiceConfigurationsOutput, error)
@@ -141,6 +142,11 @@ func (c *awsClient) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.D
 func (c *awsClient) StopInstances(input *ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error) {
 	metricAWSAPICalls.WithLabelValues("StopInstances").Inc()
 	return c.ec2Client.StopInstances(input)
+}
+
+func (c *awsClient) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
+	metricAWSAPICalls.WithLabelValues("TerminateInstances").Inc()
+	return c.ec2Client.TerminateInstances(input)
 }
 
 func (c *awsClient) StartInstances(input *ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error) {

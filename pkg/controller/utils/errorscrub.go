@@ -5,8 +5,11 @@ import (
 )
 
 var (
+	newlineTabRE = regexp.MustCompile(`\n\t`)
+	// aws
 	awsRequestIDRE = regexp.MustCompile(`(, )*(?i)(request id: )(?:[-[:xdigit:]]+)`)
-	newlineTabRE   = regexp.MustCompile(`(\n\t)`)
+	// azure
+	azureErrorDescriptionRE = regexp.MustCompile(`\"error_description\":\"(.*?)\\r\\n`)
 )
 
 // ErrorScrub scrubs cloud error messages destined for CRD status to remove things that
@@ -17,5 +20,10 @@ func ErrorScrub(err error) string {
 	}
 	s := newlineTabRE.ReplaceAllString(err.Error(), ", ")
 	s = awsRequestIDRE.ReplaceAllString(s, "")
+	// if Azure error, return just the error description
+	match := azureErrorDescriptionRE.FindStringSubmatch(s)
+	if len(match) > 0 {
+		return match[1]
+	}
 	return s
 }

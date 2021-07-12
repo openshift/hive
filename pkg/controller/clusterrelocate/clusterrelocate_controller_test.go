@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -831,7 +832,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 		destResources                     []runtime.Object
 		expectedError                     bool
 		expectedRelocateStatus            hivev1.RelocateStatus
-		expectedDeletionTimestamp         bool
+		expectDeleted                     bool
 		expectedRelocationFailedCondition *hivev1.ClusterDeploymentCondition
 		validate                          func(t *testing.T, cd *hivev1.ClusterDeployment)
 	}{
@@ -845,8 +846,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedRelocateStatus:    hivev1.RelocateComplete,
-			expectedDeletionTimestamp: true,
+			expectedRelocateStatus: hivev1.RelocateComplete,
+			expectDeleted:          true,
 		},
 		{
 			name: "clusterdeployment with dnszone already relocating",
@@ -860,8 +861,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedRelocateStatus:    hivev1.RelocateComplete,
-			expectedDeletionTimestamp: true,
+			expectedRelocateStatus: hivev1.RelocateComplete,
+			expectDeleted:          true,
 		},
 		{
 			name: "switch relocates",
@@ -878,8 +879,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedRelocateStatus:    hivev1.RelocateComplete,
-			expectedDeletionTimestamp: true,
+			expectedRelocateStatus: hivev1.RelocateComplete,
+			expectDeleted:          true,
 		},
 		{
 			name: "multiple relocates",
@@ -937,8 +938,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedRelocateStatus:    hivev1.RelocateComplete,
-			expectedDeletionTimestamp: true,
+			expectedRelocateStatus: hivev1.RelocateComplete,
+			expectDeleted:          true,
 		},
 		{
 			name: "already moved clusterdeployment",
@@ -953,8 +954,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			destResources: []runtime.Object{
 				cdBuilder.Build(),
 			},
-			expectedRelocateStatus:    hivev1.RelocateComplete,
-			expectedDeletionTimestamp: true,
+			expectedRelocateStatus: hivev1.RelocateComplete,
+			expectDeleted:          true,
 		},
 		{
 			name: "already moved clusterdeployment with dnszone already completed",
@@ -971,8 +972,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			destResources: []runtime.Object{
 				cdBuilder.Build(),
 			},
-			expectedRelocateStatus:    hivev1.RelocateComplete,
-			expectedDeletionTimestamp: true,
+			expectedRelocateStatus: hivev1.RelocateComplete,
+			expectDeleted:          true,
 		},
 		{
 			name: "clusterdeployment mismatch",
@@ -1050,7 +1051,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedDeletionTimestamp: true,
+			expectDeleted: true,
 			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
 				Status: corev1.ConditionFalse,
 				Reason: "DontUpdateCondition",
@@ -1073,7 +1074,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedDeletionTimestamp: true,
+			expectDeleted: true,
 			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
 				Status: corev1.ConditionFalse,
 				Reason: "DontUpdateCondition",
@@ -1096,7 +1097,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			srcResources: []runtime.Object{
 				crBuilder.Build(),
 			},
-			expectedDeletionTimestamp: true,
+			expectDeleted: true,
 			expectedRelocationFailedCondition: &hivev1.ClusterDeploymentCondition{
 				Status: corev1.ConditionFalse,
 				Reason: "DontUpdateCondition",
@@ -1144,15 +1145,21 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 				require.NoError(t, err, "unexpected error during reconcile")
 			}
 
-			cd := &hivev1.ClusterDeployment{}
-			err = srcClient.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: cdName}, cd)
-			require.NoError(t, err, "unexpected error fetching clusterdeployment")
-
 			var dnsZone *hivev1.DNSZone
 			if tc.dnsZone != nil {
 				dnsZone = &hivev1.DNSZone{}
 				err = srcClient.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: tc.dnsZone.Name}, dnsZone)
 				require.NoError(t, err, "unexpected error fetching dnszone")
+			}
+
+			cd := &hivev1.ClusterDeployment{}
+			err = srcClient.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: cdName}, cd)
+			if tc.expectDeleted {
+				require.True(t, apierrors.IsNotFound(err), "expected clusterdeployment to be deleted")
+				// The remainder of the checks rely on the CD existing
+				return
+			} else {
+				require.NoError(t, err, "unexpected error fetching clusterdeployment")
 			}
 
 			if tc.expectedRelocateStatus != "" {
@@ -1166,12 +1173,6 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 				if dnsZone != nil {
 					assert.NotContains(t, dnsZone.Annotations, constants.RelocateAnnotation, "unexpected relocate annotation on dnszone")
 				}
-			}
-
-			if tc.expectedDeletionTimestamp {
-				assert.NotNil(t, cd.DeletionTimestamp, "expected ClusterDeployment to be deleted")
-			} else {
-				assert.Nil(t, cd.DeletionTimestamp, "expected ClusterDeployment to not be deleted")
 			}
 
 			cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.RelocationFailedCondition)

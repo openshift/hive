@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -950,11 +951,11 @@ func TestReconcileClusterPool(t *testing.T) {
 
 			pool := &hivev1.ClusterPool{}
 			err = fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)
-			assert.NoError(t, err, "unexpected error getting clusterpool")
 
 			if test.expectFinalizerRemoved {
-				assert.NotContains(t, pool.Finalizers, finalizer, "expected no finalizer on clusterpool")
+				assert.True(t, apierrors.IsNotFound(err), "expected pool to be deleted")
 			} else {
+				assert.NoError(t, err, "unexpected error getting clusterpool")
 				assert.Contains(t, pool.Finalizers, finalizer, "expect finalizer on clusterpool")
 				assert.Equal(t, test.expectedObservedSize, pool.Status.Size, "unexpected observed size")
 				assert.Equal(t, test.expectedObservedReady, pool.Status.Ready, "unexpected observed ready count")

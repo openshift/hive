@@ -250,7 +250,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testgeneric.Deleted(),
 			).Build(),
 			expectNoAssignment:                     true,
-			expectNoFinalizer:                      true,
+			expectDeleted:                          true,
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
@@ -264,8 +264,8 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testRole(),
 				testRoleBinding(),
 			},
-			expectNoFinalizer: true,
-			expectRBAC:        true,
+			expectDeleted: true,
+			expectRBAC:    true,
 		},
 		{
 			name: "deleted claim with claimed assignment",
@@ -279,7 +279,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testRoleBinding(),
 			},
 			expectCompletedClaim:                   true,
-			expectNoFinalizer:                      true,
+			expectDeleted:                          true,
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
@@ -288,7 +288,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
-			expectNoFinalizer:                      true,
+			expectDeleted:                          true,
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
@@ -304,7 +304,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testRoleBinding(),
 			},
 			expectCompletedClaim: true,
-			expectNoFinalizer:    true,
+			expectDeleted:        true,
 		},
 		{
 			name: "deleted claim with clusterdeployment assigned to other claim",
@@ -312,8 +312,8 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
-			cd:                cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
-			expectNoFinalizer: true,
+			cd:            cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
+			expectDeleted: true,
 		},
 		{
 			name:  "no RBAC when no subjects",
@@ -485,21 +485,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Status: corev1.ConditionTrue,
 				}),
 			),
-			expectDeleted: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectCompletedClaim: true,
 		},
 		{
 			name: "claim with elapsed pool lifetime is deleted as set by pool default",
@@ -522,21 +508,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithDefaultClaimLifetime(1 * time.Hour)),
 			},
-			expectDeleted: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectCompletedClaim: true,
 		},
 		{
 			name: "claim with elapsed pool lifetime is deleted as set by pool maximum",
@@ -559,21 +531,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithMaximumClaimLifetime(1 * time.Hour)),
 			},
-			expectDeleted: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectCompletedClaim: true,
 		},
 		{
 			name: "claim with elapsed smaller lifetime is deleted, where pool maximum is smaller",
@@ -597,21 +555,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithMaximumClaimLifetime(1 * time.Hour)),
 			},
-			expectDeleted: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectCompletedClaim: true,
 		},
 		{
 			name: "claim with elapsed smaller lifetime is deleted, where pool maximum is smaller than default",
@@ -634,21 +578,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithDefaultClaimLifetime(2*time.Hour), testcp.WithMaximumClaimLifetime(1*time.Hour)),
 			},
-			expectDeleted: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectCompletedClaim: true,
 		},
 		{
 			name: "claim with elapsed smaller lifetime is deleted, where claim is smaller",
@@ -672,21 +602,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithMaximumClaimLifetime(2 * time.Hour)),
 			},
-			expectDeleted: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
+			expectCompletedClaim: true,
 		},
 		{
 			name: "claim with non-elapsed lifetime is not deleted",

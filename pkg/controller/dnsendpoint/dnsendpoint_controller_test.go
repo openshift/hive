@@ -14,9 +14,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -68,6 +70,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 		expectErr                bool
 		expectedNameServers      rootDomainsMap
 		expectedCreatedCondition bool
+		expectDNSZoneDeleted     bool
 		expectedConditions       []conditionExpectations
 	}{
 		{
@@ -169,6 +172,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{},
 			},
+			expectDNSZoneDeleted: true,
 		},
 		{
 			name:    "delete untracked name server",
@@ -182,6 +186,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nameServersMap{},
 			},
+			expectDNSZoneDeleted: true,
 		},
 		{
 			name:    "create error",
@@ -350,7 +355,11 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			assert.Equal(t, reconcile.Result{}, result, "unexpected reconcile result")
 			assertRootDomainsMapEqual(t, tc.expectedNameServers, scraper.nameServers)
 			dnsZone := &hivev1.DNSZone{}
-			if err := fakeClient.Get(context.Background(), objectKey, dnsZone); assert.NoError(t, err, "unexpected error getting DNSZone") {
+			err = fakeClient.Get(context.Background(), objectKey, dnsZone)
+			if tc.expectDNSZoneDeleted {
+				assert.True(t, apierrors.IsNotFound(err))
+			} else {
+				assert.NoError(t, err, "unexpected error getting DNSZone")
 				validateConditions(t, dnsZone, tc.expectedConditions)
 			}
 		})
@@ -448,6 +457,10 @@ func (*fakeManager) GetWebhookServer() *webhook.Server {
 }
 
 func (*fakeManager) GetLogger() logr.Logger {
+	panic("not implemented")
+}
+
+func (*fakeManager) GetControllerOptions() v1alpha1.ControllerConfigurationSpec {
 	panic("not implemented")
 }
 

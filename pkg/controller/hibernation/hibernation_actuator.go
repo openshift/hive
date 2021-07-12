@@ -28,3 +28,13 @@ type HibernationActuator interface {
 	// that have not stopped.
 	MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error)
 }
+
+// HibernationPreemptibleMachines is the interface that the hibernation controller
+// for preemptible instances on cloud providers.
+type HibernationPreemptibleMachines interface {
+	// ReplaceMachines uses the remote client to replace the preemptible machines
+	// belonging to the given ClusterDeployment. Since it uses the remote client
+	// it should only be called when the API is reachable.
+	// replaced is true when at least one machine was replaced.
+	ReplaceMachines(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (replaced bool, err error)
+}

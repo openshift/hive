@@ -193,11 +193,11 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		// Determine if SyncSets have been applied
 		clusterSync := &hiveintv1alpha1.ClusterSync{}
 		err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync)
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return reconcile.Result{}, fmt.Errorf("could not get ClusterSync: %v", err)
 		}
-		// SyncSets have not been applied
-		if clusterSync.Status.FirstSuccessTime == nil {
+		// SyncSets are present and have not been applied
+		if err == nil && clusterSync.Status.FirstSuccessTime == nil {
 			// Allow hibernation (do not set condition) if hibernateAfterSyncSetsNotApplied duration has passed since cluster
 			// installed and syncsets still not applied
 			if cd.Status.InstalledTimestamp != nil && time.Now().Sub(cd.Status.InstalledTimestamp.Time) < hibernateAfterSyncSetsNotApplied {

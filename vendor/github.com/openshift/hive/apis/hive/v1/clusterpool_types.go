@@ -63,6 +63,8 @@ type ClusterPoolSpec struct {
 	// out of hibernation.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
 	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 
 	// SkipMachinePools allows creating clusterpools where the machinepools are not managed by hive after cluster creation
@@ -79,6 +81,8 @@ type ClusterPoolClaimLifetime struct {
 	// Default is the default lifetime of the claim when no lifetime is set on the claim itself.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
 	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
 	Default *metav1.Duration `json:"default,omitempty"`
 
 	// Maximum is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
@@ -86,6 +90,8 @@ type ClusterPoolClaimLifetime struct {
 	// The lifetime of a claim is the mimimum of the lifetimes set by the cluster pool and the claim itself.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
 	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
 	Maximum *metav1.Duration `json:"maximum,omitempty"`
 }
 

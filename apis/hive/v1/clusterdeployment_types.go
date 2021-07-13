@@ -145,6 +145,8 @@ type ClusterDeploymentSpec struct {
 	// time since the cluster last came out of hibernation.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
 	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Format=duration
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 
 	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.

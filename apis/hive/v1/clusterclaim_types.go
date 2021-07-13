@@ -23,6 +23,7 @@ type ClusterClaimSpec struct {
 
 	// Lifetime is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
 	// when the lifetime has elapsed, the claim will be deleted by Hive.
+	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
 	// +optional
 	Lifetime *metav1.Duration `json:"lifetime,omitempty"`
 }

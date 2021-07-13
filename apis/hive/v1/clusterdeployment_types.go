@@ -143,6 +143,7 @@ type ClusterDeploymentSpec struct {
 	// HibernateAfter will transition a cluster to hibernating power state after it has been running for the
 	// given duration. The time that a cluster has been running is the time since the cluster was installed or the
 	// time since the cluster last came out of hibernation.
+	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
 	// +optional
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 

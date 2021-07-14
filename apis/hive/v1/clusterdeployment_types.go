@@ -264,7 +264,8 @@ type ClusterMetadata struct {
 	AdminKubeconfigSecretRef corev1.LocalObjectReference `json:"adminKubeconfigSecretRef"`
 
 	// AdminPasswordSecretRef references the secret containing the admin username/password which can be used to login to this cluster.
-	AdminPasswordSecretRef corev1.LocalObjectReference `json:"adminPasswordSecretRef"`
+	// +optional
+	AdminPasswordSecretRef *corev1.LocalObjectReference `json:"adminPasswordSecretRef,omitempty"`
 }
 
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment

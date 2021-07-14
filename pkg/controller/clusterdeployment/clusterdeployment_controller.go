@@ -592,7 +592,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			if err := r.addOwnershipToSecret(cd, cdLog, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name); err != nil {
 				return reconcile.Result{}, err
 			}
-			if cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name != "" {
+			if cd.Spec.ClusterMetadata.AdminPasswordSecretRef != nil && cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name != "" {
 				if err := r.addOwnershipToSecret(cd, cdLog, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name); err != nil {
 					return reconcile.Result{}, err
 				}

@@ -235,7 +235,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 			clusterMetadata.AdminKubeconfigSecretRef = *provision.Spec.AdminKubeconfigSecretRef
 		}
 		if provision.Spec.AdminPasswordSecretRef != nil {
-			clusterMetadata.AdminPasswordSecretRef = *provision.Spec.AdminPasswordSecretRef
+			clusterMetadata.AdminPasswordSecretRef = provision.Spec.AdminPasswordSecretRef
 		}
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata

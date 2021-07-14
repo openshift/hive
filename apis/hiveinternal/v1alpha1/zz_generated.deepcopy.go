@@ -291,7 +291,7 @@ func (in *FakeClusterInstallSpec) DeepCopyInto(out *FakeClusterInstallSpec) {
 	if in.ClusterMetadata != nil {
 		in, out := &in.ClusterMetadata, &out.ClusterMetadata
 		*out = new(v1.ClusterMetadata)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

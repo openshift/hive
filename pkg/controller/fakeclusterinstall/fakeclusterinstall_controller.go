@@ -283,7 +283,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 				InfraID:   "not-a-real-cluster",
 				// TODO: do we need to create dummy secrets?
 				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "admin-kubeconfig"},
-				AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: "admin-password"},
+				AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "admin-password"},
 			}
 			logger.Info("setting fake ClusterMetadata")
 			return reconcile.Result{}, r.Client.Update(context.Background(), fci)

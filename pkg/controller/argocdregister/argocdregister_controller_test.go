@@ -294,7 +294,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			ClusterID:                testClusterID,
 			InfraID:                  testInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
-			AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: adminPasswordSecret},
+			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
 		},
 	}
 

@@ -83,7 +83,7 @@ func (in *ClusterInstallSpec) DeepCopyInto(out *ClusterInstallSpec) {
 	if in.ClusterMetadata != nil {
 		in, out := &in.ClusterMetadata, &out.ClusterMetadata
 		*out = new(hivev1.ClusterMetadata)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

@@ -723,7 +723,7 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 	if in.ClusterMetadata != nil {
 		in, out := &in.ClusterMetadata, &out.ClusterMetadata
 		*out = new(ClusterMetadata)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Provisioning != nil {
 		in, out := &in.Provisioning, &out.Provisioning
@@ -1172,7 +1172,11 @@ func (in *ClusterInstallLocalReference) DeepCopy() *ClusterInstallLocalReference
 func (in *ClusterMetadata) DeepCopyInto(out *ClusterMetadata) {
 	*out = *in
 	out.AdminKubeconfigSecretRef = in.AdminKubeconfigSecretRef
-	out.AdminPasswordSecretRef = in.AdminPasswordSecretRef
+	if in.AdminPasswordSecretRef != nil {
+		in, out := &in.AdminPasswordSecretRef, &out.AdminPasswordSecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	return
 }
 

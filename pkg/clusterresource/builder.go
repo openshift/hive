@@ -328,7 +328,7 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 		}
 		cd.Spec.Installed = true
 		if o.AdoptAdminUsername != "" {
-			cd.Spec.ClusterMetadata.AdminPasswordSecretRef = corev1.LocalObjectReference{
+			cd.Spec.ClusterMetadata.AdminPasswordSecretRef = &corev1.LocalObjectReference{
 				Name: o.getAdoptAdminPasswordSecretName(),
 			}
 		}

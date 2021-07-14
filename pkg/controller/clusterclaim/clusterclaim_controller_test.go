@@ -90,7 +90,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		func(cd *hivev1.ClusterDeployment) {
 			cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: kubeconfigSecretName},
-				AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: passwordSecretName},
+				AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: passwordSecretName},
 			}
 		},
 	)

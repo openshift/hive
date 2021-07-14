@@ -1353,7 +1353,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						InfraID:                  "old-infra-id",
 						ClusterID:                "old-cluster-id",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "old-kubeconfig-secret"},
-						AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: "old-password-secret"},
+						AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "old-password-secret"},
 					}
 					return cd
 				}(),
@@ -1484,7 +1484,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 						InfraID:                  "fakeinfra",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
-						AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: adminPasswordSecret},
+						AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
 					}
 					cd.Status.WebConsoleURL = "https://example.com"
 					cd.Status.APIURL = "https://example.com"
@@ -2012,7 +2012,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					AdminKubeconfigSecretRef: corev1.LocalObjectReference{
 						Name: adminKubeconfigSecret,
 					},
-					AdminPasswordSecretRef: corev1.LocalObjectReference{
+					AdminPasswordSecretRef: &corev1.LocalObjectReference{
 						Name: adminPasswordSecret,
 					},
 				}),
@@ -2623,7 +2623,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			ClusterID:                testClusterID,
 			InfraID:                  testInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
-			AdminPasswordSecretRef:   corev1.LocalObjectReference{Name: adminPasswordSecret},
+			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
 		},
 	}
 
@@ -2795,9 +2795,12 @@ func testFakeClusterInstallWithClusterMetadata(name string, metadata hivev1.Clus
 		"adminKubeconfigSecretRef": map[string]interface{}{
 			"name": metadata.AdminKubeconfigSecretRef.Name,
 		},
-		"adminPasswordSecretRef": map[string]interface{}{
+	}
+
+	if metadata.AdminPasswordSecretRef != nil {
+		value["adminPasswordSecretRef"] = map[string]interface{}{
 			"name": metadata.AdminPasswordSecretRef.Name,
-		},
+		}
 	}
 
 	unstructured.SetNestedField(fake.UnstructuredContent(), value, "spec", "clusterMetadata")

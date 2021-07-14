@@ -4,28 +4,28 @@ go 1.16
 
 require (
 	github.com/Azure/azure-sdk-for-go v45.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.6
+	github.com/Azure/go-autorest/autorest v0.11.12
 	github.com/Azure/go-autorest/autorest/azure/auth v0.4.1
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/aws/aws-sdk-go v1.38.41
 	github.com/blang/semver/v4 v4.0.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/evanphx/json-patch v4.9.0+incompatible
+	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-logr/logr v0.3.0
+	github.com/go-logr/logr v0.4.0
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.31.0
-	github.com/google/go-cmp v0.5.2
+	github.com/google/go-cmp v0.5.5
 	github.com/google/uuid v1.1.2
 	github.com/gophercloud/utils v0.0.0-20210113034859-6f548432055a
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.1.0
-	github.com/json-iterator/go v1.1.10
+	github.com/json-iterator/go v1.1.11
 	github.com/miekg/dns v1.1.22
 	github.com/modern-go/reflect2 v1.0.1
-	github.com/onsi/ginkgo v1.14.1
-	github.com/onsi/gomega v1.10.2
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.13.0
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible
 	github.com/openshift/build-machinery-go v0.0.0-20210701182933-efa47ed39f2e
 	github.com/openshift/cluster-api v0.0.0-20191129101638-b09907ac6668 // indirect
@@ -38,37 +38,38 @@ require (
 	github.com/openshift/library-go v0.0.0-20201109112824-093ad3cf6600
 	github.com/openshift/machine-api-operator v0.2.1-0.20201111151924-77300d0c997a
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.7.1
+	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/sirupsen/logrus v1.6.0
+	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.22.2
-	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
+	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/mod v0.4.0
-	golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
+	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
-	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
+	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
 	google.golang.org/api v0.33.0
 	gopkg.in/ini.v1 v1.61.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.2
-	k8s.io/apiextensions-apiserver v0.20.2
-	k8s.io/apimachinery v0.20.2
-	k8s.io/cli-runtime v0.20.0
+	k8s.io/api v0.21.2
+	k8s.io/apiextensions-apiserver v0.21.2
+	k8s.io/apimachinery v0.21.2
+	k8s.io/cli-runtime v0.21.2
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
-	k8s.io/code-generator v0.20.2
+	k8s.io/code-generator v0.21.2
 	k8s.io/klog v1.0.0
-	k8s.io/kube-aggregator v0.20.0
-	k8s.io/kubectl v0.20.0
-	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009
+	k8s.io/klog/v2 v2.9.0 // indirect
+	k8s.io/kube-aggregator v0.21.2
+	k8s.io/kubectl v0.21.2
+	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0
-	sigs.k8s.io/controller-runtime v0.8.3
+	sigs.k8s.io/controller-runtime v0.9.3-0.20210709165254-650ea59f19cc
 	sigs.k8s.io/controller-tools v0.5.0
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -109,10 +110,7 @@ replace (
 )
 
 // needed because otherwise v12.0.0 is picked up as a more recent version
-replace k8s.io/client-go => k8s.io/client-go v0.20.0
+replace k8s.io/client-go => k8s.io/client-go v0.21.2
 
 // needed for fixing CVE-2020-29529
 replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0
-
-// point sigs.k8s.io/controller-runtime to forked version
-replace sigs.k8s.io/controller-runtime => github.com/openshift-hive/controller-runtime v0.8.3-openshift

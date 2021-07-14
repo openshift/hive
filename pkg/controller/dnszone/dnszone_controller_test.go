@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -33,12 +34,13 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	cases := []struct {
-		name            string
-		dnsZone         *hivev1.DNSZone
-		setupAWSMock    func(*awsmock.MockClientMockRecorder)
-		validateZone    func(*testing.T, *hivev1.DNSZone)
-		errorExpected   bool
-		soaLookupResult bool
+		name              string
+		dnsZone           *hivev1.DNSZone
+		setupAWSMock      func(*awsmock.MockClientMockRecorder)
+		expectZoneDeleted bool
+		validateZone      func(*testing.T, *hivev1.DNSZone)
+		errorExpected     bool
+		soaLookupResult   bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -122,9 +124,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				mockExistingAWSTags(expect)
 				mockDeleteAWSZone(expect)
 			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
-			},
+			expectZoneDeleted: true,
 		},
 		{
 			name:    "Delete non-existent hosted zone",
@@ -132,9 +132,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
 				mockAWSZoneDoesntExist(expect, validDNSZoneBeingDeleted())
 			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
-			},
+			expectZoneDeleted: true,
 		},
 		{
 			name: "Delete DNSZone without status",
@@ -149,9 +147,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				mockExistingAWSTags(expect)
 				mockDeleteAWSZone(expect)
 			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
-			},
+			expectZoneDeleted: true,
 		},
 		{
 			name:            "Existing zone, link to parent, reachable SOA",
@@ -214,7 +210,11 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			// Validate
 			zone := &hivev1.DNSZone{}
 			err = mocks.fakeKubeClient.Get(context.TODO(), types.NamespacedName{Namespace: tc.dnsZone.Namespace, Name: tc.dnsZone.Name}, zone)
-			if err != nil {
+			if tc.expectZoneDeleted {
+				assert.True(t, apierrors.IsNotFound(err), "expected DNSZone to be deleted")
+				// Remainder of the test checks the zone
+				return
+			} else if err != nil {
 				t.Fatalf("unexpected: %v", err)
 			}
 			if tc.validateZone != nil {
@@ -230,12 +230,13 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	cases := []struct {
-		name            string
-		dnsZone         *hivev1.DNSZone
-		setupGCPMock    func(*gcpmock.MockClientMockRecorder)
-		validateZone    func(*testing.T, *hivev1.DNSZone)
-		errorExpected   bool
-		soaLookupResult bool
+		name              string
+		dnsZone           *hivev1.DNSZone
+		setupGCPMock      func(*gcpmock.MockClientMockRecorder)
+		expectZoneDeleted bool
+		validateZone      func(*testing.T, *hivev1.DNSZone)
+		errorExpected     bool
+		soaLookupResult   bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -300,9 +301,7 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
 				mockGCPZoneDoesntExist(expect)
 			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
-			},
+			expectZoneDeleted: true,
 		},
 		{
 			name:            "Existing zone, link to parent, reachable SOA",
@@ -363,7 +362,11 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			// Validate
 			zone := &hivev1.DNSZone{}
 			err = mocks.fakeKubeClient.Get(context.TODO(), types.NamespacedName{Namespace: tc.dnsZone.Namespace, Name: tc.dnsZone.Name}, zone)
-			if err != nil {
+			if tc.expectZoneDeleted {
+				assert.True(t, apierrors.IsNotFound(err), "expected DNSZone to be deleted")
+				// Remainder of the test uses zone
+				return
+			} else if err != nil {
 				t.Fatalf("unexpected: %v", err)
 			}
 			if tc.validateZone != nil {
@@ -379,12 +382,13 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	cases := []struct {
-		name            string
-		dnsZone         *hivev1.DNSZone
-		setupAzureMock  func(*gomock.Controller, *azuremock.MockClientMockRecorder)
-		validateZone    func(*testing.T, *hivev1.DNSZone)
-		errorExpected   bool
-		soaLookupResult bool
+		name              string
+		dnsZone           *hivev1.DNSZone
+		setupAzureMock    func(*gomock.Controller, *azuremock.MockClientMockRecorder)
+		expectZoneDeleted bool
+		validateZone      func(*testing.T, *hivev1.DNSZone)
+		errorExpected     bool
+		soaLookupResult   bool
 	}{
 		{
 			name:    "DNSZone without finalizer",
@@ -424,9 +428,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 				mockAzureZoneExists(expect)
 				mockDeleteAzureZone(mockCtrl, expect)
 			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
-			},
+			expectZoneDeleted: true,
 		},
 		{
 			name:    "Delete non-existent managed zone",
@@ -434,9 +436,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			setupAzureMock: func(_ *gomock.Controller, expect *azuremock.MockClientMockRecorder) {
 				mockAzureZoneDoesntExist(expect)
 			},
-			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.False(t, controllerutils.HasFinalizer(zone, hivev1.FinalizerDNSZone))
-			},
+			expectZoneDeleted: true,
 		},
 		{
 			name:            "Existing zone, link to parent, reachable SOA",
@@ -496,7 +496,11 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			// Validate
 			zone := &hivev1.DNSZone{}
 			err = mocks.fakeKubeClient.Get(context.TODO(), types.NamespacedName{Namespace: tc.dnsZone.Namespace, Name: tc.dnsZone.Name}, zone)
-			if err != nil {
+			if tc.expectZoneDeleted {
+				assert.True(t, apierrors.IsNotFound(err), "expected DNSZone to be deleted")
+				// Remainder of the test uses zone
+				return
+			} else if err != nil {
 				t.Fatalf("unexpected: %v", err)
 			}
 			if tc.validateZone != nil {

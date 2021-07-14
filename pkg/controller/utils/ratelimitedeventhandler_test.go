@@ -24,7 +24,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	h := NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, func(_ event.UpdateEvent) bool { return false })
 	h.Update(event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
-	require.Equal(t, 2, len(q.added))
+	require.Equal(t, 1, len(q.added))
 	require.Equal(t, 0, len(q.ratelimitAdded))
 
 	// always rate limited
@@ -33,7 +33,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	h.Update(event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
 	require.Equal(t, 0, len(q.added))
-	require.Equal(t, 2, len(q.ratelimitAdded))
+	require.Equal(t, 1, len(q.ratelimitAdded))
 
 	// always rate limited not UPDATE
 	q = &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
@@ -66,7 +66,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	h.Update(event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
 	require.Equal(t, 0, len(q.added))
-	require.Equal(t, 6, len(q.ratelimitAdded))
+	require.Equal(t, 3, len(q.ratelimitAdded))
 
 }
 

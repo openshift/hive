@@ -106,14 +106,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                             string
-		clusterDeployment                *hivev1.ClusterDeployment
-		machinePool                      *hivev1.MachinePool
-		remoteExisting                   []runtime.Object
-		generatedMachineSets             []*machineapi.MachineSet
-		actuatorDoNotProceed             bool
-		expectErr                        bool
-		expectNoFinalizer                bool
+		name                 string
+		clusterDeployment    *hivev1.ClusterDeployment
+		machinePool          *hivev1.MachinePool
+		remoteExisting       []runtime.Object
+		generatedMachineSets []*machineapi.MachineSet
+		actuatorDoNotProceed bool
+		expectErr            bool
+		expectNoFinalizer    bool
+		// expectPoolPresent is ignored if expectNoFinalizer is false
+		expectPoolPresent                bool
 		expectedRemoteMachineSets        []*machineapi.MachineSet
 		expectedRemoteMachineAutoscalers []autoscalingv1beta1.MachineAutoscaler
 		expectedRemoteClusterAutoscalers []autoscalingv1.ClusterAutoscaler
@@ -329,6 +331,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 			},
 			expectNoFinalizer: true,
+			expectPoolPresent: true,
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
 				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
 				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
@@ -351,6 +354,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 			},
 			expectNoFinalizer: true,
+			expectPoolPresent: true,
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
 				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
 				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
@@ -707,12 +711,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				return
 			}
 
-			if pool := getPool(fakeClient, "worker"); assert.NotNil(t, pool, "missing machinepool") {
-				if test.expectNoFinalizer {
-					assert.NotContains(t, pool.Finalizers, finalizer, "unexpected finalizer")
+			pool := getPool(fakeClient, "worker")
+			if test.expectNoFinalizer {
+				if test.expectPoolPresent {
+					assert.NotNil(t, pool, "missing machinepool (with no finalizer)")
 				} else {
-					assert.Contains(t, pool.Finalizers, finalizer, "missing finalizer")
+					assert.Nil(t, pool, "unexpected machinepool")
 				}
+			} else {
+				assert.NotNil(t, pool, "missing machinepool")
+				assert.Contains(t, pool.Finalizers, finalizer, "missing finalizer")
 			}
 
 			rMSL, err := getRMSL(remoteFakeClient)

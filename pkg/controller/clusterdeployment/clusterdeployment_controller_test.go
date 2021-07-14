@@ -412,7 +412,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				deprovision := getDeprovision(c)
 				assert.Nil(t, deprovision, "expected no deprovision request")
 				cd := getCD(c)
-				assert.Equal(t, 0, len(cd.Finalizers))
+				assert.Nil(t, cd, "expected ClusterDeployment to be deleted")
 			},
 		},
 		{
@@ -424,9 +424,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if cd != nil {
-					t.Errorf("got unexpected cluster deployment (expected deleted)")
-				}
+				assert.NotNil(t, cd, "clusterdeployment deleted unexpectedly")
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected hive finalizer")
 			},
 		},
 		{
@@ -443,9 +442,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
-				}
+				assert.Nil(t, cd, "expected clusterdeployment to be deleted")
 				deprovision := getDeprovision(c)
 				assert.Nil(t, deprovision, "expected no deprovision request")
 			},
@@ -464,9 +461,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
-				}
+				assert.Nil(t, cd, "expected clusterdeployment to be deleted")
 				deprovision := getDeprovision(c)
 				assert.Nil(t, deprovision, "expected no deprovision request")
 			},
@@ -1182,9 +1177,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					assert.Empty(t, cd.Finalizers, "expected empty finalizers")
-				}
+				assert.Nil(t, cd, "expected clusterdeployment to be deleted")
 			},
 		},
 		{
@@ -1544,8 +1537,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				require.NotNil(t, cd, "could not get ClusterDeployment")
-				assert.NotContains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+				require.Nil(t, cd, "expected ClusterDeployment to be deleted")
 			},
 		},
 		{
@@ -1624,8 +1616,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				require.NotNil(t, cd, "could not get ClusterDeployment")
-				assert.NotContains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+				require.Nil(t, cd, "expected ClusterDeployment to be deleted")
 			},
 		},
 		{

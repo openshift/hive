@@ -59,6 +59,7 @@ spec:
                   is assigned a cluster. If the claim still exists when the lifetime
                   has elapsed, the claim will be deleted by Hive. This is a Duration
                   value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                format: duration
                 type: string
               namespace:
                 description: Namespace is the namespace containing the ClusterDeployment

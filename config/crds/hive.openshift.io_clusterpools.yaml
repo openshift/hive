@@ -70,6 +70,7 @@ spec:
                     description: Default is the default lifetime of the claim when
                       no lifetime is set on the claim itself. This is a Duration value;
                       see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                    format: duration
                     type: string
                   maximum:
                     description: Maximum is the maximum lifetime of the claim after
@@ -78,6 +79,7 @@ spec:
                       lifetime of a claim is the mimimum of the lifetimes set by the
                       cluster pool and the claim itself. This is a Duration value;
                       see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                    format: duration
                     type: string
                 type: object
               hibernateAfter:
@@ -88,6 +90,7 @@ spec:
                   is the time since the cluster was installed or the time since the
                   cluster last came out of hibernation. This is a Duration value;
                   see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                format: duration
                 type: string
               imageSetRef:
                 description: ImageSetRef is a reference to a ClusterImageSet. The

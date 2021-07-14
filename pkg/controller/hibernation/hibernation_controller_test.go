@@ -114,6 +114,19 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "start hibernating, no syncsets",
+			cd:   cdBuilder.Options(o.shouldHibernate).Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+			},
+		},
+		{
 			name: "start hibernating, syncsets not applied",
 			cd:   cdBuilder.Options(o.shouldHibernate, testcd.InstalledTimestamp(time.Now())).Build(),
 			cs:   csBuilder.Options(testcs.WithNoFirstSuccessTime()).Build(),
@@ -409,7 +422,12 @@ func TestReconcile(t *testing.T) {
 				test.setupCSRHelper(mockCSRHelper)
 			}
 			actuators = []HibernationActuator{mockActuator}
-			c := fake.NewFakeClientWithScheme(scheme, test.cd, test.cs)
+			var c client.Client
+			if test.cs != nil {
+				c = fake.NewFakeClientWithScheme(scheme, test.cd, test.cs)
+			} else {
+				c = fake.NewFakeClientWithScheme(scheme, test.cd)
+			}
 
 			reconciler := hibernationReconciler{
 				Client: c,
@@ -543,6 +561,14 @@ func TestHibernateAfter(t *testing.T) {
 			expectRequeueAfter: stateCheckInterval,
 		},
 		{
+			name: "cluster due for hibernate, no syncsets",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8*time.Minute),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 8*time.Minute)),
+				testcd.InstalledTimestamp(time.Now().Add(-8*time.Minute))),
+			expectedPowerState: hivev1.HibernatingClusterPowerState,
+		},
+		{
 			name: "cluster due for hibernate but syncsets not applied",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Minute),
@@ -626,7 +652,12 @@ func TestHibernateAfter(t *testing.T) {
 			mockBuilder := remoteclientmock.NewMockBuilder(ctrl)
 			mockCSRHelper := mock.NewMockcsrHelper(ctrl)
 			actuators = []HibernationActuator{mockActuator}
-			c := fake.NewFakeClientWithScheme(scheme, test.cd, test.cs)
+			var c client.Client
+			if test.cs != nil {
+				c = fake.NewFakeClientWithScheme(scheme, test.cd, test.cs)
+			} else {
+				c = fake.NewFakeClientWithScheme(scheme, test.cd)
+			}
 
 			reconciler := hibernationReconciler{
 				Client: c,

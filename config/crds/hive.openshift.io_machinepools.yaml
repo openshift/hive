@@ -95,6 +95,11 @@ spec:
                           iops:
                             description: IOPS defines the iops for the storage.
                             type: integer
+                          kmsKeyARN:
+                            description: The KMS key that will be used to encrypt
+                              the EBS volume. If no key is provided the default KMS
+                              key for the account will be used. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_GetEbsDefaultKmsKeyId.html
+                            type: string
                           size:
                             description: Size defines the size of the storage.
                             type: integer

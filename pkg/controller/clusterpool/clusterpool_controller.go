@@ -253,7 +253,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	// Find all ClusterDeployments from this pool:
-	claimedCDs, unClaminedCDs, err := r.getAllClusterDeploymentsForPool(clp, logger)
+	claimedCDs, unClaimedCDs, err := r.getAllClusterDeploymentsForPool(clp, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -273,7 +273,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	var installingCDs []*hivev1.ClusterDeployment
 	var readyCDs []*hivev1.ClusterDeployment
 	numberOfDeletingCDs := 0
-	for _, cd := range unClaminedCDs {
+	for _, cd := range unClaimedCDs {
 		switch {
 		case cd.DeletionTimestamp != nil:
 			numberOfDeletingCDs++
@@ -287,7 +287,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	logger.WithFields(log.Fields{
 		"installing": len(installingCDs),
 		"deleting":   numberOfDeletingCDs,
-		"total":      len(unClaminedCDs),
+		"total":      len(unClaimedCDs),
 		"ready":      len(readyCDs),
 	}).Debug("found clusters for ClusterPool")
 
@@ -303,12 +303,12 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 
 	availableCapacity := math.MaxInt32
 	if clp.Spec.MaxSize != nil {
-		availableCapacity = int(*clp.Spec.MaxSize) - len(unClaminedCDs) - len(claimedCDs)
+		availableCapacity = int(*clp.Spec.MaxSize) - len(unClaimedCDs) - len(claimedCDs)
 		if availableCapacity <= 0 {
 			logger.WithFields(log.Fields{
-				"lUnclaimedSize": len(unClaminedCDs),
-				"ClaimedSize":    len(claimedCDs),
-				"Capacity":       *clp.Spec.MaxSize,
+				"UnclaimedSize": len(unClaimedCDs),
+				"ClaimedSize":   len(claimedCDs),
+				"Capacity":      *clp.Spec.MaxSize,
 			}).Info("Cannot add more clusters because no capacity available.")
 		}
 	}

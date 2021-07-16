@@ -325,6 +325,10 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 
 	// reserveSize is the number of clusters that the pool currently has in reserve
 	reserveSize := len(installingCDs) + len(readyCDs) - len(pendingClaims)
+	// Don't allow excess claims to add CDs
+	if reserveSize < 0 {
+		reserveSize = 0
+	}
 
 	readyCDs, err = r.assignClustersToClaims(pendingClaims, readyCDs, logger)
 	if err != nil {

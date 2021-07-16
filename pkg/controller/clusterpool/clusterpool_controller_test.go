@@ -885,6 +885,25 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedReady:   2,
 			expectedDeletedClusters: []string{"c4"},
 		},
+		{
+			name: "claims exceed capacity",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				testclaim.FullBuilder(testNamespace, "test-claim1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim2", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim3", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedTotalClusters:    2,
+			expectedUnassignedClaims: 3,
+		},
+		{
+			name: "zero size pool",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(0)),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedUnassignedClaims: 1,
+		},
 	}
 
 	for _, test := range tests {

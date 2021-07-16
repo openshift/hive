@@ -79,10 +79,6 @@ func TestReconcileClusterClaim(t *testing.T) {
 		}),
 		testclaim.WithCondition(hivev1.ClusterClaimCondition{
 			Status: corev1.ConditionUnknown,
-			Type:   hivev1.ClusterClaimClusterDeletedCondition,
-		}),
-		testclaim.WithCondition(hivev1.ClusterClaimCondition{
-			Status: corev1.ConditionUnknown,
 			Type:   hivev1.ClusterRunningCondition,
 		}),
 	)
@@ -119,10 +115,6 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectedConditions: []hivev1.ClusterClaimCondition{
 				{
 					Type:   hivev1.ClusterClaimPendingCondition,
-					Status: corev1.ConditionUnknown,
-				},
-				{
-					Type:   hivev1.ClusterClaimClusterDeletedCondition,
 					Status: corev1.ConditionUnknown,
 				},
 				{
@@ -201,8 +193,8 @@ func TestReconcileClusterClaim(t *testing.T) {
 			name:  "deleted cluster",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			expectedConditions: []hivev1.ClusterClaimCondition{{
-				Type:    hivev1.ClusterClaimClusterDeletedCondition,
-				Status:  corev1.ConditionTrue,
+				Type:    hivev1.ClusterRunningCondition,
+				Status:  corev1.ConditionFalse,
 				Reason:  "ClusterDeleted",
 				Message: "Assigned cluster has been deleted",
 			}},

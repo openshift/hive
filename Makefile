@@ -2,12 +2,16 @@
 all: vendor update test build
 
 # Include the library makefile
+# TODO: Get rid of the imagebuilder.mk include once
+# https://github.com/openshift/build-machinery-go/pull/50 is merged and
+# vendored.
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/controller-gen.mk \
 	targets/openshift/yq.mk \
 	targets/openshift/bindata.mk \
 	targets/openshift/deps.mk \
+	targets/openshift/imagebuilder.mk \
 	targets/openshift/images.mk \
 	targets/openshift/kustomize.mk \
 )
@@ -185,8 +189,8 @@ deploy: ensure-kustomize install
 	oc create namespace ${HIVE_OPERATOR_NS} || true
 	mkdir -p overlays/deploy
 	cp overlays/template/kustomization.yaml overlays/deploy
-	cd overlays/deploy && kustomize edit set image registry.ci.openshift.org/openshift/hive-v4.0:hive=${IMG} && kustomize edit set namespace ${HIVE_OPERATOR_NS}
-	kustomize build overlays/deploy | oc apply -f -
+	cd overlays/deploy && ../../$(KUSTOMIZE) edit set image registry.ci.openshift.org/openshift/hive-v4.0:hive=${IMG} && ../../$(KUSTOMIZE) edit set namespace ${HIVE_OPERATOR_NS}
+	$(KUSTOMIZE) build overlays/deploy | oc apply -f -
 	rm -rf overlays/deploy
 	# Create a default basic HiveConfig so the operator will deploy Hive
 	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -f config/templates/hiveconfig.yaml | oc apply -f -

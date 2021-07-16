@@ -28,17 +28,6 @@ fi
 echo "Running e2e with HIVE_IMAGE ${HIVE_IMAGE}"
 echo "Running e2e with RELEASE_IMAGE ${RELEASE_IMAGE}"
 
-if ! which kustomize > /dev/null; then
-  kustomize_dir="$(mktemp -d)"
-  export PATH="$PATH:${kustomize_dir}"
-  # download kustomize so we can use it for deploying
-  pushd "${kustomize_dir}"
-  curl -O -L https://github.com/kubernetes-sigs/kustomize/releases/download/v2.0.0/kustomize_2.0.0_linux_amd64
-  mv kustomize_2.0.0_linux_amd64 kustomize
-  chmod u+x kustomize
-  popd
-fi
-
 i=1
 while [ $i -le ${max_tries} ]; do
   if [ $i -gt 1 ]; then

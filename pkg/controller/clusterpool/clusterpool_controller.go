@@ -43,6 +43,7 @@ const (
 	clusterPoolAdminRoleName        = "hive-cluster-pool-admin"
 	clusterPoolAdminRoleBindingName = "hive-cluster-pool-admin-binding"
 	icSecretDependent               = "install config template secret"
+	cdClusterPoolIndex              = "spec.clusterpool.namespacedname"
 )
 
 var (
@@ -55,6 +56,10 @@ var (
 		hivev1.ClusterPoolCapacityAvailableCondition,
 	}
 )
+
+func poolKey(namespace, name string) string {
+	return namespace + "/" + name
+}
 
 // Add creates a new ClusterPool Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -87,6 +92,19 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 		RateLimiter:             rateLimiter,
 	})
 	if err != nil {
+		return err
+	}
+
+	// Index ClusterDeployments by pool namespace/name
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{}, cdClusterPoolIndex,
+		func(o client.Object) []string {
+			cd := o.(*hivev1.ClusterDeployment)
+			if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
+				return []string{poolKey(poolRef.Namespace, poolRef.PoolName)}
+			}
+			return []string{}
+		}); err != nil {
+		log.WithError(err).Error("Error indexing ClusterDeployments by ClusterPool")
 		return err
 	}
 
@@ -688,19 +706,22 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 
 func (r *ReconcileClusterPool) getAllClusterDeploymentsForPool(pool *hivev1.ClusterPool, logger log.FieldLogger) (claimed, unclaimed []*hivev1.ClusterDeployment, err error) {
 	cdList := &hivev1.ClusterDeploymentList{}
-	if err := r.Client.List(context.Background(), cdList); err != nil {
+	if err := r.Client.List(context.Background(), cdList,
+		client.MatchingFields{cdClusterPoolIndex: poolKey(pool.GetNamespace(), pool.GetName())}); err != nil {
 		logger.WithError(err).Error("error listing ClusterDeployments")
 		return nil, nil, err
 	}
 	for i, cd := range cdList.Items {
-		if refInCD := cd.Spec.ClusterPoolRef; refInCD != nil {
-			if refInCD.Namespace == pool.Namespace && refInCD.PoolName == pool.Name {
-				if len(refInCD.ClaimName) > 0 {
-					claimed = append(claimed, &cdList.Items[i])
-				} else {
-					unclaimed = append(unclaimed, &cdList.Items[i])
-				}
-			}
+		poolRef := cd.Spec.ClusterPoolRef
+		if poolRef == nil || poolRef.Namespace != pool.Namespace || poolRef.PoolName != pool.Name {
+			// This shouldn't happen IRL, but controller-runtime fake client doesn't support index filters
+			logger.Errorf("unepectedly got a ClusterDeployment not belonging to this pool; ClusterPoolRef: %v", cd.Spec.ClusterPoolRef)
+			continue
+		}
+		if poolRef.ClaimName != "" {
+			claimed = append(claimed, &cdList.Items[i])
+		} else {
+			unclaimed = append(unclaimed, &cdList.Items[i])
 		}
 	}
 	return claimed, unclaimed, nil

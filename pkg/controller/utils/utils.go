@@ -387,3 +387,8 @@ func SetProxyEnvVars(podSpec *corev1.PodSpec, httpProxy, httpsProxy, noProxy str
 		setEnvVarOnContainers(podSpec, "NO_PROXY", noProxy)
 	}
 }
+
+func SafeDelete(cl client.Client, ctx context.Context, obj client.Object) error {
+	rv := obj.GetResourceVersion()
+	return cl.Delete(ctx, obj, client.Preconditions{ResourceVersion: &rv})
+}

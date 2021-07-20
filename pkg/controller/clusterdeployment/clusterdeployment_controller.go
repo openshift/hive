@@ -45,6 +45,7 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -527,7 +528,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.Debugf("cluster expires at: %s", expiry)
 			if time.Now().After(expiry) {
 				cdLog.WithField("expiry", expiry).Info("cluster has expired, issuing delete")
-				err := r.Delete(context.TODO(), cd)
+				err := utils.SafeDelete(r, context.TODO(), cd)
 				if err != nil {
 					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting expired cluster")
 				}

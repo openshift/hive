@@ -1,24 +1,28 @@
 package utils
 
 import (
+	"context"
 	goerrors "errors"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveassert "github.com/openshift/hive/pkg/test/assert"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -489,4 +493,52 @@ func TestSetProxyEnvVars(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSafeDelete(t *testing.T) {
+	scheme := runtime.NewScheme()
+	hivev1.AddToScheme(scheme)
+	corev1.AddToScheme(scheme)
+
+	fakeClient := fake.NewFakeClientWithScheme(scheme)
+
+	cp := &hivev1.ClusterPool{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "bar",
+		},
+	}
+
+	cp1 := cp.DeepCopy()
+	t.Log("1) Deletion with matching ResourceVersion")
+	if err := fakeClient.Create(context.Background(), cp1); err != nil {
+		t.Errorf("Failed initial creation: %v", err)
+	}
+	t.Logf("ResourceVersion after Creation: %s", cp1.ResourceVersion)
+
+	// SafeDelete works if we don't muck with the ResourceVersion
+	if err := SafeDelete(fakeClient, context.Background(), cp1); err != nil {
+		t.Errorf("SafeDelete() error: %v", err)
+	}
+
+	t.Log("2) Deletion with stale ResourceVersion")
+	cp2 := cp.DeepCopy()
+	if err := fakeClient.Create(context.Background(), cp2); err != nil {
+		t.Errorf("Failed creation: %v", err)
+	}
+
+	cp3 := cp2.DeepCopy()
+	// Make a change to the created object
+	cp2.Spec.BaseDomain = "foo.example.com"
+	if err := fakeClient.Update(context.Background(), cp2); err != nil {
+		t.Errorf("Failed update: %v", err)
+	}
+	assert.NotEqual(t, cp3.ResourceVersion, cp2.ResourceVersion)
+	t.Logf("ResourceVersion after update: %s", cp2.ResourceVersion)
+
+	// Now try to delete the object using the stale copy
+	err := SafeDelete(fakeClient, context.Background(), cp3)
+	assert.True(
+		t, apierrors.IsConflict(err),
+		"Expected conflict error deleting stale copy with ResourceVersion %s, but got %s", cp3.ResourceVersion, err)
 }

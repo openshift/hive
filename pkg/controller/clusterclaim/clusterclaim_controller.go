@@ -263,7 +263,8 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 
 	switch cd.Spec.ClusterPoolRef.ClaimName {
 	case "":
-		return r.reconcileForNewAssignment(claim, cd, logger)
+		logger.Debugf("clusterdeployment %s has not yet been assigned to claim", cd.Name)
+		return reconcile.Result{}, nil
 	case claim.Name:
 		return r.reconcileForExistingAssignment(claim, cd, logger)
 	default:
@@ -426,17 +427,6 @@ func (r *ReconcileClusterClaim) reconcileForDeletedCluster(claim *hivev1.Cluster
 		}
 	}
 	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileClusterClaim) reconcileForNewAssignment(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
-	logger.Info("cluster assigned to claim")
-	cd.Spec.ClusterPoolRef.ClaimName = claim.Name
-	cd.Spec.PowerState = hivev1.RunningClusterPowerState
-	if err := r.Update(context.Background(), cd); err != nil {
-		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not set claim for ClusterDeployment")
-		return reconcile.Result{}, err
-	}
-	return r.reconcileForExistingAssignment(claim, cd, logger)
 }
 
 func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {

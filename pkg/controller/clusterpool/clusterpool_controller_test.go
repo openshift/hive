@@ -93,6 +93,8 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedMissingDependenciesMessage string
 		expectedAssignedClaims             int
 		expectedUnassignedClaims           int
+		expectedAssignedCDs                int
+		expectedRunning                    int
 		expectedLabels                     map[string]string // Tested on all clusters, so will not work if your test has pre-existing cds in the pool.
 		// Map, keyed by claim name, of expected Status.Conditions['Pending'].Reason.
 		// (The clusterpool controller always sets this condition's Status to True.)
@@ -159,6 +161,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			name: "scale up with no more capacity including claimed",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(3)),
+				testclaim.FullBuilder(testNamespace, "test", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 				cdBuilder("c1").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test")),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
@@ -166,12 +169,15 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:  3,
 			expectedObservedSize:   2,
 			expectedObservedReady:  1,
+			expectedAssignedClaims: 1,
+			expectedAssignedCDs:    1,
 			expectedCapacityStatus: corev1.ConditionFalse,
 		},
 		{
 			name: "scale up with some capacity including claimed",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(4)),
+				testclaim.FullBuilder(testNamespace, "test", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 				cdBuilder("c1").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test")),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
@@ -179,6 +185,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:  4,
 			expectedObservedSize:   2,
 			expectedObservedReady:  1,
+			expectedAssignedClaims: 1,
+			expectedAssignedCDs:    1,
 			expectedCapacityStatus: corev1.ConditionTrue,
 		},
 		{
@@ -260,15 +268,18 @@ func TestReconcileClusterPool(t *testing.T) {
 			name: "no scale up with max concurrent and some deleting claimed clusters",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 				cdBuilder("c1").GenericOptions(generic.Deleted()).Build(
 					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 				),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
-			expectedTotalClusters: 3,
-			expectedObservedSize:  2,
-			expectedObservedReady: 1,
+			expectedTotalClusters:  3,
+			expectedObservedSize:   2,
+			expectedObservedReady:  1,
+			expectedAssignedClaims: 1,
+			expectedAssignedCDs:    1,
 		},
 		{
 			name: "scale up with max concurrent and some deleting",
@@ -421,6 +432,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 4,
 			expectedObservedSize:  3,
 			expectedObservedReady: 2,
+			expectedAssignedCDs:   1,
 		},
 		{
 			name: "clusters in different pool are not counted against pool size",
@@ -600,7 +612,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedSize:        3,
 			expectedObservedReady:       2,
 			expectedAssignedClaims:      1,
-			expectedUnassignedClaims:    0,
+			expectedAssignedCDs:         1,
+			expectedRunning:             1,
 			expectedClaimPendingReasons: map[string]string{"test-claim": "ClusterAssigned"},
 		},
 		{
@@ -644,6 +657,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedSize:     3,
 			expectedObservedReady:    2,
 			expectedAssignedClaims:   2,
+			expectedAssignedCDs:      2,
+			expectedRunning:          2,
 			expectedUnassignedClaims: 1,
 			expectedClaimPendingReasons: map[string]string{
 				"test-claim-1": "ClusterAssigned",
@@ -713,6 +728,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 4,
 			expectedObservedSize:  3,
 			expectedObservedReady: 2,
+			expectedAssignedCDs:   1,
 		},
 		{
 			name: "do not delete previously claimed clusters 2",
@@ -730,6 +746,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 4,
 			expectedObservedSize:  3,
 			expectedObservedReady: 2,
+			expectedAssignedCDs:   1,
 		},
 		{
 			name: "delete previously claimed clusters",
@@ -765,6 +782,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 4,
 			expectedObservedSize:  3,
 			expectedObservedReady: 1,
+			expectedAssignedCDs:   1,
 		},
 		{
 			name: "deleting previously claimed clusters should use max concurrent 2",
@@ -782,6 +800,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 4,
 			expectedObservedSize:  2,
 			expectedObservedReady: 1,
+			expectedAssignedCDs:   1,
 		},
 		{
 			name: "deleting previously claimed clusters should use max concurrent 3",
@@ -860,6 +879,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:   3,
 			expectedObservedSize:    2,
 			expectedObservedReady:   1,
+			expectedAssignedCDs:     1,
 			expectedDeletedClusters: []string{"c4"},
 		},
 		{
@@ -924,7 +944,30 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:   4,
 			expectedObservedSize:    3,
 			expectedObservedReady:   2,
+			expectedAssignedCDs:     1,
 			expectedDeletedClusters: []string{"c4"},
+		},
+		{
+			name: "claims exceed capacity",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				testclaim.FullBuilder(testNamespace, "test-claim1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim2", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim3", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedTotalClusters: 5,
+			// The assignments don't happen until a subsequent reconcile after the CDs are ready
+			expectedUnassignedClaims: 3,
+		},
+		{
+			name: "zero size pool",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(0)),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedTotalClusters: 1,
+			// The assignments don't happen until a subsequent reconcile after the CDs are ready
+			expectedUnassignedClaims: 1,
 		},
 	}
 
@@ -981,14 +1024,30 @@ func TestReconcileClusterPool(t *testing.T) {
 				}
 			}
 
+			var actualAssignedCDs, actualUnassignedCDs, actualRunning, actualHibernating int
 			for _, cd := range cds.Items {
-				assert.Equal(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected cluster to be hibernating")
+				if poolRef := cd.Spec.ClusterPoolRef; poolRef == nil || poolRef.PoolName != testLeasePoolName || poolRef.ClaimName == "" {
+					actualUnassignedCDs++
+				} else {
+					actualAssignedCDs++
+				}
+				switch powerState := cd.Spec.PowerState; powerState {
+				case hivev1.RunningClusterPowerState:
+					actualRunning++
+				case hivev1.HibernatingClusterPowerState:
+					actualHibernating++
+				}
+
 				if test.expectedLabels != nil {
 					for k, v := range test.expectedLabels {
 						assert.Equal(t, v, cd.Labels[k])
 					}
 				}
 			}
+			assert.Equal(t, test.expectedAssignedCDs, actualAssignedCDs, "unexpected number of assigned CDs")
+			assert.Equal(t, test.expectedTotalClusters-test.expectedAssignedCDs, actualUnassignedCDs, "unexpected number of unassigned CDs")
+			assert.Equal(t, test.expectedRunning, actualRunning, "unexpected number of running CDs")
+			assert.Equal(t, test.expectedTotalClusters-test.expectedRunning, actualHibernating, "unexpected number of assigned CDs")
 
 			pool := &hivev1.ClusterPool{}
 			err = fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)

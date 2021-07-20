@@ -1453,6 +1453,17 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		return nil, err
 	}
 
+	// Ensure the DNSZone has PreserveOnDelete if ClusterDeployment is set.
+	if dnsZone.Spec.PreserveOnDelete != cd.Spec.PreserveOnDelete {
+		logger.Infof("setting DNSZone PreserveOnDelete to match ClusterDeployment PreserveOnDelete: %v", cd.Spec.PreserveOnDelete)
+		dnsZone.Spec.PreserveOnDelete = cd.Spec.PreserveOnDelete
+		err := r.Update(context.TODO(), dnsZone)
+		if err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating DNSZone")
+			return nil, err
+		}
+	}
+
 	if !metav1.IsControlledBy(dnsZone, cd) {
 		cdLog.Error("DNS zone already exists but is not owned by cluster deployment")
 		if err := r.setDNSNotReadyCondition(cd, corev1.ConditionTrue, dnsZoneResourceConflictReason, "Existing DNS zone not owned by cluster deployment", cdLog); err != nil {
@@ -1523,6 +1534,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 		},
 		Spec: hivev1.DNSZoneSpec{
 			Zone:               cd.Spec.BaseDomain,
+			PreserveOnDelete:   cd.Spec.PreserveOnDelete,
 			LinkToParentDomain: true,
 		},
 	}

@@ -125,6 +125,12 @@ func WithClusterPoolReference(namespace, poolName, claimName string) Option {
 	}
 }
 
+func PreserveOnDelete() Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.PreserveOnDelete = true
+	}
+}
+
 func Installed() Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.Installed = true

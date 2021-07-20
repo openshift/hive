@@ -15,6 +15,7 @@ import (
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
@@ -197,6 +198,10 @@ const (
 
 func buildScheme() (*runtime.Scheme, error) {
 	scheme := runtime.NewScheme()
+
+	if err := capiv1.AddToScheme(scheme); err != nil {
+		return nil, err
+	}
 
 	if err := machineapi.AddToScheme(scheme); err != nil {
 		return nil, err

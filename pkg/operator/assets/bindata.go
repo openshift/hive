@@ -936,6 +936,18 @@ rules:
   - backups
   verbs:
   - create
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - machinesets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 `)
 
 func configControllersHive_controllers_roleYamlBytes() ([]byte, error) {

@@ -16,7 +16,7 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.31.0
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.1.2
 	github.com/gophercloud/utils v0.0.0-20210113034859-6f548432055a
 	github.com/heptio/velero v1.0.0
@@ -41,7 +41,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/sirupsen/logrus v1.7.0
-	github.com/spf13/cobra v1.1.1
+	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.22.2
@@ -49,10 +49,10 @@ require (
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
 	golang.org/x/mod v0.4.0
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
-	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
+	golang.org/x/oauth2 v0.0.0-20210615190721-d04028783cf1
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
-	google.golang.org/api v0.33.0
-	gopkg.in/ini.v1 v1.61.0
+	google.golang.org/api v0.44.0
+	gopkg.in/ini.v1 v1.62.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.21.2
 	k8s.io/apiextensions-apiserver v0.21.2
@@ -62,10 +62,10 @@ require (
 	k8s.io/cluster-registry v0.0.6
 	k8s.io/code-generator v0.21.2
 	k8s.io/klog v1.0.0
-	k8s.io/klog/v2 v2.9.0 // indirect
 	k8s.io/kube-aggregator v0.21.2
 	k8s.io/kubectl v0.21.2
 	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
+	sigs.k8s.io/cluster-api v0.4.0
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0

@@ -373,7 +373,7 @@ func (r *ReconcileAWSPrivateLink) setErrCondition(cd *hivev1.ClusterDeployment,
 	}
 	curr.Status.Conditions = conditions
 	logger.Debug("setting AWSPrivateLinkFailedClusterDeploymentCondition to true")
-	return r.Status().Update(context.TODO(), curr)
+	return r.updateClusterDeploymentConditions(curr, logger)
 }
 
 func (r *ReconcileAWSPrivateLink) setReadyCondition(cd *hivev1.ClusterDeployment,
@@ -429,7 +429,7 @@ func (r *ReconcileAWSPrivateLink) setReadyCondition(cd *hivev1.ClusterDeployment
 	}
 	curr.Status.Conditions = conditions
 	logger.Debug("setting AWSPrivateLinkReadyClusterDeploymentCondition to %s", completed)
-	return r.Status().Update(context.TODO(), curr)
+	return r.updateClusterDeploymentConditions(curr, logger)
 }
 
 func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeployment, clusterMetadata *hivev1.ClusterMetadata, logger log.FieldLogger) (reconcile.Result, error) {
@@ -1291,6 +1291,19 @@ func (r *ReconcileAWSPrivateLink) updatePrivateLinkStatus(cd *hivev1.ClusterDepl
 
 		initPrivateLinkStatus(curr)
 		curr.Status.Platform.AWS.PrivateLink = cd.Status.Platform.AWS.PrivateLink
+		return r.Client.Status().Update(context.TODO(), curr)
+	})
+}
+
+func (r *ReconcileAWSPrivateLink) updateClusterDeploymentConditions(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+	return retry.RetryOnConflict(retryBackoff, func() error {
+		curr := &hivev1.ClusterDeployment{}
+		err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, curr)
+		if err != nil {
+			return err
+		}
+
+		curr.Status.Conditions = cd.Status.Conditions
 		return r.Client.Status().Update(context.TODO(), curr)
 	})
 }

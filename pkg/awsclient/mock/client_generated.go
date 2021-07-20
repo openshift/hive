@@ -114,6 +114,21 @@ func (mr *MockClientMockRecorder) StopInstances(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopInstances", reflect.TypeOf((*MockClient)(nil).StopInstances), arg0)
 }
 
+// TerminateInstances mocks base method
+func (m *MockClient) TerminateInstances(arg0 *ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TerminateInstances", arg0)
+	ret0, _ := ret[0].(*ec2.TerminateInstancesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TerminateInstances indicates an expected call of TerminateInstances
+func (mr *MockClientMockRecorder) TerminateInstances(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TerminateInstances", reflect.TypeOf((*MockClient)(nil).TerminateInstances), arg0)
+}
+
 // StartInstances mocks base method
 func (m *MockClient) StartInstances(arg0 *ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error) {
 	m.ctrl.T.Helper()

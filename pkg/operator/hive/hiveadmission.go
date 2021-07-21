@@ -27,7 +27,7 @@ import (
 
 	admregv1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -287,7 +287,7 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 // is311 returns true if this is a 3.11 OpenShift cluster. We check by looking for a ClusterVersion CRD,
 // which should only exist on OpenShift 4.x. We do not expect Hive to ever be deployed on pre-3.11.
 func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
-	cvCRD := &apiextv1beta1.CustomResourceDefinition{}
+	cvCRD := &apiextv1.CustomResourceDefinition{}
 	err := r.Client.Get(context.Background(), types.NamespacedName{Name: clusterVersionCRDName}, cvCRD)
 	if err != nil && errors.IsNotFound(err) {
 		// If this CRD does not exist, we must not be on a 4.x cluster.
@@ -354,7 +354,7 @@ func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLo
 		supported[k.Name] = k.Supported
 	}
 
-	crdList := &apiextv1beta1.CustomResourceDefinitionList{}
+	crdList := &apiextv1.CustomResourceDefinitionList{}
 	if err := r.Client.List(context.TODO(), crdList); err != nil {
 		hLog.WithError(err).Error("error getting crds for collect contract implementations")
 		return "", err

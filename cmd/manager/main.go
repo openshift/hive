@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -192,10 +191,6 @@ func newRootCommand() *cobra.Command {
 				}
 
 				if err := openshiftapiv1.Install(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := apiextv1.AddToScheme(mgr.GetScheme()); err != nil {
 					log.Fatal(err)
 				}
 

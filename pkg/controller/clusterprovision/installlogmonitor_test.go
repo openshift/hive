@@ -28,6 +28,7 @@ const (
 	pendingVerificationLog  = "blahblah\naws_instance.master.2: Error launching source instance: PendingVerification: Your request for accessing resources in this region is being validated, and you will not be able to launch additional resources in this region until the validation is complete. We will notify you by email once your request has been validated. While normally resolved within minutes, please allow up to 4 hours for this process to complete. If the issue still persists, please let us know by writing to awsa\n\nblahblah"
 	gcpInvalidProjectIDLog  = "blahblah\ntime=\"2020-11-13T16:05:07Z\" level=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": platform.gcp.project: Invalid value: \"o-6b20f250\": invalid project ID\nblahblah"
 	gcpSSDQUotaLog          = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error waiting for instance to create: Quota 'SSD_TOTAL_GB' exceeded. Limit: 500.0 in region asia-northeast2.\nblahblah"
+	gcpCPUQuotaLog          = "level=fatal msg=failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Quota Check\": error(MissingQuota): compute.googleapis.com/cpus is not available in us-east1 because the required number of resources (20) is more than remaining quota of 16"
 	kubeAPIWaitTimeoutLog   = "blahblah\ntime=\"2021-01-03T07:04:44Z\" level=fatal msg=\"waiting for Kubernetes API: context deadline exceeded\""
 	natGatewayLimitExceeded = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error creating NAT Gateway: NatGatewayLimitExceeded: The maximum number of NAT Gateways has been reached.\""
 	vpcLimitExceeded        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating VPC: VpcLimitExceeded: The maximum number of VPCs has been reached.\""
@@ -261,6 +262,26 @@ func TestParseInstallLog(t *testing.T) {
 				},
 			}},
 			expectedReason: "DNSAlreadyExists",
+		},
+		{
+			name: "GCP compute quota",
+			log:  pointer.StringPtr(gcpCPUQuotaLog),
+			existing: []runtime.Object{&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      regexConfigMapName,
+					Namespace: constants.DefaultHiveNamespace,
+				},
+				Data: map[string]string{
+					"regexes": `
+- name: GCPComputeQuota
+  searchRegexStrings:
+  - "compute\\.googleapis\\.com/cpus is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than remaining quota"
+  installFailingReason: GCPComputeQuotaExceeded
+  installFailingMessage: GCP CPUs quota exceeded
+`,
+				},
+			}},
+			expectedReason: "GCPComputeQuotaExceeded",
 		},
 	}
 

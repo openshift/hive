@@ -159,6 +159,12 @@ var (
 		return zone
 	}
 
+	validDNSZoneBeingDeletedWithPreserve = func() *hivev1.DNSZone {
+		zone := validDNSZoneBeingDeleted()
+		zone.Spec.PreserveOnDelete = true
+		return zone
+	}
+
 	validAzureDNSZoneBeingDeleted = func() *hivev1.DNSZone {
 		// Take a copy of the default validAzureDNSZone object
 		zone := validAzureDNSZone()

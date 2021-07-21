@@ -135,6 +135,14 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			expectZoneDeleted: true,
 		},
 		{
+			name:    "Delete zone with PreserveOnDelete",
+			dnsZone: validDNSZoneBeingDeletedWithPreserve(),
+			// No AWS calls expected in this case, our creds may be bad:
+			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			},
+			expectZoneDeleted: true,
+		},
+		{
 			name: "Delete DNSZone without status",
 			dnsZone: func() *hivev1.DNSZone {
 				dz := validDNSZoneBeingDeleted()

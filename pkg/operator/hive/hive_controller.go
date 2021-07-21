@@ -18,7 +18,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -206,7 +206,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Monitor CRDs so that we can keep latest list of supported contracts
-	err = c.Watch(&source.Kind{Type: &apiextv1beta1.CustomResourceDefinition{}},
+	err = c.Watch(&source.Kind{Type: &apiextv1.CustomResourceDefinition{}},
 		handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
 			retval := []reconcile.Request{}
 

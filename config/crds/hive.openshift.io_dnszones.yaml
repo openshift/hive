@@ -131,6 +131,12 @@ spec:
                 description: LinkToParentDomain specifies whether DNS records should
                   be automatically created to link this DNSZone with a parent domain.
                 type: boolean
+              preserveOnDelete:
+                description: PreserveOnDelete allows the user to disconnect a DNSZone
+                  from Hive without deprovisioning it. This can also be used to abandon
+                  ongoing DNSZone deprovision. Typically set automatically due to
+                  PreserveOnDelete being set on a ClusterDeployment.
+                type: boolean
               zone:
                 description: Zone is the DNS zone to host
                 type: string

@@ -94,6 +94,7 @@ type ClusterDeploymentSpec struct {
 
 	// PreserveOnDelete allows the user to disconnect a cluster from Hive without deprovisioning it. This can also be
 	// used to abandon ongoing cluster deprovision.
+	// +optional
 	PreserveOnDelete bool `json:"preserveOnDelete,omitempty"`
 
 	// ControlPlaneConfig contains additional configuration for the target cluster's control plane

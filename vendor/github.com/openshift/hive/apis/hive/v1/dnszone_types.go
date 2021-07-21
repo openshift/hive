@@ -27,6 +27,12 @@ type DNSZoneSpec struct {
 	// +optional
 	LinkToParentDomain bool `json:"linkToParentDomain,omitempty"`
 
+	// PreserveOnDelete allows the user to disconnect a DNSZone from Hive without deprovisioning it.
+	// This can also be used to abandon ongoing DNSZone deprovision.
+	// Typically set automatically due to PreserveOnDelete being set on a ClusterDeployment.
+	// +optional
+	PreserveOnDelete bool `json:"preserveOnDelete,omitempty"`
+
 	// AWS specifies AWS-specific cloud configuration
 	// +optional
 	AWS *AWSDNSZoneSpec `json:"aws,omitempty"`

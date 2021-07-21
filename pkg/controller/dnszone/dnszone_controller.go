@@ -257,6 +257,15 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 
 // ReconcileDNSProvider attempts to make the current state reflect the desired state. It does this idempotently.
 func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hivev1.DNSZone) (reconcile.Result, error) {
+
+	// If deleted and set to PreserveOnDelete, we need to skip any
+	// attempts to use the cluster's cloud credentials as they may no longer be good.
+	if dnsZone.DeletionTimestamp != nil && dnsZone.Spec.PreserveOnDelete {
+		r.logger.Info("DNSZone set to PreserveOnDelete, skipping cleanup and removing finalizer")
+		err := r.removeDNSZoneFinalizer(dnsZone)
+		return reconcile.Result{}, err
+	}
+
 	r.logger.Debug("Retrieving current state")
 	err := actuator.Refresh()
 	if err != nil {
@@ -273,18 +282,16 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 	if dnsZone.DeletionTimestamp != nil {
 		if zoneFound {
 			r.logger.Debug("DNSZone resource is deleted, deleting hosted zone")
-			err := actuator.Delete()
+			err = actuator.Delete()
 			if err != nil {
 				return reconcile.Result{}, err
 			}
 		}
 		if controllerutils.HasFinalizer(dnsZone, hivev1.FinalizerDNSZone) {
 			// Remove the finalizer from the DNSZone. It will be persisted when we persist status
-			r.logger.Info("Removing DNSZone finalizer")
-			controllerutils.DeleteFinalizer(dnsZone, hivev1.FinalizerDNSZone)
-			err := r.Client.Update(context.TODO(), dnsZone)
+			err = r.removeDNSZoneFinalizer(dnsZone)
 			if err != nil {
-				r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
+				return reconcile.Result{}, err
 			}
 			metricDNSZonesDeleted.WithLabelValues("false").Inc()
 		}
@@ -333,6 +340,17 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 	}
 
 	return reconcileResult, r.updateStatus(nameServers, isZoneSOAAvailable, dnsZone)
+}
+
+func (r *ReconcileDNSZone) removeDNSZoneFinalizer(dnsZone *hivev1.DNSZone) error {
+	// Remove the finalizer from the DNSZone. It will be persisted when we persist status
+	r.logger.Info("Removing DNSZone finalizer")
+	controllerutils.DeleteFinalizer(dnsZone, hivev1.FinalizerDNSZone)
+	err := r.Client.Update(context.TODO(), dnsZone)
+	if err != nil {
+		r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
+	}
+	return err
 }
 
 func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {

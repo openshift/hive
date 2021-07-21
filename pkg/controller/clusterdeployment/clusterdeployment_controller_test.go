@@ -738,6 +738,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
+					cd.Spec.PreserveOnDelete = true
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -748,6 +749,27 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				require.NotNil(t, zone, "dns zone should exist")
 				assert.Equal(t, testClusterDeployment().Name, zone.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
 				assert.Equal(t, constants.DNSZoneTypeChild, zone.Labels[constants.DNSZoneTypeLabel], "incorrect dnszone type label")
+				assert.True(t, zone.Spec.PreserveOnDelete, "PreserveOnDelete did not transfer to DNSZone")
+			},
+		},
+		{
+			name: "Update DNSZone when PreserveOnDelete changes",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.ManageDNS = true
+					cd.Spec.PreserveOnDelete = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testDNSZone(),
+			},
+			expectedRequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime,
+			validate: func(c client.Client, t *testing.T) {
+				zone := getDNSZone(c)
+				require.NotNil(t, zone, "dns zone should exist")
+				assert.True(t, zone.Spec.PreserveOnDelete, "PreserveOnDelete was not updated")
 			},
 		},
 		{

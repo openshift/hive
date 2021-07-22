@@ -98,6 +98,11 @@ data:
       - "compute\\.googleapis\\.com/cpus is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than remaining quota"
       installFailingReason: GCPComputeQuotaExceeded
       installFailingMessage: GCP CPUs quota exceeded
+    - name: GCPServiceAccountQuota
+      searchRegexStrings:
+      - "iam\\.googleapis\\.com/quota/service-account-count is not available in global because the required number of resources \\([0-9]*\\) is more than remaining quota"
+      installFailingReason: GCPServiceAccountQuotaExceeded
+      installFailingMessage: GCP Service Account quota exceeded
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:

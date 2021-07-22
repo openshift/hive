@@ -38,7 +38,6 @@ const (
 // clusterClaimConditions are the cluster claim conditions controlled or initialized by cluster claim controller
 var clusterClaimConditions = []hivev1.ClusterClaimConditionType{
 	hivev1.ClusterClaimPendingCondition,
-	hivev1.ClusterClaimClusterDeletedCondition,
 	hivev1.ClusterRunningCondition,
 }
 
@@ -394,8 +393,8 @@ func (r *ReconcileClusterClaim) reconcileForDeletedCluster(claim *hivev1.Cluster
 	logger.Debug("assigned cluster has been deleted")
 	conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
 		claim.Status.Conditions,
-		hivev1.ClusterClaimClusterDeletedCondition,
-		corev1.ConditionTrue,
+		hivev1.ClusterRunningCondition,
+		corev1.ConditionFalse,
 		"ClusterDeleted",
 		"Assigned cluster has been deleted",
 		controllerutils.UpdateConditionIfReasonOrMessageChange,

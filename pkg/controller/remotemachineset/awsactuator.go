@@ -366,7 +366,7 @@ func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePo
 
 	var privateSubnets, publicSubnets = map[string]ec2.Subnet{}, map[string]ec2.Subnet{}
 	for _, subnet := range results.Subnets {
-		isPublic, err := isSubnetPublic(routeTables.RouteTables, *subnet.SubnetId, a.logger)
+		isPublic, err := isSubnetPublic(routeTables.RouteTables, subnet, a.logger)
 		if err != nil {
 			return nil, errors.Wrap(err, "error describing route tables")
 		}
@@ -428,8 +428,13 @@ func isUsingUnsupportedSpotMarketOptions(pool *hivev1.MachinePool, clusterVersio
 	return !versionsSupportingSpotInstances(parsedVersion)
 }
 
+// tagNameSubnetPublicELB is the tag name used on a subnet to designate that
+// it should be used for internet ELBs
+const tagNameSubnetPublicELB = "kubernetes.io/role/elb"
+
 // https://github.com/kubernetes/kubernetes/blob/9f036cd43d35a9c41d7ac4ca82398a6d0bef957b/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L3376-L3419
-func isSubnetPublic(rt []*ec2.RouteTable, subnetID string, logger log.FieldLogger) (bool, error) {
+func isSubnetPublic(rt []*ec2.RouteTable, subnet *ec2.Subnet, logger log.FieldLogger) (bool, error) {
+	subnetID := aws.StringValue(subnet.SubnetId)
 	var subnetTable *ec2.RouteTable
 	for _, table := range rt {
 		for _, assoc := range table.Associations {
@@ -471,7 +476,25 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string, logger log.FieldLogge
 		}
 	}
 
+	// If we couldn't use the subnet table to figure out whether the subnet is public,
+	// we let the users define whether this subnet should be used for internet-facing things
+	// by looking for tagNameSubnetPublicELB tag.
+	tagVal, subnetHasTag := findTag(subnet.Tags, tagNameSubnetPublicELB)
+	if subnetHasTag && (tagVal == "" || tagVal == "1") {
+		return true, nil
+	}
+
 	return false, nil
+}
+
+// Finds the value for a given tag.
+func findTag(tags []*ec2.Tag, key string) (string, bool) {
+	for _, tag := range tags {
+		if aws.StringValue(tag.Key) == key {
+			return aws.StringValue(tag.Value), true
+		}
+	}
+	return "", false
 }
 
 // validateSubnets ensures there's only one public or private subnet per availability zone, and returns

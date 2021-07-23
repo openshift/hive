@@ -190,6 +190,20 @@ func TestReconcileClusterClaim(t *testing.T) {
 			}},
 		},
 		{
+			name:  "deleting cluster",
+			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
+			cd: cdBuilder.GenericOptions(testgeneric.Deleted()).Build(
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
+			),
+			expectCompletedClaim: true,
+			expectedConditions: []hivev1.ClusterClaimCondition{{
+				Type:    hivev1.ClusterRunningCondition,
+				Status:  corev1.ConditionFalse,
+				Reason:  "ClusterDeleting",
+				Message: "Assigned cluster has been marked for deletion",
+			}},
+		},
+		{
 			name:  "deleted cluster",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			expectedConditions: []hivev1.ClusterClaimCondition{{

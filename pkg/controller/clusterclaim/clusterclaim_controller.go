@@ -254,6 +254,8 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {
 	case apierrors.IsNotFound(err):
 		return r.reconcileForDeletedCluster(claim, logger)
+	case cd.DeletionTimestamp != nil || controllerutils.IsClaimedClusterMarkedForRemoval(cd):
+		return r.setDeletingStatus(claim, logger)
 	case err != nil:
 		logger.Log(controllerutils.LogLevel(err), "error getting ClusterDeployment")
 		return reconcile.Result{}, err
@@ -267,6 +269,23 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	default:
 		return r.reconcileForAssignmentConflict(claim, logger)
 	}
+}
+
+func (r *ReconcileClusterClaim) setDeletingStatus(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
+	if conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
+		claim.Status.Conditions,
+		hivev1.ClusterRunningCondition,
+		corev1.ConditionFalse,
+		"ClusterDeleting",
+		"Assigned cluster has been marked for deletion",
+		controllerutils.UpdateConditionIfReasonOrMessageChange); changed {
+		claim.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), claim); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
+			return reconcile.Result{}, err
+		}
+	}
+	return reconcile.Result{}, nil
 }
 
 // getClaimLifetime returns the lifetime for a claim taking into account the lifetime set on the pool

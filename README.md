@@ -34,7 +34,3 @@ In the future Hive will support more cloud providers.
   * [Hive Architecture](./docs/architecture.md)
   * [SyncSet](./docs/syncset.md)
   * [SyncIdentityProvider](./docs/syncidentityprovider.md)
-  
-# Office Hours
-
-Hive team hosts virtual office hours every third Friday at 2 PM EST. Hive users can join [here](https://calendar.google.com/event?action=TEMPLATE&tmeid=MzBqcmhoOTJkZjNkcDI4NnZhaTJwcXJhaDBfMjAyMDEyMTFUMTkwMDAwWiBzdW1laHRhQHJlZGhhdC5jb20&tmsrc=sumehta%40redhat.com&scp=ALL).

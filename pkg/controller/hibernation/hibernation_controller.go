@@ -56,6 +56,10 @@ const (
 	// hibernateAfterSyncSetsNotApplied is the amount of time to wait
 	// before hibernating when SyncSets have not been applied
 	hibernateAfterSyncSetsNotApplied = 10 * time.Minute
+
+	machineAPINamespace                 = "openshift-machine-api"
+	machineAPIInterruptibleLabel        = "machine.openshift.io/interruptible-instance"
+	machineAPIExcludeDrainingAnnotation = "machine.openshift.io/exclude-node-draining"
 )
 
 var (
@@ -413,6 +417,21 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to connect to target cluster")
 		return reconcile.Result{}, err
 	}
+
+	preemptibleActuator, ok := actuator.(HibernationPreemptibleMachines)
+	if ok {
+		replaced, err := preemptibleActuator.ReplaceMachines(cd, remoteClient, logger)
+		if err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to replace Preemptible machines")
+			return reconcile.Result{}, err
+		}
+		if replaced {
+			// when machines were replaced we must give some time before new nodes
+			// appear.
+			return reconcile.Result{RequeueAfter: nodeCheckWaitTime}, nil
+		}
+	}
+
 	ready, err := r.nodesReady(cd, remoteClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether nodes are ready")

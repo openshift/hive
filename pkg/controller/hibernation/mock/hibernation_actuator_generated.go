@@ -108,3 +108,41 @@ func (mr *MockHibernationActuatorMockRecorder) MachinesStopped(cd, hiveClient, l
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MachinesStopped", reflect.TypeOf((*MockHibernationActuator)(nil).MachinesStopped), cd, hiveClient, logger)
 }
+
+// MockHibernationPreemptibleMachines is a mock of HibernationPreemptibleMachines interface
+type MockHibernationPreemptibleMachines struct {
+	ctrl     *gomock.Controller
+	recorder *MockHibernationPreemptibleMachinesMockRecorder
+}
+
+// MockHibernationPreemptibleMachinesMockRecorder is the mock recorder for MockHibernationPreemptibleMachines
+type MockHibernationPreemptibleMachinesMockRecorder struct {
+	mock *MockHibernationPreemptibleMachines
+}
+
+// NewMockHibernationPreemptibleMachines creates a new mock instance
+func NewMockHibernationPreemptibleMachines(ctrl *gomock.Controller) *MockHibernationPreemptibleMachines {
+	mock := &MockHibernationPreemptibleMachines{ctrl: ctrl}
+	mock.recorder = &MockHibernationPreemptibleMachinesMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockHibernationPreemptibleMachines) EXPECT() *MockHibernationPreemptibleMachinesMockRecorder {
+	return m.recorder
+}
+
+// ReplaceMachines mocks base method
+func (m *MockHibernationPreemptibleMachines) ReplaceMachines(cd *v1.ClusterDeployment, remoteClient client.Client, logger logrus.FieldLogger) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplaceMachines", cd, remoteClient, logger)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReplaceMachines indicates an expected call of ReplaceMachines
+func (mr *MockHibernationPreemptibleMachinesMockRecorder) ReplaceMachines(cd, remoteClient, logger interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceMachines", reflect.TypeOf((*MockHibernationPreemptibleMachines)(nil).ReplaceMachines), cd, remoteClient, logger)
+}

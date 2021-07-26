@@ -677,9 +677,19 @@ func TestReconcileClusterClaim(t *testing.T) {
 			err = c.Get(context.Background(), client.ObjectKey{Namespace: claimNamespace, Name: claimName}, claim)
 			if !test.expectDeleted {
 				require.NoError(t, err, "unexpected error getting claim")
+				if test.expectNoFinalizer {
+					assert.NotContains(t, claim.Finalizers, finalizer, "expected no finalizer on claim")
+				} else {
+					assert.Contains(t, claim.Finalizers, finalizer, "expected finalizer on claim")
+				}
 			} else {
 				assert.True(t, apierrors.IsNotFound(err), "expected claim to be deleted")
-				return
+			}
+
+			// If the claim was deleted, we still need to be able to check things against the
+			// fields that existed in it before the Reconcile
+			if test.expectDeleted {
+				claim = test.claim
 			}
 
 			cds := &hivev1.ClusterDeploymentList{}
@@ -714,6 +724,10 @@ func TestReconcileClusterClaim(t *testing.T) {
 				assert.NotEmpty(t, claim.Spec.Namespace, "expected assignment set on claim")
 			}
 
+			if test.expectDeleted && len(test.expectedConditions) != 0 {
+				t.Fatal("test configuration error: Can't expect deleted claim and also expect conditions")
+			}
+
 			for _, expectedCond := range test.expectedConditions {
 				cond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, expectedCond.Type)
 				if assert.NotNilf(t, cond, "did not find expected condition type: %v", expectedCond.Type) {
@@ -725,12 +739,6 @@ func TestReconcileClusterClaim(t *testing.T) {
 						assert.Equal(t, expectedCond.Message, cond.Message, "condition found with unexpected message")
 					}
 				}
-			}
-
-			if test.expectNoFinalizer {
-				assert.NotContains(t, claim.Finalizers, finalizer, "expected no finalizer on claim")
-			} else {
-				assert.Contains(t, claim.Finalizers, finalizer, "expected finalizer on claim")
 			}
 
 			role := &rbacv1.Role{}

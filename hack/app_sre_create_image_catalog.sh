@@ -24,7 +24,7 @@ REMOVED_VERSIONS=""
 if [[ "$REMOVE_UNDEPLOYED" == true ]]; then
     DEPLOYED_HASH=$(
         curl -s https://gitlab.cee.redhat.com/service/app-interface/-/raw/master/data/services/hive/cicd/ci-int/saas-hive.yaml | \
-            docker run --rm -i quay.io/openshift-hive/yq:latest -r '.resourceTemplates[]|select(.name="hive").targets[]|select(.namespace."$ref"=="/services/hive/namespaces/hive-production.yml").ref'
+            docker run --rm -i quay.io/openshift-hive/yq:latest -r '.resourceTemplates[]|select(.name="hive").targets[]|select(.namespace."$ref"=="/services/hive/namespaces/hivep01ue1/hive-production.yml").ref'
     )
 
     delete=false

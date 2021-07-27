@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -884,33 +885,72 @@ func (r *ReconcileAWSPrivateLink) reconcileHostedZone(awsClient *awsClient,
 
 	hzLog := logger.WithField("hostedZoneID", hostedZoneID)
 
-	endpointDNSName := vpcEndpoint.DnsEntries[0].DnsName
-	endpointDNSHostedZone := vpcEndpoint.DnsEntries[0].HostedZoneId
+	rSet, err := r.recordSet(awsClient.hub, apiDomain, vpcEndpoint)
+	if err != nil {
+		hzLog.WithField("vpcEndpoint", aws.StringValue(vpcEndpoint.VpcEndpointId)).
+			WithError(err).Error("error generating DNS records")
+		return modified, "", err
+	}
 
 	_, err = awsClient.hub.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(hostedZoneID),
 		ChangeBatch: &route53.ChangeBatch{
 			Changes: []*route53.Change{{
-				Action: aws.String(route53.ChangeActionUpsert),
-				ResourceRecordSet: &route53.ResourceRecordSet{
-					Type: aws.String("A"),
-					AliasTarget: &route53.AliasTarget{
-						DNSName:              endpointDNSName,
-						HostedZoneId:         endpointDNSHostedZone,
-						EvaluateTargetHealth: aws.Bool(false),
-					},
-					Name: aws.String(apiDomain),
-				},
+				Action:            aws.String(route53.ChangeActionUpsert),
+				ResourceRecordSet: rSet,
 			}},
 		},
 	})
 	if err != nil {
-		hzLog.WithField("aliasDNSName", endpointDNSName).
-			WithField("aliasHostedZone", endpointDNSHostedZone).
-			WithError(err).Error("error add record to Hosted Zone for VPC Endpoint")
+		hzLog.WithError(err).Error("error adding record to Hosted Zone for VPC Endpoint")
 		return modified, "", err
 	}
 	return modified, hostedZoneID, nil
+}
+
+func (r *ReconcileAWSPrivateLink) recordSet(awsClient awsclient.Client, apiDomain string, vpcEndpoint *ec2.VpcEndpoint) (*route53.ResourceRecordSet, error) {
+	rSet := &route53.ResourceRecordSet{
+		Name: aws.String(apiDomain),
+	}
+	switch r.controllerconfig.DNSRecordType {
+	case hivev1.ARecordAWSPrivateLinkDNSRecordType:
+		rSet.Type = aws.String("A")
+		rSet.TTL = aws.Int64(10)
+
+		// get the ips from the elastic networking interfaces attached to the VPC endpoint
+		enis := vpcEndpoint.NetworkInterfaceIds
+		if len(enis) == 0 {
+			return nil, errors.New("No network interfaces attached to the vpc endpoint")
+		}
+		res, err := awsClient.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{NetworkInterfaceIds: vpcEndpoint.NetworkInterfaceIds})
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to list network interfaces attached to the vpc endpoint")
+		}
+		if len(res.NetworkInterfaces) == 0 {
+			return nil, errors.New("No network interfaces attached to the vpc endpoint")
+		}
+
+		var ips []string
+		for _, eni := range res.NetworkInterfaces {
+			ips = append(ips, aws.StringValue(eni.PrivateIpAddress))
+		}
+		sort.Strings(ips)
+
+		for _, ip := range ips {
+			rSet.ResourceRecords = append(rSet.ResourceRecords, &route53.ResourceRecord{
+				Value: aws.String(ip),
+			})
+		}
+
+	default: // Alias is the default case.
+		rSet.Type = aws.String("A")
+		rSet.AliasTarget = &route53.AliasTarget{
+			DNSName:              vpcEndpoint.DnsEntries[0].DnsName,
+			HostedZoneId:         vpcEndpoint.DnsEntries[0].HostedZoneId,
+			EvaluateTargetHealth: aws.Bool(false),
+		}
+	}
+	return rSet, nil
 }
 
 func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,

@@ -3,6 +3,7 @@ package awsprivatelink
 import (
 	"context"
 	"fmt"
+	"sort"
 	"testing"
 	"time"
 
@@ -632,12 +633,78 @@ users:
 		return hzID
 	}
 
+	mockPHZARecords := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingSummary *route53.HostedZoneSummary, knownENIs map[string]string) string {
+		byVPCOut := &route53.ListHostedZonesByVPCOutput{}
+		if existingSummary != nil {
+			byVPCOut.HostedZoneSummaries = []*route53.HostedZoneSummary{existingSummary}
+		}
+		m.EXPECT().ListHostedZonesByVPC(&route53.ListHostedZonesByVPCInput{
+			MaxItems:  aws.String("100"),
+			VPCId:     endpoint.VpcId,
+			VPCRegion: aws.String("us-east-1"),
+		}).Return(byVPCOut, nil)
+		var hzID string
+		if existingSummary == nil {
+			hzID = "HZ12345"
+			m.EXPECT().CreateHostedZone(newCreateHostedZoneInputMatcher(&route53.CreateHostedZoneInput{
+				HostedZoneConfig: &route53.HostedZoneConfig{
+					PrivateZone: aws.Bool(true),
+				},
+				Name: aws.String(apiDomain),
+				VPC: &route53.VPC{
+					VPCId:     endpoint.VpcId,
+					VPCRegion: aws.String("us-east-1"),
+				},
+			})).Return(&route53.CreateHostedZoneOutput{
+				HostedZone: &route53.HostedZone{
+					Id: aws.String(hzID),
+				},
+			}, nil)
+		} else {
+			hzID = aws.StringValue(existingSummary.HostedZoneId)
+		}
+
+		eniReq := &ec2.DescribeNetworkInterfacesInput{
+			NetworkInterfaceIds: endpoint.NetworkInterfaceIds,
+		}
+		eniResp := &ec2.DescribeNetworkInterfacesOutput{}
+		var rr []*route53.ResourceRecord
+		for _, eni := range aws.StringValueSlice(eniReq.NetworkInterfaceIds) {
+			ip, ok := knownENIs[eni]
+			if ok {
+				eniResp.NetworkInterfaces = append(eniResp.NetworkInterfaces, &ec2.NetworkInterface{PrivateIpAddress: aws.String(ip)})
+				rr = append(rr, &route53.ResourceRecord{Value: aws.String(ip)})
+			}
+		}
+		m.EXPECT().DescribeNetworkInterfaces(eniReq).Return(eniResp, nil)
+
+		sort.Slice(rr, func(i, j int) bool {
+			return *rr[i].Value < *rr[j].Value
+		})
+		m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
+			ChangeBatch: &route53.ChangeBatch{
+				Changes: []*route53.Change{{
+					Action: aws.String("UPSERT"),
+					ResourceRecordSet: &route53.ResourceRecordSet{
+						Name:            aws.String(apiDomain),
+						Type:            aws.String("A"),
+						TTL:             aws.Int64(10),
+						ResourceRecords: rr,
+					},
+				}},
+			},
+			HostedZoneId: aws.String(hzID),
+		})
+		return hzID
+	}
+
 	cases := []struct {
 		name string
 
 		existing           []runtime.Object
 		inventory          []hivev1.AWSPrivateLinkInventory
 		associate          []hivev1.AWSAssociatedVPC
+		dnsRecordType      hivev1.AWSPrivateLinkDNSRecordType
 		configureAWSClient func(*mock.MockClient)
 
 		hasFinalizer        bool
@@ -1042,6 +1109,52 @@ users:
 		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
 			"private link access is ready for use"),
 	}, {
+		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no previous PHZ (A records)",
+
+		existing: []runtime.Object{
+			testSecret("test-cd-provision-0-kubeconfig", kubeConfigSecret),
+			testProvision("test-cd-provision-0",
+				provisionWithInfraID("test-cd-1234"),
+				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
+			enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0")),
+		},
+		inventory:     validInventory,
+		dnsRecordType: hivev1.ARecordAWSPrivateLinkDNSRecordType,
+		configureAWSClient: func(m *mock.MockClient) {
+			clusternlb := mockDiscoverLB(m)
+			service := mockCreateService(m, clusternlb)
+			mockServicePerms(m, service)
+			endpoint := mockCreateEndpoint(m, service)
+
+			knownENI := map[string]string{
+				"eni-1": "ip-1",
+				"eni-2": "ip-2",
+				"eni-3": "ip-3",
+			}
+			endpoint.NetworkInterfaceIds = aws.StringSlice([]string{"eni-2", "eni-1"})
+
+			hzID := mockPHZARecords(m, endpoint, "api.test-cluster", nil, knownENI)
+
+			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
+				HostedZone: &route53.HostedZone{
+					Id: aws.String(hzID),
+				},
+				VPCs: []*route53.VPC{{
+					VPCId:     endpoint.VpcId,
+					VPCRegion: aws.String("us-east-1"),
+				}},
+			}, nil)
+		},
+
+		hasFinalizer: true,
+		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointID:      "vpce-12345",
+			HostedZoneID:       "HZ12345",
+		},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
+	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, existing PHZ, no record for endpoint",
 
 		existing: []runtime.Object{
@@ -1062,6 +1175,55 @@ users:
 				HostedZoneId: aws.String("HZ12345"),
 				Name:         aws.String("api.test-cluster"),
 			})
+
+			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
+				HostedZone: &route53.HostedZone{
+					Id: aws.String(hzID),
+				},
+				VPCs: []*route53.VPC{{
+					VPCId:     endpoint.VpcId,
+					VPCRegion: aws.String("us-east-1"),
+				}},
+			}, nil)
+		},
+
+		hasFinalizer: true,
+		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointID:      "vpce-12345",
+			HostedZoneID:       "HZ12345",
+		},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
+	}, {
+		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, existing PHZ, no record for endpoint (A records)",
+
+		existing: []runtime.Object{
+			testSecret("test-cd-provision-0-kubeconfig", kubeConfigSecret),
+			testProvision("test-cd-provision-0",
+				provisionWithInfraID("test-cd-1234"),
+				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
+			enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0")),
+		},
+		inventory:     validInventory,
+		dnsRecordType: hivev1.ARecordAWSPrivateLinkDNSRecordType,
+		configureAWSClient: func(m *mock.MockClient) {
+			clusternlb := mockDiscoverLB(m)
+			service := mockCreateService(m, clusternlb)
+			mockServicePerms(m, service)
+			endpoint := mockCreateEndpoint(m, service)
+
+			knownENI := map[string]string{
+				"eni-1": "ip-1",
+				"eni-2": "ip-2",
+				"eni-3": "ip-3",
+			}
+			endpoint.NetworkInterfaceIds = aws.StringSlice([]string{"eni-2", "eni-1"})
+
+			hzID := mockPHZARecords(m, endpoint, "api.test-cluster", &route53.HostedZoneSummary{
+				HostedZoneId: aws.String("HZ12345"),
+				Name:         aws.String("api.test-cluster"),
+			}, knownENI)
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
 				HostedZone: &route53.HostedZone{
@@ -1468,6 +1630,7 @@ users:
 				controllerconfig: &hivev1.AWSPrivateLinkConfig{
 					EndpointVPCInventory: test.inventory,
 					AssociatedVPCs:       test.associate,
+					DNSRecordType:        test.dnsRecordType,
 				},
 
 				awsClientFn: func(_ client.Client, _ awsclient.Options) (awsclient.Client, error) {

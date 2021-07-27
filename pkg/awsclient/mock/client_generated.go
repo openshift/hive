@@ -264,6 +264,21 @@ func (mr *MockClientMockRecorder) DescribeVpcEndpoints(arg0 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVpcEndpoints", reflect.TypeOf((*MockClient)(nil).DescribeVpcEndpoints), arg0)
 }
 
+// DescribeNetworkInterfaces mocks base method
+func (m *MockClient) DescribeNetworkInterfaces(input *ec2.DescribeNetworkInterfacesInput) (*ec2.DescribeNetworkInterfacesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeNetworkInterfaces", input)
+	ret0, _ := ret[0].(*ec2.DescribeNetworkInterfacesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeNetworkInterfaces indicates an expected call of DescribeNetworkInterfaces
+func (mr *MockClientMockRecorder) DescribeNetworkInterfaces(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeNetworkInterfaces", reflect.TypeOf((*MockClient)(nil).DescribeNetworkInterfaces), input)
+}
+
 // CreateVpcEndpoint mocks base method
 func (m *MockClient) CreateVpcEndpoint(arg0 *ec2.CreateVpcEndpointInput) (*ec2.CreateVpcEndpointOutput, error) {
 	m.ctrl.T.Helper()

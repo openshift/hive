@@ -223,5 +223,35 @@ expectations of required permissions for these credentials.
     ec2:DescribeVPCs
     ```
 
+## Using A DNS records type in Private Hosted Zones
+
+Currently the private link controller creates an ALIAS record in the PHZ
+created for customer's cluster. This record points enables the dns
+resolution of customer clusters k8s API to the VPC endpoint, therefore
+allowing hive to transparently accessing the cluster over the private
+link.
+
+In some cases the ALIAS record cannot be used. For example, in GovCloud
+environments the Route53 private hosted zones do not support ALIAS
+record type and therefore we have to use A records.
+
+CNAME records would have been more suitable replacement for ALIAS records, but
+CNAME records cannot be created at the apex of a DNS zone like ALIAS records.
+The private link architecture uses a DNS zone like `api.<clustername>.<clusterdomain>`
+so that there is no conflicts with authority on DNS resolution. Since CNAME
+records are not supported on the apex, we use A records pointing the cluster's
+API DNS name to the IP addresses of the VPC endpoint directly. Since these IP
+addresses do not change as they are backed by Elastic Network Interfaces in the
+corresponding subnets of the VPC endpoint, this DNS record should remain stable.
+
+For simplicity and current desired use-case, the dns record type can be
+configured globally for all clusters managed by private link controller.
+
+```yaml
+spec:
+  awsPrivateLink:
+    dnsRecordType: (Alias | ARecord)
+```
+
 [aws-private-link-overview]: https://docs.aws.amazon.com/vpc/latest/privatelink/endpoint-services-overview.html
 [control-access-vpc-endpoint]: https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html#vpc-endpoints-security-groups

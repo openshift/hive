@@ -120,6 +120,15 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                  dnsRecordType:
+                    default: Alias
+                    description: DNSRecordType defines what type of DNS record should
+                      be created in Private Hosted Zone for the customer clusters
+                      API endpoint (which is the VPC Endpoint's regional DNS name).
+                    enum:
+                    - Alias
+                    - ARecord
+                    type: string
                   endpointVPCInventory:
                     description: EndpointVPCInventory is a list of VPCs and the corresponding
                       subnets in various AWS regions. The controller uses this list

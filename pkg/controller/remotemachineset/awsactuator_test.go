@@ -246,6 +246,72 @@ func TestAWSActuator(t *testing.T) {
 			},
 		},
 		{
+			name:              "public subnets all don't have route tables pointing to igw",
+			clusterDeployment: testClusterDeployment(),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				func() *hivev1.MachinePool {
+					pool := testMachinePool()
+					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+					return pool
+				}(),
+			},
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeSubnets(client, []string{"zone1", "zone2"},
+					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"subnet-zone2":    false,
+					"pubSubnet-zone1": false,
+					"pubSubnet-zone2": false,
+				}, "vpc-1")
+			},
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
+				Status: corev1.ConditionFalse,
+				Reason: "ValidSubnets",
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 2,
+				generateAWSMachineSetName("zone2"): 1,
+			},
+			expectedSubnetIDInMachineSet: true,
+		},
+		{
+			name:              "public subnets some don't have route tables pointing to igw",
+			clusterDeployment: testClusterDeployment(),
+			poolName:          testMachinePool().Name,
+			existing: []runtime.Object{
+				func() *hivev1.MachinePool {
+					pool := testMachinePool()
+					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+					return pool
+				}(),
+			},
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeSubnets(client, []string{"zone1", "zone2"},
+					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"subnet-zone2":    false,
+					"pubSubnet-zone1": true,
+					"pubSubnet-zone2": false,
+				}, "vpc-1")
+			},
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
+				Status: corev1.ConditionFalse,
+				Reason: "ValidSubnets",
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 2,
+				generateAWSMachineSetName("zone2"): 1,
+			},
+			expectedSubnetIDInMachineSet: true,
+		},
+		{
 			name:              "supported spot market options",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
 			poolName:          testMachinePool().Name,
@@ -414,8 +480,8 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 
 	for _, ms := range mSets {
 		expectedReplicas, ok := expectedMSReplicas[ms.Name]
-		if assert.True(t, ok, "unexpected machine set") {
-			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
+		if assert.True(t, ok, "unexpected machine set", ms.Name) {
+			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch", ms.Name)
 		}
 
 		awsProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
@@ -480,6 +546,10 @@ func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubn
 			SubnetId:         &pubSubnetIDs[i],
 			AvailabilityZone: &zones[i],
 			VpcId:            &vpcID,
+			Tags: []*ec2.Tag{{
+				Key:   aws.String(tagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			}},
 		}
 	}
 	output := &ec2.DescribeSubnetsOutput{

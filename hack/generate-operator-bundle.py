@@ -43,7 +43,7 @@ if not os.path.exists(version_dir):
 owned_crds = []
 
 # Copy all CSV files over to the bundle output dir:
-crd_files = os.listdir('config/crds/')
+crd_files = sorted(os.listdir('config/crds/'))
 for file_name in crd_files:
     full_path = os.path.join('config/crds', file_name)
     if (os.path.isfile(os.path.join('config/crds', file_name))):

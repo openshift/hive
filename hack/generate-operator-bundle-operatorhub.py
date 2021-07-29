@@ -90,7 +90,7 @@ def generate_csv_base(version, prev_version, hive_image):
     owned_crds = []
 
     # Copy all CSV files over to the bundle output dir:
-    crd_files = os.listdir(crds_dir)
+    crd_files = sorted(os.listdir(crds_dir))
     for file_name in crd_files:
         full_path = os.path.join(crds_dir, file_name)
         if os.path.isfile(os.path.join(crds_dir, file_name)):

@@ -378,7 +378,7 @@ func TestReconcile(t *testing.T) {
 		{
 			name: "hibernate fake cluster",
 			cd: cdBuilder.Build(
-				testcd.WithHibernateAfter(1*time.Hour),
+				o.shouldHibernate,
 				testcd.InstalledTimestamp(time.Now().Add(-1*time.Hour)),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")),
 			cs: csBuilder.Build(),
@@ -392,10 +392,11 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "start hibernated fake cluster",
-			cd:   cdBuilder.Options(o.hibernating, testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")).Build(),
-			cs:   csBuilder.Build(),
+			cd: cdBuilder.Options(o.hibernating,
+				testcd.WithPowerState(hivev1.RunningClusterPowerState),
+				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")).Build(),
+			cs: csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, hivev1.RunningClusterPowerState, cd.Spec.PowerState)
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
@@ -517,13 +518,14 @@ func TestHibernateAfter(t *testing.T) {
 			expectedConditionReason: hivev1.UnsupportedHibernationReason,
 		},
 		{
-			name: "cluster not yet due for hibernate no condition", // cluster that has never been hibernated and thus has no running condition
+			name: "cluster not yet due for hibernate no running condition", // cluster that has never been hibernated
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(12*time.Hour),
+				testcd.WithPowerState(hivev1.RunningClusterPowerState),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs:                 csBuilder.Build(),
 			expectRequeueAfter: 2 * time.Hour,
-			expectedPowerState: "",
+			expectedPowerState: hivev1.RunningClusterPowerState,
 		},
 		{
 			name: "cluster with running condition due for hibernate",

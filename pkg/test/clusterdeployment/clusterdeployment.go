@@ -98,6 +98,11 @@ func WithAnnotation(key, value string) Option {
 	return Generic(generic.WithAnnotation(key, value))
 }
 
+// WithPoolVersion sets the cluster pool spec hash annotation on the supplied object.
+func WithPoolVersion(poolVersion string) Option {
+	return WithAnnotation(constants.ClusterDeploymentPoolSpecHashAnnotation, poolVersion)
+}
+
 // WithCondition adds the specified condition to the ClusterDeployment
 func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {

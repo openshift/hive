@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -13,6 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -371,20 +374,98 @@ func (cds *cdCollection) SyncClaimAssignments(c client.Client, claims *claimColl
 	cds.MakeNotAssignable(invalidCDs...)
 }
 
+func removeCDsFromSlice(slice *[]*hivev1.ClusterDeployment, cdNames ...string) {
+	for _, cdName := range cdNames {
+		for i, cd := range *slice {
+			if cd.Name == cdName {
+				copy((*slice)[i:], (*slice)[i+1:])
+				*slice = (*slice)[:len(*slice)-1]
+			}
+		}
+	}
+}
+
 // MakeNotAssignable idempotently removes the named ClusterDeployments from the assignable list of the
 // cdCollection, so they are no longer considered for assignment. They still count against pool
 // capacity. Do this to a broken ClusterDeployment -- e.g. one that
 // - is assigned to the wrong claim, or a claim that doesn't exist
 // - can't be synced with its claim for whatever reason in this iteration (e.g. Update() failure)
 func (cds *cdCollection) MakeNotAssignable(cdNames ...string) {
-	for _, cdName := range cdNames {
-		for i, cd := range cds.assignable {
-			if cd.Name == cdName {
-				copy((cds.assignable)[i:], (cds.assignable)[i+1:])
-				cds.assignable = cds.assignable[:len(cds.assignable)-1]
-			}
+	removeCDsFromSlice(&cds.assignable, cdNames...)
+}
+
+// Delete deletes the named ClusterDeployment from the server, moving it from Assignable() to
+// Deleting()
+func (cds *cdCollection) Delete(c client.Client, cdName string) error {
+	cd := cds.ByName(cdName)
+	if cd == nil {
+		return errors.New(fmt.Sprintf("No such ClusterDeployment %s to delete. This is a bug!", cdName))
+	}
+	if err := utils.SafeDelete(c, context.Background(), cd); err != nil {
+		return err
+	}
+	cds.deleting = append(cds.deleting, cd)
+	// Remove from any of the other lists it might be in
+	removeCDsFromSlice(&cds.assignable, cdName)
+	removeCDsFromSlice(&cds.installing, cdName)
+	removeCDsFromSlice(&cds.assignable, cdName)
+	removeCDsFromSlice(&cds.markedForDeletion, cdName)
+	return nil
+}
+
+// setCDsCurrentCondition idempotently sets the ClusterDeploymentsCurrent condition on the
+// ClusterPool according to whether all unassigned CDs have the same PoolVersion as the pool.
+func setCDsCurrentCondition(c client.Client, cds *cdCollection, clp *hivev1.ClusterPool, poolVersion string) error {
+	// CDs with mismatched poolVersion
+	mismatchedCDs := make([]string, 0)
+	// CDs with no poolVersion
+	unknownCDs := make([]string, 0)
+
+	for _, cd := range append(cds.Assignable(), cds.Installing()...) {
+		if cdPoolVersion, ok := cd.Annotations[constants.ClusterDeploymentPoolSpecHashAnnotation]; !ok || cdPoolVersion == "" {
+			// Annotation is either missing or empty. This could be due to upgrade (this CD was
+			// created before this code was installed) or manual intervention (outside agent mucked
+			// with the annotation). Either way we don't know whether the CD matches or not.
+			unknownCDs = append(unknownCDs, cd.Name)
+		} else if cdPoolVersion != poolVersion {
+			mismatchedCDs = append(mismatchedCDs, cd.Name)
 		}
 	}
+
+	var status corev1.ConditionStatus
+	var reason, message string
+	if len(mismatchedCDs) != 0 {
+		// We can assert staleness if there are any mismatches
+		status = corev1.ConditionFalse
+		reason = "SomeClusterDeploymentsStale"
+		sort.Strings(mismatchedCDs)
+		message = fmt.Sprintf("Some unassigned ClusterDeployments do not match the pool configuration: %s", strings.Join(mismatchedCDs, ", "))
+	} else if len(unknownCDs) != 0 {
+		// There are no mismatches, but some unknowns. Note that this is a different "unknown" from "we haven't looked yet".
+		status = corev1.ConditionUnknown
+		reason = "SomeClusterDeploymentsUnknown"
+		sort.Strings(unknownCDs)
+		message = fmt.Sprintf("Some unassigned ClusterDeployments are missing their pool spec hash annotation: %s", strings.Join(unknownCDs, ", "))
+	} else {
+		// All match (or there are no CDs, which is also fine)
+		status = corev1.ConditionTrue
+		reason = "ClusterDeploymentsCurrent"
+		message = "All unassigned ClusterDeployments match the pool configuration"
+	}
+
+	// This will re-update with the same status/reason multiple times as stale/unknown CDs get
+	// claimed. That's intentional.
+	conds, changed := controllerutils.SetClusterPoolConditionWithChangeCheck(
+		clp.Status.Conditions,
+		hivev1.ClusterPoolAllClustersCurrentCondition,
+		status, reason, message, controllerutils.UpdateConditionIfReasonOrMessageChange)
+	if changed {
+		clp.Status.Conditions = conds
+		if err := c.Status().Update(context.Background(), clp); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureClaimAssignment returns successfully (nil) when the claim and the cd are both assigned to each other.

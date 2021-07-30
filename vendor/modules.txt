@@ -153,6 +153,9 @@ github.com/daixiang0/gci/pkg/gci
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/davegardnerisme/deephash v0.0.0-20210406090112-6d072427d830
+## explicit
+github.com/davegardnerisme/deephash
 # github.com/denis-tingajkin/go-header v0.3.1
 github.com/denis-tingajkin/go-header
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible

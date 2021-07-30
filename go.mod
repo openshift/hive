@@ -10,6 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.38.41
 	github.com/blang/semver/v4 v4.0.0
 	github.com/davecgh/go-spew v1.1.1
+	github.com/davegardnerisme/deephash v0.0.0-20210406090112-6d072427d830
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible

@@ -333,6 +333,12 @@ const (
 	// from the pool.
 	ClusterClaimRemoveClusterAnnotation = "hive.openshift.io/remove-claimed-cluster-from-pool"
 
+	// ClusterDeploymentPoolSpecHashAnnotation annotates a ClusterDeployment. It is an opaque value representing
+	// the state of the important (to ClusterDeployments) fields of the ClusterPool at the time this CD was created.
+	// It is used by the clusterpool controller to determine whether its unclaimed ClusterDeployments are current or
+	// stale, allowing it to set the ClusterPool's "ClusterDeploymentsCurrent" status condition.
+	ClusterDeploymentPoolSpecHashAnnotation = "hive.openshift.io/cluster-pool-spec-hash"
+
 	// HiveAWSServiceProviderCredentialsSecretRefEnvVar is the environment variable specifying what secret to use for
 	// assuming the service provider credentials for AWS clusters.
 	HiveAWSServiceProviderCredentialsSecretRefEnvVar = "HIVE_AWS_SERVICE_PROVIDER_CREDENTIALS_SECRET"

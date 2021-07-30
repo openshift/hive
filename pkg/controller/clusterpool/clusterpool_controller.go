@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
+	"github.com/davegardnerisme/deephash"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +31,6 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -55,6 +55,7 @@ var (
 	clusterPoolConditions = []hivev1.ClusterPoolConditionType{
 		hivev1.ClusterPoolMissingDependenciesCondition,
 		hivev1.ClusterPoolCapacityAvailableCondition,
+		hivev1.ClusterPoolAllClustersCurrentCondition,
 	}
 )
 
@@ -347,12 +348,14 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	for _, cd := range toRemoveClaimedCDs[:toDel] {
 		cdLog := logger.WithField("cluster", cd.Name)
 		cdLog.Info("deleting cluster deployment for previous claim")
-		if err := utils.SafeDelete(r, context.Background(), cd); err != nil {
+		if err := cds.Delete(r.Client, cd.Name); err != nil {
 			cdLog.WithError(err).Error("error deleting cluster deployment")
 			return reconcile.Result{}, err
 		}
 	}
 	availableCurrent -= toDel
+
+	poolVersion := calculatePoolVersion(clp)
 
 	switch drift := reserveSize - int(clp.Spec.Size); {
 	// activity quota exceeded, so no action
@@ -364,7 +367,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// If too many, delete some.
 	case drift > 0:
 		toDel := minIntVarible(drift, availableCurrent)
-		if err := r.deleteExcessClusters(cds.Installing(), cds.Assignable(), toDel, logger); err != nil {
+		if err := r.deleteExcessClusters(cds, toDel, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	// If too few, create new InstallConfig and ClusterDeployment.
@@ -373,10 +376,21 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			break
 		}
 		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
-		if err := r.addClusters(clp, toAdd, logger); err != nil {
+		// TODO: Do this in cdLookup so we can add the new CDs to Installing(). For now it's okay
+		// because the new CDs are guaranteed to have a matching PoolVersion, and that's the only
+		// thing we need to keep consistent.
+		if err := r.addClusters(clp, poolVersion, toAdd, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
+	}
+
+	// One more (possible) status update: wait until the end to detect whether all unassigned CDs
+	// are current with the pool config, since assigning or deleting CDs may eliminate the last
+	// one that isn't.
+	if err := setCDsCurrentCondition(r.Client, cds, clp, poolVersion); err != nil {
+		log.WithError(err).Error("error updating 'ClusterDeployments current' status")
+		return reconcile.Result{}, err
 	}
 
 	if err := r.reconcileRBAC(clp, logger); err != nil {
@@ -385,6 +399,23 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// calculatePoolVersion computes a hash of the important (to ClusterDeployments) fields of the
+// ClusterPool.Spec. This is annotated on ClusterDeployments when the pool creates them, which
+// subsequently allows us to tell whether all unclaimed CDs are up to date and set a condition
+// accordingly.
+// NOTE: If we change this algorithm, we're guaranteed to think that all CDs are stale at the
+// moment that code update rolls out. We may wish to consider a way to support detecting the old
+// value as "current" in that case.
+func calculatePoolVersion(clp *hivev1.ClusterPool) string {
+	ba := []byte{}
+	ba = append(ba, deephash.Hash(clp.Spec.Platform)...)
+	ba = append(ba, deephash.Hash(clp.Spec.BaseDomain)...)
+	ba = append(ba, deephash.Hash(clp.Spec.ImageSetRef)...)
+	ba = append(ba, deephash.Hash(clp.Spec.InstallConfigSecretTemplateRef)...)
+	// Hash of hashes to ensure fixed length
+	return fmt.Sprintf("%x", deephash.Hash(ba))
 }
 
 func minIntVarible(v1 int, vn ...int) (m int) {
@@ -497,6 +528,7 @@ func (r *ReconcileClusterPool) applyRoleBinding(desired, observed *rbacv1.RoleBi
 
 func (r *ReconcileClusterPool) addClusters(
 	clp *hivev1.ClusterPool,
+	poolVersion string,
 	newClusterCount int,
 	logger log.FieldLogger,
 ) error {
@@ -536,7 +568,7 @@ func (r *ReconcileClusterPool) addClusters(
 	}
 
 	for i := 0; i < newClusterCount; i++ {
-		if err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, logger); err != nil {
+		if err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, logger); err != nil {
 			return err
 		}
 	}
@@ -549,6 +581,7 @@ func (r *ReconcileClusterPool) createCluster(
 	cloudBuilder clusterresource.CloudBuilder,
 	pullSecret string,
 	installConfigTemplate string,
+	poolVersion string,
 	logger log.FieldLogger,
 ) error {
 	ns, err := r.createRandomNamespace(clp)
@@ -557,6 +590,13 @@ func (r *ReconcileClusterPool) createCluster(
 		return err
 	}
 	logger.WithField("cluster", ns.Name).Info("Creating new cluster")
+
+	annotations := clp.Spec.Annotations
+	// Annotate the CD so we can distinguish "stale" CDs
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[constants.ClusterDeploymentPoolSpecHashAnnotation] = poolVersion
 
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
@@ -569,7 +609,7 @@ func (r *ReconcileClusterPool) createCluster(
 		PullSecret:            pullSecret,
 		CloudBuilder:          cloudBuilder,
 		Labels:                clp.Spec.Labels,
-		Annotations:           clp.Spec.Annotations,
+		Annotations:           annotations,
 		InstallConfigTemplate: installConfigTemplate,
 		SkipMachinePools:      clp.Spec.SkipMachinePools,
 	}
@@ -624,14 +664,15 @@ func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool) (*
 }
 
 func (r *ReconcileClusterPool) deleteExcessClusters(
-	installingClusters []*hivev1.ClusterDeployment,
-	readyClusters []*hivev1.ClusterDeployment,
+	cds *cdCollection,
 	deletionsNeeded int,
 	logger log.FieldLogger,
 ) error {
 
 	logger.WithField("deletionsNeeded", deletionsNeeded).Info("deleting excess clusters")
 	clustersToDelete := make([]*hivev1.ClusterDeployment, 0, deletionsNeeded)
+	installingClusters := cds.Installing()
+	readyClusters := cds.Assignable()
 	if deletionsNeeded < len(installingClusters) {
 		clustersToDelete = installingClusters[:deletionsNeeded]
 	} else {
@@ -650,7 +691,7 @@ func (r *ReconcileClusterPool) deleteExcessClusters(
 	for _, cd := range clustersToDelete {
 		logger := logger.WithField("cluster", cd.Name)
 		logger.Info("deleting cluster deployment")
-		if err := utils.SafeDelete(r, context.Background(), cd); err != nil {
+		if err := cds.Delete(r.Client, cd.Name); err != nil {
 			logger.WithError(err).Error("error deleting cluster deployment")
 			return err
 		}
@@ -671,7 +712,7 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 		if cd.DeletionTimestamp != nil {
 			continue
 		}
-		if err := utils.SafeDelete(r, context.Background(), cd); err != nil {
+		if err := cds.Delete(r.Client, cd.Name); err != nil {
 			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete ClusterDeployment")
 			return errors.Wrap(err, "could not delete ClusterDeployment")
 		}

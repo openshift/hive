@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
@@ -46,6 +47,10 @@ func TestReconcileClusterPool(t *testing.T) {
 	corev1.AddToScheme(scheme)
 	rbacv1.AddToScheme(scheme)
 
+	// See calculatePoolVersion. If this changes, the easiest way to figure out the new value is
+	// to pull it from the test failure :)
+	initialPoolVersion := "3533907469253ac5"
+
 	poolBuilder := testcp.FullBuilder(testNamespace, testLeasePoolName, scheme).
 		GenericOptions(
 			testgeneric.WithFinalizer(finalizer),
@@ -55,23 +60,30 @@ func TestReconcileClusterPool(t *testing.T) {
 			testcp.WithBaseDomain("test-domain"),
 			testcp.WithImageSet(imageSetName),
 		)
-	initializedPoolBuilder := poolBuilder.Options(testcp.WithCondition(hivev1.ClusterPoolCondition{
-		Status: corev1.ConditionUnknown,
-		Type:   hivev1.ClusterPoolMissingDependenciesCondition,
-	}),
+	initializedPoolBuilder := poolBuilder.Options(
+		testcp.WithCondition(hivev1.ClusterPoolCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterPoolMissingDependenciesCondition,
+		}),
 		testcp.WithCondition(hivev1.ClusterPoolCondition{
 			Status: corev1.ConditionUnknown,
 			Type:   hivev1.ClusterPoolCapacityAvailableCondition,
+		}),
+		testcp.WithCondition(hivev1.ClusterPoolCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterPoolAllClustersCurrentCondition,
 		}),
 	)
 	cdBuilder := func(name string) testcd.Builder {
 		return testcd.FullBuilder(name, name, scheme).Options(
 			testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
+			testcd.WithPoolVersion(initialPoolVersion),
 		)
 	}
 	unclaimedCDBuilder := func(name string) testcd.Builder {
 		return cdBuilder(name).Options(
 			testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+			testcd.WithPoolVersion(initialPoolVersion),
 		)
 	}
 
@@ -90,6 +102,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectFinalizerRemoved             bool
 		expectedMissingDependenciesStatus  corev1.ConditionStatus
 		expectedCapacityStatus             corev1.ConditionStatus
+		expectedCDCurrentStatus            corev1.ConditionStatus
 		expectedMissingDependenciesMessage string
 		expectedAssignedClaims             int
 		expectedUnassignedClaims           int
@@ -100,6 +113,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		// (The clusterpool controller always sets this condition's Status to True.)
 		// Not checked if nil.
 		expectedClaimPendingReasons map[string]string
+		expectPoolVersionChanged    bool
 	}{
 		{
 			name: "initialize conditions",
@@ -108,6 +122,39 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedMissingDependenciesStatus: corev1.ConditionUnknown,
 			expectedCapacityStatus:            corev1.ConditionUnknown,
+			expectedCDCurrentStatus:           corev1.ConditionUnknown,
+		},
+		{
+			name: "poolVersion changes with Platform",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithPlatform(hivev1.Platform{
+					AWS: &aws.Platform{
+						CredentialsSecretRef: corev1.LocalObjectReference{Name: "foo"},
+					},
+				})),
+			},
+			expectPoolVersionChanged: true,
+		},
+		{
+			name: "poolVersion changes with BaseDomain",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithBaseDomain("foo.example.com")),
+			},
+			expectPoolVersionChanged: true,
+		},
+		{
+			name: "poolVersion changes with ImageSet",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithImageSet("abc123")),
+			},
+			expectPoolVersionChanged: true,
+		},
+		{
+			name: "poolVersion changes with InstallConfigSecretTemplate",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithInstallConfigSecretTemplateRef("abc123")),
+			},
+			expectPoolVersionChanged: true,
 		},
 		{
 			name: "create all clusters",
@@ -162,7 +209,10 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(3)),
 				testclaim.FullBuilder(testNamespace, "test", scheme).Build(testclaim.WithPool(testLeasePoolName)),
-				cdBuilder("c1").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test")),
+				cdBuilder("c1").Build(
+					testcd.Installed(),
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test"),
+				),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
@@ -178,7 +228,10 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxSize(4)),
 				testclaim.FullBuilder(testNamespace, "test", scheme).Build(testclaim.WithPool(testLeasePoolName)),
-				cdBuilder("c1").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test")),
+				cdBuilder("c1").Build(
+					testcd.Installed(),
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test"),
+				),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
@@ -390,8 +443,9 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(),
 				unclaimedCDBuilder("c3").Build(),
 			},
-			expectedTotalClusters:  0,
-			expectFinalizerRemoved: true,
+			expectedTotalClusters:   0,
+			expectFinalizerRemoved:  true,
+			expectedCDCurrentStatus: corev1.ConditionUnknown,
 		},
 		{
 			name: "finalizer added to clusterpool",
@@ -443,7 +497,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").Build(
 					testcd.WithClusterPoolReference(testNamespace, "other-pool", "test-claim"),
-				),
+					testcd.WithPoolVersion("aversion")),
 			},
 			expectedTotalClusters: 4,
 			expectedObservedSize:  3,
@@ -472,6 +526,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectError:                        true,
 			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
 			expectedMissingDependenciesMessage: `cluster image set: clusterimagesets.hive.openshift.io "test-image-set" not found`,
+			expectedCDCurrentStatus:            corev1.ConditionUnknown,
 		},
 		{
 			name: "missing creds secret",
@@ -482,17 +537,9 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectError:                        true,
 			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
 			expectedMissingDependenciesMessage: `credentials secret: secrets "aws-creds" not found`,
+			expectedCDCurrentStatus:            corev1.ConditionUnknown,
 		},
-		{
-			name: "missing ClusterImageSet",
-			existing: []runtime.Object{
-				initializedPoolBuilder.Build(testcp.WithSize(1)),
-			},
-			noClusterImageSet:                  true,
-			expectError:                        true,
-			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
-			expectedMissingDependenciesMessage: `cluster image set: clusterimagesets.hive.openshift.io "test-image-set" not found`,
-		},
+
 		{
 			name: "multiple missing dependents",
 			existing: []runtime.Object{
@@ -503,6 +550,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectError:                        true,
 			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
 			expectedMissingDependenciesMessage: `[cluster image set: clusterimagesets.hive.openshift.io "test-image-set" not found, credentials secret: secrets "aws-creds" not found]`,
+			expectedCDCurrentStatus:            corev1.ConditionUnknown,
 		},
 		{
 			name: "missing dependents resolved",
@@ -585,6 +633,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectError:                        true,
 			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
 			expectedMissingDependenciesMessage: `pull secret: secrets "test-pull-secret" not found`,
+			expectedCDCurrentStatus:            corev1.ConditionUnknown,
 		},
 		{
 			name: "pull secret missing docker config",
@@ -598,6 +647,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectError:                        true,
 			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
 			expectedMissingDependenciesMessage: `pull secret: pull secret does not contain .dockerconfigjson data`,
+			expectedCDCurrentStatus:            corev1.ConditionUnknown,
 		},
 		{
 			name: "assign to claim",
@@ -969,6 +1019,77 @@ func TestReconcileClusterPool(t *testing.T) {
 			// The assignments don't happen until a subsequent reconcile after the CDs are ready
 			expectedUnassignedClaims: 1,
 		},
+		{
+			name: "no CDs match pool version",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				cdBuilder("c1").Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithPoolVersion("a-previous-version")),
+				cdBuilder("c2").Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithPoolVersion("some-other-version")),
+			},
+			expectedObservedSize:    2,
+			expectedTotalClusters:   2,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+		},
+		{
+			name: "not all CDs match pool version",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				cdBuilder("c1").Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithPoolVersion("a-previous-version")),
+				unclaimedCDBuilder("c2").Build(),
+			},
+			expectedObservedSize:    2,
+			expectedTotalClusters:   2,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+		},
+		{
+			name: "empty pool version results in unknown CDCurrent status",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(1)),
+				cdBuilder("c1").Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithPoolVersion("")),
+			},
+			expectedObservedSize:    1,
+			expectedTotalClusters:   1,
+			expectedCDCurrentStatus: corev1.ConditionUnknown,
+		},
+		{
+			name: "mismatched CDCurrent status takes precedence over unknown",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				cdBuilder("c1").Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithPoolVersion("")),
+				cdBuilder("c2").Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithPoolVersion("some-other-version")),
+			},
+			expectedObservedSize:    2,
+			expectedTotalClusters:   2,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+		},
+		{
+			name: "claimed CD at old version doesn't affect version status",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				cdBuilder("c1").Build(
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
+					testcd.WithPoolVersion("a-previous-version")),
+				unclaimedCDBuilder("c2").Build(),
+				unclaimedCDBuilder("c3").Build(),
+			},
+			expectedAssignedCDs:    1,
+			expectedAssignedClaims: 1,
+			expectedObservedSize:   2,
+			expectedTotalClusters:  3,
+		},
 	}
 
 	for _, test := range tests {
@@ -1059,6 +1180,20 @@ func TestReconcileClusterPool(t *testing.T) {
 				assert.Contains(t, pool.Finalizers, finalizer, "expect finalizer on clusterpool")
 				assert.Equal(t, test.expectedObservedSize, pool.Status.Size, "unexpected observed size")
 				assert.Equal(t, test.expectedObservedReady, pool.Status.Ready, "unexpected observed ready count")
+				currentPoolVersion := calculatePoolVersion(pool)
+				assert.Equal(
+					t, test.expectPoolVersionChanged, currentPoolVersion != initialPoolVersion,
+					"expectPoolVersionChanged is %t\ninitial %q\nfinal   %q",
+					test.expectPoolVersionChanged, initialPoolVersion, currentPoolVersion)
+				expectedCDCurrentStatus := test.expectedCDCurrentStatus
+				if expectedCDCurrentStatus == "" {
+					expectedCDCurrentStatus = corev1.ConditionTrue
+				}
+				cdCurrentCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolAllClustersCurrentCondition)
+				if assert.NotNil(t, cdCurrentCondition, "did not find ClusterDeploymentsCurrent condition") {
+					assert.Equal(t, expectedCDCurrentStatus, cdCurrentCondition.Status,
+						"unexpected ClusterDeploymentsCurrent condition")
+				}
 			}
 
 			if test.expectedMissingDependenciesStatus != "" {

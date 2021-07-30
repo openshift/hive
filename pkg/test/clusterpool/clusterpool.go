@@ -104,6 +104,12 @@ func WithClusterDeploymentLabels(labels map[string]string) Option {
 	}
 }
 
+func WithPlatform(platform hivev1.Platform) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.Platform = platform
+	}
+}
+
 func WithBaseDomain(baseDomain string) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
 		clusterPool.Spec.BaseDomain = baseDomain
@@ -113,6 +119,14 @@ func WithBaseDomain(baseDomain string) Option {
 func WithImageSet(clusterImageSetName string) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
 		clusterPool.Spec.ImageSetRef = hivev1.ClusterImageSetReference{Name: clusterImageSetName}
+	}
+}
+
+func WithInstallConfigSecretTemplateRef(name string) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.InstallConfigSecretTemplateRef = &corev1.LocalObjectReference{
+			Name: name,
+		}
 	}
 }
 

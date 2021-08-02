@@ -226,25 +226,25 @@ expectations of required permissions for these credentials.
 ## Using A DNS records type in Private Hosted Zones
 
 Currently the private link controller creates an ALIAS record in the PHZ
-created for customer's cluster. This record points enables the dns
-resolution of customer clusters k8s API to the VPC endpoint, therefore
-allowing hive to transparently accessing the cluster over the private
+created for customer's cluster. This record points the dns
+resolution of customer cluster's k8s API to the VPC endpoint, therefore
+allowing hive to transparently access the cluster over the private
 link.
 
 In some cases the ALIAS record cannot be used. For example, in GovCloud
-environments the Route53 private hosted zones do not support ALIAS
+environments the Route53 private hosted zones do not support the ALIAS
 record type and therefore we have to use A records.
 
-CNAME records would have been more suitable replacement for ALIAS records, but
+CNAME records would have been a more suitable replacement for ALIAS records, but
 CNAME records cannot be created at the apex of a DNS zone like ALIAS records.
 The private link architecture uses a DNS zone like `api.<clustername>.<clusterdomain>`
-so that there is no conflicts with authority on DNS resolution. Since CNAME
+so that there are no conflicts with authority on DNS resolution. Since CNAME
 records are not supported on the apex, we use A records pointing the cluster's
 API DNS name to the IP addresses of the VPC endpoint directly. Since these IP
 addresses do not change as they are backed by Elastic Network Interfaces in the
 corresponding subnets of the VPC endpoint, this DNS record should remain stable.
 
-For simplicity and current desired use-case, the dns record type can be
+For simplicity and current desired use-case, the DNS record type can be
 configured globally for all clusters managed by private link controller.
 
 ```yaml
@@ -258,13 +258,13 @@ spec:
 
 ## Developing for Private Link
 
-Since Private link requires some networking setup before Hive controller can create
+Private link requires some networking setup before Hive controller can create
 clusters with Private link routing.
 
 ### Setup VPCs in AWS
 
 Create 2 sets of VPCs in the same region in an AWS account. One VPC will
-be used for creating an OCP cluster for Hive, and the another will be used
+be used for creating an OCP cluster for Hive, and the other will be used
 as inventory for VPC endpoints.
 
 1. Create a Hive VPC using cloudformation template.
@@ -393,7 +393,7 @@ You can use security groups from peered VPCs to allow flow of traffic using [AWS
 
 1. Find the security group for workers in Hive Cluster
 
-You the Hive VPC id to list the security groups.
+Use the Hive VPC id to list the security groups.
 
 ```
 aws --region us-east-1 ec2 describe-security-groups \
@@ -411,7 +411,7 @@ aws --region us-east-1 ec2 describe-security-groups \
 
 3. Allow all incoming traffic from Hive cluster's worker security group to VPC endpoints
 
-Create a incoming security group rule in Private link VPC's default security group that allows ALL traffic
+Create an incoming security group rule in Private link VPC's default security group that allows ALL traffic
 from the Hive cluster's worker security group.
 
 ```
@@ -422,7 +422,7 @@ aws --region us-east-1 ec2 authorize-security-group-ingress \
 
 4. Allow all incoming traffic from VPC endpoints to Hive cluster's worker security group
 
-Create a incoming security group rule in Hive cluster's worker security group that allows ALL traffic
+Create an incoming security group rule in Hive cluster's worker security group that allows ALL traffic
 from the Private link VPC's default security group.
 
 ```

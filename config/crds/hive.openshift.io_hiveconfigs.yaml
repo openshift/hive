@@ -123,7 +123,7 @@ spec:
                   dnsRecordType:
                     default: Alias
                     description: DNSRecordType defines what type of DNS record should
-                      be created in Private Hosted Zone for the customer clusters
+                      be created in Private Hosted Zone for the customer cluster's
                       API endpoint (which is the VPC Endpoint's regional DNS name).
                     enum:
                     - Alias

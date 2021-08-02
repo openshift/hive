@@ -154,6 +154,10 @@ test-integration: generate
 test-e2e:
 	hack/e2e-test.sh
 
+.PHONY: test-e2e-pool
+test-e2e-pool:
+	hack/e2e-pool-test.sh
+
 .PHONY: test-e2e-postdeploy
 test-e2e-postdeploy:
 	go test $(GO_MOD_FLAGS) -v -timeout 0 -count=1 ./test/e2e/postdeploy/...

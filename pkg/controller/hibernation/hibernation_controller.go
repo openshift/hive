@@ -288,8 +288,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 			if controllerutils.IsFakeCluster(cd) {
 				r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, "Fake cluster is running",
 					corev1.ConditionFalse, cdLog)
-			}
-			if cd.Spec.PowerState != hivev1.RunningClusterPowerState {
+			} else {
 				return r.startMachines(cd, cdLog)
 			}
 			return reconcile.Result{}, nil

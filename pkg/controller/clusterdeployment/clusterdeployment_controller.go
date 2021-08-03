@@ -557,6 +557,30 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
+	// Ensure that if DNSZone already exists, it's PreserveOnDelete setting matches the ClusterDeployment:
+	if cd.Spec.ManageDNS {
+		dnsZone := &hivev1.DNSZone{}
+		nsName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
+		logger := cdLog.WithField("zone", nsName.String())
+
+		switch err := r.Get(context.TODO(), nsName, dnsZone); {
+		case err != nil && !apierrors.IsNotFound(err):
+			logger.WithError(err).Error("failed to fetch DNS zone")
+			return reconcile.Result{}, err
+		case err == nil:
+			if dnsZone.Spec.PreserveOnDelete != cd.Spec.PreserveOnDelete {
+				logger.Infof("setting DNSZone PreserveOnDelete to match ClusterDeployment PreserveOnDelete: %v", cd.Spec.PreserveOnDelete)
+				dnsZone.Spec.PreserveOnDelete = cd.Spec.PreserveOnDelete
+				err := r.Update(context.TODO(), dnsZone)
+				if err != nil {
+					logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating DNSZone")
+				}
+				return reconcile.Result{}, err
+			}
+		}
+
+	}
+
 	if cd.Spec.Installed {
 		// set installedTimestamp for adopted clusters
 		if cd.Status.InstalledTimestamp == nil {
@@ -1451,17 +1475,6 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	case err != nil:
 		logger.WithError(err).Error("failed to fetch DNS zone")
 		return nil, err
-	}
-
-	// Ensure the DNSZone has PreserveOnDelete if ClusterDeployment is set.
-	if dnsZone.Spec.PreserveOnDelete != cd.Spec.PreserveOnDelete {
-		logger.Infof("setting DNSZone PreserveOnDelete to match ClusterDeployment PreserveOnDelete: %v", cd.Spec.PreserveOnDelete)
-		dnsZone.Spec.PreserveOnDelete = cd.Spec.PreserveOnDelete
-		err := r.Update(context.TODO(), dnsZone)
-		if err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating DNSZone")
-			return nil, err
-		}
 	}
 
 	if !metav1.IsControlledBy(dnsZone, cd) {

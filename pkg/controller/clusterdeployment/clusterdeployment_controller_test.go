@@ -765,6 +765,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZone(),
 			},
+			expectedRequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime,
 			validate: func(c client.Client, t *testing.T) {
 				zone := getDNSZone(c)
 				require.NotNil(t, zone, "dns zone should exist")
@@ -782,7 +783,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testDNSZone(),
+				testAvailableDNSZone(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				zone := getDNSZone(c)
@@ -902,10 +903,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
-					cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
-						Type:   hivev1.DNSNotReadyCondition,
-						Status: corev1.ConditionTrue,
-					})
+					cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+						cd.Status.Conditions,
+						hivev1.DNSNotReadyCondition,
+						corev1.ConditionTrue,
+						"no reason",
+						"no message",
+						controllerutils.UpdateConditionIfReasonOrMessageChange)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),

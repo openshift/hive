@@ -557,28 +557,26 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, nil
 	}
 
-	// Ensure that if DNSZone already exists, it's PreserveOnDelete setting matches the ClusterDeployment:
 	if cd.Spec.ManageDNS {
-		dnsZone := &hivev1.DNSZone{}
-		nsName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
-		logger := cdLog.WithField("zone", nsName.String())
-
-		switch err := r.Get(context.TODO(), nsName, dnsZone); {
-		case err != nil && !apierrors.IsNotFound(err):
-			logger.WithError(err).Error("failed to fetch DNS zone")
+		dnsZone, err := r.ensureManagedDNSZone(cd, cdLog)
+		if err != nil {
 			return reconcile.Result{}, err
-		case err == nil:
-			if dnsZone.Spec.PreserveOnDelete != cd.Spec.PreserveOnDelete {
-				logger.Infof("setting DNSZone PreserveOnDelete to match ClusterDeployment PreserveOnDelete: %v", cd.Spec.PreserveOnDelete)
-				dnsZone.Spec.PreserveOnDelete = cd.Spec.PreserveOnDelete
-				err := r.Update(context.TODO(), dnsZone)
-				if err != nil {
-					logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating DNSZone")
-				}
-				return reconcile.Result{}, err
+		}
+		if dnsZone == nil {
+			// dnsNotReady condition was set.
+			if isSet, _ := isDNSNotReadyConditionSet(cd); isSet {
+				// dnsNotReadyReason is why the dnsNotReady condition was set, therefore requeue so that we check to see if it times out.
+				// add defaultRequeueTime to avoid the race condition where the controller is reconciled at the exact time of the timeout (unlikely, but possible).
+				return reconcile.Result{RequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime}, nil
 			}
+
+			return reconcile.Result{}, nil
 		}
 
+		updated, err := r.setDNSDelayMetric(cd, dnsZone, cdLog)
+		if updated || err != nil {
+			return reconcile.Result{}, err
+		}
 	}
 
 	if cd.Spec.Installed {
@@ -718,28 +716,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	if !r.expectations.SatisfiedExpectations(request.String()) {
 		cdLog.Debug("waiting for expectations to be satisfied")
 		return reconcile.Result{}, nil
-	}
-
-	if cd.Spec.ManageDNS {
-		dnsZone, err := r.ensureManagedDNSZone(cd, cdLog)
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-		if dnsZone == nil {
-			// dnsNotReady condition was set.
-			if isSet, _ := isDNSNotReadyConditionSet(cd); isSet {
-				// dnsNotReadyReason is why the dnsNotReady condition was set, therefore requeue so that we check to see if it times out.
-				// add defaultRequeueTime to avoid the race condition where the controller is reconciled at the exact time of the timeout (unlikely, but possible).
-				return reconcile.Result{RequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime}, nil
-			}
-
-			return reconcile.Result{}, nil
-		}
-
-		updated, err := r.setDNSDelayMetric(cd, dnsZone, cdLog)
-		if updated || err != nil {
-			return reconcile.Result{}, err
-		}
 	}
 
 	switch {
@@ -1475,6 +1451,16 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	case err != nil:
 		logger.WithError(err).Error("failed to fetch DNS zone")
 		return nil, err
+	}
+
+	if dnsZone.Spec.PreserveOnDelete != cd.Spec.PreserveOnDelete {
+		logger.Infof("setting DNSZone PreserveOnDelete to match ClusterDeployment PreserveOnDelete: %v", cd.Spec.PreserveOnDelete)
+		dnsZone.Spec.PreserveOnDelete = cd.Spec.PreserveOnDelete
+		err := r.Update(context.TODO(), dnsZone)
+		if err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating DNSZone")
+			return dnsZone, err
+		}
 	}
 
 	if !metav1.IsControlledBy(dnsZone, cd) {

@@ -445,7 +445,7 @@ func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeploy
 		hivev1.ClusterHibernatingCondition,
 		status,
 		reason,
-		message,
+		controllerutils.ErrorScrub(errors.New(message)),
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 

@@ -170,7 +170,32 @@ type AWSPrivateLinkConfig struct {
 	//
 	// This list should at minimum include the VPC where the current Hive controller is running.
 	AssociatedVPCs []AWSAssociatedVPC `json:"associatedVPCs,omitempty"`
+
+	// DNSRecordType defines what type of DNS record should be created in Private Hosted Zone
+	// for the customer cluster's API endpoint (which is the VPC Endpoint's regional DNS name).
+	//
+	// +kubebuilder:default=Alias
+	// +optional
+	DNSRecordType AWSPrivateLinkDNSRecordType `json:"dnsRecordType,omitempty"`
 }
+
+// AWSPrivateLinkDNSRecordType defines what type of DNS record should be created in Private Hosted Zone
+// for the customer cluster's API endpoint (which is the VPC Endpoint's regional DNS name).
+// +kubebuilder:validation:Enum=Alias;ARecord
+type AWSPrivateLinkDNSRecordType string
+
+const (
+	// AliasAWSPrivateLinkDNSRecordType uses Route53 Alias record type for pointing the customer cluster's
+	// API DNS name to the DNS name of the VPC endpoint. This is the default and should be used for most
+	// cases as it is provided at no extra cost in terms of DNS queries and usually resolves faster in AWS
+	// environments.
+	AliasAWSPrivateLinkDNSRecordType AWSPrivateLinkDNSRecordType = "Alias"
+
+	// ARecordAWSPrivateLinkDNSRecordType uses Route53 A record type for pointing the customer cluster's
+	// API DNS name to the DNS name of the VPC endpoint. This should be used when Alias record type cannot
+	// be used or other restrictions prevent use of Alias records.
+	ARecordAWSPrivateLinkDNSRecordType AWSPrivateLinkDNSRecordType = "ARecord"
+)
 
 // AWSPrivateLinkInventory is a VPC and its corresponding subnets in an AWS region.
 // This VPC will be used to create an AWS VPC Endpoint whenever there is a VPC Endpoint Service

@@ -223,5 +223,220 @@ expectations of required permissions for these credentials.
     ec2:DescribeVPCs
     ```
 
+## Using A DNS records type in Private Hosted Zones
+
+Currently the private link controller creates an ALIAS record in the PHZ
+created for customer's cluster. This record points the dns
+resolution of customer cluster's k8s API to the VPC endpoint, therefore
+allowing hive to transparently access the cluster over the private
+link.
+
+In some cases the ALIAS record cannot be used. For example, in GovCloud
+environments the Route53 private hosted zones do not support the ALIAS
+record type and therefore we have to use A records.
+
+CNAME records would have been a more suitable replacement for ALIAS records, but
+CNAME records cannot be created at the apex of a DNS zone like ALIAS records.
+The private link architecture uses a DNS zone like `api.<clustername>.<clusterdomain>`
+so that there are no conflicts with authority on DNS resolution. Since CNAME
+records are not supported on the apex, we use A records pointing the cluster's
+API DNS name to the IP addresses of the VPC endpoint directly. Since these IP
+addresses do not change as they are backed by Elastic Network Interfaces in the
+corresponding subnets of the VPC endpoint, this DNS record should remain stable.
+
+For simplicity and current desired use-case, the DNS record type can be
+configured globally for all clusters managed by private link controller.
+
+```yaml
+spec:
+  awsPrivateLink:
+    dnsRecordType: (Alias | ARecord)
+```
+
 [aws-private-link-overview]: https://docs.aws.amazon.com/vpc/latest/privatelink/endpoint-services-overview.html
 [control-access-vpc-endpoint]: https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html#vpc-endpoints-security-groups
+
+## Developing for Private Link
+
+Private link requires some networking setup before Hive controller can create
+clusters with Private link routing.
+
+### Setup VPCs in AWS
+
+Create 2 sets of VPCs in the same region in an AWS account. One VPC will
+be used for creating an OCP cluster for Hive, and the other will be used
+as inventory for VPC endpoints.
+
+1. Create a Hive VPC using cloudformation template.
+
+```
+aws --region us-east-1 cloudformation create-stack \
+  --stack-name hive-vpc \
+  --template-body "file://hack/awsprivatelink/vpc.cf.yaml" \
+  --parameters ParameterKey=AvailabilityZoneCount,ParameterValue=3 ParameterKey=VpcCidr,ParameterValue=10.0.0.0/16
+```
+
+2. Once the cloudformation completes, extract the VPC and subnets from the output.
+
+```
+aws --region us-east-1 cloudformation describe-stacks \
+  --stack-name hive-vpc --query 'Stacks[].Outputs'
+[
+  [
+    {
+      "OutputKey": "PrivateSubnetIds",
+      "OutputValue": "subnet-0bf2b8faf1c7d200b,subnet-09d53f09b54c38029,subnet-015d46e5f7fb7055d",
+      "Description": "Subnet IDs of the private subnets."
+    },
+    {
+      "OutputKey": "PublicSubnetIds",
+      "OutputValue": "subnet-00d5d89ce7b049296,subnet-0253d95c4bcfe7e17,subnet-03a4cfddbf7d9f73a",
+      "Description": "Subnet IDs of the public subnets."
+    },
+    {
+      "OutputKey": "VpcId",
+      "OutputValue": "vpc-0e0b3939a23a5e33e",
+      "Description": "ID of the new VPC."
+    }
+  ]
+]
+```
+
+3. Create a Private link VPC using cloudformation template.
+
+```
+aws --region us-east-1 cloudformation create-stack \
+  --stack-name private-link-vpc \
+  --template-body "file://hack/awsprivatelink/vpc.cf.yaml" \
+  --parameters ParameterKey=AvailabilityZoneCount,ParameterValue=3 ParameterKey=VpcCidr,ParameterValue=10.1.0.0/16
+```
+
+4. Once the cloudformation completes, extract the VPC and subnets from the output.
+
+```
+aws --region us-east-1 cloudformation describe-stacks \
+  --stack-name private-link-vpc --query 'Stacks[].Outputs'\
+[
+  [
+    {
+      "OutputKey": "PrivateSubnetIds",
+      "OutputValue": "subnet-0bf2b8faf1c7d200b,subnet-09d53f09b54c38029,subnet-015d46e5f7fb7055d",
+      "Description": "Subnet IDs of the private subnets."
+    },
+    {
+      "OutputKey": "PublicSubnetIds",
+      "OutputValue": "subnet-00d5d89ce7b049296,subnet-0253d95c4bcfe7e17,subnet-03a4cfddbf7d9f73a",
+      "Description": "Subnet IDs of the public subnets."
+    },
+    {
+      "OutputKey": "VpcId",
+      "OutputValue": "vpc-0e0b3939a23a5e33e",
+      "Description": "ID of the new VPC."
+    }
+  ]
+]
+```
+
+### Create OCP cluster in preexisting Hive VPC
+
+Follow the steps outlines in [OpenShift documentation][openshift-install-aws-existing-vpc].
+
+```yaml
+# install-config.yaml
+...
+platform:
+  aws:
+    region: us-east-1
+    subnets:
+    - # include all the subnets public and private created by cloudformation stack
+    defaultMachinePlatform:
+      zones:
+      - us-east-1a
+      - us-east-1b
+      - us-east-1c
+...
+```
+
+### Setup network peering connection between Hive and Private link VPCs
+
+Create and accept the VPC peering connection using [AWS documentation][aws-vpc-peering]
+
+```
+aws --region us-east-1 ec2 create-vpc-peering-connection \
+  --vpc-id $HIVE_VPC_ID \
+  --peer-vpc-id $PRIVATE_LINK_VPC_ID \
+  --tag-specification "ResourceType=vpc-peering-connection,Tags=[{Key=hive-private-link,Value=owned}]"
+```
+
+```
+aws --region us-east-1 ec2 accept-vpc-peering-connection --vpc-peering-connection-id $VPC_PEERING_CONNECTION_ID
+```
+
+Now update the Route tables using [AWS documentation][aws-vpc-peering-route-tables]
+
+The cloudformation stack creates one route table for all the public subnets, and one route table
+for each private subnet.
+
+First update the private route tables for Hive VPC. Update the routes so that `10.1.0.0/16`
+prefix routes to the VPC peering connection.
+
+Second update the private route tables for Private link VPC. Update the routes so that `10.0.0.0/16`
+prefix routes to the VPC peering connection.
+
+### Setup the security group rules to allow traffic
+
+So we want the workers in the Hive cluster to be able to communicate with the VPC
+endpoints that will be created in the Private link VPC. Secondly, we also want the
+workers to receive traffic from the VPC endpoints.
+
+You can use security groups from peered VPCs to allow flow of traffic using [AWS documentation][aws-vpc-peering-security-groups]
+
+1. Find the security group for workers in Hive Cluster
+
+Use the Hive VPC id to list the security groups.
+
+```
+aws --region us-east-1 ec2 describe-security-groups \
+  --filter Name=vpc-id,Values=$HIVE_VPC_ID Name=tag:Name,Values=$HIVE_CLUSTER_INFRA_ID-worker-sg \
+  --query "SecurityGroups[*].{GroupName:GroupName,GroupId:GroupId}"
+```
+
+2. Find the default security group of the Private link VPC
+
+```
+aws --region us-east-1 ec2 describe-security-groups \
+    --filters Name=vpc-id,Values=$PRIVATE_LINK_VPC_ID,Name=group-name,Values=default \
+    --query "SecurityGroups[*].{GroupName:GroupName,GroupId:GroupId}"
+```
+
+3. Allow all incoming traffic from Hive cluster's worker security group to VPC endpoints
+
+Create an incoming security group rule in Private link VPC's default security group that allows ALL traffic
+from the Hive cluster's worker security group.
+
+```
+aws --region us-east-1 ec2 authorize-security-group-ingress \
+    --group-id $PRIVATE_LINK_VPC_DEFAULT_SG --protocol all --port -1 \
+    --source-group $HIVE_CLUSTER_WORKER_SG
+```
+
+4. Allow all incoming traffic from VPC endpoints to Hive cluster's worker security group
+
+Create an incoming security group rule in Hive cluster's worker security group that allows ALL traffic
+from the Private link VPC's default security group.
+
+```
+aws --region us-east-1 ec2 authorize-security-group-ingress \
+    --group-id $HIVE_CLUSTER_WORKER_SG --protocol all --port -1 \
+    --source-group $PRIVATE_LINK_VPC_DEFAULT_SG
+```
+
+### Configure the inventory for VPC endpoints in HiveConfig
+
+Use the private subnets from Private link VPC as inventory for VPC endpoints by following
+the steps mentioned [above](#configuring-hive-to-enable-aws-private-link)
+
+[openshift-install-aws-existing-vpc]: https://docs.openshift.com/container-platform/4.8/installing/installing_aws/installing-aws-vpc.html
+[aws-vpc-peering]: https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html
+[aws-vpc-peering-route-tables]: https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html
+[aws-vpc-peering-security-groups]: https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-security-groups.html

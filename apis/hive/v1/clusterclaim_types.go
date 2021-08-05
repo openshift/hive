@@ -68,8 +68,6 @@ type ClusterClaimConditionType string
 const (
 	// ClusterClaimPendingCondition is set when a cluster has not yet been assigned and made ready to the claim.
 	ClusterClaimPendingCondition ClusterClaimConditionType = "Pending"
-	// ClusterClaimClusterDeletedCondition is set when the cluster assigned to the claim has been deleted.
-	ClusterClaimClusterDeletedCondition ClusterClaimConditionType = "ClusterDeleted"
 	// ClusterRunningCondition is true when a claimed cluster is running and ready for use.
 	ClusterRunningCondition ClusterClaimConditionType = "ClusterRunning"
 )

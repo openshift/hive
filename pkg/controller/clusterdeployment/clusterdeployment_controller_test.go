@@ -773,6 +773,25 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Update DNSZone when PreserveOnDelete changes for installed cluster",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testInstalledClusterDeployment(time.Now()))
+					cd.Spec.ManageDNS = true
+					cd.Spec.PreserveOnDelete = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testAvailableDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				zone := getDNSZone(c)
+				require.NotNil(t, zone, "dns zone should exist")
+				assert.True(t, zone.Spec.PreserveOnDelete, "PreserveOnDelete was not updated")
+			},
+		},
+		{
 			name: "Wait when DNSZone is not available yet",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -884,10 +903,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
-					cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
-						Type:   hivev1.DNSNotReadyCondition,
-						Status: corev1.ConditionTrue,
-					})
+					cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+						cd.Status.Conditions,
+						hivev1.DNSNotReadyCondition,
+						corev1.ConditionTrue,
+						"no reason",
+						"no message",
+						controllerutils.UpdateConditionIfReasonOrMessageChange)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),

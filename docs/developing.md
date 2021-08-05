@@ -210,7 +210,11 @@ We use a hiveutil subcommand for the install-manager, in pods and thus in an ima
 
 While a community Hive operator bundle is now published weekly to OperatorHub (see above), in rare cases developers may want to build a bundle from source.  You can run or work off the test script below to generate a ClusterServiceVersion, OLM bundle+package, registry image, catalog source, and subscription. (WARNING: this is seldom used and may not always be working)
 
-`$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry" DEPLOY_IMG="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
+`hack/generate-operator-bundle-operatorhub.py operatorhub --previous-version 1.1.11 --new-version 1.1.12 --hive-image "quay.io/dgoodwin/hive:latest"`
+
+You can also generate the OSD version via
+
+`$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry" HIVE_IMAGE="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
 
 ## Enable Debug Logging In Hive Controllers
 

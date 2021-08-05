@@ -75,6 +75,8 @@ func TestReconcileClusterPool(t *testing.T) {
 		)
 	}
 
+	nowish := time.Now()
+
 	tests := []struct {
 		name                               string
 		existing                           []runtime.Object
@@ -92,6 +94,10 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedAssignedClaims             int
 		expectedUnassignedClaims           int
 		expectedLabels                     map[string]string // Tested on all clusters, so will not work if your test has pre-existing cds in the pool.
+		// Map, keyed by claim name, of expected Status.Conditions['Pending'].Reason.
+		// (The clusterpool controller always sets this condition's Status to True.)
+		// Not checked if nil.
+		expectedClaimPendingReasons map[string]string
 	}{
 		{
 			name: "initialize conditions",
@@ -590,11 +596,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 			},
-			expectedTotalClusters:    4,
-			expectedObservedSize:     3,
-			expectedObservedReady:    2,
-			expectedAssignedClaims:   1,
-			expectedUnassignedClaims: 0,
+			expectedTotalClusters:       4,
+			expectedObservedSize:        3,
+			expectedObservedReady:       2,
+			expectedAssignedClaims:      1,
+			expectedUnassignedClaims:    0,
+			expectedClaimPendingReasons: map[string]string{"test-claim": "ClusterAssigned"},
 		},
 		{
 			name: "no ready clusters to assign to claim",
@@ -605,11 +612,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 			},
-			expectedTotalClusters:    4,
-			expectedObservedSize:     3,
-			expectedObservedReady:    0,
-			expectedAssignedClaims:   0,
-			expectedUnassignedClaims: 1,
+			expectedTotalClusters:       4,
+			expectedObservedSize:        3,
+			expectedObservedReady:       0,
+			expectedAssignedClaims:      0,
+			expectedUnassignedClaims:    1,
+			expectedClaimPendingReasons: map[string]string{"test-claim": "NoClusters"},
 		},
 		{
 			name: "assign to multiple claims",
@@ -618,15 +626,30 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
-				testclaim.FullBuilder(testNamespace, "test-claim-1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
-				testclaim.FullBuilder(testNamespace, "test-claim-2", scheme).Build(testclaim.WithPool(testLeasePoolName)),
-				testclaim.FullBuilder(testNamespace, "test-claim-3", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				// Claims are assigned in FIFO order by creationTimestamp
+				testclaim.FullBuilder(testNamespace, "test-claim-1", scheme).Build(
+					testclaim.WithPool(testLeasePoolName),
+					testclaim.Generic(testgeneric.WithCreationTimestamp(nowish.Add(-time.Second*2))),
+				),
+				testclaim.FullBuilder(testNamespace, "test-claim-2", scheme).Build(
+					testclaim.WithPool(testLeasePoolName),
+					testclaim.Generic(testgeneric.WithCreationTimestamp(nowish.Add(-time.Second))),
+				),
+				testclaim.FullBuilder(testNamespace, "test-claim-3", scheme).Build(
+					testclaim.WithPool(testLeasePoolName),
+					testclaim.Generic(testgeneric.WithCreationTimestamp(nowish)),
+				),
 			},
 			expectedTotalClusters:    6,
 			expectedObservedSize:     3,
 			expectedObservedReady:    2,
 			expectedAssignedClaims:   2,
 			expectedUnassignedClaims: 1,
+			expectedClaimPendingReasons: map[string]string{
+				"test-claim-1": "ClusterAssigned",
+				"test-claim-2": "ClusterAssigned",
+				"test-claim-3": "NoClusters",
+			},
 		},
 		{
 			name: "do not assign to claims for other pools",
@@ -635,13 +658,22 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
-				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool("other-pool")),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(
+					testclaim.WithPool("other-pool"),
+					testclaim.WithCondition(hivev1.ClusterClaimCondition{
+						Type:    hivev1.ClusterClaimPendingCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  "ThisShouldNotChange",
+						Message: "Claim ignored because not in the pool",
+					}),
+				),
 			},
-			expectedTotalClusters:    3,
-			expectedObservedSize:     3,
-			expectedObservedReady:    2,
-			expectedAssignedClaims:   0,
-			expectedUnassignedClaims: 1,
+			expectedTotalClusters:       3,
+			expectedObservedSize:        3,
+			expectedObservedReady:       2,
+			expectedAssignedClaims:      0,
+			expectedUnassignedClaims:    1,
+			expectedClaimPendingReasons: map[string]string{"test-claim": "ThisShouldNotChange"},
 		},
 		{
 			name: "do not assign to claims in other namespaces",
@@ -650,13 +682,22 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
-				testclaim.FullBuilder("other-namespace", "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder("other-namespace", "test-claim", scheme).Build(
+					testclaim.WithPool(testLeasePoolName),
+					testclaim.WithCondition(hivev1.ClusterClaimCondition{
+						Type:    hivev1.ClusterClaimPendingCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  "ThisShouldNotChange",
+						Message: "Claim ignored because not in the namespace",
+					}),
+				),
 			},
-			expectedTotalClusters:    3,
-			expectedObservedSize:     3,
-			expectedObservedReady:    2,
-			expectedAssignedClaims:   0,
-			expectedUnassignedClaims: 1,
+			expectedTotalClusters:       3,
+			expectedObservedSize:        3,
+			expectedObservedReady:       2,
+			expectedAssignedClaims:      0,
+			expectedUnassignedClaims:    1,
+			expectedClaimPendingReasons: map[string]string{"test-claim": "ThisShouldNotChange"},
 		},
 		{
 			name: "do not delete previously claimed clusters",
@@ -987,6 +1028,14 @@ func TestReconcileClusterPool(t *testing.T) {
 			actualAssignedClaims := 0
 			actualUnassignedClaims := 0
 			for _, claim := range claims.Items {
+				if test.expectedClaimPendingReasons != nil {
+					if reason, ok := test.expectedClaimPendingReasons[claim.Name]; ok {
+						actualCond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
+						if assert.NotNil(t, actualCond, "did not find Pending condition on claim %s", claim.Name) {
+							assert.Equal(t, reason, actualCond.Reason, "wrong reason on Pending condition for claim %s", claim.Name)
+						}
+					}
+				}
 				if claim.Spec.Namespace == "" {
 					actualUnassignedClaims++
 				} else {

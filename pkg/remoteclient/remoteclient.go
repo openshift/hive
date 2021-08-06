@@ -168,7 +168,7 @@ func SetUnreachableCondition(cd *hivev1.ClusterDeployment, connectionError error
 	if connectionError != nil {
 		status = corev1.ConditionTrue
 		reason = "ErrorConnectingToCluster"
-		message = connectionError.Error()
+		message = utils.ErrorScrub(connectionError)
 		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
 	}
 	cd.Status.Conditions, changed = utils.SetClusterDeploymentConditionWithChangeCheck(

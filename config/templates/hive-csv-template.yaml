@@ -14,6 +14,7 @@ metadata:
     support: Hive Team
     alm-examples: |-
       [{"apiVersion":"hive.openshift.io/v1","kind":"HiveConfig","metadata":{"name":"hive"},"spec":{"managedDomains":[{"aws":{"credentialsSecretRef":{"name":"my-route53-creds"}},"domains":["my-base-domain.example.com"]}]}}]
+    operators.operatorframework.io/internal-objects: '["checkpoints.hive.openshift.io","clusterdeprovisions.hive.openshift.io","clusterprovisions.hive.openshift.io","clusterstates.hive.openshift.io","machinepoolnameleases.hive.openshift.io","clustersyncleases.hiveinternal.openshift.io","clustersyncs.hiveinternal.openshift.io","fakeclusterinstalls.hiveinternal.openshift.io"]'
 spec:
   displayName: Hive for Red Hat OpenShift
   icon:

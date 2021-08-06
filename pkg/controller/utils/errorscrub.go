@@ -5,7 +5,8 @@ import (
 )
 
 var (
-	newlineTabRE = regexp.MustCompile(`\n\t`)
+	newlineTabRE           = regexp.MustCompile(`\n\t`)
+	certificateTimeErrorRE = regexp.MustCompile(`: current time \S+ is after \S+`)
 	// aws
 	awsRequestIDRE = regexp.MustCompile(`(, )*(?i)(request id: )(?:[-[:xdigit:]]+)`)
 	// azure
@@ -20,6 +21,7 @@ func ErrorScrub(err error) string {
 	}
 	s := newlineTabRE.ReplaceAllString(err.Error(), ", ")
 	s = awsRequestIDRE.ReplaceAllString(s, "")
+	s = certificateTimeErrorRE.ReplaceAllString(s, "")
 	// if Azure error, return just the error description
 	match := azureErrorDescriptionRE.FindStringSubmatch(s)
 	if len(match) > 0 {

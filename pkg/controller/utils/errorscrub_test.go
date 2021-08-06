@@ -39,6 +39,11 @@ func TestErrorScrubber(t *testing.T) {
 			input:    errors.New("azure.BearerAuthorizer#WithAuthorization: Failed to refresh the Token for request to https://management.azure.com/subscriptions/53b8f551-f0fc-4bea-8cba-6d1fefd54c8a/resourceGroups/os4-common/providers/Microsoft.Network/dnsZones/hive-managed.qe.azure.devcluster.openshift.com?api-version=2018-05-01: StatusCode=401 -- Original Error: adal: Refresh request failed. Status Code = '401'. Response body: {\"error\":\"invalid_client\",\"error_description\":\"AADSTS7000215: Invalid client secret is provided.\\r\\nTrace ID: 9a06fe2e-c2af-44eb-b3ec-036929a15701\\r\\nCorrelation ID: ae4130a3-7160-40d5-b67e-b6f4a0dd18a5\\r\\nTimestamp: 2021-07-02 09:28:53Z\",\"error_codes\":[7000215],\"timestamp\":\"2021-07-02 09:28:53Z\",\"trace_id\":\"9a06fe2e-c2af-44eb-b3ec-036929a15701\",\"correlation_id\":\"ae4130a3-7160-40d5-b67e-b6f4a0dd18a5\",\"error_uri\":\"https://login.microsoftonline.com/error?code=7000215"),
 			expected: "AADSTS7000215: Invalid client secret is provided.",
 		},
+		{
+			name:     "invalid certificate date",
+			input:    errors.New(`[an error on the server ("") has prevented the request from succeeding, Get "https://api.foobar.openshiftapps.com:6443/api?timeout=32s": x509: certificate has expired or is not yet valid: current time 2021-08-06T11:54:02Z is after 2021-07-26T09:26:41Z]`),
+			expected: `[an error on the server ("") has prevented the request from succeeding, Get "https://api.foobar.openshiftapps.com:6443/api?timeout=32s": x509: certificate has expired or is not yet valid`,
+		},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

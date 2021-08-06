@@ -2,16 +2,12 @@
 all: vendor update test build
 
 # Include the library makefile
-# TODO: Get rid of the imagebuilder.mk include once
-# https://github.com/openshift/build-machinery-go/pull/50 is merged and
-# vendored.
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/controller-gen.mk \
 	targets/openshift/yq.mk \
 	targets/openshift/bindata.mk \
 	targets/openshift/deps.mk \
-	targets/openshift/imagebuilder.mk \
 	targets/openshift/images.mk \
 	targets/openshift/kustomize.mk \
 )

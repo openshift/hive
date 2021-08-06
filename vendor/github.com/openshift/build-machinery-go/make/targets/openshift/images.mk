@@ -1,3 +1,7 @@
+include $(addprefix $(dir $(lastword $(MAKEFILE_LIST))), \
+	imagebuilder.mk \
+)
+
 # IMAGE_BUILD_EXTRA_FLAGS lets you add extra flags for imagebuilder
 # e.g. to mount secrets and repo information into base image like:
 # make images IMAGE_BUILD_EXTRA_FLAGS='-mount ~/projects/origin-repos/4.2/:/etc/yum.repos.d/'

@@ -41,7 +41,7 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 	b := &ValidatingWebhookConfigurationApplyConfiguration{}
 	b.WithName(name)
 	b.WithKind("ValidatingWebhookConfiguration")
-	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
+	b.WithAPIVersion("admissionregistration.k8s.io/v1")
 	return b
 }
 
@@ -56,16 +56,16 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	b := &ValidatingWebhookConfigurationApplyConfiguration{}
-	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.ValidatingWebhookConfiguration"), fieldManager, b)
+	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"), fieldManager, b)
 	if err != nil {
 		return nil, err
 	}
 	b.WithName(validatingWebhookConfiguration.Name)
 
 	b.WithKind("ValidatingWebhookConfiguration")
-	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
+	b.WithAPIVersion("admissionregistration.k8s.io/v1")
 	return b, nil
 }
 

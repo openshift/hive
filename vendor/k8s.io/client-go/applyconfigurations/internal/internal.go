@@ -378,7 +378,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: timeoutSeconds
       type:
         scalar: numeric
-- name: io.k8s.api.admissionregistration.v1beta1.ValidatingWebhookConfiguration
+- name: io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration
   map:
     fields:
     - name: apiVersion

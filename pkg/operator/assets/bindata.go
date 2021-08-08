@@ -253,7 +253,7 @@ func configHiveadmissionApiserviceYaml() (*asset, error) {
 }
 
 var _configHiveadmissionClusterdeploymentWebhookYaml = []byte(`---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: clusterdeploymentvalidators.admission.hive.openshift.io
@@ -296,7 +296,7 @@ func configHiveadmissionClusterdeploymentWebhookYaml() (*asset, error) {
 }
 
 var _configHiveadmissionClusterimagesetWebhookYaml = []byte(`---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: clusterimagesetvalidators.admission.hive.openshift.io
@@ -338,7 +338,7 @@ func configHiveadmissionClusterimagesetWebhookYaml() (*asset, error) {
 }
 
 var _configHiveadmissionClusterprovisionWebhookYaml = []byte(`---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: clusterprovisionvalidators.admission.hive.openshift.io
@@ -456,7 +456,7 @@ func configHiveadmissionDeploymentYaml() (*asset, error) {
 
 var _configHiveadmissionDnszonesWebhookYaml = []byte(`---
 # register to intercept DNSZone object creates and updates
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: dnszonevalidators.admission.hive.openshift.io
@@ -590,7 +590,7 @@ func configHiveadmissionHiveadmission_rbac_role_bindingYaml() (*asset, error) {
 }
 
 var _configHiveadmissionMachinepoolWebhookYaml = []byte(`---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: machinepoolvalidators.admission.hive.openshift.io
@@ -632,7 +632,7 @@ func configHiveadmissionMachinepoolWebhookYaml() (*asset, error) {
 }
 
 var _configHiveadmissionSelectorsyncsetWebhookYaml = []byte(`---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: selectorsyncsetvalidators.admission.hive.openshift.io
@@ -729,7 +729,7 @@ func configHiveadmissionServiceYaml() (*asset, error) {
 }
 
 var _configHiveadmissionSyncsetWebhookYaml = []byte(`---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: syncsetvalidators.admission.hive.openshift.io

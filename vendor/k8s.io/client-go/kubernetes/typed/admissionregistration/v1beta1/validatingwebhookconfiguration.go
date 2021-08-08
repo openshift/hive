@@ -41,15 +41,15 @@ type ValidatingWebhookConfigurationsGetter interface {
 
 // ValidatingWebhookConfigurationInterface has methods to work with ValidatingWebhookConfiguration resources.
 type ValidatingWebhookConfigurationInterface interface {
-	Create(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.CreateOptions) (*v1beta1.ValidatingWebhookConfiguration, error)
-	Update(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.UpdateOptions) (*v1beta1.ValidatingWebhookConfiguration, error)
+	Create(ctx context.Context, validatingWebhookConfiguration *v1.ValidatingWebhookConfiguration, opts v1.CreateOptions) (*v1.ValidatingWebhookConfiguration, error)
+	Update(ctx context.Context, validatingWebhookConfiguration *v1.ValidatingWebhookConfiguration, opts v1.UpdateOptions) (*v1.ValidatingWebhookConfiguration, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.ValidatingWebhookConfiguration, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ValidatingWebhookConfigurationList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1.ValidatingWebhookConfiguration, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1.ValidatingWebhookConfigurationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ValidatingWebhookConfiguration, err error)
-	Apply(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1.ValidatingWebhookConfiguration, err error)
+	Apply(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1.ValidatingWebhookConfiguration, err error)
 	ValidatingWebhookConfigurationExpansion
 }
 
@@ -66,8 +66,8 @@ func newValidatingWebhookConfigurations(c *AdmissionregistrationV1beta1Client) *
 }
 
 // Get takes name of the validatingWebhookConfiguration, and returns the corresponding validatingWebhookConfiguration object, and an error if there is any.
-func (c *validatingWebhookConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
-	result = &v1beta1.ValidatingWebhookConfiguration{}
+func (c *validatingWebhookConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1.ValidatingWebhookConfiguration, err error) {
+	result = &v1.ValidatingWebhookConfiguration{}
 	err = c.client.Get().
 		Resource("validatingwebhookconfigurations").
 		Name(name).
@@ -78,12 +78,12 @@ func (c *validatingWebhookConfigurations) Get(ctx context.Context, name string, 
 }
 
 // List takes label and field selectors, and returns the list of ValidatingWebhookConfigurations that match those selectors.
-func (c *validatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ValidatingWebhookConfigurationList, err error) {
+func (c *validatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1.ValidatingWebhookConfigurationList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
-	result = &v1beta1.ValidatingWebhookConfigurationList{}
+	result = &v1.ValidatingWebhookConfigurationList{}
 	err = c.client.Get().
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -108,8 +108,8 @@ func (c *validatingWebhookConfigurations) Watch(ctx context.Context, opts v1.Lis
 }
 
 // Create takes the representation of a validatingWebhookConfiguration and creates it.  Returns the server's representation of the validatingWebhookConfiguration, and an error, if there is any.
-func (c *validatingWebhookConfigurations) Create(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.CreateOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
-	result = &v1beta1.ValidatingWebhookConfiguration{}
+func (c *validatingWebhookConfigurations) Create(ctx context.Context, validatingWebhookConfiguration *v1.ValidatingWebhookConfiguration, opts v1.CreateOptions) (result *v1.ValidatingWebhookConfiguration, err error) {
+	result = &v1.ValidatingWebhookConfiguration{}
 	err = c.client.Post().
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -120,8 +120,8 @@ func (c *validatingWebhookConfigurations) Create(ctx context.Context, validating
 }
 
 // Update takes the representation of a validatingWebhookConfiguration and updates it. Returns the server's representation of the validatingWebhookConfiguration, and an error, if there is any.
-func (c *validatingWebhookConfigurations) Update(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.UpdateOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
-	result = &v1beta1.ValidatingWebhookConfiguration{}
+func (c *validatingWebhookConfigurations) Update(ctx context.Context, validatingWebhookConfiguration *v1.ValidatingWebhookConfiguration, opts v1.UpdateOptions) (result *v1.ValidatingWebhookConfiguration, err error) {
+	result = &v1.ValidatingWebhookConfiguration{}
 	err = c.client.Put().
 		Resource("validatingwebhookconfigurations").
 		Name(validatingWebhookConfiguration.Name).
@@ -158,8 +158,8 @@ func (c *validatingWebhookConfigurations) DeleteCollection(ctx context.Context, 
 }
 
 // Patch applies the patch and returns the patched validatingWebhookConfiguration.
-func (c *validatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
-	result = &v1beta1.ValidatingWebhookConfiguration{}
+func (c *validatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1.ValidatingWebhookConfiguration, err error) {
+	result = &v1.ValidatingWebhookConfiguration{}
 	err = c.client.Patch(pt).
 		Resource("validatingwebhookconfigurations").
 		Name(name).
@@ -172,7 +172,7 @@ func (c *validatingWebhookConfigurations) Patch(ctx context.Context, name string
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied validatingWebhookConfiguration.
-func (c *validatingWebhookConfigurations) Apply(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
+func (c *validatingWebhookConfigurations) Apply(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1.ValidatingWebhookConfiguration, err error) {
 	if validatingWebhookConfiguration == nil {
 		return nil, fmt.Errorf("validatingWebhookConfiguration provided to Apply must not be nil")
 	}
@@ -185,7 +185,7 @@ func (c *validatingWebhookConfigurations) Apply(ctx context.Context, validatingW
 	if name == nil {
 		return nil, fmt.Errorf("validatingWebhookConfiguration.Name must be provided to Apply")
 	}
-	result = &v1beta1.ValidatingWebhookConfiguration{}
+	result = &v1.ValidatingWebhookConfiguration{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Resource("validatingwebhookconfigurations").
 		Name(*name).

@@ -41,7 +41,7 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 	b := &MutatingWebhookConfigurationApplyConfiguration{}
 	b.WithName(name)
 	b.WithKind("MutatingWebhookConfiguration")
-	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
+	b.WithAPIVersion("admissionregistration.k8s.io/v1")
 	return b
 }
 
@@ -65,7 +65,7 @@ func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admission
 	b.WithName(mutatingWebhookConfiguration.Name)
 
 	b.WithKind("MutatingWebhookConfiguration")
-	b.WithAPIVersion("admissionregistration.k8s.io/v1beta1")
+	b.WithAPIVersion("admissionregistration.k8s.io/v1")
 	return b, nil
 }
 

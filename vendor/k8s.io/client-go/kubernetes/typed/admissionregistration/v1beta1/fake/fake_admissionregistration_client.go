@@ -32,7 +32,7 @@ func (c *FakeAdmissionregistrationV1beta1) MutatingWebhookConfigurations() v1bet
 	return &FakeMutatingWebhookConfigurations{c}
 }
 
-func (c *FakeAdmissionregistrationV1beta1) ValidatingWebhookConfigurations() v1beta1.ValidatingWebhookConfigurationInterface {
+func (c *FakeAdmissionregistrationV1beta1) ValidatingWebhookConfigurations() v1.ValidatingWebhookConfigurationInterface {
 	return &FakeValidatingWebhookConfigurations{c}
 }
 

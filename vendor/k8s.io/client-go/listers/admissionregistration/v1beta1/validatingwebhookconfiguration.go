@@ -30,10 +30,10 @@ import (
 type ValidatingWebhookConfigurationLister interface {
 	// List lists all ValidatingWebhookConfigurations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ValidatingWebhookConfiguration, err error)
+	List(selector labels.Selector) (ret []*v1beta1.ValidatingWebhookConfiguration, err error)
 	// Get retrieves the ValidatingWebhookConfiguration from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ValidatingWebhookConfiguration, error)
+	Get(name string) (*v1beta1.ValidatingWebhookConfiguration, error)
 	ValidatingWebhookConfigurationListerExpansion
 }
 
@@ -48,15 +48,15 @@ func NewValidatingWebhookConfigurationLister(indexer cache.Indexer) ValidatingWe
 }
 
 // List lists all ValidatingWebhookConfigurations in the indexer.
-func (s *validatingWebhookConfigurationLister) List(selector labels.Selector) (ret []*v1.ValidatingWebhookConfiguration, err error) {
+func (s *validatingWebhookConfigurationLister) List(selector labels.Selector) (ret []*v1beta1.ValidatingWebhookConfiguration, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ValidatingWebhookConfiguration))
+		ret = append(ret, m.(*v1beta1.ValidatingWebhookConfiguration))
 	})
 	return ret, err
 }
 
 // Get retrieves the ValidatingWebhookConfiguration from the index for a given name.
-func (s *validatingWebhookConfigurationLister) Get(name string) (*v1.ValidatingWebhookConfiguration, error) {
+func (s *validatingWebhookConfigurationLister) Get(name string) (*v1beta1.ValidatingWebhookConfiguration, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -64,5 +64,5 @@ func (s *validatingWebhookConfigurationLister) Get(name string) (*v1.ValidatingW
 	if !exists {
 		return nil, errors.NewNotFound(v1beta1.Resource("validatingwebhookconfiguration"), name)
 	}
-	return obj.(*v1.ValidatingWebhookConfiguration), nil
+	return obj.(*v1beta1.ValidatingWebhookConfiguration), nil
 }

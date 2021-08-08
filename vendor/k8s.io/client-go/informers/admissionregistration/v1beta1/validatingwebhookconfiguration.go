@@ -36,7 +36,7 @@ import (
 // ValidatingWebhookConfigurations.
 type ValidatingWebhookConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ValidatingWebhookConfigurationLister
+	Lister() v1beta1.ValidatingWebhookConfigurationLister
 }
 
 type validatingWebhookConfigurationInformer struct {
@@ -81,9 +81,9 @@ func (f *validatingWebhookConfigurationInformer) defaultInformer(client kubernet
 }
 
 func (f *validatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistrationv1.ValidatingWebhookConfiguration{}, f.defaultInformer)
+	return f.factory.InformerFor(&admissionregistrationv1beta1.ValidatingWebhookConfiguration{}, f.defaultInformer)
 }
 
-func (f *validatingWebhookConfigurationInformer) Lister() v1.ValidatingWebhookConfigurationLister {
+func (f *validatingWebhookConfigurationInformer) Lister() v1beta1.ValidatingWebhookConfigurationLister {
 	return v1beta1.NewValidatingWebhookConfigurationLister(f.Informer().GetIndexer())
 }

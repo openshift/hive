@@ -332,8 +332,8 @@ func init() {
 	proto.RegisterType((*RuleWithOperations)(nil), "k8s.io.api.admissionregistration.v1beta1.RuleWithOperations")
 	proto.RegisterType((*ServiceReference)(nil), "k8s.io.api.admissionregistration.v1beta1.ServiceReference")
 	proto.RegisterType((*ValidatingWebhook)(nil), "k8s.io.api.admissionregistration.v1beta1.ValidatingWebhook")
-	proto.RegisterType((*ValidatingWebhookConfiguration)(nil), "k8s.io.api.admissionregistration.v1.ValidatingWebhookConfiguration")
-	proto.RegisterType((*ValidatingWebhookConfigurationList)(nil), "k8s.io.api.admissionregistration.v1.ValidatingWebhookConfigurationList")
+	proto.RegisterType((*ValidatingWebhookConfiguration)(nil), "k8s.io.api.admissionregistration.v1beta1.ValidatingWebhookConfiguration")
+	proto.RegisterType((*ValidatingWebhookConfigurationList)(nil), "k8s.io.api.admissionregistration.v1beta1.ValidatingWebhookConfigurationList")
 	proto.RegisterType((*WebhookClientConfig)(nil), "k8s.io.api.admissionregistration.v1beta1.WebhookClientConfig")
 }
 

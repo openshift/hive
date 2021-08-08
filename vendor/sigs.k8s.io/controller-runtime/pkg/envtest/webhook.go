@@ -404,7 +404,7 @@ func readWebhooks(path string) ([]client.Object, []client.Object, error) {
 
 			const (
 				admissionregv1      = "admissionregistration.k8s.io/v1"
-				admissionregv1beta1 = "admissionregistration.k8s.io/v1"
+				admissionregv1beta1 = "admissionregistration.k8s.io/v1beta1"
 			)
 			switch {
 			case generic.Kind == "MutatingWebhookConfiguration":

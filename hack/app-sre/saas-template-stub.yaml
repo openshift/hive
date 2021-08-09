@@ -1,0 +1,15 @@
+# This is used by generate-saas-template.py to generate saas-template.yaml.
+# Edit this file only to manage parameters.
+apiVersion: v1
+kind: Template
+metadata:
+  name: hive-saas-template
+
+parameters:
+  - name: REGISTRY_IMG
+    required: true
+  - name: IMAGE_TAG
+    required: true
+
+# Populated by generate-saas-template.py with the objects in saas-objects.yaml
+objects: []

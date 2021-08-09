@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -46,6 +47,10 @@ const (
 	// csrCheckInterval is the time interval for polling
 	// pending CertificateSigningRequests
 	csrCheckInterval = 30 * time.Second
+
+	// clusterOperatorCheckInterval is the time interval for polling
+	// ClusterOperator state
+	clusterOperatorCheckInterval = 30 * time.Second
 
 	// nodeCheckWaitTime is the minimum time to wait for a node
 	// ready check after a cluster started resuming. This is to
@@ -425,17 +430,38 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		}
 	}
 
-	ready, err := r.nodesReady(cd, remoteClient, logger)
+	nodesReady, err := r.nodesReady(cd, remoteClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether nodes are ready")
 		return reconcile.Result{}, err
 	}
-	if !ready {
+	if !nodesReady {
 		logger.Info("Nodes are not ready, checking for CSRs to approve")
+		_, err := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, "Waiting for nodes to be ready", corev1.ConditionTrue, logger)
+		if err != nil {
+			logger.WithError(err).Error("error updating hibernating condition")
+			return reconcile.Result{}, err
+		}
 		return r.checkCSRs(cd, remoteClient, logger)
 	}
+
+	operatorsReady, err := r.operatorsReady(cd, remoteClient, logger)
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether nodes are ready")
+		return reconcile.Result{}, err
+	}
+	if !operatorsReady {
+		logger.Info("ClusterOperators are not ready")
+		_, err := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, "Waiting for ClusterOperators to be ready", corev1.ConditionTrue, logger)
+		if err != nil {
+			logger.WithError(err).Error("error updating hibernating condition")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{RequeueAfter: clusterOperatorCheckInterval}, nil
+	}
+
 	logger.Info("Cluster has started and is in Running state")
-	return r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, "All machines are started and nodes are ready", corev1.ConditionFalse, logger)
+	return r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, "Cluster is ready", corev1.ConditionFalse, logger)
 }
 
 func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeployment, reason, message string, status corev1.ConditionStatus, logger log.FieldLogger) (result reconcile.Result, returnErr error) {
@@ -525,6 +551,40 @@ func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, remoteC
 	}
 	logger.WithField("count", len(nodeList.Items)).Info("All cluster nodes are ready")
 	return true, nil
+}
+
+func (r *hibernationReconciler) operatorsReady(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (bool, error) {
+
+	logger.Debug("Checking if ClusterOperators are ready")
+	coList := &configv1.ClusterOperatorList{}
+	err := remoteClient.List(context.TODO(), coList)
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to fetch ClusterOperators")
+		err = errors.Wrap(err, "failed to fetch ClusterOperators")
+		return false, err
+	}
+	var success bool
+
+	for _, co := range coList.Items {
+		for _, cosc := range co.Status.Conditions {
+			if cosc.Type == "Disabled" && cosc.Status == "True" {
+				continue
+			}
+
+			// Check that ClusterOperators are in a good state before we consider a cluster ready:
+			if (cosc.Type == "Available" && cosc.Status == configv1.ConditionFalse) ||
+				(cosc.Type == "Progressing" && cosc.Status == configv1.ConditionTrue) ||
+				(cosc.Type == "Degraded" && cosc.Status == configv1.ConditionTrue) {
+				logger.WithFields(log.Fields{
+					"clusterOperator": co.Name,
+					"condition":       cosc.Type,
+					"status":          cosc.Status,
+				}).Info("ClusterOperator is in undesired state")
+				success = false
+			}
+		}
+	}
+	return success, nil
 }
 
 func (r *hibernationReconciler) checkCSRs(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (reconcile.Result, error) {

@@ -31,6 +31,7 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -362,7 +363,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	for _, cd := range toRemoveClaimedCDs[:toDel] {
 		cdLog := logger.WithField("cluster", cd.Name)
 		cdLog.Info("deleting cluster deployment for previous claim")
-		if err := r.Client.Delete(context.Background(), cd); err != nil {
+		if err := utils.SafeDelete(r, context.Background(), cd); err != nil {
 			cdLog.WithError(err).Error("error deleting cluster deployment")
 			return reconcile.Result{}, err
 		}
@@ -670,7 +671,7 @@ func (r *ReconcileClusterPool) deleteExcessClusters(
 	for _, cd := range clustersToDelete {
 		logger := logger.WithField("cluster", cd.Name)
 		logger.Info("deleting cluster deployment")
-		if err := r.Client.Delete(context.Background(), cd); err != nil {
+		if err := utils.SafeDelete(r, context.Background(), cd); err != nil {
 			logger.WithError(err).Error("error deleting cluster deployment")
 			return err
 		}
@@ -691,7 +692,7 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 		if cd.DeletionTimestamp != nil {
 			continue
 		}
-		if err := r.Delete(context.Background(), cd); err != nil {
+		if err := utils.SafeDelete(r, context.Background(), cd); err != nil {
 			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete ClusterDeployment")
 			return errors.Wrap(err, "could not delete ClusterDeployment")
 		}

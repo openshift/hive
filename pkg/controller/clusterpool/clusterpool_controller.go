@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"sort"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -45,6 +44,7 @@ const (
 	clusterPoolAdminRoleBindingName = "hive-cluster-pool-admin-binding"
 	icSecretDependent               = "install config template secret"
 	cdClusterPoolIndex              = "spec.clusterpool.namespacedname"
+	claimClusterPoolIndex           = "spec.clusterpoolname"
 )
 
 var (
@@ -106,6 +106,19 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 			return []string{}
 		}); err != nil {
 		log.WithError(err).Error("Error indexing ClusterDeployments by ClusterPool")
+		return err
+	}
+
+	// Index ClusterClaims by pool name
+	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterClaim{}, claimClusterPoolIndex,
+		func(o client.Object) []string {
+			claim := o.(*hivev1.ClusterClaim)
+			if poolName := claim.Spec.ClusterPoolName; poolName != "" {
+				return []string{poolName}
+			}
+			return []string{}
+		}); err != nil {
+		log.WithError(err).Error("Error indexing ClusterClaims by ClusterPool")
 		return err
 	}
 
@@ -221,7 +234,7 @@ type ReconcileClusterPool struct {
 // attempts to reach the desired state if not.
 func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := controllerutils.BuildControllerLogger(ControllerName, "clusterPool", request.NamespacedName)
-	logger.Infof("reconciling cluster pool")
+	logger.Info("reconciling cluster pool")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
 	defer recobsrv.ObserveControllerReconcileTime()
 
@@ -243,7 +256,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	newConditions := controllerutils.InitializeClusterPoolConditions(clp.Status.Conditions, clusterPoolConditions)
 	if len(newConditions) > len(clp.Status.Conditions) {
 		clp.Status.Conditions = newConditions
-		logger.Infof("initializing cluster pool conditions")
+		logger.Info("initializing cluster pool conditions")
 		if err := r.Status().Update(context.TODO(), clp); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster pool status")
 			return reconcile.Result{}, err
@@ -271,48 +284,22 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, nil
 	}
 
-	// Find all ClusterDeployments from this pool:
-	claimedCDs, unClaimedCDs, err := r.getAllClusterDeploymentsForPool(clp, logger)
+	cds, err := getAllClusterDeploymentsForPool(r.Client, clp, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	var toRemoveClaimedCDs []*hivev1.ClusterDeployment
-	numberOfDeletingClaimedCDs := 0
-	for _, cd := range claimedCDs {
-		toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(cd)
-		switch {
-		case cd.DeletionTimestamp != nil:
-			numberOfDeletingClaimedCDs++
-		case toRemove:
-			toRemoveClaimedCDs = append(toRemoveClaimedCDs, cd)
-		}
+	claims, err := getAllClaimsForPool(r.Client, clp, logger)
+	if err != nil {
+		return reconcile.Result{}, err
 	}
 
-	var installingCDs []*hivev1.ClusterDeployment
-	var readyCDs []*hivev1.ClusterDeployment
-	numberOfDeletingCDs := 0
-	for _, cd := range unClaimedCDs {
-		switch {
-		case cd.DeletionTimestamp != nil:
-			numberOfDeletingCDs++
-		case !cd.Spec.Installed:
-			installingCDs = append(installingCDs, cd)
-		default:
-			readyCDs = append(readyCDs, cd)
-		}
-	}
-
-	logger.WithFields(log.Fields{
-		"installing": len(installingCDs),
-		"deleting":   numberOfDeletingCDs,
-		"total":      len(unClaimedCDs),
-		"ready":      len(readyCDs),
-	}).Debug("found clusters for ClusterPool")
+	claims.SyncClusterDeploymentAssignments(r.Client, cds, logger)
+	cds.SyncClaimAssignments(r.Client, claims, logger)
 
 	origStatus := clp.Status.DeepCopy()
-	clp.Status.Size = int32(len(installingCDs) + len(readyCDs))
-	clp.Status.Ready = int32(len(readyCDs))
+	clp.Status.Size = int32(len(cds.Installing()) + len(cds.Assignable()))
+	clp.Status.Ready = int32(len(cds.Assignable()))
 	if !reflect.DeepEqual(origStatus, &clp.Status) {
 		if err := r.Status().Update(context.Background(), clp); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool status")
@@ -322,11 +309,13 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 
 	availableCapacity := math.MaxInt32
 	if clp.Spec.MaxSize != nil {
-		availableCapacity = int(*clp.Spec.MaxSize) - len(unClaimedCDs) - len(claimedCDs)
+		availableCapacity = int(*clp.Spec.MaxSize) - cds.Total()
+		numUnassigned := len(cds.Installing()) + len(cds.Assignable())
+		numAssigned := cds.NumAssigned()
 		if availableCapacity <= 0 {
 			logger.WithFields(log.Fields{
-				"UnclaimedSize": len(unClaimedCDs),
-				"ClaimedSize":   len(claimedCDs),
+				"UnclaimedSize": numUnassigned,
+				"ClaimedSize":   numAssigned,
 				"Capacity":      *clp.Spec.MaxSize,
 			}).Info("Cannot add more clusters because no capacity available.")
 		}
@@ -336,29 +325,24 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	pendingClaims, err := r.getAllPendingClusterClaims(clp, logger)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-	logger.WithField("count", len(pendingClaims)).Debug("found pending claims for ClusterPool")
-
 	// reserveSize is the number of clusters that the pool currently has in reserve
-	reserveSize := len(installingCDs) + len(readyCDs) - len(pendingClaims)
+	reserveSize := len(cds.Installing()) + len(cds.Assignable()) - len(claims.Unassigned())
 
-	readyCDs, err = r.assignClustersToClaims(pendingClaims, readyCDs, logger)
-	if err != nil {
+	if err := assignClustersToClaims(r.Client, claims, cds, logger); err != nil {
+		logger.WithError(err).Error("error assigning clusters <=> claims")
 		return reconcile.Result{}, err
 	}
 
 	availableCurrent := math.MaxInt32
 	if clp.Spec.MaxConcurrent != nil {
-		availableCurrent = int(*clp.Spec.MaxConcurrent) - len(installingCDs) - numberOfDeletingCDs - numberOfDeletingClaimedCDs
+		availableCurrent = int(*clp.Spec.MaxConcurrent) - len(cds.Installing()) - len(cds.Deleting())
 		if availableCurrent < 0 {
 			availableCurrent = 0
 		}
 	}
 
 	// remove clusters that were previously claimed but now not required.
+	toRemoveClaimedCDs := cds.MarkedForDeletion()
 	toDel := minIntVarible(len(toRemoveClaimedCDs), availableCurrent)
 	for _, cd := range toRemoveClaimedCDs[:toDel] {
 		cdLog := logger.WithField("cluster", cd.Name)
@@ -380,7 +364,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// If too many, delete some.
 	case drift > 0:
 		toDel := minIntVarible(drift, availableCurrent)
-		if err := r.deleteExcessClusters(installingCDs, readyCDs, toDel, logger); err != nil {
+		if err := r.deleteExcessClusters(cds.Installing(), cds.Assignable(), toDel, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	// If too few, create new InstallConfig and ClusterDeployment.
@@ -649,11 +633,6 @@ func (r *ReconcileClusterPool) deleteExcessClusters(
 	logger.WithField("deletionsNeeded", deletionsNeeded).Info("deleting excess clusters")
 	clustersToDelete := make([]*hivev1.ClusterDeployment, 0, deletionsNeeded)
 	if deletionsNeeded < len(installingClusters) {
-		// Sort the installing clusters in order by creation timestamp from newest to oldest. This has the effect of
-		// prioritizing deleting those clusters that have the longest time until they are installed.
-		sort.Slice(installingClusters, func(i, j int) bool {
-			return installingClusters[i].CreationTimestamp.After(installingClusters[j].CreationTimestamp.Time)
-		})
 		clustersToDelete = installingClusters[:deletionsNeeded]
 	} else {
 		clustersToDelete = append(clustersToDelete, installingClusters...)
@@ -684,11 +663,11 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if !controllerutils.HasFinalizer(pool, finalizer) {
 		return nil
 	}
-	_, unClaimedCDs, err := r.getAllClusterDeploymentsForPool(pool, logger)
+	cds, err := getAllClusterDeploymentsForPool(r.Client, pool, logger)
 	if err != nil {
 		return err
 	}
-	for _, cd := range unClaimedCDs {
+	for _, cd := range append(cds.Assignable(), cds.Installing()...) {
 		if cd.DeletionTimestamp != nil {
 			continue
 		}
@@ -703,29 +682,6 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 		return errors.Wrap(err, "could not delete finalizer from ClusterPool")
 	}
 	return nil
-}
-
-func (r *ReconcileClusterPool) getAllClusterDeploymentsForPool(pool *hivev1.ClusterPool, logger log.FieldLogger) (claimed, unclaimed []*hivev1.ClusterDeployment, err error) {
-	cdList := &hivev1.ClusterDeploymentList{}
-	if err := r.Client.List(context.Background(), cdList,
-		client.MatchingFields{cdClusterPoolIndex: poolKey(pool.GetNamespace(), pool.GetName())}); err != nil {
-		logger.WithError(err).Error("error listing ClusterDeployments")
-		return nil, nil, err
-	}
-	for i, cd := range cdList.Items {
-		poolRef := cd.Spec.ClusterPoolRef
-		if poolRef == nil || poolRef.Namespace != pool.Namespace || poolRef.PoolName != pool.Name {
-			// This shouldn't happen IRL, but controller-runtime fake client doesn't support index filters
-			logger.Errorf("unepectedly got a ClusterDeployment not belonging to this pool; ClusterPoolRef: %v", cd.Spec.ClusterPoolRef)
-			continue
-		}
-		if poolRef.ClaimName != "" {
-			claimed = append(claimed, &cdList.Items[i])
-		} else {
-			unclaimed = append(unclaimed, &cdList.Items[i])
-		}
-	}
-	return claimed, unclaimed, nil
 }
 
 func poolReference(pool *hivev1.ClusterPool) hivev1.ClusterPoolReference {
@@ -902,77 +858,4 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")
 	}
-}
-
-// getAllPendingClusterClaims returns all of the ClusterClaims that are requesting clusters from the specified pool.
-// The claims are returned in order of creation time, from oldest to youngest.
-func (r *ReconcileClusterPool) getAllPendingClusterClaims(pool *hivev1.ClusterPool, logger log.FieldLogger) ([]*hivev1.ClusterClaim, error) {
-	claimsList := &hivev1.ClusterClaimList{}
-	if err := r.Client.List(context.Background(), claimsList, client.InNamespace(pool.Namespace)); err != nil {
-		logger.WithError(err).Error("error listing ClusterClaims")
-		return nil, err
-	}
-	var pendingClaims []*hivev1.ClusterClaim
-	for i, claim := range claimsList.Items {
-		// skip claims for other pools
-		if claim.Spec.ClusterPoolName != pool.Name {
-			continue
-		}
-		// skip claims that have been assigned already
-		if claim.Spec.Namespace != "" {
-			continue
-		}
-		pendingClaims = append(pendingClaims, &claimsList.Items[i])
-	}
-	sort.Slice(
-		pendingClaims,
-		func(i, j int) bool {
-			return pendingClaims[i].CreationTimestamp.Before(&pendingClaims[j].CreationTimestamp)
-		},
-	)
-	return pendingClaims, nil
-}
-
-func (r *ReconcileClusterPool) assignClustersToClaims(claims []*hivev1.ClusterClaim, cds []*hivev1.ClusterDeployment, logger log.FieldLogger) ([]*hivev1.ClusterDeployment, error) {
-	for _, claim := range claims {
-		logger := logger.WithField("claim", claim.Name)
-		var conds []hivev1.ClusterClaimCondition
-		var statusChanged bool
-		if len(cds) > 0 {
-			claim.Spec.Namespace = cds[0].Namespace
-			cds = cds[1:]
-			logger.WithField("cluster", claim.Spec.Namespace).Info("assigning cluster to claim")
-			if err := r.Update(context.Background(), claim); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not assign cluster to claim")
-				return cds, err
-			}
-			conds = controllerutils.SetClusterClaimCondition(
-				claim.Status.Conditions,
-				hivev1.ClusterClaimPendingCondition,
-				corev1.ConditionTrue,
-				"ClusterAssigned",
-				"Cluster assigned to ClusterClaim, awaiting claim",
-				controllerutils.UpdateConditionIfReasonOrMessageChange,
-			)
-			statusChanged = true
-		} else {
-			logger.Debug("no clusters ready to assign to claim")
-			conds, statusChanged = controllerutils.SetClusterClaimConditionWithChangeCheck(
-				claim.Status.Conditions,
-				hivev1.ClusterClaimPendingCondition,
-				corev1.ConditionTrue,
-				"NoClusters",
-				"No clusters in pool are ready to be claimed",
-				controllerutils.UpdateConditionIfReasonOrMessageChange,
-			)
-		}
-		if statusChanged {
-			claim.Status.Conditions = conds
-			if err := r.Status().Update(context.Background(), claim); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
-				return cds, err
-			}
-		}
-	}
-	return cds, nil
 }

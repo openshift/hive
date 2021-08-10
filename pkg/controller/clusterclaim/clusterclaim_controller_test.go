@@ -124,7 +124,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			},
 		},
 		{
-			name:  "new assignment",
+			name:  "unassigned CD is a no-op",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
@@ -133,20 +133,14 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Status: corev1.ConditionTrue,
 				},
 				)),
-			expectCompletedClaim: true,
-			expectRBAC:           true,
 			expectedConditions: []hivev1.ClusterClaimCondition{
 				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
+					Type:   hivev1.ClusterClaimPendingCondition,
+					Status: corev1.ConditionUnknown,
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
+					Type:   hivev1.ClusterRunningCondition,
+					Status: corev1.ConditionUnknown,
 				},
 			},
 		},
@@ -215,7 +209,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
-			name: "new assignment clears pending condition",
+			name: "existing assignment clears pending condition",
 			claim: initializedClaimBuilder.Build(
 				testclaim.WithCluster(clusterName),
 				testclaim.WithCondition(
@@ -226,7 +220,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				),
 			),
 			cd: cdBuilder.Build(
-				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterHibernatingCondition,
 					Status: corev1.ConditionTrue,
@@ -324,7 +318,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		{
 			name:  "no RBAC when no subjects",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName), testclaim.WithSubjects(nil)),
-			cd: cdBuilder.Build(testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
+			cd: cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterHibernatingCondition,
 					Status: corev1.ConditionTrue,
@@ -350,7 +344,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			name:  "update existing role",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
-				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterHibernatingCondition,
 					Status: corev1.ConditionTrue,
@@ -384,7 +378,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			name:  "update existing rolebinding",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
-				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
+				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterHibernatingCondition,
 					Status: corev1.ConditionTrue,
@@ -400,35 +394,6 @@ func TestReconcileClusterClaim(t *testing.T) {
 			},
 			expectCompletedClaim: true,
 			expectRBAC:           true,
-			expectedConditions: []hivev1.ClusterClaimCondition{
-				{
-					Type:    hivev1.ClusterClaimPendingCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "ClusterClaimed",
-					Message: "Cluster claimed",
-				},
-				{
-					Type:    hivev1.ClusterRunningCondition,
-					Status:  corev1.ConditionFalse,
-					Reason:  "Resuming",
-					Message: "Waiting for cluster to be running",
-				},
-			},
-		},
-		{
-			name:  "new assignment bring cluster out of hibernation",
-			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
-			cd: cdBuilder.Build(
-				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
-				testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
-				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-					Type:   hivev1.ClusterHibernatingCondition,
-					Status: corev1.ConditionTrue,
-				}),
-			),
-			expectCompletedClaim: true,
-			expectRBAC:           true,
-			expectHibernating:    false,
 			expectedConditions: []hivev1.ClusterClaimCondition{
 				{
 					Type:    hivev1.ClusterClaimPendingCondition,

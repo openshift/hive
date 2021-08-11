@@ -212,6 +212,8 @@ func (o *Options) Run(args []string) error {
 	return nil
 }
 
+//boo
+
 func waitForHiveAdmissionPods(dynClient dynamic.Interface, hiveNSName string) error {
 	resourceName := "deployments"
 	gvr := appsv1.SchemeGroupVersion.WithResource(resourceName)

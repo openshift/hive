@@ -361,6 +361,8 @@ func tlsClientConfigBuilderFunc(kubeConfig clientcmd.ClientConfig, cdLog log.Fie
 		Insecure:   cfg.TLSClientConfig.Insecure,
 		ServerName: cfg.TLSClientConfig.ServerName,
 		CAData:     cfg.TLSClientConfig.CAData,
+		CertData:   cfg.TLSClientConfig.CertData,
+		KeyData:    cfg.TLSClientConfig.KeyData,
 	}
 
 	return tlsClientConfig, nil

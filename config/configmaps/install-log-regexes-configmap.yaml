@@ -72,6 +72,11 @@ data:
       - "InvalidClientTokenId: The security token included in the request is invalid."
       installFailingReason: InvalidCredentials
       installFailingMessage: Credentials are invalid
+    - name: NoWorkerNodes
+      searchRegexStrings:
+      - "Got 0 worker nodes, 3 master nodes"
+      installFailingReason: NoWorkerNodes
+      installFailingMessage: No worker nodes could be created. Check that your machine-api role is correct and try again.
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:

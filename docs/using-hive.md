@@ -587,7 +587,7 @@ spec:
   replicas: 3
 ```
 
-If the Availability Zones are not configured in the `MachinePool`, then all of the AZs in the region will be used and a `MachineSet` resource will be created in all of the AZs.
+If the Availability Zones are not configured in the `MachinePool`, then all of the AZs in the region will be used and a `MachineSet` resource will be created for each AZ.
 
 #### Auto-scaling
 

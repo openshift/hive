@@ -1,0 +1,21 @@
+# HACK: This is the same as config/operator/operator_role_binding.yaml *except*
+# that the subjects[0].namespace is hardcoded. This is because:
+# - `kustomize set namespace` will *set* the subjects[].namespace if absent,
+#   but will not *override* it if present. So we can't just set it in the
+#   original file, or `make deploy` breaks when HIVE_OPERATOR_NS != "hive".
+# - app-sre manages the namespace into which the operator artifacts are to be
+#   deployed ("hive") and sets it on most things (or it's implicit)... but it
+#   can't/won't dig into this CRB to do so.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: hive-operator-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: hive-operator-role
+subjects:
+- kind: ServiceAccount
+  name: hive-operator
+  namespace: hive

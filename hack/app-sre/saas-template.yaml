@@ -6443,6 +6443,7 @@ objects:
   subjects:
   - kind: ServiceAccount
     name: hive-operator
+    namespace: hive
 - apiVersion: apps/v1
   kind: Deployment
   metadata:

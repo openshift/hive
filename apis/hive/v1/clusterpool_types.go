@@ -138,6 +138,9 @@ const (
 	// ClusterPoolCapacityAvailableCondition is set to provide information on whether the cluster pool has capacity
 	// available to create more clusters for the pool.
 	ClusterPoolCapacityAvailableCondition ClusterPoolConditionType = "CapacityAvailable"
+	// ClusterPoolAllClustersCurrentCondition indicates whether all unassigned (installing or ready)
+	// ClusterDeployments in the pool match the current configuration of the ClusterPool.
+	ClusterPoolAllClustersCurrentCondition ClusterPoolConditionType = "AllClustersCurrent"
 )
 
 // +genclient

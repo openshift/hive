@@ -486,7 +486,7 @@ openstack:
 
 ### Machine Pools
 
-`MachinePool` is a YAML configuration by which you can create and scale worker nodes on a deployed cluster. A `MachinePool` will create `MachineSet` resources on the deployed cluster equivalent to the number of configured Availability Zones (AZ).
+`MachinePool` is a YAML configuration by which you can create and scale worker nodes on a deployed cluster. A `MachinePool` will create `MachineSet` resources on the deployed cluster. If supported on your cloud, those MachineSets will automatically span all AZs, or you can specify an explicit list.
 
 To manage `MachinePools` Day 2, you need to define these as well. The definition of the worker pool should mostly match what was specified in `InstallConfig` to prevent replacement of all worker nodes.
 
@@ -587,11 +587,11 @@ spec:
   replicas: 3
 ```
 
-If the Availability Zones are not configured in the `MachinePool`, then all of the AZs in the region will be used and a `MachineSet` resource will be created for each AZ.
+If the Availability Zones are not configured in the `MachinePool`, then all of the AZs in the region will be used and a `MachineSet` resource will be created for each AZ (only relevant for public cloud providers).
 
 #### Auto-scaling
 
-`MachinePools` can be configured to auto-scale to scale up or down worker nodes as needed based on resource utilization of the deployed cluster by creating a `ClusterAutoscaler` on the deployed cluster.
+`MachinePools` can be configured to auto-scale the number of worker nodes as needed based on resource utilization of the deployed cluster (this feature creates a `ClusterAutoscaler` resource in the deployed cluster).
 
 ```yaml
 apiVersion: hive.openshift.io/v1
@@ -621,7 +621,7 @@ The `spec.replicas` and `spec.autoscaling` configurations cannot be configured s
 
 The `spec.autoscaling.maxReplicas` is an optional field. If it is not configured, then nodes will be auto-scaled without restriction based on resource utilization needs.
 
-##### Integration with Horiztonal Pod Autoscalers
+##### Integration with Horizontal Pod Autoscalers
 
 A `MachinePool` configured to auto-scaling mode creates a `ClusterAutoscaler` on the deployed cluster. `ClusterAutoscalers` can co-exist and work with Horiztonal Pod Autoscalers to ensure that there are enough available nodes to meet the auto-scaled pod replica count requirements. See excerpt from OpenShift [documentation](https://docs.openshift.com/container-platform/4.8/machine_management/applying-autoscaling.html):
 

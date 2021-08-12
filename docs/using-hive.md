@@ -486,7 +486,7 @@ openstack:
 
 ### Machine Pools
 
-`MachinePool` is a YAML configuration by which you can create and scale work nodes on a deployed cluster. A `MachinePool` will create `MachineSet` resources on the deployed cluster equivalent to the number of configured Availability Zones (AZ).
+`MachinePool` is a YAML configuration by which you can create and scale worker nodes on a deployed cluster. A `MachinePool` will create `MachineSet` resources on the deployed cluster equivalent to the number of configured Availability Zones (AZ).
 
 To manage `MachinePools` Day 2, you need to define these as well. The definition of the worker pool should mostly match what was specified in `InstallConfig` to prevent replacement of all worker nodes.
 
@@ -619,11 +619,11 @@ The number of minimum replicas must be equivalent to the number of configured Av
 
 The `spec.replicas` and `spec.autoscaling` configurations cannot be configured simultaneously.
 
-The `spec.autoscaling.maxReplicas` is an optional field, if it is not configured, then nodes will be auto-scaled without restriction based on resource utilization needs.
+The `spec.autoscaling.maxReplicas` is an optional field. If it is not configured, then nodes will be auto-scaled without restriction based on resource utilization needs.
 
 ##### Integration with Horiztonal Pod Autoscalers
 
-A `MachinePool` configured to auto-scaling mode creates a `ClusterAutoscaler` on the deployed cluster. `ClusterAutoscalers` can co-exist and work with Horiztonal Pod Autoscalers to ensure that there are enough available nodes to meet the auto-scaled pod replica count requirements. See excerpt from OpenShift documentation:
+A `MachinePool` configured to auto-scaling mode creates a `ClusterAutoscaler` on the deployed cluster. `ClusterAutoscalers` can co-exist and work with Horiztonal Pod Autoscalers to ensure that there are enough available nodes to meet the auto-scaled pod replica count requirements. See excerpt from OpenShift [documentation](https://docs.openshift.com/container-platform/4.8/machine_management/applying-autoscaling.html):
 
 > The horizontal pod autoscaler (HPA) and the cluster autoscaler modify cluster resources in different ways. The HPA changes the deployment’s or replica set’s number of replicas based on the current CPU load. If the load increases, the HPA creates new replicas, regardless of the amount of resources available to the cluster. If there are not enough resources, the cluster autoscaler adds resources so that the HPA-created pods can run. If the load decreases, the HPA stops some replicas. If this action causes some nodes to be underutilized or completely empty, the cluster autoscaler deletes the unnecessary nodes.
 

@@ -18,6 +18,7 @@ var (
 	// ClusterDeployment conditions that could indicate provisioning problems with a cluster
 	// First condition appearing True will be used in the metric labels.
 	provisioningDelayCondition = [...]hivev1.ClusterDeploymentConditionType{
+		hivev1.RequirementsMetCondition,
 		hivev1.DNSNotReadyCondition,
 		hivev1.InstallLaunchErrorCondition,
 		hivev1.ProvisionFailedCondition,

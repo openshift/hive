@@ -5,7 +5,7 @@ include $(addprefix $(dir $(lastword $(MAKEFILE_LIST))), \
 
 .empty-golang-versions-files:
 	@rm -f "$(PERMANENT_TMP)/golang-versions" "$(PERMANENT_TMP)/named-golang-versions"
-.PHONE: .empty-golang-versions-files
+.PHONY: .empty-golang-versions-files
 
 verify-golang-versions:
 	@if [ -f "$(PERMANENT_TMP)/golang-versions" ]; then \

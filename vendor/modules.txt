@@ -544,7 +544,7 @@ github.com/openshift/api/image/v1
 github.com/openshift/api/operator/v1
 github.com/openshift/api/pkg/serialization
 github.com/openshift/api/route/v1
-# github.com/openshift/build-machinery-go v0.0.0-20210701182933-efa47ed39f2e
+# github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37
 ## explicit
 github.com/openshift/build-machinery-go
 github.com/openshift/build-machinery-go/make

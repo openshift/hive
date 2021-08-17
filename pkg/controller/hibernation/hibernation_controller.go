@@ -539,7 +539,7 @@ func (r *hibernationReconciler) checkCSRs(cd *hivev1.ClusterDeployment, remoteCl
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to list machines")
 		return reconcile.Result{}, errors.Wrap(err, "failed to list machines")
 	}
-	csrList, err := kubeClient.CertificatesV1beta1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
+	csrList, err := kubeClient.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to list CSRs")
 		return reconcile.Result{}, errors.Wrap(err, "failed to list CSRs")

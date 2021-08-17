@@ -37,3 +37,11 @@ images:
 - name: registry.ci.openshift.org/openshift/hive-v4.0:hive
   newName: ${REGISTRY_IMG}
   newTag: ${IMAGE_TAG}
+patchesStrategicMerge:
+- |-
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: hive-operator-role
+    labels:
+      managed.openshift.io/aggregate-to-dedicated-admins: cluster

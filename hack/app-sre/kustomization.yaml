@@ -7,7 +7,7 @@
 # The other resources should be curated manually.
 resources:
 - ../../config/operator/operator_role.yaml
-- operator_role_binding.yaml
+- ../../config/operator/operator_role_binding.yaml
 - ../../config/operator/operator_deployment.yaml
 - ../../config/crds/hiveinternal.openshift.io_clustersyncleases.yaml
 - ../../config/crds/hiveinternal.openshift.io_clustersyncs.yaml
@@ -45,3 +45,12 @@ patchesStrategicMerge:
     name: hive-operator-role
     labels:
       managed.openshift.io/aggregate-to-dedicated-admins: cluster
+- |-
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: hive-operator-rolebinding
+  subjects:
+  - kind: ServiceAccount
+    name: hive-operator
+    namespace: hive

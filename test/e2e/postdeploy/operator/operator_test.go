@@ -12,7 +12,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -51,12 +51,12 @@ func TestOperatorDeployment(t *testing.T) {
 	}
 }
 
-func readHiveCRDs(t *testing.T) []*apiextv1beta1.CustomResourceDefinition {
+func readHiveCRDs(t *testing.T) []*apiextv1.CustomResourceDefinition {
 	files, err := ioutil.ReadDir(crdDirectory)
 	if err != nil {
 		t.Fatalf("cannot read crd directory: %v", err)
 	}
-	result := []*apiextv1beta1.CustomResourceDefinition{}
+	result := []*apiextv1.CustomResourceDefinition{}
 	for _, file := range files {
 		if !strings.HasSuffix(file.Name(), ".yaml") {
 			continue
@@ -65,7 +65,7 @@ func readHiveCRDs(t *testing.T) []*apiextv1beta1.CustomResourceDefinition {
 		if err != nil {
 			t.Fatalf("cannot read crd file %s: %v", file.Name(), err)
 		}
-		crd := &apiextv1beta1.CustomResourceDefinition{}
+		crd := &apiextv1.CustomResourceDefinition{}
 		if err = yaml.Unmarshal(b, crd); err != nil {
 			t.Fatalf("failed to unmarshall crd from %s: %v", file.Name(), err)
 		}
@@ -81,7 +81,7 @@ func TestHiveCRDs(t *testing.T) {
 	c := common.MustGetClient()
 	hiveCRDs := readHiveCRDs(t)
 	for _, crd := range hiveCRDs {
-		serverCRD := &apiextv1beta1.CustomResourceDefinition{}
+		serverCRD := &apiextv1.CustomResourceDefinition{}
 		err := c.Get(context.TODO(), types.NamespacedName{Name: crd.Name}, serverCRD)
 		if err != nil {
 			t.Errorf("cannot fetch expected crd (%s): %v", crd.Name, err)
@@ -99,7 +99,7 @@ func TestHiveCRDs(t *testing.T) {
 			continue
 		}
 
-		lastAppliedCRD := &apiextv1beta1.CustomResourceDefinition{}
+		lastAppliedCRD := &apiextv1.CustomResourceDefinition{}
 		if err = yaml.Unmarshal([]byte(lastApplied), lastAppliedCRD); err != nil {
 			t.Fatalf("Unable to unmarshal last applied CRD for %s", serverCRD.Name)
 		}

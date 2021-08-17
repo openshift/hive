@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	batchv1 "k8s.io/api/batch/v1"
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -753,7 +753,7 @@ func unreadyNode() []runtime.Object {
 func csrs() []runtime.Object {
 	result := make([]runtime.Object, 5)
 	for i := 0; i < len(result); i++ {
-		csr := &certsv1beta1.CertificateSigningRequest{}
+		csr := &certsv1.CertificateSigningRequest{}
 		csr.Name = fmt.Sprintf("csr-%d", i)
 		result[i] = csr
 	}

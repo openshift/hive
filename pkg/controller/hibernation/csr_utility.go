@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,24 +40,24 @@ var masterNodeBootstrapperGroups = sets.NewString(
 	"system:authenticated",
 )
 
-var kubeletClientUsages = []certificatesv1beta1.KeyUsage{
-	certificatesv1beta1.UsageKeyEncipherment,
-	certificatesv1beta1.UsageDigitalSignature,
-	certificatesv1beta1.UsageClientAuth,
+var kubeletClientUsages = []certificatesv1.KeyUsage{
+	certificatesv1.UsageKeyEncipherment,
+	certificatesv1.UsageDigitalSignature,
+	certificatesv1.UsageClientAuth,
 }
 
-var kubeletServerUsages = []certificatesv1beta1.KeyUsage{
-	certificatesv1beta1.UsageDigitalSignature,
-	certificatesv1beta1.UsageKeyEncipherment,
-	certificatesv1beta1.UsageServerAuth,
+var kubeletServerUsages = []certificatesv1.KeyUsage{
+	certificatesv1.UsageDigitalSignature,
+	certificatesv1.UsageKeyEncipherment,
+	certificatesv1.UsageServerAuth,
 }
 
 // csrUtility implements the csrHelper interface for use in the hibernation controller
 type csrUtility struct{}
 
-func (u *csrUtility) IsApproved(csr *certificatesv1beta1.CertificateSigningRequest) bool {
+func (u *csrUtility) IsApproved(csr *certificatesv1.CertificateSigningRequest) bool {
 	for _, condition := range csr.Status.Conditions {
-		if condition.Type == certificatesv1beta1.CertificateApproved {
+		if condition.Type == certificatesv1.CertificateApproved {
 			return true
 		}
 	}
@@ -65,7 +65,7 @@ func (u *csrUtility) IsApproved(csr *certificatesv1beta1.CertificateSigningReque
 }
 
 // parseCSR extracts the CSR from the API object and decodes it.
-func (u *csrUtility) Parse(obj *certificatesv1beta1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
+func (u *csrUtility) Parse(obj *certificatesv1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	// extract PEM from request object
 	block, _ := pem.Decode(obj.Spec.Request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
@@ -74,18 +74,18 @@ func (u *csrUtility) Parse(obj *certificatesv1beta1.CertificateSigningRequest) (
 	return x509.ParseCertificateRequest(block.Bytes)
 }
 
-func (u *csrUtility) Approve(client kubeclient.Interface, csr *certificatesv1beta1.CertificateSigningRequest) error {
+func (u *csrUtility) Approve(client kubeclient.Interface, csr *certificatesv1.CertificateSigningRequest) error {
 	if u.IsApproved(csr) {
 		return nil
 	}
 	// Add approved condition
-	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1beta1.CertificateSigningRequestCondition{
-		Type:           certificatesv1beta1.CertificateApproved,
+	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
+		Type:           certificatesv1.CertificateApproved,
 		Reason:         "KubectlApprove",
 		Message:        "This CSR was automatically approved by Hive",
 		LastUpdateTime: metav1.Now(),
 	})
-	_, err := client.CertificatesV1beta1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr, metav1.UpdateOptions{})
+	_, err := client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 	return err
 }
 
@@ -105,7 +105,7 @@ func (u *csrUtility) Approve(client kubeclient.Interface, csr *certificatesv1bet
 func (*csrUtility) Authorize(
 	machines []v1beta1.Machine,
 	client kubeclient.Interface,
-	req *certificatesv1beta1.CertificateSigningRequest,
+	req *certificatesv1.CertificateSigningRequest,
 	csr *x509.CertificateRequest,
 ) error {
 	if req == nil || csr == nil {
@@ -186,7 +186,7 @@ func (*csrUtility) Authorize(
 	return nil
 }
 
-func validateCSRContents(req *certificatesv1beta1.CertificateSigningRequest, csr *x509.CertificateRequest) (string, error) {
+func validateCSRContents(req *certificatesv1.CertificateSigningRequest, csr *x509.CertificateRequest) (string, error) {
 	if !strings.HasPrefix(req.Spec.Username, nodeUserPrefix) {
 		return "", fmt.Errorf("%q doesn't match expected prefix: %q", req.Spec.Username, nodeUserPrefix)
 	}
@@ -234,7 +234,7 @@ func validateCSRContents(req *certificatesv1beta1.CertificateSigningRequest, csr
 	return nodeAsking, nil
 }
 
-func authorizeNodeClientCSR(machines []v1beta1.Machine, client kubeclient.Interface, req *certificatesv1beta1.CertificateSigningRequest, csr *x509.CertificateRequest) error {
+func authorizeNodeClientCSR(machines []v1beta1.Machine, client kubeclient.Interface, req *certificatesv1.CertificateSigningRequest, csr *x509.CertificateRequest) error {
 
 	if !isReqFromNodeBootstrapper(req) {
 		return fmt.Errorf("CSR %s for node client cert has wrong user %s or groups %s", req.Name, req.Spec.Username, sets.NewString(req.Spec.Groups...))
@@ -264,7 +264,7 @@ func authorizeNodeClientCSR(machines []v1beta1.Machine, client kubeclient.Interf
 	return nil // approve node client cert
 }
 
-func isReqFromNodeBootstrapper(req *certificatesv1beta1.CertificateSigningRequest) bool {
+func isReqFromNodeBootstrapper(req *certificatesv1.CertificateSigningRequest) bool {
 	groups := sets.NewString(req.Spec.Groups...)
 	return req.Spec.Username == nodeBootstrapperUsername &&
 		(workerNodeBootstrapperGroups.Equal(groups) ||
@@ -291,7 +291,7 @@ func findMatchingMachineFromInternalDNS(nodeName string, machines []v1beta1.Mach
 	return v1beta1.Machine{}, false
 }
 
-func keyUsageSliceToStringSlice(usages []certificatesv1beta1.KeyUsage) []string {
+func keyUsageSliceToStringSlice(usages []certificatesv1.KeyUsage) []string {
 	result := make([]string, len(usages))
 	for i := range usages {
 		result[i] = string(usages[i])
@@ -299,11 +299,11 @@ func keyUsageSliceToStringSlice(usages []certificatesv1beta1.KeyUsage) []string 
 	return result
 }
 
-func hasExactUsages(csr *certificatesv1beta1.CertificateSigningRequest, usages []certificatesv1beta1.KeyUsage) bool {
+func hasExactUsages(csr *certificatesv1.CertificateSigningRequest, usages []certificatesv1.KeyUsage) bool {
 	return sets.NewString(keyUsageSliceToStringSlice(csr.Spec.Usages)...).Equal(sets.NewString(keyUsageSliceToStringSlice(usages)...))
 }
 
-func isNodeClientCert(csr *certificatesv1beta1.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
+func isNodeClientCert(csr *certificatesv1.CertificateSigningRequest, x509cr *x509.CertificateRequest) bool {
 	if !reflect.DeepEqual([]string{"system:nodes"}, x509cr.Subject.Organization) {
 		return false
 	}

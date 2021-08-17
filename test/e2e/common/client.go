@@ -7,7 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/dynamic"
 	kclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -21,7 +21,7 @@ import (
 )
 
 func init() {
-	apiextv1beta1.AddToScheme(scheme.Scheme)
+	apiextv1.AddToScheme(scheme.Scheme)
 	hiveapis.AddToScheme(scheme.Scheme)
 	admissionv1beta1.AddToScheme(scheme.Scheme)
 	autoscalingv1.SchemeBuilder.AddToScheme(scheme.Scheme)

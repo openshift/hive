@@ -8,7 +8,8 @@ var (
 	newlineTabRE           = regexp.MustCompile(`\n\t`)
 	certificateTimeErrorRE = regexp.MustCompile(`: current time \S+ is after \S+`)
 	// aws
-	awsRequestIDRE = regexp.MustCompile(`(, )*(?i)(request id: )(?:[-[:xdigit:]]+)`)
+	awsRequestIDRE   = regexp.MustCompile(`(, )*(?i)(request id: )(?:[-[:xdigit:]]+)`)
+	awsNotAuthorized = regexp.MustCompile(`User\: \S+ is not authorized to perform\: \S+ on resource\: \S+`)
 	// azure
 	azureErrorDescriptionRE = regexp.MustCompile(`\"error_description\":\"(.*?)\\r\\n`)
 )
@@ -21,6 +22,7 @@ func ErrorScrub(err error) string {
 	}
 	s := newlineTabRE.ReplaceAllString(err.Error(), ", ")
 	s = awsRequestIDRE.ReplaceAllString(s, "")
+	s = awsNotAuthorized.ReplaceAllString(s, "")
 	s = certificateTimeErrorRE.ReplaceAllString(s, "")
 	// if Azure error, return just the error description
 	match := azureErrorDescriptionRE.FindStringSubmatch(s)

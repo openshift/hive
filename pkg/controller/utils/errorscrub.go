@@ -9,7 +9,7 @@ var (
 	certificateTimeErrorRE = regexp.MustCompile(`: current time \S+ is after \S+`)
 	// aws
 	awsRequestIDRE   = regexp.MustCompile(`(, )*(?i)(request id: )(?:[-[:xdigit:]]+)`)
-	awsNotAuthorized = regexp.MustCompile(`User\: \S+ is not authorized to perform\: \S+ on resource\: \S+`)
+	awsNotAuthorized = regexp.MustCompile(`User: \S+ is not authorized to perform: \S+ on resource: \S+`)
 	// azure
 	azureErrorDescriptionRE = regexp.MustCompile(`\"error_description\":\"(.*?)\\r\\n`)
 )

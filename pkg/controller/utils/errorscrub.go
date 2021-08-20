@@ -22,7 +22,7 @@ func ErrorScrub(err error) string {
 	}
 	s := newlineTabRE.ReplaceAllString(err.Error(), ", ")
 	s = awsRequestIDRE.ReplaceAllString(s, "")
-	s = awsNotAuthorized.ReplaceAllString(s, `$1 XXX $2 XXX $3 XXX $4`)
+	s = awsNotAuthorized.ReplaceAllString(s, `${1}XXX${2}XXX${3}XXX${4}`)
 	s = certificateTimeErrorRE.ReplaceAllString(s, "")
 	// if Azure error, return just the error description
 	match := azureErrorDescriptionRE.FindStringSubmatch(s)

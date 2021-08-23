@@ -8,7 +8,7 @@ import (
 	x509 "crypto/x509"
 	gomock "github.com/golang/mock/gomock"
 	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	v1beta10 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/certificates/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
 	reflect "reflect"
 )
@@ -37,7 +37,7 @@ func (m *MockcsrHelper) EXPECT() *MockcsrHelperMockRecorder {
 }
 
 // IsApproved mocks base method
-func (m *MockcsrHelper) IsApproved(csr *v1beta10.CertificateSigningRequest) bool {
+func (m *MockcsrHelper) IsApproved(csr *v1.CertificateSigningRequest) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsApproved", csr)
 	ret0, _ := ret[0].(bool)
@@ -51,7 +51,7 @@ func (mr *MockcsrHelperMockRecorder) IsApproved(csr interface{}) *gomock.Call {
 }
 
 // Parse mocks base method
-func (m *MockcsrHelper) Parse(obj *v1beta10.CertificateSigningRequest) (*x509.CertificateRequest, error) {
+func (m *MockcsrHelper) Parse(obj *v1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Parse", obj)
 	ret0, _ := ret[0].(*x509.CertificateRequest)
@@ -66,7 +66,7 @@ func (mr *MockcsrHelperMockRecorder) Parse(obj interface{}) *gomock.Call {
 }
 
 // Authorize mocks base method
-func (m *MockcsrHelper) Authorize(machines []v1beta1.Machine, nodes kubernetes.Interface, req *v1beta10.CertificateSigningRequest, csr *x509.CertificateRequest) error {
+func (m *MockcsrHelper) Authorize(machines []v1beta1.Machine, nodes kubernetes.Interface, req *v1.CertificateSigningRequest, csr *x509.CertificateRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Authorize", machines, nodes, req, csr)
 	ret0, _ := ret[0].(error)
@@ -80,7 +80,7 @@ func (mr *MockcsrHelperMockRecorder) Authorize(machines, nodes, req, csr interfa
 }
 
 // Approve mocks base method
-func (m *MockcsrHelper) Approve(client kubernetes.Interface, csr *v1beta10.CertificateSigningRequest) error {
+func (m *MockcsrHelper) Approve(client kubernetes.Interface, csr *v1.CertificateSigningRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Approve", client, csr)
 	ret0, _ := ret[0].(error)

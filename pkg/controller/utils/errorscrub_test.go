@@ -44,6 +44,11 @@ func TestErrorScrubber(t *testing.T) {
 			input:    errors.New(`[an error on the server ("") has prevented the request from succeeding, Get "https://api.foobar.openshiftapps.com:6443/api?timeout=32s": x509: certificate has expired or is not yet valid: current time 2021-08-06T11:54:02Z is after 2021-07-26T09:26:41Z]`),
 			expected: `[an error on the server ("") has prevented the request from succeeding, Get "https://api.foobar.openshiftapps.com:6443/api?timeout=32s": x509: certificate has expired or is not yet valid`,
 		},
+		{
+			name:     "aws not authorized arn",
+			input:    errors.New("failed to describe load balancer for the cluster: AccessDenied: User: arn:aws:sts::999999999:assumed-role/RH-Managed-OpenShift-Installer/9999999999999999999 is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::999999999999:role/ManagedOpenShift-Installer-Role\n\tstatus code: 403, request id: be5fed4c-ba78-43a2-82b7-150bab2b10cc"),
+			expected: `failed to describe load balancer for the cluster: AccessDenied: User: arn:aws:sts::XXX:assumed-role/RH-Managed-OpenShift-Installer/XXX is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::XXX:role/ManagedOpenShift-Installer-Role, status code: 403`,
+		},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

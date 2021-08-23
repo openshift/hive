@@ -459,7 +459,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 
 		logger.WithField("infraID", clusterMetadata.InfraID).WithError(err).Error("error discovering NLB for the cluster")
 
-		if err := r.setErrCondition(cd, "DiscoveringNLBFailed", err, logger); err != nil {
+		if err := r.setErrCondition(cd, "DiscoveringNLBFailed", errors.New(controllerutils.ErrorScrub(err)), logger); err != nil {
 			logger.WithError(err).Error("failed to update condition on cluster deployment")
 			return reconcile.Result{}, err
 		}

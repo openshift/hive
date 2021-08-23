@@ -87,6 +87,15 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
+	// metricClusterDeploymentPowerStateTransitionSeconds is a prometheus metric for the number of seconds it takes
+	// for a cluster to transition to the desired power state. It is cleared once the desired state is reached
+	metricClusterDeploymentPowerStateTransitionSeconds = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "hive_cluster_deployment_powerstate_transition_seconds",
+			Help: "Length of time for a cluster to transition to the desired power state",
+		},
+		[]string{"cluster_deployment", "desired_powerstate"},
+	)
 	// metricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
@@ -141,6 +150,7 @@ func init() {
 	metrics.Registry.MustRegister(metricControllerReconcileTime)
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
+	metrics.Registry.MustRegister(metricClusterDeploymentPowerStateTransitionSeconds)
 	metrics.Registry.MustRegister(metricClusterDeploymentSyncsetPaused)
 }
 
@@ -223,6 +233,27 @@ func (mc *Calculator) Start(ctx context.Context) error {
 					})
 					if cleared {
 						mcLog.Infof("cleared metric: %v", metricClusterDeploymentSyncsetPaused)
+					}
+				}
+
+				// For a cluster resuming from hibernated state or trying to hibernate, we report the seconds for that
+				// transition time to the desired power state
+				hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+					hivev1.ClusterHibernatingCondition)
+				if hibernatingCondition != nil {
+					if hibernatingCondition.Reason == hivev1.ResumingHibernationReason ||
+						hibernatingCondition.Reason == hivev1.StoppingHibernationReason {
+						metricClusterDeploymentPowerStateTransitionSeconds.WithLabelValues(cd.Name,
+							string(cd.Spec.PowerState)).Set(time.Since(
+							hibernatingCondition.LastTransitionTime.Time).Seconds())
+					} else {
+						cleared := metricClusterDeploymentPowerStateTransitionSeconds.Delete(map[string]string{
+							"cluster_deployment": cd.Name,
+							"desired_powerstate": string(cd.Spec.PowerState),
+						})
+						if cleared {
+							mcLog.Infof("cleared metric: %v", metricClusterDeploymentPowerStateTransitionSeconds)
+						}
 					}
 				}
 			}

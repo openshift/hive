@@ -198,6 +198,10 @@ type cdCollection struct {
 	deleting []*hivev1.ClusterDeployment
 	// Clusters with the ClusterClaimRemoveClusterAnnotation. Mutually exclusive with deleting.
 	markedForDeletion []*hivev1.ClusterDeployment
+	// Clusters with a missing or empty pool version annotation
+	unknownPoolVersion []*hivev1.ClusterDeployment
+	// Clusters whose pool version annotation doesn't match the pool's
+	mismatchedPoolVersion []*hivev1.ClusterDeployment
 	// All CDs in this pool
 	byCDName map[string]*hivev1.ClusterDeployment
 	// This contains only claimed CDs
@@ -206,7 +210,7 @@ type cdCollection struct {
 
 // getAllClusterDeploymentsForPool is the constructor for a cdCollection
 // comprising all the ClusterDeployments created for the specified ClusterPool.
-func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, logger log.FieldLogger) (*cdCollection, error) {
+func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, poolVersion string, logger log.FieldLogger) (*cdCollection, error) {
 	cdList := &hivev1.ClusterDeploymentList{}
 	if err := c.List(context.Background(), cdList,
 		client.MatchingFields{cdClusterPoolIndex: poolKey(pool.GetNamespace(), pool.GetName())}); err != nil {
@@ -214,11 +218,13 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		return nil, err
 	}
 	cdCol := cdCollection{
-		assignable:  make([]*hivev1.ClusterDeployment, 0),
-		installing:  make([]*hivev1.ClusterDeployment, 0),
-		deleting:    make([]*hivev1.ClusterDeployment, 0),
-		byCDName:    make(map[string]*hivev1.ClusterDeployment),
-		byClaimName: make(map[string]*hivev1.ClusterDeployment),
+		assignable:            make([]*hivev1.ClusterDeployment, 0),
+		installing:            make([]*hivev1.ClusterDeployment, 0),
+		deleting:              make([]*hivev1.ClusterDeployment, 0),
+		unknownPoolVersion:    make([]*hivev1.ClusterDeployment, 0),
+		mismatchedPoolVersion: make([]*hivev1.ClusterDeployment, 0),
+		byCDName:              make(map[string]*hivev1.ClusterDeployment),
+		byClaimName:           make(map[string]*hivev1.ClusterDeployment),
 	}
 	for i, cd := range cdList.Items {
 		poolRef := cd.Spec.ClusterPoolRef
@@ -245,6 +251,16 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			} else {
 				cdCol.installing = append(cdCol.installing, ref)
 			}
+			// Count stale CDs (poolVersion either unknown or mismatched)
+			if cdPoolVersion, ok := cd.Annotations[constants.ClusterDeploymentPoolSpecHashAnnotation]; !ok || cdPoolVersion == "" {
+				// Annotation is either missing or empty. This could be due to upgrade (this CD was
+				// created before this code was installed) or manual intervention (outside agent mucked
+				// with the annotation). Either way we don't know whether the CD matches or not.
+				cdCol.unknownPoolVersion = append(cdCol.unknownPoolVersion, ref)
+			} else if cdPoolVersion != poolVersion {
+				cdCol.mismatchedPoolVersion = append(cdCol.mismatchedPoolVersion, ref)
+			}
+
 		}
 		// Register all claimed CDs, even if they're deleting/marked
 		if claimName != "" {
@@ -268,6 +284,19 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		cdCol.installing,
 		func(i, j int) bool {
 			return cdCol.installing[i].CreationTimestamp.After(cdCol.installing[j].CreationTimestamp.Time)
+		},
+	)
+	// Sort stale CDs by age so we delete the oldest first
+	sort.Slice(
+		cdCol.unknownPoolVersion,
+		func(i, j int) bool {
+			return cdCol.unknownPoolVersion[i].CreationTimestamp.Before(&cdCol.unknownPoolVersion[j].CreationTimestamp)
+		},
+	)
+	sort.Slice(
+		cdCol.mismatchedPoolVersion,
+		func(i, j int) bool {
+			return cdCol.mismatchedPoolVersion[i].CreationTimestamp.Before(&cdCol.mismatchedPoolVersion[j].CreationTimestamp)
 		},
 	)
 
@@ -320,6 +349,24 @@ func (cds *cdCollection) MarkedForDeletion() []*hivev1.ClusterDeployment {
 // not available for claim assignment.
 func (cds *cdCollection) Installing() []*hivev1.ClusterDeployment {
 	return cds.installing
+}
+
+// UnknownPoolVersion returns the list of ClusterDeployments whose pool version annotation is
+// missing or empty.
+func (cds *cdCollection) UnknownPoolVersion() []*hivev1.ClusterDeployment {
+	return cds.unknownPoolVersion
+}
+
+// MismatchedPoolVersion returns the list of ClusterDeployments whose pool version annotation
+// doesn't match the version of the pool.
+func (cds *cdCollection) MismatchedPoolVersion() []*hivev1.ClusterDeployment {
+	return cds.mismatchedPoolVersion
+}
+
+// Stale returns the list of ClusterDeployments whose pool version annotation doesn't match the
+// version of the pool. Put "unknown" first becuase they're annoying.
+func (cds *cdCollection) Stale() []*hivev1.ClusterDeployment {
+	return append(cds.unknownPoolVersion, cds.mismatchedPoolVersion...)
 }
 
 // Assign assigns the specified ClusterDeployment to the specified claim, updating its spec on the
@@ -409,6 +456,8 @@ func (cds *cdCollection) Delete(c client.Client, cdName string) error {
 	removeCDsFromSlice(&cds.assignable, cdName)
 	removeCDsFromSlice(&cds.installing, cdName)
 	removeCDsFromSlice(&cds.assignable, cdName)
+	removeCDsFromSlice(&cds.unknownPoolVersion, cdName)
+	removeCDsFromSlice(&cds.mismatchedPoolVersion, cdName)
 	removeCDsFromSlice(&cds.markedForDeletion, cdName)
 	return nil
 }
@@ -416,36 +465,26 @@ func (cds *cdCollection) Delete(c client.Client, cdName string) error {
 // setCDsCurrentCondition idempotently sets the ClusterDeploymentsCurrent condition on the
 // ClusterPool according to whether all unassigned CDs have the same PoolVersion as the pool.
 func setCDsCurrentCondition(c client.Client, cds *cdCollection, clp *hivev1.ClusterPool, poolVersion string) error {
-	// CDs with mismatched poolVersion
-	mismatchedCDs := make([]string, 0)
-	// CDs with no poolVersion
-	unknownCDs := make([]string, 0)
-
-	for _, cd := range append(cds.Assignable(), cds.Installing()...) {
-		if cdPoolVersion, ok := cd.Annotations[constants.ClusterDeploymentPoolSpecHashAnnotation]; !ok || cdPoolVersion == "" {
-			// Annotation is either missing or empty. This could be due to upgrade (this CD was
-			// created before this code was installed) or manual intervention (outside agent mucked
-			// with the annotation). Either way we don't know whether the CD matches or not.
-			unknownCDs = append(unknownCDs, cd.Name)
-		} else if cdPoolVersion != poolVersion {
-			mismatchedCDs = append(mismatchedCDs, cd.Name)
-		}
-	}
-
 	var status corev1.ConditionStatus
 	var reason, message string
-	if len(mismatchedCDs) != 0 {
+	names := func(cdList []*hivev1.ClusterDeployment) string {
+		names := make([]string, len(cdList))
+		for i, cd := range cdList {
+			names[i] = cd.Name
+		}
+		sort.Strings(names)
+		return strings.Join(names, ", ")
+	}
+	if len(cds.MismatchedPoolVersion()) != 0 {
 		// We can assert staleness if there are any mismatches
 		status = corev1.ConditionFalse
 		reason = "SomeClusterDeploymentsStale"
-		sort.Strings(mismatchedCDs)
-		message = fmt.Sprintf("Some unassigned ClusterDeployments do not match the pool configuration: %s", strings.Join(mismatchedCDs, ", "))
-	} else if len(unknownCDs) != 0 {
+		message = fmt.Sprintf("Some unassigned ClusterDeployments do not match the pool configuration: %s", names(cds.MismatchedPoolVersion()))
+	} else if len(cds.UnknownPoolVersion()) != 0 {
 		// There are no mismatches, but some unknowns. Note that this is a different "unknown" from "we haven't looked yet".
 		status = corev1.ConditionUnknown
 		reason = "SomeClusterDeploymentsUnknown"
-		sort.Strings(unknownCDs)
-		message = fmt.Sprintf("Some unassigned ClusterDeployments are missing their pool spec hash annotation: %s", strings.Join(unknownCDs, ", "))
+		message = fmt.Sprintf("Some unassigned ClusterDeployments are missing their pool spec hash annotation: %s", names(cds.UnknownPoolVersion()))
 	} else {
 		// All match (or there are no CDs, which is also fine)
 		status = corev1.ConditionTrue

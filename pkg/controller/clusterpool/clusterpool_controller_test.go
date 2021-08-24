@@ -157,6 +157,110 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectPoolVersionChanged: true,
 		},
 		{
+			// This also proves we only delete one stale cluster at a time
+			name: "delete oldest stale cluster first",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				unclaimedCDBuilder("c1").Build(
+					testcd.WithPoolVersion("abc123"),
+					testcd.Installed(),
+					testcd.Generic(generic.WithCreationTimestamp(nowish)),
+				),
+				unclaimedCDBuilder("c2").Build(
+					testcd.WithPoolVersion("def345"),
+					testcd.Installed(),
+					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+				),
+			},
+			expectedTotalClusters: 1,
+			// Note: these observed counts are calculated before we start adding/deleting
+			// clusters, so they include the stale one we deleted.
+			expectedObservedSize:    2,
+			expectedObservedReady:   2,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+			expectedDeletedClusters: []string{"c2"},
+		},
+		{
+			name: "delete stale unknown-version cluster first",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				// Two CDs: One with an "unknown" poolVersion, the other older. Proving we favor the unknown for deletion.
+				unclaimedCDBuilder("c1").Build(
+					testcd.WithPoolVersion(""),
+					testcd.Installed(),
+					testcd.Generic(generic.WithCreationTimestamp(nowish)),
+				),
+				unclaimedCDBuilder("c2").Build(
+					testcd.WithPoolVersion("bogus, but set"),
+					testcd.Installed(),
+					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+				),
+			},
+			expectedTotalClusters:   1,
+			expectedObservedSize:    2,
+			expectedObservedReady:   2,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+			expectedDeletedClusters: []string{"c1"},
+		},
+		{
+			name: "stale clusters not deleted if any CD still installing",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2)),
+				unclaimedCDBuilder("c1").Build(),
+				unclaimedCDBuilder("c2").Build(
+					testcd.WithPoolVersion("stale"),
+					testcd.Installed(),
+					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+				),
+			},
+			expectedTotalClusters:   2,
+			expectedObservedSize:    2,
+			expectedObservedReady:   1,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+		},
+		{
+			name: "stale clusters not deleted if under capacity",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(
+					testcd.Installed(),
+				),
+				unclaimedCDBuilder("c2").Build(
+					testcd.WithPoolVersion("stale"),
+					testcd.Installed(),
+					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+				),
+			},
+			expectedTotalClusters:   3,
+			expectedObservedSize:    2,
+			expectedObservedReady:   2,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+		},
+		{
+			name: "stale clusters not deleted if over capacity",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(1)),
+				unclaimedCDBuilder("c1").Build(
+					testcd.Installed(),
+				),
+				unclaimedCDBuilder("c2").Build(
+					testcd.WithPoolVersion("stale"),
+					testcd.Installed(),
+					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+				),
+			},
+			// This deletion happens because we're over capacity, not because we have staleness.
+			// This is proven below.
+			expectedTotalClusters:   1,
+			expectedObservedSize:    2,
+			expectedObservedReady:   2,
+			expectedCDCurrentStatus: corev1.ConditionFalse,
+			// So this is kind of interesting. We delete c1 even though c2 is a) older, b) stale.
+			// This is because we prioritize keeping installed clusters, as they can satisfy claims
+			// more quickly. Possible subject of a future optimization.
+			expectedDeletedClusters: []string{"c1"},
+		},
+		{
 			name: "create all clusters",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithClusterDeploymentLabels(map[string]string{"foo": "bar"})),

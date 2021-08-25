@@ -212,10 +212,6 @@ While a community Hive operator bundle is now published weekly to OperatorHub (s
 
 `hack/generate-operator-bundle-operatorhub.py operatorhub --previous-version 1.1.11 --new-version 1.1.12 --hive-image "quay.io/dgoodwin/hive:latest"`
 
-You can also generate the OSD version via
-
-`$ REGISTRY_IMG="quay.io/dgoodwin/hive-registry" HIVE_IMAGE="quay.io/dgoodwin/hive:latest" hack/olm-registry-deploy.sh`
-
 ## Enable Debug Logging In Hive Controllers
 
 Scale down the Hive operator to zero

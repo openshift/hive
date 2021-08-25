@@ -10,7 +10,7 @@ var (
 	// aws
 	awsRequestIDRE    = regexp.MustCompile(`(, )*(?i)(request id: )(?:[-[:xdigit:]]+)`)
 	awsNotAuthorized  = regexp.MustCompile(`(User: arn:aws:sts::)\S+(:assumed-role/[^/]+/)\S+( is not authorized to perform: \S+ on resource: arn:aws:iam::)[^:]+(:\S+)`)
-	awsEncodedMessage = regexp.MustCompile(`(Encoded authorization failure message: )\S+(,)`)
+	awsEncodedMessage = regexp.MustCompile(`(Encoded authorization failure message: )[^,]+,`)
 	// azure
 	azureErrorDescriptionRE = regexp.MustCompile(`\"error_description\":\"(.*?)\\r\\n`)
 )

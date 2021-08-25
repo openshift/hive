@@ -471,7 +471,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 	if err != nil {
 		logger.WithError(err).Error("failed to reconcile the VPC Endpoint Service")
 
-		if err := r.setErrCondition(cd, "VPCEndpointServiceReconcileFailed", err, logger); err != nil {
+		if err := r.setErrCondition(cd, "VPCEndpointServiceReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger); err != nil {
 			logger.WithError(err).Error("failed to update condition on cluster deployment")
 			return reconcile.Result{}, err
 		}

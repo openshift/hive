@@ -77,6 +77,11 @@ data:
       - "Got 0 worker nodes, 3 master nodes"
       installFailingReason: NoWorkerNodes
       installFailingMessage: No worker nodes could be created. Check that your machine-api role is correct and try again.
+    - name: InvalidAWSTags
+      searchRegexStrings:
+      - "platform\\.aws\\.userTags.*: Invalid value:.*value contains invalid characters"
+      installFailingReason: InvalidAWSTags
+      installFailingMessage: You have specified an invalid AWS tag value. Verify that your tags meet AWS requirements and try again.
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:

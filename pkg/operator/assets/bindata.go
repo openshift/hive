@@ -1654,7 +1654,7 @@ data:
       installFailingMessage: GCP quota SSD_TOTAL_GB exceeded
     - name: GCPComputeQuota
       searchRegexStrings:
-      - "compute\\.googleapis\\.com/cpus is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than remaining quota"
+      - "compute\\.googleapis\\.com/cpus is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than"
       installFailingReason: GCPComputeQuotaExceeded
       installFailingMessage: GCP CPUs quota exceeded
     - name: GCPServiceAccountQuota

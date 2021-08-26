@@ -8,6 +8,7 @@
     - [Checkpoint](#checkpoint)
     - [ClusterClaim](#clusterclaim)
     - [ClusterDeployment](#clusterdeployment)
+      - [`powerState` Sub-Struct](#powerstate-sub-struct)
     - [ClusterDeprovision](#clusterdeprovision)
     - [ClusterImageSet](#clusterimageset)
     - [ClusterPool](#clusterpool)
@@ -47,6 +48,24 @@ Merge once it's deemed feasible and at least somewhat desirable, and with enough
 ### ClusterClaim
 
 ### ClusterDeployment
+#### `powerState` Sub-Struct
+Coming out of [HIVE-1602](https://issues.redhat.com/browse/HIVE-1602) and [this series of comments](https://github.com/openshift/hive/pull/1506#discussion_r691644196) on [#1506](https://github.com/openshift/hive/pull/1506):
+
+We want to be able to indicate multiple things related to `powerState`, including:
+- The desired power state of the ClusterDeployment
+- A timeout for Resuming from hibernation after which we declare the CD to be broken
+- Likewise for Hibernating
+
+Draft pseudo-design:
+```
+spec:
+  ...
+  powerState:
+    desired: [String] {enum: Running|Hibernating}
+    transitionToRunningTimeout: [Duration] {nil means "wait forever" -- current behavior}
+    transitionToHibernatingTimeout: [Duration] {ditto}
+  ...
+```
 
 ### ClusterDeprovision
 

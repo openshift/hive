@@ -125,9 +125,10 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler.EnqueueRequestsFromMapFunc(
-		r.clusterDeploymentWatchHandler,
-	))
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		controllerutils.NewRateLimitedUpdateEventHandler(
+			handler.EnqueueRequestsFromMapFunc(r.clusterDeploymentWatchHandler),
+			controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		return err
 	}

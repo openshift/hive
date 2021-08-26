@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) error {
@@ -26,7 +27,8 @@ func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) 
 		),
 		reconciler: r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, h)
+	return c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		controllerutils.NewRateLimitedUpdateEventHandler(h, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 }
 
 var _ handler.EventHandler = &clusterDeploymentEventHandler{}

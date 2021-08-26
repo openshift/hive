@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -97,4 +98,44 @@ func CredentialsSecretName(cd *hivev1.ClusterDeployment) string {
 	default:
 		return ""
 	}
+}
+
+// IsClusterDeploymentErrorUpdateEvent returns true when the update event is from
+// error state in clusterdeployment.
+func IsClusterDeploymentErrorUpdateEvent(evt event.UpdateEvent) bool {
+	new, ok := evt.ObjectNew.(*hivev1.ClusterDeployment)
+	if !ok {
+		return false
+	}
+	if len(new.Status.Conditions) == 0 {
+		return false
+	}
+
+	old, ok := evt.ObjectOld.(*hivev1.ClusterDeployment)
+	if !ok {
+		return false
+	}
+
+	for _, cond := range new.Status.Conditions {
+		if IsConditionInDesiredState(cond) {
+			continue
+		}
+
+		oldcond := FindClusterDeploymentCondition(old.Status.Conditions, cond.Type)
+		if oldcond == nil {
+			return true // newly added condition in failed state
+		}
+
+		if IsConditionInDesiredState(*oldcond) {
+			return true // newly Failed condition
+		}
+
+		if cond.Message != oldcond.Message ||
+			cond.Reason != oldcond.Reason {
+			return true // already failing but change in error reported
+		}
+
+	}
+
+	return false
 }

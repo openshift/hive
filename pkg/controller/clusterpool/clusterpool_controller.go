@@ -392,7 +392,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			logger.WithError(err).Error("error deleting cluster deployment")
 			return reconcile.Result{}, err
 		}
-
+		metricStaleClusterDeploymentsDeleted.WithLabelValues(clp.Namespace, clp.Name).Inc()
 	}
 
 	// One more (possible) status update: wait until the end to detect whether all unassigned CDs

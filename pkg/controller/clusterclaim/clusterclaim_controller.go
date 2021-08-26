@@ -82,7 +82,9 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentRecon
 	// Watch for changes to ClusterDeployment
 	if err := c.Watch(
 		&source.Kind{Type: &hivev1.ClusterDeployment{}},
-		handler.EnqueueRequestsFromMapFunc(requestsForClusterDeployment)); err != nil {
+		controllerutils.NewRateLimitedUpdateEventHandler(
+			handler.EnqueueRequestsFromMapFunc(requestsForClusterDeployment),
+			controllerutils.IsClusterDeploymentErrorUpdateEvent)); err != nil {
 		return err
 	}
 

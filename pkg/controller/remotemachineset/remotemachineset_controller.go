@@ -114,7 +114,8 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to MachinePools
-	err = c.Watch(&source.Kind{Type: &hivev1.MachinePool{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &hivev1.MachinePool{}},
+		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent))
 	if err != nil {
 		return err
 	}
@@ -125,9 +126,10 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler.EnqueueRequestsFromMapFunc(
-		r.clusterDeploymentWatchHandler,
-	))
+	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		controllerutils.NewRateLimitedUpdateEventHandler(
+			handler.EnqueueRequestsFromMapFunc(r.clusterDeploymentWatchHandler),
+			controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		return err
 	}
@@ -1164,4 +1166,45 @@ func (ps *periodicSource) syncFunc(handler handler.EventHandler,
 
 func (ps *periodicSource) String() string {
 	return fmt.Sprintf("periodic source for MachinePools every %s", ps.duration)
+}
+
+// IsErrorUpdateEvent returns true when the update event for MachinePool is from
+// error state.
+func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
+	new, ok := evt.ObjectNew.(*hivev1.MachinePool)
+	if !ok {
+		return false
+	}
+	if len(new.Status.Conditions) == 0 {
+		return false
+	}
+
+	old, ok := evt.ObjectOld.(*hivev1.MachinePool)
+	if !ok {
+		return false
+	}
+
+	errorConds := []hivev1.MachinePoolConditionType{
+		hivev1.InvalidSubnetsMachinePoolCondition,
+		hivev1.UnsupportedConfigurationMachinePoolCondition,
+	}
+
+	for _, cond := range errorConds {
+		cn := controllerutils.FindMachinePoolCondition(new.Status.Conditions, cond)
+		if cn != nil && cn.Status == corev1.ConditionTrue {
+			co := controllerutils.FindMachinePoolCondition(old.Status.Conditions, cond)
+			if co == nil {
+				return true // newly added failure condition
+			}
+			if co.Status != corev1.ConditionTrue {
+				return true // newly Failed failure condition
+			}
+			if cn.Message != co.Message ||
+				cn.Reason != co.Reason {
+				return true // already failing but change in error reported
+			}
+		}
+	}
+
+	return false
 }

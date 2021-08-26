@@ -6,6 +6,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -217,6 +220,219 @@ func TestClearRelocateAnnotation(t *testing.T) {
 			actualChanged := ClearRelocateAnnotation(tc.obj)
 			assert.NotContains(t, tc.obj.GetAnnotations(), constants.RelocateAnnotation, "unexpected relocate annotation")
 			assert.Equal(t, tc.expectedChanged, actualChanged, "unexpected changed result")
+		})
+	}
+}
+
+func TestIsClusterDeploymentErrorUpdateEvent(t *testing.T) {
+	cases := []struct {
+		name     string
+		old, new client.Object
+
+		exp bool
+	}{{
+		name: "no conditions",
+		old:  &hivev1.ClusterDeployment{},
+		new:  &hivev1.ClusterDeployment{},
+		exp:  false,
+	}, {
+		name: "all in desired state",
+		old:  &hivev1.ClusterDeployment{},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionTrue,
+				}},
+			},
+		},
+		exp: false,
+	}, {
+		name: "condition in undesired, previously missing",
+		old: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}},
+			},
+		},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+				}},
+			},
+		},
+		exp: true,
+	}, {
+		name: "condition in undesired, previously in desired",
+		old: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionTrue,
+				}},
+			},
+		},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+				}},
+			},
+		},
+		exp: true,
+	}, {
+		name: "condition in undesired, previously unknown",
+		old: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionUnknown,
+				}},
+			},
+		},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+				}},
+			},
+		},
+		exp: false,
+	}, {
+		name: "condition in undesired, previously unknown with new error",
+		old: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionUnknown,
+					Reason: "SomeReason",
+				}},
+			},
+		},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+					Reason: "SomeAnotherReason",
+				}},
+			},
+		},
+		exp: true,
+	}, {
+		name: "condition in undesired, previously in undesired",
+		old: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+				}},
+			},
+		},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+				}},
+			},
+		},
+		exp: false,
+	}, {
+		name: "condition in undesired, previously in undesired with new error",
+		old: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+					Reason: "SomeReason",
+				}},
+			},
+		},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+					Reason: "SomeAnotherReason",
+				}},
+			},
+		},
+		exp: true,
+	}, {
+		name: "condition in undesired, previously in undesired with same error",
+		old: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+					Reason: "SomeReason",
+				}},
+			},
+		},
+		new: &hivev1.ClusterDeployment{
+			Status: hivev1.ClusterDeploymentStatus{
+				Conditions: []hivev1.ClusterDeploymentCondition{{
+					Type:   hivev1.ProvisionFailedCondition,
+					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status: corev1.ConditionFalse,
+					Reason: "SomeReason",
+				}},
+			},
+		},
+		exp: false,
+	}}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			got := IsClusterDeploymentErrorUpdateEvent(event.UpdateEvent{ObjectOld: test.old, ObjectNew: test.new})
+			assert.Equal(t, test.exp, got)
 		})
 	}
 }

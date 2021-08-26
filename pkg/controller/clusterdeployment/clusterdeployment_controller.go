@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -180,7 +179,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 	// Watch for changes to ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
-		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent))
+		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment")
 		return err
@@ -2166,44 +2165,4 @@ func LoadReleaseImageVerifier(config *rest.Config) (verify.Interface, error) {
 		Raw:              cmData,
 	}
 	return verify.NewFromManifests([]manifest.Manifest{m}, sigstore.NewCachedHTTPClientConstructor(sigstore.DefaultClient, nil).HTTPClient)
-}
-
-// IsErrorUpdateEvent returns true when the update event is from
-// error state in clusterdeployment.
-func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
-	new, ok := evt.ObjectNew.(*hivev1.ClusterDeployment)
-	if !ok {
-		return false
-	}
-	if len(new.Status.Conditions) == 0 {
-		return false
-	}
-
-	old, ok := evt.ObjectOld.(*hivev1.ClusterDeployment)
-	if !ok {
-		return false
-	}
-
-	for _, cond := range new.Status.Conditions {
-		if controllerutils.IsConditionInDesiredState(cond) {
-			continue
-		}
-
-		oldcond := controllerutils.FindClusterDeploymentCondition(old.Status.Conditions, cond.Type)
-		if oldcond == nil {
-			return true // newly added condition in failed state
-		}
-
-		if controllerutils.IsConditionInDesiredState(*oldcond) {
-			return true // newly Failed condition
-		}
-
-		if cond.Message != oldcond.Message ||
-			cond.Reason != oldcond.Reason {
-			return true // already failing but change in error reported
-		}
-
-	}
-
-	return false
 }

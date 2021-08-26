@@ -82,6 +82,7 @@ func (u *csrUtility) Approve(client kubeclient.Interface, csr *certificatesv1.Ce
 	csr.Status.Conditions = append(csr.Status.Conditions, certificatesv1.CertificateSigningRequestCondition{
 		Type:           certificatesv1.CertificateApproved,
 		Reason:         "KubectlApprove",
+		Status:         corev1.ConditionTrue,
 		Message:        "This CSR was automatically approved by Hive",
 		LastUpdateTime: metav1.Now(),
 	})

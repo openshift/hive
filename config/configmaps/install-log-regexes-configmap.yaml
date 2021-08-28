@@ -168,3 +168,8 @@ data:
       - "Quota '[A-Z_]*' exceeded"
       installFailingReason: GeneralQuotaExceeded
       installFailingMessage: Quota exceeded
+    - name: PlatformQuotaCheck
+      searchRegexStrings:
+      - "\\\"Platform Quota Check\\\": error(MissingQuota): .* is not available in .* because the required number of resources .* is more than the limit"
+      installFailingReason: PlatformQuotaCheckExceeded
+      installFailingMessage: Platform Quota exceeded

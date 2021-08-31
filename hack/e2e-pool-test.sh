@@ -10,16 +10,18 @@ source ${0%/*}/e2e-common.sh
 echo "Waiting for the deployment to settle"
 sleep 120
 
-echo "Creating imageset"
-IMAGESET_NAME=cis
-oc apply -f -<<EOF
+function create_imageset() {
+  local is_name=$1
+  echo "Creating imageset $is_name"
+  oc apply -f -<<EOF
 apiVersion: hive.openshift.io/v1
 kind: ClusterImageSet
 metadata:
-  name: $IMAGESET_NAME
+  name: $is_name
 spec:
   releaseImage: $RELEASE_IMAGE
 EOF
+}
 
 # NOTE: This is needed in order for the short form (cd) to work
 oc get clusterdeployment > /dev/null
@@ -39,7 +41,7 @@ fi
 
 # Use the CLUSTER_NAME configured by the test as the pool name. This will result in CD names
 # being seeded with that as a prefix, which will make them visible to our leak detector.
-POOL_NAME=$CLUSTER_NAME
+REAL_POOL_NAME=$CLUSTER_NAME
 
 function cleanup() {
   capture_manifests
@@ -47,7 +49,7 @@ function cleanup() {
   echo "Saving hive logs before cleanup"
   save_hive_logs
   oc delete clusterclaim --all
-  oc delete clusterpool $POOL_NAME
+  oc delete clusterpool --all
   # Wait indefinitely for all CDs to disappear. If we exceed the test timeout,
   # we'll get killed, and resources will leak.
   while true; do
@@ -64,7 +66,24 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-echo "Creating cluster pool"
+function wait_for_pool_to_be_ready() {
+  local poolname=$1
+  local i=0
+  while [[ $(oc get clusterpool $poolname -o json | jq '.status.ready == .status.size') != "true" ]]; do
+    i=$((i+1))
+    if [[ $i -gt $max_cluster_deployment_status_checks ]]; then
+      echo "Timed out waiting for clusterpool $poolname to be ready."
+      return 1
+    fi
+    echo "Waiting for clusterpool $poolname to be ready: $i of $max_cluster_deployment_status_checks"
+    sleep $sleep_between_cluster_deployment_status_checks
+  done
+}
+
+IMAGESET_NAME=cis
+create_imageset $IMAGESET_NAME
+
+echo "Creating real cluster pool"
 # TODO: This can't be changed yet -- see other TODOs (search for 'variable POOL_SIZE')
 POOL_SIZE=1
 # TODO: This is aws-specific at the moment.
@@ -76,60 +95,20 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   --image-set "${IMAGESET_NAME}" \
   --region us-east-1 \
   --size "${POOL_SIZE}" \
-  ${POOL_NAME}
+  ${REAL_POOL_NAME}
 
-echo "Waiting for pool to create $POOL_SIZE ClusterDeployment(s)"
-i=1
-while [[ $i -le ${max_tries} ]]; do
-  if [[ $i -gt 1 ]]; then
-    # Don't sleep on first loop
-    echo "sleeping ${sleep_between_tries} seconds"
-    sleep ${sleep_between_tries}
-  fi
+# We can get spurious ready==size for a little while
+# TODO: something better than sleep
+sleep 5
 
-  NUM_CDS=$(count_cds)
-  if [[ $NUM_CDS == "${POOL_SIZE}" ]]; then
-    echo "Success"
-    break
-  else
-    echo -n "Failed $(NUM_CDS), "
-  fi
-
-  i=$((i + 1))
-done
-
-if [[ $i -ge ${max_tries} ]] ; then
-  # Failed the maximum amount of times.
-  echo "exiting"
-  exit 10
-fi
+wait_for_pool_to_be_ready $REAL_POOL_NAME
 
 # Get the CD name & namespace (which should be the same)
-# TODO: Set this up for variable POOL_SIZE
-CLUSTER_NAME=$(oc get cd -A -o json | jq -r .items[0].metadata.name)
-
-echo "Waiting for ClusterDeployment $CLUSTER_NAME to finish installing"
-# TODO: Set this up for variable POOL_SIZE
-i=1
-while [[ $i -le ${max_cluster_deployment_status_checks} ]]; do
-  CD_JSON=$(oc get cd -n $CLUSTER_NAME $CLUSTER_NAME -o json)
-  if [[ $(jq .spec.installed <<<"${CD_JSON}") == "true" ]]; then
-    echo "ClusterDeployment is Installed"
-    break
-  fi
-  PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionFailed")' <<<"${CD_JSON}")
-  if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
-    FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
-    FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
-    echo "ClusterDeployment install failed with reason '$FAILURE_REASON' and message: $FAILURE_MESSAGE" >&2
-    capture_cluster_logs $CLUSTER_NAME $CLUSTER_NAME failure
-    exit 7
-  fi
-  sleep ${sleep_between_cluster_deployment_status_checks}
-  echo "Still waiting for the ClusterDeployment ${CLUSTER_NAME} to install. Status check #${i}/${max_cluster_deployment_status_checks}... "
-  i=$((i + 1))
-
-done
+# TODO: Set this up for variable POOL_SIZE -- as written this would put
+#       multiple results in CLUSTER_NAME; for >1 pool size we would not only
+#       need to grab just one of the results, but we would also need to make
+#       sure that's the one that gets claimed for the meat of this test.
+CLUSTER_NAME=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'$REAL_POOL_NAME'") | .metadata.name')
 
 function wait_for_hibernation_state() {
   local CLUSTER_NAME=$1
@@ -167,7 +146,7 @@ wait_for_hibernation_state $CLUSTER_NAME Hibernating
 
 echo "Claiming"
 CLAIM_NAME=the-claim
-go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool claim -n $CLUSTER_NAMESPACE $POOL_NAME $CLAIM_NAME
+go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool claim -n $CLUSTER_NAMESPACE $REAL_POOL_NAME $CLAIM_NAME
 
 wait_for_hibernation_state $CLUSTER_NAME Running
 

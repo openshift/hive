@@ -177,8 +177,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if len(newConditions) > len(cd.Status.Conditions) {
 		cd.Status.Conditions = newConditions
 		cdLog.Info("initializing hibernating controller conditions")
-		if err := r.Status().Update(context.TODO(), cd); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
+		if err := r.updateClusterDeployment(cd, cdLog); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
@@ -192,10 +191,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if supported, msg := r.hibernationSupported(cd); !supported {
 		changed := r.setHibernatingCondition(cd, hivev1.UnsupportedHibernationReason, msg, corev1.ConditionFalse, cdLog)
 		if changed {
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-				err = errors.Wrap(err, "failed to update clusterdeployment")
-			}
+			err := r.updateClusterDeployment(cd, cdLog)
 			return reconcile.Result{}, err
 		}
 	}
@@ -220,9 +216,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 			if cd.Status.InstalledTimestamp != nil && time.Now().Sub(cd.Status.InstalledTimestamp.Time) < hibernateAfterSyncSetsNotApplied {
 				changed := r.setHibernatingCondition(cd, hivev1.SyncSetsNotAppliedReason, "Cluster SyncSets have not been applied", corev1.ConditionFalse, cdLog)
 				if changed {
-					if err := r.Status().Update(context.TODO(), cd); err != nil {
-						cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-						err = errors.Wrap(err, "failed to update clusterdeployment")
+					if err := r.updateClusterDeployment(cd, cdLog); err != nil {
 						return reconcile.Result{}, err
 					}
 				}
@@ -240,9 +234,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 			changed := r.setHibernatingCondition(cd, hivev1.HibernatingHibernationReason, "Fake cluster is stopped",
 				corev1.ConditionTrue, cdLog)
 			if changed {
-				if err := r.Status().Update(context.TODO(), cd); err != nil {
-					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-					err = errors.Wrap(err, "failed to update clusterdeployment")
+				if err := r.updateClusterDeployment(cd, cdLog); err != nil {
 					return reconcile.Result{}, err
 				}
 			}
@@ -254,10 +246,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		if supported, msg := r.hibernationSupported(cd); supported {
 			changed := r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, msg, corev1.ConditionFalse, cdLog)
 			if changed {
-				if err := r.Status().Update(context.TODO(), cd); err != nil {
-					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-					err = errors.Wrap(err, "failed to update clusterdeployment")
-				}
+				err = r.updateClusterDeployment(cd, cdLog)
 			}
 			return reconcile.Result{}, err
 		}
@@ -329,9 +318,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 				changed := r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, "Fake cluster is running",
 					corev1.ConditionFalse, cdLog)
 				if changed {
-					if err := r.Status().Update(context.TODO(), cd); err != nil {
-						cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-						err = errors.Wrap(err, "failed to update clusterdeployment")
+					if err := r.updateClusterDeployment(cd, cdLog); err != nil {
 						return reconcile.Result{}, err
 					}
 				}
@@ -368,9 +355,7 @@ func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logg
 		msg := fmt.Sprintf("Failed to start machines: %v", err)
 		changed := r.setHibernatingCondition(cd, hivev1.FailedToStartHibernationReason, msg, corev1.ConditionTrue, logger)
 		if changed {
-			if updateErr := r.Status().Update(context.TODO(), cd); updateErr != nil {
-				logger.WithError(updateErr).Log(controllerutils.LogLevel(updateErr), "failed to update clusterdeployment")
-				updateErr = errors.Wrap(updateErr, "failed to update clusterdeployment")
+			if updateErr := r.updateClusterDeployment(cd, logger); updateErr != nil {
 				return reconcile.Result{}, updateErr
 			}
 		}
@@ -379,9 +364,7 @@ func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logg
 	}
 	changed := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, "Starting cluster machines", corev1.ConditionTrue, logger)
 	if changed {
-		if updateErr := r.Status().Update(context.TODO(), cd); updateErr != nil {
-			logger.WithError(updateErr).Log(controllerutils.LogLevel(updateErr), "failed to update clusterdeployment")
-			updateErr = errors.Wrap(updateErr, "failed to update clusterdeployment")
+		if updateErr := r.updateClusterDeployment(cd, logger); updateErr != nil {
 			return reconcile.Result{}, updateErr
 		}
 	}
@@ -399,19 +382,15 @@ func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logge
 		msg := fmt.Sprintf("Failed to stop machines: %v", err)
 		changed := r.setHibernatingCondition(cd, hivev1.FailedToStopHibernationReason, msg, corev1.ConditionFalse, logger)
 		if changed {
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-				err = errors.Wrap(err, "failed to update clusterdeployment")
+			if err := r.updateClusterDeployment(cd, logger); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 	changed := r.setHibernatingCondition(cd, hivev1.StoppingHibernationReason, "Stopping cluster machines", corev1.ConditionTrue, logger)
 	if changed {
-		if err := r.Status().Update(context.TODO(), cd); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-			err = errors.Wrap(err, "failed to update clusterdeployment")
+		if err := r.updateClusterDeployment(cd, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
@@ -441,9 +420,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		msg := fmt.Sprintf("Stopping cluster machines. Some machines have not yet stopped: %s", strings.Join(remaining, ","))
 		changed := r.setHibernatingCondition(cd, hivev1.StoppingHibernationReason, msg, corev1.ConditionTrue, logger)
 		if changed {
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-				err = errors.Wrap(err, "failed to update clusterdeployment")
+			if err := r.updateClusterDeployment(cd, logger); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
@@ -454,10 +431,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 	logger.Info("Cluster has stopped and is in hibernating state")
 	changed := r.setHibernatingCondition(cd, hivev1.HibernatingHibernationReason, "Cluster is stopped", corev1.ConditionTrue, logger)
 	if changed {
-		if err = r.Status().Update(context.TODO(), cd); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-			err = errors.Wrap(err, "failed to update clusterdeployment")
-		}
+		err = r.updateClusterDeployment(cd, logger)
 	}
 	return reconcile.Result{}, err
 }
@@ -485,9 +459,7 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		msg := fmt.Sprintf("Starting cluster machines. Some machines are not yet running: %s", strings.Join(remaining, ","))
 		changed := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, msg, corev1.ConditionTrue, logger)
 		if changed {
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-				err = errors.Wrap(err, "failed to update clusterdeployment")
+			if err := r.updateClusterDeployment(cd, logger); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
@@ -524,9 +496,7 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		logger.Info("Nodes are not ready, checking for CSRs to approve")
 		changed := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, "Waiting for nodes to be ready", corev1.ConditionTrue, logger)
 		if changed {
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-				err = errors.Wrap(err, "failed to update clusterdeployment")
+			if err := r.updateClusterDeployment(cd, logger); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
@@ -542,9 +512,7 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 		logger.Info("ClusterOperators are not ready")
 		changed := r.setHibernatingCondition(cd, hivev1.ResumingHibernationReason, "Waiting for ClusterOperators to be ready", corev1.ConditionTrue, logger)
 		if changed {
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-				err = errors.Wrap(err, "failed to update clusterdeployment")
+			if err := r.updateClusterDeployment(cd, logger); err != nil {
 				return reconcile.Result{}, err
 			}
 		}
@@ -554,12 +522,18 @@ func (r *hibernationReconciler) checkClusterResumed(cd *hivev1.ClusterDeployment
 	logger.Info("Cluster has started and is in Running state")
 	changed := r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, "Cluster is ready", corev1.ConditionFalse, logger)
 	if changed {
-		if err = r.Status().Update(context.TODO(), cd); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
-			err = errors.Wrap(err, "failed to update clusterdeployment")
-		}
+		err = r.updateClusterDeployment(cd, logger)
 	}
 	return reconcile.Result{}, err
+}
+
+func (r *hibernationReconciler) updateClusterDeployment(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+	err := r.Status().Update(context.TODO(), cd)
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
+		err = errors.Wrap(err, "failed to update clusterdeployment")
+	}
+	return err
 }
 
 func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeployment, reason, message string, status corev1.ConditionStatus, logger log.FieldLogger) bool {
@@ -645,7 +619,7 @@ func (r *hibernationReconciler) operatorsReady(cd *hivev1.ClusterDeployment, rem
 		err = errors.Wrap(err, "failed to fetch ClusterOperators")
 		return false, err
 	}
-	var success bool
+	success := true
 
 	for _, co := range coList.Items {
 		for _, cosc := range co.Status.Conditions {

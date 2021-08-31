@@ -140,8 +140,10 @@ else
 	CLUSTER_DOMAIN="${BASE_DOMAIN}"
 fi
 
-
 echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
+
+# NOTE: This is needed in order for the short form (cd) to work
+oc get clusterdeployment > /dev/null
 
 function capture_manifests() {
     oc get clusterdeployment -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterdeployment.yaml" || true

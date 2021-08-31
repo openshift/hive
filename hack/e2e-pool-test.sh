@@ -23,9 +23,6 @@ spec:
 EOF
 }
 
-# NOTE: This is needed in order for the short form (cd) to work
-oc get clusterdeployment > /dev/null
-
 function count_cds() {
   oc get cd -A -o json | jq -r '.items | length'
 }
@@ -80,6 +77,42 @@ function wait_for_pool_to_be_ready() {
   done
 }
 
+function get_all_clusters_current_condition() {
+  local poolname=$1
+  oc get clusterpool $poolname -o json | jq -r '.status.conditions[] | select(.type=="AllClustersCurrent")'
+}
+
+function expect_all_clusters_current() {
+  local poolname=$1
+  local expected_status=$2
+  local cond=$(get_all_clusters_current_condition $poolname)
+  if [[ $(jq -r .status <<< $cond) != $expected_status ]]; then
+    echo "Expected AllClustersCurrent to be $expected_status, but:"
+    jq -r .message <<< $cond
+    return 1
+  fi
+}
+
+function verify_pool_cd_imagesets() {
+  local poolname=$1
+  local expected_cis=$2
+  local rc=0
+  echo "Validating all ClusterDeployments for pool $poolname have imageSetRef $expected_cis"
+  cd_cis=$(oc get cd -A -o json \
+      | jq -r '.items[]
+        | select(.metadata.deletionTimestamp==null)
+        | select(.spec.clusterPoolRef.poolName=="'$poolname'")
+        | [.metadata.name, .spec.provisioning.imageSetRef.name]
+        | @tsv')
+  while read cd cis; do
+    if [[ $cis != $expected_cis ]]; then
+      echo "FAIL: ClusterDeployment $cd has imageSetRef $cis"
+      rc=1
+    fi
+  done <<< "$cd_cis"
+  return $rc
+}
+
 IMAGESET_NAME=cis
 create_imageset $IMAGESET_NAME
 
@@ -97,10 +130,38 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   --size "${POOL_SIZE}" \
   ${REAL_POOL_NAME}
 
+## INTERLUDE: FAKE POOL
+# The real cluster pool is going to take a while to become ready. While that
+# happens, create a fake pool and do some more testing. We'll use the real
+# pool as a template, just changing its name and size and adding the annotation
+# that causes its CDs to be faked.
+FAKE_POOL_NAME=fake-pool
+oc get clusterpool ${REAL_POOL_NAME} -o json \
+  | jq '.spec.annotations["hive.openshift.io/fake-cluster"] = "true" | .metadata.name = "'${FAKE_POOL_NAME}'" | .spec.size = 4' \
+  | oc apply -f -
 # We can get spurious ready==size for a little while
 # TODO: something better than sleep
 sleep 5
+wait_for_pool_to_be_ready $FAKE_POOL_NAME
 
+# Test stale cluster replacement (HIVE-1058)
+expect_all_clusters_current $FAKE_POOL_NAME True
+verify_pool_cd_imagesets $FAKE_POOL_NAME $IMAGESET_NAME
+# Create another cluster image set so we can edit a relevant pool field.
+# The cis is identical except for the name, but the pool doesn't know that.
+create_imageset fake-cis
+# Modify the clusterpool and watch CDs get replaced
+oc patch clusterpool $FAKE_POOL_NAME --type=merge -p '{"spec":{"imageSetRef": {"name": "fake-cis"}}}'
+expect_all_clusters_current $FAKE_POOL_NAME False
+oc wait --for=condition=AllClustersCurrent --timeout=10m clusterpool/$FAKE_POOL_NAME
+# The wait returns as soon as we delete the last stale cluster. Wait for its replacement to be ready.
+wait_for_pool_to_be_ready $FAKE_POOL_NAME
+# At this point all CDs should ref the new imageset
+verify_pool_cd_imagesets $FAKE_POOL_NAME fake-cis
+
+## BACK TO THE REAL POOL
+
+# Wait for the real cluster pool to become ready (if it isn't yet)
 wait_for_pool_to_be_ready $REAL_POOL_NAME
 
 # Get the CD name & namespace (which should be the same)

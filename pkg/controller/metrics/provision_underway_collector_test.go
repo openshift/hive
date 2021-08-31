@@ -84,6 +84,19 @@ func TestProvisioningUnderwayCollector(t *testing.T) {
 			"cluster_deployment = cd-2 cluster_type = unspecified condition = ProvisionFailed image_set = none namespace = cd-2 platform =  reason = FailedDueToQuotas",
 		},
 	}, {
+		name: "provisioning with positive polarity condition",
+		existing: []runtime.Object{
+			cdBuilder("cd-1").Build(testcd.Installed()),
+			cdBuilder("cd-2").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RequirementsMetCondition,
+				Status: corev1.ConditionFalse,
+				Reason: "ClusterImageSetNotFound",
+			})),
+		},
+		expected: []string{
+			"cluster_deployment = cd-2 cluster_type = unspecified condition = RequirementsMet image_set = none namespace = cd-2 platform =  reason = ClusterImageSetNotFound",
+		},
+	}, {
 		name: "provisioning with ProvisionFailed, DNSNotReadyCondition condition",
 		existing: []runtime.Object{
 			cdBuilder("cd-1").Build(testcd.Installed()),

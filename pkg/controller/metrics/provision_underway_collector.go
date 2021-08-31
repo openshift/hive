@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -209,7 +208,7 @@ func getKnownConditions(conditions []hivev1.ClusterDeploymentCondition) (conditi
 	for _, delayCondition := range provisioningDelayCondition {
 		if cdCondition := controllerutils.FindClusterDeploymentCondition(conditions,
 			delayCondition); cdCondition != nil {
-			if cdCondition.Status == corev1.ConditionTrue {
+			if !controllerutils.IsConditionInDesiredState(*cdCondition) {
 				condition = string(delayCondition)
 				if cdCondition.Reason != "" {
 					reason = cdCondition.Reason

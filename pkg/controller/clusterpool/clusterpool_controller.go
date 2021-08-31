@@ -285,7 +285,9 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, nil
 	}
 
-	cds, err := getAllClusterDeploymentsForPool(r.Client, clp, logger)
+	poolVersion := calculatePoolVersion(clp)
+
+	cds, err := getAllClusterDeploymentsForPool(r.Client, clp, poolVersion, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -355,8 +357,6 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 	availableCurrent -= toDel
 
-	poolVersion := calculatePoolVersion(clp)
-
 	switch drift := reserveSize - int(clp.Spec.Size); {
 	// activity quota exceeded, so no action
 	case availableCurrent <= 0:
@@ -383,6 +383,16 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
+	// Special case for stale CDs: allow deleting one if all CDs are installed.
+	case drift == 0 && len(cds.Installing()) == 0 && len(cds.Stale()) > 0:
+		toDelete := cds.Stale()[0]
+		logger := logger.WithField("cluster", toDelete.Name)
+		logger.Info("deleting cluster deployment")
+		if err := cds.Delete(r.Client, toDelete.Name); err != nil {
+			logger.WithError(err).Error("error deleting cluster deployment")
+			return reconcile.Result{}, err
+		}
+		metricStaleClusterDeploymentsDeleted.WithLabelValues(clp.Namespace, clp.Name).Inc()
 	}
 
 	// One more (possible) status update: wait until the end to detect whether all unassigned CDs
@@ -704,7 +714,8 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if !controllerutils.HasFinalizer(pool, finalizer) {
 		return nil
 	}
-	cds, err := getAllClusterDeploymentsForPool(r.Client, pool, logger)
+	// Don't care about the poolVersion here since we're deleting everything.
+	cds, err := getAllClusterDeploymentsForPool(r.Client, pool, "", logger)
 	if err != nil {
 		return err
 	}

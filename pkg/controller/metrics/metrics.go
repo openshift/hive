@@ -385,7 +385,7 @@ func processJobs(jobs []batchv1.Job) (runningTotal, succeededTotal, failedTotal 
 }
 
 // clusterAccumulator is an object used to process cluster deployments and sort them so we can
-// increment the appropriate metrics counter based on it's type, installed state, length of time
+// increment the appropriate metrics counter based on its type, installed state, length of time
 // it has been uninstalled, and the conditions it has.
 type clusterAccumulator struct {
 	// ageFilter can optionally be specified to skip processing clusters older than this duration. If this is not desired,

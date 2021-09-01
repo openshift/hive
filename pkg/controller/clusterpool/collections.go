@@ -196,6 +196,8 @@ type cdCollection struct {
 	installing []*hivev1.ClusterDeployment
 	// Clusters with a DeletionTimestamp. Mutually exclusive with markedForDeletion.
 	deleting []*hivev1.ClusterDeployment
+	// Clusters we've declared unusable (e.g. provision failed terminally).
+	broken []*hivev1.ClusterDeployment
 	// Clusters with the ClusterClaimRemoveClusterAnnotation. Mutually exclusive with deleting.
 	markedForDeletion []*hivev1.ClusterDeployment
 	// Clusters with a missing or empty pool version annotation
@@ -206,6 +208,20 @@ type cdCollection struct {
 	byCDName map[string]*hivev1.ClusterDeployment
 	// This contains only claimed CDs
 	byClaimName map[string]*hivev1.ClusterDeployment
+}
+
+func isBroken(cd *hivev1.ClusterDeployment) bool {
+	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition)
+	if cond == nil {
+		// Since we should be initializing conditions, this probably means the CD is super fresh.
+		// Don't declare it broken yet -- give it a chance to come to life.
+		return false
+	}
+	if cond.Status == corev1.ConditionTrue {
+		return true
+	}
+	// Other causes of broken-ness to be added here later. E.g. resume failed.
+	return false
 }
 
 // getAllClusterDeploymentsForPool is the constructor for a cdCollection
@@ -221,6 +237,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		assignable:            make([]*hivev1.ClusterDeployment, 0),
 		installing:            make([]*hivev1.ClusterDeployment, 0),
 		deleting:              make([]*hivev1.ClusterDeployment, 0),
+		broken:                make([]*hivev1.ClusterDeployment, 0),
 		unknownPoolVersion:    make([]*hivev1.ClusterDeployment, 0),
 		mismatchedPoolVersion: make([]*hivev1.ClusterDeployment, 0),
 		byCDName:              make(map[string]*hivev1.ClusterDeployment),
@@ -246,7 +263,9 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			// Do *not* double count "deleting" and "marked for deletion"
 			cdCol.markedForDeletion = append(cdCol.markedForDeletion, ref)
 		} else if claimName == "" {
-			if cd.Spec.Installed {
+			if isBroken(&cd) {
+				cdCol.broken = append(cdCol.broken, ref)
+			} else if cd.Spec.Installed {
 				cdCol.assignable = append(cdCol.assignable, ref)
 			} else {
 				cdCol.installing = append(cdCol.installing, ref)
@@ -306,6 +325,8 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		"deleting":   len(cdCol.deleting),
 		"installing": len(cdCol.installing),
 		"unclaimed":  len(cdCol.installing) + len(cdCol.assignable),
+		"stale":      len(cdCol.unknownPoolVersion) + len(cdCol.mismatchedPoolVersion),
+		"broken":     len(cdCol.broken),
 	}).Debug("found clusters for ClusterPool")
 	return &cdCol, nil
 }
@@ -349,6 +370,11 @@ func (cds *cdCollection) MarkedForDeletion() []*hivev1.ClusterDeployment {
 // not available for claim assignment.
 func (cds *cdCollection) Installing() []*hivev1.ClusterDeployment {
 	return cds.installing
+}
+
+// Broken returns the list of ClusterDeployments we've deemed unrecoverably broken.
+func (cds *cdCollection) Broken() []*hivev1.ClusterDeployment {
+	return cds.broken
 }
 
 // UnknownPoolVersion returns the list of ClusterDeployments whose pool version annotation is
@@ -455,7 +481,7 @@ func (cds *cdCollection) Delete(c client.Client, cdName string) error {
 	// Remove from any of the other lists it might be in
 	removeCDsFromSlice(&cds.assignable, cdName)
 	removeCDsFromSlice(&cds.installing, cdName)
-	removeCDsFromSlice(&cds.assignable, cdName)
+	removeCDsFromSlice(&cds.broken, cdName)
 	removeCDsFromSlice(&cds.unknownPoolVersion, cdName)
 	removeCDsFromSlice(&cds.mismatchedPoolVersion, cdName)
 	removeCDsFromSlice(&cds.markedForDeletion, cdName)

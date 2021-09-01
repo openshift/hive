@@ -83,7 +83,6 @@ func TestReconcileClusterPool(t *testing.T) {
 	unclaimedCDBuilder := func(name string) testcd.Builder {
 		return cdBuilder(name).Options(
 			testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
-			testcd.WithPoolVersion(initialPoolVersion),
 		)
 	}
 
@@ -258,6 +257,64 @@ func TestReconcileClusterPool(t *testing.T) {
 			// So this is kind of interesting. We delete c1 even though c2 is a) older, b) stale.
 			// This is because we prioritize keeping installed clusters, as they can satisfy claims
 			// more quickly. Possible subject of a future optimization.
+			expectedDeletedClusters: []string{"c1"},
+		},
+		{
+			name: "delete broken unclaimed clusters",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(4)),
+				unclaimedCDBuilder("c1").Build(testcd.Broken()),
+				// ProvisionStopped+Installed doesn't make sense IRL; but we're proving it would
+				// be counted as broken if it did.
+				unclaimedCDBuilder("c2").Build(testcd.Broken(), testcd.Installed()),
+				// Unbroken CDs don't get deleted
+				unclaimedCDBuilder("c3").Build(),
+				// ...including assignable ones
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				// Claimed CDs don't get deleted
+				cdBuilder("c5").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test1")),
+				// ...even if they're broken
+				cdBuilder("c6").Build(testcd.Broken(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test2")),
+			},
+			expectedTotalClusters: 4,
+			expectedObservedSize:  4,
+			// The broken one doesn't get counted as Ready
+			expectedObservedReady:   1,
+			expectedDeletedClusters: []string{"c1", "c2"},
+			expectedAssignedCDs:     2,
+		},
+		{
+			name: "deleting broken clusters is bounded by maxConcurrent",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(4), testcp.WithMaxConcurrent(2)),
+				unclaimedCDBuilder("c1").Build(testcd.Broken()),
+				unclaimedCDBuilder("c2").Build(testcd.Broken()),
+				unclaimedCDBuilder("c3").Build(testcd.Broken()),
+				unclaimedCDBuilder("c4").Build(testcd.Broken()),
+			},
+			expectedTotalClusters: 2,
+			expectedObservedSize:  4,
+			// Note: We can't expectDeletedClusters because we delete broken clusters in arbitrary order
+		},
+		{
+			name: "adding takes precedence over deleting broken clusters",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(3)),
+				unclaimedCDBuilder("c1").Build(testcd.Broken()),
+				unclaimedCDBuilder("c2").Build(),
+			},
+			expectedTotalClusters: 3,
+			expectedObservedSize:  2,
+		},
+		{
+			name: "delete broken clusters first when reducing capacity",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(1)),
+				unclaimedCDBuilder("c1").Build(testcd.Broken()),
+				unclaimedCDBuilder("c2").Build(),
+			},
+			expectedTotalClusters:   1,
+			expectedObservedSize:    2,
 			expectedDeletedClusters: []string{"c1"},
 		},
 		{
@@ -1272,7 +1329,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			assert.Equal(t, test.expectedAssignedCDs, actualAssignedCDs, "unexpected number of assigned CDs")
 			assert.Equal(t, test.expectedTotalClusters-test.expectedAssignedCDs, actualUnassignedCDs, "unexpected number of unassigned CDs")
 			assert.Equal(t, test.expectedRunning, actualRunning, "unexpected number of running CDs")
-			assert.Equal(t, test.expectedTotalClusters-test.expectedRunning, actualHibernating, "unexpected number of assigned CDs")
+			assert.Equal(t, test.expectedTotalClusters-test.expectedRunning, actualHibernating, "unexpected number of hibernating CDs")
 
 			pool := &hivev1.ClusterPool{}
 			err = fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)

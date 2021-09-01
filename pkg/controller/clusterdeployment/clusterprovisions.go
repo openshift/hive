@@ -52,14 +52,14 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 
 	r.deleteStaleProvisions(existingProvisions, logger)
 
-	if cd.Status.InstallRestarts > 0 && cd.Annotations[tryInstallOnceAnnotation] == "true" {
-		logger.Debug("not creating new provision since the deployment is set to try install only once")
+	setProvisionStoppedTrue := func(reason, message string) (reconcile.Result, error) {
+		logger.Debug("not creating new provision: %s", message)
 		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 			cd.Status.Conditions,
 			hivev1.ProvisionStoppedCondition,
 			corev1.ConditionTrue,
-			installOnlyOnceSetReason,
-			"Deployment is set to try install only once",
+			reason,
+			message,
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
 		if changed {
 			cd.Status.Conditions = conditions
@@ -71,24 +71,12 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		}
 		return reconcile.Result{}, nil
 	}
+
+	if cd.Status.InstallRestarts > 0 && cd.Annotations[tryInstallOnceAnnotation] == "true" {
+		return setProvisionStoppedTrue(installOnlyOnceSetReason, "Deployment is set to try install only once")
+	}
 	if cd.Spec.InstallAttemptsLimit != nil && cd.Status.InstallRestarts >= int(*cd.Spec.InstallAttemptsLimit) {
-		logger.Debug("not creating new provision since the install attempts limit has been reached")
-		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
-			hivev1.ProvisionStoppedCondition,
-			corev1.ConditionTrue,
-			installAttemptsLimitReachedReason,
-			"Install attempts limit reached",
-			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		if changed {
-			cd.Status.Conditions = conditions
-			logger.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
-			if err := r.Status().Update(context.TODO(), cd); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
-				return reconcile.Result{}, err
-			}
-		}
-		return reconcile.Result{}, nil
+		return setProvisionStoppedTrue(installAttemptsLimitReachedReason, "Install attempts limit reached")
 	}
 
 	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(

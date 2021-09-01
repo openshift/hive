@@ -4,6 +4,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
 var (
@@ -61,7 +63,21 @@ var (
 			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
 		},
 	)
+	metricProvisionFailedTerminal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "hive_cluster_deployments_provision_failed_terminal_total",
+		Help: "Counter incremented when a cluster provision has failed and won't be retried.",
+	},
+		[]string{"clusterpool_namespacedname"},
+	)
 )
+
+func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment) {
+	poolNSName := ""
+	if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
+		poolNSName = poolRef.Namespace + "/" + poolRef.PoolName
+	}
+	metricProvisionFailedTerminal.WithLabelValues(poolNSName).Inc()
+}
 
 func init() {
 	metrics.Registry.MustRegister(metricInstallJobDuration)
@@ -72,4 +88,5 @@ func init() {
 	metrics.Registry.MustRegister(metricClustersInstalled)
 	metrics.Registry.MustRegister(metricClustersDeleted)
 	metrics.Registry.MustRegister(metricDNSDelaySeconds)
+	metrics.Registry.MustRegister(metricProvisionFailedTerminal)
 }

@@ -68,6 +68,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
 				return reconcile.Result{}, err
 			}
+			incProvisionFailedTerminal(cd)
 		}
 		return reconcile.Result{}, nil
 	}

@@ -187,13 +187,13 @@ type MachineManagement struct {
 
 	// TargetNamespace is the namespace in which we will create worker machineset resources. Resources
 	// required to create machines will be copied to the TargetNamespace.
-	// TargetNamespace is created for you and cannot be set during creation. TargetNamespace is also
+	// This field is set by Hive and therefore must not be set during creation. TargetNamespace is also
 	// immutable once set.
 	// +optional
 	TargetNamespace string `json:"targetNamespace,omitempty"`
 }
 
-// CentralMachineManagement contains settings used for central machine managemnt.
+// CentralMachineManagement contains settings used for central machine management.
 type CentralMachineManagement struct {
 }
 

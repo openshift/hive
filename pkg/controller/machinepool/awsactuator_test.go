@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
@@ -29,6 +31,7 @@ import (
 	awshivev1 "github.com/openshift/hive/apis/hive/v1/aws"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	capiaws "github.com/openshift/hive/thirdparty/clusterapiprovideraws/v1alpha4"
 )
 
 const (
@@ -392,6 +395,50 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "UnsupportedSpotMarketOptions",
 			},
 		},
+		{
+			name: "generate single CAPI machineset for single zone",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central: &hivev1.CentralMachineManagement{},
+				}
+				return cd
+			}(),
+			poolName: testMachinePool().Name,
+			existing: []runtime.Object{
+				testMachinePool(),
+			},
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeAvailabilityZones(client, []string{"zone1"})
+				mockDescribeAvailabilityZones(client, []string{"zone1"})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 3,
+			},
+		},
+		{
+			name: "generate CAPI machinesets for specified zones",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central: &hivev1.CentralMachineManagement{},
+				}
+				return cd
+			}(),
+			poolName: testMachinePool().Name,
+			existing: []runtime.Object{
+				func() *hivev1.MachinePool {
+					pool := testMachinePool()
+					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
+					return pool
+				}(),
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 1,
+				generateAWSMachineSetName("zone2"): 1,
+				generateAWSMachineSetName("zone3"): 1,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -421,12 +468,23 @@ func TestAWSActuator(t *testing.T) {
 			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: test.poolName}, pool)
 			require.NoError(t, err)
 
-			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, pool, actuator.logger)
-			if test.expectedErr {
-				assert.Error(t, err, "expected error for test case")
+			cd := test.clusterDeployment
+			if cd.Spec.Platform.AWS != nil && cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.Central != nil {
+				generatedMachineSets, generatedMachineTemplates, _, err := actuator.GenerateCAPIMachineSets(cd, pool, actuator.logger)
+				if test.expectedErr {
+					assert.Error(t, err, "expected error for test case")
+				} else {
+					validateAWSCAPIMachineSets(t, generatedMachineSets, generatedMachineTemplates, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey)
+				}
 			} else {
-				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey)
+				generatedMachineSets, _, err := actuator.GenerateMAPIMachineSets(cd, pool, actuator.logger)
+				if test.expectedErr {
+					assert.Error(t, err, "expected error for test case")
+				} else {
+					validateAWSMAPIMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey)
+				}
 			}
+
 			if test.expectedCondition != nil {
 				cond := controllerutils.FindMachinePoolCondition(pool.Status.Conditions, test.expectedCondition.Type)
 				if assert.NotNilf(t, cond, "did not find expected condition type: %v", test.expectedCondition.Type) {
@@ -475,7 +533,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 }
 
-func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string) {
+func validateAWSMAPIMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -499,6 +557,40 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 			providerConfig := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
 			assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID")
 			assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
+		}
+	}
+}
+
+func validateAWSCAPIMachineSets(t *testing.T, mSets []*capiv1.MachineSet, mTemplates []client.Object, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string) {
+	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
+
+	for _, ms := range mSets {
+		expectedReplicas, ok := expectedMSReplicas[ms.Name]
+		if assert.True(t, ok, "unexpected machine set") {
+			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
+		}
+
+		var awsMachineTemplate *capiaws.AWSMachineTemplate
+		found := false
+		for _, template := range mTemplates {
+			awsMachineTemplate = template.(*capiaws.AWSMachineTemplate)
+			if awsMachineTemplate.Name == ms.Spec.Template.Spec.InfrastructureRef.Name {
+				found = true
+				break
+			}
+		}
+
+		assert.True(t, found, "did not find aws machine template for machineset")
+		if assert.NotNil(t, testInstanceType, awsMachineTemplate.Spec.Template.Spec.InstanceType) {
+			assert.Equal(t, testInstanceType, awsMachineTemplate.Spec.Template.Spec.InstanceType, "unexpected instance type")
+		}
+		if assert.NotNil(t, awsMachineTemplate.Spec.Template.Spec.AMI.ID, "missing AMI ID") {
+			assert.Equal(t, testAMI, *awsMachineTemplate.Spec.Template.Spec.AMI.ID, "unexpected AMI ID")
+		}
+
+		if expectedSubnetID {
+			assert.NotNil(t, awsMachineTemplate.Spec.Template.Spec.Subnet.ID, "missing subnet ID")
+			assert.Equal(t, expectedSubnetID, *awsMachineTemplate.Spec.Template.Spec.Subnet.ID, "unexpected subnet ID")
 		}
 	}
 }

@@ -6,6 +6,9 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
@@ -46,9 +49,9 @@ func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Schem
 	return actuator, nil
 }
 
-// GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
+// GenerateMAPIMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of Machine API MachineSets
 // to sync to the remote cluster.
-func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
+func (a *VSphereActuator) GenerateMAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
 	if cd.Spec.ClusterMetadata == nil {
 		return nil, false, errors.New("ClusterDeployment does not have cluster metadata")
 	}
@@ -98,6 +101,15 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	}
 
 	return installerMachineSets, true, nil
+}
+
+// GenerateCAPIMachineSets takes a clusterDeployment and returns a list of upstream CAPI MachineSets
+func (a *VSphereActuator) GenerateCAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*capiv1.MachineSet, []client.Object, bool, error) {
+	return nil, nil, false, errors.New("GenerateCAPIMachineSets is not implemented for provider")
+}
+
+func (a *VSphereActuator) GetLocalMachineTemplates(lc client.Client, targetNamespace string, logger log.FieldLogger) ([]client.Object, error) {
+	return nil, errors.New("GetLocalMachineTemplates is not implemented for provider")
 }
 
 // Get the OS image from an existing master machine.

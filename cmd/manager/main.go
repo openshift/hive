@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"k8s.io/klog"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -210,6 +211,10 @@ func newRootCommand() *cobra.Command {
 				}
 
 				if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := capiv1.AddToScheme(mgr.GetScheme()); err != nil {
 					log.Fatal(err)
 				}
 

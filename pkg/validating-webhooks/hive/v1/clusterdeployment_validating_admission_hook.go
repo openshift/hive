@@ -667,14 +667,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newPoolRef, "cannot add clusterPoolRef"))
 	}
 
-	// Validate cd.Spec.MachineManagement.TargetNamespace
-	if cd.Spec.MachineManagement != nil {
-		switch oldTargetNamespace, newTargetNamespace := oldObject.Spec.MachineManagement.TargetNamespace, cd.Spec.MachineManagement.TargetNamespace; {
+	// Validate cd.Spec.MachineManagement
+	switch oldMachineManagement, newMachineManagement := oldObject.Spec.MachineManagement, cd.Spec.MachineManagement; {
+	case oldMachineManagement != nil && newMachineManagement != nil:
+		switch oldTargetNamespace, newTargetNamespace := oldMachineManagement.TargetNamespace, newMachineManagement.TargetNamespace; {
 		case oldTargetNamespace != "" && newTargetNamespace != "":
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.MachineManagement.TargetNamespace, oldObject.Spec.MachineManagement.TargetNamespace, specPath.Child("machineManagement", "targetNamespace"))...)
 		case oldTargetNamespace != "" && newTargetNamespace == "":
 			allErrs = append(allErrs, field.Invalid(specPath.Child("machineManagement", "targetNamespace"), newTargetNamespace, "cannot remove targetNamespace"))
 		}
+	case oldMachineManagement != nil && newMachineManagement == nil:
+		allErrs = append(allErrs, field.Invalid(specPath.Child("machineManagement"), newMachineManagement, "cannot remove machineManagement"))
 	}
 
 	if len(allErrs) > 0 {

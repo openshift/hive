@@ -2,9 +2,9 @@ package machinemanagement
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,13 +29,7 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/remoteclient"
 	k8sannotations "github.com/openshift/hive/pkg/util/annotations"
-)
-
-var (
-	// controllerKind contains the schema.GroupVersionKind for this controller type.
-	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterDeployment")
 )
 
 const (
@@ -59,9 +53,6 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flow
 		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme: mgr.GetScheme(),
 		logger: logger,
-	}
-	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 	return r
 }
@@ -141,10 +132,6 @@ type ReconcileMachineManagement struct {
 	client.Client
 	scheme *runtime.Scheme
 	logger log.FieldLogger
-
-	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
-	// for the remote cluster's API server
-	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 }
 
 // Reconcile reads settings within ClusterDeployment.Spec.MachineManagement and creates/copies resources necessary for
@@ -170,107 +157,113 @@ func (r *ReconcileMachineManagement) Reconcile(ctx context.Context, request reco
 		return reconcile.Result{}, err
 	}
 
-	return r.reconcile(request, cd, cdLog)
-}
+	if cd.Spec.MachineManagement == nil || cd.Spec.MachineManagement.Central == nil {
+		return reconcile.Result{}, nil
+	}
 
-func (r *ReconcileMachineManagement) reconcile(request reconcile.Request, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (result reconcile.Result, returnErr error) {
 	// Return early if cluster deployment was deleted
 	if !cd.DeletionTimestamp.IsZero() {
 		if controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace) {
-			if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.TargetNamespace != "" {
+			if cd.Spec.MachineManagement.TargetNamespace != "" {
 				// Clean up namespace
 				cdLog.Info("Deleting target namespace ", cd.Spec.MachineManagement.TargetNamespace)
 				ns := &corev1.Namespace{
 					ObjectMeta: metav1.ObjectMeta{Name: cd.Spec.MachineManagement.TargetNamespace},
 				}
 				if err := r.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
-					return reconcile.Result{}, fmt.Errorf("failed to delete namespace: %w", err)
+					return reconcile.Result{}, errors.Wrapf(err, "failed to delete target namespace %q", cd.Spec.MachineManagement.TargetNamespace)
 				}
 			}
 			// Remove finalizer from cluster deployment
 			controllerutil.RemoveFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
 			if err := r.Update(context.TODO(), cd); err != nil {
-				return reconcile.Result{}, fmt.Errorf("failed to remove finalizer from cluster deployment: %w", err)
+				return reconcile.Result{}, errors.Wrap(err, "failed to remove finalizer from cluster deployment")
 			}
 		}
 		return reconcile.Result{}, nil
 	}
 
-	if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.Central != nil {
-		if cd.Spec.MachineManagement.TargetNamespace == "" {
-			cd.Spec.MachineManagement.TargetNamespace = apihelpers.GetResourceName(cd.Name+"-targetns", utilrand.String(5))
+	if cd.Spec.MachineManagement.TargetNamespace == "" {
+		cd.Spec.MachineManagement.TargetNamespace = apihelpers.GetResourceName(cd.Name+"-targetns", utilrand.String(5))
 
-			// Ensure the cluster deployment has a finalizer for cleanup
-			if !controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace) {
-				controllerutil.AddFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
-			}
-
-			if err := r.Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment")
-				return reconcile.Result{Requeue: true}, nil
-			}
+		// Ensure the cluster deployment has a finalizer for cleanup
+		if !controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace) {
+			controllerutil.AddFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
 		}
 
-		ns := &corev1.Namespace{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: cd.Spec.MachineManagement.TargetNamespace}, ns); err != nil && apierrors.IsNotFound(err) {
-			cdLog.Info("Creating the target namespace ", cd.Spec.MachineManagement.TargetNamespace)
-			ns.Name = cd.Spec.MachineManagement.TargetNamespace
-			if err := r.Create(context.TODO(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
-				return reconcile.Result{}, fmt.Errorf("failed to create target namespace %q: %w", cd.Spec.MachineManagement.TargetNamespace, err)
-			}
-		}
-
-		// Ensure targetNamespace has machine management annotation
-		if err := r.addAnnotationToTargetNamespace(cd, cdLog, cd.Spec.MachineManagement.TargetNamespace); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		// Sync credentials secret to targetNamespace
-		if err := r.createOrUpdateSecretInTargetNamespace(utils.CredentialsSecretName(cd), cd, cdLog); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		// Sync pull secret to targetNamespace
-		if err := r.createOrUpdateSecretInTargetNamespace(cd.Spec.PullSecretRef.Name, cd, cdLog); err != nil {
-			return reconcile.Result{}, err
-		}
-
-		// Sync SSH key secret to targetNamespace
-		if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
-			if err := r.createOrUpdateSecretInTargetNamespace(cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name, cd, cdLog); err != nil {
-				return reconcile.Result{}, err
-			}
+		if err := r.Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment with MachineManagement.TargetNamespace")
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
+
+	ns := &corev1.Namespace{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: cd.Spec.MachineManagement.TargetNamespace}, ns)
+	switch {
+	case apierrors.IsNotFound(err):
+		cdLog.Info("Creating MachineManagement.TargetNamespace ", cd.Spec.MachineManagement.TargetNamespace)
+		ns.Name = cd.Spec.MachineManagement.TargetNamespace
+		if err := r.Create(context.TODO(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
+			return reconcile.Result{}, errors.Wrapf(err, "failed to create MachineManagement.TargetNamespace: %q", cd.Spec.MachineManagement.TargetNamespace)
+		}
+	case err != nil:
+		return reconcile.Result{}, errors.Wrapf(err, "failed to get namespace")
+	}
+
+	// Ensure targetNamespace has machine management annotation
+	if err := r.addAnnotationToTargetNamespace(cd, cdLog, cd.Spec.MachineManagement.TargetNamespace); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Sync credentials secret to targetNamespace
+	if err := r.createOrUpdateSecretInTargetNamespace(utils.CredentialsSecretName(cd), cd, cdLog); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Sync pull secret to targetNamespace
+	if err := r.createOrUpdateSecretInTargetNamespace(cd.Spec.PullSecretRef.Name, cd, cdLog); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Sync SSH key secret to targetNamespace
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil {
+		if err := r.createOrUpdateSecretInTargetNamespace(cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name, cd, cdLog); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	return reconcile.Result{}, nil
 }
 
 // createOrUpdateSecretInTargetNamespace
 func (r *ReconcileMachineManagement) createOrUpdateSecretInTargetNamespace(secretName string, cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
 	targetNamespace := cd.Spec.MachineManagement.TargetNamespace
+
 	secret := &corev1.Secret{}
 	err := r.Get(context.Background(), types.NamespacedName{Name: secretName, Namespace: targetNamespace}, secret)
 	// Create secret in targetNamespace
+
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			cdLog.Infof("Creating secret %s in the target namespace %s", secretName, targetNamespace)
-			if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret); err != nil {
-				return fmt.Errorf("failed to get secret %s: %w", secretName, err)
-			}
-			secret.Namespace = targetNamespace
-			secret.ResourceVersion = ""
-			if err := r.Create(context.TODO(), secret); err != nil {
-				return fmt.Errorf("failed to create secret in target namespace: %v", err)
-			}
-			return nil
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "failed to get secret: %s", secretName)
 		}
-		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+
+		cdLog.WithFields(log.Fields{"secret": secretName, "targetNamespace": targetNamespace}).Info("Creating secret in the target namespace")
+		if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, secret); err != nil {
+			return errors.Wrapf(err, "failed to get secret: %s", secretName)
+		}
+		secret.Namespace = targetNamespace
+		secret.ResourceVersion = ""
+		if err := r.Create(context.TODO(), secret); err != nil {
+			return errors.Wrap(err, "failed to create secret in target namespace")
+		}
+		return nil
 	}
 
 	origSecret := &corev1.Secret{}
 	err = r.Get(context.Background(), types.NamespacedName{Name: secretName, Namespace: cd.Namespace}, origSecret)
 	if err != nil {
-		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+		return errors.Wrapf(err, "failed to get secret: %s", secretName)
 	}
 	if reflect.DeepEqual(origSecret.Data, secret.Data) {
 		return nil
@@ -281,13 +274,14 @@ func (r *ReconcileMachineManagement) createOrUpdateSecretInTargetNamespace(secre
 	secret.Data = origSecret.Data
 	err = r.Update(context.Background(), secret)
 	if err != nil {
-		return fmt.Errorf("failed to update secret %s: %w", secretName, err)
+		return errors.Wrapf(err, "failed to update secret: %s", secretName)
 	}
 
 	return nil
 }
 
-// addAnnotationToTargetNamespace adds annotation to cluster deployment
+// addAnnotationToTargetNamespace adds a constants.MachineManagementAnnotation=cd.Name annotation to target namespace
+// constants.MachineManagementAnnotation=cd.Name is used by the Cluster API to know to watch the target namespace
 func (r *ReconcileMachineManagement) addAnnotationToTargetNamespace(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger, name string) error {
 	cdLog = cdLog.WithField("namespace", name)
 
@@ -297,14 +291,10 @@ func (r *ReconcileMachineManagement) addAnnotationToTargetNamespace(cd *hivev1.C
 		return err
 	}
 
-	annotationAdded := false
 	if namespace.Annotations[constants.MachineManagementAnnotation] != cd.Name {
 		cdLog.Debug("Setting annotation on target namespace")
 		namespace.Annotations = k8sannotations.AddAnnotation(namespace.Annotations, constants.MachineManagementAnnotation, cd.Name)
-		annotationAdded = true
-	}
 
-	if annotationAdded {
 		cdLog.Info("namespace has been modified, updating")
 		if err := r.Update(context.TODO(), namespace); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating namespace")

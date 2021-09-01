@@ -27,7 +27,7 @@ LOG_LEVEL ?= debug
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
 
-GO_PACKAGES :=./...
+GO_PACKAGES :=$(shell $(GO) list ./... | grep -v /thirdparty/)
 GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
 GO_BUILD_BINDIR :=bin
 # Exclude e2e tests from unit testing
@@ -253,7 +253,7 @@ $(addprefix verify-govet-submodules-,$(GO_SUB_MODULES)):
 # Generate code
 .PHONY: generate
 generate: install-tools
-	$(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
+	$(GOFLAGS_FOR_GENERATE) $(GO) generate ./pkg/... ./cmd/...
 update: generate
 
 .PHONY: generate-submodules

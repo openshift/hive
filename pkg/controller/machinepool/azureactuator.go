@@ -11,6 +11,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	installazure "github.com/openshift/installer/pkg/asset/machines/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -43,9 +45,18 @@ func NewAzureActuator(azureCreds *corev1.Secret, cloudName string, logger log.Fi
 	return actuator, nil
 }
 
-// GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
+// GenerateCAPIMachineSets takes a clusterDeployment and returns a list of upstream CAPI MachineSets
+func (a *AzureActuator) GenerateCAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*capiv1.MachineSet, []client.Object, bool, error) {
+	return nil, nil, false, errors.New("GenerateCAPIMachineSets is not implemented for provider")
+}
+
+func (a *AzureActuator) GetLocalMachineTemplates(lc client.Client, targetNamespace string, logger log.FieldLogger) ([]client.Object, error) {
+	return nil, errors.New("GetLocalMachineTemplates is not implemented for provider")
+}
+
+// GenerateMAPIMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
 // to sync to the remote cluster.
-func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
+func (a *AzureActuator) GenerateMAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
 	if cd.Spec.ClusterMetadata == nil {
 		return nil, false, errors.New("ClusterDeployment does not have cluster metadata")
 	}
@@ -117,4 +128,9 @@ func (a *AzureActuator) getZones(region string, instanceType string) ([]string, 
 	}
 
 	return nil, err
+}
+
+// GenerateMachineTemplates satisfies the Actuator interface and will take a clusterDeployment and returns a list of machine templates
+func (a *AzureActuator) GenerateMachineTemplates(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) (interface{}, bool, error) {
+	return nil, false, errors.New("GenerateMachineTemplates is not implemented for provider")
 }

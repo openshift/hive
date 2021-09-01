@@ -126,18 +126,18 @@ func TestAzureActuator(t *testing.T) {
 				logger: log.WithField("actuator", "azureactuator"),
 			}
 
-			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
+			generatedMachineSets, _, err := actuator.GenerateMAPIMachineSets(test.clusterDeployment, test.pool, actuator.logger)
 
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
+				validateAzureMAPIMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
 			}
 		})
 	}
 }
 
-func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64) {
+func validateAzureMAPIMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {

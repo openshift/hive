@@ -23,6 +23,7 @@ import (
 	"k8s.io/utils/pointer"
 	awsproviderapis "sigs.k8s.io/cluster-api-provider-aws/pkg/apis"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -38,6 +39,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/machinepool/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	capiaws "github.com/openshift/hive/thirdparty/clusterapiprovideraws/v1alpha4"
 )
 
 const (
@@ -50,6 +52,7 @@ const (
 	testRegion          = "test-region"
 	testPoolName        = "worker"
 	testInstanceType    = "test-instance-type"
+	testTargetNamespace = "target-namespace"
 )
 
 func init() {
@@ -105,20 +108,59 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		return nil, err
 	}
 
+	// Utility function to list local capiv1 test MachineSets from the fake client
+	getLMSL := func(lc client.Client, namespace string) (*capiv1.MachineSetList, error) {
+		lMSL := &capiv1.MachineSetList{}
+		tm := metav1.TypeMeta{}
+		tm.SetGroupVersionKind(capiv1.GroupVersion.WithKind("MachineSet"))
+		err := lc.List(context.TODO(), lMSL, &client.ListOptions{Namespace: namespace, Raw: &metav1.ListOptions{TypeMeta: tm}})
+		if err == nil {
+			return lMSL, err
+		}
+		return nil, err
+	}
+
+	getLAMT := func(lc client.Client, namespace string) (*capiaws.AWSMachineTemplateList, error) {
+		lAMT := &capiaws.AWSMachineTemplateList{}
+		tm := metav1.TypeMeta{}
+		tm.SetGroupVersionKind(capiv1.GroupVersion.WithKind("AWSMachineTemplate"))
+		err := lc.List(context.TODO(), lAMT, &client.ListOptions{Namespace: namespace, Raw: &metav1.ListOptions{TypeMeta: tm}})
+		if err == nil {
+			return lAMT, err
+		}
+		return nil, err
+	}
+
+	getCD := func(lc client.Client, name, namespace string) (*hivev1.ClusterDeployment, error) {
+		cd := &hivev1.ClusterDeployment{}
+		err := lc.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, cd)
+		if err != nil {
+			return cd, err
+		}
+		return cd, nil
+	}
+
 	tests := []struct {
-		name                 string
-		clusterDeployment    *hivev1.ClusterDeployment
-		machinePool          *hivev1.MachinePool
-		remoteExisting       []runtime.Object
-		generatedMachineSets []*machineapi.MachineSet
-		actuatorDoNotProceed bool
-		expectErr            bool
-		expectNoFinalizer    bool
+		name                      string
+		clusterDeployment         *hivev1.ClusterDeployment
+		machinePool               *hivev1.MachinePool
+		remoteExisting            []runtime.Object
+		localExisting             []runtime.Object
+		localMachineTemplates     []client.Object
+		generatedMachineSets      []*machineapi.MachineSet
+		generatedCAPIMachineSets  []*capiv1.MachineSet
+		generatedMachineTemplates []client.Object
+		actuatorDoNotProceed      bool
+		expectErr                 bool
+		expectNoFinalizer         bool
 		// expectPoolPresent is ignored if expectNoFinalizer is false
 		expectPoolPresent                bool
 		expectedRemoteMachineSets        []*machineapi.MachineSet
+		expectedLocalMachineSets         []*capiv1.MachineSet
+		expectedLocalMachineTemplates    []client.Object
 		expectedRemoteMachineAutoscalers []autoscalingv1beta1.MachineAutoscaler
 		expectedRemoteClusterAutoscalers []autoscalingv1.ClusterAutoscaler
+		CAPI                             bool
 	}{
 		{
 			name: "Cluster not installed yet",
@@ -648,20 +690,190 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				*testClusterAutoscaler("1"),
 			},
 		},
+		{
+			name: "Create machinesets and machinetemplates for cmm enabled cd",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central: &hivev1.CentralMachineManagement{},
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			CAPI:        true,
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+			},
+			localExisting: []runtime.Object{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+			},
+			generatedCAPIMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineTemplates: []client.Object{
+				testAWSMachineTemplate("foo-12345-worker-us-east-1a", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1b", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1c", true),
+			},
+			expectedLocalMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+		},
+		{
+			name: "Update machinesets for cmm enabled cd",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: testTargetNamespace,
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			CAPI:        true,
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+			},
+			localExisting: []runtime.Object{
+				// Incorrect replicas
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 0, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 0, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 0, 0),
+			},
+			generatedCAPIMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineTemplates: []client.Object{
+				testAWSMachineTemplate("foo-12345-worker-us-east-1a", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1b", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1c", true),
+			},
+			expectedLocalMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectedLocalMachineTemplates: []client.Object{
+				testAWSMachineTemplate("foo-12345-worker-us-east-1a", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1b", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1c", true),
+			},
+		},
+		{
+			name: "Delete machinesets for cmm enabled cd",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: testTargetNamespace,
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			CAPI:        true,
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+			},
+			localExisting: []runtime.Object{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				// MachineSet that we didn't generate
+				testCAPIMachineSet("foo-12345-worker-us-east-1d", "worker", true, 0, 0),
+			},
+			generatedCAPIMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineTemplates: []client.Object{
+				testAWSMachineTemplate("foo-12345-worker-us-east-1a", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1b", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1c", true),
+			},
+			expectedLocalMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectedLocalMachineTemplates: []client.Object{
+				testAWSMachineTemplate("foo-12345-worker-us-east-1a", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1b", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1c", true),
+			},
+		},
+		{
+			name: "Delete machine template for cmm enabled cd",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: testTargetNamespace,
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			CAPI:        true,
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+			},
+			localExisting: []runtime.Object{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			localMachineTemplates: []client.Object{
+				// Local machine template that we didn't generate
+				testAWSMachineTemplate("foo-12345-worker-us-east-1d", true),
+			},
+			generatedCAPIMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineTemplates: []client.Object{
+				testAWSMachineTemplate("foo-12345-worker-us-east-1a", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1b", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1c", true),
+			},
+			expectedLocalMachineSets: []*capiv1.MachineSet{
+				testCAPIMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testCAPIMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectedLocalMachineTemplates: []client.Object{
+				testAWSMachineTemplate("foo-12345-worker-us-east-1a", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1b", true),
+				testAWSMachineTemplate("foo-12345-worker-us-east-1c", true),
+			},
+		},
 	}
 
 	for _, test := range tests {
 		apis.AddToScheme(scheme.Scheme)
+		capiv1.AddToScheme(scheme.Scheme)
+		capiaws.AddToScheme(scheme.Scheme)
 		machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
 		autoscalingv1.SchemeBuilder.AddToScheme(scheme.Scheme)
 		autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
-			localExisting := []runtime.Object{}
+			localExisting := test.localExisting
 			if test.clusterDeployment != nil {
 				localExisting = append(localExisting, test.clusterDeployment)
 			}
 			if test.machinePool != nil {
 				localExisting = append(localExisting, test.machinePool)
+			}
+			if test.localMachineTemplates != nil {
+				for _, mt := range test.localMachineTemplates {
+					localExisting = append(localExisting, mt)
+				}
 			}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(localExisting...).Build()
 			remoteFakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
@@ -670,10 +882,18 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			mockActuator := mock.NewMockActuator(mockCtrl)
-			if test.generatedMachineSets != nil {
+			if !test.CAPI && test.generatedMachineSets != nil {
 				mockActuator.EXPECT().
-					GenerateMachineSets(test.clusterDeployment, test.machinePool, gomock.Any()).
+					GenerateMAPIMachineSets(test.clusterDeployment, test.machinePool, gomock.Any()).
 					Return(test.generatedMachineSets, !test.actuatorDoNotProceed, nil)
+			}
+			if test.CAPI && test.generatedCAPIMachineSets != nil && test.generatedMachineTemplates != nil {
+				mockActuator.EXPECT().
+					GetLocalMachineTemplates(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(test.localMachineTemplates, nil)
+				mockActuator.EXPECT().
+					GenerateCAPIMachineSets(test.clusterDeployment, test.machinePool, gomock.Any()).
+					Return(test.generatedCAPIMachineSets, test.generatedMachineTemplates, !test.actuatorDoNotProceed, nil)
 			}
 
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -721,6 +941,83 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			} else {
 				assert.NotNil(t, pool, "missing machinepool")
 				assert.Contains(t, pool.Finalizers, finalizer, "missing finalizer")
+			}
+
+			if test.expectedLocalMachineSets != nil {
+				cd, err := getCD(fakeClient, testName, testNamespace)
+				assert.NoError(t, err)
+
+				if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.TargetNamespace != "" {
+					lMSL, err := getLMSL(fakeClient, cd.Spec.MachineManagement.TargetNamespace)
+					if assert.NoError(t, err) {
+						for _, eMS := range test.expectedLocalMachineSets {
+							lMSfound := false
+							for _, lMS := range lMSL.Items {
+								lMSfound = true
+								if !reflect.DeepEqual(eMS.ObjectMeta.Labels, lMS.ObjectMeta.Labels) {
+									t.Errorf("machineset %v has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Labels, lMS.Labels)
+								}
+								if !reflect.DeepEqual(eMS.ObjectMeta.Annotations, lMS.ObjectMeta.Annotations) {
+									t.Errorf("machineset %v has unexpected annotations:\nexpected: %v\nactual: %v", eMS.Name, eMS.Annotations, lMS.Annotations)
+								}
+								if !reflect.DeepEqual(eMS.Spec.Template.Spec.InfrastructureRef, lMS.Spec.Template.Spec.InfrastructureRef) {
+									t.Errorf("machineset %v machinespec has unexpected infrastructureRef:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.InfrastructureRef, lMS.Spec.Template.Spec.InfrastructureRef)
+								}
+							}
+							if !lMSfound {
+								t.Errorf("did not find expected local machineset: %v", eMS.Name)
+							}
+						}
+						for _, lMS := range lMSL.Items {
+							found := false
+							for _, eMS := range test.expectedLocalMachineSets {
+								if lMS.Name == eMS.Name {
+									found = true
+								}
+							}
+							if !found {
+								t.Errorf("found unexpected local machineset: %v", lMS.Name)
+							}
+						}
+					}
+				}
+			}
+
+			if test.expectedLocalMachineTemplates != nil {
+				cd, err := getCD(fakeClient, testName, testNamespace)
+				assert.NoError(t, err)
+
+				if cd.Spec.MachineManagement != nil && cd.Spec.MachineManagement.TargetNamespace != "" {
+					lAMT, err := getLAMT(fakeClient, cd.Spec.MachineManagement.TargetNamespace)
+					if assert.NoError(t, err) {
+						for _, eMT := range test.expectedLocalMachineTemplates {
+							lAMTfound := false
+							for _, lMT := range lAMT.Items {
+								lAMTfound = true
+								if !reflect.DeepEqual(eMT.GetLabels(), lMT.ObjectMeta.Labels) {
+									t.Errorf("machineset %v has unexpected labels:\nexpected: %v\nactual: %v", eMT.GetName(), eMT.GetLabels(), lMT.Labels)
+								}
+								if !reflect.DeepEqual(eMT.GetAnnotations(), lMT.ObjectMeta.Annotations) {
+									t.Errorf("machineset %v has unexpected annotations:\nexpected: %v\nactual: %v", eMT.GetName(), eMT.GetAnnotations(), lMT.Annotations)
+								}
+							}
+							if !lAMTfound {
+								t.Errorf("did not find expected local machinetemplate: %v", eMT.GetName())
+							}
+						}
+						for _, lMT := range lAMT.Items {
+							found := false
+							for _, eMT := range test.expectedLocalMachineTemplates {
+								if lMT.Name == eMT.GetName() {
+									found = true
+								}
+							}
+							if !found {
+								t.Errorf("found unexpected local machinetemplate: %v", lMT.Name)
+							}
+						}
+					}
+				}
 			}
 
 			rMSL, err := getRMSL(remoteFakeClient)
@@ -979,6 +1276,22 @@ func testMachineSpec(machineType string) machineapi.MachineSpec {
 	}
 }
 
+func testCAPIMachineSpec(machineType string) capiv1.MachineSpec {
+	dataSecretName := fmt.Sprintf("%s-user-data", machineType)
+	return capiv1.MachineSpec{
+		Bootstrap: capiv1.Bootstrap{
+			DataSecretName: &dataSecretName,
+		},
+		ClusterName: testName,
+		InfrastructureRef: corev1.ObjectReference{
+			Namespace:  testName,
+			Name:       testName,
+			APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha4",
+			Kind:       "AWSMachineTemplate",
+		},
+	}
+}
+
 func testMachine(name string, machineType string) *machineapi.Machine {
 	return &machineapi.Machine{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1041,6 +1354,72 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 		}
 	}
 	return &ms
+}
+
+func testCAPIMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *capiv1.MachineSet {
+	msReplicas := int32(replicas)
+	ms := capiv1.MachineSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: capiv1.GroupVersion.String(),
+			Kind:       "MachineSet",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: testTargetNamespace,
+			Labels: map[string]string{
+				machinePoolNameLabel:                       machineType,
+				"machine.openshift.io/cluster-api-cluster": testInfraID,
+				constants.HiveManagedLabel:                 "true",
+			},
+			Generation: int64(generation),
+		},
+		Spec: capiv1.MachineSetSpec{
+			Replicas: &msReplicas,
+			Template: capiv1.MachineTemplateSpec{
+				ObjectMeta: capiv1.ObjectMeta{
+					Labels: map[string]string{
+						"machine.openshift.io/cluster-api-machineset": name,
+						"machine.openshift.io/cluster-api-cluster":    testInfraID,
+					},
+				},
+				Spec: testCAPIMachineSpec(machineType),
+			},
+		},
+	}
+	return &ms
+}
+
+func testAWSMachineTemplate(name string, unstompedAnnotation bool) *capiaws.AWSMachineTemplate {
+	instanceProfile := fmt.Sprintf("%s-worker-profile", testInfraID)
+	awsMachineTemplate := capiaws.AWSMachineTemplate{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				machinePoolNameLabel: testPoolName,
+			},
+			Namespace: testTargetNamespace,
+		},
+		Spec: capiaws.AWSMachineTemplateSpec{
+			Template: capiaws.AWSMachineTemplateResource{
+				Spec: capiaws.AWSMachineSpec{
+					UncompressedUserData: pointer.BoolPtr(true),
+					CloudInit: capiaws.CloudInit{
+						InsecureSkipSecretsManager: true,
+						SecureSecretsBackend:       "secrets-manager",
+					},
+					IAMInstanceProfile: instanceProfile,
+					InstanceType:       "testinstancetype",
+					AMI: capiaws.AWSResourceReference{
+						ID: pointer.StringPtr("testami"),
+					},
+					AdditionalSecurityGroups: []capiaws.AWSResourceReference{},
+					Subnet:                   &capiaws.AWSResourceReference{},
+				},
+			},
+		},
+	}
+	return &awsMachineTemplate
 }
 
 func testMachineAutoscaler(name string, resourceVersion string, min, max int) *autoscalingv1beta1.MachineAutoscaler {

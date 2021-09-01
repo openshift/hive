@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -27,39 +26,21 @@ import (
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/remoteclient"
-	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	"github.com/openshift/hive/pkg/test/generic"
 )
 
 const (
-	testName              = "foo-lqmsh"
-	testClusterName       = "bar"
-	testClusterID         = "testFooClusterUUID"
-	testInfraID           = "testFooInfraID"
-	testNamespace         = "default"
-	adminKubeconfigSecret = "foo-lqmsh-admin-kubeconfig"
-	adminKubeconfig       = `clusters:
-- cluster:
-    certificate-authority-data: JUNK
-    server: https://bar-api.clusters.example.com:6443
-  name: bar
-contexts:
-- context:
-    cluster: bar
-  name: admin
-current-context: admin
-`
-	adminPasswordSecret = "foo-lqmsh-admin-password"
-	adminPassword       = "foo"
-
+	testName         = "foo-lqmsh"
+	testClusterName  = "bar"
+	testClusterID    = "testFooClusterUUID"
+	testInfraID      = "testFooInfraID"
+	testNamespace    = "test-namespace"
 	pullSecretSecret = "pull-secret"
 	credsSecret      = "aws-credentials"
 	targetNamespace  = "foo-lqmsh-targetns-vxx6f"
-
-	remoteClusterRouteObjectName      = "console"
-	remoteClusterRouteObjectNamespace = "openshift-console"
 )
 
 func init() {
@@ -71,6 +52,8 @@ func TestMachineManagementReconcile(t *testing.T) {
 	openshiftapiv1.Install(scheme.Scheme)
 	routev1.Install(scheme.Scheme)
 
+	cdBuilder := testcd.FullBuilder(testNamespace, testName, scheme.Scheme)
+
 	getCD := func(c client.Client) *hivev1.ClusterDeployment {
 		cd := &hivev1.ClusterDeployment{}
 		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, cd)
@@ -80,9 +63,9 @@ func TestMachineManagementReconcile(t *testing.T) {
 		return nil
 	}
 
-	getTargetNS := func(c client.Client, cd *hivev1.ClusterDeployment) *corev1.Namespace {
+	getTargetNS := func(c client.Client, name string) *corev1.Namespace {
 		ns := &corev1.Namespace{}
-		err := c.Get(context.TODO(), client.ObjectKey{Name: cd.Spec.MachineManagement.TargetNamespace}, ns)
+		err := c.Get(context.TODO(), client.ObjectKey{Name: name}, ns)
 		if err == nil {
 			return ns
 		}
@@ -109,20 +92,18 @@ func TestMachineManagementReconcile(t *testing.T) {
 		{
 			name: "Create target namespace and add finalizer to cd",
 			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Spec.MachineManagement = &hivev1.MachineManagement{
-						Central: &hivev1.CentralMachineManagement{},
-					}
-					return cd
-				}(),
+				cdBuilder.Build(
+					testcd.WithPullSecretRef(pullSecretSecret),
+					testcd.WithAWSPlatform(&aws.Platform{CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret}}),
+					testcd.WithCentralMachineManagement(),
+				),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(cdBuilder.Build()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				ns := getTargetNS(c, cd)
+				ns := getTargetNS(c, cd.Spec.MachineManagement.TargetNamespace)
 				assert.Equal(t, ns.Annotations[constants.MachineManagementAnnotation], testName)
 				assert.Equal(t, ns.Name, cd.Spec.MachineManagement.TargetNamespace)
 				assert.True(t, controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace))
@@ -136,38 +117,36 @@ func TestMachineManagementReconcile(t *testing.T) {
 		{
 			name: "Cleanup target namespace and remove finalizer from cd",
 			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testDeletedClusterDeployment()
-					cd.Spec.MachineManagement = &hivev1.MachineManagement{
-						Central:         &hivev1.CentralMachineManagement{},
-						TargetNamespace: targetNamespace,
-					}
-					controllerutil.AddFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace)
-					return cd
-				}(),
+				cdBuilder.GenericOptions(generic.Deleted()).Build(
+					testcd.WithPullSecretRef(pullSecretSecret),
+					testcd.WithAWSPlatform(&aws.Platform{CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret}}),
+					testcd.WithCentralMachineManagement(),
+					testcd.WithTargetNamespace(targetNamespace),
+					testcd.WithFinalizer(hivev1.FinalizerMachineManagementTargetNamespace),
+				),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(cdBuilder.Build()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
 				testNs(targetNamespace),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				assert.True(t, !controllerutil.ContainsFinalizer(cd, hivev1.FinalizerMachineManagementTargetNamespace))
-				ns := getTargetNS(c, cd)
-				assert.Nil(t, ns)
+				// cd will be deleted when the finalizer is removed
+				assert.Nil(t, cd, "expected cluster deployment to be deleted")
+				ns := getTargetNS(c, targetNamespace)
+				assert.Nil(t, ns, "expected target namespace to be deleted")
 			},
 		},
 		{
 			name: "Changes to secret in cd namespace are synced to target namespace",
 			existing: []runtime.Object{
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
-					cd.Spec.MachineManagement = &hivev1.MachineManagement{
-						Central:         &hivev1.CentralMachineManagement{},
-						TargetNamespace: targetNamespace,
-					}
-					return cd
-				}(),
+				cdBuilder.Build(
+					testcd.WithPullSecretRef(pullSecretSecret),
+					testcd.WithAWSPlatform(&aws.Platform{CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret}}),
+					testcd.WithCentralMachineManagement(),
+					testcd.WithTargetNamespace(targetNamespace),
+					testcd.WithFinalizer(hivev1.FinalizerMachineManagementTargetNamespace),
+				),
 				testNs(targetNamespace),
 				testSecretWithNamespace(corev1.SecretTypeOpaque, credsSecret, targetNamespace, "username", "test"),
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, pullSecretSecret, targetNamespace, corev1.DockerConfigJsonKey, "{}"),
@@ -192,17 +171,14 @@ func TestMachineManagementReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
-
-			rcd := &ReconcileMachineManagement{
-				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
-				logger:                        logger,
-				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+			rmm := &ReconcileMachineManagement{
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+				logger: logger,
 			}
 
 			if test.reconcilerSetup != nil {
-				test.reconcilerSetup(rcd)
+				test.reconcilerSetup(rmm)
 			}
 
 			reconcileRequest := reconcile.Request{
@@ -212,7 +188,7 @@ func TestMachineManagementReconcile(t *testing.T) {
 				},
 			}
 
-			result, err := rcd.Reconcile(context.TODO(), reconcileRequest)
+			result, err := rmm.Reconcile(context.TODO(), reconcileRequest)
 
 			if test.validate != nil {
 				test.validate(fakeClient, t)
@@ -232,82 +208,6 @@ func TestMachineManagementReconcile(t *testing.T) {
 			}
 		})
 	}
-}
-
-func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
-	cd := &hivev1.ClusterDeployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: hivev1.SchemeGroupVersion.String(),
-			Kind:       "ClusterDeployment",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       testName,
-			Namespace:  testNamespace,
-			Finalizers: []string{hivev1.FinalizerDeprovision},
-			UID:        types.UID("1234"),
-		},
-	}
-	return cd
-}
-
-func testClusterDeployment() *hivev1.ClusterDeployment {
-	cd := testEmptyClusterDeployment()
-
-	cd.Spec = hivev1.ClusterDeploymentSpec{
-		ClusterName: testClusterName,
-		PullSecretRef: &corev1.LocalObjectReference{
-			Name: pullSecretSecret,
-		},
-		Platform: hivev1.Platform{
-			AWS: &hivev1aws.Platform{
-				CredentialsSecretRef: corev1.LocalObjectReference{
-					Name: "aws-credentials",
-				},
-				Region: "us-east-1",
-			},
-		},
-		Provisioning: &hivev1.Provisioning{
-			InstallConfigSecretRef: &corev1.LocalObjectReference{Name: "install-config-secret"},
-		},
-		ClusterMetadata: &hivev1.ClusterMetadata{
-			ClusterID:                testClusterID,
-			InfraID:                  testInfraID,
-			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
-			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
-		},
-	}
-
-	if cd.Labels == nil {
-		cd.Labels = make(map[string]string, 2)
-	}
-	cd.Labels[hivev1.HiveClusterPlatformLabel] = "aws"
-	cd.Labels[hivev1.HiveClusterRegionLabel] = "us-east-1"
-
-	cd.Status = hivev1.ClusterDeploymentStatus{
-		InstallerImage: pointer.StringPtr("installer-image:latest"),
-		CLIImage:       pointer.StringPtr("cli:latest"),
-	}
-
-	return cd
-}
-
-func testDeletedClusterDeployment() *hivev1.ClusterDeployment {
-	cd := testClusterDeployment()
-	now := metav1.Now()
-	cd.DeletionTimestamp = &now
-	return cd
-}
-
-func testRemoteClusterAPIClient() client.Client {
-	remoteClusterRouteObject := &routev1.Route{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      remoteClusterRouteObjectName,
-			Namespace: remoteClusterRouteObjectNamespace,
-		},
-	}
-	remoteClusterRouteObject.Spec.Host = "bar-api.clusters.example.com:6443/console"
-
-	return fake.NewFakeClient(remoteClusterRouteObject)
 }
 
 func testSecret(secretType corev1.SecretType, name, key, value string) *corev1.Secret {

@@ -68,8 +68,8 @@ type ClusterClaimConditionType string
 const (
 	// ClusterClaimPendingCondition is set when a cluster has not yet been assigned and made ready to the claim.
 	ClusterClaimPendingCondition ClusterClaimConditionType = "Pending"
-	// ClusterRunningCondition is true when a claimed cluster is running and ready for use.
-	ClusterRunningCondition ClusterClaimConditionType = "ClusterRunning"
+	// ClusterClaimRunningCondition is true when a claimed cluster is running and ready for use.
+	ClusterClaimRunningCondition ClusterClaimConditionType = "ClusterRunning"
 )
 
 // +genclient

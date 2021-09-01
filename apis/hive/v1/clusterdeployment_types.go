@@ -384,9 +384,11 @@ const (
 	// RelocationFailedCondition indicates if a relocation to another Hive instance has failed
 	RelocationFailedCondition ClusterDeploymentConditionType = "RelocationFailed"
 
-	// ClusterHibernatingCondition is set when the ClusterDeployment is either
-	// transitioning to/from a hibernating state or is in a hibernating state.
+	// ClusterHibernatingCondition is true when a Cluster is in a Hibernating state.
 	ClusterHibernatingCondition ClusterDeploymentConditionType = "Hibernating"
+
+	// ClusterRunningCondition is true when a cluster is running and ready for use.
+	ClusterRunningCondition ClusterDeploymentConditionType = "Running"
 
 	// InstallLaunchErrorCondition is set when a cluster provision fails to launch an install pod
 	InstallLaunchErrorCondition ClusterDeploymentConditionType = "InstallLaunchError"
@@ -433,9 +435,20 @@ var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionTy
 
 // Cluster hibernating reasons
 const (
+	// ResumingOrRunningHibernationReason is used as the reason for the Hibernating condition when the cluster
+	// is resuming or running. Precise details are available in the Running condition.
+	ResumingOrRunningHibernationReason = "ResumingOrRunning"
+
+	StoppingOrHibernatingRunningReason = "StoppingOrHibernating"
+
 	// ResumingHibernationReason is used as the reason when the cluster is transitioning
 	// from a Hibernating state to a Running state.
-	ResumingHibernationReason = "Resuming"
+	//ResumingHibernationReason = "Resuming"
+
+	WaitingForMachinesRunningReason  = "WaitingForMachines"
+	WaitingForNodesRunningReason     = "WaitingForNodes"
+	WaitingForClusterOperatorsReason = "WaitingForClusterOperators"
+
 	// RunningHibernationReason is used as the reason when the cluster is running and
 	// the Hibernating condition is false.
 	RunningHibernationReason = "Running"

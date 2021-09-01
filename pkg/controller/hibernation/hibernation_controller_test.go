@@ -78,20 +78,23 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.GenericOptions(testgeneric.Deleted()).Options(o.shouldHibernate).Build(),
 			cs:   csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				if getHibernatingCondition(cd) != nil {
-					t.Errorf("not expecting hibernating condition")
-				}
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				assert.Nil(t, cond, "not expecting hibernating condition")
+				assert.Nil(t, runCond, "not expecting running condition")
 			},
 		},
 		{
-			name: "hibernation condition initialized",
+			name: "hibernation and running condition initialized",
 			cd:   cdBuilder.Options(o.notInstalled, o.shouldHibernate).Build(),
 			cs:   csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
+				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionUnknown, cond.Status)
 				assert.Equal(t, hivev1.InitializedConditionReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionUnknown, runCond.Status)
+				assert.Equal(t, hivev1.InitializedConditionReason, runCond.Reason)
 			},
 		},
 		{
@@ -99,10 +102,13 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(testcd.WithClusterVersion("4.3.11")).Build(),
 			cs:   csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.RunningHibernationReason, runCond.Reason)
 			},
 		},
 		{
@@ -110,10 +116,13 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.shouldHibernate, testcd.WithClusterVersion("4.3.11")).Build(),
 			cs:   csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.RunningHibernationReason, runCond.Reason)
 			},
 		},
 		{
@@ -123,10 +132,13 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -134,10 +146,13 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.shouldHibernate, testcd.InstalledTimestamp(time.Now())).Build(),
 			cs:   csBuilder.Options(testcs.WithNoFirstSuccessTime()).Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.SyncSetsNotAppliedReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.RunningHibernationReason, runCond.Reason)
 			},
 			expectError:        false,
 			expectRequeueAfter: time.Duration(time.Minute * 10),
@@ -150,10 +165,13 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -164,10 +182,13 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -178,10 +199,13 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(fmt.Errorf("error"))
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.FailedToStopHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -192,10 +216,13 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().MachinesStopped(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -208,11 +235,14 @@ func TestReconcile(t *testing.T) {
 					Return(false, []string{"running-1", "pending-1", "stopping-1"}, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
 				assert.Equal(t, "Stopping cluster machines. Some machines have not yet stopped: pending-1,running-1,stopping-1", cond.Message)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Minute * 1),
 		},
@@ -231,10 +261,13 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -245,10 +278,13 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.WaitingForMachinesRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -260,10 +296,13 @@ func TestReconcile(t *testing.T) {
 			},
 			expectError: true,
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.FailedToStartHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.FailedToStartHibernationReason, runCond.Reason)
 			},
 		},
 		{
@@ -271,21 +310,36 @@ func TestReconcile(t *testing.T) {
 			cd: cdBuilder.Options(o.resuming).Build(
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterHibernatingCondition,
-					Status: corev1.ConditionTrue,
+					Status: corev1.ConditionFalse,
+					Reason: hivev1.ResumingOrRunningHibernationReason,
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterRunningCondition,
+					Status: corev1.ConditionFalse,
 					Reason: hivev1.FailedToStartHibernationReason,
-				},
-				)),
+				}),
+			),
 			cs: csBuilder.Build(),
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				fakeClient := fake.NewFakeClientWithScheme(scheme, unreadyNode()...)
+				fakeKubeClient := fakekubeclient.NewSimpleClientset()
+				builder.EXPECT().Build().Times(1).Return(fakeClient, nil)
+				builder.EXPECT().BuildKubeClient().Times(1).Return(fakeKubeClient, nil)
+			},
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				// Call will succeed which should clear the FailedToStart reason:
-				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).
+					Return(true, []string{}, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.WaitingForNodesRunningReason, runCond.Reason)
 			},
+			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
 		{
 			name: "resuming machines have not started",
@@ -297,11 +351,14 @@ func TestReconcile(t *testing.T) {
 					Return(false, []string{"stopped-1", "pending-1"}, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
-				assert.Equal(t, "Starting cluster machines. Some machines are not yet running: pending-1,stopped-1", cond.Message)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.WaitingForMachinesRunningReason, runCond.Reason)
+				assert.Equal(t, "Starting cluster machines. Some machines are not yet running: pending-1,stopped-1", runCond.Message)
 			},
 			expectRequeueAfter: time.Duration(time.Minute * 1),
 		},
@@ -319,10 +376,13 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().BuildKubeClient().Times(1).Return(fakeKubeClient, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.WaitingForNodesRunningReason, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
@@ -347,10 +407,13 @@ func TestReconcile(t *testing.T) {
 				helper.EXPECT().Approve(gomock.Any(), gomock.Any()).Times(count).Return(nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.WaitingForNodesRunningReason, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
@@ -369,10 +432,13 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.WaitingForClusterOperatorsReason, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
@@ -386,15 +452,18 @@ func TestReconcile(t *testing.T) {
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
-				objs = append(objs, degradedClusterOperators()...)
+				objs = append(objs, readyClusterOperators()...)
 				c := fake.NewFakeClientWithScheme(scheme, objs...)
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.RunningHibernationReason, runCond.Reason)
 			},
 		},
 		{
@@ -402,10 +471,13 @@ func TestReconcile(t *testing.T) {
 			cd:   cdBuilder.Options(o.unsupported, testcd.WithHibernateAfter(8*time.Hour)).Build(),
 			cs:   csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
 				assert.Equal(t, "Hibernation capable", cond.Message)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.RunningHibernationReason, runCond.Reason)
 			},
 		},
 		{
@@ -416,11 +488,14 @@ func TestReconcile(t *testing.T) {
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")),
 			cs: csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, "Fake cluster is stopped", cond.Message)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.StoppingOrHibernatingRunningReason, runCond.Reason)
 			},
 		},
 		{
@@ -430,11 +505,13 @@ func TestReconcile(t *testing.T) {
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")).Build(),
 			cs: csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond := getHibernatingCondition(cd)
+				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, "Fake cluster is running", cond.Message)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.RunningHibernationReason, runCond.Reason)
 			},
 		},
 	}
@@ -583,7 +660,8 @@ func TestHibernateAfter(t *testing.T) {
 		{
 			name: "cluster with running condition not due for hibernate",
 			cd: cdBuilder.Build(
-				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 6*time.Hour)),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.ResumingOrRunningHibernationReason, 6*time.Hour)),
+				testcd.WithCondition(runningCondition(corev1.ConditionTrue, hivev1.RunningHibernationReason, 6*time.Hour)),
 				testcd.WithHibernateAfter(20*time.Hour),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs:                 csBuilder.Build(),
@@ -600,7 +678,7 @@ func TestHibernateAfter(t *testing.T) {
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour)),
-				testcd.WithCondition(hibernatingCondition(corev1.ConditionTrue, hivev1.ResumingHibernationReason, 8*time.Hour)),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionTrue, hivev1.ResumingOrRunningHibernationReason, 8*time.Hour)),
 				o.shouldRun),
 			cs:                 csBuilder.Build(),
 			expectedPowerState: hivev1.RunningClusterPowerState,
@@ -751,6 +829,16 @@ func hibernatingCondition(status corev1.ConditionStatus, reason string, lastTran
 	}
 }
 
+func runningCondition(status corev1.ConditionStatus, reason string, lastTransitionAgo time.Duration) hivev1.ClusterDeploymentCondition {
+	return hivev1.ClusterDeploymentCondition{
+		Type:               hivev1.ClusterRunningCondition,
+		Status:             status,
+		Message:            "unused",
+		Reason:             reason,
+		LastTransitionTime: metav1.NewTime(time.Now().Add(-lastTransitionAgo)),
+	}
+}
+
 type clusterDeploymentOptions struct{}
 
 func (*clusterDeploymentOptions) notInstalled(cd *hivev1.ClusterDeployment) {
@@ -779,7 +867,7 @@ func (*clusterDeploymentOptions) hibernating(cd *hivev1.ClusterDeployment) {
 func (*clusterDeploymentOptions) resuming(cd *hivev1.ClusterDeployment) {
 	cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 		Type:   hivev1.ClusterHibernatingCondition,
-		Reason: hivev1.ResumingHibernationReason,
+		Reason: hivev1.ResumingOrRunningHibernationReason,
 		Status: corev1.ConditionTrue,
 	})
 }
@@ -791,13 +879,17 @@ func (*clusterDeploymentOptions) unsupported(cd *hivev1.ClusterDeployment) {
 	})
 }
 
-func getHibernatingCondition(cd *hivev1.ClusterDeployment) *hivev1.ClusterDeploymentCondition {
+func getHibernatingAndRunningConditions(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeploymentCondition, *hivev1.ClusterDeploymentCondition) {
+	var hibCond *hivev1.ClusterDeploymentCondition
+	var runCond *hivev1.ClusterDeploymentCondition
 	for i := range cd.Status.Conditions {
 		if cd.Status.Conditions[i].Type == hivev1.ClusterHibernatingCondition {
-			return &cd.Status.Conditions[i]
+			hibCond = &cd.Status.Conditions[i]
+		} else if cd.Status.Conditions[i].Type == hivev1.ClusterRunningCondition {
+			runCond = &cd.Status.Conditions[i]
 		}
 	}
-	return nil
+	return hibCond, runCond
 }
 
 func readyNodes() []runtime.Object {

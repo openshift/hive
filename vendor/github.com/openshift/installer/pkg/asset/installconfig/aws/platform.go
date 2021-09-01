@@ -5,28 +5,37 @@ import (
 	"sort"
 	"strings"
 
+	survey "github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/core"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	survey "gopkg.in/AlecAivazis/survey.v1"
 
 	"github.com/openshift/installer/pkg/types/aws"
+	"github.com/openshift/installer/pkg/version"
 )
 
 // Platform collects AWS-specific configuration.
 func Platform() (*aws.Platform, error) {
-	regions := knownRegions()
+	architecture := version.DefaultArch()
+	regions := knownRegions(architecture)
 	longRegions := make([]string, 0, len(regions))
 	shortRegions := make([]string, 0, len(regions))
 	for id, location := range regions {
 		longRegions = append(longRegions, fmt.Sprintf("%s (%s)", id, location))
 		shortRegions = append(shortRegions, id)
 	}
-	regionTransform := survey.TransformString(func(s string) string {
-		return strings.SplitN(s, " ", 2)[0]
-	})
+	var regionTransform survey.Transformer = func(ans interface{}) interface{} {
+		switch v := ans.(type) {
+		case core.OptionAnswer:
+			return core.OptionAnswer{Value: strings.SplitN(v.Value, " ", 2)[0], Index: v.Index}
+		case string:
+			return strings.SplitN(v, " ", 2)[0]
+		}
+		return ""
+	}
 
 	defaultRegion := "us-east-1"
-	if !IsKnownRegion(defaultRegion) {
+	if !IsKnownRegion(defaultRegion, architecture) {
 		panic(fmt.Sprintf("installer bug: invalid default AWS region %q", defaultRegion))
 	}
 
@@ -37,7 +46,7 @@ func Platform() (*aws.Platform, error) {
 
 	defaultRegionPointer := ssn.Config.Region
 	if defaultRegionPointer != nil && *defaultRegionPointer != "" {
-		if IsKnownRegion(*defaultRegionPointer) {
+		if IsKnownRegion(*defaultRegionPointer, architecture) {
 			defaultRegion = *defaultRegionPointer
 		} else {
 			logrus.Warnf("Unrecognized AWS region %q, defaulting to %s", *defaultRegionPointer, defaultRegion)
@@ -57,7 +66,7 @@ func Platform() (*aws.Platform, error) {
 				Options: longRegions,
 			},
 			Validate: survey.ComposeValidators(survey.Required, func(ans interface{}) error {
-				choice := regionTransform(ans).(string)
+				choice := regionTransform(ans).(core.OptionAnswer).Value
 				i := sort.SearchStrings(shortRegions, choice)
 				if i == len(shortRegions) || shortRegions[i] != choice {
 					return errors.Errorf("invalid region %q", choice)

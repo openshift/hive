@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/AlecAivazis/survey.v1"
 )
 
 var errHTTPNotFound = errors.New("http response 404")
@@ -108,37 +108,27 @@ func (c *clientHTTP) checkURLResponse() error {
 	return nil
 }
 
-// askPassword will ask the password to connect to Engine API.
+// askPassword will ask the password to connect to the Engine API.
 // The password provided will be added in the Config struct.
 // If an error happens, it will ask again username for users.
 func askPassword(c *Config) error {
-	origPwdTpl := survey.PasswordQuestionTemplate
-	survey.PasswordQuestionTemplate = `
-{{- if .ShowHelp }}{{- color "cyan"}}{{ HelpIcon }} {{ .Help }}{{color "reset"}}{{"\n"}}{{end}}
-{{- color "green+hb"}}{{ QuestionIcon }} {{color "reset"}}
-{{- color "default+hb"}}{{ .Message }} {{color "reset"}}
-{{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[Press Ctrl+C to switch username, {{ HelpInputRune }} for help]{{color "reset"}} {{end}}`
-
 	err := survey.Ask([]*survey.Question{
 		{
 			Prompt: &survey.Password{
 				Message: "Engine password",
-				Help:    "Password for the choosen username",
+				Help:    "Password for the chosen username, Press Ctrl+C to change username",
 			},
 			Validate: survey.ComposeValidators(survey.Required, authenticated(c)),
 		},
 	}, &c.Password)
 
-	survey.PasswordQuestionTemplate = origPwdTpl
-
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
-// askUsername will ask username to connect to Engine API.
+// askUsername will ask username to connect to the Engine API.
 // The username provided will be added in the Config struct.
 // Returns Config and error if failure.
 func askUsername(c *Config) error {
@@ -146,7 +136,7 @@ func askUsername(c *Config) error {
 		{
 			Prompt: &survey.Input{
 				Message: "Engine username",
-				Help:    "The username to connect to Engine API",
+				Help:    "The username to connect to the Engine API",
 				Default: "admin@internal",
 			},
 			Validate: survey.ComposeValidators(survey.Required),
@@ -168,7 +158,9 @@ func askQuestionTrueOrFalse(question string, helpMessage string) (bool, error) {
 			Message: question,
 			Help:    helpMessage,
 		},
-		&value, survey.Required)
+		&value,
+		survey.WithValidator(survey.Required),
+	)
 	if err != nil {
 		return value, err
 	}
@@ -219,6 +211,7 @@ func showPEM(pemFilePath string) error {
 
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
+		logrus.Debugf("Failed to read the cert: %s", err)
 		return errors.Wrapf(err, "failed to read the cert: %s", pemFilePath)
 	}
 
@@ -241,12 +234,14 @@ func showPEM(pemFilePath string) error {
 // or in case of failure returns error
 func askPEMFile() (string, error) {
 	bundlePEM := ""
-	err := survey.AskOne(&survey.Multiline{
-		Message: "Certificate bundle",
-		Help:    "The certificate bundle to installer be able to communicate with oVirt API",
-	},
+	err := survey.AskOne(
+		&survey.Multiline{
+			Message: "Certificate bundle",
+			Help:    "The certificate bundle to installer be able to communicate with oVirt API",
+		},
 		&bundlePEM,
-		survey.ComposeValidators(survey.Required))
+		survey.WithValidator(survey.Required),
+	)
 	if err != nil {
 		return bundlePEM, err
 	}
@@ -326,8 +321,8 @@ func engineSetup() (Config, error) {
 			engineConfig.Insecure = true
 		} else {
 			answer, err := askQuestionTrueOrFalse(
-				"Would you like to use the above certificate to connect to Engine? ",
-				"Certificate to connecto with Engine. Make sure this cert CA is trusted locally.")
+				"Would you like to use the above certificate to connect to the Engine? ",
+				"Certificate to connect to the Engine. Make sure this cert CA is trusted locally.")
 			if err != nil {
 				return engineConfig, err
 			}
@@ -343,7 +338,7 @@ func engineSetup() (Config, error) {
 			} else {
 				answer, err = askQuestionTrueOrFalse(
 					"Would you like to import another PEM bundle?",
-					"Users are able to use it's own PEM bundle to connect to Engine API")
+					"You can use your own PEM bundle to connect to the Engine API")
 				if err != nil {
 					return engineConfig, err
 				}

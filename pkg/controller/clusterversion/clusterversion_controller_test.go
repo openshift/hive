@@ -199,7 +199,7 @@ func testRemoteClusterAPIClient() client.Client {
 func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {
 	zeroTime := metav1.NewTime(time.Unix(0, 0))
 	return &configv1.ClusterVersionStatus{
-		Desired: configv1.Update{
+		Desired: configv1.Release{
 			Version: "2.3.4+somebuild",
 		},
 		History: []configv1.UpdateHistory{

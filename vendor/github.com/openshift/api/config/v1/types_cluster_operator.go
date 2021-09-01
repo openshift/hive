@@ -16,7 +16,7 @@ type ClusterOperator struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
 
-	// spec hold the intent of how this operator should behave.
+	// spec holds configuration that could apply to any operator.
 	// +kubebuilder:validation:Required
 	// +required
 	Spec ClusterOperatorSpec `json:"spec"`
@@ -130,7 +130,8 @@ type ClusterOperatorStatusCondition struct {
 	Reason string `json:"reason,omitempty"`
 
 	// message provides additional information about the current condition.
-	// This is only to be consumed by humans.
+	// This is only to be consumed by humans.  It may contain Line Feed
+	// characters (U+000A), which should be rendered as new lines.
 	// +optional
 	Message string `json:"message,omitempty"`
 }
@@ -141,6 +142,8 @@ type ClusterStatusConditionType string
 const (
 	// Available indicates that the operand (eg: openshift-apiserver for the
 	// openshift-apiserver-operator), is functional and available in the cluster.
+	// Available=False means at least part of the component is non-functional,
+	// and that the condition requires immediate administrator intervention.
 	OperatorAvailable ClusterStatusConditionType = "Available"
 
 	// Progressing indicates that the operator is actively rolling out new code,
@@ -149,11 +152,7 @@ const (
 	// a previously known state.
 	OperatorProgressing ClusterStatusConditionType = "Progressing"
 
-	// Degraded indicates that the operand is not functioning completely. An example of a degraded state
-	// would be if there should be 5 copies of the operand running but only 4 are running. It may still be available,
-	// but it is degraded
-
-	// Degraded indicated that the operator's current state does not match its
+	// Degraded indicates that the operator's current state does not match its
 	// desired state over a period of time resulting in a lower quality of service.
 	// The period of time may vary by component, but a Degraded state represents
 	// persistent observation of a condition.  As a result, a component should not
@@ -165,13 +164,13 @@ const (
 	// persist over a long enough period to report Degraded.  A service should not
 	// report Degraded during the course of a normal upgrade.  A service may report
 	// Degraded in response to a persistent infrastructure failure that requires
-	// administrator intervention.  For example, if a control plane host is unhealthy
-	// and must be replaced.  An operator should report Degraded if unexpected
-	// errors occur over a period, but the expectation is that all unexpected errors
-	// are handled as operators mature.
+	// eventual administrator intervention.  For example, if a control plane host
+	// is unhealthy and must be replaced.  An operator should report Degraded if
+	// unexpected errors occur over a period, but the expectation is that all
+	// unexpected errors are handled as operators mature.
 	OperatorDegraded ClusterStatusConditionType = "Degraded"
 
-	// Upgradeable indicates whether the operator is in a state that is safe to upgrade. When status is `False`
+	// Upgradeable indicates whether the operator safe to upgrade based on the current cluster state. When status is `False`
 	// administrators should not upgrade their cluster and the message field should contain a human readable description
 	// of what the administrator should do to allow the operator to successfully update.  A missing condition, True,
 	// and Unknown are all treated by the CVO as allowing an upgrade.

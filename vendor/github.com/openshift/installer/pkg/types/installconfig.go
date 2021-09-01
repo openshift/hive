@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	"github.com/openshift/installer/pkg/types/gcp"
+	"github.com/openshift/installer/pkg/types/ibmcloud"
 	"github.com/openshift/installer/pkg/types/kubevirt"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
@@ -22,7 +23,8 @@ const (
 	// InstallConfigVersion is the version supported by this package.
 	// If you bump this, you must also update the list of convertable values in
 	// pkg/types/conversion/installconfig.go
-	InstallConfigVersion = "v1"
+	InstallConfigVersion  = "v1"
+	workerMachinePoolName = "worker"
 )
 
 var (
@@ -42,9 +44,13 @@ var (
 	// to the user in the interactive wizard.
 	HiddenPlatformNames = []string{
 		baremetal.Name,
+		ibmcloud.Name,
 		kubevirt.Name,
 		none.Name,
 	}
+
+	// OKD is a setting to enable community-only modifications
+	OKD = false
 )
 
 // PublishingStrategy is a strategy for how various endpoints for the cluster are exposed.
@@ -138,14 +144,25 @@ type InstallConfig struct {
 	// field must not be set.
 	// AWS: "Mint", "Passthrough", "Manual"
 	// Azure: "Mint", "Passthrough", "Manual"
+	// AzureStack: "Manual"
 	// GCP: "Mint", "Passthrough", "Manual"
+	// IBMCloud: "Manual"
 	// +optional
 	CredentialsMode CredentialsMode `json:"credentialsMode,omitempty"`
+
+	// BootstrapInPlace is the configuration for installing a single node
+	// with bootstrap in place installation.
+	BootstrapInPlace *BootstrapInPlace `json:"bootstrapInPlace,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.
 func (c *InstallConfig) ClusterDomain() string {
 	return fmt.Sprintf("%s.%s", c.ObjectMeta.Name, strings.TrimSuffix(c.BaseDomain, "."))
+}
+
+// IsOKD returns true if community-only modifications are enabled
+func (c *InstallConfig) IsOKD() bool {
+	return OKD
 }
 
 // Platform is the configuration for the specific platform upon which to perform
@@ -166,6 +183,10 @@ type Platform struct {
 	// GCP is the configuration used when installing on Google Cloud Platform.
 	// +optional
 	GCP *gcp.Platform `json:"gcp,omitempty"`
+
+	// IBMCloud is the configuration used when installing on IBM Cloud.
+	// +optional
+	IBMCloud *ibmcloud.Platform `json:"ibmcloud,omitempty"`
 
 	// Libvirt is the configuration used when installing on libvirt.
 	// +optional
@@ -207,6 +228,8 @@ func (p *Platform) Name() string {
 		return baremetal.Name
 	case p.GCP != nil:
 		return gcp.Name
+	case p.IBMCloud != nil:
+		return ibmcloud.Name
 	case p.Libvirt != nil:
 		return libvirt.Name
 	case p.None != nil:
@@ -341,3 +364,20 @@ const (
 	// cloud credentials for each CredentialsRequest.
 	PassthroughCredentialsMode CredentialsMode = "Passthrough"
 )
+
+// BootstrapInPlace defines the configuration for bootstrap-in-place installation
+type BootstrapInPlace struct {
+	// InstallationDisk is the target disk drive for coreos-installer
+	InstallationDisk string `json:"installationDisk"`
+}
+
+// WorkerMachinePool retrieves the worker MachinePool from InstallConfig.Compute
+func (c *InstallConfig) WorkerMachinePool() *MachinePool {
+	for _, machinePool := range c.Compute {
+		if machinePool.Name == workerMachinePoolName {
+			return &machinePool
+		}
+	}
+
+	return nil
+}

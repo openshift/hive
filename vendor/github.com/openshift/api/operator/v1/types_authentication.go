@@ -25,7 +25,19 @@ type AuthenticationSpec struct {
 }
 
 type AuthenticationStatus struct {
+	// OAuthAPIServer holds status specific only to oauth-apiserver
+	// +optional
+	OAuthAPIServer OAuthAPIServerStatus `json:"oauthAPIServer,omitempty"`
+
 	OperatorStatus `json:",inline"`
+}
+
+type OAuthAPIServerStatus struct {
+	// LatestAvailableRevision is the latest revision used as suffix of revisioned
+	// secrets like encryption-config. A new revision causes a new deployment of pods.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	LatestAvailableRevision int32 `json:"latestAvailableRevision,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

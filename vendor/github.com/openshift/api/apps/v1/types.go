@@ -32,6 +32,7 @@ type DeploymentConfig struct {
 	Spec DeploymentConfigSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Status represents the current deployment state.
+	// +optional
 	Status DeploymentConfigStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -82,6 +83,7 @@ type DeploymentConfigSpec struct {
 // DeploymentStrategy describes how to perform a deployment.
 type DeploymentStrategy struct {
 	// Type is the name of a deployment strategy.
+	// +optional
 	Type DeploymentStrategyType `json:"type,omitempty" protobuf:"bytes,1,opt,name=type,casttype=DeploymentStrategyType"`
 
 	// CustomParams are the input to the Custom deployment strategy, and may also

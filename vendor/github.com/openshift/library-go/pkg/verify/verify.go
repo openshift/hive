@@ -68,7 +68,7 @@ var Reject Interface = rejectVerifier{}
 const maxSignatureSearch = 10
 
 // validReleaseDigest is a verification rule to filter clearly invalid digests.
-var validReleaseDigest = regexp.MustCompile(`^[a-zA-Z0-9:]+$`)
+var validReleaseDigest = regexp.MustCompile(`^[a-z0-9]+(?:[.+_-][a-z0-9]+)*:[a-zA-Z0-9=_-]+$`)
 
 // releaseVerifier implements a signature intersection operation on a provided release
 // digest - all verifiers must have at least one valid signature attesting the release
@@ -158,7 +158,7 @@ func (v *releaseVerifier) Verify(ctx context.Context, releaseDigest string) erro
 		return fmt.Errorf("release images that are not accessed via digest cannot be verified")
 	}
 	if !validReleaseDigest.MatchString(releaseDigest) {
-		return fmt.Errorf("the provided release image digest contains prohibited characters")
+		return fmt.Errorf("the provided release image digest has an invalid format: %q", releaseDigest)
 	}
 
 	if v.hasVerified(releaseDigest) {

@@ -37,7 +37,9 @@ type PolicyRule struct {
 	// APIGroups is the name of the APIGroup that contains the resources.  If this field is empty, then both kubernetes and origin API groups are assumed.
 	// That means that if an action is requested against one of the enumerated resources in either the kubernetes or the origin API group, the request
 	// will be allowed
-	APIGroups []string `json:"apiGroups" protobuf:"bytes,3,rep,name=apiGroups"`
+	// +optional
+	// +nullable
+	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,3,rep,name=apiGroups"`
 	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
 	Resources []string `json:"resources" protobuf:"bytes,4,rep,name=resources"`
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
@@ -89,11 +91,13 @@ type RoleBinding struct {
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	UserNames OptionalNames `json:"userNames" protobuf:"bytes,2,rep,name=userNames"`
 	// GroupNames holds all the groups directly bound to the role.
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	GroupNames OptionalNames `json:"groupNames" protobuf:"bytes,3,rep,name=groupNames"`
 	// Subjects hold object references to authorize with this rule.
 	// This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers.
@@ -322,7 +326,7 @@ type Action struct {
 	ResourceName string `json:"resourceName" protobuf:"bytes,6,opt,name=resourceName"`
 	// Path is the path of a non resource URL
 	Path string `json:"path" protobuf:"bytes,8,opt,name=path"`
-	// IsNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hieraarchy)
+	// IsNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hierarchy)
 	IsNonResourceURL bool `json:"isNonResourceURL" protobuf:"varint,9,opt,name=isNonResourceURL"`
 	// Content is the actual content of the request for create and update
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -384,11 +388,13 @@ type ClusterRoleBinding struct {
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	UserNames OptionalNames `json:"userNames" protobuf:"bytes,2,rep,name=userNames"`
 	// GroupNames holds all the groups directly bound to the role.
 	// This field should only be specified when supporting legacy clients and servers.
 	// See Subjects for further details.
 	// +k8s:conversion-gen=false
+	// +optional
 	GroupNames OptionalNames `json:"groupNames" protobuf:"bytes,3,rep,name=groupNames"`
 	// Subjects hold object references to authorize with this rule.
 	// This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers.

@@ -28,14 +28,16 @@ const (
 
 	// PermissionDeleteSharedNetworking is a set of permissions required when the installer destroys resources from a shared-network cluster.
 	PermissionDeleteSharedNetworking PermissionGroup = "delete-shared-networking"
+
+	// PermissionDeleteSharedInstanceRole is a set of permissions required when the installer destroys resources from a
+	// cluster with user-supplied IAM roles for instances.
+	PermissionDeleteSharedInstanceRole PermissionGroup = "delete-shared-instance-role"
 )
 
 var permissions = map[PermissionGroup][]string{
 	// Base set of permissions required for cluster creation
 	PermissionCreateBase: {
 		// EC2 related perms
-		"ec2:AllocateAddress",
-		"ec2:AssociateAddress",
 		"ec2:AuthorizeSecurityGroupEgress",
 		"ec2:AuthorizeSecurityGroupIngress",
 		"ec2:CopyImage",
@@ -75,7 +77,6 @@ var permissions = map[PermissionGroup][]string{
 		"ec2:GetEbsDefaultKmsKeyId",
 		"ec2:ModifyInstanceAttribute",
 		"ec2:ModifyNetworkInterfaceAttribute",
-		"ec2:ReleaseAddress",
 		"ec2:RevokeSecurityGroupEgress",
 		"ec2:RevokeSecurityGroupIngress",
 		"ec2:RunInstances",
@@ -176,11 +177,13 @@ var permissions = map[PermissionGroup][]string{
 	PermissionDeleteBase: {
 		"autoscaling:DescribeAutoScalingGroups",
 		"ec2:DeleteNetworkInterface",
+		"ec2:DeleteTags",
 		"ec2:DeleteVolume",
 		"elasticloadbalancing:DeleteTargetGroup",
 		"elasticloadbalancing:DescribeTargetGroups",
 		"iam:DeleteAccessKey",
 		"iam:DeleteUser",
+		"iam:ListAttachedRolePolicies",
 		"iam:ListInstanceProfiles",
 		"iam:ListRolePolicies",
 		"iam:ListUserPolicies",
@@ -190,7 +193,9 @@ var permissions = map[PermissionGroup][]string{
 	},
 	// Permissions required for creating network resources
 	PermissionCreateNetworking: {
+		"ec2:AllocateAddress",
 		"ec2:AssociateDhcpOptions",
+		"ec2:AssociateAddress",
 		"ec2:AssociateRouteTable",
 		"ec2:AttachInternetGateway",
 		"ec2:CreateDhcpOptions",
@@ -216,11 +221,16 @@ var permissions = map[PermissionGroup][]string{
 		"ec2:DeleteVpcEndpoints",
 		"ec2:DetachInternetGateway",
 		"ec2:DisassociateRouteTable",
+		"ec2:ReleaseAddress",
 		"ec2:ReplaceRouteTableAssociation",
 	},
 	// Permissions required for deleting a cluster with shared network resources
 	PermissionDeleteSharedNetworking: {
 		"tag:UnTagResources",
+	},
+	// Permissions required for deleting a cluster with shared instance roles
+	PermissionDeleteSharedInstanceRole: {
+		"iam:UntagRole",
 	},
 }
 

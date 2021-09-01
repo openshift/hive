@@ -114,6 +114,10 @@ func (o *ClusterUninstaller) Run() error {
 		time.Second*10,
 		o.destroyCluster,
 	)
+	if err != nil {
+		return errors.Wrap(err, "failed to destroy cluster")
+	}
+
 	return nil
 
 }
@@ -177,11 +181,15 @@ func (o *ClusterUninstaller) isClusterResource(name string) bool {
 }
 
 func (o *ClusterUninstaller) clusterIDFilter() string {
-	return fmt.Sprintf("name eq \"%s-.*\"", o.ClusterID)
+	return fmt.Sprintf("name : \"%s-*\"", o.ClusterID)
 }
 
 func (o *ClusterUninstaller) clusterLabelFilter() string {
-	return fmt.Sprintf("labels.kubernetes-io-cluster-%s eq \"owned\"", o.ClusterID)
+	return fmt.Sprintf("labels.kubernetes-io-cluster-%s = \"owned\"", o.ClusterID)
+}
+
+func (o *ClusterUninstaller) clusterLabelOrClusterIDFilter() string {
+	return fmt.Sprintf("(%s) OR (%s)", o.clusterIDFilter(), o.clusterLabelFilter())
 }
 
 func isNoOp(err error) bool {

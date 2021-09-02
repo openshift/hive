@@ -54,9 +54,6 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS}
 
-# NOTE: This is needed in order for the short form (cd) to work
-oc get clusterdeployment > /dev/null
-
 # Sanity check the cluster deployment printer
 i=1
 while [ $i -le ${max_tries} ]; do

@@ -224,21 +224,45 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		}
 	}
 
-	// Check if HibernateAfter is set, and if the cluster has been in running state for longer than this duration, put it to sleep.
-	if cd.Spec.HibernateAfter != nil && cd.Spec.PowerState != hivev1.HibernatingClusterPowerState {
+	// Check if HibernateAfter is set, and put it to sleep if necessary.
+	// As the baseline timestamp for determining whether HibernateAfter should trigger, we use the latest of:
+	// - When the cluster finished installing (status.installedTimestamp)
+	// - When the cluster was claimed (spec.clusterPoolRef.claimedTimestamp -- ClusterPool CDs only)
+	// - The last time the cluster resumed (status.conditions[Hibernating].lastTransitionTime if not hibernating (but see TODO))
+	// BUT pool clusters wait until they're claimed for HibernateAfter to have effect.
+	poolRef := cd.Spec.ClusterPoolRef
+	isUnclaimedPoolCluster := poolRef != nil && poolRef.PoolName != "" &&
+		// Upgrade note: If we hit this code path on a CD that was claimed before upgrading to
+		// where we introduced ClaimedTimestamp, then that CD was Hibernating when it was claimed
+		// (because that's the same time we introduced ClusterPool.RunningCount) so it's safe to
+		// just use installed/last-resumed as the baseline for hibernateAfter.
+		(poolRef.ClaimName == "" || poolRef.ClaimedTimestamp == nil)
+	if cd.Spec.HibernateAfter != nil && cd.Spec.PowerState != hivev1.HibernatingClusterPowerState && !isUnclaimedPoolCluster {
 		hibernateAfterDur := cd.Spec.HibernateAfter.Duration
-		runningSince := cd.Status.InstalledTimestamp.Time
-		hibLog := cdLog.WithFields(log.Fields{
-			"runningSince":   runningSince,
-			"hibernateAfter": hibernateAfterDur,
-		})
+		hibLog := cdLog.WithField("hibernateAfter", hibernateAfterDur)
+
+		// The nil values of each of these will make them "earliest" and therefore unused.
+		var installedSince, runningSince, claimedSince time.Time
 		var isRunning bool
 
+		installedSince = cd.Status.InstalledTimestamp.Time
+		hibLog = hibLog.WithField("installedSince", installedSince)
+
+		if poolRef != nil && poolRef.ClaimedTimestamp != nil {
+			claimedSince = poolRef.ClaimedTimestamp.Time
+			hibLog = hibLog.WithField("claimedSince", claimedSince)
+		} else {
+			// This means it's not a pool cluster (!isUnclaimedPoolCluster && poolRef == nil)
+			hibLog.Debug("cluster does not belong to a clusterpool")
+		}
+
 		cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-		if cond.Status == corev1.ConditionUnknown {
-			hibLog.Debug("cluster has never been hibernated, using installed time")
+		if cond == nil || cond.Status == corev1.ConditionUnknown {
+			hibLog.Debug("cluster has never been hibernated")
 			isRunning = true
 		} else if cond.Status == corev1.ConditionFalse {
+			// TODO: This seems wrong. Shouldn't we start the clock from when we declared the
+			// cluster running, rather than when we first asked it to resume?
 			runningSince = cond.LastTransitionTime.Time
 			hibLog = hibLog.WithField("runningSince", runningSince)
 			hibLog.WithField("reason", cond.Reason).Debug("hibernating condition false")
@@ -246,7 +270,13 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		}
 
 		if isRunning {
-			expiry := runningSince.Add(hibernateAfterDur)
+			// Which timestamp should we use to calculate HibernateAfter from?
+			// Sort our timestamps in descending order and use the first (latest) one.
+			stamps := []time.Time{installedSince, claimedSince, runningSince}
+			sort.Slice(stamps, func(i, j int) bool {
+				return stamps[i].After(stamps[j])
+			})
+			expiry := stamps[0].Add(hibernateAfterDur)
 			hibLog.Debugf("cluster should be hibernating after: %s", expiry)
 			if time.Now().After(expiry) {
 				hibLog.WithField("expiry", expiry).Debug("cluster has been running longer than hibernate-after duration, moving to hibernating powerState")

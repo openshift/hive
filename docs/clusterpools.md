@@ -24,12 +24,12 @@ the pool. `ClusterClaims` must be created in the same namespace as their
 The user who claims a cluster can be given RBAC to their clusters namespace to
 prevent anyone else from being able to access it.
 
-Presently once a `ClusterDeployment` is ready, it will be
+By default once a `ClusterDeployment` is ready, it will be
 [hibernated](./hibernating-clusters.md) automatically. Once claimed it will be
 automatically resumed, meaning that the typical time to claim a cluster and be
-ready to go is in the 2-5 minute range while the cluster starts up. An option
-to keep the clusters in the pool always running so they can instantly be used
-may be added in the future.
+ready to go is in the 2-5 minute range while the cluster starts up. You can
+keep a subset of clusters active by setting `ClusterPool.Spec.RunningCount`;
+such clusters will be ready immediately when claimed.
 
 When done with a cluster, users can just delete their `ClusterClaim` and the
 `ClusterDeployment` will be automatically deprovisioned. An optional
@@ -67,7 +67,8 @@ spec:
       region: us-east-1
   pullSecretRef:
     name: hive-team-pull-secret
-  size: 1
+  runningCount: 1
+  size: 3
 ```
 
 ## Sample Cluster Claim

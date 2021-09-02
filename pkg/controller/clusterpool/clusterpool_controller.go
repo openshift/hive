@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -399,6 +400,11 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		metricStaleClusterDeploymentsDeleted.WithLabelValues(clp.Namespace, clp.Name).Inc()
 	}
 
+	if err := r.reconcileRunningClusters(clp, cds, logger); err != nil {
+		log.WithError(err).Error("error updating hibernating/running state")
+		return reconcile.Result{}, err
+	}
+
 	// One more (possible) status update: wait until the end to detect whether all unassigned CDs
 	// are current with the pool config, since assigning or deleting CDs may eliminate the last
 	// one that isn't.
@@ -413,6 +419,47 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// reconcileRunningClusters ensures the oldest pool.spec.runningCount unassigned clusters are
+// set to running, and the remainder are set to hibernating.
+func (r *ReconcileClusterPool) reconcileRunningClusters(
+	clp *hivev1.ClusterPool,
+	cds *cdCollection,
+	logger log.FieldLogger,
+) error {
+	runningCount := int(clp.Spec.RunningCount)
+	cdList := append(cds.Assignable(), cds.Installing()...)
+	// Sort by age, oldest first
+	sort.Slice(
+		cdList,
+		func(i, j int) bool {
+			return cdList[i].CreationTimestamp.Before(&cdList[j].CreationTimestamp)
+		},
+	)
+	for i := 0; i < len(cdList); i++ {
+		cd := cdList[i]
+		var desiredPowerState hivev1.ClusterPowerState
+		if i < runningCount {
+			desiredPowerState = hivev1.RunningClusterPowerState
+		} else {
+			desiredPowerState = hivev1.HibernatingClusterPowerState
+		}
+		if cd.Spec.PowerState == desiredPowerState {
+			continue
+		}
+		cd.Spec.PowerState = desiredPowerState
+		contextLogger := logger.WithFields(log.Fields{
+			"cluster":       cd.Name,
+			"newPowerState": desiredPowerState,
+		})
+		contextLogger.Info("Changing cluster powerState to satisfy runningCount")
+		if err := r.Update(context.Background(), cd); err != nil {
+			contextLogger.WithError(err).Error("could not update powerState")
+			return err
+		}
+	}
+	return nil
 }
 
 // calculatePoolVersion computes a hash of the important (to ClusterDeployments) fields of the
@@ -652,7 +699,6 @@ func (r *ReconcileClusterPool) createCluster(
 		}
 		poolRef := poolReference(clp)
 		cd.Spec.ClusterPoolRef = &poolRef
-		cd.Spec.PowerState = hivev1.HibernatingClusterPowerState
 		lastIndex := len(objs) - 1
 		objs[i], objs[lastIndex] = objs[lastIndex], objs[i]
 	}

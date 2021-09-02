@@ -21,6 +21,12 @@ type ClusterPoolSpec struct {
 	// +required
 	Size int32 `json:"size"`
 
+	// RunningCount is the number of clusters we should keep running. The remainder will be kept hibernated until claimed.
+	// By default no clusters will be kept running (all will be hibernated).
+	// +kubebuilder:validation:Minimum=0
+	// +optional
+	RunningCount int32 `json:"runningCount,omitempty"`
+
 	// MaxSize is the maximum number of clusters that will be provisioned including clusters that have been claimed
 	// and ones waiting to be used.
 	// By default there is no limit.

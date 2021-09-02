@@ -181,6 +181,12 @@ spec:
                     description: ClaimName is the name of the ClusterClaim that claimed
                       the cluster from the pool.
                     type: string
+                  claimedTimestamp:
+                    description: ClaimedTimestamp is the time this cluster was assigned
+                      to a ClusterClaim. This is only used for ClusterDeployments
+                      belonging to ClusterPools.
+                    format: date-time
+                    type: string
                   namespace:
                     description: Namespace is the namespace where the ClusterPool
                       resides.

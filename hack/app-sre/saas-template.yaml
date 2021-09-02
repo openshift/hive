@@ -434,6 +434,12 @@ objects:
                       description: ClaimName is the name of the ClusterClaim that
                         claimed the cluster from the pool.
                       type: string
+                    claimedTimestamp:
+                      description: ClaimedTimestamp is the time this cluster was assigned
+                        to a ClusterClaim. This is only used for ClusterDeployments
+                        belonging to ClusterPools.
+                      format: date-time
+                      type: string
                     namespace:
                       description: Namespace is the namespace where the ClusterPool
                         resides.
@@ -2143,6 +2149,13 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                runningCount:
+                  description: RunningCount is the number of clusters we should keep
+                    running. The remainder will be kept hibernated until claimed.
+                    By default no clusters will be kept running (all will be hibernated).
+                  format: int32
+                  minimum: 0
+                  type: integer
                 size:
                   description: Size is the default number of clusters that we should
                     keep provisioned and waiting for use.

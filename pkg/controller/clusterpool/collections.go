@@ -224,6 +224,17 @@ func isBroken(cd *hivev1.ClusterDeployment) bool {
 	return false
 }
 
+func (cds *cdCollection) sortInstalling() {
+	// Sort installing CDs so we prioritize deleting those that are furthest away from completing
+	// their installation (prioritizing preserving those that will be assignable the soonest).
+	sort.Slice(
+		cds.installing,
+		func(i, j int) bool {
+			return cds.installing[i].CreationTimestamp.After(cds.installing[j].CreationTimestamp.Time)
+		},
+	)
+}
+
 // getAllClusterDeploymentsForPool is the constructor for a cdCollection
 // comprising all the ClusterDeployments created for the specified ClusterPool.
 func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, poolVersion string, logger log.FieldLogger) (*cdCollection, error) {
@@ -297,14 +308,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			return cdCol.assignable[i].CreationTimestamp.Before(&cdCol.assignable[j].CreationTimestamp)
 		},
 	)
-	// Sort installing CDs so we prioritize deleting those that are furthest away from completing
-	// their installation (prioritizing preserving those that will be assignable the soonest).
-	sort.Slice(
-		cdCol.installing,
-		func(i, j int) bool {
-			return cdCol.installing[i].CreationTimestamp.After(cdCol.installing[j].CreationTimestamp.Time)
-		},
-	)
+	cdCol.sortInstalling()
 	// Sort stale CDs by age so we delete the oldest first
 	sort.Slice(
 		cdCol.unknownPoolVersion,
@@ -393,6 +397,13 @@ func (cds *cdCollection) MismatchedPoolVersion() []*hivev1.ClusterDeployment {
 // version of the pool. Put "unknown" first becuase they're annoying.
 func (cds *cdCollection) Stale() []*hivev1.ClusterDeployment {
 	return append(cds.unknownPoolVersion, cds.mismatchedPoolVersion...)
+}
+
+// RegisterNewCluster adds a freshly-created cluster to the cdCollection, assuming it is installing.
+func (cds *cdCollection) RegisterNewCluster(cd *hivev1.ClusterDeployment) {
+	cds.byCDName[cd.Name] = cd
+	cds.installing = append(cds.installing, cd)
+	cds.sortInstalling()
 }
 
 // Assign assigns the specified ClusterDeployment to the specified claim, updating its spec on the

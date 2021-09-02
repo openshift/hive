@@ -370,10 +370,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			break
 		}
 		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
-		// TODO: Do this in cdLookup so we can add the new CDs to Installing(). For now it's okay
-		// because the new CDs are guaranteed to have a matching PoolVersion, and that's the only
-		// thing we need to keep consistent.
-		if err := r.addClusters(clp, poolVersion, toAdd, logger); err != nil {
+		if err := r.addClusters(clp, poolVersion, cds, toAdd, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
@@ -546,6 +543,7 @@ func (r *ReconcileClusterPool) applyRoleBinding(desired, observed *rbacv1.RoleBi
 func (r *ReconcileClusterPool) addClusters(
 	clp *hivev1.ClusterPool,
 	poolVersion string,
+	cds *cdCollection,
 	newClusterCount int,
 	logger log.FieldLogger,
 ) error {
@@ -585,9 +583,11 @@ func (r *ReconcileClusterPool) addClusters(
 	}
 
 	for i := 0; i < newClusterCount; i++ {
-		if err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, logger); err != nil {
+		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, logger)
+		if err != nil {
 			return err
 		}
+		cds.RegisterNewCluster(cd)
 	}
 
 	return nil
@@ -600,11 +600,11 @@ func (r *ReconcileClusterPool) createCluster(
 	installConfigTemplate string,
 	poolVersion string,
 	logger log.FieldLogger,
-) error {
+) (*hivev1.ClusterDeployment, error) {
 	ns, err := r.createRandomNamespace(clp)
 	if err != nil {
 		logger.WithError(err).Error("error obtaining random namespace")
-		return err
+		return nil, err
 	}
 	logger.WithField("cluster", ns.Name).Info("Creating new cluster")
 
@@ -637,14 +637,16 @@ func (r *ReconcileClusterPool) createCluster(
 
 	objs, err := builder.Build()
 	if err != nil {
-		return errors.Wrap(err, "error building resources")
+		return nil, errors.Wrap(err, "error building resources")
 	}
 
 	poolKey := types.NamespacedName{Namespace: clp.Namespace, Name: clp.Name}.String()
 	r.expectations.ExpectCreations(poolKey, 1)
+	var cd *hivev1.ClusterDeployment
 	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
 	for i, obj := range objs {
-		cd, ok := obj.(*hivev1.ClusterDeployment)
+		var ok bool
+		cd, ok = obj.(*hivev1.ClusterDeployment)
 		if !ok {
 			continue
 		}
@@ -658,11 +660,11 @@ func (r *ReconcileClusterPool) createCluster(
 	for _, obj := range objs {
 		if err := r.Client.Create(context.Background(), obj.(client.Object)); err != nil {
 			r.expectations.CreationObserved(poolKey)
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return cd, nil
 }
 
 func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool) (*corev1.Namespace, error) {

@@ -17,6 +17,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -516,4 +517,48 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 		listOptions.Continue = cont
 	}
 	return
+}
+
+func (r *ReconcileHiveConfig) deployMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) error {
+	hiveNSName := getHiveNamespace(instance)
+
+	if !instance.Spec.ExportMetrics {
+		hLog.Info("metrics were not requested to be extracted, so skipping")
+		return nil
+	}
+
+	// setup the hiveNSName labels so that openshift-prometheus discovers the namespace.
+	ns := &corev1.Namespace{}
+	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: hiveNSName}, ns); err != nil {
+		hLog.WithError(err).Error("error getting hive namespace")
+		return err
+	}
+	if v, ok := ns.Labels["openshift.io/cluster-monitoring"]; !ok || v != "true" {
+		// add the label
+		if ns.Labels == nil {
+			ns.Labels = map[string]string{}
+		}
+		ns.Labels["openshift.io/cluster-monitoring"] = "true"
+		if err := r.Client.Update(context.TODO(), ns); err != nil {
+			hLog.WithError(err).Error("error updating hive namespace label to enable monitoring")
+			return err
+		}
+	}
+
+	// Load namespaced assets, decode them, set to our target namespace, and apply:
+	namespacedAssets := []string{
+		"config/monitoring/hive_clustersync_servicemonitor.yaml",
+		"config/monitoring/hive_controllers_servicemonitor.yaml",
+		"config/monitoring/role.yaml",
+		"config/monitoring/role_binding.yaml",
+	}
+	for _, assetPath := range namespacedAssets {
+		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
+			hLog.WithError(err).Error("error applying object with namespace override")
+			return err
+		}
+		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
+	}
+
+	return nil
 }

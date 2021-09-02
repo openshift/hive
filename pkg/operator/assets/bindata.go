@@ -29,6 +29,10 @@
 // config/rbac/hive_reader_role.yaml
 // config/rbac/hive_reader_role_binding.yaml
 // config/configmaps/install-log-regexes-configmap.yaml
+// config/monitoring/hive_clustersync_servicemonitor.yaml
+// config/monitoring/hive_controllers_servicemonitor.yaml
+// config/monitoring/role.yaml
+// config/monitoring/role_binding.yaml
 package assets
 
 import (
@@ -1739,6 +1743,138 @@ func configConfigmapsInstallLogRegexesConfigmapYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configMonitoringHive_clustersync_servicemonitorYaml = []byte(`apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hive-clustersync
+spec:
+  endpoints:
+  - interval: 30s
+    path: /metrics
+    port: metrics
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '^rest_client_.*'
+      action: drop
+  selector:
+    matchLabels:
+      control-plane: clustersync
+`)
+
+func configMonitoringHive_clustersync_servicemonitorYamlBytes() ([]byte, error) {
+	return _configMonitoringHive_clustersync_servicemonitorYaml, nil
+}
+
+func configMonitoringHive_clustersync_servicemonitorYaml() (*asset, error) {
+	bytes, err := configMonitoringHive_clustersync_servicemonitorYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/monitoring/hive_clustersync_servicemonitor.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configMonitoringHive_controllers_servicemonitorYaml = []byte(`apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hive-controllers
+spec:
+  endpoints:
+  - interval: 30s
+    path: /metrics
+    port: metrics
+    scheme: http
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '^rest_client_.*'
+      action: drop
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+`)
+
+func configMonitoringHive_controllers_servicemonitorYamlBytes() ([]byte, error) {
+	return _configMonitoringHive_controllers_servicemonitorYaml, nil
+}
+
+func configMonitoringHive_controllers_servicemonitorYaml() (*asset, error) {
+	bytes, err := configMonitoringHive_controllers_servicemonitorYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/monitoring/hive_controllers_servicemonitor.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configMonitoringRoleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+`)
+
+func configMonitoringRoleYamlBytes() ([]byte, error) {
+	return _configMonitoringRoleYaml, nil
+}
+
+func configMonitoringRoleYaml() (*asset, error) {
+	bytes, err := configMonitoringRoleYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/monitoring/role.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configMonitoringRole_bindingYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+- kind: ServiceAccount
+  name: prometheus-user-workload
+  namespace: openshift-user-workload-monitoring
+`)
+
+func configMonitoringRole_bindingYamlBytes() ([]byte, error) {
+	return _configMonitoringRole_bindingYaml, nil
+}
+
+func configMonitoringRole_bindingYaml() (*asset, error) {
+	bytes, err := configMonitoringRole_bindingYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/monitoring/role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -1820,6 +1956,10 @@ var _bindata = map[string]func() (*asset, error){
 	"config/rbac/hive_reader_role.yaml":                         configRbacHive_reader_roleYaml,
 	"config/rbac/hive_reader_role_binding.yaml":                 configRbacHive_reader_role_bindingYaml,
 	"config/configmaps/install-log-regexes-configmap.yaml":      configConfigmapsInstallLogRegexesConfigmapYaml,
+	"config/monitoring/hive_clustersync_servicemonitor.yaml":    configMonitoringHive_clustersync_servicemonitorYaml,
+	"config/monitoring/hive_controllers_servicemonitor.yaml":    configMonitoringHive_controllers_servicemonitorYaml,
+	"config/monitoring/role.yaml":                               configMonitoringRoleYaml,
+	"config/monitoring/role_binding.yaml":                       configMonitoringRole_bindingYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -1892,6 +2032,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"service-account.yaml":                 {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},
 			"service.yaml":                         {configHiveadmissionServiceYaml, map[string]*bintree{}},
 			"syncset-webhook.yaml":                 {configHiveadmissionSyncsetWebhookYaml, map[string]*bintree{}},
+		}},
+		"monitoring": {nil, map[string]*bintree{
+			"hive_clustersync_servicemonitor.yaml": {configMonitoringHive_clustersync_servicemonitorYaml, map[string]*bintree{}},
+			"hive_controllers_servicemonitor.yaml": {configMonitoringHive_controllers_servicemonitorYaml, map[string]*bintree{}},
+			"role.yaml":                            {configMonitoringRoleYaml, map[string]*bintree{}},
+			"role_binding.yaml":                    {configMonitoringRole_bindingYaml, map[string]*bintree{}},
 		}},
 		"rbac": {nil, map[string]*bintree{
 			"hive_admin_role.yaml":              {configRbacHive_admin_roleYaml, map[string]*bintree{}},

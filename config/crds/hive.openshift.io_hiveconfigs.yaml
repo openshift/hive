@@ -334,6 +334,14 @@ spec:
                 items:
                   type: string
                 type: array
+              exportMetrics:
+                description: ExportMetrics specifies whether the operator should enable
+                  metrics for hive controllers to be extracted for prometheus. When
+                  set to true, the operator deploys ServiceMonitors so that the prometheus
+                  instances that extract metrics. The operator also sets up RBAC in
+                  the TargetNamespace so that openshift prometheus in the cluster
+                  can list/access objects required to pull metrics.
+                type: boolean
               failedProvisionConfig:
                 description: FailedProvisionConfig is used to configure settings related
                   to handling provision failures.

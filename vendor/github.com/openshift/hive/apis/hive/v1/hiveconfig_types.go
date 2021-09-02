@@ -141,6 +141,13 @@ type HiveConfigSpec struct {
 	ArgoCD ArgoCDConfig `json:"argoCDConfig,omitempty"`
 
 	FeatureGates *FeatureGateSelection `json:"featureGates,omitempty"`
+
+	// ExportMetrics specifies whether the operator should enable metrics for hive controllers
+	// to be extracted for prometheus.
+	// When set to true, the operator deploys ServiceMonitors so that the prometheus instances that
+	// extract metrics. The operator also sets up RBAC in the TargetNamespace so that openshift
+	// prometheus in the cluster can list/access objects required to pull metrics.
+	ExportMetrics bool `json:"exportMetrics,omitempty"`
 }
 
 // ReleaseImageVerificationConfigMapReference is a reference to the ConfigMap that

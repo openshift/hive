@@ -454,6 +454,14 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	err = r.deployMonitoring(hLog, h, instance)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying monitoring")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingMonitoring", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
 	// Cleanup legacy objects:
 	if err := r.cleanupLegacyObjects(hLog); err != nil {
 		return reconcile.Result{}, err

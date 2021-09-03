@@ -3,6 +3,7 @@ package clusterdeployment
 import (
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -114,6 +115,14 @@ func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 		}
 		clusterDeployment.Status.Conditions = append(clusterDeployment.Status.Conditions, cond)
 	}
+}
+
+// Broken uses ProvisionStopped=True to make the CD be recognized as broken.
+func Broken() Option {
+	return WithCondition(hivev1.ClusterDeploymentCondition{
+		Type:   hivev1.ProvisionStoppedCondition,
+		Status: v1.ConditionTrue,
+	})
 }
 
 func WithUnclaimedClusterPoolReference(namespace, poolName string) Option {

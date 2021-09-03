@@ -140,6 +140,9 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	}
 
 	updated = false
+	// Fun extra variable to keep track of whether we should increment metricProvisionFailedTerminal
+	// later; because we only want to do that if (we change that status and) the status update succeeds.
+	provisionFailedTerminal := false
 	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 		hivev1.ProvisionStoppedCondition,
 		stopped.Status,
@@ -149,6 +152,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	)
 	if updated {
 		statusModified = true
+		provisionFailedTerminal = true
 	}
 
 	completed = controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
@@ -195,6 +199,10 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		if err := r.Status().Update(context.TODO(), cd); err != nil {
 			logger.WithError(err).Error("failed to update the status of clusterdeployment")
 			return reconcile.Result{}, err
+		}
+		// If we declared the provision terminally failed, bump our metric
+		if provisionFailedTerminal {
+			incProvisionFailedTerminal(cd)
 		}
 	}
 

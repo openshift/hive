@@ -301,7 +301,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	cds.SyncClaimAssignments(r.Client, claims, logger)
 
 	origStatus := clp.Status.DeepCopy()
-	clp.Status.Size = int32(len(cds.Installing()) + len(cds.Assignable()))
+	clp.Status.Size = int32(len(cds.Installing()) + len(cds.Assignable()) + len(cds.Broken()))
 	clp.Status.Ready = int32(len(cds.Assignable()))
 	if !reflect.DeepEqual(origStatus, &clp.Status) {
 		if err := r.Status().Update(context.Background(), clp); err != nil {
@@ -313,7 +313,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	availableCapacity := math.MaxInt32
 	if clp.Spec.MaxSize != nil {
 		availableCapacity = int(*clp.Spec.MaxSize) - cds.Total()
-		numUnassigned := len(cds.Installing()) + len(cds.Assignable())
+		numUnassigned := len(cds.Installing()) + len(cds.Assignable()) + len(cds.Broken())
 		numAssigned := cds.NumAssigned()
 		if availableCapacity <= 0 {
 			logger.WithFields(log.Fields{
@@ -329,7 +329,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	// reserveSize is the number of clusters that the pool currently has in reserve
-	reserveSize := len(cds.Installing()) + len(cds.Assignable()) - len(claims.Unassigned())
+	reserveSize := len(cds.Installing()) + len(cds.Assignable()) + len(cds.Broken()) - len(claims.Unassigned())
 
 	if err := assignClustersToClaims(r.Client, claims, cds, logger); err != nil {
 		logger.WithError(err).Error("error assigning clusters <=> claims")
@@ -364,12 +364,6 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			"MaxConcurrent": *clp.Spec.MaxConcurrent,
 			"Available":     availableCurrent,
 		}).Info("Cannot create/delete clusters as max concurrent quota exceeded.")
-	// If too many, delete some.
-	case drift > 0:
-		toDel := minIntVarible(drift, availableCurrent)
-		if err := r.deleteExcessClusters(cds, toDel, logger); err != nil {
-			return reconcile.Result{}, err
-		}
 	// If too few, create new InstallConfig and ClusterDeployment.
 	case drift < 0:
 		if availableCapacity <= 0 {
@@ -381,6 +375,19 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		// thing we need to keep consistent.
 		if err := r.addClusters(clp, poolVersion, toAdd, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
+			return reconcile.Result{}, err
+		}
+	// Delete broken CDs. We put this case after the "addClusters" case because we would rather
+	// consume our maxConcurrent with additions than deletions. But we put it before the
+	// "deleteExcessClusters" case because we would rather trim broken clusters than viable ones.
+	case len(cds.Broken()) > 0:
+		if err := r.deleteBrokenClusters(cds, availableCurrent, logger); err != nil {
+			return reconcile.Result{}, err
+		}
+	// If too many, delete some.
+	case drift > 0:
+		toDel := minIntVarible(drift, availableCurrent)
+		if err := r.deleteExcessClusters(cds, toDel, logger); err != nil {
 			return reconcile.Result{}, err
 		}
 	// Special case for stale CDs: allow deleting one if all CDs are installed.
@@ -707,6 +714,21 @@ func (r *ReconcileClusterPool) deleteExcessClusters(
 		}
 	}
 	logger.Info("no more deletions required")
+	return nil
+}
+
+func (r *ReconcileClusterPool) deleteBrokenClusters(cds *cdCollection, maxToDelete int, logger log.FieldLogger) error {
+	numToDel := minIntVarible(maxToDelete, len(cds.Broken()))
+	logger.WithField("numberToDelete", numToDel).Info("deleting broken clusters")
+	clustersToDelete := make([]*hivev1.ClusterDeployment, numToDel)
+	copy(clustersToDelete, cds.Broken()[:numToDel])
+	for _, cd := range clustersToDelete {
+		logger.WithField("cluster", cd.Name).Info("deleting broken cluster deployment")
+		if err := cds.Delete(r.Client, cd.Name); err != nil {
+			logger.WithError(err).Error("error deleting cluster deployment")
+			return err
+		}
+	}
 	return nil
 }
 

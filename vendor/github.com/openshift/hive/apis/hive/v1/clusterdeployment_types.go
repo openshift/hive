@@ -445,9 +445,10 @@ const (
 	// from a Hibernating state to a Running state.
 	//ResumingHibernationReason = "Resuming"
 
-	WaitingForMachinesRunningReason  = "WaitingForMachines"
-	WaitingForNodesRunningReason     = "WaitingForNodes"
-	WaitingForClusterOperatorsReason = "WaitingForClusterOperators"
+	WaitingForMachinesRunningReason          = "WaitingForMachines"
+	WaitingForNodesRunningReason             = "WaitingForNodes"
+	PausingForClusterOperatorsToSettleReason = "PausingForClusterOperatorsToSettle"
+	WaitingForClusterOperatorsReason         = "WaitingForClusterOperators"
 
 	// RunningHibernationReason is used as the reason when the cluster is running and
 	// the Hibernating condition is false.

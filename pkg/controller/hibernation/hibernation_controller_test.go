@@ -418,9 +418,104 @@ func TestReconcile(t *testing.T) {
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
 		{
+			name: "resuming nodes ready pause for clusteroperators to start and settle",
+			cd: cdBuilder.Options(o.resuming).Build(
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterHibernatingCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.ResumingOrRunningHibernationReason,
+					LastProbeTime:      metav1.Time{time.Now().Add(-2 * time.Hour)},
+					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterRunningCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.WaitingForNodesRunningReason,
+					LastProbeTime:      metav1.Time{time.Now().Add(-2 * time.Minute)},
+					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
+				}),
+			),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				objs := []runtime.Object{}
+				objs = append(objs, readyNodes()...)
+				objs = append(objs, readyClusterOperators()...)
+				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				builder.EXPECT().Build().Times(1).Return(c, nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleReason, runCond.Reason)
+			},
+			expectRequeueAfter: time.Duration(time.Minute * 5),
+		},
+		{
+			name: "resuming continue to pause for clusteroperators to start and settle",
+			cd: cdBuilder.Options(o.resuming).Build(
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterHibernatingCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.ResumingOrRunningHibernationReason,
+					LastProbeTime:      metav1.Time{time.Now().Add(-2 * time.Hour)},
+					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterRunningCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.PausingForClusterOperatorsToSettleReason,
+					LastProbeTime:      metav1.Time{time.Now().Add(-2 * time.Minute)},
+					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
+				}),
+			),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				objs := []runtime.Object{}
+				objs = append(objs, readyNodes()...)
+				objs = append(objs, degradedClusterOperators()...)
+				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				builder.EXPECT().Build().Times(1).Return(c, nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleReason, runCond.Reason)
+			},
+			expectRequeueAfter: time.Duration(time.Minute * 3),
+		},
+		{
 			name: "resuming clusteroperators not ready",
-			cd:   cdBuilder.Options(o.resuming).Build(),
-			cs:   csBuilder.Build(),
+			cd: cdBuilder.Options(o.resuming).Build(
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterHibernatingCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.ResumingOrRunningHibernationReason,
+					LastProbeTime:      metav1.Time{time.Now().Add(-2 * time.Hour)},
+					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterRunningCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.PausingForClusterOperatorsToSettleReason,
+					LastProbeTime:      metav1.Time{time.Now().Add(-6 * time.Minute)},
+					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
+				}),
+			),
+			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
 				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},

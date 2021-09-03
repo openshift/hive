@@ -79,7 +79,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 		}),
 		testclaim.WithCondition(hivev1.ClusterClaimCondition{
 			Status: corev1.ConditionUnknown,
-			Type:   hivev1.ClusterRunningCondition,
+			Type:   hivev1.ClusterClaimRunningCondition,
 		}),
 	)
 	cdBuilder := testcd.FullBuilder(clusterName, clusterName, scheme).Options(
@@ -118,7 +118,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Status: corev1.ConditionUnknown,
 				},
 				{
-					Type:   hivev1.ClusterRunningCondition,
+					Type:   hivev1.ClusterClaimRunningCondition,
 					Status: corev1.ConditionUnknown,
 				},
 			},
@@ -139,7 +139,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Status: corev1.ConditionUnknown,
 				},
 				{
-					Type:   hivev1.ClusterRunningCondition,
+					Type:   hivev1.ClusterClaimRunningCondition,
 					Status: corev1.ConditionUnknown,
 				},
 			},
@@ -164,7 +164,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Message: "Cluster claimed",
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
+					Type:    hivev1.ClusterClaimRunningCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  "Resuming",
 					Message: "Waiting for cluster to be running",
@@ -191,7 +191,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			expectCompletedClaim: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{{
-				Type:    hivev1.ClusterRunningCondition,
+				Type:    hivev1.ClusterClaimRunningCondition,
 				Status:  corev1.ConditionFalse,
 				Reason:  "ClusterDeleting",
 				Message: "Assigned cluster has been marked for deletion",
@@ -201,7 +201,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			name:  "deleted cluster",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			expectedConditions: []hivev1.ClusterClaimCondition{{
-				Type:    hivev1.ClusterRunningCondition,
+				Type:    hivev1.ClusterClaimRunningCondition,
 				Status:  corev1.ConditionFalse,
 				Reason:  "ClusterDeleted",
 				Message: "Assigned cluster has been deleted",
@@ -235,7 +235,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Message: "Cluster claimed",
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
+					Type:    hivev1.ClusterClaimRunningCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  "Resuming",
 					Message: "Waiting for cluster to be running",
@@ -333,7 +333,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Message: "Cluster claimed",
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
+					Type:    hivev1.ClusterClaimRunningCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  "Resuming",
 					Message: "Waiting for cluster to be running",
@@ -367,7 +367,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Message: "Cluster claimed",
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
+					Type:    hivev1.ClusterClaimRunningCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  "Resuming",
 					Message: "Waiting for cluster to be running",
@@ -402,7 +402,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Message: "Cluster claimed",
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
+					Type:    hivev1.ClusterClaimRunningCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  "Resuming",
 					Message: "Waiting for cluster to be running",
@@ -431,7 +431,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Message: "Cluster claimed",
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
+					Type:    hivev1.ClusterClaimRunningCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  "Resuming",
 					Message: "Waiting for cluster to be running",
@@ -608,7 +608,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					Message: "Cluster claimed",
 				},
 				{
-					Type:    hivev1.ClusterRunningCondition,
+					Type:    hivev1.ClusterClaimRunningCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  "Resuming",
 					Message: "Waiting for cluster to be running",

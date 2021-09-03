@@ -453,7 +453,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleReason, runCond.Reason)
+				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleRunningReason, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Minute * 5),
 		},
@@ -470,7 +470,7 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterRunningCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.PausingForClusterOperatorsToSettleReason,
+					Reason:             hivev1.PausingForClusterOperatorsToSettleRunningReason,
 					LastProbeTime:      metav1.Time{time.Now().Add(-2 * time.Minute)},
 					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
 				}),
@@ -493,7 +493,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleReason, runCond.Reason)
+				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleRunningReason, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Minute * 3),
 		},
@@ -510,7 +510,7 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterRunningCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.PausingForClusterOperatorsToSettleReason,
+					Reason:             hivev1.PausingForClusterOperatorsToSettleRunningReason,
 					LastProbeTime:      metav1.Time{time.Now().Add(-6 * time.Minute)},
 					LastTransitionTime: metav1.Time{time.Now().Add(-2 * time.Hour)},
 				}),
@@ -533,7 +533,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.WaitingForClusterOperatorsReason, runCond.Reason)
+				assert.Equal(t, hivev1.WaitingForClusterOperatorsRunningReason, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},

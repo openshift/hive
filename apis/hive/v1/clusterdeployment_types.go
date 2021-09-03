@@ -439,16 +439,22 @@ const (
 	// is resuming or running. Precise details are available in the Running condition.
 	ResumingOrRunningHibernationReason = "ResumingOrRunning"
 
+	// StoppingOrHibernatingRunningReason is used as the reason for the Running condition when the cluster
+	// is stopping or hibernating. Precise details are available in the Hibernating condition.
 	StoppingOrHibernatingRunningReason = "StoppingOrHibernating"
 
-	// ResumingHibernationReason is used as the reason when the cluster is transitioning
-	// from a Hibernating state to a Running state.
-	//ResumingHibernationReason = "Resuming"
+	// WaitingForMachinesRunningReason is used on the Running condition when waiting for cloud VMs to start.
+	WaitingForMachinesRunningReason = "WaitingForMachines"
 
-	WaitingForMachinesRunningReason          = "WaitingForMachines"
-	WaitingForNodesRunningReason             = "WaitingForNodes"
-	PausingForClusterOperatorsToSettleReason = "PausingForClusterOperatorsToSettle"
-	WaitingForClusterOperatorsReason         = "WaitingForClusterOperators"
+	// WaitingForNodesRunningReason is used on the Running condition when waiting for nodes to become Ready.
+	WaitingForNodesRunningReason = "WaitingForNodes"
+
+	// PausingForClusterOperatorsToSettleRunningReason is used on the Running condition when pausing to let ClusterOperators start and post new status before we check it.
+	PausingForClusterOperatorsToSettleRunningReason = "PausingForClusterOperatorsToSettle"
+
+	// WaitingForClusterOperatorsRunningReason is used on the Running condition when waiting for ClusterOperators to
+	// get to a good state. (Available=True, Processing=False, Degraded=False)
+	WaitingForClusterOperatorsRunningReason = "WaitingForClusterOperators"
 
 	// RunningHibernationReason is used as the reason when the cluster is running and
 	// the Hibernating condition is false.

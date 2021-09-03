@@ -38,7 +38,7 @@ const (
 // clusterClaimConditions are the cluster claim conditions controlled or initialized by cluster claim controller
 var clusterClaimConditions = []hivev1.ClusterClaimConditionType{
 	hivev1.ClusterClaimPendingCondition,
-	hivev1.ClusterRunningCondition,
+	hivev1.ClusterClaimRunningCondition,
 }
 
 // Add creates a new ClusterClaim Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -275,7 +275,7 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 func (r *ReconcileClusterClaim) setDeletingStatus(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
 	if conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
 		claim.Status.Conditions,
-		hivev1.ClusterRunningCondition,
+		hivev1.ClusterClaimRunningCondition,
 		corev1.ConditionFalse,
 		"ClusterDeleting",
 		"Assigned cluster has been marked for deletion",
@@ -413,7 +413,7 @@ func (r *ReconcileClusterClaim) reconcileForDeletedCluster(claim *hivev1.Cluster
 	logger.Debug("assigned cluster has been deleted")
 	conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
 		claim.Status.Conditions,
-		hivev1.ClusterRunningCondition,
+		hivev1.ClusterClaimRunningCondition,
 		corev1.ConditionFalse,
 		"ClusterDeleted",
 		"Assigned cluster has been deleted",
@@ -452,7 +452,7 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 	if hc.Status == corev1.ConditionFalse {
 		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
 			conds,
-			hivev1.ClusterRunningCondition,
+			hivev1.ClusterClaimRunningCondition,
 			corev1.ConditionTrue,
 			"Running",
 			"Cluster is running",
@@ -463,7 +463,7 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 		log.Debug("waiting for cluster to be running")
 		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
 			conds,
-			hivev1.ClusterRunningCondition,
+			hivev1.ClusterClaimRunningCondition,
 			corev1.ConditionFalse,
 			"Resuming",
 			"Waiting for cluster to be running",

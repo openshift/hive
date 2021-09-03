@@ -39,7 +39,7 @@ func TestOvirtActuator(t *testing.T) {
 			clusterDeployment: testOvirtClusterDeployment(),
 			pool:              testOvirtPool(),
 			expectedMachineSetReplicas: map[string]int64{
-				fmt.Sprintf("%s-worker-0", testInfraID): 3,
+				fmt.Sprintf("%s-worker", testInfraID): 3,
 			},
 		},
 	}

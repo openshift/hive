@@ -133,8 +133,14 @@ if $USE_MANAGED_DNS; then
 	# This is to prevent name conflicts across customer clusters.
 	CLUSTER_SHARD=$(cat /dev/urandom | tr -dc 'a-z' | fold -w 8 | head -n 1)
 	CLUSTER_DOMAIN="${CLUSTER_SHARD}.${BASE_DOMAIN}"
-	go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN} \
-		--creds-file="${CREDS_FILE}" --cloud="${CLOUD}"
+	# We've seen this failing 409 (concurrent updates) recently. So try a couple times.
+	# TODO: Check output for "the object has been modified" and only retry if it matches.
+	echo "enabling managed DNS"
+	for i in 1 2 3; do
+	  go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN} \
+	    --creds-file="${CREDS_FILE}" --cloud="${CLOUD}" && break
+	  echo "Retrying..."
+	done
 	MANAGED_DNS_ARG=" --manage-dns"
 else
 	CLUSTER_DOMAIN="${BASE_DOMAIN}"

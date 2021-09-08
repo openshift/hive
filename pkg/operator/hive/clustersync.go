@@ -141,6 +141,10 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 		}
 	}
 
+	// Apply nodeSelector and tolerations passed through from the operator deployment
+	newClusterSyncStatefulSet.Spec.Template.Spec.NodeSelector = r.nodeSelector
+	newClusterSyncStatefulSet.Spec.Template.Spec.Tolerations = r.tolerations
+
 	newClusterSyncStatefulSet.Namespace = hiveNSName
 	result, err := util.ApplyRuntimeObjectWithGC(h, newClusterSyncStatefulSet, hiveconfig)
 	if err != nil {

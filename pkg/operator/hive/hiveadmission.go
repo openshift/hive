@@ -187,6 +187,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	}
 	hiveAdmDeployment.Spec.Template.Annotations[servingCertSecretHashAnnotation] = certSecretHash
 
+	// Apply nodeSelector and tolerations passed through from the operator deployment
+	hiveAdmDeployment.Spec.Template.Spec.NodeSelector = r.nodeSelector
+	hiveAdmDeployment.Spec.Template.Spec.Tolerations = r.tolerations
+
 	result, err := util.ApplyRuntimeObjectWithGC(h, hiveAdmDeployment, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")

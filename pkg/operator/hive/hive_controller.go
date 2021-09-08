@@ -229,8 +229,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Lookup the hive-operator Deployment image, we will assume hive components should all be
-	// using the same image as the operator.
+	// Lookup the hive-operator Deployment. We will assume hive components should all be
+	// using the same image, pull policy, node selector, and tolerations as the operator.
 	operatorDeployment := &appsv1.Deployment{}
 	err = tempClient.Get(context.Background(),
 		types.NamespacedName{Name: hiveOperatorDeploymentName, Namespace: hiveOperatorNS},
@@ -241,8 +241,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		log.Debugf("loaded hive image from hive-operator deployment: %s (%s)", img, pullPolicy)
 		r.(*ReconcileHiveConfig).hiveImage = img
 		r.(*ReconcileHiveConfig).hiveImagePullPolicy = pullPolicy
+		nodeSelector := operatorDeployment.Spec.Template.Spec.NodeSelector
+		log.Debugf("loaded nodeSelector from hive-operator deployment: %v", nodeSelector)
+		r.(*ReconcileHiveConfig).nodeSelector = nodeSelector
+		tolerations := operatorDeployment.Spec.Template.Spec.Tolerations
+		log.Debugf("loaded tolerations from hive-operator deployment: %v", tolerations)
+		r.(*ReconcileHiveConfig).tolerations = tolerations
 	} else {
-		log.WithError(err).Fatal("unable to lookup hive image from hive-operator Deployment, image overriding disabled")
+		log.WithError(err).Fatal("unable to look up hive-operator Deployment")
 	}
 
 	// TODO: Monitor CRDs but do not try to use an owner ref. (as they are global,
@@ -268,6 +274,8 @@ type ReconcileHiveConfig struct {
 	hiveImage              string
 	hiveOperatorNamespace  string
 	hiveImagePullPolicy    corev1.PullPolicy
+	nodeSelector           map[string]string
+	tolerations            []corev1.Toleration
 	syncAggregatorCA       bool
 	managedConfigCMLister  corev1listers.ConfigMapLister
 	ctrlr                  controller.Controller

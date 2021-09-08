@@ -1039,9 +1039,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{}
 				return cd
 			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     true,
-			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
 		},
 		{
 			name: "private link enabled, no config",
@@ -1050,9 +1049,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
 		},
 		{
 			name: "private link enabled, no inventory",
@@ -1061,10 +1059,9 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
-			awsPrivateLink:      &hivev1.AWSPrivateLinkConfig{},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+			awsPrivateLink:  &hivev1.AWSPrivateLinkConfig{},
 		},
 		{
 			name: "private link enabled, no inventory in the given region",
@@ -1073,9 +1070,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
-			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
 			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
 				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
 					AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
@@ -1092,9 +1088,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
 				return cd
 			}(),
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     true,
-			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
 			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
 				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
 					AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
@@ -1108,6 +1103,22 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					},
 				}},
 			},
+		},
+		{
+			name:      "cd.spec.platform.agentBareMetal.agentSelector is a mutable field",
+			oldObject: validAgentBareMetalClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAgentBareMetalClusterDeployment()
+				// use different label selector
+				cd.Spec.Platform.AgentBareMetal.AgentSelector = metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"bar": "baz",
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
 		},
 	}
 

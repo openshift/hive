@@ -66,7 +66,8 @@ trap cleanup EXIT
 function wait_for_pool_to_be_ready() {
   local poolname=$1
   local i=0
-  while [[ $(oc get clusterpool $poolname -o json | jq '.status.ready == .status.size') != "true" ]]; do
+  # NOTE: This will need to change if we add a test with a zero-size pool.
+  while [[ $(oc get clusterpool $poolname -o json | jq '.status.size != 0 and .status.ready == .status.size') != "true" ]]; do
     i=$((i+1))
     if [[ $i -gt $max_cluster_deployment_status_checks ]]; then
       echo "Timed out waiting for clusterpool $poolname to be ready."
@@ -139,9 +140,6 @@ FAKE_POOL_NAME=fake-pool
 oc get clusterpool ${REAL_POOL_NAME} -o json \
   | jq '.spec.annotations["hive.openshift.io/fake-cluster"] = "true" | .metadata.name = "'${FAKE_POOL_NAME}'" | .spec.size = 4' \
   | oc apply -f -
-# We can get spurious ready==size for a little while
-# TODO: something better than sleep
-sleep 5
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
 
 # Test stale cluster replacement (HIVE-1058)

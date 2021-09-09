@@ -131,7 +131,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   --size "${POOL_SIZE}" \
   ${REAL_POOL_NAME}
 
-## INTERLUDE: FAKE POOL
+### INTERLUDE: FAKE POOL
 # The real cluster pool is going to take a while to become ready. While that
 # happens, create a fake pool and do some more testing. We'll use the real
 # pool as a template, just changing its name and size and adding the annotation
@@ -142,7 +142,7 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
   | oc apply -f -
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
 
-# Test stale cluster replacement (HIVE-1058)
+## Test stale cluster replacement (HIVE-1058)
 verify_pool_cd_imagesets $FAKE_POOL_NAME $IMAGESET_NAME
 # Create another cluster image set so we can edit a relevant pool field.
 # The cis is identical except for the name, but the pool doesn't know that.
@@ -156,7 +156,30 @@ wait_for_pool_to_be_ready $FAKE_POOL_NAME
 # At this point all CDs should ref the new imageset
 verify_pool_cd_imagesets $FAKE_POOL_NAME fake-cis
 
-## BACK TO THE REAL POOL
+## Test broken cluster replacement (HIVE-1615)
+# Grab the name (which is also the namespace) of a cd from our pool
+cd=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'${FAKE_POOL_NAME}'") | .metadata.name' | head -1)
+if [[ -z "$cd" ]]; then
+  echo "Failed to retrieve a ClusterDeployment from pool $FAKE_POOL_NAME"
+  exit 1
+fi
+# Patch the CD's ProvisionStopped status condition to make it look "broken".
+# This should cause the clusterpool controller to replace it.
+${0%/*}/statuspatch cd -n $cd $cd <<< '(.status.conditions[] | select(.type=="ProvisionStopped") | .status) = "True"'
+# The controller deletes the CD. Wait for it to disappear
+while oc get cd -n $cd $cd >/dev/null; do
+  i=$((i+1))
+  if [[ $i -gt $max_tries ]]; then
+    echo "Timed out waiting for clusterdeployment $cd to be deleted."
+    exit 1
+  fi
+  echo "Waiting for clusterdeployment $cd to be deleted: $i of $max_tries"
+  sleep $sleep_between_tries
+done
+# Now wait for the controller to replace the CD, bringing the ready count back
+wait_for_pool_to_be_ready $FAKE_POOL_NAME
+
+### BACK TO THE REAL POOL
 
 # Wait for the real cluster pool to become ready (if it isn't yet)
 wait_for_pool_to_be_ready $REAL_POOL_NAME

@@ -1,0 +1,139 @@
+#!/bin/bash
+
+CMD=${0##*/}
+EDITOR=${EDITOR:-/usr/bin/vi}
+
+RC=0
+
+usage() {
+    cat <<EOF
+Usage: $CMD {oc args to get a single object} [<<< JQ]
+
+Uses oc with the supplied arguments to retrieve a single k8s object for
+editing. But instead of your .status edits being ignored, they are
+applied (and any .spec edits are ignored). Do not include "-o json" --
+we'll do that for you.
+
+In interactive mode, opens an editor like "oc edit" would. Changes are
+applied when the editor is saved and exited.
+
+To use this utility noninteractively, supply a jq command on stdin. That
+command is run on the object and the resulting output is applied.
+NOTE: The jq command must return the whole object, not just the chunk
+that was changed.
+NOTE: Be sure you're using the right version of jq. App-SRE Jenkins
+servers are running v3.
+
+Example:
+  Interactive: 
+    $CMD -n mynamespace clusterdeployment foo
+
+  Noninteractive:
+    $CMD -n mynamespace clusterdeployment foo <<< '(.status.conditions[] | select(.type=="ProvisionStopped") | .status) = "True"'
+EOF
+    exit -1
+}
+
+cleanup() {
+    # Terminate proxy, if any
+    kill %1 2>/dev/null
+    # Clean up the unix socket, if it exists
+    [[ -S "$socket" ]] && rm -f $socket
+    # Clean up the patchfile, unless we failed (and it's nonempty)
+    if [[ $RC -ne 0 ]] && [[ -s "$patchfile" ]]; then
+        echo "Saving patchfile $patchfile"
+    else
+        echo "Cleaning up $patchfile"
+        rm -f $patchfile
+    fi
+}
+trap "cleanup" EXIT
+
+getfield() {
+    local path="$1"
+    local res=$(jq -r "$path" $patchfile)
+    RC=$?
+    if [[ $RC -ne 0 ]] || [[ -z "$res" ]]; then
+        echo "Couldn't get '$path' from retrieved object! What's in $patchfile?"
+        exit 2
+    fi
+    echo $res
+}
+
+# Print usage if no args, or if any arg looks like -h/--help
+[[ $# -eq 0 ]] && usage
+for arg in "$@"; do
+  [[ "$arg" == "-h"* ]] || [[ "$arg" == "--h"* ]] && usage
+done
+
+patchfile=$(mktemp /tmp/$CMD.XXXX)
+
+echo "Retrieving object..."
+oc get "$@" -o json > $patchfile || RC=$?
+[[ $RC -eq 0 ]] || exit 1
+
+kind=$(getfield .kind)
+
+# Only support single objects
+if [[ $kind == "List" ]]; then
+    echo "Can't patch a List! Please refine your command to retrieve a single object."
+    exit 3
+fi
+
+# TODO: This will *usually* work, but the right thing would be to go
+# discover the proper API path.
+kind=$(echo "$kind" | tr '[:upper:]' '[:lower:]')s
+
+apiVersion=$(getfield .apiVersion)
+name=$(getfield .metadata.name)
+namespace=$(getfield .metadata.namespace)
+# Construct the sub-path depending on whether it's a namespaced resource
+if [[ $namespace == "null" ]]; then
+    subpath=$kind/$name
+else
+    subpath=namespaces/$namespace/$kind/$name
+fi
+
+if [[ -t 0 ]]; then
+    # No stdin: interactive mode: allow user to edit
+    # TODO: If $EDITOR launches in the background...
+    $EDITOR $patchfile
+else
+    echo "Noninteractive mode. Applying jq..."
+    read jqcmd
+    # TODO: Better way to edit in place?
+    jq "$jqcmd" < $patchfile > $patchfile.2 || RC=$?
+    # Do this before error checking, for consistency/cleanup purposes
+    mv $patchfile.2 $patchfile
+    if [[ $RC -ne 0 ]]; then
+        echo "jq patch failed"
+        exit 4
+    fi
+fi
+if ! [[ -s $patchfile ]]; then
+    echo "Empty patch file $patchfile! Aborting."
+    exit 5
+fi
+
+# Proxy through a unix socket so we don't have to dork with ports
+socket=$patchfile.sock
+python -c "import os, socket as s; s.socket(s.AF_UNIX).bind('$socket')"
+oc proxy -u $socket &
+# TODO: Better way to wait for the socket to spin up
+sleep 1
+
+# Do the patch. Save the output (which is the object, returned by the
+# server) to the same patchfile so it's preserved if something fails.
+# TODO: Is this the right thing? Should we preserve the original
+# patchfile separately?
+curl -k -s -X PATCH \
+    -H "Accept: application/json, */*" \
+    -H "Content-Type: application/merge-patch+json" \
+    --unix-socket $socket \
+    http://localhost/apis/$apiVersion/$subpath/status \
+    --data @$patchfile -o $patchfile || RC=$?
+if [[ $RC -eq 0 ]]; then
+    echo "Success"
+fi
+
+# Let the trap do the cleanup.

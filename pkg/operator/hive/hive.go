@@ -310,6 +310,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hLog.Warn("hive is not running on OpenShift, some optional assets will not be deployed")
 	}
 
+	// Apply nodeSelector and tolerations passed through from the operator deployment
+	hiveDeployment.Spec.Template.Spec.NodeSelector = r.nodeSelector
+	hiveDeployment.Spec.Template.Spec.Tolerations = r.tolerations
+
 	hiveDeployment.Namespace = hiveNSName
 	result, err := util.ApplyRuntimeObjectWithGC(h, hiveDeployment, instance)
 	if err != nil {

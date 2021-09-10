@@ -26,6 +26,15 @@ type Platform struct {
 	// +optional
 	Subnets []string `json:"subnets,omitempty"`
 
+	// HostedZone is the ID of an existing hosted zone into which to add DNS
+	// records for the cluster's internal API. An existing hosted zone can
+	// only be used when also using existing subnets. The hosted zone must be
+	// associated with the VPC containing the subnets.
+	// Leave the hosted zone unset to have the installer create the hosted zone
+	// on your behalf.
+	// +optional
+	HostedZone string `json:"hostedZone,omitempty"`
+
 	// UserTags additional keys and values that the installer will add
 	// as tags to all resources that it creates. Resources created by the
 	// cluster itself may not include these tags.
@@ -43,6 +52,12 @@ type Platform struct {
 	// platform configuration.
 	// +optional
 	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
+
+	// ExperimentalPropagateUserTags is an experimental flag that directs in-cluster
+	// operators to include the specified user tags in the tags of the AWS resources
+	// that the operators create.
+	// +optional
+	ExperimentalPropagateUserTag bool `json:"experimentalPropagateUserTags,omitempty"`
 }
 
 // ServiceEndpoint store the configuration for services to

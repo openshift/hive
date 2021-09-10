@@ -222,7 +222,8 @@ func setupAzureClientInstances(client *mockazureclient.MockClient, instances map
 			})
 		}
 	}
-	result := compute.NewVirtualMachineListResultPage(func(ctx context.Context, result compute.VirtualMachineListResult) (compute.VirtualMachineListResult, error) {
+	cur := compute.VirtualMachineListResult{}
+	result := compute.NewVirtualMachineListResultPage(cur, func(ctx context.Context, result compute.VirtualMachineListResult) (compute.VirtualMachineListResult, error) {
 		if result.Value == nil {
 			return compute.VirtualMachineListResult{Value: &vms}, nil
 		}

@@ -5,6 +5,7 @@ import (
 	"github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	"github.com/openshift/installer/pkg/types/gcp"
+	"github.com/openshift/installer/pkg/types/ibmcloud"
 	"github.com/openshift/installer/pkg/types/kubevirt"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/openstack"
@@ -34,6 +35,8 @@ const (
 	ArchitectureS390X = "s390x"
 	// ArchitecturePPC64LE indicates ppc64 little endian (Power PC)
 	ArchitecturePPC64LE = "ppc64le"
+	// ArchitectureARM64 indicates arm (aarch64) systems
+	ArchitectureARM64 = "arm64"
 )
 
 // MachinePool is a pool of machines to be installed.
@@ -80,6 +83,9 @@ type MachinePoolPlatform struct {
 	// GCP is the configuration used when installing on GCP
 	GCP *gcp.MachinePool `json:"gcp,omitempty"`
 
+	// IBMCloud is the configuration used when installing on IBM Cloud.
+	IBMCloud *ibmcloud.MachinePool `json:"ibmcloud,omitempty"`
+
 	// Libvirt is the configuration used when installing on libvirt.
 	Libvirt *libvirt.MachinePool `json:"libvirt,omitempty"`
 
@@ -111,6 +117,8 @@ func (p *MachinePoolPlatform) Name() string {
 		return baremetal.Name
 	case p.GCP != nil:
 		return gcp.Name
+	case p.IBMCloud != nil:
+		return ibmcloud.Name
 	case p.Libvirt != nil:
 		return libvirt.Name
 	case p.OpenStack != nil:

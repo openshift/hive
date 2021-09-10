@@ -2,6 +2,7 @@ package remotemachineset
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -97,8 +98,20 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}
+	installerMachineSets = preserveOvirtMachineSetNameSuffix(installerMachineSets)
 
 	return installerMachineSets, true, nil
+}
+
+// preserveOvirtMachineSetNameSuffix ensures that machineset names have a "-0" suffix. The suffix was
+// removed from instalovirt.MachineSets so we maintain it here to prevent machineset replacement.
+func preserveOvirtMachineSetNameSuffix(machineSets []*machineapi.MachineSet) []*machineapi.MachineSet {
+	for _, ms := range machineSets {
+		if !strings.HasSuffix(ms.Name, "-0") {
+			ms.Name = fmt.Sprintf("%s-0", ms.Name)
+		}
+	}
+	return machineSets
 }
 
 // Get the OS image from an existing master machine.

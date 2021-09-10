@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go/service/efs"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/elbv2"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -59,10 +60,11 @@ type ClusterUninstaller struct {
 	//   }
 	//
 	// will match resources with (a:b and c:d) or d:e.
-	Filters   []Filter // filter(s) we will be searching for
-	Logger    logrus.FieldLogger
-	Region    string
-	ClusterID string
+	Filters       []Filter // filter(s) we will be searching for
+	Logger        logrus.FieldLogger
+	Region        string
+	ClusterID     string
+	ClusterDomain string
 
 	// Session is the AWS session to be used for deletion.  If nil, a
 	// new session will be created based on the usual credential
@@ -86,11 +88,12 @@ func New(logger logrus.FieldLogger, metadata *types.ClusterMetadata) (providers.
 	}
 
 	return &ClusterUninstaller{
-		Filters:   filters,
-		Region:    region,
-		Logger:    logger,
-		ClusterID: metadata.InfraID,
-		Session:   session,
+		Filters:       filters,
+		Region:        region,
+		Logger:        logger,
+		ClusterID:     metadata.InfraID,
+		ClusterDomain: metadata.AWS.ClusterDomain,
+		Session:       session,
 	}, nil
 }
 
@@ -138,10 +141,7 @@ func (o *ClusterUninstaller) RunWithContext(ctx context.Context) ([]string, erro
 
 	switch o.Region {
 	case endpoints.CnNorth1RegionID, endpoints.CnNorthwest1RegionID:
-		if o.Region != endpoints.CnNorthwest1RegionID {
-			tagClients = append(tagClients,
-				resourcegroupstaggingapi.New(awsSession, aws.NewConfig().WithRegion(endpoints.CnNorthwest1RegionID)))
-		}
+		break
 	case endpoints.UsGovEast1RegionID, endpoints.UsGovWest1RegionID:
 		if o.Region != endpoints.UsGovWest1RegionID {
 			tagClients = append(tagClients,
@@ -183,18 +183,24 @@ func (o *ClusterUninstaller) RunWithContext(ctx context.Context) ([]string, erro
 	// running on the cluster creating new resources while we are attempting to delete resources, which could leak
 	// the new resources.
 	ec2Client := ec2.New(awsSession)
+	lastTerminateTime := time.Now()
 	err = wait.PollImmediateUntil(
 		time.Second*10,
 		func() (done bool, err error) {
-			instancesToDelete, err := o.findEC2Instances(ctx, ec2Client, deleted)
+			instancesRunning, instancesNotTerminated, err := o.findEC2Instances(ctx, ec2Client, deleted)
 			if err != nil {
 				o.Logger.WithError(err).Info("error while finding EC2 instances to delete")
 				if err := ctx.Err(); err != nil {
 					return false, err
 				}
 			}
-			if len(instancesToDelete) == 0 && err == nil {
+			if len(instancesNotTerminated) == 0 && len(instancesRunning) == 0 && err == nil {
 				return true, nil
+			}
+			instancesToDelete := instancesRunning
+			if time.Since(lastTerminateTime) > 10*time.Minute {
+				instancesToDelete = instancesNotTerminated
+				lastTerminateTime = time.Now()
 			}
 			newlyDeleted, err := o.deleteResources(ctx, awsSession, instancesToDelete, tracker)
 			// Delete from the resources-to-delete set so that the current state of the resources to delete can be
@@ -248,7 +254,7 @@ func (o *ClusterUninstaller) RunWithContext(ctx context.Context) ([]string, erro
 		return resourcesToDelete.UnsortedList(), err
 	}
 
-	err = removeSharedTags(ctx, tagClients, o.Filters, o.Logger)
+	err = o.removeSharedTags(ctx, awsSession, tagClients, tracker)
 	if err != nil {
 		return nil, err
 	}
@@ -257,18 +263,21 @@ func (o *ClusterUninstaller) RunWithContext(ctx context.Context) ([]string, erro
 }
 
 // findEC2Instances returns the EC2 instances with tags that satisfy the filters.
+// returns two lists, first one is the list of all resources that are not terminated and are not in shutdown
+// stage and the second list is the list of resources that are not terminated.
 //   deleted - the resources that have already been deleted. Any resources specified in this set will be ignored.
-func (o *ClusterUninstaller) findEC2Instances(ctx context.Context, ec2Client *ec2.EC2, deleted sets.String) ([]string, error) {
+func (o *ClusterUninstaller) findEC2Instances(ctx context.Context, ec2Client *ec2.EC2, deleted sets.String) ([]string, []string, error) {
 	if ec2Client.Config.Region == nil {
-		return nil, errors.New("EC2 client does not have region configured")
+		return nil, nil, errors.New("EC2 client does not have region configured")
 	}
 
 	partition, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), *ec2Client.Config.Region)
 	if !ok {
-		return nil, errors.Errorf("no partition found for region %q", *ec2Client.Config.Region)
+		return nil, nil, errors.Errorf("no partition found for region %q", *ec2Client.Config.Region)
 	}
 
-	var resources []string
+	var resourcesRunning []string
+	var resourcesNotTerminated []string
 	for _, filter := range o.Filters {
 		o.Logger.Debugf("search for instances by tag matching %#+v", filter)
 		instanceFilters := make([]*ec2.Filter, 0, len(filter))
@@ -299,9 +308,12 @@ func (o *ClusterUninstaller) findEC2Instances(ctx context.Context, ec2Client *ec
 								instanceLogger.Info("Terminated")
 								deleted.Insert(arn)
 							}
-						} else {
-							resources = append(resources, arn)
+							continue
 						}
+						if *instance.State.Name != "shutting-down" {
+							resourcesRunning = append(resourcesRunning, arn)
+						}
+						resourcesNotTerminated = append(resourcesNotTerminated, arn)
 					}
 				}
 				return !lastPage
@@ -310,10 +322,10 @@ func (o *ClusterUninstaller) findEC2Instances(ctx context.Context, ec2Client *ec
 		if err != nil {
 			err = errors.Wrap(err, "get ec2 instances")
 			o.Logger.Info(err)
-			return resources, err
+			return resourcesRunning, resourcesNotTerminated, err
 		}
 	}
-	return resources, nil
+	return resourcesRunning, resourcesNotTerminated, nil
 }
 
 // findResourcesToDelete returns the resources that should be deleted.
@@ -415,7 +427,7 @@ func (o *ClusterUninstaller) findResourcesByTag(
 //   deleted - the resources that have already been deleted. Any resources specified in this set will be ignored.
 func (o *ClusterUninstaller) findIAMRoles(ctx context.Context, search *iamRoleSearch, deleted sets.String) (sets.String, error) {
 	o.Logger.Debug("search for IAM roles")
-	resources, err := search.arns(ctx)
+	resources, _, err := search.find(ctx)
 	if err != nil {
 		o.Logger.Info(err)
 		return nil, err
@@ -517,12 +529,11 @@ type iamRoleSearch struct {
 	unmatched map[string]struct{}
 }
 
-func (search *iamRoleSearch) arns(ctx context.Context) ([]string, error) {
+func (search *iamRoleSearch) find(ctx context.Context) (arns []string, names []string, returnErr error) {
 	if search.unmatched == nil {
 		search.unmatched = map[string]struct{}{}
 	}
 
-	arns := []string{}
 	var lastError error
 	err := search.client.ListRolesPagesWithContext(
 		ctx,
@@ -552,6 +563,7 @@ func (search *iamRoleSearch) arns(ctx context.Context) ([]string, error) {
 					}
 					if tagMatch(search.filters, tags) {
 						arns = append(arns, *role.Arn)
+						names = append(names, *role.RoleName)
 					} else {
 						search.unmatched[*role.Arn] = exists
 					}
@@ -563,9 +575,9 @@ func (search *iamRoleSearch) arns(ctx context.Context) ([]string, error) {
 	)
 
 	if lastError != nil {
-		return arns, lastError
+		return arns, names, lastError
 	}
-	return arns, err
+	return arns, names, err
 }
 
 type iamUserSearch struct {
@@ -626,9 +638,9 @@ func (search *iamUserSearch) arns(ctx context.Context) ([]string, error) {
 	return arns, err
 }
 
-// getSharedHostedZone will find the ID of the non-Terraform-managed public route53 zone given the
+// getPublicHostedZone will find the ID of the non-Terraform-managed public route53 zone given the
 // Terraform-managed zone's privateID.
-func getSharedHostedZone(ctx context.Context, client *route53.Route53, privateID string, logger logrus.FieldLogger) (string, error) {
+func getPublicHostedZone(ctx context.Context, client *route53.Route53, privateID string, logger logrus.FieldLogger) (string, error) {
 	response, err := client.GetHostedZoneWithContext(ctx, &route53.GetHostedZoneInput{
 		Id: aws.String(privateID),
 	})
@@ -640,33 +652,32 @@ func getSharedHostedZone(ctx context.Context, client *route53.Route53, privateID
 
 	if response.HostedZone.Config != nil && response.HostedZone.Config.PrivateZone != nil {
 		if !*response.HostedZone.Config.PrivateZone {
-			return "", errors.Errorf("getSharedHostedZone requires a private ID, but was passed the public %s", privateID)
+			return "", errors.Errorf("getPublicHostedZone requires a private ID, but was passed the public %s", privateID)
 		}
 	} else {
 		logger.WithField("hosted zone", privateName).Warn("could not determine whether hosted zone is private")
 	}
 
-	domain := privateName
-	parents := []string{domain}
-	for {
-		idx := strings.Index(domain, ".")
-		if idx == -1 {
-			break
-		}
-		if len(domain[idx+1:]) > 0 {
-			parents = append(parents, domain[idx+1:])
-		}
-		domain = domain[idx+1:]
-	}
+	return findAncestorPublicRoute53(ctx, client, privateName, logger)
+}
 
-	for _, p := range parents {
-		sZone, err := findPublicRoute53(ctx, client, p, logger)
+// findAncestorPublicRoute53 finds a public route53 zone with the closest ancestor or match to dnsName.
+// It returns "", when no public route53 zone could be found.
+func findAncestorPublicRoute53(ctx context.Context, client *route53.Route53, dnsName string, logger logrus.FieldLogger) (string, error) {
+	for len(dnsName) > 0 {
+		sZone, err := findPublicRoute53(ctx, client, dnsName, logger)
 		if err != nil {
 			return "", err
 		}
 		if sZone != "" {
 			return sZone, nil
 		}
+
+		idx := strings.Index(dnsName, ".")
+		if idx == -1 {
+			break
+		}
+		dnsName = dnsName[idx+1:]
 	}
 	return "", nil
 }
@@ -720,6 +731,8 @@ func deleteARN(ctx context.Context, session *session.Session, arn arn.ARN, logge
 		return deleteRoute53(ctx, session, arn, logger)
 	case "s3":
 		return deleteS3(ctx, session, arn, logger)
+	case "elasticfilesystem":
+		return deleteElasticFileSystem(ctx, session, arn, logger)
 	default:
 		return errors.Errorf("unrecognized ARN service %s (%s)", arn.Service, arn)
 	}
@@ -810,7 +823,7 @@ func deleteEC2Image(ctx context.Context, client *ec2.EC2, id string, logger logr
 				Tags:      image.Tags,
 			})
 			if err != nil {
-				err = errors.Wrapf(err, "tagging snapshots for %s", id)
+				return errors.Wrapf(err, "tagging snapshots for %s", id)
 			}
 		}
 	}
@@ -867,8 +880,8 @@ func terminateEC2Instance(ctx context.Context, ec2Client *ec2.EC2, iamClient *ia
 }
 
 func terminateEC2InstanceByInstance(ctx context.Context, ec2Client *ec2.EC2, iamClient *iam.IAM, instance *ec2.Instance, logger logrus.FieldLogger) error {
-	// Skip 'shutting-down' and 'terminated' instances since they take a while to get cleaned up
-	if instance.State == nil || *instance.State.Name == "shutting-down" || *instance.State.Name == "terminated" {
+	// Ignore instances that are already terminated
+	if instance.State == nil || *instance.State.Name == "terminated" {
 		return nil
 	}
 
@@ -1816,7 +1829,7 @@ func deleteRoute53(ctx context.Context, session *session.Session, arn arn.ARN, l
 
 	client := route53.New(session)
 
-	sharedZoneID, err := getSharedHostedZone(ctx, client, id, logger)
+	publicZoneID, err := getPublicHostedZone(ctx, client, id, logger)
 	if err != nil {
 		// In some cases AWS may return the zone in the list of tagged resources despite the fact
 		// it no longer exists.
@@ -1830,15 +1843,15 @@ func deleteRoute53(ctx context.Context, session *session.Session, arn arn.ARN, l
 		return fmt.Sprintf("%s %s", *recordSet.Type, *recordSet.Name)
 	}
 
-	sharedEntries := map[string]*route53.ResourceRecordSet{}
-	if len(sharedZoneID) != 0 {
+	publicEntries := map[string]*route53.ResourceRecordSet{}
+	if len(publicZoneID) != 0 {
 		err = client.ListResourceRecordSetsPagesWithContext(
 			ctx,
-			&route53.ListResourceRecordSetsInput{HostedZoneId: aws.String(sharedZoneID)},
+			&route53.ListResourceRecordSetsInput{HostedZoneId: aws.String(publicZoneID)},
 			func(results *route53.ListResourceRecordSetsOutput, lastPage bool) bool {
 				for _, recordSet := range results.ResourceRecordSets {
 					key := recordSetKey(recordSet)
-					sharedEntries[key] = recordSet
+					publicEntries[key] = recordSet
 				}
 
 				return !lastPage
@@ -1862,14 +1875,17 @@ func deleteRoute53(ctx context.Context, session *session.Session, arn arn.ARN, l
 					continue
 				}
 				key := recordSetKey(recordSet)
-				if sharedEntry, ok := sharedEntries[key]; ok {
-					err := deleteRoute53RecordSet(ctx, client, sharedZoneID, sharedEntry, logger.WithField("public zone", sharedZoneID))
+				if publicEntry, ok := publicEntries[key]; ok {
+					err := deleteRoute53RecordSet(ctx, client, publicZoneID, publicEntry, logger.WithField("public zone", publicZoneID))
 					if err != nil {
 						if lastError != nil {
 							logger.Debug(lastError)
 						}
-						lastError = errors.Wrapf(err, "deleting public zone %s", sharedZoneID)
+						lastError = errors.Wrapf(err, "deleting record set %#v from public zone %s", publicEntry, publicZoneID)
 					}
+					// do not delete the record set in the private zone if the delete failed in the public zone;
+					// otherwise the record set in the public zone will get leaked
+					continue
 				}
 
 				err = deleteRoute53RecordSet(ctx, client, id, recordSet, logger)
@@ -2011,85 +2027,132 @@ func isBucketNotFound(err interface{}) bool {
 	return false
 }
 
-func removeSharedTags(ctx context.Context, tagClients []*resourcegroupstaggingapi.ResourceGroupsTaggingAPI, filters []Filter, logger logrus.FieldLogger) error {
-	for _, filter := range filters {
-		for key, value := range filter {
-			if strings.HasPrefix(key, "kubernetes.io/cluster/") {
-				if value == "owned" {
-					if err := removeSharedTag(ctx, tagClients, key, logger); err != nil {
-						return err
-					}
-				} else {
-					logger.Warnf("Ignoring non-owned cluster key %s: %s for shared-tag removal", key, value)
-				}
-			}
+func deleteElasticFileSystem(ctx context.Context, session *session.Session, arn arn.ARN, logger logrus.FieldLogger) error {
+	client := efs.New(session)
+
+	resourceType, id, err := splitSlash("resource", arn.Resource)
+	if err != nil {
+		return err
+	}
+
+	switch resourceType {
+	case "file-system":
+		return deleteFileSystem(ctx, client, id, logger)
+	case "access-point":
+		return deleteAccessPoint(ctx, client, id, logger)
+	default:
+		return errors.Errorf("unrecognized elastic file system resource type %s", resourceType)
+	}
+}
+
+func deleteFileSystem(ctx context.Context, client *efs.EFS, fsid string, logger logrus.FieldLogger) error {
+	logger = logger.WithField("Elastic FileSystem ID", fsid)
+
+	// Delete all MountTargets + AccessPoints under given FS ID
+	mountTargetIDs, err := getMountTargets(ctx, client, fsid)
+	if err != nil {
+		return err
+	}
+	for _, mt := range mountTargetIDs {
+		err := deleteMountTarget(ctx, client, mt, logger)
+		if err != nil {
+			return err
+		}
+	}
+	accessPointIDs, err := getAccessPoints(ctx, client, fsid)
+	if err != nil {
+		return err
+	}
+	for _, ap := range accessPointIDs {
+		err := deleteAccessPoint(ctx, client, ap, logger)
+		if err != nil {
+			return err
 		}
 	}
 
+	_, err = client.DeleteFileSystemWithContext(ctx, &efs.DeleteFileSystemInput{FileSystemId: aws.String(fsid)})
+	if err != nil {
+		if err.(awserr.Error).Code() == efs.ErrCodeFileSystemNotFound {
+			return nil
+		}
+		return err
+	}
+
+	logger.Info("Deleted")
 	return nil
 }
 
-func removeSharedTag(ctx context.Context, tagClients []*resourcegroupstaggingapi.ResourceGroupsTaggingAPI, key string, logger logrus.FieldLogger) error {
-	request := &resourcegroupstaggingapi.UntagResourcesInput{
-		TagKeys: []*string{aws.String(key)},
-	}
-
-	removed := map[string]struct{}{}
-	tagClients = append([]*resourcegroupstaggingapi.ResourceGroupsTaggingAPI(nil), tagClients...)
-	for len(tagClients) > 0 {
-		nextTagClients := tagClients[:0]
-		for _, tagClient := range tagClients {
-			logger.Debugf("Search for and remove tags in %s matching %s: shared", *tagClient.Config.Region, key)
-			arns := []string{}
-			err := tagClient.GetResourcesPagesWithContext(
-				ctx,
-				&resourcegroupstaggingapi.GetResourcesInput{TagFilters: []*resourcegroupstaggingapi.TagFilter{{
-					Key:    aws.String(key),
-					Values: []*string{aws.String("shared")},
-				}}},
-				func(results *resourcegroupstaggingapi.GetResourcesOutput, lastPage bool) bool {
-					for _, resource := range results.ResourceTagMappingList {
-						arn := *resource.ResourceARN
-						if _, ok := removed[arn]; !ok {
-							arns = append(arns, arn)
-						}
-					}
-
-					return !lastPage
-				},
-			)
-			if err != nil {
-				err = errors.Wrap(err, "get tagged resources")
-				logger.Info(err)
-				nextTagClients = append(nextTagClients, tagClient)
-				continue
-			}
-			if len(arns) == 0 {
-				logger.Debugf("No matches in %s for %s: shared, removing client", *tagClient.Config.Region, key)
-				continue
-			}
-			nextTagClients = append(nextTagClients, tagClient)
-
-			for i := 0; i < len(arns); i += 20 {
-				request.ResourceARNList = make([]*string, 0, 20)
-				for j := 0; i+j < len(arns) && j < 20; j++ {
-					request.ResourceARNList = append(request.ResourceARNList, aws.String(arns[i+j]))
-				}
-				_, err = tagClient.UntagResourcesWithContext(ctx, request)
-				if err != nil {
-					err = errors.Wrap(err, "untag shared resources")
-					logger.Info(err)
+func getAccessPoints(ctx context.Context, client *efs.EFS, apID string) ([]string, error) {
+	var accessPointIDs []string
+	err := client.DescribeAccessPointsPagesWithContext(
+		ctx,
+		&efs.DescribeAccessPointsInput{FileSystemId: aws.String(apID)},
+		func(page *efs.DescribeAccessPointsOutput, lastPage bool) bool {
+			for _, ap := range page.AccessPoints {
+				apName := ap.AccessPointId
+				if apName == nil {
 					continue
 				}
-				for j := 0; i+j < len(arns) && j < 20; j++ {
-					arn := arns[i+j]
-					logger.WithField("arn", arn).Infof("Removed tag %s: shared", key)
-					removed[arn] = exists
-				}
+				accessPointIDs = append(accessPointIDs, *apName)
 			}
-		}
-		tagClients = nextTagClients
+			return !lastPage
+
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return accessPointIDs, nil
+}
+
+func getMountTargets(ctx context.Context, client *efs.EFS, fsid string) ([]string, error) {
+	var mountTargetIDs []string
+	// There is no DescribeMountTargetsPagesWithContext.
+	// Number of Mount Targets should be equal to nr. of subnets that can access the volume, i.e. relatively small.
+	rsp, err := client.DescribeMountTargetsWithContext(
+		ctx,
+		&efs.DescribeMountTargetsInput{FileSystemId: aws.String(fsid)},
+	)
+	if err != nil {
+		return nil, err
 	}
 
+	for _, mt := range rsp.MountTargets {
+		mtName := mt.MountTargetId
+		if mtName == nil {
+			continue
+		}
+		mountTargetIDs = append(mountTargetIDs, *mtName)
+	}
+
+	return mountTargetIDs, nil
+}
+
+func deleteAccessPoint(ctx context.Context, client *efs.EFS, id string, logger logrus.FieldLogger) error {
+	logger = logger.WithField("AccessPoint ID", id)
+	_, err := client.DeleteAccessPointWithContext(ctx, &efs.DeleteAccessPointInput{AccessPointId: aws.String(id)})
+	if err != nil {
+		if err.(awserr.Error).Code() == efs.ErrCodeAccessPointNotFound {
+			return nil
+		}
+
+		return err
+	}
+
+	logger.Info("Deleted")
+	return nil
+}
+
+func deleteMountTarget(ctx context.Context, client *efs.EFS, id string, logger logrus.FieldLogger) error {
+	logger = logger.WithField("Mount Target ID", id)
+	_, err := client.DeleteMountTargetWithContext(ctx, &efs.DeleteMountTargetInput{MountTargetId: aws.String(id)})
+	if err != nil {
+		if err.(awserr.Error).Code() == efs.ErrCodeMountTargetNotFound {
+			return nil
+		}
+		return err
+	}
+
+	logger.Info("Deleted")
 	return nil
 }

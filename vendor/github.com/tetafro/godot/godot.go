@@ -49,8 +49,8 @@ var (
 	// Special tags in comments like "// nolint:", or "// +k8s:".
 	tags = regexp.MustCompile(`^\+?[a-z0-9]+:`)
 
-	// Special hashtags in comments like "#nosec".
-	hashtags = regexp.MustCompile("^#[a-z]+ ")
+	// Special hashtags in comments like "// #nosec".
+	hashtags = regexp.MustCompile(`^#[a-z]+($|\s)`)
 
 	// URL at the end of the line.
 	endURL = regexp.MustCompile(`[a-z]+://[^\s]+$`)
@@ -138,33 +138,6 @@ func sortIssues(iss []Issue) {
 	})
 }
 
-// checkTopLevel checks all top-level comments.
-func checkTopLevel(file *ast.File, fset *token.FileSet) (issues []Issue) {
-	for _, group := range file.Comments {
-		if iss, ok := check(fset, group, topLevelColumn); !ok {
-			issues = append(issues, iss)
-		}
-	}
-	return issues
-}
-
-// checkDeclarations checks top level declaration comments.
-func checkDeclarations(file *ast.File, fset *token.FileSet) (issues []Issue) {
-	for _, decl := range file.Decls {
-		switch d := decl.(type) {
-		case *ast.GenDecl:
-			if iss, ok := check(fset, d.Doc, topLevelColumn); !ok {
-				issues = append(issues, iss)
-			}
-		case *ast.FuncDecl:
-			if iss, ok := check(fset, d.Doc, topLevelColumn); !ok {
-				issues = append(issues, iss)
-			}
-		}
-	}
-	return issues
-}
-
 // checkBlocks checks comments inside top level blocks (var (...), const (...), etc).
 func checkBlocks(file *ast.File, fset *token.FileSet) (issues []Issue) {
 	for _, decl := range file.Decls {
@@ -186,6 +159,33 @@ func checkBlocks(file *ast.File, fset *token.FileSet) (issues []Issue) {
 				continue
 			}
 			if iss, ok := check(fset, group, topLevelGroupColumn); !ok {
+				issues = append(issues, iss)
+			}
+		}
+	}
+	return issues
+}
+
+// checkTopLevel checks all top-level comments.
+func checkTopLevel(file *ast.File, fset *token.FileSet) (issues []Issue) {
+	for _, group := range file.Comments {
+		if iss, ok := check(fset, group, topLevelColumn); !ok {
+			issues = append(issues, iss)
+		}
+	}
+	return issues
+}
+
+// checkDeclarations checks top level declaration comments.
+func checkDeclarations(file *ast.File, fset *token.FileSet) (issues []Issue) {
+	for _, decl := range file.Decls {
+		switch d := decl.(type) {
+		case *ast.GenDecl:
+			if iss, ok := check(fset, d.Doc, topLevelColumn); !ok {
+				issues = append(issues, iss)
+			}
+		case *ast.FuncDecl:
+			if iss, ok := check(fset, d.Doc, topLevelColumn); !ok {
 				issues = append(issues, iss)
 			}
 		}
@@ -275,7 +275,7 @@ func checkLastChar(s string) bool {
 		return true
 	}
 	// Skip cgo export tags: https://golang.org/cmd/cgo/#hdr-C_references_to_Go
-	if strings.HasPrefix(s, "export") {
+	if strings.HasPrefix(s, "export ") {
 		return true
 	}
 	s = strings.TrimSpace(s)
@@ -291,6 +291,11 @@ func checkLastChar(s string) bool {
 	}
 	// Trim parenthesis for cases when the whole sentence is inside parenthesis
 	s = strings.TrimRight(s, ")")
+	// Don't panic when comment looks like this: `// )`
+	// TODO: Check previous line (which is not available in this function right now)
+	if len(s) == 0 {
+		return true
+	}
 	for _, ch := range lastChars {
 		if string(s[len(s)-1]) == ch {
 			return true

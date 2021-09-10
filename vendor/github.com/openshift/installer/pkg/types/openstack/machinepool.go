@@ -23,6 +23,10 @@ type MachinePool struct {
 	// +optional
 	AdditionalSecurityGroupIDs []string `json:"additionalSecurityGroupIDs,omitempty"`
 
+	// ServerGroupPolicy will be used to create the Server Group that will contain all the machines of this MachinePool.
+	// Defaults to "soft-anti-affinity".
+	ServerGroupPolicy ServerGroupPolicy `json:"serverGroupPolicy,omitempty"`
+
 	// Zones is the list of availability zones where the instances should be deployed.
 	// If no zones are provided, all instances will be deployed on OpenStack Nova default availability zone
 	// +optional
@@ -45,6 +49,9 @@ func (o *MachinePool) Set(required *MachinePool) {
 		}
 		o.RootVolume.Size = required.RootVolume.Size
 		o.RootVolume.Type = required.RootVolume.Type
+		if len(required.RootVolume.Zones) > 0 {
+			o.RootVolume.Zones = required.RootVolume.Zones
+		}
 	}
 
 	if required.AdditionalNetworkIDs != nil {
@@ -53,6 +60,10 @@ func (o *MachinePool) Set(required *MachinePool) {
 
 	if required.AdditionalSecurityGroupIDs != nil {
 		o.AdditionalSecurityGroupIDs = append(required.AdditionalSecurityGroupIDs[:0:0], required.AdditionalSecurityGroupIDs...)
+	}
+
+	if required.ServerGroupPolicy != "" {
+		o.ServerGroupPolicy = required.ServerGroupPolicy
 	}
 
 	if len(required.Zones) > 0 {
@@ -68,4 +79,9 @@ type RootVolume struct {
 	// Type defines the type of the volume.
 	// Required
 	Type string `json:"type"`
+
+	// Zones is the list of availability zones where the root volumes should be deployed.
+	// If no zones are provided, all instances will be deployed on OpenStack Cinder default availability zone
+	// +optional
+	Zones []string `json:"zones,omitempty"`
 }

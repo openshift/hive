@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// aro is a setting to enable aro-only modifications
+var aro bool
+
 // OutboundType is a strategy for how egress from cluster is achieved.
 // +kubebuilder:validation:Enum="";Loadbalancer;UserDefinedRouting
 type OutboundType string
@@ -24,6 +27,9 @@ const (
 type Platform struct {
 	// Region specifies the Azure region where the cluster will be created.
 	Region string `json:"region"`
+
+	// ARMEndpoint is the endpoint for the Azure API when installing on Azure Stack.
+	ARMEndpoint string `json:"armEndpoint,omitempty"`
 
 	// BaseDomainResourceGroupName specifies the resource group where the Azure DNS zone for the base domain is found.
 	BaseDomainResourceGroupName string `json:"baseDomainResourceGroupName,omitempty"`
@@ -67,7 +73,7 @@ type Platform struct {
 	OutboundType OutboundType `json:"outboundType"`
 
 	// ResourceGroupName is the name of an already existing resource group where the cluster should be installed.
-	// This resource group should only be used for this specific cluster and the cluster components will assume assume
+	// This resource group should only be used for this specific cluster and the cluster components will assume
 	// ownership of all resources in the resource group. Destroying the cluster using installer will delete this
 	// resource group.
 	// This resource group must be empty with no other resources when trying to use it for creating a cluster.
@@ -78,7 +84,7 @@ type Platform struct {
 }
 
 // CloudEnvironment is the name of the Azure cloud environment
-// +kubebuilder:validation:Enum="";AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud
+// +kubebuilder:validation:Enum="";AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud;AzureStackCloud
 type CloudEnvironment string
 
 const (
@@ -93,6 +99,9 @@ const (
 
 	// GermanCloud is the Azure cloud environment used in Germany.
 	GermanCloud CloudEnvironment = "AzureGermanCloud"
+
+	// StackCloud is the Azure cloud environment used at the edge and on premises.
+	StackCloud CloudEnvironment = "AzureStackCloud"
 )
 
 // Name returns name that Azure uses for the cloud environment.
@@ -114,4 +123,9 @@ func (p *Platform) ClusterResourceGroupName(infraID string) string {
 		return p.ResourceGroupName
 	}
 	return fmt.Sprintf("%s-rg", infraID)
+}
+
+// IsARO returns true if ARO-only modifications are enabled
+func (p *Platform) IsARO() bool {
+	return aro
 }

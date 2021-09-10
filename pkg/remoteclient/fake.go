@@ -48,7 +48,7 @@ func (b *fakeBuilder) Build() (client.Client, error) {
 				Name: "version",
 			},
 			Status: openshiftapiv1.ClusterVersionStatus{
-				Desired: openshiftapiv1.Update{
+				Desired: openshiftapiv1.Release{
 					Version: "4.6.8",
 				},
 			},

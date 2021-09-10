@@ -55,7 +55,7 @@ apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
   name: openshift-46-aws-us-east-1
-  namespace: hive
+  namespace: my-project
 spec:
   baseDomain: new-installer.openshift.com
   imageSetRef:
@@ -77,7 +77,7 @@ apiVersion: hive.openshift.io/v1
 kind: ClusterClaim
 metadata:
   name: dgood46
-  namespace: hive
+  namespace: my-project
 spec:
   clusterPoolName: openshift-46-aws-us-east-1
   lifetime: 8h
@@ -120,17 +120,18 @@ To control parts of the cluster deployments that are not directly supported by H
 Load the install-config.yaml template as a secret (assuming that the `install-config.yaml` you want to use as a template is in the active directory)
 
 ```bash
-kubectl  -n hive create secret generic my-install-config-template --from-file=install-config.yaml=./install-config.yaml
+kubectl  -n my-project create secret generic my-install-config-template --from-file=install-config.yaml=./install-config.yaml
 ```
 
-With this secret created, you can create a pool that references the install config secret template
+With this secret created, you can create a pool that references the install config secret template.
+The pool and secret must be in the same namespace.
 
 ```yaml
 apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
   name: openshift-46-aws-us-east-1
-  namespace: hive
+  namespace: my-project
 spec:
   baseDomain: hive.mytests.io
   imageSetRef:
@@ -159,7 +160,7 @@ The following are the yaml configurations for setting up the permissions: Role, 
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  namespace: hive
+  namespace: my-project
   name: scale-clusterpool
 rules:
 - apiGroups:
@@ -180,11 +181,11 @@ kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: scale-clusterpool
-  namespace: hive
+  namespace: my-project
 subjects:
 - kind: ServiceAccount
   name: sa-scale-clusterpool
-  namespace: hive
+  namespace: my-project
 roleRef:
   kind: Role
   name: scale-clusterpool
@@ -195,7 +196,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: sa-scale-clusterpool
-  namespace: hive
+  namespace: my-project
 ```
 
 Below is the sample configuration for the CronJob to scale up a clusterpool to size 10 at 6:00 AM everyday. It uses the serviceAccountName `sa-scale-clusterpool` created above.  
@@ -204,7 +205,7 @@ apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
   name: scale-up-clusterpool
-  namespace: hive
+  namespace: my-project
 spec:
   schedule: "0 6 * * *"
   jobTemplate:
@@ -218,7 +219,7 @@ spec:
             command:
             - /bin/sh 
             - -c 
-            - oc scale clusterpool openshift-46-aws-us-east-1 -n hive --replicas=10
+            - oc scale clusterpool openshift-46-aws-us-east-1 -n my-project --replicas=10
           restartPolicy: OnFailure
 ```
 
@@ -228,7 +229,7 @@ apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
   name: scale-down-clusterpool
-  namespace: hive
+  namespace: my-project
 spec:
   schedule: "0 20 * * *"
   jobTemplate:
@@ -242,7 +243,7 @@ spec:
             command:
             - /bin/sh 
             - -c 
-            - oc scale clusterpool openshift-46-aws-us-east-1 -n hive --replicas=0
+            - oc scale clusterpool openshift-46-aws-us-east-1 -n my-project --replicas=0
           restartPolicy: OnFailure
 ```
 

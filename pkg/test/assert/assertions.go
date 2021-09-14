@@ -64,7 +64,7 @@ func AssertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType 
 }
 
 // AssertConditions asserts if the expected conditions are present on the cluster deployment.
-// It also asserts if those conditions have the expected status and reason
+// It also asserts if those conditions have the expected status, reason, and (optionally) message.
 func AssertConditions(t *testing.T, cd *hivev1.ClusterDeployment, expectedConditions []hivev1.ClusterDeploymentCondition) {
 	testifyassert.LessOrEqual(t, len(expectedConditions), len(cd.Status.Conditions), "some conditions are not present")
 	for _, expectedCond := range expectedConditions {
@@ -72,6 +72,10 @@ func AssertConditions(t *testing.T, cd *hivev1.ClusterDeployment, expectedCondit
 		if testifyassert.NotNilf(t, condition, "did not find expected condition type: %v", expectedCond.Type) {
 			testifyassert.Equal(t, expectedCond.Status, condition.Status, "condition found with unexpected status")
 			testifyassert.Equal(t, expectedCond.Reason, condition.Reason, "condition found with unexpected reason")
+			// Optionally validate the message
+			if expectedCond.Message != "" {
+				testifyassert.Equal(t, expectedCond.Message, condition.Message, "condition found with unexpected message")
+			}
 		}
 	}
 }

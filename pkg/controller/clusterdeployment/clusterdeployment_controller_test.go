@@ -178,6 +178,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Len(t, provisions, 1, "expected provision to exist")
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.ProvisioningProvisionedReason,
+					Message: "Cluster provision created",
+				}})
 			},
 		},
 		{
@@ -192,6 +198,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Empty(t, provisions, "expected provision to not exist")
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 			},
 		},
 		{
@@ -209,11 +221,18 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					if assert.NotNil(t, cd.Status.ProvisionRef, "missing provision ref") {
 						assert.Equal(t, provisionName, cd.Status.ProvisionRef.Name, "unexpected provision ref name")
 					}
+					// When adopting, we don't know the provisioning state until the *next* reconcile when we dig into the ClusterProvision.
+					testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionUnknown,
+						Reason:  hivev1.InitializedConditionReason,
+						Message: "Condition Initialized",
+					}})
 				}
 			},
 		},
 		{
-			name: "No-op Running provision",
+			name: "Initializing provision",
 			existing: []runtime.Object{
 				testInstallConfigSecret(),
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())),
@@ -226,6 +245,14 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.NotNil(t, cd, "no clusterdeployment found") {
 					e := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(
 						testClusterDeploymentWithProvision()))
+					e.Status.Conditions = addOrUpdateClusterDeploymentCondition(
+						*e,
+						hivev1.ProvisionedCondition,
+						corev1.ConditionFalse,
+						hivev1.ProvisioningProvisionedReason,
+						"Cluster provision initializing",
+					)
+					sanitizeConditions(e, cd)
 					testassert.AssertEqualWhereItCounts(t, e, cd, "unexpected change in clusterdeployment")
 				}
 				provisions := getProvisions(c)
@@ -308,6 +335,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					assert.True(t, cd.Spec.Installed, "expected cluster to be installed")
 					assert.NotContains(t, cd.Annotations, constants.ProtectedDeleteAnnotation, "unexpected protected delete annotation")
+					testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  hivev1.ProvisionedProvisionedReason,
+						Message: "Cluster is provisioned",
+					}})
 				}
 			},
 		},
@@ -330,6 +363,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
 					assert.True(t, cd.Spec.Installed, "expected cluster to be installed")
 					assert.Equal(t, "true", cd.Annotations[constants.ProtectedDeleteAnnotation], "unexpected protected delete annotation")
+					testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  hivev1.ProvisionedProvisionedReason,
+						Message: "Cluster is provisioned",
+					}})
 				}
 			},
 		},
@@ -380,6 +419,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
 					now := metav1.Now()
 					cd.DeletionTimestamp = &now
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(
+						*cd,
+						hivev1.ProvisionedCondition,
+						corev1.ConditionTrue,
+						hivev1.ProvisionedProvisionedReason,
+						"Cluster is provisioned",
+					)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -390,6 +436,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Nil(t, deprovision, "expected no deprovision request")
 				cd := getCD(c)
 				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer")
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  hivev1.ProvisionedProvisionedReason,
+					Message: "Cluster is provisioned",
+				}})
 			},
 		},
 		{
@@ -1062,6 +1114,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				provisions := getProvisions(c)
 				assert.Len(t, provisions, 1, "expected provision to exist")
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.ProvisioningProvisionedReason,
+					Message: "Cluster provision created",
+				}})
 			},
 		},
 		{
@@ -1142,31 +1200,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Adopt provision",
-			existing: []runtime.Object{
-				testInstallConfigSecret(),
-				testClusterDeploymentWithInitializedConditions(testClusterDeployment()),
-				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
-				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testProvision(),
-			},
-			validate: func(c client.Client, t *testing.T) {
-				cd := getCD(c)
-				if assert.NotNil(t, cd, "missing cluster deployment") {
-					if assert.NotNil(t, cd.Status.ProvisionRef, "provision reference not set") {
-						assert.Equal(t, provisionName, cd.Status.ProvisionRef.Name, "unexpected provision referenced")
-					}
-				}
-			},
-		},
-		{
 			name: "Do not adopt failed provision",
 			existing: []runtime.Object{
 				testInstallConfigSecret(),
-				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
-					return cd
-				}(),
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testFailedProvisionAttempt(0),
@@ -1176,6 +1213,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing cluster deployment") {
 					assert.Nil(t, cd.Status.ProvisionRef, "expected provision reference to not be set")
+					// This code path creates a new provision, but it doesn't get adopted until the *next* reconcile
+					testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  hivev1.ProvisioningProvisionedReason,
+						Message: "Cluster provision created",
+					}})
 				}
 			},
 		},
@@ -1224,6 +1268,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					if assert.NotNil(t, cd.Status.ProvisionRef, "missing provision ref") {
 						assert.Equal(t, provisionName, cd.Status.ProvisionRef.Name, "unexpected provision ref name")
 					}
+					testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionUnknown,
+						Reason:  hivev1.InitializedConditionReason,
+						Message: "Condition Initialized",
+					}})
 				}
 			},
 		},
@@ -1253,6 +1303,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					now := metav1.Now()
 					cd.DeletionTimestamp = &now
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(
+						*cd,
+						hivev1.ProvisionedCondition,
+						corev1.ConditionTrue,
+						hivev1.ProvisionedProvisionedReason,
+						"Cluster is provisioned",
+					)
 					return cd
 				}(),
 				testProvision(),
@@ -1266,6 +1323,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Empty(t, provisions, "expected provision to be deleted")
 				deprovision := getDeprovision(c)
 				assert.Nil(t, deprovision, "expect not to create deprovision request until provision removed")
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  hivev1.ProvisionedProvisionedReason,
+					Message: "Cluster is provisioned",
+				}})
 			},
 		},
 		{
@@ -1307,6 +1370,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 				deprovision := getDeprovision(c)
 				assert.NotNil(t, deprovision, "missing deprovision request")
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.DeprovisioningProvisionedReason,
+					Message: "Cluster is being deprovisioned",
+				}})
 			},
 		},
 		{
@@ -1648,10 +1717,39 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "wait for deprovision to complete",
+			name: "deprovision finished",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.ManageDNS = true
+					cd.Spec.Installed = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					cd.Finalizers = append(cd.Finalizers, "prevent the CD from being deleted so we can validate deprovisioned status")
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+					testclusterdeprovision.Completed(),
+				),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.DeprovisionedProvisionedReason,
+					Message: "Cluster is deprovisioned",
+				}})
+			},
+		},
+		{
+			name: "existing deprovision in progress",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
 					cd.Spec.Installed = true
 					now := metav1.Now()
@@ -1666,7 +1764,75 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
-				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.DeprovisioningProvisionedReason,
+					Message: "Cluster is deprovisioning",
+				}})
+			},
+		},
+		{
+			name: "deprovision failed",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.ManageDNS = true
+					cd.Spec.Installed = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+					testclusterdeprovision.WithAuthenticationFailure(),
+				),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.DeprovisionFailedProvisionedReason,
+					Message: "Cluster deprovision failed",
+				}})
+			},
+		},
+		{
+			name: "wait for deprovision to complete",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.ManageDNS = true
+					cd.Spec.Installed = true
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(
+						*cd,
+						hivev1.ProvisionedCondition,
+						corev1.ConditionFalse,
+						hivev1.DeprovisioningProvisionedReason,
+						"Cluster is being deprovisioned",
+					)
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+				),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer not to be removed from ClusterDeployment")
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.DeprovisioningProvisionedReason,
+					Message: "Cluster is being deprovisioned",
+				}})
 			},
 		},
 		{
@@ -1695,7 +1861,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
-				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer not to be removed from ClusterDeployment")
 			},
 			expectedRequeueAfter: defaultRequeueTime,
 		},
@@ -1747,7 +1913,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
-				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer to be removed from ClusterDeployment")
+				assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected finalizer not to be removed from ClusterDeployment")
 			},
 			expectedRequeueAfter: defaultRequeueTime,
 		},
@@ -1768,6 +1934,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						Type:   hivev1.InstallLaunchErrorCondition,
 						Status: corev1.ConditionTrue,
 						Reason: "PodInPendingPhase",
+					},
+					// This is not terminal; to the outside world, the CD is still provisioning
+					{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  hivev1.ProvisioningProvisionedReason,
+						Message: "Cluster provision initializing",
 					},
 				})
 			},
@@ -1790,6 +1963,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 				testassert.AssertConditionStatus(t, cd, hivev1.ProvisionStoppedCondition, corev1.ConditionFalse)
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.ProvisioningProvisionedReason,
+					Message: "Cluster provision created",
+				}})
 			},
 		},
 		{
@@ -1813,6 +1992,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						Type:   hivev1.ProvisionStoppedCondition,
 						Status: corev1.ConditionTrue,
 						Reason: "InstallAttemptsLimitReached",
+					},
+					{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  hivev1.ProvisionStoppedProvisionedReason,
+						Message: "Provisioning failed terminally (see the ProvisionStopped condition for details)",
 					},
 				})
 			},
@@ -1839,6 +2024,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						Status: corev1.ConditionTrue,
 						Reason: "InstallAttemptsLimitReached",
 					},
+					{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  hivev1.ProvisionStoppedProvisionedReason,
+						Message: "Provisioning failed terminally (see the ProvisionStopped condition for details)",
+					},
 				})
 			},
 		},
@@ -1856,6 +2047,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 
 				testassert.AssertConditionStatus(t, cd, hivev1.AuthenticationFailureClusterDeploymentCondition, corev1.ConditionTrue)
+				// Preflight check happens before we declare provisioning
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 			},
 		},
 		{
@@ -1873,6 +2071,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
+				// Preflight check happens before we declare provisioning
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 
 				provisionList := &hivev1.ClusterProvisionList{}
 				err := c.List(context.TODO(), provisionList, client.InNamespace(cd.Namespace))
@@ -1900,6 +2105,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 
 				testassert.AssertConditionStatus(t, cd, hivev1.RequirementsMetCondition, corev1.ConditionFalse)
+				// Preflight check happens before we declare provisioning
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 			},
 		},
 		{
@@ -1914,6 +2126,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 			},
 		},
 		{
@@ -1931,6 +2149,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 			},
 		},
 		{
@@ -1949,6 +2173,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 				testassert.AssertConditionStatus(t, cd, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition, corev1.ConditionTrue)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 			},
 		},
 		{
@@ -1968,6 +2198,13 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 				testassert.AssertConditionStatus(t, cd, hivev1.ClusterInstallFailedClusterDeploymentCondition, corev1.ConditionTrue)
 				testassert.AssertConditionStatus(t, cd, hivev1.ProvisionFailedCondition, corev1.ConditionTrue)
+				// We don't declare provision failed in the Provisioned condition until it's terminal
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.InitializedConditionReason,
+					Message: "Condition Initialized",
+				}})
 			},
 		},
 		{
@@ -2026,6 +2263,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						Status: corev1.ConditionTrue,
 						Reason: "InstallAttemptsLimitReached",
 					},
+					{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  hivev1.ProvisionStoppedProvisionedReason,
+						Message: "Provisioning failed terminally (see the ProvisionStopped condition for details)",
+					},
 				})
 			},
 		},
@@ -2053,6 +2296,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						Type:   hivev1.ProvisionStoppedCondition,
 						Status: corev1.ConditionTrue,
 						Reason: "InstallAttemptsLimitReached",
+					},
+					{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionFalse,
+						Reason:  hivev1.ProvisionStoppedProvisionedReason,
+						Message: "Provisioning failed terminally (see the ProvisionStopped condition for details)",
 					},
 				})
 			},
@@ -2155,6 +2404,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testassert.AssertConditionStatus(t, cd, hivev1.ClusterInstallCompletedClusterDeploymentCondition, corev1.ConditionTrue)
 				assert.Equal(t, true, cd.Spec.Installed)
 				assert.NotNil(t, cd.Status.InstalledTimestamp)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  hivev1.ProvisionedProvisionedReason,
+					Message: "Cluster is provisioned",
+				}})
 			},
 		},
 		{
@@ -2183,6 +2438,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						Type:   hivev1.ProvisionStoppedCondition,
 						Status: corev1.ConditionTrue,
 						Reason: "InstallComplete",
+					},
+					{
+						Type:    hivev1.ProvisionedCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  hivev1.ProvisionedProvisionedReason,
+						Message: "Cluster is provisioned",
 					},
 				})
 				assert.Equal(t, true, cd.Spec.Installed)
@@ -2565,7 +2826,7 @@ func testClusterDeploymentWithInitializedConditions(cd *hivev1.ClusterDeployment
 			Status:  corev1.ConditionUnknown,
 			Type:    condition,
 			Reason:  hivev1.InitializedConditionReason,
-			Message: "Initialized",
+			Message: "Condition Initialized",
 		})
 	}
 	return cd
@@ -2945,6 +3206,17 @@ func addOrUpdateClusterDeploymentCondition(cd hivev1.ClusterDeployment,
 		})
 	}
 	return newConditions
+}
+
+// sanitizeConditions scrubs the condition list for each CD in `cds` so they can reasonably be compared
+func sanitizeConditions(cds ...*hivev1.ClusterDeployment) {
+	for _, cd := range cds {
+		cd.Status.Conditions = controllerutils.SortClusterDeploymentConditions(cd.Status.Conditions)
+		for i := range cd.Status.Conditions {
+			cd.Status.Conditions[i].LastProbeTime = metav1.Time{}
+			cd.Status.Conditions[i].LastTransitionTime = metav1.Time{}
+		}
+	}
 }
 
 func getJob(c client.Client, name string) *batchv1.Job {

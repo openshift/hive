@@ -54,14 +54,25 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 
 	setProvisionStoppedTrue := func(reason, message string) (reconcile.Result, error) {
 		logger.Debug("not creating new provision: %s", message)
-		conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		var changed1, changed2 bool
+		var conditions []hivev1.ClusterDeploymentCondition
+		conditions, changed1 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 			cd.Status.Conditions,
 			hivev1.ProvisionStoppedCondition,
 			corev1.ConditionTrue,
 			reason,
 			message,
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
-		if changed {
+
+		conditions, changed2 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionFalse,
+			hivev1.ProvisionStoppedProvisionedReason,
+			"Provisioning failed terminally (see the ProvisionStopped condition for details)",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+
+		if changed1 || changed2 {
 			cd.Status.Conditions = conditions
 			logger.Debugf("setting ProvisionStoppedCondition to %v", corev1.ConditionTrue)
 			if err := r.Status().Update(context.TODO(), cd); err != nil {
@@ -189,6 +200,17 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 
 	logger.WithField("provision", provision.Name).Info("created new provision")
 
+	if err := r.updateCondition(
+		cd,
+		hivev1.ProvisionedCondition,
+		corev1.ConditionFalse,
+		hivev1.ProvisioningProvisionedReason,
+		"Cluster provision created",
+		logger,
+	); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	if cd.Status.InstallRestarts == 0 {
 		kickstartDuration := time.Since(cd.CreationTimestamp.Time)
 		logger.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to first provision seconds")
@@ -287,6 +309,17 @@ func (r *ReconcileClusterDeployment) reconcileInitializingProvision(cd *hivev1.C
 			return reconcile.Result{}, err
 		}
 	}
+	if err := r.updateCondition(
+		cd,
+		hivev1.ProvisionedCondition,
+		corev1.ConditionFalse,
+		hivev1.ProvisioningProvisionedReason,
+		"Cluster provision initializing",
+		cdLog,
+	); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 
@@ -294,6 +327,16 @@ func (r *ReconcileClusterDeployment) reconcileProvisioningProvision(cd *hivev1.C
 	cdLog.Debug("still provisioning")
 	if err := r.updateCondition(cd, hivev1.InstallLaunchErrorCondition, corev1.ConditionFalse, "InstallLaunchSuccessful", "Successfully launched install pod", cdLog); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update InstallLaunchErrorCondition")
+		return reconcile.Result{}, err
+	}
+	if err := r.updateCondition(
+		cd,
+		hivev1.ProvisionedCondition,
+		corev1.ConditionFalse,
+		hivev1.ProvisioningProvisionedReason,
+		"Cluster is provisioning",
+		cdLog,
+	); err != nil {
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
@@ -354,6 +397,18 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 		"ProvisionSucceeded",
 		fmt.Sprintf("Provision %s succeeded.", provision.Name),
 		controllerutils.UpdateConditionNever,
+	)
+	if changed {
+		statusChange = true
+		cd.Status.Conditions = conds
+	}
+	conds, changed = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.ProvisionedCondition,
+		corev1.ConditionTrue,
+		hivev1.ProvisionedProvisionedReason,
+		"Cluster is provisioned",
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 	if changed {
 		statusChange = true

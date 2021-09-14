@@ -153,12 +153,27 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	if updated {
 		statusModified = true
 		provisionFailedTerminal = true
+		conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionFalse,
+			hivev1.ProvisionStoppedProvisionedReason,
+			"Provisioning failed terminally (see the ProvisionStopped condition for details)",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
 	}
 
 	completed = controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
 	if completed.Status == corev1.ConditionTrue { // the cluster install is complete
 		cd.Spec.Installed = true
 		cd.Status.InstalledTimestamp = &completed.LastTransitionTime
+		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+			cd.Status.Conditions,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionTrue,
+			hivev1.ProvisionedProvisionedReason,
+			"Cluster is provisioned",
+			controllerutils.UpdateConditionAlways,
+		)
 		specModified = true
 		statusModified = true
 

@@ -67,6 +67,7 @@ var (
 		hivev1.ProvisionStoppedCondition,
 		hivev1.AuthenticationFailureClusterDeploymentCondition,
 		hivev1.RequirementsMetCondition,
+		hivev1.ProvisionedCondition,
 
 		// ClusterInstall conditions copied over to cluster deployment
 		hivev1.ClusterInstallFailedClusterDeploymentCondition,
@@ -1255,7 +1256,13 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 			}
 			return false, err
 		default:
-			return false, nil
+			// Successfully created the ClusterDeprovision. Update the Provisioned CD status condition accordingly.
+			return false, r.updateCondition(cd,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionFalse,
+				hivev1.DeprovisioningProvisionedReason,
+				"Cluster is being deprovisioned",
+				cdLog)
 		}
 	case err != nil:
 		cdLog.WithError(err).Error("error getting deprovision request")
@@ -1264,25 +1271,57 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 
 	authenticationFailureCondition := controllerutils.FindClusterDeprovisionCondition(existingRequest.Status.Conditions, hivev1.AuthenticationFailureClusterDeprovisionCondition)
 	if authenticationFailureCondition != nil {
-		err := r.updateCondition(cd,
+		var conds []hivev1.ClusterDeploymentCondition
+		var changed1, changed2, authFailure bool
+		conds, changed1 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
 			hivev1.DeprovisionLaunchErrorCondition,
 			authenticationFailureCondition.Status,
 			authenticationFailureCondition.Reason,
 			authenticationFailureCondition.Message,
-			cdLog)
-
-		if err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update deprovisionLaunchErrorCondition")
-			return false, err
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if authenticationFailureCondition.Status == corev1.ConditionTrue {
+			authFailure = true
+			conds, changed2 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				conds,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionFalse,
+				hivev1.DeprovisionFailedProvisionedReason,
+				"Cluster deprovision failed",
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+		}
+		if changed1 || changed2 {
+			cd.Status.Conditions = conds
+			return false, r.Status().Update(context.TODO(), cd)
+		}
+		if authFailure {
+			// We get here if we had already set Provisioned to DeprovisionFailed
+			return false, nil
 		}
 	}
 
 	if !existingRequest.Status.Completed {
 		cdLog.Debug("deprovision request not yet completed")
-		return false, nil
+		return false, r.updateCondition(
+			cd,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionFalse,
+			hivev1.DeprovisioningProvisionedReason,
+			"Cluster is deprovisioning",
+			cdLog,
+		)
 	}
 
-	return true, nil
+	// Deprovision succeeded
+	return true, r.updateCondition(
+		cd,
+		hivev1.ProvisionedCondition,
+		corev1.ConditionFalse,
+		hivev1.DeprovisionedProvisionedReason,
+		"Cluster is deprovisioned",
+		cdLog,
+	)
 }
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {

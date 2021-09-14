@@ -127,15 +127,15 @@ func SetClusterDeploymentConditionWithChangeCheck(
 		}
 	}
 	if changed {
-		conditions = sortClusterDeploymentConditions(conditions)
+		conditions = SortClusterDeploymentConditions(conditions)
 	}
 	return conditions, changed
 }
 
-// sortClusterDeploymentConditions sorts the cluster deployment conditions such that conditions in their undesired/error
+// SortClusterDeploymentConditions sorts the cluster deployment conditions such that conditions in their undesired/error
 // state are at the top, followed by conditions in their desired/expected state, with conditions that have unknown status
 // at the last. All conditions that are undesired, desired or unknown are sorted in alphabetical order of their type
-func sortClusterDeploymentConditions(conditions []hivev1.ClusterDeploymentCondition) []hivev1.ClusterDeploymentCondition {
+func SortClusterDeploymentConditions(conditions []hivev1.ClusterDeploymentCondition) []hivev1.ClusterDeploymentCondition {
 	sort.SliceStable(conditions, func(i, j int) bool {
 		if conditions[i].Status != corev1.ConditionUnknown && conditions[j].Status == corev1.ConditionUnknown {
 			return true

@@ -18,5 +18,5 @@ var (
 )
 
 func init() {
-	metrics.Registry.MustRegister()
+	metrics.Registry.MustRegister(metricStaleClusterDeploymentsDeleted)
 }

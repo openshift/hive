@@ -1731,6 +1731,11 @@ data:
       - "Quota '[A-Z_]*' exceeded"
       installFailingReason: GeneralQuotaExceeded
       installFailingMessage: Quota exceeded
+    - name: AWSSubnetDoesNotExist
+      searchRegexStrings:
+      - "The subnet ID '[a-z0-9-]*' does not exist"
+      installFailingReason: AWSSubnetDoesNotExist
+      installFailingMessage: AWS Subnet Does Not Exist
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

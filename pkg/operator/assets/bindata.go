@@ -1736,6 +1736,11 @@ data:
       - "The subnet ID '[a-z0-9-]*' does not exist"
       installFailingReason: AWSSubnetDoesNotExist
       installFailingMessage: AWS Subnet Does Not Exist
+    - name: AWSInsufficientPermissions
+      searchRegexStrings:
+      - "current credentials insufficient for performing cluster installation"
+      installFailingReason: AWSInsufficientPermissions
+      installFailingMessage: AWS credentials are insufficient for performing cluster installation
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

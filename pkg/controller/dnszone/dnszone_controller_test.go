@@ -958,6 +958,19 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 			},
 		},
 		{
+			name:    "Set APIOptInRequiredCondition on DNSZone for OptInRequired error",
+			dnsZone: validDNSZone(),
+			error:   testOptInRequiredError(),
+			expectConditions: []hivev1.DNSZoneCondition{
+				{
+					Type:    hivev1.APIOptInRequiredCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  apiOptInRequiredReason,
+					Message: "The AWS Access Key Id needs a subscription for the service.",
+				},
+			},
+		},
+		{
 			name:    "Set GenericDNSErrorsCondition on DNSZone",
 			dnsZone: validDNSZone(),
 			error:   testCloudError(),
@@ -992,6 +1005,12 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 						Status:  corev1.ConditionTrue,
 						Reason:  authenticationFailedReason,
 						Message: "The security token included in the request is invalid.",
+					},
+					{
+						Type:    hivev1.APIOptInRequiredCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  apiOptInRequiredReason,
+						Message: "The AWS Access Key Id needs a subscription for the service.",
 					},
 				}
 
@@ -1101,4 +1120,11 @@ func testInvalidSignatureExceptionError() error {
 		"The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
 		fmt.Errorf("The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details"))
 	return invalidSignatureErr
+}
+
+func testOptInRequiredError() error {
+	optInReqErr := awserr.New("OptInRequired",
+		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: f5afff49-3e3d-46d7-92e5-5f9992757398",
+		fmt.Errorf("The AWS Access Key Id needs a subscription for the service"))
+	return optInReqErr
 }

@@ -572,6 +572,39 @@ func (a *AWSActuator) setInsufficientCredentialsConditionToTrue(message string) 
 	return accessDeniedCondsChanged
 }
 
+func (a *AWSActuator) setAPIOptInRequiredConditionToFalse() bool {
+	apiOptInConds, apiOptInCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.APIOptInRequiredCondition,
+		corev1.ConditionFalse,
+		apiOptInNotRequiredReason,
+		"route53 apis are enabled",
+		controllerutils.UpdateConditionNever,
+	)
+	if apiOptInCondsChanged {
+		a.dnsZone.Status.Conditions = apiOptInConds
+	}
+
+	return apiOptInCondsChanged
+}
+
+func (a *AWSActuator) setAPIOptInRequiredConditionToTrue(message string) bool {
+	apiOptInConds, apiOptInCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
+		a.dnsZone.Status.Conditions,
+		hivev1.APIOptInRequiredCondition,
+		corev1.ConditionTrue,
+		apiOptInRequiredReason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
+	if apiOptInCondsChanged {
+		// Conditions have changed. Update them in the object.
+		a.dnsZone.Status.Conditions = apiOptInConds
+	}
+	return apiOptInCondsChanged
+}
+
 func (a *AWSActuator) setAuthenticationFailureConditionToFalse() bool {
 	authenticationFailureConds, authenticationFailureCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
 		a.dnsZone.Status.Conditions,
@@ -646,13 +679,15 @@ func (a *AWSActuator) setCloudErrorsConditionToTrue(err error) bool {
 func (a *AWSActuator) SetConditionsForError(err error) bool {
 	accessDeniedCondsChanged := false
 	authenticationFailureCondsChanged := false
+	apiOptInCondsChanged := false
 	cloudErrorsCondsChanged := false
 
 	if err == nil {
 		cloudErrorsCondsChanged = a.setCloudErrorsConditionToFalse()
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()
 		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
-		return accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged
+		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToFalse()
+		return accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged || apiOptInCondsChanged
 	}
 
 	// handle AWS vs non-AWS specific errors
@@ -680,11 +715,17 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
 	}
 
-	if !(accessDeniedCondsChanged || authenticationFailureCondsChanged) {
+	if awsErr.Code() == "OptInRequired" {
+		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToTrue(awsErr.Message())
+	} else {
+		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToFalse()
+	}
+
+	if !(accessDeniedCondsChanged || authenticationFailureCondsChanged || apiOptInCondsChanged) {
 		cloudErrorsCondsChanged = a.setCloudErrorsConditionToTrue(err)
 	}
 
-	return accessDeniedCondsChanged || authenticationFailureCondsChanged || cloudErrorsCondsChanged
+	return accessDeniedCondsChanged || authenticationFailureCondsChanged || apiOptInCondsChanged || cloudErrorsCondsChanged
 }
 
 func tagEquals(a, b *route53.Tag) bool {

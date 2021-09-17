@@ -1504,6 +1504,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	availableCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 	insufficientCredentialsCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.InsufficientCredentialsCondition)
 	authenticationFailureCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.AuthenticationFailureCondition)
+	apiOptInRequiredCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.APIOptInRequiredCondition)
 	dnsErrorCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.GenericDNSErrorsCondition)
 	var (
 		status          corev1.ConditionStatus
@@ -1522,6 +1523,10 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		status = corev1.ConditionTrue
 		reason = "AuthenticationFailure"
 		message = authenticationFailureCondition.Message
+	case apiOptInRequiredCondition != nil && apiOptInRequiredCondition.Status == corev1.ConditionTrue:
+		status = corev1.ConditionTrue
+		reason = "APIOptInRequiredForDNS"
+		message = apiOptInRequiredCondition.Message
 	case dnsErrorCondition != nil && dnsErrorCondition.Status == corev1.ConditionTrue:
 		status = corev1.ConditionTrue
 		reason = dnsErrorCondition.Reason

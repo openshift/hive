@@ -23,7 +23,7 @@ require (
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go v1.1.11
-	github.com/miekg/dns v1.1.22
+	github.com/miekg/dns v1.1.25
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0

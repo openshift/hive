@@ -472,7 +472,7 @@ github.com/mbilski/exhaustivestruct/pkg/analyzer
 github.com/metal3-io/baremetal-operator/apis/metal3.io/v1alpha1
 # github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 github.com/mgutz/ansi
-# github.com/miekg/dns v1.1.22
+# github.com/miekg/dns v1.1.25
 ## explicit
 github.com/miekg/dns
 # github.com/mitchellh/go-homedir v1.1.0

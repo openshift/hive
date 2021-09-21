@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -370,10 +371,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			break
 		}
 		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
-		// TODO: Do this in cdLookup so we can add the new CDs to Installing(). For now it's okay
-		// because the new CDs are guaranteed to have a matching PoolVersion, and that's the only
-		// thing we need to keep consistent.
-		if err := r.addClusters(clp, poolVersion, toAdd, logger); err != nil {
+		if err := r.addClusters(clp, poolVersion, cds, toAdd, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
@@ -402,6 +400,11 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		metricStaleClusterDeploymentsDeleted.WithLabelValues(clp.Namespace, clp.Name).Inc()
 	}
 
+	if err := r.reconcileRunningClusters(clp, cds, logger); err != nil {
+		log.WithError(err).Error("error updating hibernating/running state")
+		return reconcile.Result{}, err
+	}
+
 	// One more (possible) status update: wait until the end to detect whether all unassigned CDs
 	// are current with the pool config, since assigning or deleting CDs may eliminate the last
 	// one that isn't.
@@ -416,6 +419,47 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// reconcileRunningClusters ensures the oldest pool.spec.runningCount unassigned clusters are
+// set to running, and the remainder are set to hibernating.
+func (r *ReconcileClusterPool) reconcileRunningClusters(
+	clp *hivev1.ClusterPool,
+	cds *cdCollection,
+	logger log.FieldLogger,
+) error {
+	runningCount := int(clp.Spec.RunningCount)
+	cdList := append(cds.Assignable(), cds.Installing()...)
+	// Sort by age, oldest first
+	sort.Slice(
+		cdList,
+		func(i, j int) bool {
+			return cdList[i].CreationTimestamp.Before(&cdList[j].CreationTimestamp)
+		},
+	)
+	for i := 0; i < len(cdList); i++ {
+		cd := cdList[i]
+		var desiredPowerState hivev1.ClusterPowerState
+		if i < runningCount {
+			desiredPowerState = hivev1.RunningClusterPowerState
+		} else {
+			desiredPowerState = hivev1.HibernatingClusterPowerState
+		}
+		if cd.Spec.PowerState == desiredPowerState {
+			continue
+		}
+		cd.Spec.PowerState = desiredPowerState
+		contextLogger := logger.WithFields(log.Fields{
+			"cluster":       cd.Name,
+			"newPowerState": desiredPowerState,
+		})
+		contextLogger.Info("Changing cluster powerState to satisfy runningCount")
+		if err := r.Update(context.Background(), cd); err != nil {
+			contextLogger.WithError(err).Error("could not update powerState")
+			return err
+		}
+	}
+	return nil
 }
 
 // calculatePoolVersion computes a hash of the important (to ClusterDeployments) fields of the
@@ -546,6 +590,7 @@ func (r *ReconcileClusterPool) applyRoleBinding(desired, observed *rbacv1.RoleBi
 func (r *ReconcileClusterPool) addClusters(
 	clp *hivev1.ClusterPool,
 	poolVersion string,
+	cds *cdCollection,
 	newClusterCount int,
 	logger log.FieldLogger,
 ) error {
@@ -585,9 +630,11 @@ func (r *ReconcileClusterPool) addClusters(
 	}
 
 	for i := 0; i < newClusterCount; i++ {
-		if err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, logger); err != nil {
+		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, logger)
+		if err != nil {
 			return err
 		}
+		cds.RegisterNewCluster(cd)
 	}
 
 	return nil
@@ -600,11 +647,11 @@ func (r *ReconcileClusterPool) createCluster(
 	installConfigTemplate string,
 	poolVersion string,
 	logger log.FieldLogger,
-) error {
+) (*hivev1.ClusterDeployment, error) {
 	ns, err := r.createRandomNamespace(clp)
 	if err != nil {
 		logger.WithError(err).Error("error obtaining random namespace")
-		return err
+		return nil, err
 	}
 	logger.WithField("cluster", ns.Name).Info("Creating new cluster")
 
@@ -637,20 +684,21 @@ func (r *ReconcileClusterPool) createCluster(
 
 	objs, err := builder.Build()
 	if err != nil {
-		return errors.Wrap(err, "error building resources")
+		return nil, errors.Wrap(err, "error building resources")
 	}
 
 	poolKey := types.NamespacedName{Namespace: clp.Namespace, Name: clp.Name}.String()
 	r.expectations.ExpectCreations(poolKey, 1)
+	var cd *hivev1.ClusterDeployment
 	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
 	for i, obj := range objs {
-		cd, ok := obj.(*hivev1.ClusterDeployment)
+		var ok bool
+		cd, ok = obj.(*hivev1.ClusterDeployment)
 		if !ok {
 			continue
 		}
 		poolRef := poolReference(clp)
 		cd.Spec.ClusterPoolRef = &poolRef
-		cd.Spec.PowerState = hivev1.HibernatingClusterPowerState
 		lastIndex := len(objs) - 1
 		objs[i], objs[lastIndex] = objs[lastIndex], objs[i]
 	}
@@ -658,11 +706,11 @@ func (r *ReconcileClusterPool) createCluster(
 	for _, obj := range objs {
 		if err := r.Client.Create(context.Background(), obj.(client.Object)); err != nil {
 			r.expectations.CreationObserved(poolKey)
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return cd, nil
 }
 
 func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool) (*corev1.Namespace, error) {

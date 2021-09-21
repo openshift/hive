@@ -172,3 +172,9 @@ func WithCondition(cond hivev1.ClusterPoolCondition) Option {
 		clusterPool.Status.Conditions = append(clusterPool.Status.Conditions, cond)
 	}
 }
+
+func WithRunningCount(size int) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.RunningCount = int32(size)
+	}
+}

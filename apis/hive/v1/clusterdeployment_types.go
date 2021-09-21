@@ -252,6 +252,9 @@ type ClusterPoolReference struct {
 	// ClaimName is the name of the ClusterClaim that claimed the cluster from the pool.
 	// +optional
 	ClaimName string `json:"claimName,omitempty"`
+	// ClaimedTimestamp is the time this cluster was assigned to a ClusterClaim. This is only used for
+	// ClusterDeployments belonging to ClusterPools.
+	ClaimedTimestamp *metav1.Time `json:"claimedTimestamp,omitempty"`
 }
 
 // ClusterMetadata contains metadata information about the installed cluster.

@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -224,6 +225,29 @@ func isBroken(cd *hivev1.ClusterDeployment) bool {
 	return false
 }
 
+func isRunning(cd *hivev1.ClusterDeployment) bool {
+	// TODO: Change this to use the Running condition
+	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	if cond == nil {
+		// Since we should be initializing conditions, this probably means the CD is super fresh
+		// and quite unlikely to be running. (That said, this really should never happen, since we
+		// only check this for Installed clusters.)
+		return false
+	}
+	return cond.Reason == hivev1.RunningHibernationReason
+}
+
+func (cds *cdCollection) sortInstalling() {
+	// Sort installing CDs so we prioritize deleting those that are furthest away from completing
+	// their installation (prioritizing preserving those that will be assignable the soonest).
+	sort.Slice(
+		cds.installing,
+		func(i, j int) bool {
+			return cds.installing[i].CreationTimestamp.After(cds.installing[j].CreationTimestamp.Time)
+		},
+	)
+}
+
 // getAllClusterDeploymentsForPool is the constructor for a cdCollection
 // comprising all the ClusterDeployments created for the specified ClusterPool.
 func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, poolVersion string, logger log.FieldLogger) (*cdCollection, error) {
@@ -243,6 +267,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		byCDName:              make(map[string]*hivev1.ClusterDeployment),
 		byClaimName:           make(map[string]*hivev1.ClusterDeployment),
 	}
+	running := 0
 	for i, cd := range cdList.Items {
 		poolRef := cd.Spec.ClusterPoolRef
 		if poolRef == nil || poolRef.Namespace != pool.Namespace || poolRef.PoolName != pool.Name {
@@ -267,6 +292,9 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 				cdCol.broken = append(cdCol.broken, ref)
 			} else if cd.Spec.Installed {
 				cdCol.assignable = append(cdCol.assignable, ref)
+				if isRunning(&cd) {
+					running++
+				}
 			} else {
 				cdCol.installing = append(cdCol.installing, ref)
 			}
@@ -297,14 +325,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			return cdCol.assignable[i].CreationTimestamp.Before(&cdCol.assignable[j].CreationTimestamp)
 		},
 	)
-	// Sort installing CDs so we prioritize deleting those that are furthest away from completing
-	// their installation (prioritizing preserving those that will be assignable the soonest).
-	sort.Slice(
-		cdCol.installing,
-		func(i, j int) bool {
-			return cdCol.installing[i].CreationTimestamp.After(cdCol.installing[j].CreationTimestamp.Time)
-		},
-	)
+	cdCol.sortInstalling()
 	// Sort stale CDs by age so we delete the oldest first
 	sort.Slice(
 		cdCol.unknownPoolVersion,
@@ -325,6 +346,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		"deleting":   len(cdCol.deleting),
 		"installing": len(cdCol.installing),
 		"unclaimed":  len(cdCol.installing) + len(cdCol.assignable),
+		"running":    running,
 		"stale":      len(cdCol.unknownPoolVersion) + len(cdCol.mismatchedPoolVersion),
 		"broken":     len(cdCol.broken),
 	}).Debug("found clusters for ClusterPool")
@@ -395,6 +417,13 @@ func (cds *cdCollection) Stale() []*hivev1.ClusterDeployment {
 	return append(cds.unknownPoolVersion, cds.mismatchedPoolVersion...)
 }
 
+// RegisterNewCluster adds a freshly-created cluster to the cdCollection, assuming it is installing.
+func (cds *cdCollection) RegisterNewCluster(cd *hivev1.ClusterDeployment) {
+	cds.byCDName[cd.Name] = cd
+	cds.installing = append(cds.installing, cd)
+	cds.sortInstalling()
+}
+
 // Assign assigns the specified ClusterDeployment to the specified claim, updating its spec on the
 // server. Errors from the update are bubbled up. Returns an error if the CD is already assigned
 // (to *any* claim). The CD must be from the Assignable() list; otherwise it is an error.
@@ -407,6 +436,9 @@ func (cds *cdCollection) Assign(c client.Client, cd *hivev1.ClusterDeployment, c
 		if cdi.Name == cd.Name {
 			// Update the spec
 			cdi.Spec.ClusterPoolRef.ClaimName = claim.Name
+			now := metav1.Now()
+			cdi.Spec.ClusterPoolRef.ClaimedTimestamp = &now
+			// This may be redundant if we already did it to satisfy runningCount; but no harm.
 			cdi.Spec.PowerState = hivev1.RunningClusterPowerState
 			if err := c.Update(context.Background(), cdi); err != nil {
 				return err
@@ -602,6 +634,7 @@ func assignClustersToClaims(c client.Client, claims *claimCollection, cds *cdCol
 	claimList := make([]*hivev1.ClusterClaim, numToAssign)
 	copy(claimList, claims.Unassigned())
 	cdList := make([]*hivev1.ClusterDeployment, numToAssign)
+	// Assignable is sorted by age, oldest first.
 	copy(cdList, cds.Assignable())
 	var errs []error
 	for i := 0; i < numToAssign; i++ {

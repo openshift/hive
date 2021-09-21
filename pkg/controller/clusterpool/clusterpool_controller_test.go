@@ -1251,6 +1251,127 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedObservedSize:   2,
 			expectedTotalClusters:  3,
 		},
+		{
+			name: "runningCount < size",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(4),
+					testcp.WithRunningCount(2),
+				),
+			},
+			expectedTotalClusters: 4,
+			expectedRunning:       2,
+		},
+		{
+			name: "runningCount == size",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(4),
+					testcp.WithRunningCount(4),
+				),
+			},
+			expectedTotalClusters: 4,
+			expectedRunning:       4,
+		},
+		{
+			name: "runningCount > size",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(4),
+					testcp.WithRunningCount(400),
+				),
+			},
+			expectedTotalClusters: 4,
+			expectedRunning:       4,
+		},
+		{
+			name: "runningCount restored after deletion",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(4),
+					testcp.WithRunningCount(2),
+				),
+				unclaimedCDBuilder("c1").Build(testcd.Generic(testgeneric.Deleted()), testcd.WithPowerState(hivev1.RunningClusterPowerState)),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState)),
+				unclaimedCDBuilder("c3").Build(),
+				unclaimedCDBuilder("c4").Build(),
+			},
+			expectedObservedSize:  3,
+			expectedTotalClusters: 5,
+			expectedRunning:       3,
+		},
+		{
+			name: "runningCount restored after claim",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(4),
+					testcp.WithRunningCount(2),
+				),
+				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedObservedSize:   4,
+			expectedObservedReady:  4,
+			expectedTotalClusters:  5,
+			expectedRunning:        3,
+			expectedAssignedCDs:    1,
+			expectedAssignedClaims: 1,
+		},
+		{
+			name: "pool size > number of claims > runningCount",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(4),
+					testcp.WithRunningCount(2),
+				),
+				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				testclaim.FullBuilder(testNamespace, "test-claim1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim2", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim3", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedObservedSize:   4,
+			expectedObservedReady:  4,
+			expectedTotalClusters:  7,
+			expectedRunning:        5,
+			expectedAssignedCDs:    3,
+			expectedAssignedClaims: 3,
+		},
+		{
+			name: "number of claims > pool size > runningCount",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(4),
+					testcp.WithRunningCount(2),
+				),
+				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+				unclaimedCDBuilder("c4").Build(testcd.Installed()),
+				testclaim.FullBuilder(testNamespace, "test-claim1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim2", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim3", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim4", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+				testclaim.FullBuilder(testNamespace, "test-claim5", scheme).Build(testclaim.WithPool(testLeasePoolName)),
+			},
+			expectedObservedSize:  4,
+			expectedObservedReady: 4,
+			expectedTotalClusters: 9,
+			// The four original pool CDs got claimed. Two were already running; we started the other two.
+			// We create five new CDs to satisfy the pool size plus the additional claim.
+			// Of those, we start two for runningCount, and hibernate the rest.
+			// (Intuitively, perhaps the one for the excess claim should start off in running state.
+			// But that's not how the logic works today. Should it?)
+			expectedRunning:          6,
+			expectedAssignedCDs:      4,
+			expectedAssignedClaims:   4,
+			expectedUnassignedClaims: 1,
+		},
 	}
 
 	for _, test := range tests {

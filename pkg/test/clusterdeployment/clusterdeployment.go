@@ -136,6 +136,8 @@ func WithClusterPoolReference(namespace, poolName, claimName string) Option {
 			PoolName:  poolName,
 			ClaimName: claimName,
 		}
+		now := metav1.Now()
+		clusterDeployment.Spec.ClusterPoolRef.ClaimedTimestamp = &now
 	}
 }
 

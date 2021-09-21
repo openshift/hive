@@ -16,6 +16,7 @@
   - [Alternatives](#alternatives)
     - [Don't Hibernate New ClusterDeployments](#dont-hibernate-new-clusterdeployments)
     - [`runningPercent`](#runningpercent)
+    - [Where to put `ClaimedTimestamp`](#where-to-put-claimedtimestamp)
 
 ## Summary
 
@@ -95,7 +96,7 @@ or, if the status of that condition is Unknown, from
 [when installation completed](https://github.com/openshift/hive/blob/28f67bab3dac5fb9dec405e0536d64187faf964d/pkg/controller/hibernation/hibernation_controller.go#L229-L239).
 If we don't account for this, Running unassigned CDs in the pool will hibernate, and then the [new logic](#decouple-powerstate-on-creation) will immediately wake them back up, resulting in unnecessary churn and potential claim delays.
 So we'll:
-- Add Status field to ClusterDeployment called `ClaimedTimestamp`, corollary to `InstalledTimestamp`.
+- Add a field to `ClusterDeployment.Spec.ClusterPoolRef` called `ClaimedTimestamp`, corollary to `Status.InstalledTimestamp`.
   We'll set this to `Now()` at the same time we set the `Spec.ClusterPoolRef.ClaimName`.
   Like `InstalledTimestamp` (and `ClaimName`, for that matter), once set, it never changes.
 - Add logic to the hibernation controller as follows:
@@ -167,3 +168,21 @@ Quoting a conversation with [Gurney Buchanan](https://github.com/gurnben) (ACM):
 >
 > Gurney Buchanan:
 > That’s what I realized as I was typing up the use-case @Eric Fried :laugh1:
+
+### Where to put `ClaimedTimestamp`
+- Originally we were going to make a new ClusterDeployment.Status Condition called `Claimed` and use its `lastTransitionTime` as the baseline for `hibernateAfter`.
+  This has the advantage of not committing us (we're allowed to change/remove status conditions without revving the API).
+  However, it seemed too heavy a solution:
+  - We weren't going to use the rest of the Condition for anything, nor would it be useful to anyone else as far as we could predict;
+  - We already have too many status conditions on ClusterDeployment
+
+  So then we decided to:
+- Make it `ClusterDeployment.Status.ClaimedTimestamp`.
+  After all, it behaves a lot like `Status.InstalledTimestamp`, and the code uses it in the same place for a similar purpose.
+  But
+  - It felt wrong to be further leaking ClusterPool details into the ClusterDeployment;
+  - There was concern about disaster recovery properly restoring this datum if it's in Status; and
+  - It was tougher to code because we needed a separate Status update at the same time we set `Spec.ClusterPoolRef.ClaimName`.
+
+So we decided to put it next to `ClaimName` because the two are bound together both logically and intuitively.
+It's not really a speccy thing, but neither is `ClaimName`.

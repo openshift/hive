@@ -282,7 +282,7 @@ func (r *ReconcileClusterDeployment) reconcileInitializingProvision(cd *hivev1.C
 	// Set condition on ClusterDeployment when install pod is stuck in pending phase
 	installPodStuckCondition := controllerutils.FindClusterProvisionCondition(provision.Status.Conditions, hivev1.InstallPodStuckCondition)
 	if installPodStuckCondition != nil && installPodStuckCondition.Status == corev1.ConditionTrue {
-		if err := r.setInstallLaunchErrorCondition(cd, corev1.ConditionTrue, installPodStuckCondition.Reason, installPodStuckCondition.Message, cdLog); err != nil {
+		if err := r.updateCondition(cd, hivev1.InstallLaunchErrorCondition, corev1.ConditionTrue, installPodStuckCondition.Reason, installPodStuckCondition.Message, cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update InstallLaunchErrorCondition")
 			return reconcile.Result{}, err
 		}
@@ -292,7 +292,7 @@ func (r *ReconcileClusterDeployment) reconcileInitializingProvision(cd *hivev1.C
 
 func (r *ReconcileClusterDeployment) reconcileProvisioningProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
 	cdLog.Debug("still provisioning")
-	if err := r.setInstallLaunchErrorCondition(cd, corev1.ConditionFalse, "InstallLaunchSuccessful", "Successfully launched install pod", cdLog); err != nil {
+	if err := r.updateCondition(cd, hivev1.InstallLaunchErrorCondition, corev1.ConditionFalse, "InstallLaunchSuccessful", "Successfully launched install pod", cdLog); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update InstallLaunchErrorCondition")
 		return reconcile.Result{}, err
 	}

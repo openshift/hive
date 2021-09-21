@@ -10,10 +10,13 @@ import (
 )
 
 const (
-	noAWSPlatformErr   = "install config did not contain an AWS platform"
-	noGCPPlatformErr   = "install config did not contain a GCP platform"
-	noAzurePlatformErr = "install config did not contain an Azure platform"
-	regionMismatchErr  = "install config region does not match cluster deployment region"
+	noAWSPlatformErr     = "install config did not contain an AWS platform"
+	noGCPPlatformErr     = "install config did not contain a GCP platform"
+	noAzurePlatformErr   = "install config did not contain an Azure platform"
+	novSpherePlatformErr = "install config did not contain an vSphere platform"
+	regionMismatchErr    = "install config region does not match cluster deployment region"
+
+	missingvSphereCredentialsErr = "install config does not contain username/password for vSphere platform"
 )
 
 func ValidateInstallConfig(cd *hivev1.ClusterDeployment, installConfig []byte) error {
@@ -44,6 +47,13 @@ func ValidateInstallConfig(cd *hivev1.ClusterDeployment, installConfig []byte) e
 		}
 		if ic.Platform.Azure.Region != cd.Spec.Platform.Azure.Region {
 			return errors.New(regionMismatchErr)
+		}
+	case platform.VSphere != nil:
+		if ic.Platform.VSphere == nil {
+			return errors.New(novSpherePlatformErr)
+		}
+		if ic.Platform.VSphere.Username == "" || ic.Platform.VSphere.Password == "" {
+			return errors.New(missingvSphereCredentialsErr)
 		}
 	}
 	return nil

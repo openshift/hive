@@ -12,6 +12,7 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1vpshere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 )
 
@@ -136,6 +137,21 @@ platform:
 pullSecret: ""
 `
 
+const testvSphereIC = `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-vsphere
+platform:
+  vsphere:
+    vCenter: 10.0.0.1
+pullSecret: ""
+`
+
 func TestInstallConfigValidation(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
@@ -215,6 +231,30 @@ func TestInstallConfigValidation(t *testing.T) {
 			),
 			ic:            testAzureIC,
 			expectedError: regionMismatchErr,
+		},
+		{
+			name: "test install config no vSphere platform",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						VCenter: "10.0.0.1",
+					}
+				},
+			),
+			ic:            testAWSIC,
+			expectedError: novSpherePlatformErr,
+		},
+		{
+			name: "test install config no vSphere credentials",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
+						VCenter: "10.0.0.1",
+					}
+				},
+			),
+			ic:            testvSphereIC,
+			expectedError: missingvSphereCredentialsErr,
 		},
 	}
 	for _, test := range tests {

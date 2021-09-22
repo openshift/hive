@@ -117,6 +117,18 @@ while [ $i -le ${max_cluster_deployment_status_checks} ]; do
     FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
     break
   fi
+  # HACK: We've seen flakes where the dnszone controller can't instantiate the AWS actuator because
+  # the *-aws-creds secret hasn't come to life yet. This causes the dnszone controller to ignore it
+  # for 2h, which is too long for this test; and the CD is stuck during that time. So here we
+  # detect whether that condition has happened, and then kick the DNSZone object in such a way that
+  # the controller stops ignoring it and tries to resync it.
+  DNS_COND=$(jq -r '.status.conditions[] | select(.type == "DNSNotReady")' <<<"${CD_JSON}")
+  if [[ $(jq -r .status <<<"${DNS_COND}") == 'True' ]] && [[ $(jq -r .reason <<<"${DNS_COND}") == 'ActuatorNotInitialized' ]]; then
+    echo "Found DNSNotReady=>ActuatorNotInitialized condition. Forcing DNSZone to resync..."
+    # The DNSZone is in the CD's namespace. Its name is the CD name suffixed with '-zone'. Resetting
+    # its lastSyncGeneration should trigger a resync.
+    ${0%/*}/statuspatch dnszone -n ${CLUSTER_NAMESPACE} ${CLUSTER_NAME}-zone <<< '.status.lastSyncGeneration = 0'
+  fi
   sleep ${sleep_between_cluster_deployment_status_checks}
   echo "Still waiting for the ClusterDeployment ${CLUSTER_NAME} to install. Status check #${i}/${max_cluster_deployment_status_checks}... "
   i=$((i + 1))
@@ -127,12 +139,14 @@ case "${INSTALL_RESULT}" in
         echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
         ;;
     failure)
-        echo "ClusterDeployment ${CLUSTER_NAME} provision failed"
-        echo "Reason: $FAILURE_REASON"
-        echo "Message: $FAILURE_MESSAGE"
+        echo "ClusterDeployment ${CLUSTER_NAME} provision failed" >&2
+        echo "Reason: $FAILURE_REASON" >&2
+        echo "Message: $FAILURE_MESSAGE" >&2
         ;;
     *)
-        echo "Timed out waiting for the ClusterDeployment ${CLUSTER_NAME} to install"
+        echo "Timed out waiting for the ClusterDeployment ${CLUSTER_NAME} to install" >&2
+        echo "You may be interested in its status conditions:" >&2
+        jq -r .status.conditions <<<"${CD_JSON}" >&2
         ;;
 esac
 

@@ -48,6 +48,8 @@ const (
 	accessGrantedReason             = "AccessGranted"
 	authenticationFailedReason      = "AuthenticationFailed"
 	authenticationSucceededReason   = "AuthenticationSucceeded"
+	apiOptInRequiredReason          = "RequiredAPIsNotEnabled"
+	apiOptInNotRequiredReason       = "RequiredAPIsEnabled"
 	dnsCloudErrorReason             = "CloudError"
 	dnsNoErrorReason                = "NoError"
 )

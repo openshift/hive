@@ -1642,7 +1642,7 @@ data:
       installFailingMessage: You have specified an invalid AWS tag value. Verify that your tags meet AWS requirements and try again.
     - name: ErrorDeletingIAMRole
       searchRegexStrings:
-        - "Error deleting IAM Role \\([a-zA-Z0-9-]*\\): DeleteConflict: Cannot delete entity, must detach all policies first."
+        - "Error deleting IAM Role \\([a-zA-Z0-9+=,.@-]+\\): DeleteConflict: Cannot delete entity, must detach all policies first."
       installFailingReason: ErrorDeletingIAMRole
       installFailingMessage: The cluster installer was not able to delete the roles it used during the installation. Ensure that no policies are added to new roles by default and try again.
     # GCP Specific

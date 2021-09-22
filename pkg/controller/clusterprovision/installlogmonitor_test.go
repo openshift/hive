@@ -36,6 +36,7 @@ const (
 	genericLimitExceeded      = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating Generic: GenericLimitExceeded: The maximum number of Generics has been reached.\""
 	invalidCredentials        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: error waiting for Route53 Hosted Zone (Z1009177L956IM4ANFHL) creation: InvalidClientTokenId: The security token included in the request is invalid.\""
 	kubeAPIWaitFailedLog      = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane.\""
+	awsDeleteRoleFailed       = "time=\"2021-09-22T12:25:40Z\" level=error msg=\"Error: Error deleting IAM Role (my-fake-cluster-hashn0s-bootstrap-role): DeleteConflict: Cannot delete entity, must detach all policies first.\""
 	noMatchLog                = "an example of something that doesn't match the log regexes"
 )
 
@@ -303,6 +304,26 @@ func TestParseInstallLog(t *testing.T) {
 				},
 			}},
 			expectedReason: "GCPServiceAccountQuotaExceeded",
+		},
+		{
+			name: "Can't delete IAM role",
+			log:  pointer.StringPtr(awsDeleteRoleFailed),
+			existing: []runtime.Object{&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      regexConfigMapName,
+					Namespace: constants.DefaultHiveNamespace,
+				},
+				Data: map[string]string{
+					"regexes": `
+    - name: ErrorDeletingIAMRole
+      searchRegexStrings:
+        - "Error deleting IAM Role \\([a-zA-Z0-9-]*\\): DeleteConflict: Cannot delete entity, must detach all policies first."
+      installFailingReason: ErrorDeletingIAMRole
+      installFailingMessage: The cluster installer was not able to delete the roles it used during the installation. Ensure that no policies are added to new roles by default and try again.
+`,
+				},
+			}},
+			expectedReason: "ErrorDeletingIAMRole",
 		},
 	}
 

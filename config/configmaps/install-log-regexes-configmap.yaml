@@ -98,6 +98,11 @@ data:
       - "VcpuLimitExceeded"
       installFailingReason: VcpuLimitExceeded
       installFailingMessage: The install requires more vCPU capacity than your current vCPU limit
+    - name: UserInitiatedShutdown
+      searchRegexStrings:
+      - "Error waiting for instance .* to become ready .* User initiated shutdown"
+      installFailingReason: UserInitiatedShutdown
+      installFailingMessage: User initiated shutdown of instances as the install was running
 
     # GCP Specific
     - name: GCPInvalidProjectID
@@ -193,3 +198,8 @@ data:
       - "failed to load asset \\\"Install Config\\\""
       installFailingReason: FallbackInvalidInstallConfig
       installFailingMessage: Unknown error - installer failed to load install config
+    - name: FallbackInstancesFailedToBecomeReady
+      searchRegexStrings:
+      - "Error waiting for instance .* to become ready"
+      installFailingReason: FallbackInstancesFailedToBecomeReady
+      installFailingMessage: Unknown error - instances failed to become ready

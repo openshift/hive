@@ -27,6 +27,16 @@ data:
       - "EIP: AddressLimitExceeded"
       installFailingReason: EIPAddressLimitExceeded
       installFailingMessage: EIP Address limit exceeded
+    - name: MissingPublicSubnetForZone
+      searchRegexStrings:
+      - "No public subnet provided for zone"
+      installFailingReason: MissingPublicSubnetForZone
+      installFailingMessage: No public subnet provided for at least one zone
+    - name: PrivateSubnetInMultipleZones
+      searchRegexStrings:
+      - "private subnet .* is also in zone"
+      installFailingReason: PrivateSubnetInMultipleZones
+      installFailingMessage: Same private subnet used in multiple zones
     - name: InvalidInstallConfigSubnet
       searchRegexStrings:
       - "CIDR range start.*is outside of the specified machine networks"

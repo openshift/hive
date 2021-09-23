@@ -1,9 +1,11 @@
 package clusterprovision
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -265,43 +267,15 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: "DNSAlreadyExists",
 		},
 		{
-			name: "GCP compute quota",
-			log:  pointer.StringPtr(gcpCPUQuotaLog),
-			existing: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      regexConfigMapName,
-					Namespace: constants.DefaultHiveNamespace,
-				},
-				Data: map[string]string{
-					"regexes": `
-- name: GCPComputeQuota
-  searchRegexStrings:
-  - "compute\\.googleapis\\.com/cpus is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than remaining quota"
-  installFailingReason: GCPComputeQuotaExceeded
-  installFailingMessage: GCP CPUs quota exceeded
-`,
-				},
-			}},
+			name:           "GCP compute quota",
+			log:            pointer.StringPtr(gcpCPUQuotaLog),
+			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPComputeQuotaExceeded",
 		},
 		{
-			name: "GCP service account quota",
-			log:  pointer.StringPtr(gcpServiceAccountQuotaLog),
-			existing: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      regexConfigMapName,
-					Namespace: constants.DefaultHiveNamespace,
-				},
-				Data: map[string]string{
-					"regexes": `
-- name: GCPServiceAccountQuota
-  searchRegexStrings:
-  - "iam\\.googleapis\\.com/quota/service-account-count is not available in global because the required number of resources \\([0-9]*\\) is more than remaining quota"
-  installFailingReason: GCPServiceAccountQuotaExceeded
-  installFailingMessage: GCP Service Account quota exceeded
-`,
-				},
-			}},
+			name:           "GCP service account quota",
+			log:            pointer.StringPtr(gcpServiceAccountQuotaLog),
+			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPServiceAccountQuotaExceeded",
 		},
 	}
@@ -324,62 +298,16 @@ func TestParseInstallLog(t *testing.T) {
 	}
 }
 
-func buildRegexConfigMap() *corev1.ConfigMap {
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      regexConfigMapName,
-			Namespace: constants.DefaultHiveNamespace,
-		},
-		Data: map[string]string{
-			"regexes": `
-- name: DNSAlreadyExists
-  searchRegexStrings:
-  - "aws_route53_record.*Error building changeset:.*Tried to create resource record set.*but it already exists"
-  installFailingReason: DNSAlreadyExists
-  installFailingMessage: DNS record already exists
-- name: PendingVerification
-  searchRegexStrings:
-  - "PendingVerification: Your request for accessing resources in this region is being validated"
-  installFailingReason: PendingVerification
-  installFailingMessage: Account pending verification for region
-- name: GCPInvalidProjectID
-  searchRegexStrings:
-  - "platform.gcp.project.* invalid project ID"
-  installFailingReason: GCPInvalidProjectID
-  installFailingMessage: Invalid GCP project ID
-- name: GCPQuotaSSDTotalGBExceeded
-  searchRegexStrings:
-  - "Quota \'SSD_TOTAL_GB\' exceeded"
-  installFailingReason: GCPQuotaSSDTotalGBExceeded
-  installFailingMessage: GCP quota SSD_TOTAL_GB exceeded
-# AWS Specific
-- name: AWSNATGatewayLimitExceeded
-  searchRegexStrings:
-  - "NatGatewayLimitExceeded"
-  installFailingReason: AWSNATGatewayLimitExceeded
-  installFailingMessage: AWS NAT gateway limit exceeded
-- name: AWSVPCLimitExceeded
-  searchRegexStrings:
-    - "VpcLimitExceeded"
-  installFailingReason: AWSVPCLimitExceeded
-  installFailingMessage: AWS VPC limit exceeded
-- name: ResourceLimitExceeded
-  searchRegexStrings:
-  - "LimitExceeded"
-  installFailingReason: ResourceLimitExceeded
-  installFailingMessage: Resource limit exceeded
-- name: InvalidCredentials
-  searchRegexStrings:
-  - "InvalidClientTokenId: The security token included in the request is invalid."
-  installFailingReason: InvalidCredentials
-  installFailingMessage: Credentials are invalid
-- name: KubeAPIWaitFailed
-  searchRegexStrings:
-  - "Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane"
-  installFailingReason: KubeAPIWaitFailed
-  installFailingMessage: Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane
-`,
-		},
+// buildRegexConfigMap reads the install log regexes configmap from within config/configmaps/install-log-regexes-configmap.yaml
+func buildRegexConfigMap() runtime.Object {
+	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
+	stream, err := ioutil.ReadFile("../../../config/configmaps/install-log-regexes-configmap.yaml")
+	if err != nil {
+		log.Fatal(err)
 	}
-	return cm
+	obj, _, err := decode(stream, nil, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return obj
 }

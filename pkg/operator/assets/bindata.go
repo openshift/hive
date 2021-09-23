@@ -1651,6 +1651,11 @@ data:
       - "current credentials insufficient for performing cluster installation"
       installFailingReason: AWSInsufficientPermissions
       installFailingMessage: AWS credentials are insufficient for performing cluster installation
+    - name: VcpuLimitExceeded
+      searchRegexStrings:
+      - "VcpuLimitExceeded"
+      installFailingReason: VcpuLimitExceeded
+      installFailingMessage: The install requires more vCPU capacity than your current vCPU limit
 
     # GCP Specific
     - name: GCPInvalidProjectID

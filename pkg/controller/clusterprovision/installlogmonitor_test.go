@@ -93,7 +93,7 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "Generic ResourceLimitExceeded",
 			log:            pointer.StringPtr(genericLimitExceeded),
 			existing:       []runtime.Object{buildRegexConfigMap()},
-			expectedReason: "ResourceLimitExceeded",
+			expectedReason: "FallbackResourceLimitExceeded",
 		},
 		{
 			name:           "Credentials are invalid",

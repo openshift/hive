@@ -1563,6 +1563,7 @@ metadata:
   namespace: hive
 data:
   regexes: |
+
     # AWS Specific
     - name: AWSNATGatewayLimitExceeded
       searchRegexStrings:
@@ -1584,11 +1585,6 @@ data:
       - "EIP: AddressLimitExceeded"
       installFailingReason: EIPAddressLimitExceeded
       installFailingMessage: EIP Address limit exceeded
-    - name: LimitExceeded
-      searchRegexStrings:
-      - "LimitExceeded"
-      installFailingReason: ResourceLimitExceeded
-      installFailingMessage: Resource limit exceeded
     - name: InvalidInstallConfigSubnet
       searchRegexStrings:
       - "CIDR range start.*is outside of the specified machine networks"
@@ -1655,6 +1651,7 @@ data:
       - "current credentials insufficient for performing cluster installation"
       installFailingReason: AWSInsufficientPermissions
       installFailingMessage: AWS credentials are insufficient for performing cluster installation
+
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:
@@ -1686,12 +1683,19 @@ data:
       - "iam\\.googleapis\\.com/quota/service-account-count is not available in global because the required number of resources \\([0-9]*\\) is more than remaining quota"
       installFailingReason: GCPServiceAccountQuotaExceeded
       installFailingMessage: GCP Service Account quota exceeded
+
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:
       - "platform.baremetal.libvirtURI: Internal error: could not connect to libvirt: virError.Code=38, Domain=7, Message=.Cannot recv data: Permission denied"
       installFailingReason: LibvirtSSHKeyPermissionDenied
       installFailingMessage: "Permission denied connecting to libvirt host, check SSH key configuration and pass phrase"
+    - name: LibvirtConnectionFailed
+      searchRegexStrings:
+      - "could not connect to libvirt"
+      installFailingReason: LibvirtConnectionFailed
+      installFailingMessage: "Could not connect to libvirt host"
+
     # Generic OpenShift Install
     - name: KubeAPIWaitTimeout
       searchRegexStrings:
@@ -1723,24 +1727,25 @@ data:
       - "Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane"
       installFailingReason: KubeAPIWaitFailed
       installFailingMessage: Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane
-    # Processing stops at the first match, so this more generic
-    # message about the connection failure must always come after the
-    # more specific message for LibvirtSSHKeyPermissionDenied.
-    - name: InvalidInstallConfig
-      searchRegexStrings:
-      - "failed to load asset \\\"Install Config\\\""
-      installFailingReason: InvalidInstallConfig
-      installFailingMessage: Installer failed to load install config
-    - name: LibvirtConnectionFailed
-      searchRegexStrings:
-      - "could not connect to libvirt"
-      installFailingReason: LibvirtConnectionFailed
-      installFailingMessage: "Could not connect to libvirt host"
-    - name: GeneralQuota
+
+    # Keep these at the bottom so that they're only hit if nothing above matches.
+    # We don't want to show these to users unless it's a last resort. It's barely better than "unknown error".
+    # These are clues to SRE that they need to add more specific regexps to this file.
+    - name: FallbackQuotaExceeded
       searchRegexStrings:
       - "Quota '[A-Z_]*' exceeded"
-      installFailingReason: GeneralQuotaExceeded
-      installFailingMessage: Quota exceeded
+      installFailingReason: FallbackQuotaExceeded
+      installFailingMessage: Unknown quota exceeded - couldn't parse a specific resource type
+    - name: FallbackResourceLimitExceeded
+      searchRegexStrings:
+      - "LimitExceeded"
+      installFailingReason: FallbackResourceLimitExceeded
+      installFailingMessage: Unknown resource limit exceeded - couldn't parse a specific resource type
+    - name: FallbackInvalidInstallConfig
+      searchRegexStrings:
+      - "failed to load asset \\\"Install Config\\\""
+      installFailingReason: FallbackInvalidInstallConfig
+      installFailingMessage: Unknown error - installer failed to load install config
 `)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {

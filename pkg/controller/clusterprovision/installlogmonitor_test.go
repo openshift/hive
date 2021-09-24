@@ -339,7 +339,7 @@ func TestParseInstallLog(t *testing.T) {
 					"regexes": `
 - name: AWSSubnetDoesNotExist
   searchRegexStrings:
-  - "The subnet ID '[a-z0-9-]*' does not exist"
+  - "The subnet ID .* does not exist"
   installFailingReason: AWSSubnetDoesNotExist
   installFailingMessage: AWS Subnet Does Not Exist
 `,

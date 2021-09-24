@@ -1645,6 +1645,16 @@ data:
         - "Error deleting IAM Role .* DeleteConflict: Cannot delete entity, must detach all policies first."
       installFailingReason: ErrorDeletingIAMRole
       installFailingMessage: The cluster installer was not able to delete the roles it used during the installation. Ensure that no policies are added to new roles by default and try again.
+    - name: AWSSubnetDoesNotExist
+      searchRegexStrings:
+      - "The subnet ID .* does not exist"
+      installFailingReason: AWSSubnetDoesNotExist
+      installFailingMessage: AWS Subnet Does Not Exist
+    - name: AWSInsufficientPermissions
+      searchRegexStrings:
+      - "current credentials insufficient for performing cluster installation"
+      installFailingReason: AWSInsufficientPermissions
+      installFailingMessage: AWS credentials are insufficient for performing cluster installation
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:

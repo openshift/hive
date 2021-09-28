@@ -12,6 +12,7 @@ import sys
 import tempfile
 import urllib3
 import yaml
+import re
 
 # HIVE_VERSION_PREFIX is the prefix of the Hive version that will be constructed by this script
 # the version used for images and bundles will be "{prefix}.{number of commits}-{git hash}" eg. "v1.2.3187-18827f6"
@@ -31,7 +32,7 @@ REGISTRY_AUTH_FILE_DEFAULT = '{}/.docker/config.json'.format(os.environ['HOME'])
 COMMUNITY_OPERATORS_HIVE_PKG_URL = 'https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-prod/main/operators/hive-operator/hive.package.yaml'
 
 CHANNEL_DEFAULT = 'alpha'
-BRANCH_DEFAULT = 'master'
+HIVE_BRANCH_DEFAULT = 'master'
 
 SUBPROCESS_REDIRECT = subprocess.DEVNULL
 
@@ -47,14 +48,18 @@ def get_params():
                         help='Test run that skips pushing branches and submitting PRs',
                         action='store_true')
     parser.add_argument('--branch',
-                        default=False,
+                        default=HIVE_BRANCH_DEFAULT,
                         help='''The branch (or commit-ish) from which to build and push the image.
-                                If unspecified, we assume `master`. If we're using `master`, we
+                                If unspecified, we assume `{}`. If we're using `{}`, we
                                 generate the bundle version number based on the hive version prefix `{}` and
-                                update the `alpha` channel. If BRANCH *also* corresponds to an `ocm-X.Y`,
+                                update the `{}` channel. If BRANCH *also* corresponds to an `ocm-X.Y`,
                                 we'll also update that channel with the same bundle. If BRANCH corresponds
-                                to an `ocm-X.Y` but *not* `master`, we'll generate the bundle version
-                                number based on `X.Y` and update only that channel.'''.format(HIVE_VERSION_PREFIX))
+                                to an `ocm-X.Y` but *not* `{}`, we'll generate the bundle version
+                                number based on `X.Y` and update only that channel.'''.format(
+                                    HIVE_BRANCH_DEFAULT, HIVE_BRANCH_DEFAULT,
+                                    HIVE_VERSION_PREFIX,
+                                    CHANNEL_DEFAULT,
+                                    HIVE_BRANCH_DEFAULT))
     parser.add_argument('--registry-auth-file',
                         default=REGISTRY_AUTH_FILE_DEFAULT,
                         help='Path to registry auth file')
@@ -67,9 +72,6 @@ def get_params():
                         action='store_true')
     args = parser.parse_args()
 
-    if args.branch and args.branch == BRANCH_DEFAULT:
-        parser.error('--branch=master is assumed by this script and corresponds to the alpha channel')
-
     if not os.path.isfile(args.registry_auth_file):
         parser.error('--registry-auth-file ({}) does not exist, provide --registry-auth-file'.format(args.registry_auth_file))
 
@@ -80,16 +82,7 @@ def get_params():
     return args
 
 # build_and_push_image uses buildah to build the HIVE image (tagged with image_tag) and then pushes the image to quay
-def build_and_push_image(repo_dir, registry_auth_file, image_tag, branch, dry_run):
-    repo = git.Repo(repo_dir)
-
-    print('Checkout out {} branch'.format(branch))
-    try:
-        repo.git.checkout(branch)
-    except:
-        print('Failed to checkout branch {}'.format(branch))
-        raise
-
+def build_and_push_image(registry_auth_file, image_tag, dry_run):
     container_name = '{}:{}'.format(OPERATORHUB_HIVE_IMAGE_DEFAULT, image_tag)
 
     if dry_run:
@@ -115,18 +108,9 @@ def build_and_push_image(repo_dir, registry_auth_file, image_tag, branch, dry_ru
     subprocess.run(cmd.split())
 
 # gen_hive_version generates and returns the hive version eg. "1.2.3187-18827f6"
-def gen_hive_version(repo_dir, branch, commit_hash, prefix):
-    repo = git.Repo(repo_dir)
-
-    print('Checking out {} branch'.format(branch))
-    try:
-        repo.git.checkout(branch)
-    except:
-        print('Failed to checkout branch {}'.format(branch))
-        raise
-
+def gen_hive_version(repo, commit_hash, prefix):
     # sha is the first 7 characters of commit_hash
-    sha = str(repo.rev_parse(commit_hash))[0:7]
+    sha = commit_hash[0:7]
 
     # num commits is the number of git commits counted from the first commit to the provided commit_hash
     # this is the equivalent of running:
@@ -151,6 +135,8 @@ def get_previous_version(channel_name):
         raise
 
 def generate_csv_base(bundle_dir, version, prev_version, channel):
+    if version == prev_version:
+        raise ValueError("Version {} already exists upstream".format(version))
     print("Writing bundle files to directory: %s" % bundle_dir)
     print("Generating CSV for version: %s" % version)
 
@@ -395,6 +381,57 @@ def branch_is_on_master_commit(branch, repo_dir):
 def buildah_installed():
     return shutil.which('buildah') is not None
 
+def process_branch(hive_repo, branch_arg):
+    """Validate and process the input (or default) branch.
+
+    :param hive_repo: The git.Repo for the local hive clone.
+    :param branch_arg: The string commit-ish input (or defaulted) via the --branch arg.
+    :return commit_hash: The canonical full-length sha of the commit corresponding to branch_arg.
+    :return prefix: The two-digit semver prefix of the bundle version to use. If branch_arg is
+        (a descendant of) master, we'll use HIVE_VERSION_PREFIX. If not, and it names an 'ocm-X.Y'
+        branch, we'll use X.Y.
+    :return channels: List of string channel names to update. If branch_arg is (a descendant of)
+        master, this will include 'alpha'. If branch_arg names an 'ocm-X.Y' branch, it will include
+        'ocm-X.Y'.
+    :raise: If we get a branch_arg that's invalid (doesn't correspond to a real commit in hive_repo),
+        or that's not 'ocm-X.Y' or (a descendant of) master.
+    """
+    # Was an ocm-X.Y branch specified?
+    # TODO: Detect if a *hash corresponding to* an ocm-X.Y was specified:
+    #   git branch -r | while read b; do
+    #       if [[ $(git rev-parse $b) == $COMMIT_TO_MATCH ]]; then
+    #           # $b is a remote branch name at the given commit
+    #       fi
+    #   done
+    # Also:
+    # We're cloning the hive repo, so there's no local branch for ocm-X.Y; but we don't want to
+    # force the user to say 'origin/ocm-X.Y'. Accommodate...
+    m = re.match("^(?:[^/]+/)?(ocm-(\d+\.\d+))$", branch_arg)
+    if m:
+        # First capture group is ocm-X.Y
+        branch_arg = 'origin/{}'.format(m.group(1))
+
+    # This will raise an exception if there's no such commit-ish
+    commit_hash = hive_repo.rev_parse(branch_arg).hexsha
+    # This had better exist
+    master_hash = hive_repo.rev_parse(HIVE_BRANCH_DEFAULT).hexsha
+    is_master_ancestor = hive_repo.git.rev_list('--ancestry-path', '{}..{}'.format(commit_hash, master_hash))
+    channels = []
+    prefix = None
+    if commit_hash == master_hash or is_master_ancestor:
+        channels.append(CHANNEL_DEFAULT)
+        prefix = HIVE_VERSION_PREFIX
+    if m:
+        # First capture group is ocm-X.Y
+        channels.append(m.group(1))
+        # Second capture group is just the X.Y bit. But only use it if we're not tracking master.
+        if not prefix:
+            prefix = m.group(2)
+    if not channels or not prefix:
+        raise ValueError("Can't make sense of branch {}: expected {}, a direct descendant thereof, or 'ocm-X.Y'.".format(
+            branch_arg, HIVE_BRANCH_DEFAULT))
+    return commit_hash, prefix, channels
+
 if __name__ == "__main__":
     args = get_params()
 
@@ -411,31 +448,38 @@ if __name__ == "__main__":
         print('Failed to clone repo {} to {}'.format(HIVE_REPO, hive_repo_dir.name))
         raise
 
-    update_channels = [CHANNEL_DEFAULT]
-    if args.branch:
-        if branch_is_on_master_commit(args.branch, hive_repo_dir.name):
-            update_channels.append(args.branch)
-        else:
-            update_channels = [args.branch]
+    hive_repo = git.Repo(hive_repo_dir.name)
 
-    hive_version = ""
+    # If args.branch is master or a direct ancestor, use HIVE_VERSION_PREFIX
+    # (if `git rev-list --ancestry-path ${BRANCH}..master` produces no output, it's not a direct ancestor)
+    # else parse ocm-X.Y
+    #    hive_version_prefix = '{}'.format(args.branch.split('-', 1)[1])
+    hive_commit, hive_version_prefix, update_channels = process_branch(hive_repo, args.branch)
+    # update_channels = [CHANNEL_DEFAULT]
+    # if args.branch:
+    #     if branch_is_on_master_commit(args.branch, hive_repo_dir.name):
+    #         update_channels.append(args.branch)
+    #     else:
+    #         update_channels = [args.branch]
+
+    # The channel we use when looking for stuff in the package.yaml file
+    channel = CHANNEL_DEFAULT if CHANNEL_DEFAULT in update_channels else update_channels[0]
+
     bundle_dir = tempfile.TemporaryDirectory(prefix='hive-operator-bundle-')
     work_dir = tempfile.TemporaryDirectory(prefix='operatorhub-push-')
 
-    if CHANNEL_DEFAULT in update_channels:
-        hive_version = gen_hive_version(hive_repo_dir.name, BRANCH_DEFAULT, 'HEAD', HIVE_VERSION_PREFIX)
-        build_and_push_image(hive_repo_dir.name, args.registry_auth_file, hive_version, BRANCH_DEFAULT, args.dry_run)
-        previous_hive_version = get_previous_version(CHANNEL_DEFAULT)
-        generate_csv_base(bundle_dir.name, hive_version, previous_hive_version, CHANNEL_DEFAULT)
-    else:
-        # the version prefix is determined by the branch name when the top commit of branch
-        # doesn't correspond with HEAD of the master branch
-        # eg. args.branch = "ocm-2.4" -> hive_version_prefix = "2.4"
-        hive_version_prefix = '{}'.format(args.branch.split('-', 1)[1])
-        hive_version = gen_hive_version(hive_repo_dir.name, args.branch, 'HEAD', hive_version_prefix)
-        build_and_push_image(hive_repo_dir.name, args.registry_auth_file, hive_version, args.branch, args.dry_run)
-        previous_hive_version = get_previous_version(args.branch)
-        generate_csv_base(bundle_dir.name, hive_version, previous_hive_version, args.branch)
+    print('Checking out {}'.format(hive_commit))
+    try:
+        hive_repo.git.checkout(hive_commit)
+    except:
+        print('Failed to checkout {}'.format(hive_commit))
+        raise
+
+    hive_version = gen_hive_version(hive_repo, hive_commit, hive_version_prefix)
+    build_and_push_image(args.registry_auth_file, hive_version, args.dry_run)
+
+    # TODO: We shouldn't need channel here, because the package.yaml file is being updated in open_pr (right????)
+    generate_csv_base(bundle_dir.name, hive_version, get_previous_version(channel), channel)
 
     # redhat-openshift-ecosystem/community-operators-prod
     open_pr(work_dir.name,

@@ -15,7 +15,7 @@ import yaml
 
 # HIVE_VERSION_PREFIX is the prefix of the Hive version that will be constructed by this script
 # the version used for images and bundles will be "{prefix}.{number of commits}-{git hash}" eg. "v1.2.3187-18827f6"
-HIVE_VERSION_PREFIX = "v1.2"
+HIVE_VERSION_PREFIX = "1.2"
 
 HIVE_REPO = "git@github.com:openshift/hive.git"
 
@@ -52,7 +52,7 @@ def get_params():
                                 If unspecified, we assume `master`. If we're using `master`, we
                                 generate the bundle version number based on the hive version prefix `{}` and
                                 update the `alpha` channel. If BRANCH *also* corresponds to an `ocm-X.Y`,
-                                we'll also update that channel with the same bundle.If BRANCH corresponds
+                                we'll also update that channel with the same bundle. If BRANCH corresponds
                                 to an `ocm-X.Y` but *not* `master`, we'll generate the bundle version
                                 number based on `X.Y` and update only that channel.'''.format(HIVE_VERSION_PREFIX))
     parser.add_argument('--registry-auth-file',
@@ -114,11 +114,11 @@ def build_and_push_image(repo_dir, registry_auth_file, image_tag, branch, dry_ru
     cmd = cmd + ' {}'.format(container_name)
     subprocess.run(cmd.split())
 
-# gen_hive_version generates and returns the hive version eg. "v1.2.3187-18827f6"
+# gen_hive_version generates and returns the hive version eg. "1.2.3187-18827f6"
 def gen_hive_version(repo_dir, branch, commit_hash, prefix):
     repo = git.Repo(repo_dir)
 
-    print('Checkout out {} branch'.format(branch))
+    print('Checking out {} branch'.format(branch))
     try:
         repo.git.checkout(branch)
     except:
@@ -136,8 +136,8 @@ def gen_hive_version(repo_dir, branch, commit_hash, prefix):
 
     return '{prefix}.{commits}-{sha}'.format(prefix=prefix, commits=num_commits, sha=sha)
 
-# get_previous_version grabs the previous hive version from COMMUNITY_OPERATORS_HIVE_PKG_URL package yaml
-# for the provided channel_name.
+# get_previous_version grabs the previous hive version (without the leading `v`) from
+# COMMUNITY_OPERATORS_HIVE_PKG_URL package yaml for the provided channel_name.
 def get_previous_version(channel_name):
     http = urllib3.PoolManager()
     r = http.request('GET', COMMUNITY_OPERATORS_HIVE_PKG_URL)
@@ -145,7 +145,7 @@ def get_previous_version(channel_name):
     try:
         for channel in pkg_yaml['channels']:
             if channel['name'] == channel_name:
-                return channel['currentCSV'].replace('hive-operator.', '')
+                return channel['currentCSV'].replace('hive-operator.v', '')
     except:
         print('Unable to determine previous hive version from {}', COMMUNITY_OPERATORS_HIVE_PKG_URL)
         raise
@@ -160,6 +160,7 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
     deployment_spec = 'config/operator/operator_deployment.yaml'
     package_file = os.path.join(bundle_dir, 'hive.package.yaml')
 
+    # The bundle directory doesn't have the 'v'
     version_dir = os.path.join(bundle_dir, version)
     if not os.path.exists(version_dir):
         os.mkdir(version_dir)
@@ -211,12 +212,12 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
         csv['spec']['install']['spec']['deployments'][0]['spec'] = operator_deployment['spec']
 
     # Update the versions to include git hash:
-    csv['metadata']['name'] = "hive-operator.%s" % version
+    csv['metadata']['name'] = "hive-operator.v%s" % version
     csv['spec']['version'] = version
-    csv['spec']['replaces'] = "hive-operator.%s" % prev_version
+    csv['spec']['replaces'] = "hive-operator.v%s" % prev_version
 
     # Update the deployment to use the defined image:
-    image_ref = "%s:%s" % (OPERATORHUB_HIVE_IMAGE_DEFAULT, version)
+    image_ref = "%s:v%s" % (OPERATORHUB_HIVE_IMAGE_DEFAULT, version)
     csv['spec']['install']['spec']['deployments'][0]['spec']['template']['spec']['containers'][0]['image'] = image_ref
     csv['metadata']['annotations']['containerImage'] = image_ref
 
@@ -225,7 +226,7 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
     csv['metadata']['annotations']['createdAt'] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Write the CSV to disk:
-    csv_filename = "hive-operator.%s.clusterserviceversion.yaml" % version
+    csv_filename = "hive-operator.v%s.clusterserviceversion.yaml" % version
     csv_file = os.path.join(version_dir, csv_filename)
     with open(csv_file, 'w') as outfile:
         yaml.dump(csv, outfile, default_flow_style=False)
@@ -242,7 +243,7 @@ def generate_package(package_file, channel, version):
       defaultChannel: %s
       packageName: hive-operator
 """
-    name = "hive-operator.%s" % version
+    name = "hive-operator.v%s" % version
     document = document_template % (name, channel, channel)
 
     with open(package_file, 'w') as outfile:
@@ -429,8 +430,8 @@ if __name__ == "__main__":
     else:
         # the version prefix is determined by the branch name when the top commit of branch
         # doesn't correspond with HEAD of the master branch
-        # eg. args.branch = "ocm-2.4" -> hive_version_prefix = "v2.4"
-        hive_version_prefix = 'v{}'.format(args.branch.split('-', 1)[1])
+        # eg. args.branch = "ocm-2.4" -> hive_version_prefix = "2.4"
+        hive_version_prefix = '{}'.format(args.branch.split('-', 1)[1])
         hive_version = gen_hive_version(hive_repo_dir.name, args.branch, 'HEAD', hive_version_prefix)
         build_and_push_image(hive_repo_dir.name, args.registry_auth_file, hive_version, args.branch, args.dry_run)
         previous_hive_version = get_previous_version(args.branch)

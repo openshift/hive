@@ -3,7 +3,7 @@
 import argparse
 import datetime
 import git
-import importlib
+import github as gh
 import json
 import os
 import shutil
@@ -90,16 +90,22 @@ def build_and_push_image(repo_dir, registry_auth_file, image_tag, branch, dry_ru
         print('Failed to checkout branch {}'.format(branch))
         raise
 
-    # build/push the thing
     container_name = '{}:{}'.format(OPERATORHUB_HIVE_IMAGE_DEFAULT, image_tag)
-    print('Building container {}'.format(container_name))
 
     if dry_run:
-        print('Skipping build due to dry-run')
+        print('Skipping build of container {} due to dry-run'.format(container_name))
         return
 
-    cmd = 'buildah bud --tag {} -f ./Dockerfile'.format(container_name).split()
-    subprocess.run(cmd)
+    # Did we already build it locally?
+    cp = subprocess.run('buildah images -nq {}'.format(container_name).split(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if cp.returncode == 0:
+        print('Container {} already exists locally; not rebuilding.'.format(container_name))
+    else:
+        # build/push the thing
+        print('Building container {}'.format(container_name))
+
+        cmd = 'buildah bud --tag {} -f ./Dockerfile'.format(container_name).split()
+        subprocess.run(cmd)
 
     print("Pushing container")
     cmd = 'buildah push '
@@ -334,9 +340,9 @@ def open_pr(work_dir, fork_repo, upstream_repo, gh_username, bundle_source_dir, 
     print("Adding file")
     repo.git.add(HIVE_SUB_DIR)
 
-    print("Commiting {}".format(pr_title))
+    print("Committing {}".format(pr_title))
     try:
-        repo.git.commit('--signoff', '--message="{}"'.format(pr_title))
+        repo.git.commit('--signoff', '--message={}'.format(pr_title))
     except:
         print("Failed to commit")
         raise
@@ -344,15 +350,14 @@ def open_pr(work_dir, fork_repo, upstream_repo, gh_username, bundle_source_dir, 
 
     if not dry_run:
         print("Pushing branch {}".format(branch_name))
-        origin = repo.git.origin
+        origin = repo.remotes.origin
         try:
-            origin.push('--force', branch_name)
+            origin.push(branch_name, None, force=True)
         except:
             print("failed to push branch to origin")
             raise
 
         # open PR
-        gh = importlib.import_module('github')
         client = gh.GitHubClient(dest_github_org, dest_github_reponame, "")
 
         from_branch = "{}:{}".format(gh_username, branch_name)

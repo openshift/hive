@@ -778,14 +778,17 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 			Args: []string{
 				"deprovision",
 				"azure",
+				req.Spec.InfraID,
 				"--loglevel",
 				"debug",
 				"--creds-dir",
 				azureAuthDir,
-				req.Spec.InfraID,
 			},
 			VolumeMounts: volumeMounts,
 		},
+	}
+	if req.Spec.Platform.Azure.CloudName != nil {
+		containers[0].Args = append(containers[0].Args, "--azure-cloud-name", req.Spec.Platform.Azure.CloudName.Name())
 	}
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes

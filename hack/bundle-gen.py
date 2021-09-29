@@ -14,8 +14,12 @@ import urllib3
 import yaml
 import re
 
-# HIVE_VERSION_PREFIX is the prefix of the Hive version that will be constructed by this script
-# the version used for images and bundles will be "{prefix}.{number of commits}-{git hash}" eg. "v1.2.3187-18827f6"
+# HIVE_VERSION_PREFIX is the prefix of the Hive version that will be constructed by
+# this script if we get (or default to) a --branch that tracks master. Otherwise we
+# will use the branch to calculate the prefix (e.g. `--branch ocm-2.3` => '2.3').
+# The version used for images and bundles will be:
+# "{prefix}.{number of commits}-{git hash}"
+# e.g. "v1.2.3187-18827f6"
 HIVE_VERSION_PREFIX = "1.2"
 
 HIVE_REPO = "git@github.com:openshift/hive.git"
@@ -35,6 +39,12 @@ CHANNEL_DEFAULT = "alpha"
 HIVE_BRANCH_DEFAULT = "master"
 
 SUBPROCESS_REDIRECT = subprocess.DEVNULL
+
+# Match things like 'ocm-2.3' or 'origin/ocm-2.3', capturing:
+# 1: 'origin/'
+# 2: 'ocm-2.3'
+# 3: '2.3'
+OCM_BRANCH_RE = re.compile("^([^/]+/)?(ocm-(\d+\.\d+))$")
 
 
 def get_params():
@@ -75,6 +85,7 @@ def get_params():
         default=REGISTRY_AUTH_FILE_DEFAULT,
         help="Path to registry auth file",
     )
+    # TODO: Validate this early! As written, if this is wrong you won't bounce until open_pr.
     parser.add_argument(
         "--github-user",
         default=os.environ["USER"],
@@ -430,23 +441,6 @@ def open_pr(
     print()
 
 
-def branch_is_on_master_commit(branch, repo_dir):
-    repo = git.Repo(repo_dir)
-
-    print("Checkout out {} branch".format(branch))
-    try:
-        repo.git.checkout(branch)
-    except:
-        print("Failed to checkout branch {}".format(branch))
-        raise
-
-    return repo.rev_parse("master") == repo.rev_parse(branch)
-
-
-def buildah_installed():
-    return shutil.which("buildah") is not None
-
-
 def process_branch(hive_repo, branch_arg):
     """Validate and process the input (or default) branch.
 
@@ -462,39 +456,54 @@ def process_branch(hive_repo, branch_arg):
     :raise: If we get a branch_arg that's invalid (doesn't correspond to a real commit in hive_repo),
         or that's not 'ocm-X.Y' or (a descendant of) master.
     """
-    # Was an ocm-X.Y branch specified?
-    # TODO: Detect if a *hash corresponding to* an ocm-X.Y was specified:
-    #   git branch -r | while read b; do
-    #       if [[ $(git rev-parse $b) == $COMMIT_TO_MATCH ]]; then
-    #           # $b is a remote branch name at the given commit
-    #       fi
-    #   done
-    # Also:
     # We're cloning the hive repo, so there's no local branch for ocm-X.Y; but we don't want to
     # force the user to say 'origin/ocm-X.Y'. Accommodate...
-    m = re.match("^(?:[^/]+/)?(ocm-(\d+\.\d+))$", branch_arg)
+    m = OCM_BRANCH_RE.match(branch_arg)
     if m:
-        # First capture group is ocm-X.Y
-        branch_arg = "origin/{}".format(m.group(1))
+        # Second capture group is ocm-X.Y
+        branch_arg = "origin/{}".format(m.group(2))
 
     # This will raise an exception if there's no such commit-ish
     commit_hash = hive_repo.rev_parse(branch_arg).hexsha
+
     # This had better exist
     master_hash = hive_repo.rev_parse(HIVE_BRANCH_DEFAULT).hexsha
     is_master_ancestor = hive_repo.git.rev_list(
         "--ancestry-path", "{}..{}".format(commit_hash, master_hash)
     )
+
+    # Was (a commit on) an ocm-X.Y branch specified?
+    # This will find all such branch names and add them to the channel list.
+    # However, we'll only support >1 entry in this list if we're tracking
+    # master, because otherwise which would we use to compute the semver?
     channels = []
-    prefix = None
+    maybe_prefix = None
+    for ref in hive_repo.refs:
+        m = OCM_BRANCH_RE.match(ref.name)
+        # Only pay attention to remote refs
+        if m and m.group(1) == "origin/":
+            if hive_repo.rev_parse(ref.name).hexsha == commit_hash:
+                # Second capture group is ocm-X.Y
+                channels.append(m.group(2))
+                # Third capture group is X.Y. We'll only use this if we end up with one
+                # entry in this list AND we're not tracking master
+                maybe_prefix = m.group(3)
+
     if commit_hash == master_hash or is_master_ancestor:
-        channels.append(CHANNEL_DEFAULT)
         prefix = HIVE_VERSION_PREFIX
-    if m:
-        # First capture group is ocm-X.Y
-        channels.append(m.group(1))
-        # Second capture group is just the X.Y bit. But only use it if we're not tracking master.
-        if not prefix:
-            prefix = m.group(2)
+        if commit_hash == master_hash:
+            channels.append(CHANNEL_DEFAULT)
+    else:
+        if len(channels) > 1:
+            raise ValueError(
+                "Found more than one ocm-X.Y branch at {}: {}.\n".format(
+                    branch_arg, channels
+                )
+                + "I can't handle this unless they're direct descendants of master -- "
+                + "which one would I use as the semver base?"
+            )
+        prefix = maybe_prefix
+
     if not channels or not prefix:
         raise ValueError(
             "Can't make sense of branch {}: expected {}, a direct descendant thereof, or 'ocm-X.Y'.".format(
@@ -507,7 +516,7 @@ def process_branch(hive_repo, branch_arg):
 if __name__ == "__main__":
     args = get_params()
 
-    if not buildah_installed():
+    if not shutil.which("buildah"):
         print("buildah not found, please install buildah")
         sys.exit(1)
 
@@ -522,19 +531,9 @@ if __name__ == "__main__":
 
     hive_repo = git.Repo(hive_repo_dir.name)
 
-    # If args.branch is master or a direct ancestor, use HIVE_VERSION_PREFIX
-    # (if `git rev-list --ancestry-path ${BRANCH}..master` produces no output, it's not a direct ancestor)
-    # else parse ocm-X.Y
-    #    hive_version_prefix = '{}'.format(args.branch.split('-', 1)[1])
     hive_commit, hive_version_prefix, update_channels = process_branch(
         hive_repo, args.branch
     )
-    # update_channels = [CHANNEL_DEFAULT]
-    # if args.branch:
-    #     if branch_is_on_master_commit(args.branch, hive_repo_dir.name):
-    #         update_channels.append(args.branch)
-    #     else:
-    #         update_channels = [args.branch]
 
     # The channel we use when looking for stuff in the package.yaml file
     channel = (

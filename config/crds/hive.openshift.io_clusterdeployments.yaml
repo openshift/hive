@@ -530,7 +530,6 @@ spec:
                         - AzureUSGovernmentCloud
                         - AzureChinaCloud
                         - AzureGermanCloud
-                        - AzureStackCloud
                         type: string
                       credentialsSecretRef:
                         description: CredentialsSecretRef refers to a secret that

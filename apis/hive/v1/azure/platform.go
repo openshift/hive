@@ -27,7 +27,7 @@ type Platform struct {
 }
 
 // CloudEnvironment is the name of the Azure cloud environment
-// +kubebuilder:validation:Enum="";AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud;AzureStackCloud
+// +kubebuilder:validation:Enum="";AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud
 type CloudEnvironment string
 
 const (
@@ -42,9 +42,6 @@ const (
 
 	// GermanCloud is the Azure cloud environment used in Germany.
 	GermanCloud CloudEnvironment = "AzureGermanCloud"
-
-	// StackCloud is the Azure cloud environment used at the edge and on premises.
-	StackCloud CloudEnvironment = "AzureStackCloud"
 )
 
 // Name returns name that Azure uses for the cloud environment.

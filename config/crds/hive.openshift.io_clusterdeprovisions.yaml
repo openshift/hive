@@ -109,7 +109,6 @@ spec:
                         - AzureUSGovernmentCloud
                         - AzureChinaCloud
                         - AzureGermanCloud
-                        - AzureStackCloud
                         type: string
                       credentialsSecretRef:
                         description: CredentialsSecretRef is the Azure account credentials

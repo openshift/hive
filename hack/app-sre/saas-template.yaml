@@ -788,7 +788,6 @@ objects:
                           - AzureUSGovernmentCloud
                           - AzureChinaCloud
                           - AzureGermanCloud
-                          - AzureStackCloud
                           type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef refers to a secret that
@@ -1454,7 +1453,6 @@ objects:
                           - AzureUSGovernmentCloud
                           - AzureChinaCloud
                           - AzureGermanCloud
-                          - AzureStackCloud
                           type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef is the Azure account credentials
@@ -1973,7 +1971,6 @@ objects:
                           - AzureUSGovernmentCloud
                           - AzureChinaCloud
                           - AzureGermanCloud
-                          - AzureStackCloud
                           type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef refers to a secret that

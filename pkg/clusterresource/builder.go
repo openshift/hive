@@ -542,6 +542,10 @@ func (o *Builder) generateServingCertSecret() *corev1.Secret {
 
 func (o *Builder) generateAdminKubeconfigSecret() *corev1.Secret {
 	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      o.getAdoptAdminKubeconfigSecretName(),
 			Namespace: o.Namespace,
@@ -572,6 +576,10 @@ func (o *Builder) generateAdoptedAdminPasswordSecret() *corev1.Secret {
 		return nil
 	}
 	adminPasswordSecret := &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      o.getAdoptAdminPasswordSecretName(),
 			Namespace: o.Namespace,

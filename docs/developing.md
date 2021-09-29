@@ -8,13 +8,14 @@
   - [Build and run tests](#build-and-run-tests)
   - [Setting up the development environment](#setting-up-the-development-environment)
     - [Cloning the repository](#cloning-the-repository)
-  - [Deploying with Kubernetes In Docker (kind)](#deploying-with-kubernetes-in-docker-kind)
-  - [Deploying with kind and Podman (EXPERIMENTAL)](#deploying-with-kind-and-podman-experimental)
-  - [Writing/Testing Code](#writingtesting-code)
-    - [Run Hive Operator](#run-hive-operator)
-      - [Directly from source](#directly-from-source)
-      - [Run Hive Operator Using Custom Images](#run-hive-operator-using-custom-images)
-    - [Run Hive Controllers From Source](#run-hive-controllers-from-source)
+  - [Obtaining a Cluster](#obtaining-a-cluster)
+    - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
+  - [Deploying from Source](#deploying-from-source)
+    - [Full Container Build](#full-container-build)
+    - [Fedora Development Container Build](#fedora-development-container-build)
+    - [Running Code Locally](#running-code-locally)
+      - [hive-operator](#hive-operator)
+    - [hive-controllers](#hive-controllers)
   - [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
   - [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
   - [Using Serving Certificates](#using-serving-certificates)
@@ -205,12 +206,6 @@ We use a hiveutil subcommand for the install-manager, in pods and thus in an ima
  3. Compile your hiveutil changes: `$ make build`
  4. Set your pull secret as an env var to match the pod: `$ export PULL_SECRET=$(cat ~/pull-secret)`
  5. Run: `/bin/hiveutil install-manager --work-dir $GOPATH/src/github.com/openshift/hive/temp --log-level=debug hive ${CLUSTER_NAME}`
-
-## Build OLM Bundle
-
-While a community Hive operator bundle is now published weekly to OperatorHub (see above), in rare cases developers may want to build a bundle from source.  You can run or work off the test script below to generate a ClusterServiceVersion, OLM bundle+package, registry image, catalog source, and subscription. (WARNING: this is seldom used and may not always be working)
-
-`hack/generate-operator-bundle-operatorhub.py operatorhub --previous-version 1.1.11 --new-version 1.1.12 --hive-image "quay.io/dgoodwin/hive:latest"`
 
 ## Enable Debug Logging In Hive Controllers
 

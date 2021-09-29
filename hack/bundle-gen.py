@@ -102,9 +102,10 @@ def get_params():
     return args
 
 
-# build_and_push_image uses buildah to build the HIVE image (tagged with image_tag) and then pushes the image to quay
-def build_and_push_image(registry_auth_file, image_tag, dry_run):
-    container_name = "{}:{}".format(OPERATORHUB_HIVE_IMAGE_DEFAULT, image_tag)
+# build_and_push_image uses buildah to build the HIVE image (tagged with "v{hive_version}"
+# eg. "v1.2.3187-18827f6") and then pushes the image to quay
+def build_and_push_image(registry_auth_file, hive_version, dry_run):
+    container_name = "{}:v{}".format(OPERATORHUB_HIVE_IMAGE_DEFAULT, hive_version)
 
     if dry_run:
         print("Skipping build of container {} due to dry-run".format(container_name))

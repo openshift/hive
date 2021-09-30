@@ -374,7 +374,7 @@ def open_pr(
     for channel in bundle["channels"]:
         if channel["name"] in update_channels:
             found = True
-            channel["currentCSV"] = "hive-operator.{}".format(new_version)
+            channel["currentCSV"] = "hive-operator.v{}".format(new_version)
 
     if not found:
         print("did not find a CSV channel to update")

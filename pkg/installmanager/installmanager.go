@@ -566,11 +566,15 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			Logger:  logger,
 		}
 	case cd.Spec.Platform.Azure != nil:
+		cloudName := installertypesazure.PublicCloud.Name()
+		if cd.Spec.Platform.Azure.CloudName != "" {
+			cloudName = cd.Spec.Platform.Azure.CloudName.Name()
+		}
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				Azure: &installertypesazure.Metadata{
-					CloudName: installertypesazure.PublicCloud,
+					CloudName: installertypesazure.CloudEnvironment(cloudName),
 				},
 			},
 		}

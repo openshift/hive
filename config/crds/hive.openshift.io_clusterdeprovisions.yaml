@@ -99,6 +99,17 @@ spec:
                   azure:
                     description: Azure contains Azure-specific deprovision settings
                     properties:
+                      cloudName:
+                        description: cloudName is the name of the Azure cloud environment
+                          which can be used to configure the Azure SDK with the appropriate
+                          Azure API endpoints. If empty, the value is equal to "AzurePublicCloud".
+                        enum:
+                        - ""
+                        - AzurePublicCloud
+                        - AzureUSGovernmentCloud
+                        - AzureChinaCloud
+                        - AzureGermanCloud
+                        type: string
                       credentialsSecretRef:
                         description: CredentialsSecretRef is the Azure account credentials
                           to use for deprovisioning the cluster

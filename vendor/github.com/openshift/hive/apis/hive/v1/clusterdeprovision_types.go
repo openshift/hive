@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/openshift/hive/apis/hive/v1/aws"
+	"github.com/openshift/hive/apis/hive/v1/azure"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -64,6 +65,11 @@ type AWSClusterDeprovision struct {
 type AzureClusterDeprovision struct {
 	// CredentialsSecretRef is the Azure account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+	// cloudName is the name of the Azure cloud environment which can be used to configure the Azure SDK
+	// with the appropriate Azure API endpoints.
+	// If empty, the value is equal to "AzurePublicCloud".
+	// +optional
+	CloudName *azure.CloudEnvironment `json:"cloudName,omitempty"`
 }
 
 // GCPClusterDeprovision contains GCP-specific configuration for a ClusterDeprovision

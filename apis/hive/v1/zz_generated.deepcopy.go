@@ -258,6 +258,11 @@ func (in *AzureClusterDeprovision) DeepCopyInto(out *AzureClusterDeprovision) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.CloudName != nil {
+		in, out := &in.CloudName, &out.CloudName
+		*out = new(azure.CloudEnvironment)
+		**out = **in
+	}
 	return
 }
 

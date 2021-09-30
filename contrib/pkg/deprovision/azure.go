@@ -15,18 +15,24 @@ import (
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 )
 
+// AzureOptions is the set of options to deprovision an Azure cluster
+type AzureOptions struct {
+	logLevel  string
+	cloudName string
+}
+
 // NewDeprovisionAzureCommand is the entrypoint to create the azure deprovision subcommand
 func NewDeprovisionAzureCommand() *cobra.Command {
-	var logLevel string
+	opt := &AzureOptions{}
 	cmd := &cobra.Command{
-		Use:   "azure INFRAID",
+		Use:   "azure INFRAID --azure-cloud-name CLOUDNAME",
 		Short: "Deprovision Azure assets (as created by openshift-installer)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := validate(); err != nil {
 				log.WithError(err).Fatal("Failed validating Azure credentials")
 			}
-			uninstaller, err := completeAzureUninstaller(logLevel, args)
+			uninstaller, err := completeAzureUninstaller(opt.logLevel, opt.cloudName, args)
 			if err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
@@ -37,7 +43,8 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
+	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
+	flags.StringVar(&opt.cloudName, "azure-cloud-name", installertypesazure.PublicCloud.Name(), "cloudName is the name of the Azure cloud environment used to configure the Azure SDK")
 	return cmd
 }
 
@@ -50,7 +57,7 @@ func validate() error {
 	return nil
 }
 
-func completeAzureUninstaller(logLevel string, args []string) (providers.Destroyer, error) {
+func completeAzureUninstaller(logLevel, cloudName string, args []string) (providers.Destroyer, error) {
 
 	// Set log level
 	level, err := log.ParseLevel(logLevel)
@@ -72,7 +79,7 @@ func completeAzureUninstaller(logLevel string, args []string) (providers.Destroy
 		InfraID: args[0],
 		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
 			Azure: &installertypesazure.Metadata{
-				CloudName: installertypesazure.PublicCloud,
+				CloudName: installertypesazure.CloudEnvironment(cloudName),
 			},
 		},
 	}

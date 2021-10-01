@@ -17,23 +17,23 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.clusterMetadata.infraID
+      name: InfraID
+      type: string
     - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-platform
       name: Platform
       type: string
     - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-region
       name: Region
       type: string
+    - jsonPath: .metadata.labels.hive\.openshift\.io/version-major-minor-patch
+      name: Version
+      type: string
     - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-type
       name: ClusterType
       type: string
-    - jsonPath: .spec.installed
-      name: Installed
-      type: boolean
-    - jsonPath: .spec.clusterMetadata.infraID
-      name: InfraID
-      type: string
-    - jsonPath: .metadata.labels.hive\.openshift\.io/version-major-minor-patch
-      name: Version
+    - jsonPath: .status.conditions[?(@.type=='Provisioned')].reason
+      name: ProvisionStatus
       type: string
     - jsonPath: .status.conditions[?(@.type=='Hibernating')].reason
       name: PowerState

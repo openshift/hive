@@ -165,6 +165,7 @@ if [[ -z "$cd" ]]; then
 fi
 # Patch the CD's ProvisionStopped status condition to make it look "broken".
 # This should cause the clusterpool controller to replace it.
+i=0
 while j=$(oc get cd -n $cd $cd -o json); do
   i=$((i+1))
   if [[ $i -gt $max_tries ]]; then

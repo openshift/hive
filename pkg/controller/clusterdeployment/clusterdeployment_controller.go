@@ -67,6 +67,7 @@ var (
 		hivev1.ProvisionStoppedCondition,
 		hivev1.AuthenticationFailureClusterDeploymentCondition,
 		hivev1.RequirementsMetCondition,
+		hivev1.ProvisionedCondition,
 
 		// ClusterInstall conditions copied over to cluster deployment
 		hivev1.ClusterInstallFailedClusterDeploymentCondition,
@@ -712,7 +713,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithField("releaseImage", releaseImage).
 				WithField("releaseDigest", releaseDigest).
 				WithError(err).Error("Verification of release image failed")
-			return reconcile.Result{}, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionTrue, "ReleaseImageVerificationFailed", err.Error(), cdLog)
+			return reconcile.Result{}, r.updateCondition(cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue, "ReleaseImageVerificationFailed", err.Error(), cdLog)
 		}
 	}
 
@@ -944,7 +945,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	// The job does not exist. If the images have been resolved, continue reconciling. Otherwise, create the job.
 	case apierrors.IsNotFound(err):
 		if areImagesResolved {
-			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
+			return nil, r.updateCondition(cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
 
 		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.InstallServiceAccountName,
@@ -986,7 +987,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	// If the images were not resolved, requeue and wait for the delete to complete.
 	case !existingJob.DeletionTimestamp.IsZero():
 		if areImagesResolved {
-			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
+			return nil, r.updateCondition(cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
 		jobLog.Debug("imageset job is being deleted. Will recreate once deleted")
 		return &reconcile.Result{RequeueAfter: defaultRequeueTime}, err
@@ -1004,7 +1005,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			return nil, err
 		}
 		if areImagesResolved {
-			return nil, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
+			return nil, r.updateCondition(cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
 
 		// the job has failed to update the images and therefore
@@ -1018,7 +1019,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 				existingJob.Namespace, existingJob.Name,
 				jcond.Reason, jcond.Message,
 			)
-			return &reconcile.Result{}, r.setInstallImagesNotResolvedCondition(cd, corev1.ConditionTrue, "JobToResolveImagesFailed", msg, cdLog)
+			return &reconcile.Result{}, r.updateCondition(cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue, "JobToResolveImagesFailed", msg, cdLog)
 		}
 
 		return &reconcile.Result{}, nil
@@ -1030,10 +1031,16 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	}
 }
 
-func (r *ReconcileClusterDeployment) setInstallImagesNotResolvedCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) updateCondition(
+	cd *hivev1.ClusterDeployment,
+	ctype hivev1.ClusterDeploymentConditionType,
+	status corev1.ConditionStatus,
+	reason string,
+	message string,
+	cdLog log.FieldLogger) error {
 	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,
-		hivev1.InstallImagesNotResolvedCondition,
+		ctype,
 		status,
 		reason,
 		message,
@@ -1042,23 +1049,7 @@ func (r *ReconcileClusterDeployment) setInstallImagesNotResolvedCondition(cd *hi
 		return nil
 	}
 	cd.Status.Conditions = conditions
-	cdLog.Debugf("setting InstallImagesNotResolvedCondition to %v", status)
-	return r.Status().Update(context.TODO(), cd)
-}
-
-func (r *ReconcileClusterDeployment) setDNSNotReadyCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {
-	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-		cd.Status.Conditions,
-		hivev1.DNSNotReadyCondition,
-		status,
-		reason,
-		message,
-		controllerutils.UpdateConditionIfReasonOrMessageChange)
-	if !changed {
-		return nil
-	}
-	cd.Status.Conditions = conditions
-	cdLog.Debugf("setting DNSNotReadyCondition to %v", status)
+	cdLog.Debugf("setting %s Condition to %v", ctype, status)
 	return r.Status().Update(context.TODO(), cd)
 }
 
@@ -1090,38 +1081,6 @@ func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.Cluster
 	cd.Status.Conditions = conditions
 
 	return changed, r.Status().Update(context.TODO(), cd)
-}
-
-func (r *ReconcileClusterDeployment) setInstallLaunchErrorCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {
-	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-		cd.Status.Conditions,
-		hivev1.InstallLaunchErrorCondition,
-		status,
-		reason,
-		message,
-		controllerutils.UpdateConditionIfReasonOrMessageChange)
-	if !changed {
-		return nil
-	}
-	cd.Status.Conditions = conditions
-	cdLog.WithField("status", status).Debug("setting InstallLaunchErrorCondition")
-	return r.Status().Update(context.TODO(), cd)
-}
-
-func (r *ReconcileClusterDeployment) setDeprovisionLaunchErrorCondition(cd *hivev1.ClusterDeployment, status corev1.ConditionStatus, reason string, message string, cdLog log.FieldLogger) error {
-	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-		cd.Status.Conditions,
-		hivev1.DeprovisionLaunchErrorCondition,
-		status,
-		reason,
-		message,
-		controllerutils.UpdateConditionIfReasonOrMessageChange)
-	if !changed {
-		return nil
-	}
-	cd.Status.Conditions = conditions
-	cdLog.WithField("status", status).Debug("setting DeprovisionLaunchErrorCondition")
-	return r.Status().Update(context.TODO(), cd)
 }
 
 func (r *ReconcileClusterDeployment) setReqsMetConditionImageSetNotFound(cd *hivev1.ClusterDeployment, name string, isNotFound bool, cdLog log.FieldLogger) error {
@@ -1297,7 +1256,13 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 			}
 			return false, err
 		default:
-			return false, nil
+			// Successfully created the ClusterDeprovision. Update the Provisioned CD status condition accordingly.
+			return false, r.updateCondition(cd,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionFalse,
+				hivev1.DeprovisioningProvisionedReason,
+				"Cluster is being deprovisioned",
+				cdLog)
 		}
 	case err != nil:
 		cdLog.WithError(err).Error("error getting deprovision request")
@@ -1306,24 +1271,57 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 
 	authenticationFailureCondition := controllerutils.FindClusterDeprovisionCondition(existingRequest.Status.Conditions, hivev1.AuthenticationFailureClusterDeprovisionCondition)
 	if authenticationFailureCondition != nil {
-		err := r.setDeprovisionLaunchErrorCondition(cd,
+		var conds []hivev1.ClusterDeploymentCondition
+		var changed1, changed2, authFailure bool
+		conds, changed1 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.DeprovisionLaunchErrorCondition,
 			authenticationFailureCondition.Status,
 			authenticationFailureCondition.Reason,
 			authenticationFailureCondition.Message,
-			cdLog)
-
-		if err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update deprovisionLaunchErrorCondition")
-			return false, err
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		if authenticationFailureCondition.Status == corev1.ConditionTrue {
+			authFailure = true
+			conds, changed2 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				conds,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionFalse,
+				hivev1.DeprovisionFailedProvisionedReason,
+				"Cluster deprovision failed",
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+		}
+		if changed1 || changed2 {
+			cd.Status.Conditions = conds
+			return false, r.Status().Update(context.TODO(), cd)
+		}
+		if authFailure {
+			// We get here if we had already set Provisioned to DeprovisionFailed
+			return false, nil
 		}
 	}
 
 	if !existingRequest.Status.Completed {
 		cdLog.Debug("deprovision request not yet completed")
-		return false, nil
+		return false, r.updateCondition(
+			cd,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionFalse,
+			hivev1.DeprovisioningProvisionedReason,
+			"Cluster is deprovisioning",
+			cdLog,
+		)
 	}
 
-	return true, nil
+	// Deprovision succeeded
+	return true, r.updateCondition(
+		cd,
+		hivev1.ProvisionedCondition,
+		corev1.ConditionFalse,
+		hivev1.DeprovisionedProvisionedReason,
+		"Cluster is deprovisioned",
+		cdLog,
+	)
 }
 
 func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
@@ -1472,7 +1470,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	case p.Azure != nil:
 	default:
 		cdLog.Error("cluster deployment platform does not support managed DNS")
-		if err := r.setDNSNotReadyCondition(cd, corev1.ConditionTrue, dnsUnsupportedPlatformReason, "Managed DNS is not supported on specified platform", cdLog); err != nil {
+		if err := r.updateCondition(cd, hivev1.DNSNotReadyCondition, corev1.ConditionTrue, dnsUnsupportedPlatformReason, "Managed DNS is not supported on specified platform", cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition for DNSUnsupportedPlatform reason")
 			return nil, err
 		}
@@ -1494,7 +1492,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 
 	if !metav1.IsControlledBy(dnsZone, cd) {
 		cdLog.Error("DNS zone already exists but is not owned by cluster deployment")
-		if err := r.setDNSNotReadyCondition(cd, corev1.ConditionTrue, dnsZoneResourceConflictReason, "Existing DNS zone not owned by cluster deployment", cdLog); err != nil {
+		if err := r.updateCondition(cd, hivev1.DNSNotReadyCondition, corev1.ConditionTrue, dnsZoneResourceConflictReason, "Existing DNS zone not owned by cluster deployment", cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return nil, err
 		}
@@ -1548,7 +1546,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 			}
 		}
 	}
-	if err := r.setDNSNotReadyCondition(cd, status, reason, message, cdLog); err != nil {
+	if err := r.updateCondition(cd, hivev1.DNSNotReadyCondition, status, reason, message, cdLog); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 		return nil, err
 	}

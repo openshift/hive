@@ -400,6 +400,10 @@ const (
 	// ProvisionStoppedCondition is set when cluster provisioning is stopped
 	ProvisionStoppedCondition ClusterDeploymentConditionType = "ProvisionStopped"
 
+	// Provisioned is True when a cluster is installed; False while it is provisioning or deprovisioning.
+	// The Reason indicates where it is in that lifecycle.
+	ProvisionedCondition ClusterDeploymentConditionType = "Provisioned"
+
 	// RequirementsMetCondition is set True when all pre-provision requirements have been met,
 	// and the controllers can begin the cluster install.
 	RequirementsMetCondition ClusterDeploymentConditionType = "RequirementsMet"
@@ -432,6 +436,7 @@ var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionTy
 	ClusterInstallCompletedClusterDeploymentCondition,
 	ClusterInstallRequirementsMetClusterDeploymentCondition,
 	RequirementsMetCondition,
+	ProvisionedCondition,
 }
 
 // Cluster hibernating reasons
@@ -464,6 +469,22 @@ const (
 	SyncSetsNotAppliedReason = "SyncSetsNotApplied"
 )
 
+// Provisioned status condition reasons
+const (
+	// ProvisioningProvisionedReason is set while the cluster is still provisioning.
+	ProvisioningProvisionedReason = "Provisioning"
+	// ProvisionStoppedProvisionedReason means cluster provisioning is stopped. The ProvisionStopped condition may contain more detail.
+	ProvisionStoppedProvisionedReason = "ProvisionStopped"
+	// ProvisionedProvisionedReason is set when the provision is successful.
+	ProvisionedProvisionedReason = "Provisioned"
+	// DeprovisioningProvisionedReason is set when we start to deprovision the cluster.
+	DeprovisioningProvisionedReason = "Deprovisioning"
+	// DeprovisionFailedProvisionedReason means the deprovision failed terminally.
+	DeprovisionFailedProvisionedReason = "DeprovisionFailed"
+	// DeprovisionedProvisionedReason is set when the cluster has been successfully deprovisioned
+	DeprovisionedProvisionedReason = "Deprovisioned"
+)
+
 // InitializedConditionReason is used when a condition is initialized for the first time, and the status of the
 // condition is still Unknown
 const InitializedConditionReason = "Initialized"
@@ -474,12 +495,12 @@ const InitializedConditionReason = "Initialized"
 // ClusterDeployment is the Schema for the clusterdeployments API
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="InfraID",type="string",JSONPath=".spec.clusterMetadata.infraID"
 // +kubebuilder:printcolumn:name="Platform",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/cluster-platform"
 // +kubebuilder:printcolumn:name="Region",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/cluster-region"
-// +kubebuilder:printcolumn:name="ClusterType",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/cluster-type"
-// +kubebuilder:printcolumn:name="Installed",type="boolean",JSONPath=".spec.installed"
-// +kubebuilder:printcolumn:name="InfraID",type="string",JSONPath=".spec.clusterMetadata.infraID"
 // +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/version-major-minor-patch"
+// +kubebuilder:printcolumn:name="ClusterType",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/cluster-type"
+// +kubebuilder:printcolumn:name="ProvisionStatus",type="string",JSONPath=".status.conditions[?(@.type=='Provisioned')].reason"
 // +kubebuilder:printcolumn:name="PowerState",type="string",JSONPath=".status.conditions[?(@.type=='Hibernating')].reason"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:path=clusterdeployments,shortName=cd,scope=Namespaced

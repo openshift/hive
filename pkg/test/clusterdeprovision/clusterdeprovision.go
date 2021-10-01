@@ -1,9 +1,11 @@
 package clusterdeprovision
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/test/generic"
 )
 
@@ -84,5 +86,18 @@ func WithNamespace(namespace string) Option {
 func Completed() Option {
 	return func(clusterDeprovision *hivev1.ClusterDeprovision) {
 		clusterDeprovision.Status.Completed = true
+	}
+}
+
+func WithAuthenticationFailure() Option {
+	return func(clusterDeprovision *hivev1.ClusterDeprovision) {
+		clusterDeprovision.Status.Conditions = controllerutils.SetClusterDeprovisionCondition(
+			clusterDeprovision.Status.Conditions,
+			hivev1.AuthenticationFailureClusterDeprovisionCondition,
+			v1.ConditionTrue,
+			"AReason",
+			"A Message",
+			controllerutils.UpdateConditionAlways,
+		)
 	}
 }

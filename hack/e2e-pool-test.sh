@@ -165,13 +165,17 @@ if [[ -z "$cd" ]]; then
 fi
 # Patch the CD's ProvisionStopped status condition to make it look "broken".
 # This should cause the clusterpool controller to replace it.
-${0%/*}/statuspatch cd -n $cd $cd <<< '(.status.conditions[] | select(.type=="ProvisionStopped") | .status) = "True"'
-# The controller deletes the CD. Wait for it to disappear
-while oc get cd -n $cd $cd >/dev/null; do
+while j=$(oc get cd -n $cd $cd -o json); do
   i=$((i+1))
   if [[ $i -gt $max_tries ]]; then
     echo "Timed out waiting for clusterdeployment $cd to be deleted."
     exit 1
+  fi
+  # We do this inside the loop because we can hit a timing window where a controller overwrites the
+  # ProvisionStopped condition, undoing this change.
+  if [[ $(jq -r '.status.conditions[] | select(.type=="ProvisionStopped") | .status' <<<"$j") != "True" ]]; then
+    echo "Patching ProvisionStopped to True for CD $cd"
+    ${0%/*}/statuspatch cd -n $cd $cd <<< '(.status.conditions[] | select(.type=="ProvisionStopped") | .status) = "True"'
   fi
   echo "Waiting for clusterdeployment $cd to be deleted: $i of $max_tries"
   sleep $sleep_between_tries

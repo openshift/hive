@@ -599,6 +599,18 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				return reconcile.Result{Requeue: true}, nil
 			}
 		}
+		// Set the Provisioned status condition for adopted clusters (and in case we upgraded to/past where that condition was introduced)
+		if err := r.updateCondition(
+			cd,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionTrue,
+			hivev1.ProvisionedProvisionedReason,
+			"Cluster is provisioned",
+			cdLog,
+		); err != nil {
+			cdLog.WithError(err).Error("Error updating Provisioned status condition")
+			return reconcile.Result{}, err
+		}
 
 		// update SyncSetFailedCondition status condition
 		cdLog.Debug("Check if any syncsets are failing")

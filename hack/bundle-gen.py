@@ -113,8 +113,8 @@ def get_params():
     return args
 
 
-# build_and_push_image uses buildah to build the HIVE image (tagged with "v{hive_version}"
-# eg. "v1.2.3187-18827f6") and then pushes the image to quay
+# build_and_push_image uses buildah to build the HIVE image from the current working directory
+# (tagged with "v{hive_version}" eg. "v1.2.3187-18827f6") and then pushes the image to quay
 def build_and_push_image(registry_auth_file, hive_version, dry_run):
     container_name = "{}:v{}".format(OPERATORHUB_HIVE_IMAGE_DEFAULT, hive_version)
 
@@ -185,7 +185,8 @@ def get_previous_version(channel_name):
         )
         raise
 
-
+# generate_csv_base generates a hive bundle from the current working directory
+# and deposits all artifacts in the specified bundle_dir
 def generate_csv_base(bundle_dir, version, prev_version, channel):
     if version == prev_version:
         raise ValueError("Version {} already exists upstream".format(version))
@@ -543,6 +544,9 @@ if __name__ == "__main__":
 
     bundle_dir = tempfile.TemporaryDirectory(prefix="hive-operator-bundle-")
     work_dir = tempfile.TemporaryDirectory(prefix="operatorhub-push-")
+
+    print("Working in {}".format(hive_repo_dir.name))
+    os.chdir(hive_repo_dir.name)
 
     print("Checking out {}".format(hive_commit))
     try:

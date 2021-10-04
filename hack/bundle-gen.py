@@ -139,14 +139,14 @@ def build_and_push_image(registry_auth_file, hive_version, dry_run):
         print("Building container {}".format(container_name))
 
         cmd = "buildah bud --tag {} -f ./Dockerfile".format(container_name).split()
-        subprocess.run(cmd)
+        subprocess.run(cmd, check=True)
 
     print("Pushing container")
     cmd = "buildah push "
     if registry_auth_file != None:
         cmd = cmd + " --authfile={} ".format(registry_auth_file)
     cmd = cmd + " {}".format(container_name)
-    subprocess.run(cmd.split())
+    subprocess.run(cmd.split(), check=True)
 
 
 # gen_hive_version generates and returns the hive version eg. "1.2.3187-18827f6"

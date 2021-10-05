@@ -1169,6 +1169,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 5,
 			// The assignments don't happen until a subsequent reconcile after the CDs are ready
 			expectedUnassignedClaims: 3,
+			// Even though runningCount is zero, we run enough clusters to fulfill the excess claims
+			expectedRunning: 3,
 		},
 		{
 			name: "zero size pool",
@@ -1179,6 +1181,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 1,
 			// The assignments don't happen until a subsequent reconcile after the CDs are ready
 			expectedUnassignedClaims: 1,
+			// Even though runningCount is zero, we run enough clusters to fulfill the excess claims
+			expectedRunning: 1,
 		},
 		{
 			name: "no CDs match pool version",
@@ -1364,10 +1368,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters: 9,
 			// The four original pool CDs got claimed. Two were already running; we started the other two.
 			// We create five new CDs to satisfy the pool size plus the additional claim.
-			// Of those, we start two for runningCount, and hibernate the rest.
-			// (Intuitively, perhaps the one for the excess claim should start off in running state.
-			// But that's not how the logic works today. Should it?)
-			expectedRunning:          6,
+			// Of those, we start two for runningCount, and one more for the excess claim.
+			expectedRunning:          7,
 			expectedAssignedCDs:      4,
 			expectedAssignedClaims:   4,
 			expectedUnassignedClaims: 1,

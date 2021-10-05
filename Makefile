@@ -142,10 +142,6 @@ $(addprefix test-unit-submodules-,$(GO_SUB_MODULES)):
 	# hande unit test for submodule
 	(cd $(subst test-unit-submodules-,,$@); $(GO) test $(GO_MOD_FLAGS) $(GO_TEST_FLAGS) ./...)
 
-.PHONY: test-integration
-test-integration: generate
-	go test $(GO_MOD_FLAGS) ./test/integration/...
-
 .PHONY: test-e2e
 test-e2e:
 	hack/e2e-test.sh

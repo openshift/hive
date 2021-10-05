@@ -65,7 +65,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
 
 		conditions, changed2 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
-			cd.Status.Conditions,
+			conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionFalse,
 			hivev1.ProvisionStoppedProvisionedReason,

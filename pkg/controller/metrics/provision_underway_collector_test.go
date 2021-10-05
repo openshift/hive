@@ -59,16 +59,35 @@ func TestProvisioningUnderwayCollector(t *testing.T) {
 			"cluster_deployment = cd-2 cluster_type = unspecified condition = Unknown image_set = none namespace = cd-2 platform =  reason = Unknown",
 		},
 	}, {
-		name: "provisioning with other conditions",
+		name: "provisioning with other conditions in desired state",
 		existing: []runtime.Object{
 			cdBuilder("cd-1").Build(testcd.Installed()),
 			cdBuilder("cd-2").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-				Type:   hivev1.ClusterHibernatingCondition,
+				Type:   hivev1.ProvisionStoppedCondition,
+				Status: corev1.ConditionFalse,
+			})),
+		},
+	}, {
+		name: "provisioning with other conditions in undesired state",
+		existing: []runtime.Object{
+			cdBuilder("cd-1").Build(testcd.Installed()),
+			cdBuilder("cd-2").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.ProvisionStoppedCondition,
 				Status: corev1.ConditionTrue,
 			})),
 		},
 		expected: []string{
 			"cluster_deployment = cd-2 cluster_type = unspecified condition = Unknown image_set = none namespace = cd-2 platform =  reason = Unknown",
+		},
+	}, {
+		name: "provisioning with Initialized condition",
+		existing: []runtime.Object{
+			cdBuilder("cd-1").Build(testcd.Installed()),
+			cdBuilder("cd-2").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.ProvisionFailedCondition,
+				Status: corev1.ConditionUnknown,
+				Reason: hivev1.InitializedConditionReason,
+			})),
 		},
 	}, {
 		name: "provisioning with ProvisionFailed condition",
@@ -130,7 +149,7 @@ func TestProvisioningUnderwayCollector(t *testing.T) {
 		existing: []runtime.Object{
 			cdBuilder("cd-1").Build(testcd.Installed()),
 			cdBuilder("cd-2").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-				Type:   hivev1.ClusterHibernatingCondition,
+				Type:   hivev1.ProvisionStoppedCondition,
 				Status: corev1.ConditionTrue,
 			})),
 		},
@@ -334,11 +353,20 @@ func TestProvisioningUnderwayInstallRestartsCollector(t *testing.T) {
 			"cluster_deployment = cd-2 cluster_type = unspecified condition = Unknown image_set = none namespace = cd-2 platform =  reason = Unknown 2",
 		},
 	}, {
-		name: "provisioning with other conditions",
+		name: "provisioning with other conditions in desired state",
 		existing: []runtime.Object{
 			cdBuilder("cd-1").Build(testcd.Installed()),
 			cdBuilder("cd-2").Build(testcd.InstallRestarts(2), testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-				Type:   hivev1.ClusterHibernatingCondition,
+				Type:   hivev1.ProvisionStoppedCondition,
+				Status: corev1.ConditionFalse,
+			})),
+		},
+	}, {
+		name: "provisioning with other conditions in undesired state",
+		existing: []runtime.Object{
+			cdBuilder("cd-1").Build(testcd.Installed()),
+			cdBuilder("cd-2").Build(testcd.InstallRestarts(2), testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.ProvisionStoppedCondition,
 				Status: corev1.ConditionTrue,
 			})),
 		},
@@ -392,7 +420,7 @@ func TestProvisioningUnderwayInstallRestartsCollector(t *testing.T) {
 		existing: []runtime.Object{
 			cdBuilder("cd-1").Build(testcd.Installed()),
 			cdBuilder("cd-2").Build(testcd.InstallRestarts(2), testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-				Type:   hivev1.ClusterHibernatingCondition,
+				Type:   hivev1.ProvisionStoppedCondition,
 				Status: corev1.ConditionTrue,
 			})),
 		},

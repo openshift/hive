@@ -332,6 +332,20 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// reserveSize is the number of clusters that the pool currently has in reserve
 	reserveSize := len(cds.Installing()) + len(cds.Assignable()) + len(cds.Broken()) - len(claims.Unassigned())
 
+	// excessSize is the number of clusters in excess of the pool's capacity (Size) that we are
+	// creating to satisfy unassigned claims. For example:
+	// - In steady state, if Size=3 and we have 5 unassigned claims, excessSize is 2.
+	// - If Size=3, and we only have 2 clusters in the pool, and we have 6 unassigned claims,
+	//   excessSize is 4: the two existing clusters satisfy two of the claims, leaving four;
+	//   we need three to refill the pool and another four to fulfil the remaining unassigned
+	//   claims.
+	// - Any time the number of unassigned claims is less than the number of clusters in the
+	//   pool, we will be able to satisfy them from the pool, so excessSize is 0.
+	excessSize := 0
+	if reserveSize < 0 {
+		excessSize = -reserveSize
+	}
+
 	if err := assignClustersToClaims(r.Client, claims, cds, logger); err != nil {
 		logger.WithError(err).Error("error assigning clusters <=> claims")
 		return reconcile.Result{}, err
@@ -400,7 +414,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		metricStaleClusterDeploymentsDeleted.WithLabelValues(clp.Namespace, clp.Name).Inc()
 	}
 
-	if err := r.reconcileRunningClusters(clp, cds, logger); err != nil {
+	if err := r.reconcileRunningClusters(clp, cds, excessSize, logger); err != nil {
 		log.WithError(err).Error("error updating hibernating/running state")
 		return reconcile.Result{}, err
 	}
@@ -426,9 +440,13 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 func (r *ReconcileClusterPool) reconcileRunningClusters(
 	clp *hivev1.ClusterPool,
 	cds *cdCollection,
+	excessCount int,
 	logger log.FieldLogger,
 ) error {
-	runningCount := int(clp.Spec.RunningCount)
+	// If we're creating excess clusters to satisfy unassigned claims, add that many
+	// to the runningCount. They'll get snatched up immediately, bringing the number
+	// of running clusters back down to runningCount once the pool reaches steady state.
+	runningCount := int(clp.Spec.RunningCount) + excessCount
 	cdList := append(cds.Assignable(), cds.Installing()...)
 	// Sort by age, oldest first
 	sort.Slice(

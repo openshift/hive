@@ -7,6 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -60,9 +62,6 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		// Add install failure details for stuck provision
-		condition, reason := getKnownConditions(cd.Status.Conditions)
-
 		platform := cd.Labels[hivev1.HiveClusterPlatformLabel]
 		imageSet := "none"
 		if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.ImageSetRef != nil {
@@ -74,6 +73,11 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 			continue // skip reporting the metric for clusterdeployment until the elapsed time is at least minDuration
 		}
 
+		// Add install failure details for stuck provision
+		condition, reason, skip := getConditionAndReason(cd.Status.Conditions)
+		if skip {
+			continue
+		}
 		// For installing clusters we report the seconds since the cluster was created.
 		ch <- prometheus.MustNewConstMetric(
 			cc.metricClusterDeploymentProvisionUnderwaySeconds,
@@ -147,9 +151,6 @@ func (cc provisioningUnderwayInstallRestartsCollector) Collect(ch chan<- prometh
 			continue
 		}
 
-		// Add install failure details for stuck provision
-		condition, reason := getKnownConditions(cd.Status.Conditions)
-
 		platform := cd.Labels[hivev1.HiveClusterPlatformLabel]
 		imageSet := "none"
 		if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.ImageSetRef != nil {
@@ -162,6 +163,12 @@ func (cc provisioningUnderwayInstallRestartsCollector) Collect(ch chan<- prometh
 		}
 		if cc.minRestarts > 0 && restarts < cc.minRestarts {
 			continue // skip reporting the metric for clusterdeployment until the InstallRestarts is at least minRestarts
+		}
+
+		// Add install failure details for stuck provision
+		condition, reason, skip := getConditionAndReason(cd.Status.Conditions)
+		if skip {
+			continue
 		}
 
 		// For installing clusters we report the seconds since the cluster was created.
@@ -203,12 +210,16 @@ func newProvisioningUnderwayInstallRestartsCollector(client client.Client, minim
 	}
 }
 
-func getKnownConditions(conditions []hivev1.ClusterDeploymentCondition) (condition, reason string) {
+// getConditionAndReason fetches a condition and reason if some condition is found in undesired state.
+// All other conditions apart from provisionDelayConditions are tagged as unknown for metric reporting purposes
+// Reporting of the metric is to be skipped when all conditions are in their desired state
+func getConditionAndReason(conditions []hivev1.ClusterDeploymentCondition) (condition, reason string, skip bool) {
 	condition, reason = "Unknown", "Unknown"
 	for _, delayCondition := range provisioningDelayCondition {
 		if cdCondition := controllerutils.FindClusterDeploymentCondition(conditions,
 			delayCondition); cdCondition != nil {
-			if !controllerutils.IsConditionInDesiredState(*cdCondition) {
+			if cdCondition.Status != corev1.ConditionUnknown &&
+				!controllerutils.IsConditionInDesiredState(*cdCondition) {
 				condition = string(delayCondition)
 				if cdCondition.Reason != "" {
 					reason = cdCondition.Reason
@@ -217,5 +228,11 @@ func getKnownConditions(conditions []hivev1.ClusterDeploymentCondition) (conditi
 			}
 		}
 	}
-	return condition, reason
+	// skip reporting if all conditions are in their desired state
+	if condition == "Unknown" && len(conditions) > 0 {
+		if controllerutils.AreAllConditionsInDesiredState(conditions) {
+			skip = true
+		}
+	}
+	return condition, reason, skip
 }

@@ -798,3 +798,12 @@ func IsConditionInDesiredState(condition hivev1.ClusterDeploymentCondition) bool
 	return (IsConditionWithPositivePolarity(condition.Type) && condition.Status == corev1.ConditionTrue) ||
 		(!IsConditionWithPositivePolarity(condition.Type) && condition.Status == corev1.ConditionFalse)
 }
+
+// AreAllConditionsInDesiredState checks if all cluster deployment conditions are in their desired state
+func AreAllConditionsInDesiredState(conditions []hivev1.ClusterDeploymentCondition) bool {
+	// cluster deployment conditions are sorted to have error conditions at the top
+	if conditions[0].Status == corev1.ConditionUnknown || IsConditionInDesiredState(conditions[0]) {
+		return true
+	}
+	return false
+}

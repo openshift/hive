@@ -34,9 +34,9 @@ kind: Kustomization
 # Use app-sre-supplied variables to pull the image for the current commit
 # TODO: Pull by digest instead. Don't forget to address Disappearing Digest Syndrome.
 images:
-- name: registry.ci.openshift.org/openshift/hive-v4.0:hive
+- digest: ${IMAGE_DIGEST}
+  name: registry.ci.openshift.org/openshift/hive-v4.0:hive
   newName: ${REGISTRY_IMG}
-  newTag: ${IMAGE_TAG}
 patchesStrategicMerge:
 - |-
   apiVersion: rbac.authorization.k8s.io/v1

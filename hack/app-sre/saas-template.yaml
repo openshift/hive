@@ -6549,7 +6549,7 @@ objects:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
-          image: ${REGISTRY_IMG}:${IMAGE_TAG}
+          image: ${REGISTRY_IMG}@${IMAGE_DIGEST}
           imagePullPolicy: Always
           livenessProbe:
             httpGet:
@@ -6579,5 +6579,5 @@ objects:
 parameters:
 - name: REGISTRY_IMG
   required: true
-- name: IMAGE_TAG
+- name: IMAGE_DIGEST
   required: true

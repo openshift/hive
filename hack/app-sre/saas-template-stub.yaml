@@ -8,7 +8,7 @@ metadata:
 parameters:
   - name: REGISTRY_IMG
     required: true
-  - name: IMAGE_TAG
+  - name: IMAGE_DIGEST
     required: true
 
 # Populated by generate-saas-template.py with the objects in saas-objects.yaml

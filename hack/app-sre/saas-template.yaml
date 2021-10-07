@@ -1820,6 +1820,32 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                inventory:
+                  description: Inventory is a way to enumerate values unique to each
+                    ClusterDeployment in the pool. Today, it can be used exclusively
+                    to provide a list of cluster names. MaxSize is constrained to
+                    the size of the Inventory.
+                  properties:
+                    clusterDeployments:
+                      description: ClusterDeployments lists inventory entries for
+                        each unique ClusterDeployment this ClusterPool can create.
+                      items:
+                        properties:
+                          name:
+                            description: Name is the value to use for the ClusterDeployment.Spec.ClusterName
+                              field for a single ClusterDeployment owned by this ClusterPool.
+                              Must be unique within the Inventory.ClusterDeployments
+                              list.
+                            minLength: 1
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      minItems: 1
+                      type: array
+                  required:
+                  - clusterDeployments
+                  type: object
                 labels:
                   additionalProperties:
                     type: string

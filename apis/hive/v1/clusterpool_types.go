@@ -39,6 +39,11 @@ type ClusterPoolSpec struct {
 	// +optional
 	MaxConcurrent *int32 `json:"maxConcurrent,omitempty"`
 
+	// Inventory is a way to enumerate values unique to each ClusterDeployment in the pool. Today, it can be used exclusively
+	// to provide a list of cluster names. MaxSize is constrained to the size of the Inventory.
+	// +optional
+	Inventory *ClusterDeploymentInventory `json:"inventory,omitempty"`
+
 	// BaseDomain is the base domain to use for all clusters created in this pool.
 	// +required
 	BaseDomain string `json:"baseDomain"`
@@ -80,6 +85,22 @@ type ClusterPoolSpec struct {
 	// ClaimLifetime defines the lifetimes for claims for the cluster pool.
 	// +optional
 	ClaimLifetime *ClusterPoolClaimLifetime `json:"claimLifetime,omitempty"`
+}
+
+// ClusterDeploymentInventory contains information about each unique ClusterDeployment this ClusterPool can create.
+type ClusterDeploymentInventory struct {
+	// ClusterDeployments lists inventory entries for each unique ClusterDeployment this ClusterPool can create.
+	// +required
+	// +kubebuilder:validation:MinItems=1
+	ClusterDeployments []ClusterDeploymentInventoryEntry `json:"clusterDeployments"`
+}
+
+type ClusterDeploymentInventoryEntry struct {
+	// Name is the value to use for the ClusterDeployment.Spec.ClusterName field for a single ClusterDeployment owned
+	// by this ClusterPool. Must be unique within the Inventory.ClusterDeployments list.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
 }
 
 // ClusterPoolClaimLifetime defines the lifetimes for claims for the cluster pool.

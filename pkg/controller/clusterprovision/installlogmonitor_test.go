@@ -35,6 +35,7 @@ const (
 	kubeAPIWaitTimeoutLog     = "blahblah\ntime=\"2021-01-03T07:04:44Z\" level=fatal msg=\"waiting for Kubernetes API: context deadline exceeded\""
 	natGatewayLimitExceeded   = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error creating NAT Gateway: NatGatewayLimitExceeded: The maximum number of NAT Gateways has been reached.\""
 	vpcLimitExceeded          = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating VPC: VpcLimitExceeded: The maximum number of VPCs has been reached.\""
+	route53LimitExceeded      = "blahblah\nlevel=error msg=\"Error: error creating Route53 Hosted Zone: TooManyHostedZones: Limits Exceeded: MAX_HOSTED_ZONES_BY_OWNER - Cannot create more hosted zones.\\nlevel=error msg=\\tstatus code: 400,\""
 	genericLimitExceeded      = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error creating Generic: GenericLimitExceeded: The maximum number of Generics has been reached.\""
 	invalidCredentials        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: error waiting for Route53 Hosted Zone (Z1009177L956IM4ANFHL) creation: InvalidClientTokenId: The security token included in the request is invalid.\""
 	kubeAPIWaitFailedLog      = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane.\""
@@ -88,6 +89,12 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(vpcLimitExceeded),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSVPCLimitExceeded",
+		},
+		{
+			name:           "AWSRoute53LimitExceeded",
+			log:            pointer.StringPtr(route53LimitExceeded),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "TooManyRoute53Zones",
 		},
 		{
 			name:           "Generic ResourceLimitExceeded",

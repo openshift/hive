@@ -114,8 +114,15 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:        "clustersync not yet created",
+			cd:          cdBuilder.Options(o.shouldHibernate).Build(),
+			expectError: true,
+		},
+		{
 			name: "start hibernating, no syncsets",
 			cd:   cdBuilder.Options(o.shouldHibernate).Build(),
+			// The clustersync controller creates a ClusterSync even when there are no syncsets
+			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
 				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
 			},
@@ -137,6 +144,25 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.SyncSetsNotAppliedReason, cond.Reason)
 			},
 			expectError: true,
+		},
+		{
+			name: "clear SyncSetsNotApplied",
+			cd: cdBuilder.Options(
+				testcd.InstalledTimestamp(time.Now()),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:    hivev1.ClusterHibernatingCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.SyncSetsNotAppliedReason,
+					Message: "Cluster SyncSets have not been applied",
+				}),
+			).Build(),
+			cs: csBuilder.Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond := getHibernatingCondition(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, hivev1.SyncSetsAppliedReason, cond.Reason)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+			},
 		},
 		{
 			name: "start hibernating, syncsets not applied but 10 minutes have passed since cd install",
@@ -571,6 +597,8 @@ func TestHibernateAfter(t *testing.T) {
 				testcd.WithHibernateAfter(8*time.Minute),
 				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.RunningHibernationReason, 8*time.Minute)),
 				testcd.InstalledTimestamp(time.Now().Add(-8*time.Minute))),
+			// The clustersync controller creates an empty ClusterSync even when there are no syncsets.
+			cs:                 csBuilder.Build(),
 			expectedPowerState: hivev1.HibernatingClusterPowerState,
 		},
 		{

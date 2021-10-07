@@ -467,6 +467,10 @@ const (
 	// SyncSetsNotAppliedReason is used as the reason when SyncSets have not yet been applied
 	// for the cluster based on ClusterSync.Status.FirstSucessTime
 	SyncSetsNotAppliedReason = "SyncSetsNotApplied"
+	// SyncSetsAppliedReason means SyncSets have been successfully applied at some point.
+	// (It does not necessarily mean they are currently copacetic -- check ClusterSync status
+	// for that.)
+	SyncSetsAppliedReason = "SyncSetsApplied"
 )
 
 // Provisioned status condition reasons

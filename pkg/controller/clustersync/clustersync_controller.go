@@ -544,16 +544,44 @@ func (r *ReconcileClusterSync) applySyncSets(
 		return syncSets[i].AsMetaObject().GetName() < syncSets[j].AsMetaObject().GetName()
 	})
 
+	deletionList := syncStatuses
+
 	for _, syncSet := range syncSets {
-		logger := logger.WithField(syncSetType, syncSet.AsMetaObject().GetName())
-		oldSyncStatus, indexOfOldStatus := getOldSyncStatus(syncSet, syncStatuses)
+		_, indexOfOldStatus := getOldSyncStatus(syncSet, deletionList)
 		// Remove the matching old sync status from the slice of sync statuses so that the slice only contains sync
 		// statuses that have not been matched to a syncset.
 		if indexOfOldStatus >= 0 {
-			last := len(syncStatuses) - 1
-			syncStatuses[indexOfOldStatus] = syncStatuses[last]
-			syncStatuses = syncStatuses[:last]
+			last := len(deletionList) - 1
+			deletionList[indexOfOldStatus] = deletionList[last]
+			deletionList = deletionList[:last]
 		}
+	}
+
+	// The remaining sync statuses in syncStatuses do not match any syncsets. Any resources to delete in the sync status
+	// need to be deleted.
+	// In order to allow proper apply for resource moved from 1 syncset to another, we should delete old resources first
+	for _, oldSyncStatus := range deletionList {
+		remainingResources, err := deleteFromTargetCluster(oldSyncStatus.ResourcesToDelete, nil, resourceHelper, logger)
+		if err != nil {
+			requeue = true
+			newSyncStatus := hiveintv1alpha1.SyncStatus{
+				Name:               oldSyncStatus.Name,
+				ResourcesToDelete:  remainingResources,
+				Result:             hiveintv1alpha1.FailureSyncSetResult,
+				FailureMessage:     err.Error(),
+				LastTransitionTime: oldSyncStatus.LastTransitionTime,
+				FirstSuccessTime:   oldSyncStatus.FirstSuccessTime,
+			}
+			if !reflect.DeepEqual(oldSyncStatus, newSyncStatus) {
+				newSyncStatus.LastTransitionTime = metav1.Now()
+			}
+			newSyncStatuses = append(newSyncStatuses, newSyncStatus)
+		}
+	}
+
+	for _, syncSet := range syncSets {
+		logger := logger.WithField(syncSetType, syncSet.AsMetaObject().GetName())
+		oldSyncStatus, indexOfOldStatus := getOldSyncStatus(syncSet, syncStatuses)
 
 		// Determine if the syncset needs to be applied
 		switch {
@@ -666,27 +694,6 @@ func (r *ReconcileClusterSync) applySyncSets(
 			return orderResources(newSyncStatus.ResourcesToDelete[i], newSyncStatus.ResourcesToDelete[j])
 		})
 		newSyncStatuses = append(newSyncStatuses, newSyncStatus)
-	}
-
-	// The remaining sync statuses in syncStatuses do not match any syncsets. Any resources to delete in the sync status
-	// need to be deleted.
-	for _, oldSyncStatus := range syncStatuses {
-		remainingResources, err := deleteFromTargetCluster(oldSyncStatus.ResourcesToDelete, nil, resourceHelper, logger)
-		if err != nil {
-			requeue = true
-			newSyncStatus := hiveintv1alpha1.SyncStatus{
-				Name:               oldSyncStatus.Name,
-				ResourcesToDelete:  remainingResources,
-				Result:             hiveintv1alpha1.FailureSyncSetResult,
-				FailureMessage:     err.Error(),
-				LastTransitionTime: oldSyncStatus.LastTransitionTime,
-				FirstSuccessTime:   oldSyncStatus.FirstSuccessTime,
-			}
-			if !reflect.DeepEqual(oldSyncStatus, newSyncStatus) {
-				newSyncStatus.LastTransitionTime = metav1.Now()
-			}
-			newSyncStatuses = append(newSyncStatuses, newSyncStatus)
-		}
 	}
 
 	return

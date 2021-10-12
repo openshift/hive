@@ -72,6 +72,9 @@ type Builder struct {
 	// HibernateAfter is the duration after which a running cluster should be automatically hibernated.
 	HibernateAfter *time.Duration
 
+	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.
+	InstallAttemptsLimit *int32
+
 	// ServingCert is the contents of a serving certificate to be used for the cluster.
 	ServingCert string
 
@@ -319,6 +322,8 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	if o.HibernateAfter != nil {
 		cd.Spec.HibernateAfter = &metav1.Duration{Duration: *o.HibernateAfter}
 	}
+
+	cd.Spec.InstallAttemptsLimit = o.InstallAttemptsLimit
 
 	if o.Adopt {
 		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{

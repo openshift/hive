@@ -1808,6 +1808,11 @@ objects:
                   required:
                   - name
                   type: object
+                installAttemptsLimit:
+                  description: InstallAttemptsLimit is the maximum number of times
+                    Hive will attempt to install the cluster.
+                  format: int32
+                  type: integer
                 installConfigSecretTemplateRef:
                   description: InstallConfigSecretTemplateRef is a secret with the
                     key install-config.yaml consisting of the content of the install-config.yaml

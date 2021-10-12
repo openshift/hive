@@ -124,6 +124,18 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedCDCurrentStatus:           corev1.ConditionUnknown,
 		},
 		{
+			name: "copyover fields",
+			existing: []runtime.Object{
+				// The test driver makes sure that "copyover fields" -- those we copy from the pool
+				// spec to the CD spec -- match for CDs owned by the pool. This test case just
+				// needs to a) set those fields in the pool spec, and b) have a nonzero size so the
+				// pool actually creates CDs to compare.
+				// TODO: Add coverage for more "copyover fields".
+				initializedPoolBuilder.Build(testcp.WithSize(2), testcp.WithInstallAttemptsLimit(5)),
+			},
+			expectedTotalClusters: 2,
+		},
+		{
 			name: "poolVersion changes with Platform",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithPlatform(hivev1.Platform{
@@ -1476,10 +1488,22 @@ func TestReconcileClusterPool(t *testing.T) {
 
 			var actualAssignedCDs, actualUnassignedCDs, actualRunning, actualHibernating int
 			for _, cd := range cds.Items {
-				if poolRef := cd.Spec.ClusterPoolRef; poolRef == nil || poolRef.PoolName != testLeasePoolName || poolRef.ClaimName == "" {
+				poolRef := cd.Spec.ClusterPoolRef
+				if poolRef == nil || poolRef.PoolName != testLeasePoolName || poolRef.ClaimName == "" {
+					// TODO: Calling these "unassigned" isn't great. Some may not even belong to the pool.
 					actualUnassignedCDs++
 				} else {
 					actualAssignedCDs++
+				}
+				// Match up copyover fields for any clusters belonging to the pool
+				if poolRef != nil && poolRef.PoolName == testLeasePoolName {
+					// TODO: These would need to be set on all CDs in test.existing
+					// assert.Equal(t, pool.Spec.BaseDomain, cd.Spec.BaseDomain, "expected BaseDomain to match")
+					if pool.Spec.InstallAttemptsLimit != nil {
+						if assert.NotNil(t, cd.Spec.InstallAttemptsLimit, "expected InstallAttemptsLimit to be set") {
+							assert.Equal(t, *pool.Spec.InstallAttemptsLimit, *cd.Spec.InstallAttemptsLimit, "expected InstallAttemptsLimit to match")
+						}
+					}
 				}
 				switch powerState := cd.Spec.PowerState; powerState {
 				case hivev1.RunningClusterPowerState:

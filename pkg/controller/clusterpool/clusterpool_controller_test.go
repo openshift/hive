@@ -1417,43 +1417,6 @@ func TestReconcileClusterPool(t *testing.T) {
 				assert.NoError(t, err, "expected no error from reconcile")
 			}
 
-			cds := &hivev1.ClusterDeploymentList{}
-			err = fakeClient.List(context.Background(), cds)
-			require.NoError(t, err)
-
-			assert.Len(t, cds.Items, test.expectedTotalClusters, "unexpected number of total clusters")
-
-			for _, expectedDeletedName := range test.expectedDeletedClusters {
-				for _, cd := range cds.Items {
-					assert.NotEqual(t, expectedDeletedName, cd.Name, "expected cluster to have been deleted")
-				}
-			}
-
-			var actualAssignedCDs, actualUnassignedCDs, actualRunning, actualHibernating int
-			for _, cd := range cds.Items {
-				if poolRef := cd.Spec.ClusterPoolRef; poolRef == nil || poolRef.PoolName != testLeasePoolName || poolRef.ClaimName == "" {
-					actualUnassignedCDs++
-				} else {
-					actualAssignedCDs++
-				}
-				switch powerState := cd.Spec.PowerState; powerState {
-				case hivev1.RunningClusterPowerState:
-					actualRunning++
-				case hivev1.HibernatingClusterPowerState:
-					actualHibernating++
-				}
-
-				if test.expectedLabels != nil {
-					for k, v := range test.expectedLabels {
-						assert.Equal(t, v, cd.Labels[k])
-					}
-				}
-			}
-			assert.Equal(t, test.expectedAssignedCDs, actualAssignedCDs, "unexpected number of assigned CDs")
-			assert.Equal(t, test.expectedTotalClusters-test.expectedAssignedCDs, actualUnassignedCDs, "unexpected number of unassigned CDs")
-			assert.Equal(t, test.expectedRunning, actualRunning, "unexpected number of running CDs")
-			assert.Equal(t, test.expectedTotalClusters-test.expectedRunning, actualHibernating, "unexpected number of hibernating CDs")
-
 			pool := &hivev1.ClusterPool{}
 			err = fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)
 
@@ -1498,6 +1461,43 @@ func TestReconcileClusterPool(t *testing.T) {
 						"unexpected CapacityAvailable conditon status")
 				}
 			}
+
+			cds := &hivev1.ClusterDeploymentList{}
+			err = fakeClient.List(context.Background(), cds)
+			require.NoError(t, err)
+
+			assert.Len(t, cds.Items, test.expectedTotalClusters, "unexpected number of total clusters")
+
+			for _, expectedDeletedName := range test.expectedDeletedClusters {
+				for _, cd := range cds.Items {
+					assert.NotEqual(t, expectedDeletedName, cd.Name, "expected cluster to have been deleted")
+				}
+			}
+
+			var actualAssignedCDs, actualUnassignedCDs, actualRunning, actualHibernating int
+			for _, cd := range cds.Items {
+				if poolRef := cd.Spec.ClusterPoolRef; poolRef == nil || poolRef.PoolName != testLeasePoolName || poolRef.ClaimName == "" {
+					actualUnassignedCDs++
+				} else {
+					actualAssignedCDs++
+				}
+				switch powerState := cd.Spec.PowerState; powerState {
+				case hivev1.RunningClusterPowerState:
+					actualRunning++
+				case hivev1.HibernatingClusterPowerState:
+					actualHibernating++
+				}
+
+				if test.expectedLabels != nil {
+					for k, v := range test.expectedLabels {
+						assert.Equal(t, v, cd.Labels[k])
+					}
+				}
+			}
+			assert.Equal(t, test.expectedAssignedCDs, actualAssignedCDs, "unexpected number of assigned CDs")
+			assert.Equal(t, test.expectedTotalClusters-test.expectedAssignedCDs, actualUnassignedCDs, "unexpected number of unassigned CDs")
+			assert.Equal(t, test.expectedRunning, actualRunning, "unexpected number of running CDs")
+			assert.Equal(t, test.expectedTotalClusters-test.expectedRunning, actualHibernating, "unexpected number of hibernating CDs")
 
 			claims := &hivev1.ClusterClaimList{}
 			err = fakeClient.List(context.Background(), claims)

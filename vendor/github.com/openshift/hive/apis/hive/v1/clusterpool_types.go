@@ -73,6 +73,10 @@ type ClusterPoolSpec struct {
 	// +kubebuilder:validation:Format=duration
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 
+	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.
+	// +optional
+	InstallAttemptsLimit *int32 `json:"installAttemptsLimit,omitempty"`
+
 	// SkipMachinePools allows creating clusterpools where the machinepools are not managed by hive after cluster creation
 	// +optional
 	SkipMachinePools bool `json:"skipMachinePools,omitempty"`

@@ -130,6 +130,12 @@ func WithInstallConfigSecretTemplateRef(name string) Option {
 	}
 }
 
+func WithInstallAttemptsLimit(ial int32) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.InstallAttemptsLimit = &ial
+	}
+}
+
 func WithMaxSize(size int) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
 		clusterPool.Spec.MaxSize = pointer.Int32Ptr(int32(size))

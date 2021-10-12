@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -606,6 +607,11 @@ func ensureClaimAssignment(c client.Client, claim *hivev1.ClusterClaim, claims *
 		if err := claims.Assign(c, claim, cd); err != nil {
 			return err
 		}
+		// Record how long the claim took to be assigned. We choose to do this here rather than
+		// after the CD is updated.
+		claimDelay := time.Since(claim.CreationTimestamp.Time).Seconds()
+		logger.WithField("seconds", claimDelay).Info("calculated time between claim creation and assignment")
+		metricClaimDelaySeconds.WithLabelValues(poolRefInCD.Namespace, poolRefInCD.PoolName).Observe(float64(claimDelay))
 	} else {
 		logger.Debug("claim already assigned")
 	}

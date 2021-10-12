@@ -29,10 +29,14 @@ rules:
   resources:
   - clusterdeployments
   - clusterprovisions
+  - clusterdeprovisions
   verbs:
   - get
   - list
   - watch
+  - update
+  - patch
+  - delete
 - apiGroups:
   - hive.openshift.io
   resources:

@@ -545,9 +545,6 @@ func TestHibernateAfter(t *testing.T) {
 		},
 		{
 			name: "cluster not yet due for hibernate no running condition", // cluster that has never been hibernated
-			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
-			},
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(12*time.Hour),
 				testcd.WithPowerState(hivev1.RunningClusterPowerState),

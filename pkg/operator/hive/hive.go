@@ -47,10 +47,21 @@ const (
 	hiveConfigHashAnnotation = "hive.openshift.io/hiveconfig-hash"
 
 	hiveClusterSyncStatefulSetSpecHashAnnotation = "hive.openshift.io/clustersync-statefulset-spec-hash"
+
+	// clusterMonitoringLabel on a namespace tells prometheus to monitor that namespace
+	clusterMonitoringLabel = "openshift.io/cluster-monitoring"
 )
 
 var (
 	controllersUsingReplicas = hivev1.ControllerNames{hivev1.ClustersyncControllerName}
+
+	// monitoringNamespacedAssets must be deployed to the hive namespace to enable monitoring
+	monitoringNamespacedAssets = []string{
+		"config/monitoring/hive_clustersync_servicemonitor.yaml",
+		"config/monitoring/hive_controllers_servicemonitor.yaml",
+		"config/monitoring/role.yaml",
+		"config/monitoring/role_binding.yaml",
+	}
 )
 
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap, hiveControllersConfigHash string) error {
@@ -519,46 +530,69 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 	return
 }
 
-func (r *ReconcileHiveConfig) deployMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) error {
-	hiveNSName := getHiveNamespace(instance)
-
-	if !instance.Spec.ExportMetrics {
-		hLog.Info("metrics were not requested to be extracted, so skipping")
-		return nil
+func monitoringLabelPatch(enable bool) string {
+	s := `{"metadata": {"labels": {"openshift.io/cluster-monitoring": %s}}}`
+	if enable {
+		// The double quotes are part of the value!
+		return fmt.Sprintf(s, `"true"`)
+	} else {
+		return fmt.Sprintf(s, `null`)
 	}
+}
 
-	// setup the hiveNSName labels so that openshift-prometheus discovers the namespace.
-	ns := &corev1.Namespace{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: hiveNSName}, ns); err != nil {
-		hLog.WithError(err).Error("error getting hive namespace")
+// reconcileMonitoring switches metrics exporting on or off, according to HiveConfig.Spec.ExportMetrics
+func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) error {
+	hiveNSName := getHiveNamespace(instance)
+	enable := instance.Spec.ExportMetrics
+
+	// HACK: Due to https://github.com/kubernetes/kubernetes/issues/105689 using strategic merge
+	// patch with a null value to remove a key from a dict that's already empty will *add* the key
+	// with the empty string as the value. This doesn't happen if there's any other entry in the
+	// dict. So...
+	if err := h.Patch(
+		types.NamespacedName{Name: hiveNSName}, "Namespace", "v1",
+		[]byte(`{"metadata": {"labels": {"hive.openshift.io/managed": "true"}}}`),
+		"",
+	); err != nil {
+		hLog.WithError(err).Errorf("error updating hive namespace managed label")
 		return err
 	}
-	if v, ok := ns.Labels["openshift.io/cluster-monitoring"]; !ok || v != "true" {
-		// add the label
-		if ns.Labels == nil {
-			ns.Labels = map[string]string{}
-		}
-		ns.Labels["openshift.io/cluster-monitoring"] = "true"
-		if err := r.Client.Update(context.TODO(), ns); err != nil {
-			hLog.WithError(err).Error("error updating hive namespace label to enable monitoring")
-			return err
-		}
+
+	var labelVal, metricsAction, resourceVerbing, resourceVerbed string
+	var kubeFunc func(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error
+	if enable {
+		// The double quotes are part of the value!
+		labelVal = `"true"`
+		metricsAction = "enable"
+		resourceVerbing = "applying"
+		resourceVerbed = "applied"
+		kubeFunc = util.ApplyAssetWithNSOverrideAndGC
+	} else {
+		labelVal = `null`
+		metricsAction = "disable"
+		resourceVerbing = "deleting"
+		resourceVerbed = "deleted"
+		kubeFunc = util.DeleteAssetWithNSOverride
+	}
+	patch := fmt.Sprintf(`{"metadata": {"labels": {"openshift.io/cluster-monitoring": %s}}}`, labelVal)
+
+	hLog.Infof("%s metrics", metricsAction)
+
+	// setup the hiveNSName labels so that openshift-prometheus discovers the namespace.
+	if err := h.Patch(types.NamespacedName{Name: hiveNSName}, "Namespace", "v1", []byte(patch), ""); err != nil {
+		hLog.WithError(err).Errorf("error updating hive namespace label to %s monitoring", metricsAction)
+		return err
 	}
 
-	// Load namespaced assets, decode them, set to our target namespace, and apply:
-	namespacedAssets := []string{
-		"config/monitoring/hive_clustersync_servicemonitor.yaml",
-		"config/monitoring/hive_controllers_servicemonitor.yaml",
-		"config/monitoring/role.yaml",
-		"config/monitoring/role_binding.yaml",
-	}
-	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
-			hLog.WithError(err).Error("error applying object with namespace override")
+	// Load namespaced assets, decode them, set to our target namespace, and apply or delete:
+	for _, assetPath := range monitoringNamespacedAssets {
+		if err := kubeFunc(h, assetPath, hiveNSName, instance); err != nil {
+			hLog.WithError(err).Errorf("error %s object with namespace override", resourceVerbing)
 			return err
 		}
-		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
+		hLog.WithField("asset", assetPath).Infof("%s asset with namespace override", resourceVerbed)
 	}
 
 	return nil
+
 }

@@ -229,6 +229,48 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Monitor the hive namespace so we can reconcile labels for monitoring. We do this with a map
+	// func instead of an owner reference because we can't be sure we'll be the one to create it.
+	err = c.Watch(&source.Kind{Type: &corev1.Namespace{}},
+		handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+			retval := []reconcile.Request{}
+			nsName := o.GetName()
+
+			configList := &hivev1.HiveConfigList{}
+			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList)
+			if err != nil {
+				log.WithError(err).Errorf("error listing hive configs for namespace %s reconcile", nsName)
+				return retval
+			}
+
+			shouldEnqueue := func(targetNS string) bool {
+				// Always enqueue all HiveConfigs if the operator ns was updated
+				if nsName == hiveOperatorNS {
+					return true
+				}
+				// Enqueue all HiveConfigs that point to the namespace that triggered us
+				// TODO: Is this default const'ed somewhere?
+				if targetNS == "" && nsName == "hive" {
+					return true
+				}
+				return targetNS == nsName
+			}
+
+			for _, config := range configList.Items {
+				if shouldEnqueue(config.Spec.TargetNamespace) {
+					retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+						Name: config.Name,
+					}})
+				}
+			}
+			log.WithField("configs", retval).Debugf("reconciled for change in namespace %s", nsName)
+			return retval
+
+		}))
+	if err != nil {
+		return err
+	}
+
 	// Lookup the hive-operator Deployment. We will assume hive components should all be
 	// using the same image, pull policy, node selector, and tolerations as the operator.
 	operatorDeployment := &appsv1.Deployment{}
@@ -454,7 +496,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployMonitoring(hLog, h, instance)
+	err = r.reconcileMonitoring(hLog, h, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying monitoring")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingMonitoring", err.Error())

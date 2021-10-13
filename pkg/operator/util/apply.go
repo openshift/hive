@@ -81,6 +81,19 @@ func ApplyAssetWithNSOverrideAndGC(h resource.Helper, assetPath, namespaceOverri
 	return nil
 }
 
+func DeleteAssetWithNSOverride(h resource.Helper, assetPath, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
+	requiredObj, err := readRuntimeObject(assetPath)
+	if err != nil {
+		return errors.Wrapf(err, "unable to decode asset: %s", assetPath)
+	}
+	objA, _ := meta.Accessor(requiredObj)
+	objT, _ := meta.TypeAccessor(requiredObj)
+	if err := h.Delete(objT.GetAPIVersion(), objT.GetKind(), namespaceOverride, objA.GetName()); err != nil {
+		return errors.Wrapf(err, "unable to delete asset: %s", assetPath)
+	}
+	return nil
+}
+
 // ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC loads the given asset, overrides the namespace on the subject,
 // adds an owner reference to HiveConfig for uninstall, and applies it to the cluster.
 func ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h resource.Helper, roleBindingAssetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {

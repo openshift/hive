@@ -402,12 +402,11 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "hibernate fake cluster",
+			name: "hibernate fake cluster, no clusterSync",
 			cd: cdBuilder.Build(
 				o.shouldHibernate,
 				testcd.InstalledTimestamp(time.Now().Add(-1*time.Hour)),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")),
-			cs: csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)
@@ -417,11 +416,10 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "start hibernated fake cluster",
+			name: "start hibernated fake cluster, no clusterSync",
 			cd: cdBuilder.Options(o.hibernating,
 				testcd.WithPowerState(hivev1.RunningClusterPowerState),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")).Build(),
-			cs: csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond := getHibernatingCondition(cd)
 				require.NotNil(t, cond)

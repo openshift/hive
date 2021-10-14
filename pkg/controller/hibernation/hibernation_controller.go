@@ -194,11 +194,21 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return r.setHibernatingCondition(cd, hivev1.RunningHibernationReason, msg, corev1.ConditionFalse, cdLog)
 	}
 
+	isFakeCluster := controllerutils.IsFakeCluster(cd)
+	var clusterSyncExists = true
+
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync); err != nil {
-		// This may be NotFound, which means the clustersync controller hasn't created the ClusterSync yet.
-		// Fail and requeue to wait for it to exist.
-		return reconcile.Result{}, fmt.Errorf("could not get ClusterSync: %v", err)
+		if isFakeCluster && apierrors.IsNotFound(err) {
+			// fake clusters don't create clustersync object by default
+			// This check is used further in the code when we check for SyncSetsNotApplied
+			// TODO: fix this when fake clusters create clusterSync by default like real clusters
+			clusterSyncExists = false
+		} else {
+			// This may be NotFound, which means the clustersync controller hasn't created the ClusterSync yet.
+			// Fail and requeue to wait for it to exist.
+			return reconcile.Result{}, fmt.Errorf("could not get ClusterSync: %v", err)
+		}
 	}
 
 	// Check on the SyncSetsNotApplied condition. Usually this is happening on a freshly installed cluster that's
@@ -207,7 +217,6 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return r.setHibernatingCondition(cd, hivev1.SyncSetsAppliedReason, "SyncSets have been applied", corev1.ConditionFalse, cdLog)
 	}
 
-	isFakeCluster := controllerutils.IsFakeCluster(cd)
 	shouldHibernate := cd.Spec.PowerState == hivev1.HibernatingClusterPowerState
 	// set readyToHibernate if hibernate after is ready to kick in hibernation
 	var readyToHibernate bool
@@ -289,7 +298,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 
 	if shouldHibernate || readyToHibernate {
 		// Signal a problem if we should be hibernating and the SyncSets have not yet been applied.
-		if clusterSync.Status.FirstSuccessTime == nil {
+		if clusterSyncExists && clusterSync.Status.FirstSuccessTime == nil {
 			// Allow hibernation (do not set condition) if hibernateAfterSyncSetsNotApplied duration has passed since cluster
 			// installed and syncsets still not applied
 			if cd.Status.InstalledTimestamp != nil && time.Now().Sub(cd.Status.InstalledTimestamp.Time) < hibernateAfterSyncSetsNotApplied {

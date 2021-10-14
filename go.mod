@@ -17,61 +17,60 @@ require (
 	github.com/go-logr/logr v0.4.0
 	github.com/golang/mock v1.4.4
 	github.com/golangci/golangci-lint v1.32.0
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.2.0
 	github.com/gophercloud/utils v0.0.0-20210323225332-7b186010c04f
 	github.com/heptio/velero v1.0.0
-	github.com/jonboulle/clockwork v0.1.0
+	github.com/jonboulle/clockwork v0.2.2
 	github.com/json-iterator/go v1.1.11
 	github.com/miekg/dns v1.1.25
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.13.0
-	github.com/openshift/api v0.0.0-20210622200201-7740bfb97397
+	github.com/onsi/gomega v1.15.0
+	github.com/openshift/api v0.0.0-20210816181336-8ff39b776da3
 	github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37
 	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201203141909-4dc702fd57a5
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20210622084102-c4f9f269bcb7
-	github.com/openshift/cluster-autoscaler-operator v0.0.0-20190521201101-62768a6ba480
+	github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v0.9.0-master.0.20210831144123-4050517eead6
-	github.com/openshift/library-go v0.0.0-20210408164723-7a65fdb398e2
+	github.com/openshift/library-go v0.0.0-20210811133500-5e31383de2a7
 	github.com/openshift/machine-api-operator v0.2.1-0.20210505133115-b7ef098180db
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.50.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/sirupsen/logrus v1.7.0
-	github.com/spf13/cobra v1.1.1
+	github.com/sirupsen/logrus v1.8.1
+	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.24.0
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
-	golang.org/x/mod v0.4.0
-	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
-	golang.org/x/oauth2 v0.0.0-20200902213428-5d25da1a8d43
-	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
-	google.golang.org/api v0.33.0
-	gopkg.in/ini.v1 v1.61.0
+	golang.org/x/mod v0.4.2
+	golang.org/x/net v0.0.0-20210610132358-84b48f89b13b
+	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
+	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
+	google.golang.org/api v0.44.0
+	gopkg.in/ini.v1 v1.62.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.21.2
-	k8s.io/apiextensions-apiserver v0.21.2
-	k8s.io/apimachinery v0.21.2
+	k8s.io/api v0.22.2
+	k8s.io/apiextensions-apiserver v0.22.2
+	k8s.io/apimachinery v0.22.2
 	k8s.io/cli-runtime v0.21.2
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
-	k8s.io/code-generator v0.21.2
+	k8s.io/code-generator v0.22.2
 	k8s.io/klog v1.0.0
-	k8s.io/klog/v2 v2.9.0 // indirect
-	k8s.io/kube-aggregator v0.21.2
+	k8s.io/kube-aggregator v0.22.0-rc.0
 	k8s.io/kubectl v0.21.2
-	k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
+	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0
-	sigs.k8s.io/controller-runtime v0.9.3-0.20210709165254-650ea59f19cc
-	sigs.k8s.io/controller-tools v0.5.0
+	sigs.k8s.io/controller-runtime v0.10.2
+	sigs.k8s.io/controller-tools v0.6.2
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -98,18 +97,20 @@ replace (
 // Prevent the following modules from upgrading version as result of terraform-provider-kubernetes module
 // The following modules need to be locked to compile correctly with terraform-provider-azure and terraform-provider-google
 replace (
+	github.com/IBM/vpc-go-sdk => github.com/IBM/vpc-go-sdk v0.7.0
 	github.com/apparentlymart/go-cidr => github.com/apparentlymart/go-cidr v1.0.1
-	github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.0
-	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.4.1
+	github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
+	github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.4
+	github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.8
 	github.com/hashicorp/go-plugin => github.com/hashicorp/go-plugin v1.2.2
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.7
 	google.golang.org/api => google.golang.org/api v0.25.0
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
-	google.golang.org/grpc => google.golang.org/grpc v1.29.1
+	google.golang.org/grpc => google.golang.org/grpc v1.33.0
 )
 
 // needed because otherwise v12.0.0 is picked up as a more recent version
-replace k8s.io/client-go => k8s.io/client-go v0.21.2
+replace k8s.io/client-go => k8s.io/client-go v0.22.0
 
 // needed for fixing CVE-2020-29529
 replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0

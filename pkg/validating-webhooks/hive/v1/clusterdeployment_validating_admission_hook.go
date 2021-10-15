@@ -424,9 +424,7 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 	errs := field.ErrorList{}
 	// To add validation for feature gates use these examples
 	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
-	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.provisioning.installStrategy.agent", hivev1.FeatureGateAgentInstallStrategy)...)
 	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.machineManagement", hivev1.FeatureGateMachineManagement)...)
-	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.clusterInstallRef", hivev1.FeatureGateAgentInstallStrategy)...)
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()

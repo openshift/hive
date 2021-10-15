@@ -7,15 +7,26 @@ set -exv
 GIT_HASH=`git rev-parse --short=7 HEAD`
 IMG="quay.io/app-sre/hive:${GIT_HASH}"
 
-CONTAINER_ENGINE=$(command -v podman || command -v docker || true)
-[[ -n "$CONTAINER_ENGINE" ]] || echo "WARNING: Couldn't find a container engine. Assuming you already in a container, running unit tests." >&2
+### Accommodate docker or podman
+#
+# The docker/podman creds cache needs to be in a location unique to this
+# invocation; otherwise it could collide across jenkins jobs. We'll use
+# a .docker folder relative to pwd (the repo root).
+CONTAINER_ENGINE_CONFIG_DIR=.docker
+mkdir -p ${CONTAINER_ENGINE_CONFIG_DIR}
+# But docker and podman use different options to configure it :eyeroll:
+# ==> Podman uses --authfile=PATH *after* the `login` subcommand; but
+# also accepts REGISTRY_AUTH_FILE from the env. See
+# https://www.mankier.com/1/podman-login#Options---authfile=path
+export REGISTRY_AUTH_FILE=${CONTAINER_ENGINE_CONFIG_DIR}
+# ==> Docker uses --config=PATH *before* (any) subcommand; so we'll glue
+# that to the CONTAINER_ENGINE variable itself. (NOTE: I tried half a
+# dozen other ways to do this. This was the least ugly one that actually
+# works.)
+CONTAINER_ENGINE=$(command -v podman 2>/dev/null || echo docker --config=$(CONTAINER_ENGINE_CONFIG_DIR))
 
-# Set SRC container transport based on container engine
-if [[ "${CONTAINER_ENGINE##*/}" == "podman" ]]; then
-    SRC_CONTAINER_TRANSPORT="containers-storage"
-else
-    SRC_CONTAINER_TRANSPORT="docker-daemon"
-fi
+# Make sure we can log into quay; otherwise we won't be able to push
+${CONTAINER_ENGINE} login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io
 
 ## image_exits_in_repo IMAGE_URI
 #

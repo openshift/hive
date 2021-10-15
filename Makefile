@@ -13,6 +13,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 DOCKER_CMD ?= docker
+CONTAINER_BUILD_FLAGS ?= --file ./Dockerfile
 
 # Namespace hive-operator will run:
 HIVE_OPERATOR_NS ?= hive
@@ -269,7 +270,7 @@ $(addprefix generate-submodules-,$(GO_SUB_MODULES)):
 .PHONY: docker-build
 docker-build:
 	@echo "*** DEPRECATED: Use the image-hive target instead ***"
-	$(DOCKER_CMD) build -t ${IMG} .
+	$(DOCKER_CMD) build $(CONTAINER_BUILD_FLAGS) -t ${IMG} .
 
 # Push the image using docker
 .PHONY: docker-push

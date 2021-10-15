@@ -94,7 +94,7 @@ if image_exists_in_repo "${IMG}"; then
 fi
 
 # build the image
-make IMG="$IMG" GO_REQUIRED_MIN_VERSION:= docker-build
+CONTAINER_BUILD_FLAGS="--file ./Dockerfile.ubi" make IMG="$IMG" GO_REQUIRED_MIN_VERSION:= docker-build
 
 # push the image
 make IMG="$IMG" docker-push

@@ -18,12 +18,12 @@ mkdir -p ${CONTAINER_ENGINE_CONFIG_DIR}
 # ==> Podman uses --authfile=PATH *after* the `login` subcommand; but
 # also accepts REGISTRY_AUTH_FILE from the env. See
 # https://www.mankier.com/1/podman-login#Options---authfile=path
-export REGISTRY_AUTH_FILE=${CONTAINER_ENGINE_CONFIG_DIR}
+export REGISTRY_AUTH_FILE=${CONTAINER_ENGINE_CONFIG_DIR}/config.json
 # ==> Docker uses --config=PATH *before* (any) subcommand; so we'll glue
 # that to the CONTAINER_ENGINE variable itself. (NOTE: I tried half a
 # dozen other ways to do this. This was the least ugly one that actually
 # works.)
-CONTAINER_ENGINE=$(command -v podman 2>/dev/null || echo docker --config=$(CONTAINER_ENGINE_CONFIG_DIR))
+CONTAINER_ENGINE=$(command -v podman 2>/dev/null || echo docker --config=${CONTAINER_ENGINE_CONFIG_DIR})
 
 # Make sure we can log into quay; otherwise we won't be able to push
 ${CONTAINER_ENGINE} login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io

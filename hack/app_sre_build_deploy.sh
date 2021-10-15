@@ -12,6 +12,16 @@ IMG="${BASE_IMG}:latest"
 
 GIT_HASH=`git rev-parse --short=7 HEAD`
 
+CONTAINER_ENGINE=$(command -v podman || command -v docker || true)
+[[ -n "$CONTAINER_ENGINE" ]] || echo "WARNING: Couldn't find a container engine. Assuming you already in a container, running unit tests." >&2
+
+# Set SRC container transport based on container engine
+if [[ "${CONTAINER_ENGINE##*/}" == "podman" ]]; then
+    SRC_CONTAINER_TRANSPORT="containers-storage"
+else
+    SRC_CONTAINER_TRANSPORT="docker-daemon"
+fi
+
 ## image_exits_in_repo IMAGE_URI
 #
 # Checks whether IMAGE_URI -- e.g. quay.io/app-sre/osd-metrics-exporter:abcd123
@@ -82,9 +92,9 @@ BUILD_CMD="docker build" IMG="$IMG" make GO_REQUIRED_MIN_VERSION:= docker-build
 
 # push the image
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "docker-daemon:${IMG}" \
+    "${SRC_CONTAINER_TRANSPORT}:${IMG}" \
     "docker://${QUAY_IMAGE}:latest"
 
 skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "docker-daemon:${IMG}" \
+    "${SRC_CONTAINER_TRANSPORT}:${IMG}" \
     "docker://${QUAY_IMAGE}:${GIT_HASH}"

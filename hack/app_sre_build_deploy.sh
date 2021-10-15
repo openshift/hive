@@ -4,13 +4,8 @@
 
 set -exv
 
-CURRENT_DIR=$(dirname $0)
-
-BASE_IMG="hive"
-QUAY_IMAGE="quay.io/app-sre/${BASE_IMG}"
-IMG="${BASE_IMG}:latest"
-
 GIT_HASH=`git rev-parse --short=7 HEAD`
+IMG="quay.io/app-sre/hive:${GIT_HASH}"
 
 CONTAINER_ENGINE=$(command -v podman || command -v docker || true)
 [[ -n "$CONTAINER_ENGINE" ]] || echo "WARNING: Couldn't find a container engine. Assuming you already in a container, running unit tests." >&2
@@ -82,19 +77,13 @@ image_exists_in_repo() {
     fi
 }
 
-if image_exists_in_repo "${QUAY_IMAGE}:${GIT_HASH}"; then
-    echo "Skipping image build/push for ${QUAY_IMAGE}:${GIT_HASH}"
+if image_exists_in_repo "${IMG}"; then
+    echo "Skipping image build/push for ${IMG}"
     exit 0
 fi
 
 # build the image
-BUILD_CMD="docker build" IMG="$IMG" make GO_REQUIRED_MIN_VERSION:= docker-build
+make IMG="$IMG" GO_REQUIRED_MIN_VERSION:= docker-build
 
 # push the image
-skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "${SRC_CONTAINER_TRANSPORT}:${IMG}" \
-    "docker://${QUAY_IMAGE}:latest"
-
-skopeo copy --dest-creds "${QUAY_USER}:${QUAY_TOKEN}" \
-    "${SRC_CONTAINER_TRANSPORT}:${IMG}" \
-    "docker://${QUAY_IMAGE}:${GIT_HASH}"
+make IMG="$IMG" docker-push

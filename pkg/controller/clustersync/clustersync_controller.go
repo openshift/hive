@@ -557,9 +557,10 @@ func (r *ReconcileClusterSync) applySyncSets(
 		}
 	}
 
-	// The remaining sync statuses in syncStatuses do not match any syncsets. Any resources to delete in the sync status
-	// need to be deleted.
-	// In order to allow proper apply for resource moved from 1 syncset to another, we should delete old resources first
+	// sync statuses in the deletionList do not match any syncsets. Any resources to delete in the sync status need to
+	// be deleted.
+	// We delete old resources before applying new in order to allow resources to be moved from one syncset to
+	// another, ex: in the case of a syncset being renamed
 	for _, oldSyncStatus := range deletionList {
 		remainingResources, err := deleteFromTargetCluster(oldSyncStatus.ResourcesToDelete, nil, resourceHelper, logger)
 		if err != nil {

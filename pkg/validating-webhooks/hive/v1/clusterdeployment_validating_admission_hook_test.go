@@ -802,9 +802,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
 		},
 		{
 			name: "ClusterInstallRef is set when no supported",
@@ -819,9 +818,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
-			operation:           admissionv1beta1.Create,
-			expectedAllowed:     false,
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
 		},
 		{
 			name: "ClusterInstallRef is set when not supported",
@@ -836,7 +834,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
 			supportedContracts: contracts.SupportedContractImplementationsList{{
 				Name: hivecontractsv1alpha1.ClusterInstallContractName,
 				Supported: []contracts.ContractImplementation{{
@@ -861,7 +858,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				}
 				return cd
 			}(),
-			enabledFeatureGates: []string{hivev1.FeatureGateAgentInstallStrategy},
 			supportedContracts: contracts.SupportedContractImplementationsList{{
 				Name: hivecontractsv1alpha1.ClusterInstallContractName,
 				Supported: []contracts.ContractImplementation{{

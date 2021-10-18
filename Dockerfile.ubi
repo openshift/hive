@@ -6,8 +6,6 @@ RUN make build
 
 FROM registry.access.redhat.com/ubi8/ubi:latest
 
-# CentOS images do not get updates as they are meant to mirror ISO content, and thus this update
-# is strongly recommended for security updates.
 RUN dnf -y update && dnf clean all
 
 # ssh-agent required for gathering logs in some situations:

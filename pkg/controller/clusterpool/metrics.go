@@ -7,6 +7,38 @@ import (
 )
 
 var (
+	metricClusterDeploymentsAssignable = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_assignable",
+		Help: "The number of ClusterDeployments ready to be claimed. Contributes to Size and MaxSize.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
+	metricClusterDeploymentsClaimed = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_claimed",
+		Help: "The number of claimed ClusterDeployments, including those being deleted. Contributes to MaxSize.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
+	metricClusterDeploymentsDeleting = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_deleting",
+		Help: "The number of ClusterDeployments marked for or actively deprovisioning and deleting. Contributes to MaxConcurrent.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
+	metricClusterDeploymentsInstalling = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_installing",
+		Help: "The number of ClusterDeployments being added to the pool, in the process of installing. Contributes to Size, MaxSize, and MaxConcurrent.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
+	metricClusterDeploymentsUnclaimed = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_unclaimed",
+		Help: "The number of unclaimed ClusterDeployments, including both installing and assignable. Should tend toward the pool Size, unless constrained by MaxConcurrent or exceeded due to excess claims.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
+	metricClusterDeploymentsRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_running",
+		Help: "The subset of assignable ClusterDeployments that are in Running state. Should tend toward RunningCount plus the number of pending ClusterClaims.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
+	metricClusterDeploymentsStale = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_stale",
+		Help: "The number of ClusterDeployments which no longer match the spec of their ClusterPool. Should tend toward zero as such clusters are gradually replaced.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
+	metricClusterDeploymentsBroken = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_broken",
+		Help: "The number of ClusterDeployments we have deemed unrecoverable and unusable. Should tend toward zero as such clusters are gradually replaced.",
+	}, []string{"clusterpool_namespace", "clusterpool_name"})
 	// metricStaleClusterDeploymentsDeleted tracks the total number of CDs we delete because they
 	// became "stale". That is, the ClusterPool was modified in a substantive way such that these
 	// CDs no longer match its spec. Note that this only counts stale CDs we've *deleted* -- there
@@ -34,6 +66,14 @@ var (
 )
 
 func init() {
+	metrics.Registry.MustRegister(metricClusterDeploymentsAssignable)
+	metrics.Registry.MustRegister(metricClusterDeploymentsClaimed)
+	metrics.Registry.MustRegister(metricClusterDeploymentsDeleting)
+	metrics.Registry.MustRegister(metricClusterDeploymentsInstalling)
+	metrics.Registry.MustRegister(metricClusterDeploymentsUnclaimed)
+	metrics.Registry.MustRegister(metricClusterDeploymentsRunning)
+	metrics.Registry.MustRegister(metricClusterDeploymentsStale)
+	metrics.Registry.MustRegister(metricClusterDeploymentsBroken)
 	metrics.Registry.MustRegister(metricStaleClusterDeploymentsDeleted)
 	metrics.Registry.MustRegister(metricClaimDelaySeconds)
 }

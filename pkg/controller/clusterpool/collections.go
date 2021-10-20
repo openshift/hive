@@ -351,6 +351,16 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		"stale":      len(cdCol.unknownPoolVersion) + len(cdCol.mismatchedPoolVersion),
 		"broken":     len(cdCol.broken),
 	}).Debug("found clusters for ClusterPool")
+
+	metricClusterDeploymentsAssignable.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.assignable)))
+	metricClusterDeploymentsClaimed.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.byClaimName)))
+	metricClusterDeploymentsDeleting.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.deleting)))
+	metricClusterDeploymentsInstalling.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.installing)))
+	metricClusterDeploymentsUnclaimed.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.installing) + len(cdCol.assignable)))
+	metricClusterDeploymentsRunning.WithLabelValues(pool.Namespace, pool.Name).Set(float64(running))
+	metricClusterDeploymentsStale.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.unknownPoolVersion) + len(cdCol.mismatchedPoolVersion)))
+	metricClusterDeploymentsBroken.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.broken)))
+
 	return &cdCol, nil
 }
 

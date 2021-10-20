@@ -7,6 +7,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -114,22 +115,22 @@ func (c *azureClient) StartVirtualMachine(ctx context.Context, resourceGroup, na
 
 // NewClientFromSecret creates our client wrapper object for interacting with Azure. The Azure creds are read from the
 // specified secret.
-func NewClientFromSecret(secret *corev1.Secret) (Client, error) {
-	return newClient(authJSONFromSecretSource(secret))
+func NewClientFromSecret(secret *corev1.Secret, environmentName string) (Client, error) {
+	return newClient(authJSONFromSecretSource(secret), environmentName)
 }
 
 // NewClientFromFile creates our client wrapper object for interacting with Azure. The Azure creds are read from the
 // specified file.
-func NewClientFromFile(filename string) (Client, error) {
-	return newClient(authJSONFromFileSource(filename))
+func NewClientFromFile(filename string, environmentName string) (Client, error) {
+	return newClient(authJSONFromFileSource(filename), environmentName)
 }
 
 // NewClient creates our client wrapper object for interacting with Azure using the Azure creds provided.
-func NewClient(creds []byte) (Client, error) {
-	return newClient(authJSONFromBytes(creds))
+func NewClient(creds []byte, environmentName string) (Client, error) {
+	return newClient(authJSONFromBytes(creds), environmentName)
 }
 
-func newClient(authJSONSource func() ([]byte, error)) (*azureClient, error) {
+func newClient(authJSONSource func() ([]byte, error), environmentName string) (*azureClient, error) {
 	authJSON, err := authJSONSource()
 	if err != nil {
 		return nil, err
@@ -155,23 +156,30 @@ func newClient(authJSONSource func() ([]byte, error)) (*azureClient, error) {
 		return nil, errors.New("missing subscriptionId in auth")
 	}
 
-	config := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
+	if environmentName == "" {
+		environmentName = azure.PublicCloud.Name
+	}
 
-	authorizer, err := config.Authorizer()
+	env, err := azure.EnvironmentFromName(environmentName)
 	if err != nil {
 		return nil, err
 	}
 
-	resourceSKUsClient := compute.NewResourceSkusClientWithBaseURI(azure.PublicCloud.ResourceManagerEndpoint, subscriptionID)
+	authorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env)
+	if err != nil {
+		return nil, err
+	}
+
+	resourceSKUsClient := compute.NewResourceSkusClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
 	resourceSKUsClient.Authorizer = authorizer
 
-	recordSetsClient := dns.NewRecordSetsClientWithBaseURI(azure.PublicCloud.ResourceManagerEndpoint, subscriptionID)
+	recordSetsClient := dns.NewRecordSetsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
 	recordSetsClient.Authorizer = authorizer
 
-	zonesClient := dns.NewZonesClientWithBaseURI(azure.PublicCloud.ResourceManagerEndpoint, subscriptionID)
+	zonesClient := dns.NewZonesClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
 	zonesClient.Authorizer = authorizer
 
-	virtualMachinesClient := compute.NewVirtualMachinesClientWithBaseURI(azure.PublicCloud.ResourceManagerEndpoint, subscriptionID)
+	virtualMachinesClient := compute.NewVirtualMachinesClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
 	virtualMachinesClient.Authorizer = authorizer
 
 	return &azureClient{
@@ -202,4 +210,11 @@ func authJSONFromFileSource(filename string) func() ([]byte, error) {
 	return func() ([]byte, error) {
 		return ioutil.ReadFile(filename)
 	}
+}
+
+func getAuthorizer(clientID, clientSecret, tenantID string, env azure.Environment) (autorest.Authorizer, error) {
+	config := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
+	config.Resource = env.ResourceManagerEndpoint
+	config.AADEndpoint = env.ActiveDirectoryEndpoint
+	return config.Authorizer()
 }

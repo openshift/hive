@@ -1007,7 +1007,7 @@ func (r *ReconcileRemoteMachineSet) createActuator(
 		); err != nil {
 			return nil, err
 		}
-		return NewAzureActuator(creds, logger)
+		return NewAzureActuator(creds, cd.Spec.Platform.Azure.CloudName.Name(), logger)
 	case cd.Spec.Platform.OpenStack != nil:
 		return NewOpenStackActuator(masterMachine, r.scheme, r.Client, logger)
 	case cd.Spec.Platform.VSphere != nil:

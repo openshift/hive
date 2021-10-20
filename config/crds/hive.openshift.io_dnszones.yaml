@@ -89,6 +89,17 @@ spec:
               azure:
                 description: Azure specifes Azure-specific cloud configuration
                 properties:
+                  cloudName:
+                    description: CloudName is the name of the Azure cloud environment
+                      which can be used to configure the Azure SDK with the appropriate
+                      Azure API endpoints. If empty, the value is equal to "AzurePublicCloud".
+                    enum:
+                    - ""
+                    - AzurePublicCloud
+                    - AzureUSGovernmentCloud
+                    - AzureChinaCloud
+                    - AzureGermanCloud
+                    type: string
                   credentialsSecretRef:
                     description: CredentialsSecretRef references a secret that will
                       be used to authenticate with Azure CloudDNS. It will need permission

@@ -26,7 +26,7 @@ func contextWithTimeout(ctx context.Context) (context.Context, context.CancelFun
 }
 
 // NewAzureQuery creates a new name server query for Azure.
-func NewAzureQuery(c client.Client, credsSecretName string, resourceGroupName string) Query {
+func NewAzureQuery(c client.Client, credsSecretName, resourceGroupName, cloudName string) Query {
 	return &azureQuery{
 		getAzureClient: func() (azureclient.Client, error) {
 			credsSecret := &corev1.Secret{}
@@ -37,7 +37,7 @@ func NewAzureQuery(c client.Client, credsSecretName string, resourceGroupName st
 			); err != nil {
 				return nil, errors.Wrap(err, "could not get the creds secret")
 			}
-			azureClient, err := azureclient.NewClientFromSecret(credsSecret)
+			azureClient, err := azureclient.NewClientFromSecret(credsSecret, cloudName)
 			return azureClient, errors.Wrap(err, "error creating Azure client")
 		},
 		resourceGroupName: resourceGroupName,

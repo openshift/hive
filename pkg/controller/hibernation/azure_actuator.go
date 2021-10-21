@@ -215,7 +215,7 @@ func getAzureClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.Fi
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to fetch Azure credentials secret")
 		return nil, errors.Wrap(err, "failed to fetch Azure credentials secret")
 	}
-	azureClient, err := azureclient.NewClientFromSecret(secret)
+	azureClient, err := azureclient.NewClientFromSecret(secret, cd.Spec.Platform.Azure.CloudName.Name())
 	if err != nil {
 		logger.WithError(err).Error("failed to get Azure client")
 	}

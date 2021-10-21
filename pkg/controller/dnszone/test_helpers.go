@@ -210,7 +210,7 @@ func fakeGCPClientBuilder(mockGCPClient *mockgcp.MockClient) gcpClientBuilderTyp
 }
 
 func fakeAzureClientBuilder(mockAzureClient *mockazure.MockClient) azureClientBuilderType {
-	return func(secret *corev1.Secret) (azureclient.Client, error) {
+	return func(secret *corev1.Secret, cloudName string) (azureclient.Client, error) {
 		return mockAzureClient, nil
 	}
 }

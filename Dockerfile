@@ -6,13 +6,15 @@ RUN make build
 
 FROM quay.io/centos/centos:stream
 
-RUN dnf -y update && dnf clean all
+ARG DNF=dnf
+
+RUN $DNF -y update && $DNF clean all
 
 # ssh-agent required for gathering logs in some situations:
-RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q openssh-clients; then $DNF install -y openssh-clients && $DNF clean all && rm -rf /var/cache/dnf/*; fi
 
 # libvirt libraries required for running bare metal installer.
-RUN if ! rpm -q libvirt-devel; then dnf install -y libvirt-devel && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q libvirt-libs; then $DNF install -y libvirt-libs && $DNF clean all && rm -rf /var/cache/dnf/*; fi
 
 COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/

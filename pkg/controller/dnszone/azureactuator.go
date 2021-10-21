@@ -31,7 +31,7 @@ type AzureActuator struct {
 	managedZone *dns.Zone
 }
 
-type azureClientBuilderType func(secret *corev1.Secret) (azureclient.Client, error)
+type azureClientBuilderType func(secret *corev1.Secret, cloudName string) (azureclient.Client, error)
 
 // NewAzureActuator creates a new NewAzureActuator object. A new NewAzureActuator is expected to be created for each controller sync.
 func NewAzureActuator(
@@ -40,7 +40,7 @@ func NewAzureActuator(
 	dnsZone *hivev1.DNSZone,
 	azureClientBuilder azureClientBuilderType,
 ) (*AzureActuator, error) {
-	azureClient, err := azureClientBuilder(secret)
+	azureClient, err := azureClientBuilder(secret, dnsZone.Spec.Azure.CloudName.Name())
 	if err != nil {
 		logger.WithError(err).Error("Error creating AzureClient")
 		return nil, err

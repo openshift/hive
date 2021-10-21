@@ -3,6 +3,8 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/openshift/hive/apis/hive/v1/azure"
 )
 
 const (
@@ -480,6 +482,12 @@ type ManageDNSAzureConfig struct {
 	// ResourceGroupName specifies the Azure resource group containing the DNS zones
 	// for the domains being managed.
 	ResourceGroupName string `json:"resourceGroupName"`
+
+	// CloudName is the name of the Azure cloud environment which can be used to configure the Azure SDK
+	// with the appropriate Azure API endpoints.
+	// If empty, the value is equal to "AzurePublicCloud".
+	// +optional
+	CloudName azure.CloudEnvironment `json:"cloudName,omitempty"`
 }
 
 // ControllerConfig contains the configuration for a controller

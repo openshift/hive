@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	azurerest "github.com/Azure/go-autorest/autorest/azure"
 	"github.com/openshift/hive/pkg/azureclient"
 	"github.com/openshift/hive/pkg/constants"
 )
@@ -173,7 +174,7 @@ func (s *LiveAzureTestSuite) getCUT() *azureQuery {
 	credsFile := filepath.Join(usr.HomeDir, ".azure", constants.AzureCredentialsName)
 	return &azureQuery{
 		getAzureClient: func() (azureclient.Client, error) {
-			return azureclient.NewClientFromFile(credsFile)
+			return azureclient.NewClientFromFile(credsFile, azurerest.PublicCloud.Name)
 		},
 		resourceGroupName: s.resourceGroupName,
 	}

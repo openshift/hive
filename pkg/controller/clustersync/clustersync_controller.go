@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -172,10 +171,24 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*R
 	}, nil
 }
 
-func resourceHelperBuilderFunc(restConfig *rest.Config, fakeCluster bool, logger log.FieldLogger) (resource.Helper, error) {
-	if fakeCluster {
+func resourceHelperBuilderFunc(
+	cd *hivev1.ClusterDeployment,
+	remoteClusterAPIClientBuilderFunc func(cd *hivev1.ClusterDeployment) remoteclient.Builder,
+	logger log.FieldLogger,
+) (
+	resource.Helper,
+	error,
+) {
+	if controllerutils.IsFakeCluster(cd) {
 		return resource.NewFakeHelper(logger), nil
 	}
+
+	restConfig, err := remoteClusterAPIClientBuilderFunc(cd).RESTConfig()
+	if err != nil {
+		logger.WithError(err).Error("unable to get REST config")
+		return nil, err
+	}
+
 	return resource.NewHelperFromRESTConfig(restConfig, logger)
 }
 
@@ -260,7 +273,7 @@ type ReconcileClusterSync struct {
 	logger          log.FieldLogger
 	reapplyInterval time.Duration
 
-	resourceHelperBuilder func(*rest.Config, bool, log.FieldLogger) (resource.Helper, error)
+	resourceHelperBuilder func(*hivev1.ClusterDeployment, func(cd *hivev1.ClusterDeployment) remoteclient.Builder, log.FieldLogger) (resource.Helper, error)
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
@@ -384,16 +397,9 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		logger.Debug("cluster is unreachable")
 		return reconcile.Result{}, nil
 	}
-	restConfig, err := r.remoteClusterAPIClientBuilder(cd).RESTConfig()
-	if err != nil {
-		logger.WithError(err).Error("unable to get REST config")
-		return reconcile.Result{}, err
-	}
 
 	// If this cluster carries the fake annotation we will fake out all helper communication with it.
-	fakeCluster := controllerutils.IsFakeCluster(cd)
-
-	resourceHelper, err := r.resourceHelperBuilder(restConfig, fakeCluster, logger)
+	resourceHelper, err := r.resourceHelperBuilder(cd, r.remoteClusterAPIClientBuilder, logger)
 	if err != nil {
 		log.WithError(err).Error("cannot create helper")
 		return reconcile.Result{}, err

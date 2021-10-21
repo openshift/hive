@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -92,7 +91,11 @@ func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime
 		Client:          c,
 		logger:          logger,
 		reapplyInterval: defaultReapplyInterval,
-		resourceHelperBuilder: func(rc *rest.Config, fakeCluster bool, _ log.FieldLogger) (resource.Helper, error) {
+		resourceHelperBuilder: func(
+			cd *hivev1.ClusterDeployment,
+			remoteClusterAPIClientBuilderFunc func(cd *hivev1.ClusterDeployment) remoteclient.Builder,
+			_ log.FieldLogger,
+		) (resource.Helper, error) {
 			return mockResourceHelper, nil
 		},
 		remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder {
@@ -111,10 +114,6 @@ func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime
 }
 
 func (rt *reconcileTest) run(t *testing.T) {
-	if !rt.expectNoWorkDone {
-		rt.mockRemoteClientBuilder.EXPECT().RESTConfig().Return(&rest.Config{}, nil)
-	}
-
 	var origLeaseRenewTime metav1.MicroTime
 	if rt.expectUnchangedLeaseRenewTime {
 		lease := &hiveintv1alpha1.ClusterSyncLease{}
@@ -253,7 +252,6 @@ func TestReconcileClusterSync_NewClusterDeployment(t *testing.T) {
 			teststatefulset.WithReplicas(3),
 		),
 	)
-	rt.mockRemoteClientBuilder.EXPECT().RESTConfig().Return(&rest.Config{}, nil)
 	reconcileRequest := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: testNamespace,

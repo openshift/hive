@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -299,7 +298,7 @@ func createNameServerQuery(c client.Client, logger log.FieldLogger, managedDomai
 	if managedDomain.Azure != nil {
 		secretName := managedDomain.Azure.CredentialsSecretRef.Name
 		logger.Infof("using azure creds for managed domain stored in %q secret", secretName)
-		return nameserver.NewAzureQuery(c, secretName, managedDomain.Azure.ResourceGroupName)
+		return nameserver.NewAzureQuery(c, secretName, managedDomain.Azure.ResourceGroupName, managedDomain.Azure.CloudName.Name())
 	}
 	logger.Error("unsupported cloud for managing DNS")
 	return nil

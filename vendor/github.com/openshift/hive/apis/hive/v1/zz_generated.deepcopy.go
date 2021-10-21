@@ -1383,6 +1383,11 @@ func (in *ClusterPoolSpec) DeepCopyInto(out *ClusterPoolSpec) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.InstallAttemptsLimit != nil {
+		in, out := &in.InstallAttemptsLimit, &out.InstallAttemptsLimit
+		*out = new(int32)
+		**out = **in
+	}
 	if in.ClaimLifetime != nil {
 		in, out := &in.ClaimLifetime, &out.ClaimLifetime
 		*out = new(ClusterPoolClaimLifetime)

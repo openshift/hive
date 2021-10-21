@@ -84,7 +84,7 @@ func cleanupAzureDNSZone(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error 
 		return err
 	}
 
-	azureClient, err := azureclient.NewClient(creds)
+	azureClient, err := azureclient.NewClient(creds, dnsZone.Spec.Azure.CloudName.Name())
 	if err != nil {
 		logger.WithError(err).Error("failed to create Azure client")
 		return err

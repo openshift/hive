@@ -30,8 +30,8 @@ type AzureActuator struct {
 var _ Actuator = &AzureActuator{}
 
 // NewAzureActuator is the constructor for building a AzureActuator
-func NewAzureActuator(azureCreds *corev1.Secret, logger log.FieldLogger) (*AzureActuator, error) {
-	azureClient, err := azureclient.NewClientFromSecret(azureCreds)
+func NewAzureActuator(azureCreds *corev1.Secret, cloudName string, logger log.FieldLogger) (*AzureActuator, error) {
+	azureClient, err := azureclient.NewClientFromSecret(azureCreds, cloudName)
 	if err != nil {
 		logger.WithError(err).Warn("failed to create Azure client with creds in clusterDeployment's secret")
 		return nil, err

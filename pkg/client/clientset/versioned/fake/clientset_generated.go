@@ -60,7 +60,10 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // HiveV1 retrieves the HiveV1Client
 func (c *Clientset) HiveV1() hivev1.HiveV1Interface {

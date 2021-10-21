@@ -467,6 +467,18 @@ spec:
                       description: Azure contains Azure-specific settings for external
                         DNS
                       properties:
+                        cloudName:
+                          description: CloudName is the name of the Azure cloud environment
+                            which can be used to configure the Azure SDK with the
+                            appropriate Azure API endpoints. If empty, the value is
+                            equal to "AzurePublicCloud".
+                          enum:
+                          - ""
+                          - AzurePublicCloud
+                          - AzureUSGovernmentCloud
+                          - AzureChinaCloud
+                          - AzureGermanCloud
+                          type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef references a secret in
                             the TargetNamespace that will be used to authenticate

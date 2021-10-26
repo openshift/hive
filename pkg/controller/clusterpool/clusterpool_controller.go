@@ -380,10 +380,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			"Available":     availableCurrent,
 		}).Info("Cannot create/delete clusters as max concurrent quota exceeded.")
 	// If too few, create new InstallConfig and ClusterDeployment.
-	case drift < 0:
-		if availableCapacity <= 0 {
-			break
-		}
+	case drift < 0 && availableCapacity > 0:
 		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
 		if err := r.addClusters(clp, poolVersion, cds, toAdd, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")

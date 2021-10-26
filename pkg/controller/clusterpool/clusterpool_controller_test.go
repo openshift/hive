@@ -330,6 +330,23 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedDeletedClusters: []string{"c1"},
 		},
 		{
+			// HIVE-1684
+			name: "broken clusters are deleted at MaxSize",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(2), testcp.WithMaxSize(3)),
+				unclaimedCDBuilder("c1").Build(
+					testcd.Broken(),
+				),
+				cdBuilder("c2").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "aclaim")),
+				cdBuilder("c3").Build(testcd.Installed(), testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "bclaim")),
+			},
+			expectedTotalClusters:   2,
+			expectedObservedSize:    1,
+			expectedObservedReady:   0,
+			expectedAssignedCDs:     2,
+			expectedDeletedClusters: []string{"c1"},
+		},
+		{
 			name: "create all clusters",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithClusterDeploymentLabels(map[string]string{"foo": "bar"})),

@@ -7,10 +7,19 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/hibernation/mock"
+	"github.com/openshift/hive/pkg/remoteclient"
+	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testcs "github.com/openshift/hive/pkg/test/clustersync"
+	testgeneric "github.com/openshift/hive/pkg/test/generic"
+	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	batchv1 "k8s.io/api/batch/v1"
 	certsv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -21,18 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
-	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/hibernation/mock"
-	"github.com/openshift/hive/pkg/remoteclient"
-	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
-	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
-	testcs "github.com/openshift/hive/pkg/test/clustersync"
-	testgeneric "github.com/openshift/hive/pkg/test/generic"
 )
 
 const (
@@ -817,4 +814,60 @@ func csrs() []runtime.Object {
 		result[i] = csr
 	}
 	return result
+}
+
+func Test_timeBeforeClusterSyncCheck(t *testing.T) {
+	buildCD := func(installed time.Time) *hivev1.ClusterDeployment {
+		return testcd.BasicBuilder().Build(testcd.InstalledTimestamp(installed))
+	}
+	tests := []struct {
+		name string
+		cd   *hivev1.ClusterDeployment
+		want time.Duration
+	}{
+		{
+			// We should never hit this code path in real life, but make sure it behaves sanely anyway
+			name: "Not yet installed",
+			cd:   testcd.BasicBuilder().Build(),
+			want: 2 * time.Minute,
+		},
+		{
+			// This should also never happen, but is substantially the same as "waaay in the past"
+			name: "Installed at epoch",
+			cd:   buildCD(time.Time{}),
+			want: 0,
+		},
+		{
+			name: "Older than max wait time",
+			cd:   buildCD(time.Now().Add(-3 * hibernateAfterSyncSetsNotApplied)),
+			want: 0,
+		},
+		{
+			name: "Really new",
+			cd:   buildCD(time.Now().Add(-3 * time.Second)),
+			want: 10 * time.Second,
+		},
+		{
+			name: "Pretty new",
+			cd:   buildCD(time.Now().Add(-2 * time.Minute)),
+			want: time.Minute,
+		},
+		{
+			name: "Middlin",
+			cd:   buildCD(time.Now().Add(-5 * time.Minute)),
+			want: 3 * time.Minute,
+		},
+		{
+			name: "Almost expired",
+			cd:   buildCD(time.Now().Add((-9 * time.Minute) - (30 * time.Second))),
+			want: 30 * time.Second,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := timeBeforeClusterSyncCheck(tt.cd); got.Round(time.Second) != tt.want {
+				t.Errorf("timeBeforeClusterSyncCheck() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

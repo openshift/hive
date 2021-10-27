@@ -1,4 +1,4 @@
-package remotemachineset
+package machinepool
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/remotemachineset/mock"
+	"github.com/openshift/hive/pkg/controller/machinepool/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 )
@@ -679,10 +679,10 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			mockRemoteClientBuilder.EXPECT().Build().Return(remoteFakeClient, nil).AnyTimes()
 
-			logger := log.WithField("controller", "remotemachineset")
+			logger := log.WithField("controller", "machinepool")
 			controllerExpectations := controllerutils.NewExpectations(logger)
 
-			rcd := &ReconcileRemoteMachineSet{
+			rcd := &ReconcileMachinePool{
 				Client:                        fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        logger,
@@ -857,7 +857,7 @@ Machine machine-3 failed (InsufficientResources): No available quota,
 			err := fake.Get(context.TODO(), types.NamespacedName{Namespace: machineAPINamespace, Name: testName}, ms)
 			require.NoError(t, err)
 
-			reason, message := summarizeMachinesError(fake, ms, log.WithField("controller", "remotemachineset"))
+			reason, message := summarizeMachinesError(fake, ms, log.WithField("controller", "machinepool"))
 			assert.Equal(t, test.reason, reason)
 			assert.Equal(t, test.message, message)
 		})

@@ -256,6 +256,7 @@ spec:
                           - dnszone
                           - remoteingress
                           - remotemachineset
+                          - machinepool
                           - syncidentityprovider
                           - unreachable
                           - velerobackup

@@ -1,4 +1,4 @@
-package remotemachineset
+package machinepool
 
 import (
 	log "github.com/sirupsen/logrus"

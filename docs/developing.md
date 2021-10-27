@@ -382,13 +382,13 @@ make vendor
 
 * If `go mod tidy` errors with a message like the following, then check Hive's usage of that package. In this case, the Hive import is importing an old version of the API. It needs to instead import v1beta1. Fix the hive code and re-run `go mod tidy`. This may need to be done multiple times.
 ```
-github.com/openshift/hive/pkg/controller/remotemachineset imports
+github.com/openshift/hive/pkg/controller/machinepool imports
 	github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1alpha1: module github.com/openshift/machine-api-operator@latest found (v0.2.0), but does not contain package github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1alpha1
 ```
 
 * If `go mod tidy` errors with a message like the following, then check the installer's replace directives for that go module so that Hive is pulling in the same version. Re-run the `go mod tidy` once the replace directive has been added or updated. This process may need to be followed several times to clean up all of the errors.
 ```
-github.com/openshift/hive/pkg/controller/remotemachineset imports
+github.com/openshift/hive/pkg/controller/machinepool imports
 	github.com/openshift/installer/pkg/asset/machines/aws imports
 	sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1: module sigs.k8s.io/cluster-api-provider-aws@latest found (v0.5.3, replaced by github.com/openshift/cluster-api-provider-aws@v0.2.1-0.20200316201703-923caeb1d0d8), but does not contain package sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1
 ```

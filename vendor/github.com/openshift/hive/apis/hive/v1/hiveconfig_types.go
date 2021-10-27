@@ -516,7 +516,7 @@ type ControllerConfig struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=clusterDeployment;clusterrelocate;clusterstate;clusterversion;controlPlaneCerts;dnsendpoint;dnszone;remoteingress;remotemachineset;syncidentityprovider;unreachable;velerobackup;clusterprovision;clusterDeprovision;clusterpool;clusterpoolnamespace;hibernation;clusterclaim;metrics;clustersync
+// +kubebuilder:validation:Enum=clusterDeployment;clusterrelocate;clusterstate;clusterversion;controlPlaneCerts;dnsendpoint;dnszone;remoteingress;remotemachineset;machinepool;syncidentityprovider;unreachable;velerobackup;clusterprovision;clusterDeprovision;clusterpool;clusterpoolnamespace;hibernation;clusterclaim;metrics;clustersync
 type ControllerName string
 
 func (controllerName ControllerName) String() string {
@@ -554,7 +554,6 @@ const (
 	FakeClusterInstallControllerName   ControllerName = "fakeclusterinstall"
 	HibernationControllerName          ControllerName = "hibernation"
 	RemoteIngressControllerName        ControllerName = "remoteingress"
-	RemoteMachinesetControllerName     ControllerName = "remotemachineset"
 	SyncIdentityProviderControllerName ControllerName = "syncidentityprovider"
 	UnreachableControllerName          ControllerName = "unreachable"
 	VeleroBackupControllerName         ControllerName = "velerobackup"
@@ -563,6 +562,11 @@ const (
 	MachineManagementControllerName    ControllerName = "machineManagement"
 	AWSPrivateLinkControllerName       ControllerName = "awsprivatelink"
 	HiveControllerName                 ControllerName = "hive"
+
+	// DeprecatedRemoteMachinesetControllerName was deprecated but can be used to disable the
+	// MachinePool controller which supercedes it for compatability.
+	DeprecatedRemoteMachinesetControllerName ControllerName = "remotemachineset"
+	MachinePoolControllerName                ControllerName = "machinepool"
 )
 
 // SpecificControllerConfig contains the configuration for a specific controller

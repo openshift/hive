@@ -27,6 +27,38 @@ function count_cds() {
   oc get cd -A -o json | jq -r '.items | length'
 }
 
+function wait_for_hibernation_state() {
+  local CLUSTER_NAME=$1
+  local EXPECTED_STATE=$2
+  echo "Waiting for ClusterDeployment $CLUSTER_NAME to be $EXPECTED_STATE"
+  local i=1
+  while [[ $i -le ${max_tries} ]]; do
+    if [[ $i -gt 1 ]]; then
+      # Don't sleep on first loop
+      echo "sleeping ${sleep_between_tries} seconds"
+      sleep ${sleep_between_tries}
+    fi
+
+    HIB_COND=$(oc get cd -n $CLUSTER_NAME $CLUSTER_NAME -o json | jq -r '.status.conditions[] | select(.type == "Hibernating")')
+    if [[ $(jq -r .reason <<<"${HIB_COND}") == $EXPECTED_STATE ]]; then
+      echo "Success"
+      break
+    else
+      echo -n "Failed, "
+    fi
+
+    i=$((i + 1))
+  done
+
+  if [[ $i -ge ${max_tries} ]] ; then
+    # Failed the maximum amount of times.
+    echo "ClusterDeployment $CLUSTER_NAME still not $EXPECTED_STATE" >&2
+    echo "Reason: $(jq -r .reason <<<"${HIB_COND}")" >&2
+    echo "Message: $(jq -r .message <<<"${HIB_COND}")" >&2
+    exit 9
+  fi
+}
+
 # Verify no CDs exist yet
 NUM_CDS=$(count_cds)
 if [[ $NUM_CDS != "0" ]]; then
@@ -114,6 +146,12 @@ function verify_pool_cd_imagesets() {
   return $rc
 }
 
+function set_power_state() {
+  local cd=$1
+  local power_state=$2
+  oc patch cd -n $cd $cd --type=merge -p '{"spec": {"powerState": "'$power_state'"}}'
+}
+
 IMAGESET_NAME=cis
 create_imageset $IMAGESET_NAME
 
@@ -156,13 +194,27 @@ wait_for_pool_to_be_ready $FAKE_POOL_NAME
 # At this point all CDs should ref the new imageset
 verify_pool_cd_imagesets $FAKE_POOL_NAME fake-cis
 
-## Test broken cluster replacement (HIVE-1615)
 # Grab the name (which is also the namespace) of a cd from our pool
 cd=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'${FAKE_POOL_NAME}'") | .metadata.name' | head -1)
 if [[ -z "$cd" ]]; then
   echo "Failed to retrieve a ClusterDeployment from pool $FAKE_POOL_NAME"
   exit 1
 fi
+
+## Test hibernating fake cluster
+echo "Hibernating fake cluster"
+set_power_state $cd Hibernating
+wait_for_hibernation_state $cd Hibernating
+installed=$(oc get cd -n $cd $cd -o json | jq -r '.status.installedTimestamp')
+hibernated=$(oc get cd -n $cd $cd -o json | jq -r '.status.conditions[] | select(.type=="Hibernating") | .lastTransitionTime')
+delta_seconds=$((`date -d "$hibernated" +%s`-`date -d "$installed" +%s`))
+# Check fresh fake cluster did not get stuck on SyncSetsNotApplied
+if [[ $delta_seconds -gt $((10*60)) ]]; then
+  echo "Took longer than 10m to hibernate!"
+  exit 9
+fi
+
+## Test broken cluster replacement (HIVE-1615)
 # Patch the CD's ProvisionStopped status condition to make it look "broken".
 # This should cause the clusterpool controller to replace it.
 i=0
@@ -196,38 +248,6 @@ wait_for_pool_to_be_ready $REAL_POOL_NAME
 #       sure that's the one that gets claimed for the meat of this test.
 CLUSTER_NAME=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'$REAL_POOL_NAME'") | .metadata.name')
 
-function wait_for_hibernation_state() {
-  local CLUSTER_NAME=$1
-  local EXPECTED_STATE=$2
-  echo "Waiting for ClusterDeployment $CLUSTER_NAME to be $EXPECTED_STATE"
-  local i=1
-  while [[ $i -le ${max_tries} ]]; do
-    if [[ $i -gt 1 ]]; then
-      # Don't sleep on first loop
-      echo "sleeping ${sleep_between_tries} seconds"
-      sleep ${sleep_between_tries}
-    fi
-
-    HIB_COND=$(oc get cd -n $CLUSTER_NAME $CLUSTER_NAME -o json | jq -r '.status.conditions[] | select(.type == "Hibernating")')
-    if [[ $(jq -r .reason <<<"${HIB_COND}") == $EXPECTED_STATE ]]; then
-      echo "Success"
-      break
-    else
-      echo -n "Failed, "
-    fi
-
-    i=$((i + 1))
-  done
-
-  if [[ $i -ge ${max_tries} ]] ; then
-    # Failed the maximum amount of times.
-    echo "ClusterDeployment $CLUSTER_NAME still not $EXPECTED_STATE" >&2
-    echo "Reason: $(jq -r .reason <<<"${HIB_COND}")" >&2
-    echo "Message: $(jq -r .message <<<"${HIB_COND}")" >&2
-    exit 9
-  fi
-}
-
 wait_for_hibernation_state $CLUSTER_NAME Hibernating
 
 echo "Claiming"
@@ -237,12 +257,12 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool claim -n $CLUSTER_
 wait_for_hibernation_state $CLUSTER_NAME Running
 
 echo "Re-hibernating"
-oc patch cd -n $CLUSTER_NAME $CLUSTER_NAME --type=merge -p '{"spec": {"powerState": "Hibernating"}}'
+set_power_state $CLUSTER_NAME Hibernating
 
 wait_for_hibernation_state $CLUSTER_NAME Hibernating
 
 echo "Re-resuming"
-oc patch cd -n $CLUSTER_NAME $CLUSTER_NAME --type=merge -p '{"spec": {"powerState": "Running"}}'
+set_power_state $CLUSTER_NAME Running
 
 wait_for_hibernation_state $CLUSTER_NAME Running
 

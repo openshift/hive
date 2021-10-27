@@ -38,6 +38,7 @@ import (
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
@@ -801,6 +802,63 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Equal(t, testClusterDeployment().Name, zone.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
 				assert.Equal(t, constants.DNSZoneTypeChild, zone.Labels[constants.DNSZoneTypeLabel], "incorrect dnszone type label")
 				assert.True(t, zone.Spec.PreserveOnDelete, "PreserveOnDelete did not transfer to DNSZone")
+			},
+		},
+		{
+			name: "Create DNSZone with Azure CloudName",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					baseCD := testClusterDeployment()
+					baseCD.Labels[hivev1.HiveClusterPlatformLabel] = "azure"
+					baseCD.Labels[hivev1.HiveClusterRegionLabel] = "usgovvirginia"
+					baseCD.Spec.Platform.AWS = nil
+					baseCD.Spec.Platform.Azure = &azure.Platform{
+						CredentialsSecretRef: corev1.LocalObjectReference{
+							Name: "azure-credentials",
+						},
+						Region:                      "usgovvirginia",
+						CloudName:                   azure.USGovernmentCloud,
+						BaseDomainResourceGroupName: "os4-common",
+					}
+					baseCD.Spec.ManageDNS = true
+					baseCD.Spec.PreserveOnDelete = true
+					return testClusterDeploymentWithInitializedConditions(baseCD)
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				zone := getDNSZone(c)
+				require.NotNil(t, zone, "dns zone should exist")
+				assert.Equal(t, azure.USGovernmentCloud, zone.Spec.Azure.CloudName, "CloudName did not transfer to DNSZone")
+			},
+		},
+		{
+			name: "Create DNSZone without Azure CloudName",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					baseCD := testClusterDeployment()
+					baseCD.Labels[hivev1.HiveClusterPlatformLabel] = "azure"
+					baseCD.Labels[hivev1.HiveClusterRegionLabel] = "eastus"
+					baseCD.Spec.Platform.AWS = nil
+					baseCD.Spec.Platform.Azure = &azure.Platform{
+						CredentialsSecretRef: corev1.LocalObjectReference{
+							Name: "azure-credentials",
+						},
+						Region:                      "eastus",
+						BaseDomainResourceGroupName: "os4-common",
+					}
+					baseCD.Spec.ManageDNS = true
+					baseCD.Spec.PreserveOnDelete = true
+					return testClusterDeploymentWithInitializedConditions(baseCD)
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				zone := getDNSZone(c)
+				require.NotNil(t, zone, "dns zone should exist")
+				assert.Equal(t, azure.CloudEnvironment(""), zone.Spec.Azure.CloudName, "CloudName incorrectly set for DNSZone")
 			},
 		},
 		{

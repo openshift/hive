@@ -54,7 +54,7 @@ For clouds where there is support for automated IP allocation and DNS configurat
 
 #### Managed DNS
 
-In addition to the default OpenShift DNS support, Hive offers a DNS feature called Managed DNS. With Managed DNS, Hive can automatically create delegated zones for approved base domains. For example, if hive.example.com exists and is specified as your managed domain, you can specify a base domain of cluster1.hive.example.com on your `ClusterDeployment`, and Hive will create this zone for you, add forwarding records in the base domain, wait for it to resolve, and then proceed with installation.
+In addition to the default OpenShift DNS support, Hive offers a DNS feature called Managed DNS. With Managed DNS, Hive can automatically create delegated zones for approved base domains. For example, if hive.example.com exists and is specified as your managed domain, you can specify a base domain of cluster1.hive.example.com on your `ClusterDeployment`, and Hive will create this zone for you, add forwarding records in the base domain, wait for it to resolve, and then proceed with installation. Read [here](#managed-dns-1) for more details.
 
 ### Non-native
 
@@ -787,6 +787,18 @@ To use this feature:
        metadata:
          name: route53-aws-creds
        type: Opaque
+       ```
+       The following AWS IAM permissions should be associated with these credentials:
+       ```
+       route53:ChangeResourceRecordSets
+       route53:ChangeTagsForResource
+       route53:CreateHostedZone
+       route53:DeleteHostedZone
+       route53:GetHostedZone
+       route53:GetResourcesPages
+       route53:ListHostedZoneByName
+       route53:ListResourceRecordSets
+       route53:ListTagsForResource
        ```
      - GCP
        ```yaml

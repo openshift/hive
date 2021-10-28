@@ -1591,6 +1591,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 		dnsZone.Spec.Azure = &hivev1.AzureDNSZoneSpec{
 			CredentialsSecretRef: cd.Spec.Platform.Azure.CredentialsSecretRef,
 			ResourceGroupName:    cd.Spec.Platform.Azure.BaseDomainResourceGroupName,
+			CloudName:            cd.Spec.Platform.Azure.CloudName,
 		}
 	}
 

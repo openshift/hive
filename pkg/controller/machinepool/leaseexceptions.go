@@ -1,4 +1,4 @@
-package remotemachineset
+package machinepool
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
-func (r *ReconcileRemoteMachineSet) watchMachinePoolNameLeases(c controller.Controller) error {
+func (r *ReconcileMachinePool) watchMachinePoolNameLeases(c controller.Controller) error {
 	h := &machinePoolNameLeaseEventHandler{
 		EnqueueRequestForOwner: handler.EnqueueRequestForOwner{
 			IsController: true,
@@ -35,7 +35,7 @@ var _ handler.EventHandler = &machinePoolNameLeaseEventHandler{}
 
 type machinePoolNameLeaseEventHandler struct {
 	handler.EnqueueRequestForOwner
-	reconciler *ReconcileRemoteMachineSet
+	reconciler *ReconcileMachinePool
 }
 
 // Create implements handler.EventHandler
@@ -88,7 +88,7 @@ func (h *machinePoolNameLeaseEventHandler) Delete(e event.DeleteEvent, q workque
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (r *ReconcileRemoteMachineSet) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *hivev1.MachinePool {
+func (r *ReconcileMachinePool) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *hivev1.MachinePool {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
@@ -114,7 +114,7 @@ func (r *ReconcileRemoteMachineSet) resolveControllerRef(namespace string, contr
 }
 
 // When a lease is created, update the expectations of the machinepool that owns the lease.
-func (r *ReconcileRemoteMachineSet) trackLeaseAdd(obj interface{}) {
+func (r *ReconcileMachinePool) trackLeaseAdd(obj interface{}) {
 	r.logger.Debug("tracking lease add")
 	lease := obj.(*hivev1.MachinePoolNameLease)
 	if lease.DeletionTimestamp != nil {

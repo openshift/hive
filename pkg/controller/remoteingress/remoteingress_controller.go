@@ -67,7 +67,7 @@ type kubeCLIApplier interface {
 	ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Scheme) (resource.ApplyResult, error)
 }
 
-// Add creates a new RemoteMachineSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
+// Add creates a new RemoteIngress Controller and adds it to the Manager with default RBAC. The Manager will set fields on the
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)

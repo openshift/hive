@@ -306,22 +306,22 @@ var _ reconcile.Reconciler = &ReconcileHiveConfig{}
 
 // ReconcileHiveConfig reconciles a Hive object
 type ReconcileHiveConfig struct {
-	scheme                 *runtime.Scheme
-	kubeClient             kubernetes.Interface
-	discoveryClient        discovery.DiscoveryInterface
-	dynamicClient          dynamic.Interface
-	restConfig             *rest.Config
-	hiveImage              string
-	hiveOperatorNamespace  string
-	hiveImagePullPolicy    corev1.PullPolicy
-	nodeSelector           map[string]string
-	tolerations            []corev1.Toleration
-	syncAggregatorCA       bool
-	managedConfigCMLister  corev1listers.ConfigMapLister
-	ctrlr                  controller.Controller
-	hiveSecretLister       corev1listers.SecretLister
-	secretWatchEstablished bool
-	mgr                    manager.Manager
+	scheme                            *runtime.Scheme
+	kubeClient                        kubernetes.Interface
+	discoveryClient                   discovery.DiscoveryInterface
+	dynamicClient                     dynamic.Interface
+	restConfig                        *rest.Config
+	hiveImage                         string
+	hiveOperatorNamespace             string
+	hiveImagePullPolicy               corev1.PullPolicy
+	nodeSelector                      map[string]string
+	tolerations                       []corev1.Toleration
+	syncAggregatorCA                  bool
+	managedConfigCMLister             corev1listers.ConfigMapLister
+	ctrlr                             controller.Controller
+	hiveSecretLister                  corev1listers.SecretLister
+	secretWatchEstablishedInNamespace string
+	mgr                               manager.Manager
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
@@ -351,7 +351,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			hLog.Debug("HiveConfig not found, deleted?")
-			r.secretWatchEstablished = false
+			r.secretWatchEstablishedInNamespace = ""
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -533,7 +533,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName string) error {
 	// We need to establish a watch on Secret in the Hive namespace, one time only. We do not know this namespace until
 	// we have a HiveConfig.
-	if !r.secretWatchEstablished {
+	if r.secretWatchEstablishedInNamespace != hiveNSName {
 		hLog.WithField("namespace", hiveNSName).Info("establishing watch on secrets in hive namespace")
 
 		// Create an informer that only listens to events in the OpenShift managed namespace
@@ -600,7 +600,7 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 			return err
 		}
 
-		r.secretWatchEstablished = true
+		r.secretWatchEstablishedInNamespace = hiveNSName
 	} else {
 		hLog.Debug("secret watch already established")
 	}

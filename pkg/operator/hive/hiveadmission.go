@@ -22,7 +22,6 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/hive/pkg/util/contracts"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	admregv1 "k8s.io/api/admissionregistration/v1"
@@ -68,7 +67,7 @@ var webhookAssets = []string{
 	"config/hiveadmission/selectorsyncset-webhook.yaml",
 }
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap, additionalHashes ...string) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, mdConfigMap *corev1.ConfigMap, additionalHashes ...string) error {
 	hiveNSName := getHiveNamespace(instance)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:

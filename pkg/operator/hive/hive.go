@@ -21,7 +21,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -64,7 +63,7 @@ var (
 	}
 )
 
-func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap, hiveControllersConfigHash string) error {
+func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, mdConfigMap *corev1.ConfigMap, hiveControllersConfigHash string) error {
 
 	asset := assets.MustAsset("config/controllers/deployment.yaml")
 	hLog.Debug("reading deployment")

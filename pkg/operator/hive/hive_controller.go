@@ -14,8 +14,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/resource"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -377,11 +375,6 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(r.hiveOperatorNamespace), "hive-operator", &corev1.ObjectReference{
-		Name:      request.Name,
-		Namespace: r.hiveOperatorNamespace,
-	})
-
 	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
 	if err != nil {
 		hLog.WithError(err).Error("error creating resource helper")
@@ -478,7 +471,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap, confighash)
+	err = r.deployHive(hLog, h, instance, managedDomainsConfigMap, confighash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHive", err.Error())
@@ -507,7 +500,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash, plConfigHash, scConfigHash)
+	err = r.deployHiveAdmission(hLog, h, instance, managedDomainsConfigMap, fgConfigHash, plConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHiveAdmission", err.Error())

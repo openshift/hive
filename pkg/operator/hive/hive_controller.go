@@ -19,9 +19,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -79,7 +79,6 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileHiveConfig{
-		Client:     mgr.GetClient(),
 		scheme:     mgr.GetScheme(),
 		restConfig: mgr.GetConfig(),
 		mgr:        mgr,
@@ -129,7 +128,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	ns := &corev1.Namespace{}
 	log.Debugf("checking for existence of the %s namespace", managedConfigNamespace)
 	err = tempClient.Get(context.TODO(), types.NamespacedName{Name: managedConfigNamespace}, ns)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		log.WithError(err).Errorf("error checking existence of the %s namespace", managedConfigNamespace)
 		return err
 	}
@@ -211,7 +210,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			retval := []reconcile.Request{}
 
 			configList := &hivev1.HiveConfigList{}
-			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList) // reconcile all HiveConfigs
+			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList, "", metav1.ListOptions{}) // reconcile all HiveConfigs
 			if err != nil {
 				log.WithError(err).Errorf("error listing hive configs for CRD reconcile")
 				return retval
@@ -237,7 +236,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			nsName := o.GetName()
 
 			configList := &hivev1.HiveConfigList{}
-			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList)
+			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList, "", metav1.ListOptions{})
 			if err != nil {
 				log.WithError(err).Errorf("error listing hive configs for namespace %s reconcile", nsName)
 				return retval
@@ -307,7 +306,6 @@ var _ reconcile.Reconciler = &ReconcileHiveConfig{}
 
 // ReconcileHiveConfig reconciles a Hive object
 type ReconcileHiveConfig struct {
-	client.Client
 	scheme                 *runtime.Scheme
 	kubeClient             kubernetes.Interface
 	discoveryClient        discovery.DiscoveryInterface
@@ -349,7 +347,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	// when our HiveConfig is ClusterScoped.
 	err := r.Get(context.TODO(), types.NamespacedName{Name: request.NamespacedName.Name}, instance)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			hLog.Debug("HiveConfig not found, deleted?")
@@ -384,13 +382,21 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		Namespace: r.hiveOperatorNamespace,
 	})
 
+	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
+	if err != nil {
+		hLog.WithError(err).Error("error creating resource helper")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelper", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
 	// Ensure the target namespace for hive components exists and create if not:
 	hiveNamespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: hiveNSName,
 		},
 	}
-	if err := r.Client.Create(context.Background(), hiveNamespace); err != nil {
+	if _, err := h.CreateRuntimeObject(hiveNamespace, r.scheme); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			hLog.WithField("hiveNS", hiveNSName).Debug("target namespace already exists")
 		} else {
@@ -410,7 +416,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		// admission pods yet.
 		cmLog := hLog.WithField("configmap", fmt.Sprintf("%s/%s", managedConfigNamespace, aggregatorCAConfigMapName))
 		switch {
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			cmLog.Warningf("configmap was not found, will not sync aggregator CA with admission pods")
 		case err != nil:
 			cmLog.WithError(err).Errorf("cannot retrieve configmap")
@@ -433,15 +439,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
-	if err != nil {
-		hLog.WithError(err).Error("error creating resource helper")
-		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelper", err.Error())
-		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
-		return reconcile.Result{}, err
-	}
-
-	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, instance)
+	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, h, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error setting up managed domains")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorSettingUpManagedDomains", err.Error())
@@ -658,9 +656,22 @@ func (r *ReconcileHiveConfig) updateHiveConfigStatus(origHiveConfig, newHiveConf
 
 	logger.Info("HiveConfig has changed, updating")
 
-	err := r.Status().Update(context.TODO(), newHiveConfig)
+	hiveConfigClient := r.dynamicClient.Resource(hivev1.SchemeGroupVersion.WithResource("hiveconfigs"))
+	content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newHiveConfig)
+	if err != nil {
+		logger.WithError(err).Error("failed to convert new hive config to unstructured")
+		return err
+	}
+	var usNewHiveConfig unstructured.Unstructured
+	usNewHiveConfig.SetUnstructuredContent(content)
+	usUpdated, err := hiveConfigClient.UpdateStatus(context.TODO(), &usNewHiveConfig, metav1.UpdateOptions{})
 	if err != nil {
 		logger.WithError(err).Error("failed to update HiveConfig status")
+		return err
+	}
+	// Simulating Status().Update(), put the updated object back into newHiveConfig
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(usUpdated.UnstructuredContent(), newHiveConfig); err != nil {
+		logger.WithError(err).Error("failed to convert unstructured HiveConfig")
 	}
 	return err
 }

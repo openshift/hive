@@ -29,11 +29,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -228,17 +229,16 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debugf("listing secrets in %s namespace", hiveNSName)
-	secrets := &corev1.SecretList{}
-	err := r.Client.List(context.Background(), secrets, client.InNamespace(hiveNSName))
+	secrets, err := r.hiveSecretLister.Secrets(hiveNSName).List(labels.Everything())
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
 		return nil, nil, err
 	}
 	var firstSATokenSecret *corev1.Secret
-	hLog.Debugf("found %d secrets", len(secrets.Items))
-	for _, s := range secrets.Items {
+	hLog.Debugf("found %d secrets", len(secrets))
+	for _, s := range secrets {
 		if s.Type == corev1.SecretTypeServiceAccountToken {
-			firstSATokenSecret = &s
+			firstSATokenSecret = s
 			break
 		}
 	}
@@ -292,7 +292,7 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 // which should only exist on OpenShift 4.x. We do not expect Hive to ever be deployed on pre-3.11.
 func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
 	cvCRD := &apiextv1.CustomResourceDefinition{}
-	err := r.Client.Get(context.Background(), types.NamespacedName{Name: clusterVersionCRDName}, cvCRD)
+	err := r.Get(context.Background(), types.NamespacedName{Name: clusterVersionCRDName}, cvCRD)
 	if err != nil && errors.IsNotFound(err) {
 		// If this CRD does not exist, we must not be on a 4.x cluster.
 		return true, nil
@@ -359,7 +359,7 @@ func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLo
 	}
 
 	crdList := &apiextv1.CustomResourceDefinitionList{}
-	if err := r.Client.List(context.TODO(), crdList); err != nil {
+	if err := r.List(context.TODO(), crdList, "", v1.ListOptions{}); err != nil {
 		hLog.WithError(err).Error("error getting crds for collect contract implementations")
 		return "", err
 	}

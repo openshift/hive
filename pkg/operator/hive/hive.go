@@ -339,9 +339,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 }
 
 func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) error {
+	hiveNS := getHiveNamespace(instance)
 	additionalCA := &bytes.Buffer{}
 	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
-		caSecret, err := r.hiveSecretLister.Secrets(getHiveNamespace(instance)).Get(clientCARef.Name)
+		caSecret, err := r.hiveSecretLister.Secrets(hiveNS).Get(clientCARef.Name)
 		if err != nil {
 			hLog.WithError(err).WithField("secret", clientCARef.Name).Errorf("Cannot read client CA secret")
 			continue
@@ -354,11 +355,11 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 	}
 
 	if additionalCA.Len() == 0 {
-		caSecret, err := r.hiveSecretLister.Secrets(getHiveNamespace(instance)).Get(hiveAdditionalCASecret)
+		caSecret, err := r.hiveSecretLister.Secrets(hiveNS).Get(hiveAdditionalCASecret)
 		if err == nil {
-			err = r.Delete(context.TODO(), caSecret)
+			err = h.Delete(caSecret.APIVersion, caSecret.Kind, caSecret.Namespace, caSecret.Name)
 			if err != nil {
-				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", getHiveNamespace(instance), hiveAdditionalCASecret)).
+				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", hiveNS, hiveAdditionalCASecret)).
 					Error("cannot delete hive additional ca secret")
 				return err
 			}

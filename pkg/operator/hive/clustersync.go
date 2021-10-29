@@ -129,7 +129,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 			//     invalid: spec: Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
 			// The only fix is to delete the statefulset and have the apply below recreate it.
 			hLog.Info("deleting the existing clustersync statefulset because spec has changed")
-			err := r.Delete(context.TODO(), existingClusterSyncStatefulSet)
+			err := h.Delete(existingClusterSyncStatefulSet.APIVersion, existingClusterSyncStatefulSet.Kind, existingClusterSyncStatefulSet.Namespace, existingClusterSyncStatefulSet.Name)
 			if err != nil {
 				hLog.WithError(err).Error("error deleting statefulset")
 			}

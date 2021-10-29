@@ -545,19 +545,6 @@ func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resour
 	hiveNSName := getHiveNamespace(instance)
 	enable := instance.Spec.ExportMetrics
 
-	// HACK: Due to https://github.com/kubernetes/kubernetes/issues/105689 using strategic merge
-	// patch with a null value to remove a key from a dict that's already empty will *add* the key
-	// with the empty string as the value. This doesn't happen if there's any other entry in the
-	// dict. So...
-	if err := h.Patch(
-		types.NamespacedName{Name: hiveNSName}, "Namespace", "v1",
-		[]byte(`{"metadata": {"labels": {"hive.openshift.io/managed": "true"}}}`),
-		"",
-	); err != nil {
-		hLog.WithError(err).Errorf("error updating hive namespace managed label")
-		return err
-	}
-
 	var labelVal, metricsAction, resourceVerbing, resourceVerbed string
 	var kubeFunc func(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error
 	if enable {

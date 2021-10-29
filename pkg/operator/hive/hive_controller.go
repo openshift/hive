@@ -58,6 +58,12 @@ const (
 
 	// watchResyncInterval is used for a couple handcrafted watches we do with our own informers.
 	watchResyncInterval = 30 * time.Minute
+
+	// targetNamespaceLabel is the key (the value will always be "true") for the label we add to
+	// the namespace into which we deploy hive -- i.e. HiveConfig.Spec.TargetNamespace. We use this
+	// to identify namespaces that were *previously* the configured TargetNamespace so we can clean
+	// them up.
+	targetNamespaceLabel = "hive.openshift.io/target-namespace"
 )
 
 var (
@@ -386,10 +392,11 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	// Ensure the target namespace for hive components exists and create if not:
 	hiveNamespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: hiveNSName,
+			Name:   hiveNSName,
+			Labels: map[string]string{targetNamespaceLabel: "true"},
 		},
 	}
-	if _, err := h.CreateRuntimeObject(hiveNamespace, r.scheme); err != nil {
+	if _, err := h.CreateOrUpdateRuntimeObject(hiveNamespace, r.scheme); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			hLog.WithField("hiveNS", hiveNSName).Debug("target namespace already exists")
 		} else {

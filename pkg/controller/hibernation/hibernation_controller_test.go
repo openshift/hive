@@ -97,6 +97,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.UnsupportedHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -108,6 +109,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.UnsupportedHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -128,6 +130,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -139,6 +142,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.SyncSetsNotAppliedReason, cond.Reason)
+				assert.Equal(t, hivev1.SyncSetsNotAppliedReason, cd.Status.PowerState)
 			},
 			expectError: true,
 		},
@@ -159,6 +163,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.SyncSetsAppliedReason, cond.Reason)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.SyncSetsAppliedReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -173,6 +178,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -187,6 +193,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -201,6 +208,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.FailedToStopHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.FailedToStopHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -215,6 +223,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -232,6 +241,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
 				assert.Equal(t, "Stopping cluster machines. Some machines have not yet stopped: pending-1,running-1,stopping-1", cond.Message)
+				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -253,6 +263,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -267,6 +278,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.ResumingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -282,6 +294,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.FailedToStartHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.FailedToStartHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -303,6 +316,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.ResumingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -320,6 +334,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, hivev1.ResumingHibernationReason, cond.Reason)
 				assert.Equal(t, "Starting cluster machines. Some machines are not yet running: pending-1,stopped-1", cond.Message)
+				assert.Equal(t, hivev1.ResumingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -338,6 +353,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.RunningHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -396,6 +412,7 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
 				assert.Equal(t, "Hibernation capable", cond.Message)
+				assert.Equal(t, hivev1.RunningHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -411,6 +428,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, "Fake cluster is stopped", cond.Message)
+				assert.Equal(t, hivev1.HibernatingHibernationReason, cd.Status.PowerState)
 			},
 		},
 		{
@@ -425,6 +443,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.RunningHibernationReason, cond.Reason)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				assert.Equal(t, "Fake cluster is running", cond.Message)
+				assert.Equal(t, hivev1.RunningHibernationReason, cd.Status.PowerState)
 			},
 		},
 	}

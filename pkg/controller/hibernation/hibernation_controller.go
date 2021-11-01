@@ -498,6 +498,7 @@ func (r *hibernationReconciler) setHibernatingCondition(cd *hivev1.ClusterDeploy
 		controllerutils.ErrorScrub(errors.New(message)),
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
+	cd.Status.PowerState = reason
 
 	if reason == hivev1.SyncSetsNotAppliedReason {
 		defer func() {

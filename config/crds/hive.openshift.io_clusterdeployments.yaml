@@ -35,7 +35,7 @@ spec:
     - jsonPath: .status.conditions[?(@.type=='Provisioned')].reason
       name: ProvisionStatus
       type: string
-    - jsonPath: .status.conditions[?(@.type=='Hibernating')].reason
+    - jsonPath: .status.powerState
       name: PowerState
       type: string
     - jsonPath: .metadata.creationTimestamp
@@ -1037,6 +1037,9 @@ spec:
                         type: object
                     type: object
                 type: object
+              powerState:
+                description: PowerState indicates the powerstate of cluster
+                type: string
               provisionRef:
                 description: ProvisionRef is a reference to the last ClusterProvision
                   created for the deployment

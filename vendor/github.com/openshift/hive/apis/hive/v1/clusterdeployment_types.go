@@ -293,6 +293,10 @@ type ClusterDeploymentStatus struct {
 	// InstalledTimestamp is the time we first detected that the cluster has been successfully installed.
 	InstalledTimestamp *metav1.Time `json:"installedTimestamp,omitempty"`
 
+	// PowerState indicates the powerstate of cluster
+	// +optional
+	PowerState string `json:"powerState,omitempty"`
+
 	// ProvisionRef is a reference to the last ClusterProvision created for the deployment
 	// +optional
 	ProvisionRef *corev1.LocalObjectReference `json:"provisionRef,omitempty"`
@@ -484,7 +488,7 @@ const InitializedConditionReason = "Initialized"
 // +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/version-major-minor-patch"
 // +kubebuilder:printcolumn:name="ClusterType",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/cluster-type"
 // +kubebuilder:printcolumn:name="ProvisionStatus",type="string",JSONPath=".status.conditions[?(@.type=='Provisioned')].reason"
-// +kubebuilder:printcolumn:name="PowerState",type="string",JSONPath=".status.conditions[?(@.type=='Hibernating')].reason"
+// +kubebuilder:printcolumn:name="PowerState",type="string",JSONPath=".status.powerState"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:path=clusterdeployments,shortName=cd,scope=Namespaced
 type ClusterDeployment struct {

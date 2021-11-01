@@ -379,24 +379,6 @@ spec:
               installed:
                 description: Installed is true if the cluster has been installed
                 type: boolean
-              machineManagement:
-                description: MachineManagement contains machine management settings
-                  including the strategy that will be used when provisioning worker
-                  machines.
-                properties:
-                  central:
-                    description: Central contains settings for central machine management.
-                      If set Central indicates that central machine management will
-                      be used as opposed to management on the spoke cluster.
-                    type: object
-                  targetNamespace:
-                    description: TargetNamespace is the namespace in which we will
-                      create worker machineset resources. Resources required to create
-                      machines will be copied to the TargetNamespace. TargetNamespace
-                      is created for you and cannot be set during creation. TargetNamespace
-                      is also immutable once set.
-                    type: string
-                type: object
               manageDNS:
                 description: ManageDNS specifies whether a DNSZone should be created
                   and managed automatically for this ClusterDeployment

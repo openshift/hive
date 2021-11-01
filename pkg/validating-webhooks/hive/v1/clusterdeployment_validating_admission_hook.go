@@ -44,7 +44,7 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete", "ClusterPoolRef", "PowerState", "HibernateAfter", "InstallAttemptsLimit", "MachineManagement", "Platform.AgentBareMetal.AgentSelector"}
+	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete", "ClusterPoolRef", "PowerState", "HibernateAfter", "InstallAttemptsLimit", "Platform.AgentBareMetal.AgentSelector"}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
@@ -319,12 +319,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	if machineManagement := cd.Spec.MachineManagement; machineManagement != nil {
-		if targetNamespace := machineManagement.TargetNamespace; targetNamespace != "" {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("machineManagement", "targetNamespace"), targetNamespace, "cannot set targetNamespace during create, targetNamespace is created and set by controllers"))
-		}
-	}
-
 	if len(allErrs) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
 		return &admissionv1beta1.AdmissionResponse{
@@ -424,7 +418,6 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 	errs := field.ErrorList{}
 	// To add validation for feature gates use these examples
 	// 		errs = append(errs, equalOnlyWhenFeatureGate(fs, obj, "spec.platform.type", "AlphaPlatformAEnabled", "platformA")...)
-	errs = append(errs, existsOnlyWhenFeatureGate(fs, obj, "spec.machineManagement", hivev1.FeatureGateMachineManagement)...)
 
 	if len(errs) > 0 && len(errs.ToAggregate().Errors()) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, errs).Status()
@@ -665,16 +658,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newPoolRef, "cannot remove clusterPoolRef"))
 	case oldPoolRef == nil && newPoolRef != nil:
 		allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef"), newPoolRef, "cannot add clusterPoolRef"))
-	}
-
-	// Validate cd.Spec.MachineManagement.TargetNamespace
-	if cd.Spec.MachineManagement != nil {
-		switch oldTargetNamespace, newTargetNamespace := oldObject.Spec.MachineManagement.TargetNamespace, cd.Spec.MachineManagement.TargetNamespace; {
-		case oldTargetNamespace != "" && newTargetNamespace != "":
-			allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.MachineManagement.TargetNamespace, oldObject.Spec.MachineManagement.TargetNamespace, specPath.Child("machineManagement", "targetNamespace"))...)
-		case oldTargetNamespace != "" && newTargetNamespace == "":
-			allErrs = append(allErrs, field.Invalid(specPath.Child("machineManagement", "targetNamespace"), newTargetNamespace, "cannot remove targetNamespace"))
-		}
 	}
 
 	if len(allErrs) > 0 {

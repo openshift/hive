@@ -46,10 +46,6 @@ const (
 	// target specific regions of the cluster-platform.
 	HiveClusterRegionLabel = "hive.openshift.io/cluster-region"
 
-	// FinalizerMachineManagementTargetNamespace is used on ClusterDeployments to
-	// ensure we clean up the machine management target namespace before cleaning up the API object.
-	FinalizerMachineManagementTargetNamespace string = "hive.openshift.io/machine-management-targetnamespace"
-
 	// FinalizerArgoCDCluster is used on ClusterDeployments to ensure we clean up the ArgoCD cluster
 	// secret before cleaning up the API object.
 	FinalizerArgoCDCluster = "hive.openshift.io/argocd-cluster"
@@ -154,11 +150,6 @@ type ClusterDeploymentSpec struct {
 	// +optional
 	InstallAttemptsLimit *int32 `json:"installAttemptsLimit,omitempty"`
 
-	// MachineManagement contains machine management settings including the strategy that will be used when
-	// provisioning worker machines.
-	// +optional
-	MachineManagement *MachineManagement `json:"machineManagement,omitempty"`
-
 	// BoundServiceAccountSignkingKeySecretRef refers to a Secret that contains a
 	// 'bound-service-account-signing-key.key' data key pointing to the private
 	// key that will be used to sign ServiceAccount objects. Primarily used to
@@ -176,25 +167,6 @@ type ClusterInstallLocalReference struct {
 	Kind    string `json:"kind"`
 
 	Name string `json:"name"`
-}
-
-// MachineManagement contains settings used for machine management.
-type MachineManagement struct {
-	// Central contains settings for central machine management. If set Central indicates that central machine
-	// management will be used as opposed to management on the spoke cluster.
-	// +optional
-	Central *CentralMachineManagement `json:"central,omitempty"`
-
-	// TargetNamespace is the namespace in which we will create worker machineset resources. Resources
-	// required to create machines will be copied to the TargetNamespace.
-	// TargetNamespace is created for you and cannot be set during creation. TargetNamespace is also
-	// immutable once set.
-	// +optional
-	TargetNamespace string `json:"targetNamespace,omitempty"`
-}
-
-// CentralMachineManagement contains settings used for central machine managemnt.
-type CentralMachineManagement struct {
 }
 
 // Provisioning contains settings used only for initial cluster provisioning.

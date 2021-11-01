@@ -132,9 +132,6 @@ type Builder struct {
 	// InstallConfig Secret to be used as template for deployment install-config
 	InstallConfigTemplate string
 
-	// CentralMachineManagement
-	CentralMachineManagement bool
-
 	// BoundServiceAccountSigningKey is the private key used to sign ServiceAccounts. Primarily used for provisioning clusters that use AWS Security Token Service.
 	BoundServiceAccountSigningKey string
 
@@ -349,12 +346,6 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 		cd.Spec.Provisioning.ReleaseImage = o.ReleaseImage
 	} else if o.ImageSet != "" {
 		cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: o.ImageSet}
-	}
-
-	if o.CentralMachineManagement {
-		cd.Spec.MachineManagement = &hivev1.MachineManagement{
-			Central: &hivev1.CentralMachineManagement{},
-		}
 	}
 
 	if len(o.BoundServiceAccountSigningKey) > 0 {

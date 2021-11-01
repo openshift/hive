@@ -16,14 +16,14 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-logr/logr v0.4.0
 	github.com/golang/mock v1.4.4
-	github.com/golangci/golangci-lint v1.32.0
+	github.com/golangci/golangci-lint v1.42.1
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.2.0
 	github.com/gophercloud/utils v0.0.0-20210323225332-7b186010c04f
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/json-iterator/go v1.1.11
-	github.com/miekg/dns v1.1.25
+	github.com/miekg/dns v1.1.35
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0
@@ -46,8 +46,8 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.24.0
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
-	golang.org/x/lint v0.0.0-20200302205851-738671d3881b
+	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mod v0.4.2
 	golang.org/x/net v0.0.0-20210610132358-84b48f89b13b
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c

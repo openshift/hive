@@ -1,18 +1,18 @@
 module github.com/securego/gosec/v2
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/gookit/color v1.2.5
-	github.com/kr/pretty v0.1.0 // indirect
-	github.com/mozilla/tls-observatory v0.0.0-20200317151703-4fa42e1c2dee
-	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
-	github.com/onsi/ginkgo v1.13.0
-	github.com/onsi/gomega v1.10.1
-	github.com/stretchr/testify v1.4.0 // indirect
-	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20200701041122-1837592efa10
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	gopkg.in/yaml.v2 v2.3.0
+	github.com/google/uuid v1.2.0
+	github.com/gookit/color v1.4.2
+	github.com/lib/pq v1.10.2
+	github.com/mozilla/tls-observatory v0.0.0-20210609171429-7bc42856d2e5
+	github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.13.0
+	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
+	golang.org/x/text v0.3.6
+	golang.org/x/tools v0.1.3
+	gopkg.in/yaml.v2 v2.4.0
 )
 
-go 1.14
+go 1.16

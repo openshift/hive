@@ -795,10 +795,10 @@ To use this feature:
        route53:CreateHostedZone
        route53:DeleteHostedZone
        route53:GetHostedZone
-       route53:GetResourcesPages
-       route53:ListHostedZoneByName
+       route53:ListHostedZonesByName
        route53:ListResourceRecordSets
        route53:ListTagsForResource
+       tag:GetResources
        ```
      - GCP
        ```yaml

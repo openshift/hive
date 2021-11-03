@@ -52,6 +52,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/dnszone"
 	"github.com/openshift/hive/pkg/controller/fakeclusterinstall"
 	"github.com/openshift/hive/pkg/controller/hibernation"
+	"github.com/openshift/hive/pkg/controller/machinemanagement"
 	"github.com/openshift/hive/pkg/controller/machinepool"
 	"github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/remoteingress"
@@ -95,6 +96,7 @@ var controllerFuncs = map[hivev1.ControllerName]controllerSetupFunc{
 	velerobackup.ControllerName:         velerobackup.Add,
 	clusterpool.ControllerName:          clusterpool.Add,
 	hibernation.ControllerName:          hibernation.Add,
+	machinemanagement.ControllerName:    machinemanagement.Add,
 	awsprivatelink.ControllerName:       awsprivatelink.Add,
 	argocdregister.ControllerName:       argocdregister.Add,
 }

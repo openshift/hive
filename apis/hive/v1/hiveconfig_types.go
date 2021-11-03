@@ -7,6 +7,11 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/azure"
 )
 
+const (
+	// FeatureGateMachineManagement enables the use of the central machine management alpha.
+	FeatureGateMachineManagement = "AlphaMachineManagement"
+)
+
 // HiveConfigSpec defines the desired state of Hive
 type HiveConfigSpec struct {
 
@@ -554,6 +559,7 @@ const (
 	VeleroBackupControllerName         ControllerName = "velerobackup"
 	MetricsControllerName              ControllerName = "metrics"
 	ClustersyncControllerName          ControllerName = "clustersync"
+	MachineManagementControllerName    ControllerName = "machineManagement"
 	AWSPrivateLinkControllerName       ControllerName = "awsprivatelink"
 	HiveControllerName                 ControllerName = "hive"
 

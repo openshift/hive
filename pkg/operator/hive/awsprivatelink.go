@@ -23,7 +23,17 @@ const (
 	awsPrivateLinkConfigMapMountPath = "/data/aws-private-link-config"
 )
 
-func (r *ReconcileHiveConfig) deployAWSPrivateLinkConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (string, error) {
+func (r *ReconcileHiveConfig) deployAWSPrivateLinkConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (string, error) {
+	// Delete the configmap from previous target namespaces
+	for _, ns := range namespacesToClean {
+		hLog.Infof("Deleting configmap/%s from old target namespace %s", awsPrivateLinkConfigMapName, ns)
+		// h.Delete already no-ops for IsNotFound
+		// TODO: Something better than hardcoding apiVersion and kind.
+		if err := h.Delete("v1", "ConfigMap", ns, awsPrivateLinkConfigMapName); err != nil {
+			return "", errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", awsPrivateLinkConfigMapName, ns)
+		}
+	}
+
 	cm := &corev1.ConfigMap{}
 	cm.Name = awsPrivateLinkConfigMapName
 	cm.Namespace = getHiveNamespace(instance)

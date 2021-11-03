@@ -10,6 +10,8 @@ import (
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
+
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -20,7 +22,17 @@ const (
 	hiveControllersConfigMapName = "hive-controllers-config"
 )
 
-func (r *ReconcileHiveConfig) deployHiveControllersConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, additionalControllerConfigHashes ...string) (string, error) {
+func (r *ReconcileHiveConfig) deployHiveControllersConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, additionalControllerConfigHashes ...string) (string, error) {
+	// Delete the configmap from previous target namespaces
+	for _, ns := range namespacesToClean {
+		hLog.Infof("Deleting configmap/%s from old target namespace %s", hiveControllersConfigMapName, ns)
+		// h.Delete already no-ops for IsNotFound
+		// TODO: Something better than hardcoding apiVersion and kind.
+		if err := h.Delete("v1", "ConfigMap", ns, hiveControllersConfigMapName); err != nil {
+			return "", errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", hiveControllersConfigMapName, ns)
+		}
+	}
+
 	hiveControllersConfigMap := &corev1.ConfigMap{}
 	hiveControllersConfigMap.Name = hiveControllersConfigMapName
 	hiveControllersConfigMap.Namespace = getHiveNamespace(instance)

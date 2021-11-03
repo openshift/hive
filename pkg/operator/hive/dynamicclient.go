@@ -33,6 +33,8 @@ func (r *ReconcileHiveConfig) clientFor(blankObj runtime.Object, namespace strin
 		c = dc.Resource(appsv1.SchemeGroupVersion.WithResource("statefulsets"))
 	case *corev1.ConfigMapList, *corev1.ConfigMap:
 		c = dc.Resource(corev1.SchemeGroupVersion.WithResource("configmaps"))
+	case *corev1.NamespaceList, *corev1.Namespace:
+		c = dc.Resource(corev1.SchemeGroupVersion.WithResource("namespaces"))
 	}
 	if c == nil {
 		panic(fmt.Sprintf("You forgot to make a case for clients of type %T", blankObj))

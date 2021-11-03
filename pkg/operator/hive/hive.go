@@ -63,9 +63,37 @@ var (
 	}
 )
 
-func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, mdConfigMap *corev1.ConfigMap, hiveControllersConfigHash string) error {
+func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, mdConfigMap *corev1.ConfigMap, hiveControllersConfigHash string, namespacesToClean []string) error {
+	deploymentAsset := "config/controllers/deployment.yaml"
+	namespacedAssets := []string{
+		"config/controllers/service.yaml",
+		"config/configmaps/install-log-regexes-configmap.yaml",
+		"config/rbac/hive_frontend_serviceaccount.yaml",
+		"config/controllers/hive_controllers_serviceaccount.yaml",
+	}
+	// Delete the assets from previous target namespaces
+	assetsToClean := append(namespacedAssets, deploymentAsset)
+	for _, ns := range namespacesToClean {
+		for _, asset := range assetsToClean {
+			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
+			// DeleteAssetWithNSOverride already no-ops for IsNotFound
+			if err := util.DeleteAssetWithNSOverride(h, asset, ns, instance); err != nil {
+				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
+			}
+		}
+		// The hive-controller binary creates a configmap to handle leader election. Delete it.
+		// TODO: Dedup this with const cmd/manager/main.go:leaderElectionConfigMap
+		leaderCM := "hive-controllers-leader"
+		hLog.Infof("Deleting configmap/%s from old target namespace %s", leaderCM, ns)
+		// h.Delete already no-ops for IsNotFound
+		// TODO: Something better than hardcoding apiVersion and kind.
+		if err := h.Delete("v1", "ConfigMap", ns, leaderCM); err != nil {
+			return errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", leaderCM, ns)
+		}
 
-	asset := assets.MustAsset("config/controllers/deployment.yaml")
+	}
+
+	asset := assets.MustAsset(deploymentAsset)
 	hLog.Debug("reading deployment")
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 	hiveContainer := &hiveDeployment.Spec.Template.Spec.Containers[0]
@@ -232,7 +260,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		})
 	}
 
-	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment); err != nil {
+	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment, namespacesToClean); err != nil {
 		return err
 	}
 
@@ -248,18 +276,11 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveDeployment.Spec.Template.Annotations = make(map[string]string, 1)
 	}
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
-	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 
 	utils.SetProxyEnvVars(&hiveDeployment.Spec.Template.Spec,
 		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
-	namespacedAssets := []string{
-		"config/controllers/service.yaml",
-		"config/configmaps/install-log-regexes-configmap.yaml",
-		"config/rbac/hive_frontend_serviceaccount.yaml",
-		"config/controllers/hive_controllers_serviceaccount.yaml",
-	}
 	for _, assetPath := range namespacedAssets {
 		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
@@ -337,7 +358,17 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	return nil
 }
 
-func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) error {
+func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment, namespacesToClean []string) error {
+	// Delete any additional CA secrets from previous target namespaces
+	for _, ns := range namespacesToClean {
+		hLog.Infof("Deleting secret/%s from old target namespace %s", hiveAdditionalCASecret, ns)
+		// h.Delete already no-ops for IsNotFound
+		// TODO: Something better than hardcoding apiVersion and kind.
+		if err := h.Delete("v1", "Secret", ns, hiveAdditionalCASecret); err != nil {
+			return errors.Wrapf(err, "error deleting secret/%s from old target namespace %s", hiveAdditionalCASecret, ns)
+		}
+	}
+
 	hiveNS := getHiveNamespace(instance)
 	additionalCA := &bytes.Buffer{}
 	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
@@ -541,7 +572,27 @@ func monitoringLabelPatch(enable bool) string {
 }
 
 // reconcileMonitoring switches metrics exporting on or off, according to HiveConfig.Spec.ExportMetrics
-func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) error {
+func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) error {
+	patchFmt := `{"metadata": {"labels": {"openshift.io/cluster-monitoring": %s}}}`
+
+	// Clean up previous target namespaces
+	for _, ns := range namespacesToClean {
+		// Delete the assets
+		for _, asset := range monitoringNamespacedAssets {
+			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
+			// DeleteAssetWithNSOverride already no-ops for IsNotFound
+			if err := util.DeleteAssetWithNSOverride(h, asset, ns, instance); err != nil {
+				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
+			}
+		}
+		// Ensure the namespace label is gone
+		hLog.Infof("Disabling metrics reporting for old target namespace %s", ns)
+		if err := h.Patch(types.NamespacedName{Name: ns}, "Namespace", "v1", []byte(fmt.Sprintf(patchFmt, "null")), ""); err != nil {
+			hLog.WithError(err).Errorf("error disabling metrics reporting for old target namespace %s", ns)
+			return err
+		}
+	}
+
 	hiveNSName := getHiveNamespace(instance)
 	enable := instance.Spec.ExportMetrics
 
@@ -561,7 +612,7 @@ func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resour
 		resourceVerbed = "deleted"
 		kubeFunc = util.DeleteAssetWithNSOverride
 	}
-	patch := fmt.Sprintf(`{"metadata": {"labels": {"openshift.io/cluster-monitoring": %s}}}`, labelVal)
+	patch := fmt.Sprintf(patchFmt, labelVal)
 
 	hLog.Infof("%s metrics", metricsAction)
 

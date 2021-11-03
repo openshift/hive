@@ -26,7 +26,18 @@ const (
 
 // configureManagedDomains will create a new configmap holding the managed domains settings (if necessary), or simply
 // return the current configmap of the current deployment if the settings it contains match the desired settings.
-func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (*corev1.ConfigMap, error) {
+func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (*corev1.ConfigMap, error) {
+	// Scrub old target namespaces.
+	for _, ns := range namespacesToClean {
+		// Cheat: getCurrentConfigMap deletes any configmap that doesn't have the specified data.
+		// (Technically this could miss a configmap with no data. That's not a realistic problem
+		// as we always create them with managedDomainsConfigMapKey.)
+		_, err := r.getCurrentConfigMap(nil, h, ns, logger)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to scrub managed domains config maps from old target namespace %s", ns)
+		}
+	}
+
 	domains, err := json.Marshal(instance.Spec.ManagedDomains)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal managed domains list into the configmap")
@@ -92,16 +103,19 @@ func (r *ReconcileHiveConfig) getCurrentConfigMap(cmData map[string]string, h re
 	// delete all the other configmaps (will delete all if no matches found in the step above)
 	for _, cm := range configMapList.Items {
 		if cm.Name != currentConfigMap.Name {
+			logger.WithFields(log.Fields{"namespace": cm.Namespace, "name": cm.Name}).Infof("deleting out-of-date managed domains configmap")
 			if err := h.Delete(cm.APIVersion, cm.Kind, cm.Namespace, cm.Name); err != nil {
-				logger.WithError(err).Error("failed to delete out-of-date manged domains configmap")
+				logger.WithError(err).Error("failed to delete out-of-date managed domains configmap")
 			}
 		}
 	}
 
 	if currentConfigMap.Name == "" {
+		logger.Debugf("no current managed domains configmap in namespace %s", hiveNSName)
 		return nil, nil
 	}
 
+	logger.Debugf("found existing managed domains configmap %s in namespace %s", currentConfigMap.Name, hiveNSName)
 	return currentConfigMap, nil
 }
 

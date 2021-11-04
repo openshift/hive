@@ -13,6 +13,9 @@ type HiveConfigSpec struct {
 	// TargetNamespace is the namespace where the core Hive components should be run. Defaults to "hive". Will be
 	// created if it does not already exist. All resource references in HiveConfig can be assumed to be in the
 	// TargetNamespace.
+	// NOTE: Whereas it is possible to edit this value, causing hive to "move" its core components to the new
+	// namespace, the old namespace is not deleted, as it will still contain resources created by kubernetes
+	// and/or other OpenShift controllers.
 	// +optional
 	TargetNamespace string `json:"targetNamespace,omitempty"`
 

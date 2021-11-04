@@ -182,6 +182,11 @@ func (o *Options) Run(args []string) error {
 		hiveNSName = constants.DefaultHiveNamespace
 	}
 
+	// Make it easier to find the secret generically
+	credsSecret.Labels = map[string]string{
+		"hive.openshift.io/managed-dns-credentials": "true",
+	}
+
 	log.Infof("created cloud credentials secret: %s", credsSecret.Name)
 	credsSecret.Namespace = hiveNSName
 	if _, err := rh.ApplyRuntimeObject(credsSecret, scheme.Scheme); err != nil {

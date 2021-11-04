@@ -36,8 +36,37 @@ function teardown() {
 }
 trap 'teardown' EXIT
 
-echo "Running post-deploy tests"
+echo "Running post-deploy tests in original namespace $HIVE_NS"
 make test-e2e-postdeploy
+
+## Test changing the target namespace
+ORIG_NS=$HIVE_NS
+# 1) Let the rest of the suite know where to look for things
+export HIVE_NS=hive-e2e-two
+# 2) Patch the hiveconfig
+oc patch hiveconfig hive -n $HIVE_OPERATOR_NS --type=merge -p '{"spec":{"targetNamespace": "'$HIVE_NS'"}}'
+# 3) "Move" the managed DNS creds secret to the new namespace. (In real life the user would be
+#    responsible for making sure the secret referenced by hiveconfig exists in the new target
+#    namespace -- either by moving the secret or creating a new one and updating hiveconfig.)
+#    TODO: Or should  we try to do that for the user?
+oc get secret -l hive.openshift.io/managed-dns-credentials=true -n $ORIG_NS -o json \
+  | jq '.items[0].metadata.namespace = "'$HIVE_NS'"' \
+  | oc apply -f -
+# 4) Rerun postdeploy tests, which wait for everything to come up
+echo "Running post-deploy tests in new namespace $HIVE_NS"
+make test-e2e-postdeploy
+# 5) Make sure the old namespace is "clean" (modulo the garbage that k8s/openshift leave behind, sad-face)
+rc=0
+for resource in secret configmap role rolebinding serviceaccount deployment replicaset statefulset pod; do
+  echo "Checking for stale $resource resources in original namespace $ORIG_NS"
+  if oc get $resource -n $ORIG_NS | grep hive; then
+    echo "FAIL: found stale $resource in original namespace $ORIG_NS"
+    rc=1
+  fi
+done
+if [[ $rc -ne 0 ]]; then
+  exit 1
+fi
 
 export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 

@@ -7,17 +7,21 @@ source ${0%/*}/e2e-common.sh
 
 
 function teardown() {
+  capture_manifests
+  # Let's save the logs now in case any of the following never finish
+  echo "Saving hive logs before cleanup"
+  save_hive_logs
 	echo ""
 	echo ""
-        # Skip tear down if the clusterdeployment is no longer there
-        if ! oc get clusterdeployment ${CLUSTER_NAME}; then
-          return
-        fi
+  # Skip tear down if the clusterdeployment is no longer there
+  if ! oc get clusterdeployment ${CLUSTER_NAME}; then
+    return
+  fi
 
-        # This is here for backup. The test-e2e-destroycluster test
-        # should normally delete the clusterdeployemnt. Only if the
-        # test fails before then, this will ensure we at least attempt
-        # to delete the cluster.
+  # This is here for backup. The test-e2e-destroycluster test
+  # should normally delete the clusterdeployemnt. Only if the
+  # test fails before then, this will ensure we at least attempt
+  # to delete the cluster.
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
 	oc delete --wait=false clusterdeployment ${CLUSTER_NAME} || :
 
@@ -33,6 +37,9 @@ function teardown() {
 		fi
 		exit 1
 	fi
+  # And if we get this far, overwrite the logs with the latest
+  echo "Saving hive logs after cleanup"
+  save_hive_logs
 }
 trap 'teardown' EXIT
 

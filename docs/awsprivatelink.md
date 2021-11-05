@@ -195,6 +195,7 @@ expectations of required permissions for these credentials.
     ec2:DescribeVpcEndpoints
     ec2:CreateVpcEndpoint
     ec2:CreateTags
+    ec2:DescribeNetworkInterfaces
     ec2:DescribeVPCs
 
     ec2:DeleteVpcEndpoints

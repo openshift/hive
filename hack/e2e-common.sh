@@ -92,8 +92,9 @@ export HIVE_OPERATOR_NS="hive-operator"
 IMG="${HIVE_IMAGE}" make deploy
 
 function save_hive_logs() {
-  oc logs -n "${HIVE_NS}" deployment/hive-controllers > "${ARTIFACT_DIR}/hive-controllers.log"
-  oc logs -n "${HIVE_NS}" deployment/hiveadmission > "${ARTIFACT_DIR}/hiveadmission.log"
+  oc logs -n "${HIVE_NS}" deployment/hive-controllers > "${ARTIFACT_DIR}/hive-controllers.log" || true
+  oc logs -n "${HIVE_NS}" deployment/hiveadmission > "${ARTIFACT_DIR}/hiveadmission.log" || true
+  oc logs -n "${HIVE_NS}" deployment/hive-operator > "${ARTIFACT_DIR}/hive-operator.log" || true
 }
 
 SRC_ROOT=$(git rev-parse --show-toplevel)

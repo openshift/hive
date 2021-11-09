@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -22,18 +23,18 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/hive/pkg/util/contracts"
 
-	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -67,14 +68,27 @@ var webhookAssets = []string{
 	"config/hiveadmission/selectorsyncset-webhook.yaml",
 }
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, recorder events.Recorder, mdConfigMap *corev1.ConfigMap, additionalHashes ...string) error {
-	hiveNSName := getHiveNamespace(instance)
-
-	// Load namespaced assets, decode them, set to our target namespace, and apply:
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, mdConfigMap *corev1.ConfigMap, additionalHashes ...string) error {
+	deploymentAsset := "config/hiveadmission/deployment.yaml"
 	namespacedAssets := []string{
 		"config/hiveadmission/service.yaml",
 		"config/hiveadmission/service-account.yaml",
 	}
+	// Delete the assets from previous target namespaces
+	assetsToClean := append(namespacedAssets, deploymentAsset)
+	for _, ns := range namespacesToClean {
+		for _, asset := range assetsToClean {
+			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
+			// DeleteAssetWithNSOverride already no-ops for IsNotFound
+			if err := util.DeleteAssetWithNSOverride(h, asset, ns, instance); err != nil {
+				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
+			}
+		}
+	}
+
+	hiveNSName := getHiveNamespace(instance)
+
+	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
 		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
@@ -105,7 +119,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
 	}
 
-	asset := assets.MustAsset("config/hiveadmission/deployment.yaml")
+	asset := assets.MustAsset(deploymentAsset)
 	hLog.Debug("reading deployment")
 	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 	hiveAdmDeployment.Namespace = hiveNSName
@@ -228,17 +242,16 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debugf("listing secrets in %s namespace", hiveNSName)
-	secrets := &corev1.SecretList{}
-	err := r.Client.List(context.Background(), secrets, client.InNamespace(hiveNSName))
+	secrets, err := r.hiveSecretLister.Secrets(hiveNSName).List(labels.Everything())
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
 		return nil, nil, err
 	}
 	var firstSATokenSecret *corev1.Secret
-	hLog.Debugf("found %d secrets", len(secrets.Items))
-	for _, s := range secrets.Items {
+	hLog.Debugf("found %d secrets", len(secrets))
+	for _, s := range secrets {
 		if s.Type == corev1.SecretTypeServiceAccountToken {
-			firstSATokenSecret = &s
+			firstSATokenSecret = s
 			break
 		}
 	}
@@ -292,8 +305,8 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 // which should only exist on OpenShift 4.x. We do not expect Hive to ever be deployed on pre-3.11.
 func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
 	cvCRD := &apiextv1.CustomResourceDefinition{}
-	err := r.Client.Get(context.Background(), types.NamespacedName{Name: clusterVersionCRDName}, cvCRD)
-	if err != nil && errors.IsNotFound(err) {
+	err := r.Get(context.Background(), types.NamespacedName{Name: clusterVersionCRDName}, cvCRD)
+	if err != nil && apierrors.IsNotFound(err) {
 		// If this CRD does not exist, we must not be on a 4.x cluster.
 		return true, nil
 	} else if err != nil {
@@ -303,7 +316,17 @@ func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
 	return false, nil
 }
 
-func (r *ReconcileHiveConfig) deployFeatureGatesConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (string, error) {
+func (r *ReconcileHiveConfig) deployFeatureGatesConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (string, error) {
+	// Delete the configmap from previous target namespaces
+	for _, ns := range namespacesToClean {
+		hLog.Infof("Deleting configmap/%s from old target namespace %s", featureGateConfigMapName, ns)
+		// h.Delete already no-ops for IsNotFound
+		// TODO: Something better than hardcoding apiVersion and kind.
+		if err := h.Delete("v1", "ConfigMap", ns, featureGateConfigMapName); err != nil {
+			return "", errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", featureGateConfigMapName, ns)
+		}
+	}
+
 	cm := &corev1.ConfigMap{}
 	cm.Name = featureGateConfigMapName
 	cm.Namespace = getHiveNamespace(instance)
@@ -347,7 +370,17 @@ var knowContracts = contracts.SupportedContractImplementationsList{{
 	}},
 }}
 
-func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) (string, error) {
+func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (string, error) {
+	// Delete the configmap from previous target namespaces
+	for _, ns := range namespacesToClean {
+		hLog.Infof("Deleting configmap/%s from old target namespace %s", supportedContractsConfigMapName, ns)
+		// h.Delete already no-ops for IsNotFound
+		// TODO: Something better than hardcoding apiVersion and kind.
+		if err := h.Delete("v1", "ConfigMap", ns, supportedContractsConfigMapName); err != nil {
+			return "", errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", supportedContractsConfigMapName, ns)
+		}
+	}
+
 	cm := &corev1.ConfigMap{}
 	cm.Name = supportedContractsConfigMapName
 	cm.Namespace = getHiveNamespace(instance)
@@ -359,7 +392,7 @@ func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLo
 	}
 
 	crdList := &apiextv1.CustomResourceDefinitionList{}
-	if err := r.Client.List(context.TODO(), crdList); err != nil {
+	if err := r.List(context.TODO(), crdList, "", v1.ListOptions{}); err != nil {
 		hLog.WithError(err).Error("error getting crds for collect contract implementations")
 		return "", err
 	}

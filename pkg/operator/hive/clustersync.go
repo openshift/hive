@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -23,8 +24,24 @@ const (
 	defaultClustersyncReplicas = 1
 )
 
-func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource.Helper, hiveconfig *hivev1.HiveConfig, hiveControllersConfigHash string) error {
-	asset := assets.MustAsset("config/clustersync/statefulset.yaml")
+func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource.Helper, hiveconfig *hivev1.HiveConfig, hiveControllersConfigHash string, namespacesToClean []string) error {
+	ssAsset := "config/clustersync/statefulset.yaml"
+	namespacedAssets := []string{
+		"config/clustersync/service.yaml",
+	}
+	// Delete the assets from previous target namespaces
+	assetsToClean := append(namespacedAssets, ssAsset)
+	for _, ns := range namespacesToClean {
+		for _, asset := range assetsToClean {
+			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
+			// DeleteAssetWithNSOverride already no-ops for IsNotFound
+			if err := util.DeleteAssetWithNSOverride(h, asset, ns, hiveconfig); err != nil {
+				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
+			}
+		}
+	}
+
+	asset := assets.MustAsset(ssAsset)
 	hLog.Debug("reading statefulset")
 	newClusterSyncStatefulSet := controllerutils.ReadStatefulsetOrDie(asset)
 	hiveContainer := &newClusterSyncStatefulSet.Spec.Template.Spec.Containers[0]
@@ -73,9 +90,6 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	newClusterSyncStatefulSet.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
-	namespacedAssets := []string{
-		"config/clustersync/service.yaml",
-	}
 	for _, assetPath := range namespacedAssets {
 		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, hiveconfig); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
@@ -129,7 +143,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 			//     invalid: spec: Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
 			// The only fix is to delete the statefulset and have the apply below recreate it.
 			hLog.Info("deleting the existing clustersync statefulset because spec has changed")
-			err := r.Delete(context.TODO(), existingClusterSyncStatefulSet)
+			err := h.Delete(existingClusterSyncStatefulSet.APIVersion, existingClusterSyncStatefulSet.Kind, existingClusterSyncStatefulSet.Namespace, existingClusterSyncStatefulSet.Name)
 			if err != nil {
 				hLog.WithError(err).Error("error deleting statefulset")
 			}

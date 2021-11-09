@@ -138,19 +138,25 @@ func (r *helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) 
 	if err != nil {
 		return "", err
 	}
-	if err = info.Get(); err != nil {
+	// Name may be empty if the object wants to use GenerateName. In this case we don't check
+	// whether the object already exists -- GenerateName indicates we always want to create a
+	// new one.
+	if info.Name != "" {
+		err = info.Get()
+		if err == nil {
+			return UnchangedApplyResult, nil
+		}
 		if !errors.IsNotFound(err) {
 			return "", err
 		}
-		// Object doesn't exist yet, create it
-		gvr := info.ResourceMapping().Resource
-		_, err := c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured), metav1.CreateOptions{})
-		if err != nil {
-			return "", err
-		}
-		return CreatedApplyResult, nil
 	}
-	return UnchangedApplyResult, nil
+	// Object doesn't exist yet, create it
+	gvr := info.ResourceMapping().Resource
+	_, err = c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured), metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	return CreatedApplyResult, nil
 }
 
 func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer) (ApplyResult, error) {

@@ -14,14 +14,12 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/resource"
 
-	"github.com/openshift/library-go/pkg/operator/events"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -60,6 +58,12 @@ const (
 
 	// watchResyncInterval is used for a couple handcrafted watches we do with our own informers.
 	watchResyncInterval = 30 * time.Minute
+
+	// targetNamespaceLabel is the key (the value will always be "true") for the label we add to
+	// the namespace into which we deploy hive -- i.e. HiveConfig.Spec.TargetNamespace. We use this
+	// to identify namespaces that were *previously* the configured TargetNamespace so we can clean
+	// them up.
+	targetNamespaceLabel = "hive.openshift.io/target-namespace"
 )
 
 var (
@@ -79,7 +83,6 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileHiveConfig{
-		Client:     mgr.GetClient(),
 		scheme:     mgr.GetScheme(),
 		restConfig: mgr.GetConfig(),
 		mgr:        mgr,
@@ -124,12 +127,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	r.(*ReconcileHiveConfig).hiveOperatorNamespace = hiveOperatorNS
 	log.Infof("hive operator NS: %s", hiveOperatorNS)
 
-	// Determine if the openshift-config-managed namespace exists (> v4.0). If so, setup a watch
-	// for configmaps in that namespace.
+	// Determine if the openshift-config-managed namespace exists (OpenShift only). If so, set up a
+	// watch for configmaps in that namespace.
 	ns := &corev1.Namespace{}
 	log.Debugf("checking for existence of the %s namespace", managedConfigNamespace)
 	err = tempClient.Get(context.TODO(), types.NamespacedName{Name: managedConfigNamespace}, ns)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		log.WithError(err).Errorf("error checking existence of the %s namespace", managedConfigNamespace)
 		return err
 	}
@@ -211,7 +214,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			retval := []reconcile.Request{}
 
 			configList := &hivev1.HiveConfigList{}
-			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList) // reconcile all HiveConfigs
+			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList, "", metav1.ListOptions{}) // reconcile all HiveConfigs
 			if err != nil {
 				log.WithError(err).Errorf("error listing hive configs for CRD reconcile")
 				return retval
@@ -237,7 +240,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			nsName := o.GetName()
 
 			configList := &hivev1.HiveConfigList{}
-			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList)
+			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList, "", metav1.ListOptions{})
 			if err != nil {
 				log.WithError(err).Errorf("error listing hive configs for namespace %s reconcile", nsName)
 				return retval
@@ -307,23 +310,22 @@ var _ reconcile.Reconciler = &ReconcileHiveConfig{}
 
 // ReconcileHiveConfig reconciles a Hive object
 type ReconcileHiveConfig struct {
-	client.Client
-	scheme                 *runtime.Scheme
-	kubeClient             kubernetes.Interface
-	discoveryClient        discovery.DiscoveryInterface
-	dynamicClient          dynamic.Interface
-	restConfig             *rest.Config
-	hiveImage              string
-	hiveOperatorNamespace  string
-	hiveImagePullPolicy    corev1.PullPolicy
-	nodeSelector           map[string]string
-	tolerations            []corev1.Toleration
-	syncAggregatorCA       bool
-	managedConfigCMLister  corev1listers.ConfigMapLister
-	ctrlr                  controller.Controller
-	hiveSecretLister       corev1listers.SecretLister
-	secretWatchEstablished bool
-	mgr                    manager.Manager
+	scheme                            *runtime.Scheme
+	kubeClient                        kubernetes.Interface
+	discoveryClient                   discovery.DiscoveryInterface
+	dynamicClient                     dynamic.Interface
+	restConfig                        *rest.Config
+	hiveImage                         string
+	hiveOperatorNamespace             string
+	hiveImagePullPolicy               corev1.PullPolicy
+	nodeSelector                      map[string]string
+	tolerations                       []corev1.Toleration
+	syncAggregatorCA                  bool
+	managedConfigCMLister             corev1listers.ConfigMapLister
+	ctrlr                             controller.Controller
+	hiveSecretLister                  corev1listers.SecretLister
+	secretWatchEstablishedInNamespace string
+	mgr                               manager.Manager
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
@@ -349,11 +351,11 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	// when our HiveConfig is ClusterScoped.
 	err := r.Get(context.TODO(), types.NamespacedName{Name: request.NamespacedName.Name}, instance)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			hLog.Debug("HiveConfig not found, deleted?")
-			r.secretWatchEstablished = false
+			r.secretWatchEstablishedInNamespace = ""
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -379,18 +381,22 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	recorder := events.NewRecorder(r.kubeClient.CoreV1().Events(r.hiveOperatorNamespace), "hive-operator", &corev1.ObjectReference{
-		Name:      request.Name,
-		Namespace: r.hiveOperatorNamespace,
-	})
+	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
+	if err != nil {
+		hLog.WithError(err).Error("error creating resource helper")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelper", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
 
 	// Ensure the target namespace for hive components exists and create if not:
 	hiveNamespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: hiveNSName,
+			Name:   hiveNSName,
+			Labels: map[string]string{targetNamespaceLabel: "true"},
 		},
 	}
-	if err := r.Client.Create(context.Background(), hiveNamespace); err != nil {
+	if _, err := h.CreateOrUpdateRuntimeObject(hiveNamespace, r.scheme); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			hLog.WithField("hiveNS", hiveNSName).Debug("target namespace already exists")
 		} else {
@@ -403,6 +409,28 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		hLog.WithField("hiveNS", hiveNSName).Info("target namespace created")
 	}
 
+	// Find all namespaces that we've ever installed into. For each resource installed by this
+	// controller into the currently-configured target namespace, we must also ensure that resource
+	// is *uninstalled* from any previous target namespaces. Under any reasonable circumstances,
+	// this list will have one (the current target) or two (current and one previous, if the config
+	// was just changed) items.
+	nsList := &corev1.NamespaceList{}
+	if err := r.List(context.TODO(), nsList, "", metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=true", targetNamespaceLabel)}); err != nil {
+		hLog.WithError(err).Error("error retrieving list of target namespaces")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorListingTargetNamespaces", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+	var namespacesToClean []string
+	for _, ns := range nsList.Items {
+		if ns.Name != hiveNSName {
+			namespacesToClean = append(namespacesToClean, ns.Name)
+		}
+	}
+	if len(namespacesToClean) > 0 {
+		hLog.WithField("namespaces", namespacesToClean).Info("will scrub old target namespaces")
+	}
+
 	if r.syncAggregatorCA {
 		// We use the configmap lister and not the regular client which only watches resources in the hive namespace
 		aggregatorCAConfigMap, err := r.managedConfigCMLister.ConfigMaps(managedConfigNamespace).Get(aggregatorCAConfigMapName)
@@ -410,7 +438,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		// admission pods yet.
 		cmLog := hLog.WithField("configmap", fmt.Sprintf("%s/%s", managedConfigNamespace, aggregatorCAConfigMapName))
 		switch {
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			cmLog.Warningf("configmap was not found, will not sync aggregator CA with admission pods")
 		case err != nil:
 			cmLog.WithError(err).Errorf("cannot retrieve configmap")
@@ -433,15 +461,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
-	if err != nil {
-		hLog.WithError(err).Error("error creating resource helper")
-		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelper", err.Error())
-		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
-		return reconcile.Result{}, err
-	}
-
-	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, instance)
+	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, h, instance, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error setting up managed domains")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorSettingUpManagedDomains", err.Error())
@@ -449,7 +469,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	plConfigHash, err := r.deployAWSPrivateLinkConfigMap(hLog, h, instance)
+	plConfigHash, err := r.deployAWSPrivateLinkConfigMap(hLog, h, instance, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying aws privatelink configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingAWSPrivatelinkConfigmap", err.Error())
@@ -457,14 +477,14 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	scConfigHash, err := r.deploySupportedContractsConfigMap(hLog, h, instance)
+	scConfigHash, err := r.deploySupportedContractsConfigMap(hLog, h, instance, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying supported contracts configmap")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
-	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance, plConfigHash)
+	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance, namespacesToClean, plConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying controllers configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingControllersConfigmap", err.Error())
@@ -472,7 +492,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	fgConfigHash, err := r.deployFeatureGatesConfigMap(hLog, h, instance)
+	fgConfigHash, err := r.deployFeatureGatesConfigMap(hLog, h, instance, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying feature gates configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingFeatureGatesConfigmap", err.Error())
@@ -480,7 +500,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, recorder, managedDomainsConfigMap, confighash)
+	err = r.deployHive(hLog, h, instance, managedDomainsConfigMap, confighash, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHive", err.Error())
@@ -488,7 +508,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployClusterSync(hLog, h, instance, confighash)
+	err = r.deployClusterSync(hLog, h, instance, confighash, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying ClusterSync")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingClusterSync", err.Error())
@@ -496,7 +516,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.reconcileMonitoring(hLog, h, instance)
+	err = r.reconcileMonitoring(hLog, h, instance, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying monitoring")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingMonitoring", err.Error())
@@ -509,7 +529,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, recorder, managedDomainsConfigMap, fgConfigHash, plConfigHash, scConfigHash)
+	err = r.deployHiveAdmission(hLog, h, instance, namespacesToClean, managedDomainsConfigMap, fgConfigHash, plConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHiveAdmission", err.Error())
@@ -524,6 +544,21 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	// If we get here, we've successfully scrubbed all *our* resources out of previous target
+	// namespaces. Ideally, we would delete the namespace. Unfortunately, there's no good way to
+	// tell whether a) we were the one to create it, or b) it's empty. So settle for unlabeling it,
+	// accepting the fact that we might be leaking namespaces.
+	for _, ns := range namespacesToClean {
+		hLog.Infof("Unlabeling former target namespace %s", ns)
+		if err := h.Patch(
+			types.NamespacedName{Name: ns}, "Namespace", "v1",
+			[]byte(fmt.Sprintf(`{"metadata": {"labels": {"%s": null}}}`, targetNamespaceLabel)), "",
+		); err != nil {
+			hLog.WithError(err).Errorf("error unlabeling former target namespace %s", ns)
+			return reconcile.Result{}, err
+		}
+	}
+
 	instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionTrue, "DeploymentSuccess", "Hive is deployed successfully")
 	if err := r.updateHiveConfigStatus(origHiveConfig, instance, hLog, true); err != nil {
 		return reconcile.Result{}, err
@@ -535,7 +570,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName string) error {
 	// We need to establish a watch on Secret in the Hive namespace, one time only. We do not know this namespace until
 	// we have a HiveConfig.
-	if !r.secretWatchEstablished {
+	if r.secretWatchEstablishedInNamespace != hiveNSName {
 		hLog.WithField("namespace", hiveNSName).Info("establishing watch on secrets in hive namespace")
 
 		// Create an informer that only listens to events in the OpenShift managed namespace
@@ -602,7 +637,7 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 			return err
 		}
 
-		r.secretWatchEstablished = true
+		r.secretWatchEstablishedInNamespace = hiveNSName
 	} else {
 		hLog.Debug("secret watch already established")
 	}
@@ -658,9 +693,22 @@ func (r *ReconcileHiveConfig) updateHiveConfigStatus(origHiveConfig, newHiveConf
 
 	logger.Info("HiveConfig has changed, updating")
 
-	err := r.Status().Update(context.TODO(), newHiveConfig)
+	hiveConfigClient := r.dynamicClient.Resource(hivev1.SchemeGroupVersion.WithResource("hiveconfigs"))
+	content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newHiveConfig)
+	if err != nil {
+		logger.WithError(err).Error("failed to convert new hive config to unstructured")
+		return err
+	}
+	var usNewHiveConfig unstructured.Unstructured
+	usNewHiveConfig.SetUnstructuredContent(content)
+	usUpdated, err := hiveConfigClient.UpdateStatus(context.TODO(), &usNewHiveConfig, metav1.UpdateOptions{})
 	if err != nil {
 		logger.WithError(err).Error("failed to update HiveConfig status")
+		return err
+	}
+	// Simulating Status().Update(), put the updated object back into newHiveConfig
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(usUpdated.UnstructuredContent(), newHiveConfig); err != nil {
+		logger.WithError(err).Error("failed to convert unstructured HiveConfig")
 	}
 	return err
 }

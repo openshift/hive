@@ -378,6 +378,16 @@ spec:
                     required:
                     - credentialsSecretRef
                     type: object
+                  retryReasons:
+                    description: RetryReasons is a list of installFailingReason strings
+                      from the [additional-]install-log-regexes ConfigMaps. If specified,
+                      Hive will only retry a failed installation if it results in
+                      one of the listed reasons. If omitted (not the same thing as
+                      empty!), Hive will retry regardless of the failure reason. (The
+                      total number of install attempts is still constrained by ClusterDeployment.Spec.InstallAttemptsLimit.)
+                    items:
+                      type: string
+                    type: array
                   skipGatherLogs:
                     description: 'DEPRECATED: This flag is no longer respected and
                       will be removed in the future.'

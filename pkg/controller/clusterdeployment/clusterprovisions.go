@@ -44,16 +44,22 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		return reconcile.Result{}, err
 	}
 
-	for _, provision := range existingProvisions {
-		if provision.Spec.Stage != hivev1.ClusterProvisionStageFailed {
-			return reconcile.Result{}, r.adoptProvision(cd, provision, logger)
+	var lastFailedProvision *hivev1.ClusterProvision
+	for _, lastFailedProvision = range existingProvisions {
+		if lastFailedProvision.Spec.Stage != hivev1.ClusterProvisionStageFailed {
+			return reconcile.Result{}, r.adoptProvision(cd, lastFailedProvision, logger)
 		}
 	}
+	// If we get here, `lastFailedProvision` is either nil (no provisions exist yet) or points to
+	// the most recent (because `existingProvisions` is sorted by age) failed (because otherwise we
+	// went to adoptProvision) ClusterProvision.
 
+	// ...and this is guaranteed not to delete the above, as long as we continue to save >2 failed
+	// provisions (the first is always the oldest).
 	r.deleteStaleProvisions(existingProvisions, logger)
 
 	setProvisionStoppedTrue := func(reason, message string) (reconcile.Result, error) {
-		logger.Debug("not creating new provision: %s", message)
+		logger.Debugf("not creating new provision: %s", message)
 		var changed1, changed2 bool
 		var conditions []hivev1.ClusterDeploymentCondition
 		conditions, changed1 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
@@ -89,6 +95,14 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 	if cd.Spec.InstallAttemptsLimit != nil && cd.Status.InstallRestarts >= int(*cd.Spec.InstallAttemptsLimit) {
 		return setProvisionStoppedTrue(installAttemptsLimitReachedReason, "Install attempts limit reached")
+	}
+	shouldRetry, err := r.shouldRetryBasedOnFailureReason(lastFailedProvision, logger)
+	if err != nil {
+		logger.WithError(err).Error("failed to determine whether to retry based on provision failure reason")
+		return reconcile.Result{}, err
+	}
+	if !shouldRetry {
+		return setProvisionStoppedTrue(failureReasonNotListed, "Provision failure reason not retryable")
 	}
 
 	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
@@ -218,6 +232,39 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev1.ClusterProvision, logger log.FieldLogger) (bool, error) {
+	// prov will be nil if there have been no failed provisions yet
+	if prov == nil {
+		logger.Debug("no failed provisions yet -- allowing retry")
+		return true, nil
+	}
+	// Load up HiveConfig
+	hc := &hivev1.HiveConfig{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: constants.HiveConfigName}, hc); err != nil {
+		return false, err // caller logs
+	}
+	// If no retry reasons are specified, "always" retry
+	if hc.Spec.FailedProvisionConfig.RetryReasons == nil {
+		logger.Debug("no RetryReasons found in HiveConfig -- allowing retry")
+		return true, nil
+	}
+	// Does our failed provision's reason match?
+	cond := controllerutils.FindClusterProvisionCondition(
+		prov.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
+	if cond == nil {
+		return false, errors.New("failed to find ClusterProvisionFailed Condition -- this should never happen!")
+	}
+	rLog := logger.WithField("reason", cond.Reason)
+	for _, reason := range *hc.Spec.FailedProvisionConfig.RetryReasons {
+		if cond.Reason == reason {
+			rLog.Debug("retrying due to matching retry reason")
+			return true, nil
+		}
+	}
+	rLog.Debug("reason not found in HiveConfig RetryReasons -- not retrying")
+	return false, nil
 }
 
 func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (result reconcile.Result, returnedErr error) {

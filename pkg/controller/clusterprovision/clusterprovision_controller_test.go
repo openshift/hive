@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
+	tcp "github.com/openshift/hive/pkg/test/clusterprovision"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testjob "github.com/openshift/hive/pkg/test/job"
 )
@@ -102,7 +103,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "running job",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 				testJob(),
 				testPod("foo", running()),
 			},
@@ -111,7 +112,9 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "completed job",
 			existing: []runtime.Object{
-				testProvision(withJob(), provisioning()),
+				testProvision(
+					tcp.WithJob(installJobName),
+					tcp.WithStage(hivev1.ClusterProvisionStageProvisioning)),
 				testJob(completed()),
 				testPod("foo", success()),
 			},
@@ -120,7 +123,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "completed job while initializing",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 				testJob(completed()),
 				testPod("foo", success()),
 			},
@@ -130,7 +133,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "failed job",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 				testJob(failedJob()),
 				testPod("foo"),
 			},
@@ -140,7 +143,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "deadline exceeded job",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 				testJob(deadlineExceededJob()),
 				testPod("foo"),
 			},
@@ -150,7 +153,10 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "keep job for 24 hours after success",
 			existing: []runtime.Object{
-				testProvision(succeeded(), withJob(), withCreationTime(time.Now())),
+				testProvision(
+					tcp.WithStage(hivev1.ClusterProvisionStageComplete),
+					tcp.WithJob(installJobName),
+					tcp.WithCreationTimestamp(time.Now())),
 				testJob(),
 			},
 			validateRequeueAfter: func(requeueAfter time.Duration, c client.Client, t *testing.T) {
@@ -164,7 +170,10 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "removed job 24 hours after success",
 			existing: []runtime.Object{
-				testProvision(succeeded(), withJob(), withCreationTime(time.Now().Add(-24*time.Hour))),
+				testProvision(
+					tcp.WithStage(hivev1.ClusterProvisionStageComplete),
+					tcp.WithJob(installJobName),
+					tcp.WithCreationTimestamp(time.Now().Add(-24*time.Hour))),
 				testJob(),
 			},
 			expectedStage:        hivev1.ClusterProvisionStageComplete,
@@ -174,7 +183,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "keep job after failure",
 			existing: []runtime.Object{
-				testProvision(failed(), withJob()),
+				testProvision(tcp.Failed(), tcp.WithJob(installJobName)),
 				testJob(),
 			},
 			expectedStage: hivev1.ClusterProvisionStageFailed,
@@ -182,7 +191,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "lost job",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 			},
 			expectedStage:      hivev1.ClusterProvisionStageFailed,
 			expectedFailReason: "JobNotFound",
@@ -191,7 +200,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "removed job while provisioning",
 			existing: []runtime.Object{
-				testProvision(provisioning()),
+				testProvision(tcp.WithStage(hivev1.ClusterProvisionStageProvisioning)),
 			},
 			expectedStage:        hivev1.ClusterProvisionStageFailed,
 			expectedFailReason:   "NoJobReference",
@@ -201,7 +210,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "removed job after abort",
 			existing: []runtime.Object{
-				testProvision(withJob(), withFailedCondition("test-reason")),
+				testProvision(tcp.WithJob(installJobName), tcp.WithFailureReason("test-reason")),
 			},
 			expectedStage:      hivev1.ClusterProvisionStageFailed,
 			expectedFailReason: "test-reason",
@@ -210,7 +219,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "no install pod running after starting install job",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 				testJob(withCreationTimestamp(time.Now().Add(-podStatusCheckDelay))),
 			},
 			expectedStage: hivev1.ClusterProvisionStageInitializing,
@@ -225,7 +234,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "multiple install pods running after starting install job",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 				testJob(withCreationTimestamp(time.Now().Add(-podStatusCheckDelay))),
 				testPod("foo", running()),
 				testPod("bar", running()),
@@ -242,7 +251,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 		{
 			name: "install pod is stuck in pending phase",
 			existing: []runtime.Object{
-				testProvision(withJob()),
+				testProvision(tcp.WithJob(installJobName)),
 				testJob(withCreationTimestamp(time.Now().Add(-podStatusCheckDelay))),
 				testPod("foo", pending()),
 			},
@@ -328,75 +337,16 @@ func TestClusterProvisionReconcile(t *testing.T) {
 	}
 }
 
-type provisionOption func(*hivev1.ClusterProvision)
-
-func testProvision(opts ...provisionOption) *hivev1.ClusterProvision {
-	provision := &hivev1.ClusterProvision{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      testProvisionName,
-			Namespace: testNamespace,
-			Labels: map[string]string{
-				constants.ClusterDeploymentNameLabel: testDeploymentName,
-			},
-		},
-		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeploymentRef: corev1.LocalObjectReference{
-				Name: testDeploymentName,
-			},
-			Stage: hivev1.ClusterProvisionStageInitializing,
-		},
-	}
+func testProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
+	provision := tcp.
+		FullBuilder(testNamespace, testProvisionName).
+		Build(tcp.WithClusterDeploymentRef(testDeploymentName))
 
 	for _, o := range opts {
 		o(provision)
 	}
 
 	return provision
-}
-
-func provisioning() provisionOption {
-	return func(p *hivev1.ClusterProvision) {
-		p.Spec.Stage = hivev1.ClusterProvisionStageProvisioning
-	}
-}
-
-func succeeded() provisionOption {
-	return func(p *hivev1.ClusterProvision) {
-		p.Spec.Stage = hivev1.ClusterProvisionStageComplete
-	}
-}
-
-func failed() provisionOption {
-	return func(p *hivev1.ClusterProvision) {
-		p.Spec.Stage = hivev1.ClusterProvisionStageFailed
-	}
-}
-
-func withJob() provisionOption {
-	return func(p *hivev1.ClusterProvision) {
-		p.Status.JobRef = &corev1.LocalObjectReference{
-			Name: installJobName,
-		}
-	}
-}
-
-func withCreationTime(creationTime time.Time) provisionOption {
-	return func(p *hivev1.ClusterProvision) {
-		p.CreationTimestamp.Time = creationTime
-	}
-}
-
-func withFailedCondition(reason string) provisionOption {
-	return func(p *hivev1.ClusterProvision) {
-		p.Status.Conditions = append(
-			p.Status.Conditions,
-			hivev1.ClusterProvisionCondition{
-				Type:   hivev1.ClusterProvisionFailedCondition,
-				Status: corev1.ConditionTrue,
-				Reason: reason,
-			},
-		)
-	}
 }
 
 func testJob(opts ...testjob.Option) *batchv1.Job {

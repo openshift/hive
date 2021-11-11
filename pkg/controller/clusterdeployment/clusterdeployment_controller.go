@@ -101,6 +101,7 @@ const (
 
 	installAttemptsLimitReachedReason = "InstallAttemptsLimitReached"
 	installOnlyOnceSetReason          = "InstallOnlyOnceSet"
+	failureReasonNotListed            = "FailureReasonNotRetryable"
 	provisionNotStoppedReason         = "ProvisionNotStopped"
 
 	deleteAfterAnnotation    = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
@@ -1917,6 +1918,8 @@ func calculateNextProvisionTime(failureTime time.Time, retries int, cdLog log.Fi
 	return failureTime.Add((1 << uint(retries)) * time.Minute)
 }
 
+// existingProvisions returns the list of ClusterProvisions associated with the specified
+// ClusterDeployment, sorted by age, oldest first.
 func (r *ReconcileClusterDeployment) existingProvisions(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) ([]*hivev1.ClusterProvision, error) {
 	provisionList := &hivev1.ClusterProvisionList{}
 	if err := r.List(
@@ -1932,6 +1935,7 @@ func (r *ReconcileClusterDeployment) existingProvisions(cd *hivev1.ClusterDeploy
 	for i := range provisionList.Items {
 		provisions[i] = &provisionList.Items[i]
 	}
+	sort.Slice(provisions, func(i, j int) bool { return provisions[i].Spec.Attempt < provisions[j].Spec.Attempt })
 	return provisions, nil
 }
 
@@ -1973,7 +1977,6 @@ func (r *ReconcileClusterDeployment) deleteStaleProvisions(provs []*hivev1.Clust
 		return
 	}
 	cdLog.Infof("Deleting %d old provisions", amountToDelete)
-	sort.Slice(provs, func(i, j int) bool { return provs[i].Spec.Attempt < provs[j].Spec.Attempt })
 	for _, provision := range provs[1 : amountToDelete+1] {
 		pLog := cdLog.WithField("provision", provision.Name)
 		pLog.Info("Deleting old provision")

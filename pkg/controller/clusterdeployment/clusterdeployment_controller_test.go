@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -143,6 +144,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		validate                      func(client.Client, *testing.T)
 		reconcilerSetup               func(*ReconcileClusterDeployment)
 		platformCredentialsValidation func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error)
+		retryReasons                  *[]string
 	}{
 		{
 			name: "Initialize conditions",
@@ -2508,12 +2510,192 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				assert.Equal(t, true, cd.Spec.Installed)
 			},
 		},
+		{
+			name: "RetryReasons: matching entry: retry",
+			existing: []runtime.Object{
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
+				testProvision(tcp.WithFailureReason("aReason")),
+				testInstallConfigSecret(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			retryReasons:          &[]string{"foo", "aReason", "bar"},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+						assert.Equal(t, corev1.ConditionFalse, cond.Status, "expected ProvisionStopped to be False")
+					}
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+						assert.Equal(t, hivev1.ProvisioningProvisionedReason, cond.Reason, "expected Provisioned to be Provisioning")
+					}
+				}
+				assert.Len(t, getProvisions(c), 2, "expected 2 ClusterProvisions to exist")
+			},
+		},
+		{
+			name: "RetryReasons: matching entry but limit reached: no retry",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
+					cd.Status.InstallRestarts = 2
+					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					return cd
+				}(),
+				testProvision(tcp.WithFailureReason("aReason")),
+				testInstallConfigSecret(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			retryReasons: &[]string{"foo", "aReason", "bar"},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
+						assert.Equal(t, "InstallAttemptsLimitReached", cond.Reason, "expected ProvisionStopped Reason to be InstallAttemptsLimitReached")
+					}
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+						assert.Equal(t, hivev1.ProvisionStoppedProvisionedReason, cond.Reason, "expected Provisioned to be ProvisionStopped")
+					}
+				}
+				assert.Len(t, getProvisions(c), 1, "expected 1 ClusterProvision to exist")
+			},
+		},
+		{
+			name: "RetryReasons: matching entry is in most recent provision: retry",
+			existing: []runtime.Object{
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
+				testProvision(tcp.WithFailureReason("aReason"), tcp.Attempt(0), tcp.WithCreationTimestamp(time.Now().Add(-2*time.Hour))),
+				testProvision(tcp.WithFailureReason("bReason"), tcp.Attempt(1), tcp.WithCreationTimestamp(time.Now().Add(-1*time.Hour))),
+				testProvision(tcp.WithFailureReason("cReason"), tcp.Attempt(2), tcp.WithCreationTimestamp(time.Now())),
+				testInstallConfigSecret(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			retryReasons:          &[]string{"foo", "cReason", "bar"},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+						assert.Equal(t, corev1.ConditionFalse, cond.Status, "expected ProvisionStopped to be False")
+					}
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+						assert.Equal(t, hivev1.ProvisioningProvisionedReason, cond.Reason, "expected Provisioned to be Provisioning")
+					}
+				}
+				assert.Len(t, getProvisions(c), 4, "expected 4 ClusterProvisions to exist")
+			},
+		},
+		{
+			name: "RetryReasons: matching entry is in older provision: no retry",
+			existing: []runtime.Object{
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
+				testProvision(tcp.WithFailureReason("aReason"), tcp.Attempt(0), tcp.WithCreationTimestamp(time.Now().Add(-2*time.Hour))),
+				testProvision(tcp.WithFailureReason("bReason"), tcp.Attempt(1), tcp.WithCreationTimestamp(time.Now().Add(-1*time.Hour))),
+				testProvision(tcp.WithFailureReason("cReason"), tcp.Attempt(2), tcp.WithCreationTimestamp(time.Now())),
+				testInstallConfigSecret(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			retryReasons: &[]string{"foo", "bReason", "bar"},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
+						assert.Equal(t, "FailureReasonNotRetryable", cond.Reason, "expected ProvisionStopped Reason to be FailureReasonNotRetryable")
+					}
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+						assert.Equal(t, hivev1.ProvisionStoppedProvisionedReason, cond.Reason, "expected Provisioned to be ProvisionStopped")
+					}
+				}
+				assert.Len(t, getProvisions(c), 3, "expected 3 ClusterProvisions to exist")
+			},
+		},
+		{
+			name: "RetryReasons: no matching entry: no retry",
+			existing: []runtime.Object{
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
+				testProvision(tcp.WithFailureReason("aReason")),
+				testInstallConfigSecret(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			retryReasons: &[]string{"foo", "bReason", "bar"},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
+						assert.Equal(t, "FailureReasonNotRetryable", cond.Reason, "expected ProvisionStopped Reason to be FailureReasonNotRetryable")
+					}
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+						assert.Equal(t, hivev1.ProvisionStoppedProvisionedReason, cond.Reason, "expected Provisioned to be ProvisionStopped")
+					}
+				}
+				assert.Len(t, getProvisions(c), 1, "expected 1 ClusterProvision to exist")
+			},
+		},
+		{
+			name: "RetryReasons: no provision yet: list ignored, provision created",
+			existing: []runtime.Object{
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
+				testInstallConfigSecret(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			retryReasons:          &[]string{"foo", "bar", "baz"},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+						assert.Equal(t, corev1.ConditionFalse, cond.Status, "expected ProvisionStopped to be False")
+					}
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+						assert.Equal(t, hivev1.ProvisioningProvisionedReason, cond.Reason, "expected Provisioned to be Provisioning")
+					}
+				}
+				assert.Len(t, getProvisions(c), 1, "expected 1 ClusterProvisions to exist")
+			},
+		},
+		{
+			name: "RetryReasons: empty list: no retry",
+			existing: []runtime.Object{
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
+				testProvision(tcp.WithFailureReason("aReason")),
+				testInstallConfigSecret(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			// NB: This is *not* the same as the list being absent.
+			retryReasons: &[]string{},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
+						assert.Equal(t, "FailureReasonNotRetryable", cond.Reason, "expected ProvisionStopped Reason to be FailureReasonNotRetryable")
+					}
+					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+						assert.Equal(t, hivev1.ProvisionStoppedProvisionedReason, cond.Reason, "expected Provisioned to be ProvisionStopped")
+					}
+				}
+				assert.Len(t, getProvisions(c), 1, "expected 1 ClusterProvision to exist")
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
-			fakeClient := fake.NewFakeClient(test.existing...)
+			hiveConfig := &hivev1.HiveConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: constants.HiveConfigName,
+				},
+				Spec: hivev1.HiveConfigSpec{
+					FailedProvisionConfig: hivev1.FailedProvisionConfig{
+						RetryReasons: test.retryReasons,
+					},
+				},
+			}
+			fakeClient := fake.NewFakeClient(append(test.existing, hiveConfig)...)
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -3702,6 +3884,7 @@ func getProvisions(c client.Client) []*hivev1.ClusterProvision {
 	for i := range provisionList.Items {
 		provisions[i] = &provisionList.Items[i]
 	}
+	sort.Slice(provisions, func(i, j int) bool { return provisions[i].Spec.Attempt < provisions[j].Spec.Attempt })
 	return provisions
 }
 

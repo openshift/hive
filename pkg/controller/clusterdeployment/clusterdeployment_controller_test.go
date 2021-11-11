@@ -48,6 +48,7 @@ import (
 	testassert "github.com/openshift/hive/pkg/test/assert"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testclusterdeprovision "github.com/openshift/hive/pkg/test/clusterdeprovision"
+	tcp "github.com/openshift/hive/pkg/test/clusterprovision"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 )
 
@@ -1242,10 +1243,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testFailedProvisionAttempt(0),
-				testFailedProvisionAttempt(1),
-				testFailedProvisionAttempt(2),
-				testFailedProvisionAttempt(3),
+				testProvision(tcp.Failed(), tcp.Attempt(0)),
+				testProvision(tcp.Failed(), tcp.Attempt(1)),
+				testProvision(tcp.Failed(), tcp.Attempt(2)),
+				testProvision(tcp.Failed(), tcp.Attempt(3)),
 			},
 			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
@@ -1264,7 +1265,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testFailedProvisionAttempt(0),
+				testProvision(tcp.Failed(), tcp.Attempt(0)),
 			},
 			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
@@ -1313,7 +1314,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Annotations[deleteAfterAnnotation] = "8h"
 					return cd
 				}(),
-				testFailedProvisionTime(time.Now()),
+				testProvision(tcp.WithFailureTime(time.Now())),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1340,7 +1341,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
-				testFailedProvisionTime(time.Now().Add(-2 * time.Minute)),
+				testProvision(tcp.WithFailureTime(time.Now().Add(-2 * time.Minute))),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1980,7 +1981,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testInstallConfigSecret(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
-				testProvisionWithStuckInstallPod(),
+				testProvision(tcp.WithStuckInstallPod()),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2726,7 +2727,7 @@ func TestDeleteStaleProvisions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			provisions := make([]runtime.Object, len(tc.existingAttempts))
 			for i, a := range tc.existingAttempts {
-				provisions[i] = testFailedProvisionAttempt(a)
+				provisions[i] = testProvision(tcp.Failed(), tcp.Attempt(a))
 			}
 			fakeClient := fake.NewFakeClient(provisions...)
 			rcd := &ReconcileClusterDeployment{
@@ -2769,9 +2770,15 @@ func TestDeleteOldFailedProvisions(t *testing.T) {
 			provisions := make([]runtime.Object, tc.totalProvisions)
 			for i := 0; i < tc.totalProvisions; i++ {
 				if i < tc.failedProvisionsMoreThanSevenDaysOld {
-					provisions[i] = testOldFailedProvision(time.Now().Add(-7*24*time.Hour), i)
+					provisions[i] = testProvision(
+						tcp.Failed(),
+						tcp.WithCreationTimestamp(time.Now().Add(-7*24*time.Hour)),
+						tcp.Attempt(i))
 				} else {
-					provisions[i] = testOldFailedProvision(time.Now(), i)
+					provisions[i] = testProvision(
+						tcp.Failed(),
+						tcp.WithCreationTimestamp(time.Now()),
+						tcp.Attempt(i))
 				}
 			}
 			fakeClient := fake.NewFakeClient(provisions...)
@@ -3020,79 +3027,22 @@ func testFakeClusterInstallWithClusterMetadata(name string, metadata hivev1.Clus
 	return fake
 }
 
-func testProvision() *hivev1.ClusterProvision {
+func testProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
 	cd := testClusterDeployment()
-	provision := &hivev1.ClusterProvision{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      provisionName,
-			Namespace: testNamespace,
-			Labels: map[string]string{
-				constants.ClusterDeploymentNameLabel: testName,
-			},
-		},
-		Spec: hivev1.ClusterProvisionSpec{
-			ClusterDeploymentRef: corev1.LocalObjectReference{
-				Name: testName,
-			},
-			Stage: hivev1.ClusterProvisionStageInitializing,
-		},
-	}
+	provision := tcp.FullBuilder(testNamespace, provisionName).Build(tcp.WithClusterDeploymentRef(testName))
 
 	controllerutil.SetControllerReference(cd, provision, scheme.Scheme)
+
+	for _, opt := range opts {
+		opt(provision)
+	}
 
 	return provision
 }
 
 func testSuccessfulProvision() *hivev1.ClusterProvision {
-	provision := testProvision()
-	provision.Spec.Stage = hivev1.ClusterProvisionStageComplete
-	provision.Spec.ClusterID = pointer.StringPtr(testClusterID)
-	provision.Spec.InfraID = pointer.StringPtr(testInfraID)
-	provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: adminKubeconfigSecret}
-	provision.Spec.AdminPasswordSecretRef = &corev1.LocalObjectReference{Name: adminPasswordSecret}
-	return provision
-}
-
-func testFailedProvisionAttempt(attempt int) *hivev1.ClusterProvision {
-	provision := testProvision()
-	provision.Name = fmt.Sprintf("%s-%02d", provision.Name, attempt)
-	provision.Spec.Attempt = attempt
-	provision.Spec.Stage = hivev1.ClusterProvisionStageFailed
-	return provision
-}
-
-func testFailedProvisionTime(time time.Time) *hivev1.ClusterProvision {
-	provision := testProvision()
-	provision.Spec.Stage = hivev1.ClusterProvisionStageFailed
-	provision.Status.Conditions = []hivev1.ClusterProvisionCondition{
-		{
-			Type:               hivev1.ClusterProvisionFailedCondition,
-			Status:             corev1.ConditionTrue,
-			LastTransitionTime: metav1.NewTime(time),
-		},
-	}
-	return provision
-}
-
-func testProvisionWithStuckInstallPod() *hivev1.ClusterProvision {
-	provision := testProvision()
-	provision.Status.Conditions = []hivev1.ClusterProvisionCondition{
-		{
-			Type:    hivev1.InstallPodStuckCondition,
-			Status:  corev1.ConditionTrue,
-			Reason:  "PodInPendingPhase",
-			Message: "pod is in pending phase",
-		},
-	}
-	return provision
-}
-
-func testOldFailedProvision(time time.Time, attempt int) *hivev1.ClusterProvision {
-	provision := testProvision()
-	provision.Name = fmt.Sprintf("%s-%02d", provision.Name, attempt)
-	provision.CreationTimestamp.Time = time
-	provision.Spec.Stage = hivev1.ClusterProvisionStageFailed
-	return provision
+	return testProvision(tcp.Successful(
+		testClusterID, testInfraID, adminKubeconfigSecret, adminPasswordSecret))
 }
 
 func testMetadataConfigMap() *corev1.ConfigMap {

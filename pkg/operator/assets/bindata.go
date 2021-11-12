@@ -1670,10 +1670,16 @@ data:
       - "The subnet ID .* does not exist"
       installFailingReason: AWSSubnetDoesNotExist
       installFailingMessage: AWS Subnet Does Not Exist
+    # iam:CreateServiceLinkedRole is a super powerful permission that we don't give to STS clusters. We require it's done as a one-time prereq.
+    # This is the error we see when the prereq step was missed.
+    - name: AWSAccessDeniedSLR
+      searchRegexStrings:
+      - "Error creating network Load Balancer: AccessDenied.*iam:CreateServiceLinkedRole"
+      installFailingReason: AWSAccessDeniedSLR
+      installFailingMessage: Missing prerequisite service role for load balancer
     - name: AWSInsufficientPermissions
       searchRegexStrings:
       - "current credentials insufficient for performing cluster installation"
-      - "Error creating network Load Balancer: AccessDenied"
       installFailingReason: AWSInsufficientPermissions
       installFailingMessage: AWS credentials are insufficient for performing cluster installation
     - name: VcpuLimitExceeded

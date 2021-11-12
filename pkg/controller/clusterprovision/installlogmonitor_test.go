@@ -42,7 +42,7 @@ const (
 	awsDeleteRoleFailed       = "time=\"2021-09-22T12:25:40Z\" level=error msg=\"Error: Error deleting IAM Role (my-fake-cluster-hashn0s-bootstrap-role): DeleteConflict: Cannot delete entity, must detach all policies first.\""
 	subnetDoesNotExist        = "blahblah\nlevel=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": [platform.aws.subnets: Invalid value: []string{\"subnet-whatever\", \"subnet-whatever2\"}: describing subnets: InvalidSubnetID.NotFound: The subnet ID 'subnet-whatever' does not exist"
 	insufficientPermissions   = "level=fatal msg=failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Permissions Check\": validate AWS credentials: current credentials insufficient for performing cluster installation"
-	insufficientPermissionsLB = "level=error msg=\"Error: Error creating network Load Balancer: AccessDenied: User: xxxxxxxxxxx is not authorized to"
+	accessDeniedSLR           = "blahblah\nError: Error creating network Load Balancer: AccessDenied: User: arn:aws:sts::123456789:assumed-role/ManagedOpenShift-Installer-Role/123456789 is not authorized to perform: iam:CreateServiceLinkedRole on resource: arn:aws:iam::123456789:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing"
 	loadBalancerLimitExceeded = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=info msg=\"Cluster operator ingress Available is False with IngressUnavailable: The \"default\" ingress controller reports Available=False: IngressControllerUnavailable: One or more status	conditions indicate unavailable: LoadBalancerReady=False (SyncLoadBalancerFailed: The service-controller component is reporting SyncLoadBalancerFailed events like: Error syncing load balancer: failed to ensure load balancer: TooManyLoadBalancers: Exceeded quota of account 1234567890\n\tstatus code: 400, request id: f0cb17ec-68b6-4f32-8997-cce5049a6a1e\nThe kube-controller-manager logs may contain more details.)"
 	noMatchLog                = "an example of something that doesn't match the log regexes"
 )
@@ -56,6 +56,12 @@ func TestParseInstallLog(t *testing.T) {
 		expectedReason  string
 		expectedMessage *string
 	}{
+		{
+			name:           "load balancer service linked role prereq",
+			log:            pointer.StringPtr(accessDeniedSLR),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "AWSAccessDeniedSLR",
+		},
 		{
 			name:           "DNS already exists",
 			log:            pointer.StringPtr(dnsAlreadyExistsLog),
@@ -343,7 +349,6 @@ func TestParseInstallLog(t *testing.T) {
 - name: InsufficientPermissions
   searchRegexStrings:
   - "current credentials insufficient for performing cluster installation"
-  - "Error creating network Load Balancer: AccessDenied"
   installFailingReason: AWSInsufficientPermissions
   installFailingMessage: AWS credentials are insufficient for performing cluster installation
 `,
@@ -356,12 +361,6 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(loadBalancerLimitExceeded),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "LoadBalancerLimitExceeded",
-		},
-		{
-			name:           "AWSInsufficientPermissions",
-			log:            pointer.StringPtr(insufficientPermissionsLB),
-			existing:       []runtime.Object{buildRegexConfigMap()},
-			expectedReason: "AWSInsufficientPermissions",
 		},
 	}
 

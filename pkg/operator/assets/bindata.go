@@ -1584,6 +1584,11 @@ data:
        - "TooManyBuckets"
       installFailingReason: S3BucketsLimitExceeded
       installFailingMessage: S3 Buckets Limit Exceeded
+    - name: LoadBalancerLimitExceeded
+      searchRegexStrings:
+      - "TooManyLoadBalancers: Exceeded quota of account"
+      installFailingReason: LoadBalancerLimitExceeded
+      installFailingMessage: AWS Load Balancer Limit Exceeded
     - name: EIPAddressLimitExceeded
       searchRegexStrings:
       - "EIP: AddressLimitExceeded"
@@ -1668,6 +1673,7 @@ data:
     - name: AWSInsufficientPermissions
       searchRegexStrings:
       - "current credentials insufficient for performing cluster installation"
+      - "Error creating network Load Balancer: AccessDenied"
       installFailingReason: AWSInsufficientPermissions
       installFailingMessage: AWS credentials are insufficient for performing cluster installation
     - name: VcpuLimitExceeded

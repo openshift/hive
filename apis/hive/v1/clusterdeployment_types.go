@@ -369,7 +369,9 @@ const (
 	// DeprovisionLaunchErrorCondition is set when a cluster deprovision fails to launch.
 	DeprovisionLaunchErrorCondition ClusterDeploymentConditionType = "DeprovisionLaunchError"
 
-	// ProvisionStoppedCondition is set when cluster provisioning is stopped
+	// ProvisionStoppedCondition is set when cluster provisioning is stopped.
+	// This indicates that at least one provision attempt was made, but there will be no further
+	// retries (without InstallAttemptsLimit changes or other hive configuration stopping further retries).
 	ProvisionStoppedCondition ClusterDeploymentConditionType = "ProvisionStopped"
 
 	// Provisioned is True when a cluster is installed; False while it is provisioning or deprovisioning.

@@ -66,7 +66,7 @@ var webhookAssets = []string{
 	"config/hiveadmission/selectorsyncset-webhook.yaml",
 }
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, mdConfigMap *corev1.ConfigMap, additionalHashes ...string) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, additionalHashes ...string) error {
 	deploymentAsset := "config/hiveadmission/deployment.yaml"
 	namespacedAssets := []string{
 		"config/hiveadmission/service.yaml",
@@ -140,7 +140,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	controllerutils.SetProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec,
 		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
 
-	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, mdConfigMap.Name)
+	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, managedDomainsConfigMapName)
 	addAWSPrivateLinkConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
 	addSupportedContractsConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
 	addReleaseImageVerificationConfigMapEnv(&hiveAdmDeployment.Spec.Template.Spec, instance)

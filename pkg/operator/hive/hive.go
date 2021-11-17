@@ -63,7 +63,7 @@ var (
 	}
 )
 
-func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, mdConfigMap *corev1.ConfigMap, hiveControllersConfigHash string, namespacesToClean []string) error {
+func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, configHashes ...string) error {
 	deploymentAsset := "config/controllers/deployment.yaml"
 	namespacedAssets := []string{
 		"config/controllers/service.yaml",
@@ -138,7 +138,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
 
-	addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec, mdConfigMap.Name)
+	addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec, managedDomainsConfigMapName)
 	addAWSPrivateLinkConfigVolume(&hiveDeployment.Spec.Template.Spec)
 
 	hiveNSName := getHiveNamespace(instance)
@@ -275,7 +275,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if hiveDeployment.Spec.Template.Annotations == nil {
 		hiveDeployment.Spec.Template.Annotations = make(map[string]string, 1)
 	}
-	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
+	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash("", configHashes...)
 
 	utils.SetProxyEnvVars(&hiveDeployment.Spec.Template.Spec,
 		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))

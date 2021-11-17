@@ -2,8 +2,6 @@ package hive
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"reflect"
@@ -674,12 +672,6 @@ func aggregatorCAConfigMapHandler(o client.Object) []reconcile.Request {
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}}}
 	}
 	return nil
-}
-
-func computeHash(data map[string]string) string {
-	hasher := md5.New()
-	hasher.Write([]byte(fmt.Sprintf("%v", data)))
-	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func (r *ReconcileHiveConfig) updateHiveConfigStatus(origHiveConfig, newHiveConfig *hivev1.HiveConfig, logger log.FieldLogger, succeeded bool) error {

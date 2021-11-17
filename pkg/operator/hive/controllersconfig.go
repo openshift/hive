@@ -1,8 +1,6 @@
 package hive
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"strconv"
 
@@ -61,7 +59,7 @@ func (r *ReconcileHiveConfig) deployHiveControllersConfigMap(hLog log.FieldLogge
 	hLog.WithField("result", result).Info("hive-controllers-config configmap applied")
 
 	hLog.Info("Hashing hive-controllers-config data onto a hive deployment annotation")
-	hiveControllersConfigHash := computeHiveControllersConfigHash(hiveControllersConfigMap, additionalControllerConfigHashes...)
+	hiveControllersConfigHash := computeHash(hiveControllersConfigMap.Data, additionalControllerConfigHashes...)
 
 	return hiveControllersConfigHash, nil
 }
@@ -92,13 +90,4 @@ func setHiveControllersConfig(config *hivev1.ControllerConfig, hiveControllersCo
 	if config.QueueBurst != nil {
 		hiveControllersConfigMap.Data[fmt.Sprintf(utils.QueueBurstEnvVariableFormat, controllerName)] = strconv.Itoa(int(*config.QueueBurst))
 	}
-}
-
-func computeHiveControllersConfigHash(hiveControllersConfigMap *corev1.ConfigMap, additionalControllerConfigHashes ...string) string {
-	hasher := md5.New()
-	hasher.Write([]byte(fmt.Sprintf("%v", hiveControllersConfigMap.Data)))
-	for _, h := range additionalControllerConfigHashes {
-		hasher.Write([]byte(h))
-	}
-	return hex.EncodeToString(hasher.Sum(nil))
 }

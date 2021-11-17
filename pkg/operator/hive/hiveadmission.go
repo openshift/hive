@@ -2,8 +2,6 @@ package hive
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -138,11 +136,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	hiveAdmDeployment.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 
-	hasher := md5.New()
-	for _, v := range additionalHashes {
-		hasher.Write([]byte(v))
-	}
-	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[inputHashAnnotation] = hex.EncodeToString(hasher.Sum(nil))
+	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[inputHashAnnotation] = computeHash("", additionalHashes...)
 	controllerutils.SetProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec,
 		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
 
@@ -195,7 +189,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		return err
 	}
 	hLog.Info("Hashing serving cert secret onto a hiveadmission deployment annotation")
-	certSecretHash := computeSecretDataHash(servingCertSecret.Data)
+	certSecretHash := computeHash(servingCertSecret.Data)
 	if hiveAdmDeployment.Spec.Template.Annotations == nil {
 		hiveAdmDeployment.Spec.Template.Annotations = map[string]string{}
 	}
@@ -230,12 +224,6 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	hLog.Info("hiveadmission components reconciled successfully")
 	return nil
-}
-
-func computeSecretDataHash(data map[string][]byte) string {
-	hasher := md5.New()
-	hasher.Write([]byte(fmt.Sprintf("%v", data)))
-	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {
@@ -350,7 +338,7 @@ func (r *ReconcileHiveConfig) deployFeatureGatesConfigMap(hLog log.FieldLogger, 
 	}
 	hLog.WithField("result", result).Info("hive-feature-gates configmap applied")
 
-	return computeConfigHash(cm), nil
+	return computeHash(cm.Data), nil
 }
 
 // allowedContracts is the list of operator whitelisted contracts that hive will accept
@@ -449,7 +437,7 @@ func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLo
 	}
 	hLog.WithField("result", result).Info("hive-supported-contracts configmap applied")
 
-	return computeConfigHash(cm), nil
+	return computeHash(cm.Data), nil
 }
 
 func addSupportedContractsConfigVolume(podSpec *corev1.PodSpec) {
@@ -486,10 +474,4 @@ func addReleaseImageVerificationConfigMapEnv(podSpec *corev1.PodSpec, instance *
 		Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNameEnvVar,
 		Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Name,
 	})
-}
-
-func computeConfigHash(cm *corev1.ConfigMap) string {
-	hasher := md5.New()
-	hasher.Write([]byte(fmt.Sprintf("%v", cm.Data)))
-	return hex.EncodeToString(hasher.Sum(nil))
 }

@@ -140,37 +140,20 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec, managedDomainsConfigMapName)
 	addAWSPrivateLinkConfigVolume(&hiveDeployment.Spec.Template.Spec)
+	addFailedProvisionConfigVolume(&hiveDeployment.Spec.Template.Spec)
+
+	// This triggers the clusterdeployment controller to copy the secret into the CD's namespace.
+	// It would be neat if it did that purely based on the FailedProvisionConfig ConfigMap, to
+	// which it does have access, but that code path is shared by other things that need the
+	// same copied secret.
+	if awsSpec := instance.Spec.FailedProvisionConfig.AWS; awsSpec != nil {
+		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
+			Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
+			Value: awsSpec.CredentialsSecretRef.Name,
+		})
+	}
 
 	hiveNSName := getHiveNamespace(instance)
-
-	if instance.Spec.FailedProvisionConfig.AWS != nil {
-		awsSpec := instance.Spec.FailedProvisionConfig.AWS
-
-		// By default we will try to gather logs on failed installs:
-		awsLogsEnvVars := []corev1.EnvVar{
-			{
-				Name:  constants.InstallLogsUploadProviderEnvVar,
-				Value: constants.InstallLogsUploadProviderAWS,
-			},
-			{
-				Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
-				Value: awsSpec.CredentialsSecretRef.Name,
-			},
-			{
-				Name:  constants.InstallLogsAWSRegionEnvVar,
-				Value: awsSpec.Region,
-			},
-			{
-				Name:  constants.InstallLogsAWSServiceEndpointEnvVar,
-				Value: awsSpec.ServiceEndpoint,
-			},
-			{
-				Name:  constants.InstallLogsAWSS3BucketEnvVar,
-				Value: awsSpec.Bucket,
-			},
-		}
-		hiveContainer.Env = append(hiveContainer.Env, awsLogsEnvVars...)
-	}
 
 	if awssp := instance.Spec.ServiceProviderCredentialsConfig.AWS; awssp != nil && awssp.CredentialsSecretRef.Name != "" {
 		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{

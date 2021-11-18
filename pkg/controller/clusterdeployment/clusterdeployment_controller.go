@@ -864,20 +864,6 @@ func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, *hivev1.Clus
 		dnsNotReadyCondition
 }
 
-func addEnvVarIfFound(name string, envVars []corev1.EnvVar) []corev1.EnvVar {
-	value, found := os.LookupEnv(name)
-	if !found {
-		return envVars
-	}
-
-	tmp := corev1.EnvVar{
-		Name:  name,
-		Value: value,
-	}
-
-	return append(envVars, tmp)
-}
-
 // getReleaseImage looks for a a release image in clusterdeployment or its corresponding imageset in the following order:
 // 1 - specified in the cluster deployment spec.images.releaseImage
 // 2 - referenced in the cluster deployment spec.imageSet

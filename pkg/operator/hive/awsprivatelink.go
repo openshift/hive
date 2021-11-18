@@ -1,8 +1,6 @@
 package hive
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -55,15 +53,9 @@ func (r *ReconcileHiveConfig) deployAWSPrivateLinkConfigMap(hLog log.FieldLogger
 	hLog.WithField("result", result).Info("aws-private-link configmap applied")
 
 	hLog.Info("Hashing hive-controllers-config data onto a hive deployment annotation")
-	awsPrivateLinkConfigHash := computeAWSPrivateLinkConfigHash(cm)
+	awsPrivateLinkConfigHash := computeHash(cm.Data)
 
 	return awsPrivateLinkConfigHash, nil
-}
-
-func computeAWSPrivateLinkConfigHash(cm *corev1.ConfigMap) string {
-	hasher := md5.New()
-	hasher.Write([]byte(fmt.Sprintf("%v", cm.Data)))
-	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func addAWSPrivateLinkConfigVolume(podSpec *corev1.PodSpec) {

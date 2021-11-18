@@ -2,6 +2,9 @@ package hive
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
@@ -40,4 +43,13 @@ type gvrNSName struct {
 	resource  string
 	namespace string // empty for global resources
 	name      string
+}
+
+func computeHash(data interface{}, additionalHashes ...string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(fmt.Sprintf("%v", data)))
+	for _, h := range additionalHashes {
+		hasher.Write([]byte(h))
+	}
+	return hex.EncodeToString(hasher.Sum(nil))
 }

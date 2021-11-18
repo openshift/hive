@@ -18,15 +18,16 @@ import (
 )
 
 const (
-	managedDomainsConfigMapNamePrefix = "managed-domains-"
-	managedDomainsConfigMapKey        = "managed-domains"
-	configMapLabel                    = "managed-domains"
-	configMapMountPath                = "/data/config"
+	managedDomainsConfigMapName = "hive-managed-domains"
+	managedDomainsConfigMapKey  = "managed-domains"
+	configMapLabel              = "managed-domains"
+	configMapMountPath          = "/data/config"
 )
 
 // configureManagedDomains will create a new configmap holding the managed domains settings (if necessary), or simply
-// return the current configmap of the current deployment if the settings it contains match the desired settings.
-func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (*corev1.ConfigMap, error) {
+// use the current configmap of the current deployment if the settings it contains match the desired settings. The
+// first return value is a hash (MD5 sum) of the configmap's data, which can be used to indicate whether it changed.
+func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (string, error) {
 	// Scrub old target namespaces.
 	for _, ns := range namespacesToClean {
 		// Cheat: getCurrentConfigMap deletes any configmap that doesn't have the specified data.
@@ -34,20 +35,23 @@ func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, h 
 		// as we always create them with managedDomainsConfigMapKey.)
 		_, err := r.getCurrentConfigMap(nil, h, ns, logger)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to scrub managed domains config maps from old target namespace %s", ns)
+			return "", errors.Wrapf(err, "failed to scrub managed domains config maps from old target namespace %s", ns)
 		}
 	}
 
 	domains, err := json.Marshal(instance.Spec.ManagedDomains)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal managed domains list into the configmap")
+		return "", errors.Wrap(err, "failed to marshal managed domains list into the configmap")
 	}
 
 	newConfigMapData := map[string]string{managedDomainsConfigMapKey: string(domains)}
 
+	// TODO: The algorithm from here down can be simplified once we're sure we've flushed out any
+	// old managed domain configmaps with generated names.
+
 	currentConfigMap, err := r.getCurrentConfigMap(newConfigMapData, h, getHiveNamespace(instance), logger)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	var mdConfigMap *corev1.ConfigMap
@@ -56,14 +60,14 @@ func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, h 
 		mdConfigMap = &corev1.ConfigMap{}
 		mdConfigMap.Kind = "ConfigMap"
 		mdConfigMap.APIVersion = "v1"
-		mdConfigMap.GenerateName = managedDomainsConfigMapNamePrefix
+		mdConfigMap.Name = managedDomainsConfigMapName
 		mdConfigMap.Namespace = getHiveNamespace(instance)
 		mdConfigMap.Labels = map[string]string{configMapLabel: "true"}
 
 		mdConfigMap.Data = newConfigMapData
 
 		if _, err := h.CreateRuntimeObject(mdConfigMap, r.scheme); err != nil {
-			return nil, errors.Wrap(err, "failed to save new managed domains configmap")
+			return "", errors.Wrap(err, "failed to save new managed domains configmap")
 		}
 		log.WithField("configmap", fmt.Sprintf("%s/%s", mdConfigMap.Namespace, mdConfigMap.Name)).
 			Debug("saved configmap for managed domains")
@@ -75,7 +79,7 @@ func (r *ReconcileHiveConfig) configureManagedDomains(logger log.FieldLogger, h 
 		mdConfigMap = currentConfigMap
 	}
 
-	return mdConfigMap, nil
+	return computeHash(mdConfigMap.Data), nil
 }
 
 // getCurrentConfigMap will see if any existing configmap (for managed domains) already has the necessary
@@ -94,7 +98,11 @@ func (r *ReconcileHiveConfig) getCurrentConfigMap(cmData map[string]string, h re
 
 	// find any configmap that has current, correct managed domains data
 	for i, cm := range configMapList.Items {
-		if reflect.DeepEqual(cmData, cm.Data) {
+		// NOTE: We used to generate the name of this configmap and find it based on the label. Now
+		// we want it to have a static name. So if it doesn't have that static name, consider it
+		// "not found" (which will cause it to be deleted and replaced with the proper name) even
+		// if the data matches.
+		if cm.Name == managedDomainsConfigMapName && reflect.DeepEqual(cmData, cm.Data) {
 			currentConfigMap = &configMapList.Items[i]
 			break
 		}

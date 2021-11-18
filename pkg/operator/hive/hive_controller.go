@@ -2,8 +2,6 @@ package hive
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"reflect"
@@ -461,7 +459,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	managedDomainsConfigMap, err := r.configureManagedDomains(hLog, h, instance, namespacesToClean)
+	managedDomainsConfigHash, err := r.configureManagedDomains(hLog, h, instance, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error setting up managed domains")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorSettingUpManagedDomains", err.Error())
@@ -500,7 +498,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, managedDomainsConfigMap, confighash, namespacesToClean)
+	err = r.deployHive(hLog, h, instance, namespacesToClean, confighash, managedDomainsConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHive", err.Error())
@@ -529,7 +527,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, namespacesToClean, managedDomainsConfigMap, fgConfigHash, plConfigHash, scConfigHash)
+	err = r.deployHiveAdmission(hLog, h, instance, namespacesToClean, managedDomainsConfigHash, fgConfigHash, plConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHiveAdmission", err.Error())
@@ -674,12 +672,6 @@ func aggregatorCAConfigMapHandler(o client.Object) []reconcile.Request {
 		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}}}
 	}
 	return nil
-}
-
-func computeHash(data map[string]string) string {
-	hasher := md5.New()
-	hasher.Write([]byte(fmt.Sprintf("%v", data)))
-	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func (r *ReconcileHiveConfig) updateHiveConfigStatus(origHiveConfig, newHiveConfig *hivev1.HiveConfig, logger log.FieldLogger, succeeded bool) error {

@@ -372,6 +372,10 @@ const (
 	// transitioning to/from a hibernating state or is in a hibernating state.
 	ClusterHibernatingCondition ClusterDeploymentConditionType = "Hibernating"
 
+	// ClusterReadyCondition works in conjunction with ClusterHibernatingCondition and gives more information
+	// pertaining to the transition status of the cluster and whether it is running and ready
+	ClusterReadyCondition ClusterDeploymentConditionType = "Ready"
+
 	// InstallLaunchErrorCondition is set when a cluster provision fails to launch an install pod
 	InstallLaunchErrorCondition ClusterDeploymentConditionType = "InstallLaunchError"
 
@@ -415,6 +419,7 @@ const (
 var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	ActiveAPIURLOverrideCondition,
 	ClusterHibernatingCondition,
+	ClusterReadyCondition,
 	AWSPrivateLinkReadyClusterDeploymentCondition,
 	ClusterInstallCompletedClusterDeploymentCondition,
 	ClusterInstallRequirementsMetClusterDeploymentCondition,
@@ -422,14 +427,11 @@ var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionTy
 	ProvisionedCondition,
 }
 
-// Cluster hibernating reasons
+// Cluster hibernating and ready reasons
 const (
-	// ResumingHibernationReason is used as the reason when the cluster is transitioning
-	// from a Hibernating state to a Running state.
-	ResumingHibernationReason = "Resuming"
-	// RunningHibernationReason is used as the reason when the cluster is running and
-	// the Hibernating condition is false.
-	RunningHibernationReason = "Running"
+	// ResumingOrRunningHibernationReason is used as the reason for the Hibernating condition when the cluster
+	// is resuming or running. Precise details are available in the Ready condition.
+	ResumingOrRunningHibernationReason = "ResumingOrRunning"
 	// StoppingHibernationReason is used as the reason when the cluster is transitioning
 	// from a Running state to a Hibernating state.
 	StoppingHibernationReason = "Stopping"
@@ -454,6 +456,21 @@ const (
 	// (It does not necessarily mean they are currently copacetic -- check ClusterSync status
 	// for that.)
 	SyncSetsAppliedReason = "SyncSetsApplied"
+
+	// StoppingOrHibernatingReadyReason is used as the reason for the Ready condition when the cluster
+	// is stopping or hibernating. Precise details are available in the Hibernating condition.
+	StoppingOrHibernatingReadyReason = "StoppingOrHibernating"
+	// WaitingForMachinesReadyReason is used on the Ready condition when waiting for cloud VMs to start.
+	WaitingForMachinesReadyReason = "WaitingForMachines"
+	// WaitingForNodesReadyReason is used on the Ready condition when waiting for nodes to become Ready.
+	WaitingForNodesReadyReason = "WaitingForNodes"
+	// PausingForClusterOperatorsToSettleReadyReason is used on the Ready condition when pausing to let ClusterOperators start and post new status before we check it.
+	PausingForClusterOperatorsToSettleReadyReason = "PausingForClusterOperatorsToSettle"
+	// WaitingForClusterOperatorsReadyReason is used on the Ready condition when waiting for ClusterOperators to
+	// get to a good state. (Available=True, Processing=False, Degraded=False)
+	WaitingForClusterOperatorsReadyReason = "WaitingForClusterOperators"
+	// RunningReadyReason is used on the Ready condition as the reason when the cluster is running and ready
+	RunningReadyReason = "Running"
 )
 
 // Provisioned status condition reasons

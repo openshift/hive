@@ -228,14 +228,14 @@ func isBroken(cd *hivev1.ClusterDeployment) bool {
 
 func isRunning(cd *hivev1.ClusterDeployment) bool {
 	// TODO: Change this to use the Running condition
-	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 	if cond == nil {
 		// Since we should be initializing conditions, this probably means the CD is super fresh
 		// and quite unlikely to be running. (That said, this really should never happen, since we
 		// only check this for Installed clusters.)
 		return false
 	}
-	return cond.Reason == hivev1.RunningHibernationReason
+	return cond.Reason == hivev1.RunningReadyReason
 }
 
 func (cds *cdCollection) sortInstalling() {

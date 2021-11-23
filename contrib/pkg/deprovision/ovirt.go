@@ -90,5 +90,7 @@ func (o *oVirtOptions) Run() error {
 		return err
 	}
 
-	return destroyer.Run()
+	// ClusterQuota stomped in return
+	_, err = destroyer.Run()
+	return err
 }

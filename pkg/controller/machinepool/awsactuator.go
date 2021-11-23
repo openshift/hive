@@ -20,9 +20,9 @@ import (
 	awsproviderv1beta1 "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
 	installertypesaws "github.com/openshift/installer/pkg/types/aws"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"

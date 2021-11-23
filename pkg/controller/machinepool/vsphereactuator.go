@@ -9,12 +9,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	installvsphere "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	vsphereprovider "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider"
-	vsphereproviderv1beta1 "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
@@ -29,7 +27,7 @@ type VSphereActuator struct {
 var _ Actuator = &VSphereActuator{}
 
 func addVSphereProviderToScheme(scheme *runtime.Scheme) error {
-	return vsphereprovider.AddToScheme(scheme)
+	return machineapi.AddToScheme(scheme)
 }
 
 // NewVSphereActuator is the constructor for building a VSphereActuator
@@ -112,9 +110,9 @@ func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme
 	return osImage, nil
 }
 
-func decodeVSphereMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*vsphereproviderv1beta1.VSphereMachineProviderSpec, error) {
+func decodeVSphereMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*machineapi.VSphereMachineProviderSpec, error) {
 	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(vsphereproviderv1beta1.SchemeGroupVersion)
+	decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
 	if rawExt == nil {
 		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
 	}
@@ -122,7 +120,7 @@ func decodeVSphereMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runt
 	if err != nil {
 		return nil, fmt.Errorf("could not decode VSphere ProviderSpec: %v", err)
 	}
-	spec, ok := obj.(*vsphereproviderv1beta1.VSphereMachineProviderSpec)
+	spec, ok := obj.(*machineapi.VSphereMachineProviderSpec)
 	if !ok {
 		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
 	}

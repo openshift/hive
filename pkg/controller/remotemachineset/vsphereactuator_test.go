@@ -11,8 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	vsphereprovider "github.com/openshift/machine-api-operator/pkg/apis/vsphereprovider/v1beta1"
+	machineapi "github.com/openshift/api/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -67,7 +66,7 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
 		}
 
-		vsphereProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*vsphereprovider.VSphereMachineProviderSpec)
+		vsphereProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.VSphereMachineProviderSpec)
 		if assert.True(t, ok, "failed to convert to vsphere provider spec") {
 			assert.Equal(t, int64(32*1024), vsphereProvider.MemoryMiB, "unexpected MemeoryMiB")
 			assert.Equal(t, int32(4), vsphereProvider.NumCPUs, "unexpected NumCPUs")

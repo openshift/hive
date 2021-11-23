@@ -10,12 +10,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	ovirtprovider "github.com/openshift/cluster-api-provider-ovirt/pkg/apis"
 	ovirtproviderv1beta1 "github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1"
 	installovirt "github.com/openshift/installer/pkg/asset/machines/ovirt"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )

@@ -31,7 +31,8 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 				go terminateWhenFilesChange(credsDir)
 			}
 
-			if err := opt.Run(); err != nil {
+			// ClusterQuota stomped in return
+			if _, err := opt.Run(); err != nil {
 				log.WithError(err).Fatal("Runtime error")
 			}
 		},

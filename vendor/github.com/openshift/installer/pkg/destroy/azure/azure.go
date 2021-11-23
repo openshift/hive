@@ -35,6 +35,7 @@ type ClusterUninstaller struct {
 	GraphAuthorizer autorest.Authorizer
 	Authorizer      autorest.Authorizer
 	Environment     azureenv.Environment
+	CloudName       azure.CloudEnvironment
 
 	InfraID                     string
 	ResourceGroupName           string
@@ -102,11 +103,12 @@ func New(logger logrus.FieldLogger, metadata *types.ClusterMetadata) (providers.
 		Logger:                      logger,
 		BaseDomainResourceGroupName: metadata.Azure.BaseDomainResourceGroupName,
 		ClusterName:                 metadata.ClusterName,
+		CloudName:                   cloudName,
 	}, nil
 }
 
 // Run is the entrypoint to start the uninstall process.
-func (o *ClusterUninstaller) Run() error {
+func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 	var errs []error
 	var err error
 
@@ -121,7 +123,7 @@ func (o *ClusterUninstaller) Run() error {
 		waitCtx,
 		func(ctx context.Context) {
 			o.Logger.Debugf("deleting public records")
-			if o.Environment.Name == azure.StackCloud.Name() {
+			if o.CloudName == azure.StackCloud {
 				err = deleteAzureStackPublicRecords(ctx, o)
 			} else {
 				err = deletePublicRecords(ctx, o.zonesClient, o.recordsClient, o.privateZonesClient, o.privateRecordSetsClient, o.Logger, o.ResourceGroupName)
@@ -205,7 +207,7 @@ func (o *ClusterUninstaller) Run() error {
 		o.Logger.Debug(err)
 	}
 
-	return utilerrors.NewAggregate(errs)
+	return nil, utilerrors.NewAggregate(errs)
 }
 
 func deleteAzureStackPublicRecords(ctx context.Context, o *ClusterUninstaller) error {

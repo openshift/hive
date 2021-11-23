@@ -1,12 +1,12 @@
 package types
 
 import (
+	"github.com/openshift/installer/pkg/types/alibabacloud"
 	"github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
-	"github.com/openshift/installer/pkg/types/kubevirt"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/openstack"
 	"github.com/openshift/installer/pkg/types/ovirt"
@@ -16,27 +16,27 @@ import (
 // ClusterMetadata contains information
 // regarding the cluster that was created by installer.
 type ClusterMetadata struct {
-	// clusterName is the name for the cluster.
+	// ClusterName is the name for the cluster.
 	ClusterName string `json:"clusterName"`
-	// clusterID is a globally unique ID that is used to identify an Openshift cluster.
+	// ClusterID is a globally unique ID that is used to identify an Openshift cluster.
 	ClusterID string `json:"clusterID"`
-	// infraID is an ID that is used to identify cloud resources created by the installer.
+	// InfraID is an ID that is used to identify cloud resources created by the installer.
 	InfraID                 string `json:"infraID"`
 	ClusterPlatformMetadata `json:",inline"`
 }
 
 // ClusterPlatformMetadata contains metadata for platfrom.
 type ClusterPlatformMetadata struct {
-	AWS       *aws.Metadata       `json:"aws,omitempty"`
-	OpenStack *openstack.Metadata `json:"openstack,omitempty"`
-	Libvirt   *libvirt.Metadata   `json:"libvirt,omitempty"`
-	Azure     *azure.Metadata     `json:"azure,omitempty"`
-	GCP       *gcp.Metadata       `json:"gcp,omitempty"`
-	IBMCloud  *ibmcloud.Metadata  `json:"ibmcloud,omitempty"`
-	BareMetal *baremetal.Metadata `json:"baremetal,omitempty"`
-	Ovirt     *ovirt.Metadata     `json:"ovirt,omitempty"`
-	VSphere   *vsphere.Metadata   `json:"vsphere,omitempty"`
-	Kubevirt  *kubevirt.Metadata  `json:"kubevirt,omitempty"`
+	AlibabaCloud *alibabacloud.Metadata `json:"alibabacloud,omitempty"`
+	AWS          *aws.Metadata          `json:"aws,omitempty"`
+	OpenStack    *openstack.Metadata    `json:"openstack,omitempty"`
+	Libvirt      *libvirt.Metadata      `json:"libvirt,omitempty"`
+	Azure        *azure.Metadata        `json:"azure,omitempty"`
+	GCP          *gcp.Metadata          `json:"gcp,omitempty"`
+	IBMCloud     *ibmcloud.Metadata     `json:"ibmcloud,omitempty"`
+	BareMetal    *baremetal.Metadata    `json:"baremetal,omitempty"`
+	Ovirt        *ovirt.Metadata        `json:"ovirt,omitempty"`
+	VSphere      *vsphere.Metadata      `json:"vsphere,omitempty"`
 }
 
 // Platform returns a string representation of the platform
@@ -45,6 +45,9 @@ type ClusterPlatformMetadata struct {
 func (cpm *ClusterPlatformMetadata) Platform() string {
 	if cpm == nil {
 		return ""
+	}
+	if cpm.AlibabaCloud != nil {
+		return alibabacloud.Name
 	}
 	if cpm.AWS != nil {
 		return aws.Name
@@ -72,9 +75,6 @@ func (cpm *ClusterPlatformMetadata) Platform() string {
 	}
 	if cpm.VSphere != nil {
 		return vsphere.Name
-	}
-	if cpm.Kubevirt != nil {
-		return kubevirt.Name
 	}
 	return ""
 }

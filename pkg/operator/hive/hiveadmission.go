@@ -2,18 +2,14 @@ package hive
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
-	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
-	"github.com/openshift/hive/pkg/constants"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -27,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,8 +41,7 @@ const (
 )
 
 const (
-	featureGateConfigMapName = "hive-feature-gates"
-	inputHashAnnotation      = "hive.openshift.io/hive-admission-input-sources-hash"
+	inputHashAnnotation = "hive.openshift.io/hive-admission-input-sources-hash"
 )
 
 const (
@@ -120,12 +114,13 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	asset := assets.MustAsset(deploymentAsset)
 	hLog.Debug("reading deployment")
 	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
+	hiveAdmContainer := &hiveAdmDeployment.Spec.Template.Spec.Containers[0]
 	hiveAdmDeployment.Namespace = hiveNSName
 	if r.hiveImage != "" {
-		hiveAdmDeployment.Spec.Template.Spec.Containers[0].Image = r.hiveImage
+		hiveAdmContainer.Image = r.hiveImage
 	}
 	if r.hiveImagePullPolicy != "" {
-		hiveAdmDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = r.hiveImagePullPolicy
+		hiveAdmContainer.ImagePullPolicy = r.hiveImagePullPolicy
 	}
 	if hiveAdmDeployment.Annotations == nil {
 		hiveAdmDeployment.Annotations = map[string]string{}
@@ -140,10 +135,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	controllerutils.SetProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec,
 		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
 
-	addManagedDomainsVolume(&hiveAdmDeployment.Spec.Template.Spec, managedDomainsConfigMapName)
-	addAWSPrivateLinkConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
-	addSupportedContractsConfigVolume(&hiveAdmDeployment.Spec.Template.Spec)
-	addReleaseImageVerificationConfigMapEnv(&hiveAdmDeployment.Spec.Template.Spec, instance)
+	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, managedDomainsConfigMapInfo, hiveAdmContainer)
+	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, awsPrivateLinkConfigMapInfo, hiveAdmContainer)
+	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(), hiveAdmContainer)
+	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
@@ -304,43 +299,6 @@ func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
 	return false, nil
 }
 
-func (r *ReconcileHiveConfig) deployFeatureGatesConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (string, error) {
-	// Delete the configmap from previous target namespaces
-	for _, ns := range namespacesToClean {
-		hLog.Infof("Deleting configmap/%s from old target namespace %s", featureGateConfigMapName, ns)
-		// h.Delete already no-ops for IsNotFound
-		// TODO: Something better than hardcoding apiVersion and kind.
-		if err := h.Delete("v1", "ConfigMap", ns, featureGateConfigMapName); err != nil {
-			return "", errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", featureGateConfigMapName, ns)
-		}
-	}
-
-	cm := &corev1.ConfigMap{}
-	cm.Name = featureGateConfigMapName
-	cm.Namespace = getHiveNamespace(instance)
-	cm.Data = make(map[string]string)
-
-	cm.Data[constants.HiveFeatureGatesEnabledEnvVar] = ""
-	if fg := instance.Spec.FeatureGates; fg != nil {
-		s, ok := hivev1.FeatureSets[fg.FeatureSet]
-		if ok && s != nil {
-			cm.Data[constants.HiveFeatureGatesEnabledEnvVar] = strings.Join(s.Enabled, ",")
-		}
-		if fg.FeatureSet == hivev1.CustomFeatureSet && fg.Custom != nil {
-			cm.Data[constants.HiveFeatureGatesEnabledEnvVar] = strings.Join(fg.Custom.Enabled, ",")
-		}
-	}
-
-	result, err := util.ApplyRuntimeObjectWithGC(h, cm, instance)
-	if err != nil {
-		hLog.WithError(err).Error("error applying hive-feature-gates configmap")
-		return "", err
-	}
-	hLog.WithField("result", result).Info("hive-feature-gates configmap applied")
-
-	return computeHash(cm.Data), nil
-}
-
 // allowedContracts is the list of operator whitelisted contracts that hive will accept
 // from CRDs.
 var allowedContracts = sets.NewString(
@@ -358,116 +316,11 @@ var knowContracts = contracts.SupportedContractImplementationsList{{
 	}},
 }}
 
-func (r *ReconcileHiveConfig) deploySupportedContractsConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) (string, error) {
-	// Delete the configmap from previous target namespaces
-	for _, ns := range namespacesToClean {
-		hLog.Infof("Deleting configmap/%s from old target namespace %s", supportedContractsConfigMapName, ns)
-		// h.Delete already no-ops for IsNotFound
-		// TODO: Something better than hardcoding apiVersion and kind.
-		if err := h.Delete("v1", "ConfigMap", ns, supportedContractsConfigMapName); err != nil {
-			return "", errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", supportedContractsConfigMapName, ns)
-		}
-	}
-
-	cm := &corev1.ConfigMap{}
-	cm.Name = supportedContractsConfigMapName
-	cm.Namespace = getHiveNamespace(instance)
-	cm.Data = make(map[string]string)
-
-	supported := map[string][]contracts.ContractImplementation{}
-	for _, k := range knowContracts {
-		supported[k.Name] = k.Supported
-	}
-
-	crdList := &apiextv1.CustomResourceDefinitionList{}
-	if err := r.List(context.TODO(), crdList, "", v1.ListOptions{}); err != nil {
-		hLog.WithError(err).Error("error getting crds for collect contract implementations")
-		return "", err
-	}
-	for _, crd := range crdList.Items {
-		// collect all the possible implementations from this crd
-		var impls []contracts.ContractImplementation
-		for _, version := range crd.Spec.Versions {
-			impls = append(impls, contracts.ContractImplementation{
-				Group:   crd.Spec.Group,
-				Version: version.Name,
-				Kind:    crd.Spec.Names.Kind,
-			})
-		}
-
-		for label, val := range crd.ObjectMeta.Labels {
-			if strings.HasPrefix(label, "contracts.hive.openshift.io") &&
-				val == "true" &&
-				allowedContracts.Has(label) { // lets store impls for this contract
-				contract := strings.TrimPrefix(label, "contracts.hive.openshift.io/")
-				curr := supported[contract]
-				curr = append(curr, impls...)
-				supported[contract] = curr
-			}
-		}
-	}
-
-	if len(supported) > 0 {
-		var keys []string
-		for k := range supported {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		var config contracts.SupportedContractImplementationsList
-		for _, c := range keys {
-			config = append(config, contracts.SupportedContractImplementations{
-				Name:      c,
-				Supported: supported[c],
-			})
-		}
-
-		configRaw, err := json.Marshal(config)
-		if err != nil {
-			hLog.WithError(err).Error("failed to marshal the supported contracts config")
-			return "", err
-		}
-		cm.Data[supportedContractsConfigMapNameKey] = string(configRaw)
-	}
-
-	result, err := util.ApplyRuntimeObjectWithGC(h, cm, instance)
-	if err != nil {
-		hLog.WithError(err).Error("error applying hive-supported-contracts configmap")
-		return "", err
-	}
-	hLog.WithField("result", result).Info("hive-supported-contracts configmap applied")
-
-	return computeHash(cm.Data), nil
-}
-
-func addSupportedContractsConfigVolume(podSpec *corev1.PodSpec) {
-	optional := true
-	volume := corev1.Volume{}
-	volume.Name = supportedContractsConfigMapName
-	volume.ConfigMap = &corev1.ConfigMapVolumeSource{
-		LocalObjectReference: corev1.LocalObjectReference{
-			Name: supportedContractsConfigMapName,
-		},
-		Optional: &optional,
-	}
-	volumeMount := corev1.VolumeMount{
-		Name:      supportedContractsConfigMapName,
-		MountPath: supportedContractsConfigMapMountPath,
-	}
-	envVar := corev1.EnvVar{
-		Name:  constants.SupportedContractImplementationsFileEnvVar,
-		Value: fmt.Sprintf("%s/%s", supportedContractsConfigMapMountPath, supportedContractsConfigMapNameKey),
-	}
-	podSpec.Volumes = append(podSpec.Volumes, volume)
-	podSpec.Containers[0].VolumeMounts = append(podSpec.Containers[0].VolumeMounts, volumeMount)
-	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, envVar)
-}
-
-func addReleaseImageVerificationConfigMapEnv(podSpec *corev1.PodSpec, instance *hivev1.HiveConfig) {
+func addReleaseImageVerificationConfigMapEnv(container *corev1.Container, instance *hivev1.HiveConfig) {
 	if instance.Spec.ReleaseImageVerificationConfigMapRef == nil {
 		return
 	}
-	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, corev1.EnvVar{
+	container.Env = append(container.Env, corev1.EnvVar{
 		Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar,
 		Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Namespace,
 	}, corev1.EnvVar{

@@ -138,9 +138,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
 
-	addManagedDomainsVolume(&hiveDeployment.Spec.Template.Spec, managedDomainsConfigMapName)
-	addAWSPrivateLinkConfigVolume(&hiveDeployment.Spec.Template.Spec)
-	addFailedProvisionConfigVolume(&hiveDeployment.Spec.Template.Spec)
+	addConfigVolume(&hiveDeployment.Spec.Template.Spec, managedDomainsConfigMapInfo, hiveContainer)
+	addConfigVolume(&hiveDeployment.Spec.Template.Spec, awsPrivateLinkConfigMapInfo, hiveContainer)
+	addConfigVolume(&hiveDeployment.Spec.Template.Spec, failedProvisionConfigMapInfo, hiveContainer)
 
 	// This triggers the clusterdeployment controller to copy the secret into the CD's namespace.
 	// It would be neat if it did that purely based on the FailedProvisionConfig ConfigMap, to

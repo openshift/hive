@@ -22,7 +22,7 @@ import (
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/api/machine/v1beta1"
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -461,7 +461,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
-			machineapi.SchemeBuilder.AddToScheme(scheme)
+			machineapi.AddToScheme(scheme)
 			awsprovider.SchemeBuilder.AddToScheme(scheme)
 			actualAMIID, actualErr := getAWSAMIID(tc.masterMachine, scheme, log.StandardLogger())
 			if tc.expectError {

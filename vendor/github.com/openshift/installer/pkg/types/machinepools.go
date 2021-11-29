@@ -1,12 +1,12 @@
 package types
 
 import (
+	"github.com/openshift/installer/pkg/types/alibabacloud"
 	"github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
-	"github.com/openshift/installer/pkg/types/kubevirt"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/openstack"
 	"github.com/openshift/installer/pkg/types/ovirt"
@@ -71,6 +71,9 @@ type MachinePool struct {
 // MachinePoolPlatform is the platform-specific configuration for a machine
 // pool. Only one of the platforms should be set.
 type MachinePoolPlatform struct {
+	// AlibabaCloud is the configuration used when installing on Alibaba Cloud.
+	AlibabaCloud *alibabacloud.MachinePool `json:"alibabacloud,omitempty"`
+
 	// AWS is the configuration used when installing on AWS.
 	AWS *aws.MachinePool `json:"aws,omitempty"`
 
@@ -97,9 +100,6 @@ type MachinePoolPlatform struct {
 
 	// Ovirt is the configuration used when installing on oVirt.
 	Ovirt *ovirt.MachinePool `json:"ovirt,omitempty"`
-
-	// Kubevirt is the configuration used when installing on Kubevirt.
-	Kubevirt *kubevirt.MachinePool `json:"kubevirt,omitempty"`
 }
 
 // Name returns a string representation of the platform (e.g. "aws" if
@@ -109,6 +109,8 @@ func (p *MachinePoolPlatform) Name() string {
 	switch {
 	case p == nil:
 		return ""
+	case p.AlibabaCloud != nil:
+		return alibabacloud.Name
 	case p.AWS != nil:
 		return aws.Name
 	case p.Azure != nil:
@@ -127,8 +129,6 @@ func (p *MachinePoolPlatform) Name() string {
 		return vsphere.Name
 	case p.Ovirt != nil:
 		return ovirt.Name
-	case p.Kubevirt != nil:
-		return kubevirt.Name
 	default:
 		return ""
 	}

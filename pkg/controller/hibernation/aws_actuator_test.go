@@ -20,12 +20,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 	mockawsclient "github.com/openshift/hive/pkg/awsclient/mock"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 func TestCanHandle(t *testing.T) {

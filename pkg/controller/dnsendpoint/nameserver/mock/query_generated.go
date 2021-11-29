@@ -5,35 +5,64 @@
 package mock
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	sets "k8s.io/apimachinery/pkg/util/sets"
-	reflect "reflect"
 )
 
-// MockQuery is a mock of Query interface
+// MockQuery is a mock of Query interface.
 type MockQuery struct {
 	ctrl     *gomock.Controller
 	recorder *MockQueryMockRecorder
 }
 
-// MockQueryMockRecorder is the mock recorder for MockQuery
+// MockQueryMockRecorder is the mock recorder for MockQuery.
 type MockQueryMockRecorder struct {
 	mock *MockQuery
 }
 
-// NewMockQuery creates a new mock instance
+// NewMockQuery creates a new mock instance.
 func NewMockQuery(ctrl *gomock.Controller) *MockQuery {
 	mock := &MockQuery{ctrl: ctrl}
 	mock.recorder = &MockQueryMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockQuery) EXPECT() *MockQueryMockRecorder {
 	return m.recorder
 }
 
-// Get mocks base method
+// Create mocks base method.
+func (m *MockQuery) Create(rootDomain, domain string, values sets.String) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", rootDomain, domain, values)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockQueryMockRecorder) Create(rootDomain, domain, values interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockQuery)(nil).Create), rootDomain, domain, values)
+}
+
+// Delete mocks base method.
+func (m *MockQuery) Delete(rootDomain, domain string, values sets.String) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", rootDomain, domain, values)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockQueryMockRecorder) Delete(rootDomain, domain, values interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockQuery)(nil).Delete), rootDomain, domain, values)
+}
+
+// Get mocks base method.
 func (m *MockQuery) Get(rootDomain string) (map[string]sets.String, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", rootDomain)
@@ -42,36 +71,8 @@ func (m *MockQuery) Get(rootDomain string) (map[string]sets.String, error) {
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get
+// Get indicates an expected call of Get.
 func (mr *MockQueryMockRecorder) Get(rootDomain interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockQuery)(nil).Get), rootDomain)
-}
-
-// Create mocks base method
-func (m *MockQuery) Create(rootDomain, domain string, values sets.String) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", rootDomain, domain, values)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Create indicates an expected call of Create
-func (mr *MockQueryMockRecorder) Create(rootDomain, domain, values interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockQuery)(nil).Create), rootDomain, domain, values)
-}
-
-// Delete mocks base method
-func (m *MockQuery) Delete(rootDomain, domain string, values sets.String) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", rootDomain, domain, values)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Delete indicates an expected call of Delete
-func (mr *MockQueryMockRecorder) Delete(rootDomain, domain, values interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockQuery)(nil).Delete), rootDomain, domain, values)
 }

@@ -1,7 +1,8 @@
+//go:build okd
 // +build okd
 
 package rhcos
 
 func getStreamFileName() string {
-	return "fcos-stream.json"
+	return "coreos/fcos.json"
 }

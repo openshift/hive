@@ -27,9 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -58,7 +58,7 @@ func init() {
 
 func TestRemoteMachineSetReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
-	machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
+	machineapi.AddToScheme(scheme.Scheme)
 	awsproviderapis.AddToScheme(scheme.Scheme)
 
 	getPool := func(c client.Client, poolName string) *hivev1.MachinePool {
@@ -652,7 +652,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		apis.AddToScheme(scheme.Scheme)
-		machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
+		machineapi.AddToScheme(scheme.Scheme)
 		autoscalingv1.SchemeBuilder.AddToScheme(scheme.Scheme)
 		autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
@@ -848,7 +848,7 @@ Machine machine-3 failed (InsufficientResources): No available quota,
 `,
 	}}
 
-	machineapi.SchemeBuilder.AddToScheme(scheme.Scheme)
+	machineapi.AddToScheme(scheme.Scheme)
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			fake := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()

@@ -2,6 +2,10 @@
 
 Central Machine Management (CMM) is a machine management pattern where machines are managed centrally from Hive via the [Cluster API](https://github.com/kubernetes-sigs/cluster-api) as opposed to from the managed cluster via the [Machine API](https://github.com/openshift/cluster-api). CMM can be enabled when there is reduced trust in managed clusters.
 
+## Thirdparty Vendor
+
+Cluster API go modules are stored within the toplevel `thirdparty/` directory in the hive repository. OpenShift makes use of a go module replace that makes it impossible for the Machine API and the Cluster API to live in the same vendor directory. The `thirdparty` directory is intended to be short lived and used for a CMM proof of concept.
+
 ## Alpha Feature Gate
 
 The `AlphaMachineManagement` feature gate must be enabled in `hiveconfig` before the API will allow `cd.spec.machineManagement.central = {}` to be set for a `ClusterDeployment`.

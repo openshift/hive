@@ -29,6 +29,18 @@ resources:
 - ../../config/crds/hive.openshift.io_selectorsyncsets.yaml
 - ../../config/crds/hive.openshift.io_syncidentityproviders.yaml
 - ../../config/crds/hive.openshift.io_syncsets.yaml
+- ../../config/crds/cluster.x-k8s.io_clusterclasses.yaml
+- ../../config/crds/cluster.x-k8s.io_clusters.yaml
+- ../../config/crds/cluster.x-k8s.io_machinedeployments.yaml
+- ../../config/crds/cluster.x-k8s.io_machinehealthchecks.yaml
+- ../../config/crds/cluster.x-k8s.io_machinesets.yaml
+- ../../config/crds/cluster.x-k8s.io_machines.yaml
+- ../../config/crds/infrastructure.cluster.x-k8s.io_awsclustercontrolleridentities.yaml
+- ../../config/crds/infrastructure.cluster.x-k8s.io_awsclusterroleidentities.yaml
+- ../../config/crds/infrastructure.cluster.x-k8s.io_awsclusterstaticidentities.yaml
+- ../../config/crds/infrastructure.cluster.x-k8s.io_awsclusters.yaml
+- ../../config/crds/infrastructure.cluster.x-k8s.io_awsmachines.yaml
+- ../../config/crds/infrastructure.cluster.x-k8s.io_awsmachinetemplates.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Use app-sre-supplied variables to pull the image for the current commit

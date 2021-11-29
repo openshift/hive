@@ -1,10 +1,8 @@
-
----
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.2.4
+    controller-gen.kubebuilder.io/version: v0.6.0
   creationTimestamp: null
   name: machines.cluster.x-k8s.io
 spec:
@@ -19,33 +17,30 @@ spec:
     - ma
     singular: machine
   scope: Namespaced
-  subresources:
-    status: {}
-  version: v1alpha4
   versions:
   - additionalPrinterColumns:
-    - JSONPath: .spec.clusterName
-      description: Cluster
+    - description: Cluster
+      jsonPath: .spec.clusterName
       name: Cluster
       type: string
-    - JSONPath: .metadata.creationTimestamp
-      description: Time duration since creation of Machine
+    - description: Time duration since creation of Machine
+      jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    - JSONPath: .spec.providerID
-      description: Provider ID
+    - description: Provider ID
+      jsonPath: .spec.providerID
       name: ProviderID
       type: string
-    - JSONPath: .status.phase
-      description: Machine status such as Terminating/Pending/Running/Failed etc
+    - description: Machine status such as Terminating/Pending/Running/Failed etc
+      jsonPath: .status.phase
       name: Phase
       type: string
-    - JSONPath: .spec.version
-      description: Kubernetes version associated with this Machine
+    - description: Kubernetes version associated with this Machine
+      jsonPath: .spec.version
       name: Version
       type: string
-    - JSONPath: .status.nodeRef.name
-      description: Node name associated with this machine
+    - description: Node name associated with this machine
+      jsonPath: .status.nodeRef.name
       name: NodeName
       priority: 1
       type: string
@@ -412,29 +407,31 @@ spec:
         type: object
     served: true
     storage: false
+    subresources:
+      status: {}
   - additionalPrinterColumns:
-    - JSONPath: .spec.clusterName
-      description: Cluster
+    - description: Cluster
+      jsonPath: .spec.clusterName
       name: Cluster
       type: string
-    - JSONPath: .status.nodeRef.name
-      description: Node name associated with this machine
+    - description: Node name associated with this machine
+      jsonPath: .status.nodeRef.name
       name: NodeName
       type: string
-    - JSONPath: .spec.providerID
-      description: Provider ID
+    - description: Provider ID
+      jsonPath: .spec.providerID
       name: ProviderID
       type: string
-    - JSONPath: .status.phase
-      description: Machine status such as Terminating/Pending/Running/Failed etc
+    - description: Machine status such as Terminating/Pending/Running/Failed etc
+      jsonPath: .status.phase
       name: Phase
       type: string
-    - JSONPath: .metadata.creationTimestamp
-      description: Time duration since creation of Machine
+    - description: Time duration since creation of Machine
+      jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
-    - JSONPath: .spec.version
-      description: Kubernetes version associated with this Machine
+    - description: Kubernetes version associated with this Machine
+      jsonPath: .spec.version
       name: Version
       type: string
     name: v1beta1
@@ -795,6 +792,8 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""

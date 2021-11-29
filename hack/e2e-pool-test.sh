@@ -39,8 +39,8 @@ function wait_for_hibernation_state() {
       sleep ${sleep_between_tries}
     fi
 
-    HIB_COND=$(oc get cd -n $CLUSTER_NAME $CLUSTER_NAME -o json | jq -r '.status.conditions[] | select(.type == "Hibernating")')
-    if [[ $(jq -r .reason <<<"${HIB_COND}") == $EXPECTED_STATE ]]; then
+    powerState=$(oc get cd -n $CLUSTER_NAME $CLUSTER_NAME -o json | jq -r '.status.powerState')
+    if [[ "${powerState}" == $EXPECTED_STATE ]]; then
       echo "Success"
       break
     else
@@ -53,8 +53,7 @@ function wait_for_hibernation_state() {
   if [[ $i -ge ${max_tries} ]] ; then
     # Failed the maximum amount of times.
     echo "ClusterDeployment $CLUSTER_NAME still not $EXPECTED_STATE" >&2
-    echo "Reason: $(jq -r .reason <<<"${HIB_COND}")" >&2
-    echo "Message: $(jq -r .message <<<"${HIB_COND}")" >&2
+    echo "Actual state: ${powerState}" >&2
     exit 9
   fi
 }

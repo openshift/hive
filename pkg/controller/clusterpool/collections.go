@@ -227,7 +227,6 @@ func isBroken(cd *hivev1.ClusterDeployment) bool {
 }
 
 func isRunning(cd *hivev1.ClusterDeployment) bool {
-	// TODO: Change this to use the Running condition
 	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 	if cond == nil {
 		// Since we should be initializing conditions, this probably means the CD is super fresh

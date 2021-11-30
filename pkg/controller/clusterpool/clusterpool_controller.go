@@ -990,6 +990,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder := clusterresource.NewAzureCloudBuilderFromSecret(credsSecret)
 		cloudBuilder.BaseDomainResourceGroupName = platform.Azure.BaseDomainResourceGroupName
 		cloudBuilder.Region = platform.Azure.Region
+		cloudBuilder.CloudName = platform.Azure.CloudName
 		return cloudBuilder, nil
 	// TODO: OpenStack, VMware, and Ovirt.
 	default:

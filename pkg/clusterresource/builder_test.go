@@ -8,6 +8,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ const (
 	fakeAWSSecretAccessKey           = "fakesecretAccessKey"
 	fakeAzureServicePrincipal        = "fakeSP"
 	fakeAzureBaseDomainResourceGroup = "azure-resource-group"
+	fakeAzureCloudName               = hivev1azure.CloudEnvironment("AzureUSGovernmentCloud")
 	fakeGCPServiceAccount            = "fakeSA"
 	fakeGCPProjectID                 = "gcp-project-id"
 	adoptAdminKubeconfig             = "adopted-admin-kubeconfig"
@@ -115,6 +117,7 @@ func createAzureClusterBuilder() *Builder {
 	b.CloudBuilder = &AzureCloudBuilder{
 		ServicePrincipal:            []byte(fakeAzureServicePrincipal),
 		BaseDomainResourceGroupName: fakeAzureBaseDomainResourceGroup,
+		CloudName:                   fakeAzureCloudName,
 	}
 	return b
 }
@@ -209,6 +212,8 @@ func TestBuildClusterResources(t *testing.T) {
 				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.Azure.CredentialsSecretRef.Name)
 
 				assert.Equal(t, azureInstanceType, workerPool.Spec.Platform.Azure.InstanceType)
+
+				assert.Equal(t, fakeAzureCloudName, cd.Spec.Platform.Azure.CloudName)
 			},
 		},
 		{

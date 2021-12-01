@@ -182,6 +182,11 @@ type Provisioning struct {
 	// is the primary and best way to specify what specific version of OpenShift you wish to install.
 	ReleaseImage string `json:"releaseImage,omitempty"`
 
+	// InstallerImageOverride allows specifying a URI for the installer image, normally gleaned from
+	// the metadata within the ReleaseImage.
+	// +optional
+	InstallerImageOverride string `json:"installerImageOverride,omitempty"`
+
 	// ImageSetRef is a reference to a ClusterImageSet. If a value is specified for ReleaseImage,
 	// that will take precedence over the one from the ClusterImageSet.
 	ImageSetRef *ClusterImageSetReference `json:"imageSetRef,omitempty"`

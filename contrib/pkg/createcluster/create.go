@@ -156,6 +156,7 @@ type Options struct {
 	Annotations                       []string
 	SkipMachinePools                  bool
 	AdditionalTrustBundle             string
+	CentralMachineManagement          bool
 	Internal                          bool
 
 	// AWS
@@ -275,6 +276,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val)")
 	flags.StringSliceVarP(&opt.Annotations, "annotations", "a", nil, "Annotation to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
+	flags.BoolVar(&opt.CentralMachineManagement, "central-machine-management", false, "Enable central machine management for cluster")
 	flags.BoolVar(&opt.Internal, "internal", false, `When set, it configures the install-config.yaml's publish field to Internal.
 OpenShift Installer publishes all the services of the cluster like API server and ingress to internal network and not the Internet.`)
 
@@ -527,23 +529,24 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	}
 
 	builder := &clusterresource.Builder{
-		Name:                  o.Name,
-		Namespace:             o.Namespace,
-		WorkerNodesCount:      o.WorkerNodesCount,
-		PullSecret:            pullSecret,
-		SSHPrivateKey:         sshPrivateKey,
-		SSHPublicKey:          sshPublicKey,
-		InstallOnce:           o.InstallOnce,
-		BaseDomain:            o.BaseDomain,
-		ManageDNS:             o.ManageDNS,
-		DeleteAfter:           o.DeleteAfter,
-		HibernateAfter:        o.HibernateAfterDur,
-		Labels:                labels,
-		Annotations:           annotations,
-		InstallerManifests:    manifestFileData,
-		MachineNetwork:        o.MachineNetwork,
-		SkipMachinePools:      o.SkipMachinePools,
-		AdditionalTrustBundle: additionalTrustBundle,
+		Name:                     o.Name,
+		Namespace:                o.Namespace,
+		WorkerNodesCount:         o.WorkerNodesCount,
+		PullSecret:               pullSecret,
+		SSHPrivateKey:            sshPrivateKey,
+		SSHPublicKey:             sshPublicKey,
+		InstallOnce:              o.InstallOnce,
+		BaseDomain:               o.BaseDomain,
+		ManageDNS:                o.ManageDNS,
+		DeleteAfter:              o.DeleteAfter,
+		HibernateAfter:           o.HibernateAfterDur,
+		Labels:                   labels,
+		Annotations:              annotations,
+		InstallerManifests:       manifestFileData,
+		MachineNetwork:           o.MachineNetwork,
+		SkipMachinePools:         o.SkipMachinePools,
+		AdditionalTrustBundle:    additionalTrustBundle,
+		CentralMachineManagement: o.CentralMachineManagement,
 	}
 	if o.Adopt {
 		kubeconfigBytes, err := ioutil.ReadFile(o.AdoptAdminKubeConfig)

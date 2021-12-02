@@ -10,6 +10,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
+
 	gcpprovider "github.com/openshift/cluster-api-provider-gcp/pkg/apis"
 	gcpproviderv1beta1 "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -117,9 +119,9 @@ func NewGCPActuator(
 	return actuator, nil
 }
 
-// GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
+// GenerateMAPIMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MAPI MachineSets
 // to sync to the remote cluster.
-func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
+func (a *GCPActuator) GenerateMAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
 	if cd.Spec.ClusterMetadata == nil {
 		return nil, false, errors.New("ClusterDeployment does not have cluster metadata")
 	}
@@ -237,6 +239,15 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		workerUserDataName,
 	)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
+}
+
+// GenerateCAPIMachineSets takes a clusterDeployment and returns a list of upstream CAPI MachineSets
+func (a *GCPActuator) GenerateCAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*capiv1.MachineSet, []client.Object, bool, error) {
+	return nil, nil, false, errors.New("GenerateCAPIMachineSets is not implemented for provider")
+}
+
+func (a *GCPActuator) GetLocalMachineTemplates(lc client.Client, targetNamespace string, logger log.FieldLogger) ([]client.Object, error) {
+	return nil, errors.New("GetLocalMachineTemplates is not implemented for provider")
 }
 
 func (a *GCPActuator) getZones(region string) ([]string, error) {

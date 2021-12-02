@@ -46,7 +46,7 @@ func TestVSphereActuator(t *testing.T) {
 				logger: log.WithField("actuator", "vsphereactuator_test"),
 			}
 
-			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
+			generatedMachineSets, _, err := actuator.GenerateMAPIMachineSets(test.clusterDeployment, test.pool, actuator.logger)
 
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")

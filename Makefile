@@ -27,7 +27,7 @@ LOG_LEVEL ?= debug
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
 
-GO_PACKAGES :=./...
+GO_PACKAGES :=$(shell $(GO) list ./... | grep -v /thirdparty/)
 GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
 GO_BUILD_BINDIR :=bin
 # Exclude e2e tests from unit testing
@@ -111,6 +111,8 @@ endef
 crd: ensure-controller-gen ensure-yq
 	rm -rf ./config/crds
 	(cd apis; '../$(CONTROLLER_GEN)' crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
+	# Generate CMM crds
+	$(CONTROLLER_GEN) crd paths=./vendor/sigs.k8s.io/cluster-api/... paths=./thirdparty/... output:crd:dir=./config/crds
 	@echo Stripping yaml breaks from CRD files
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 	@echo Patching CRD files for additional static information
@@ -253,7 +255,7 @@ $(addprefix verify-govet-submodules-,$(GO_SUB_MODULES)):
 # Generate code
 .PHONY: generate
 generate: install-tools
-	$(GOFLAGS_FOR_GENERATE) go generate ./pkg/... ./cmd/...
+	$(GOFLAGS_FOR_GENERATE) $(GO) generate ./pkg/... ./cmd/...
 update: generate
 
 .PHONY: generate-submodules

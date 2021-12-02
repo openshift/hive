@@ -212,7 +212,7 @@ func TestGCPActuator(t *testing.T) {
 				subnet:         testSubnetID,
 			}
 
-			generatedMachineSets, _, err := ga.GenerateMachineSets(clusterDeployment, test.pool, ga.logger)
+			generatedMachineSets, _, err := ga.GenerateMAPIMachineSets(clusterDeployment, test.pool, ga.logger)
 
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")

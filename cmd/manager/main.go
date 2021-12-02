@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"k8s.io/klog"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -52,6 +53,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/dnszone"
 	"github.com/openshift/hive/pkg/controller/fakeclusterinstall"
 	"github.com/openshift/hive/pkg/controller/hibernation"
+	"github.com/openshift/hive/pkg/controller/machinemanagement"
 	"github.com/openshift/hive/pkg/controller/machinepool"
 	"github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/controller/remoteingress"
@@ -95,6 +97,7 @@ var controllerFuncs = map[hivev1.ControllerName]controllerSetupFunc{
 	velerobackup.ControllerName:         velerobackup.Add,
 	clusterpool.ControllerName:          clusterpool.Add,
 	hibernation.ControllerName:          hibernation.Add,
+	machinemanagement.ControllerName:    machinemanagement.Add,
 	awsprivatelink.ControllerName:       awsprivatelink.Add,
 	argocdregister.ControllerName:       argocdregister.Add,
 }
@@ -208,6 +211,10 @@ func newRootCommand() *cobra.Command {
 				}
 
 				if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := capiv1.AddToScheme(mgr.GetScheme()); err != nil {
 					log.Fatal(err)
 				}
 

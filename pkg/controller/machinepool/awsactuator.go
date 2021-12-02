@@ -13,20 +13,25 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis"
 	awsproviderv1beta1 "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha4"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
+	"github.com/openshift/installer/pkg/types"
 	installertypesaws "github.com/openshift/installer/pkg/types/aws"
 	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	capiaws "github.com/openshift/hive/thirdparty/clusterapiprovideraws/v1alpha4"
 )
 
 // AWSActuator encapsulates the pieces necessary to be able to generate
@@ -87,23 +92,16 @@ func NewAWSActuator(
 	return actuator, nil
 }
 
-// GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
-// to sync to the remote cluster.
-func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
-	if cd.Spec.ClusterMetadata == nil {
-		return nil, false, errors.New("ClusterDeployment does not have cluster metadata")
-	}
-	if cd.Spec.Platform.AWS == nil {
-		return nil, false, errors.New("ClusterDeployment is not for AWS")
-	}
-	if pool.Spec.Platform.AWS == nil {
-		return nil, false, errors.New("MachinePool is not for AWS")
+// GenerateMAPIMachineSets satisfies the Actuator interface and generates Machine API MachineSets given a MachinePool
+// and corresponding ClusterDeployment.
+func (a *AWSActuator) GenerateMAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
+	if err := validatePlatform(cd, pool); err != nil {
+		return nil, false, err
 	}
 	clusterVersion, err := getClusterVersion(cd)
 	if err != nil {
 		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
 	}
-
 	if isUsingUnsupportedSpotMarketOptions(pool, clusterVersion, logger) {
 		logger.WithField("clusterVersion", clusterVersion).Debug("cluster does not support spot instances")
 		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
@@ -132,28 +130,9 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 
-	computePool := baseMachinePool(pool)
-	computePool.Platform.AWS = &installertypesaws.MachinePool{
-		AMIID:        a.amiID,
-		InstanceType: pool.Spec.Platform.AWS.InstanceType,
-		EC2RootVolume: installertypesaws.EC2RootVolume{
-			IOPS:      pool.Spec.Platform.AWS.EC2RootVolume.IOPS,
-			Size:      pool.Spec.Platform.AWS.EC2RootVolume.Size,
-			Type:      pool.Spec.Platform.AWS.EC2RootVolume.Type,
-			KMSKeyARN: pool.Spec.Platform.AWS.EC2RootVolume.KMSKeyARN,
-		},
-		Zones: pool.Spec.Platform.AWS.Zones,
-	}
-
-	if len(computePool.Platform.AWS.Zones) == 0 {
-		zones, err := a.fetchAvailabilityZones()
-		if err != nil {
-			return nil, false, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
-		}
-		if len(zones) == 0 {
-			return nil, false, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.AWS.Region)
-		}
-		computePool.Platform.AWS.Zones = zones
+	computePool, err := a.awsMachinePool(pool)
+	if err != nil {
+		return nil, false, err
 	}
 
 	subnets := map[string]string{}
@@ -223,6 +202,210 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	return installerMachineSets, true, nil
 }
 
+// GenerateCAPIMachineSets satisfies the Actuator interface and will generate Cluster API MachineSets given a MachinePool
+// and corresponding ClusterDeployment.
+func (a *AWSActuator) GenerateCAPIMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*capiv1.MachineSet, []client.Object, bool, error) {
+	if err := validatePlatform(cd, pool); err != nil {
+		return nil, nil, false, err
+	}
+
+	clusterVersion, err := getClusterVersion(cd)
+	if err != nil {
+		return nil, nil, false, errors.Wrap(err, "Unable to get cluster version")
+	}
+	if isUsingUnsupportedSpotMarketOptions(pool, clusterVersion, logger) {
+		logger.WithField("clusterVersion", clusterVersion).Debug("cluster does not support spot instances")
+		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+			pool.Status.Conditions,
+			hivev1.UnsupportedConfigurationMachinePoolCondition,
+			corev1.ConditionTrue,
+			"UnsupportedSpotMarketOptions",
+			"The version of the cluster does not support using spot instances",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		if changed {
+			pool.Status.Conditions = conds
+			if err := a.client.Status().Update(context.Background(), pool); err != nil {
+				return nil, nil, false, errors.Wrap(err, "could not update MachinePool status")
+			}
+		}
+		return nil, nil, false, nil
+	}
+	statusChanged := false
+	pool.Status.Conditions, statusChanged = controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.UnsupportedConfigurationMachinePoolCondition,
+		corev1.ConditionFalse,
+		"ConfigurationSupported",
+		"The configuration is supported",
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
+	machineTemplates, err := a.generateAWSMachineTemplates(cd, pool, logger)
+	if err != nil {
+		if strings.Contains(err.Error(), "no subnet for zone") {
+			conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+				pool.Status.Conditions,
+				hivev1.InvalidSubnetsMachinePoolCondition,
+				corev1.ConditionTrue,
+				"NoSubnetForAvailabilityZone",
+				err.Error(),
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+			if statusChanged || changed {
+				pool.Status.Conditions = conds
+				if err := a.client.Status().Update(context.Background(), pool); err != nil {
+					return nil, nil, false, err
+				}
+			}
+		}
+
+		return nil, nil, false, errors.Wrap(err, "failed to generate machinesets")
+	}
+
+	computePool, err := a.awsMachinePool(pool)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	total := int64(0)
+	if pool.Spec.Replicas != nil {
+		total = *pool.Spec.Replicas
+	}
+	numOfAZs := int64(len(computePool.Platform.AWS.Zones))
+
+	dataSecretName := fmt.Sprintf("%s-user-data", cd.Name)
+	machineSets := make([]*capiv1.MachineSet, len(computePool.Platform.AWS.Zones))
+	for i, zone := range computePool.Platform.AWS.Zones {
+
+		replicas := int32(total / numOfAZs)
+		if int64(i) < total%numOfAZs {
+			replicas++
+		}
+
+		name := fmt.Sprintf("%s-%s-%s", cd.Spec.ClusterMetadata.InfraID, computePool.Name, zone)
+		machineSet := &capiv1.MachineSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        name,
+				Namespace:   cd.Spec.MachineManagement.TargetNamespace,
+				Annotations: map[string]string{},
+				Labels:      map[string]string{},
+			},
+			TypeMeta: metav1.TypeMeta{},
+			Spec: capiv1.MachineSetSpec{
+				ClusterName: cd.Name,
+				Replicas:    &replicas,
+				Selector: metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						name: name,
+					},
+				},
+				Template: capiv1.MachineTemplateSpec{
+					ObjectMeta: capiv1.ObjectMeta{
+						Labels: map[string]string{
+							name:                    name,
+							capiv1.ClusterLabelName: cd.Spec.ClusterMetadata.InfraID,
+						},
+					},
+					Spec: capiv1.MachineSpec{
+						Bootstrap: capiv1.Bootstrap{
+							DataSecretName: &dataSecretName,
+						},
+						ClusterName: cd.Name,
+						InfrastructureRef: corev1.ObjectReference{
+							Namespace:  cd.Spec.MachineManagement.TargetNamespace,
+							Name:       name,
+							APIVersion: "infrastructure.cluster.x-k8s.io/v1alpha4",
+							Kind:       "AWSMachineTemplate",
+						},
+					},
+				},
+			},
+		}
+		machineSets[i] = machineSet
+	}
+
+	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.InvalidSubnetsMachinePoolCondition,
+		corev1.ConditionFalse,
+		"ValidSubnets",
+		"Subnets are valid",
+		controllerutils.UpdateConditionNever,
+	)
+	if statusChanged || changed {
+		pool.Status.Conditions = conds
+		if err := a.client.Status().Update(context.Background(), pool); err != nil {
+			return nil, nil, false, err
+		}
+	}
+
+	logger.Infof("generated %d machinesets", len(machineSets))
+	return machineSets, machineTemplates, true, nil
+}
+
+func (a *AWSActuator) GetLocalMachineTemplates(lc client.Client, targetNamespace string, logger log.FieldLogger) ([]client.Object, error) {
+	localMachineTemplates := &capiaws.AWSMachineTemplateList{}
+	if err := lc.List(
+		context.Background(),
+		localMachineTemplates,
+		&client.ListOptions{Namespace: targetNamespace},
+	); err != nil {
+		logger.WithError(err).Error("unable to fetch local machine templates")
+		return nil, err
+	}
+	logger.Infof("found %d local machine templates", len(localMachineTemplates.Items))
+	machineTemplates := make([]client.Object, len(localMachineTemplates.Items))
+	for i, template := range localMachineTemplates.Items {
+		machineTemplates[i] = &template
+	}
+	return machineTemplates, nil
+}
+
+// generateAWSMachineTemplates takes a clusterDeployment and returns the list of AWSMachineTemplates (as opaque k8s objects)
+// required by generated CAPI MachineSets
+func (a *AWSActuator) generateAWSMachineTemplates(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]client.Object, error) {
+	computePool, err := a.awsMachinePool(pool)
+	if err != nil {
+		return nil, err
+	}
+
+	subnets := map[string]string{}
+	// Fetching private subnets from the machinepool and then mapping availability zones to subnets
+	if len(pool.Spec.Platform.AWS.Subnets) > 0 {
+		subnetsByAvailabilityZone, err := a.getPrivateSubnetsByAvailabilityZone(pool)
+		if err != nil {
+			return nil, errors.Wrap(err, "describing subnets")
+		}
+		subnets = subnetsByAvailabilityZone
+	}
+
+	machineTemplates := make([]client.Object, len(computePool.Platform.AWS.Zones))
+
+	for i, zone := range computePool.Platform.AWS.Zones {
+		subnet, ok := subnets[zone]
+		if len(subnets) > 0 && !ok {
+			return machineTemplates, errors.Errorf("no subnet for zone %s", zone)
+		}
+		subnetRef := &capiaws.AWSResourceReference{}
+		if subnet == "" {
+			subnetRef.Filters = []capiaws.Filter{{
+				Name:   "tag:Name",
+				Values: []string{fmt.Sprintf("%s-private-%s", cd.Spec.ClusterMetadata.InfraID, zone)},
+			}}
+		} else {
+			existingSubnet, err := a.getSubnet(subnet)
+			if err != nil {
+				return machineTemplates, errors.Wrap(err, "unable to get subnet")
+			}
+			subnetRef.ID = aws.String(*existingSubnet.SubnetId)
+		}
+		machineTemplates[i] = awsMachineTemplate(cd.Spec.ClusterMetadata.InfraID, a.amiID, pool, subnetRef, cd.Spec.MachineManagement.TargetNamespace, zone)
+	}
+	logger.Infof("generated %d machinetemplates", len(machineTemplates))
+	return machineTemplates, nil
+}
+
 // Get the AMI ID from an existing master machine.
 func getAWSAMIID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
 	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
@@ -267,7 +450,7 @@ func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.
 	}
 	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode AWS ProviderConfig: %v", err)
+		return nil, fmt.Errorf("could not decode AWS ProviderConfig: %d", err)
 	}
 	spec, ok := obj.(*awsproviderv1beta1.AWSMachineProviderConfig)
 	if !ok {
@@ -312,6 +495,16 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 		Value: &runtime.RawExtension{Object: providerConfig},
 	}
 
+}
+
+func (a *AWSActuator) getSubnet(subnetID string) (*ec2.Subnet, error) {
+	var subnet *ec2.Subnet
+	idPointers := []*string{aws.String(subnetID)}
+	results, err := a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: idPointers})
+	if err != nil || len(results.Subnets) == 0 {
+		return subnet, errors.Wrap(err, "unable to describe subnet")
+	}
+	return results.Subnets[0], nil
 }
 
 // getPrivateSubnetsByAvailabilityZones maps availability zones to private subnet
@@ -530,4 +723,87 @@ func (a *AWSActuator) validateSubnets(subnets map[string]ec2.Subnet, pool *hivev
 		return nil, errors.Errorf("more than one subnet found for some availability zones, conflicting subnets: %s", strings.Join(conflictingSubnets.List(), ", "))
 	}
 	return subnetsByAvailabilityZone, nil
+}
+
+func awsMachineTemplate(infraName, ami string, nodePool *hivev1.MachinePool, subnetRef *capiaws.AWSResourceReference, controlPlaneNamespace, zone string) *capiaws.AWSMachineTemplate {
+	securityGroups := []capiaws.AWSResourceReference{{
+		Filters: []capiaws.Filter{{
+			Name:   "tag:Name",
+			Values: []string{fmt.Sprintf("%s-worker-sg", infraName)},
+		}},
+	}}
+
+	instanceProfile := fmt.Sprintf("%s-worker-profile", infraName)
+
+	instanceType := nodePool.Spec.Platform.AWS.InstanceType
+
+	awsMachineTemplate := &capiaws.AWSMachineTemplate{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{
+				machinePoolNameLabel: nodePool.Name,
+			},
+			Namespace: controlPlaneNamespace,
+		},
+		Spec: capiaws.AWSMachineTemplateSpec{
+			Template: capiaws.AWSMachineTemplateResource{
+				Spec: capiaws.AWSMachineSpec{
+					UncompressedUserData: pointer.BoolPtr(true),
+					CloudInit: capiaws.CloudInit{
+						InsecureSkipSecretsManager: true,
+						SecureSecretsBackend:       "secrets-manager",
+					},
+					IAMInstanceProfile: instanceProfile,
+					InstanceType:       instanceType,
+					AMI: capiaws.AWSResourceReference{
+						ID: pointer.StringPtr(ami),
+					},
+					AdditionalSecurityGroups: securityGroups,
+					Subnet:                   subnetRef,
+				},
+			},
+		},
+	}
+	awsMachineTemplate.SetName(fmt.Sprintf("%s-worker-%s", infraName, zone))
+	return awsMachineTemplate
+}
+
+func (a *AWSActuator) awsMachinePool(pool *hivev1.MachinePool) (*types.MachinePool, error) {
+	computePool := baseMachinePool(pool)
+	computePool.Platform.AWS = &installertypesaws.MachinePool{
+		AMIID:        a.amiID,
+		InstanceType: pool.Spec.Platform.AWS.InstanceType,
+		EC2RootVolume: installertypesaws.EC2RootVolume{
+			IOPS:      pool.Spec.Platform.AWS.EC2RootVolume.IOPS,
+			Size:      pool.Spec.Platform.AWS.EC2RootVolume.Size,
+			Type:      pool.Spec.Platform.AWS.EC2RootVolume.Type,
+			KMSKeyARN: pool.Spec.Platform.AWS.EC2RootVolume.KMSKeyARN,
+		},
+		Zones: pool.Spec.Platform.AWS.Zones,
+	}
+
+	if len(computePool.Platform.AWS.Zones) == 0 {
+		zones, err := a.fetchAvailabilityZones()
+		if err != nil {
+			return nil, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
+		}
+		if len(zones) == 0 {
+			return nil, fmt.Errorf("zero zones returned for region %s", a.region)
+		}
+		computePool.Platform.AWS.Zones = zones
+	}
+	return computePool, nil
+}
+
+func validatePlatform(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool) error {
+	if cd.Spec.ClusterMetadata == nil {
+		return errors.New("ClusterDeployment does not have cluster metadata")
+	}
+	if cd.Spec.Platform.AWS == nil {
+		return errors.New("ClusterDeployment is not for AWS")
+	}
+	if pool.Spec.Platform.AWS == nil {
+		return errors.New("MachinePool is not for AWS")
+	}
+	return nil
 }

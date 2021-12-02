@@ -94,6 +94,10 @@ func WithLabel(key, value string) Option {
 	return Generic(generic.WithLabel(key, value))
 }
 
+func WithFinalizer(finalizer string) Option {
+	return Generic(generic.WithFinalizer(finalizer))
+}
+
 // WithAnnotation sets the specified annotation on the supplied object.
 func WithAnnotation(key, value string) Option {
 	return Generic(generic.WithAnnotation(key, value))
@@ -200,5 +204,27 @@ func WithGCPPlatform(platform *hivev1gcp.Platform) Option {
 func WithAzurePlatform(platform *hivev1azure.Platform) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.Platform.Azure = platform
+	}
+}
+
+// WithCentralMachineManagement enables CMM for cluster deployment
+func WithCentralMachineManagement() Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.MachineManagement = &hivev1.MachineManagement{
+			Central: &hivev1.CentralMachineManagement{},
+		}
+	}
+}
+
+// WithTargetNamespace sets the supplied MachineManagement TargetNamespace for cluster deployment
+func WithTargetNamespace(targetNamespace string) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.MachineManagement.TargetNamespace = targetNamespace
+	}
+}
+
+func WithPullSecretRef(pullSecret string) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.PullSecretRef = &v1.LocalObjectReference{Name: pullSecret}
 	}
 }

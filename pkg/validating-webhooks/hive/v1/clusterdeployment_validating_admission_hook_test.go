@@ -972,6 +972,92 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name:      "central machine management can be toggled on",
+			oldObject: validAWSClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central: &hivev1.CentralMachineManagement{},
+				}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Update,
+			expectedAllowed:     true,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "Block create with targetNamespace set",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "nope",
+				}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Create,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "targetNamespace can be set if unset",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central: &hivev1.CentralMachineManagement{},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "okay",
+				}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Update,
+			expectedAllowed:     true,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "targetNamespace is immutable once set",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "yes",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "nope",
+				}
+				return cd
+			}(),
+			operation:           admissionv1beta1.Update,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
+			name: "machineManagement cannot be unset",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.MachineManagement = &hivev1.MachineManagement{
+					Central:         &hivev1.CentralMachineManagement{},
+					TargetNamespace: "yes",
+				}
+				return cd
+			}(),
+			newObject:           validAWSClusterDeployment(),
+			operation:           admissionv1beta1.Update,
+			expectedAllowed:     false,
+			enabledFeatureGates: []string{hivev1.FeatureGateMachineManagement},
+		},
+		{
 			name: "private link set, but disabled, no config",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()

@@ -540,5 +540,5 @@ func TestSafeDelete(t *testing.T) {
 	err := SafeDelete(fakeClient, context.Background(), cp3)
 	assert.True(
 		t, apierrors.IsConflict(err),
-		"Expected conflict error deleting stale copy with ResourceVersion %s, but got %s", cp3.ResourceVersion, err)
+		"Expected conflict error deleting stale copy with ResourceVersion %s, but got %v", cp3.ResourceVersion, err)
 }

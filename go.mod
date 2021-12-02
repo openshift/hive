@@ -26,7 +26,7 @@ require (
 	github.com/miekg/dns v1.1.35
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.15.0
+	github.com/onsi/gomega v1.16.0
 	github.com/openshift/api v0.0.0-20210816181336-8ff39b776da3
 	github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37
 	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201203141909-4dc702fd57a5
@@ -46,32 +46,33 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.24.0
-	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mod v0.4.2
 	golang.org/x/net v0.0.0-20210610132358-84b48f89b13b
-	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
-	google.golang.org/api v0.44.0
-	gopkg.in/ini.v1 v1.62.0
+	google.golang.org/api v0.56.0
+	gopkg.in/ini.v1 v1.63.2
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.22.2
 	k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery v0.22.2
-	k8s.io/cli-runtime v0.21.2
+	k8s.io/cli-runtime v0.22.2
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
 	k8s.io/code-generator v0.22.2
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.22.0-rc.0
-	k8s.io/kubectl v0.21.2
-	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
+	k8s.io/kubectl v0.22.2
+	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	sigs.k8s.io/cluster-api v1.0.0
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
 	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0
 	sigs.k8s.io/controller-runtime v0.10.2
 	sigs.k8s.io/controller-tools v0.6.2
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 // sub modules

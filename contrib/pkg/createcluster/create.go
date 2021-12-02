@@ -22,6 +22,7 @@ import (
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azurecredutil "github.com/openshift/hive/contrib/pkg/utils/azure"
@@ -164,6 +165,7 @@ type Options struct {
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
+	AzureCloudName                   string
 
 	// OpenStack
 	OpenStackCloud             string
@@ -292,6 +294,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
+	flags.StringVar(&opt.AzureCloudName, "azure-cloud-name", "AzurePublicCloud", "Azure Cloud in which cluster will be created")
 
 	// OpenStack flags
 	flags.StringVar(&opt.OpenStackCloud, "openstack-cloud", "openstack", "Section of clouds.yaml to use for API/auth")
@@ -602,6 +605,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			ServicePrincipal:            creds,
 			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 			Region:                      o.Region,
+			CloudName:                   hivev1azure.CloudEnvironment(o.AzureCloudName),
 		}
 		builder.CloudBuilder = azureProvider
 	case cloudGCP:

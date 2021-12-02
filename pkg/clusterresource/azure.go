@@ -32,6 +32,9 @@ type AzureCloudBuilder struct {
 
 	// Region is the Azure region to which to install the cluster.
 	Region string
+
+	// CloudName is the name of the Azure cloud environment which will be used for the cluster.
+	CloudName hivev1azure.CloudEnvironment
 }
 
 func NewAzureCloudBuilderFromSecret(credsSecret *corev1.Secret) *AzureCloudBuilder {
@@ -66,6 +69,7 @@ func (p *AzureCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			},
 			Region:                      p.Region,
 			BaseDomainResourceGroupName: p.BaseDomainResourceGroupName,
+			CloudName:                   p.CloudName,
 		},
 	}
 }
@@ -86,6 +90,7 @@ func (p *AzureCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 		Azure: &azureinstallertypes.Platform{
 			Region:                      p.Region,
 			BaseDomainResourceGroupName: p.BaseDomainResourceGroupName,
+			CloudName:                   azureinstallertypes.CloudEnvironment(p.CloudName),
 		},
 	}
 

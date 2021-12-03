@@ -418,7 +418,7 @@ func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDe
 		}
 
 		return true
-	}, 10*time.Minute)
+	}, 15*time.Minute)
 }
 
 func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) (string, error) {

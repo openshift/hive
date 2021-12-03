@@ -1131,6 +1131,11 @@ objects:
                         - name
                         type: object
                       type: array
+                    installerImageOverride:
+                      description: InstallerImageOverride allows specifying a URI
+                        for the installer image, normally gleaned from the metadata
+                        within the ReleaseImage.
+                      type: string
                     manifestsConfigMapRef:
                       description: ManifestsConfigMapRef is a reference to user-provided
                         manifests to add to or replace manifests that are generated

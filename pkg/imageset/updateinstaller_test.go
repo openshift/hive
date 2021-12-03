@@ -27,9 +27,10 @@ import (
 )
 
 const (
-	testInstallerImage = "registry.io/test-installer-image:latest"
-	testCLIImage       = "registry.io/test-cli-image:latest"
-	testReleaseVersion = "v0.0.0-test-version"
+	testInstallerImage     = "registry.io/test-installer-image:latest"
+	testCLIImage           = "registry.io/test-cli-image:latest"
+	testReleaseVersion     = "v0.0.0-test-version"
+	installerImageOverride = "quay.io/foo/bar:baz"
 )
 
 func TestUpdateInstallerImageCommand(t *testing.T) {
@@ -51,7 +52,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution,
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage),
 		},
 		{
 			name:                      "failure execution missing cli",
@@ -82,7 +83,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"baremetal-installer": testInstallerImage,
 				"cli":                 testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution,
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage),
 		},
 		{
 			name:                      "successful execution with version in release metadata",
@@ -92,7 +93,16 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"cli":       testCLIImage,
 			},
 			version:                   testReleaseVersion,
-			validateClusterDeployment: validateSuccessfulExecution,
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage),
+		},
+		{
+			name:                      "installer image override",
+			existingClusterDeployment: testClusterDeploymentWithInstallerImageOverride(installerImageOverride),
+			images: map[string]string{
+				"installer": testInstallerImage,
+				"cli":       testCLIImage,
+			},
+			validateClusterDeployment: validateSuccessfulExecution(installerImageOverride),
 		},
 	}
 
@@ -148,14 +158,25 @@ func testClusterDeploymentWithErrorCondition() *hivev1.ClusterDeployment {
 	return cis
 }
 
-func validateSuccessfulExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
-	if clusterDeployment.Status.InstallerImage == nil ||
-		*clusterDeployment.Status.InstallerImage != testInstallerImage {
-		t.Errorf("did not get expected installer image in status")
+func testClusterDeploymentWithInstallerImageOverride(override string) *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Spec.Provisioning = &hivev1.Provisioning{
+		InstallerImageOverride: override,
 	}
-	condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
-	if condition != nil && condition.Status != corev1.ConditionFalse {
-		t.Errorf("unexpected condition status")
+	return cd
+}
+
+func validateSuccessfulExecution(expectedInstallerImage string) func(*testing.T, *hivev1.ClusterDeployment) {
+	return func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
+		if clusterDeployment.Status.InstallerImage == nil {
+			t.Error("did not get an installer image in status")
+		} else if actual := *clusterDeployment.Status.InstallerImage; actual != expectedInstallerImage {
+			t.Errorf("did not get expected installer image in status: got %s, expected %s", actual, expectedInstallerImage)
+		}
+		condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
+		if condition != nil && condition.Status != corev1.ConditionFalse {
+			t.Errorf("unexpected condition status")
+		}
 	}
 }
 

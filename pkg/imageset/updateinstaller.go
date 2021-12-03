@@ -168,18 +168,26 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		return errors.Wrap(err, "unrecognized image-references in release payload")
 	}
 
-	installerTagName := "installer"
-	// If this is a bare metal install, we need to get the openshift-install binary from a different image with
-	// bare metal functionality compiled in. The binary is named the same and in the same location, so after swapping
-	// out what image to get it from, we can proceed with the code as we normally would.
-	if cd.Spec.Platform.BareMetal != nil {
-		installerTagName = "baremetal-installer"
+	var installerImage string
+	// There should be no way we get here with Provisioning == nil, but better safe.
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallerImageOverride != "" {
+		installerImage = cd.Spec.Provisioning.InstallerImageOverride
+		o.log.WithField("installerImage", installerImage).Info("installer image overridden")
+	} else {
+		// Glean the installer image from the release metadata
+		installerTagName := "installer"
+		// If this is a bare metal install, we need to get the openshift-install binary from a different image with
+		// bare metal functionality compiled in. The binary is named the same and in the same location, so after swapping
+		// out what image to get it from, we can proceed with the code as we normally would.
+		if cd.Spec.Platform.BareMetal != nil {
+			installerTagName = "baremetal-installer"
+		}
+		installerImage, err = findImageSpec(is, installerTagName)
+		if err != nil {
+			return errors.Wrap(err, "could not get installer image")
+		}
+		o.log.WithField("installerImage", installerImage).Info("installer image found")
 	}
-	installerImage, err := findImageSpec(is, installerTagName)
-	if err != nil {
-		return errors.Wrap(err, "could not get installer image")
-	}
-	o.log.WithField("installerImage", installerImage).Info("installer image found")
 
 	cliImage, err := findImageSpec(is, "cli")
 	if err != nil {

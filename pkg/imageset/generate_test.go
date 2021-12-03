@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	hiveassert "github.com/openshift/hive/pkg/test/assert"
+	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -17,7 +18,11 @@ const (
 
 func TestGenerateImageSetJob(t *testing.T) {
 	job := GenerateImageSetJob(testClusterDeployment(), testImageSet().Spec.ReleaseImage, "test-service-account", testHttpProxy, testHttpsProxy, testNoProxy)
-	validateJob(t, job)
+	assert.Equal(t, GetImageSetJobName(testClusterDeployment().Name), job.Name, "unexpected job name")
+	assert.Equal(t, testClusterDeployment().Namespace, job.Namespace, "unexpected job namespace")
+	assert.Len(t, job.Spec.Template.Spec.InitContainers, 1, "unexpected number of init containers")
+	assert.Len(t, job.Spec.Template.Spec.Containers, 1, "unexpected number of containers")
+	assert.True(t, hasVolume(job, "common"), "missing common volume")
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTPS_PROXY", testHttpsProxy)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "NO_PROXY", testNoProxy)
@@ -35,24 +40,6 @@ func testImageSet() *hivev1.ClusterImageSet {
 	is.Name = "test-image-set"
 	is.Spec.ReleaseImage = "test-release-image"
 	return is
-}
-
-func validateJob(t *testing.T, job *batchv1.Job) {
-	if job.Name != GetImageSetJobName(testClusterDeployment().Name) {
-		t.Errorf("unexpected job name: %s", job.Name)
-	}
-	if job.Namespace != testClusterDeployment().Namespace {
-		t.Errorf("unexpected job namespace: %s", job.Namespace)
-	}
-	if len(job.Spec.Template.Spec.InitContainers) != 1 {
-		t.Errorf("unexpected number of init containers")
-	}
-	if len(job.Spec.Template.Spec.Containers) != 1 {
-		t.Errorf("unexpected number of containers")
-	}
-	if !hasVolume(job, "common") {
-		t.Errorf("missing common volume")
-	}
 }
 
 func hasVolume(job *batchv1.Job, name string) bool {

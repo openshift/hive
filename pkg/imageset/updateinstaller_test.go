@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	imageapi "github.com/openshift/api/image/v1"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
@@ -52,7 +52,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, ""),
 		},
 		{
 			name:                      "failure execution missing cli",
@@ -70,7 +70,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecutionAfterFailure,
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, installerImageResolvedReason),
 		},
 		{
 			name: "successful execution baremetal platform",
@@ -83,7 +83,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"baremetal-installer": testInstallerImage,
 				"cli":                 testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, ""),
 		},
 		{
 			name:                      "successful execution with version in release metadata",
@@ -93,7 +93,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"cli":       testCLIImage,
 			},
 			version:                   testReleaseVersion,
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, ""),
 		},
 		{
 			name:                      "installer image override",
@@ -102,7 +102,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(installerImageOverride),
+			validateClusterDeployment: validateSuccessfulExecution(installerImageOverride, ""),
 		},
 	}
 
@@ -125,20 +125,15 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			writeReleaseMetadataFile(t, workDir, test.version)
 
 			err = opt.Run()
-			if !test.expectError && err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-			if test.expectError && err == nil {
-				t.Errorf("expected error but did not get one")
-				return
+			if test.expectError {
+				assert.Error(t, err, "expected error but did not get one")
+			} else {
+				assert.NoError(t, err, "unexpected error")
 			}
 
 			clusterDeployment := &hivev1.ClusterDeployment{}
 			err = client.Get(context.TODO(), types.NamespacedName{Name: testClusterDeployment().Name, Namespace: testClusterDeployment().Namespace}, clusterDeployment)
-			if err != nil {
-				t.Fatalf("unexpected get error: %v", err)
-			}
+			assert.NoError(t, err, "unexpected get error")
 			test.validateClusterDeployment(t, clusterDeployment)
 		})
 	}
@@ -166,49 +161,27 @@ func testClusterDeploymentWithInstallerImageOverride(override string) *hivev1.Cl
 	return cd
 }
 
-func validateSuccessfulExecution(expectedInstallerImage string) func(*testing.T, *hivev1.ClusterDeployment) {
+// If expectedReason is empty, we won't check it.
+func validateSuccessfulExecution(expectedInstallerImage, expectedReason string) func(*testing.T, *hivev1.ClusterDeployment) {
 	return func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
-		if clusterDeployment.Status.InstallerImage == nil {
-			t.Error("did not get an installer image in status")
-		} else if actual := *clusterDeployment.Status.InstallerImage; actual != expectedInstallerImage {
-			t.Errorf("did not get expected installer image in status: got %s, expected %s", actual, expectedInstallerImage)
+		if assert.NotNil(t, clusterDeployment.Status.InstallerImage, "did not get an installer image in status") {
+			assert.Equal(t, expectedInstallerImage, *clusterDeployment.Status.InstallerImage, "did not get expected installer image in status")
 		}
 		condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
-		if condition != nil && condition.Status != corev1.ConditionFalse {
-			t.Errorf("unexpected condition status")
+		if assert.NotNil(t, condition, "could not find InstallerImageResolutionFailed condition") {
+			assert.Equal(t, corev1.ConditionFalse, condition.Status, "unexpected condition status")
+			if expectedReason != "" {
+				assert.Equal(t, expectedReason, condition.Reason, "unexpected condition reason")
+			}
 		}
-	}
-}
-
-func validateSuccessfulExecutionAfterFailure(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
-	if clusterDeployment.Status.InstallerImage == nil ||
-		*clusterDeployment.Status.InstallerImage != testInstallerImage {
-		t.Errorf("did not get expected installer image in status")
-	}
-	condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
-	if condition == nil {
-		t.Errorf("no failure condition found")
-		return
-	}
-	if condition.Status != corev1.ConditionFalse {
-		t.Errorf("unexpected condition status")
-	}
-	if condition.Reason != installerImageResolvedReason {
-		t.Errorf("unexpected condition reason")
 	}
 }
 
 func validateFailureExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
 	condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
-	if condition == nil {
-		t.Errorf("no failure condition found")
-		return
-	}
-	if condition.Status != corev1.ConditionTrue {
-		t.Errorf("unexpected condition status")
-	}
-	if !strings.Contains(condition.Message, "could not get cli image") {
-		t.Errorf("condition message does not contain expected error message: %s", condition.Message)
+	if assert.NotNil(t, condition, "no failure condition found") {
+		assert.Equal(t, corev1.ConditionTrue, condition.Status, "unexpected condition status")
+		assert.Contains(t, condition.Message, "could not get cli image", "condition message does not contain expected error message")
 	}
 }
 

@@ -92,9 +92,14 @@ export HIVE_OPERATOR_NS="hive-operator"
 IMG="${HIVE_IMAGE}" make deploy
 
 function save_hive_logs() {
-  oc logs -n "${HIVE_NS}" deployment/hive-controllers > "${ARTIFACT_DIR}/hive-controllers.log" || true
-  oc logs -n "${HIVE_NS}" deployment/hiveadmission > "${ARTIFACT_DIR}/hiveadmission.log" || true
-  oc logs -n "${HIVE_NS}" deployment/hive-operator > "${ARTIFACT_DIR}/hive-operator.log" || true
+  tmpf=$(mktemp)
+  for x in "hive-controllers ${HIVE_NS}" "hiveadmission ${HIVE_NS}" "hive-operator ${HIVE_OPERATOR_NS}"; do
+    read d n <<<$x
+    # Don't save/overwrite the file unless log extraction succeeds
+    if oc logs -n $n deployment/$d > $tmpf; then
+      mv $tmpf "${ARTIFACT_DIR}/${d}.log"
+    fi
+  done
 }
 
 SRC_ROOT=$(git rev-parse --show-toplevel)

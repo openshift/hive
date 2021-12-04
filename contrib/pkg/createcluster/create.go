@@ -806,7 +806,7 @@ func (o *Options) getSSHPrivateKey() (string, error) {
 			o.log.Error("Cannot read SSH private key file")
 			return "", err
 		}
-		sshPrivateKey := strings.TrimSpace(string(data))
+		sshPrivateKey := strings.TrimSpace(string(data)) + "\n"
 		return sshPrivateKey, nil
 	}
 	o.log.Debug("No private SSH key file provided")

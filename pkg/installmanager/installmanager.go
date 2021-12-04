@@ -123,7 +123,23 @@ func NewInstallManagerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install-manager NAMESPACE CLUSTER_PROVISION_NAME",
 		Short: "Executes and oversees the openshift-installer.",
-		Long:  "The Hive Install Manager runs the phases of the openshift-installer, edits generated assets before completing install, and monitors for artifacts that need to be uploaded back to Hive.",
+		Long: `
+The Hive Install Manager runs the phases of the openshift-installer, edits generated assets before
+completing install, and monitors for artifacts that need to be uploaded back to Hive.
+
+The following environment variables, if present, configure the Install Manager to upload logs for
+failed provisions:
+
+HIVE_INSTALL_LOGS_UPLOAD_PROVIDER: The cloud provider hosting the object store. At this time only
+	"aws" is supported.
+HIVE_INSTALL_LOGS_CREDENTIALS_SECRET: The name of a secret in the current namespace containing
+	credentials sufficient to write data to the specified bucket. For example, for AWS, the secret
+	data could contain base64-encoded values for "aws_access_key_id" and "aws_secret_access_key".
+HIVE_INSTALL_LOGS_AWS_REGION: The region containing the specified bucket.
+HIVE_INSTALL_LOGS_AWS_S3_BUCKET: The name of the S3 bucket to which to upload the logs. The bucket
+	must exist and be writable using the specified credentials.
+SSH_PRIV_KEY_PATH: File system path of a file containing the SSH private key corresponding to the
+	public key in the install config.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := im.Complete(args); err != nil {
 				log.WithError(err).Error("cannot complete command")

@@ -1692,6 +1692,11 @@ data:
       - "Error waiting for instance .* to become ready .* User initiated shutdown"
       installFailingReason: UserInitiatedShutdown
       installFailingMessage: User initiated shutdown of instances as the install was running
+    - name: AWSMissingQuota
+      searchRegexStrings:
+      - ".* is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than"
+      installFailingReason: MissingQuota
+      installFailingMessage: AWS missing quota
 
     # GCP Specific
     - name: GCPInvalidProjectID

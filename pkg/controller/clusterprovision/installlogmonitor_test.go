@@ -44,6 +44,7 @@ const (
 	insufficientPermissions   = "level=fatal msg=failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Permissions Check\": validate AWS credentials: current credentials insufficient for performing cluster installation"
 	accessDeniedSLR           = "blahblah\nError: Error creating network Load Balancer: AccessDenied: User: arn:aws:sts::123456789:assumed-role/ManagedOpenShift-Installer-Role/123456789 is not authorized to perform: iam:CreateServiceLinkedRole on resource: arn:aws:iam::123456789:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing"
 	loadBalancerLimitExceeded = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=info msg=\"Cluster operator ingress Available is False with IngressUnavailable: The \"default\" ingress controller reports Available=False: IngressControllerUnavailable: One or more status	conditions indicate unavailable: LoadBalancerReady=False (SyncLoadBalancerFailed: The service-controller component is reporting SyncLoadBalancerFailed events like: Error syncing load balancer: failed to ensure load balancer: TooManyLoadBalancers: Exceeded quota of account 1234567890\n\tstatus code: 400, request id: f0cb17ec-68b6-4f32-8997-cce5049a6a1e\nThe kube-controller-manager logs may contain more details.)"
+	MissingQuota              = "blahblah\nError: some-instance is not available in some-region because the required number of resources (32) is more than the limit of 5"
 	noMatchLog                = "an example of something that doesn't match the log regexes"
 )
 
@@ -361,6 +362,25 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(loadBalancerLimitExceeded),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "LoadBalancerLimitExceeded",
+		},
+		{
+			name: "AWSMissingQuota",
+			log:  pointer.StringPtr(MissingQuota),
+			existing: []runtime.Object{&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      regexConfigMapName,
+					Namespace: constants.DefaultHiveNamespace,
+				},
+				Data: map[string]string{
+					"regexes": `
+- name: AWSMissingQuota
+  searchRegexStrings:
+  - ".* is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than"
+  installFailingReason: MissingQuota
+  installFailingMessage: AWS missing quota`,
+				},
+			}},
+			expectedReason: "AWSMissingQuota",
 		},
 	}
 

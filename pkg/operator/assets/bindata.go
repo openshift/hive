@@ -1693,6 +1693,7 @@ data:
       installFailingReason: UserInitiatedShutdown
       installFailingMessage: User initiated shutdown of instances as the install was running
 
+
     # GCP Specific
     - name: GCPInvalidProjectID
       searchRegexStrings:
@@ -1725,6 +1726,7 @@ data:
       installFailingReason: GCPServiceAccountQuotaExceeded
       installFailingMessage: GCP Service Account quota exceeded
 
+    
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:
@@ -1736,6 +1738,20 @@ data:
       - "could not connect to libvirt"
       installFailingReason: LibvirtConnectionFailed
       installFailingMessage: "Could not connect to libvirt host"
+
+
+    # Proxy-enabled clusters
+    - name: ProxyTimeout
+      searchRegexStrings:
+      - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: i/o timeout"
+      installFailingReason: ProxyTimeout
+      installFailingMessage: The cluster is installing via a proxy, however the proxy server is timing out connections. Verify that the proxy is running and would be accessible from the cluster's private subnet(s).
+    - name: ProxyInvalidCABundle
+      searchRegexStrings:
+      - "error pinging docker registry .+ proxyconnect tcp: x509: certificate signed by unknown authority"
+      installFailingReason: ProxyInvalidCABundle
+      installFailingMessage: The cluster is installing via a proxy, but does not trust the signing certificate the proxy is presenting. Verify that the Certificate Authority certificate(s) to verify proxy communications have been supplied at installation time.
+
 
     # Generic OpenShift Install
     - name: KubeAPIWaitTimeout

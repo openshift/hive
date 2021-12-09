@@ -18,6 +18,10 @@ import (
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 )
 
+const (
+	testImagePublisher = "foo"
+)
+
 func TestAzureActuator(t *testing.T) {
 	tests := []struct {
 		name                       string
@@ -148,6 +152,7 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 		azureProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)
 		if assert.True(t, ok, "failed to convert to azureProviderSpec") {
 			assert.Equal(t, testInstanceType, azureProvider.VMSize, "unexpected instance type")
+			assert.Equal(t, testImagePublisher, azureProvider.Image.Publisher, "unexpected image publisher")
 		}
 	}
 }
@@ -180,6 +185,9 @@ func testAzurePool() *hivev1.MachinePool {
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
 		Azure: &hivev1azure.MachinePool{
 			InstanceType: testInstanceType,
+			Image: machineapi.Image{
+				Publisher: testImagePublisher,
+			},
 		},
 	}
 	return p

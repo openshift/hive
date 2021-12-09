@@ -1682,6 +1682,11 @@ data:
       - "current credentials insufficient for performing cluster installation"
       installFailingReason: AWSInsufficientPermissions
       installFailingMessage: AWS credentials are insufficient for performing cluster installation
+    - name: AWSThrottlingIssues
+      searchRegexStrings:
+      - "error waiting for Route53 Hosted Zone"
+      installFailingReason: AWSThrottlingIssues
+      installFailingMessage: AWS is having throttling issues, please retry your installation
     - name: VcpuLimitExceeded
       searchRegexStrings:
       - "VcpuLimitExceeded"

@@ -47,6 +47,7 @@ const (
 	proxyTimeoutLog           = "time=\"2021-11-17T03:56:25Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: i/o timeout]): quay.io/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: i/o timeout"
 	proxyInvalidCABundleLog   = "time=\"2021-08-27T05:56:50Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority]): quay.io/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority"
 	noMatchLog                = "an example of something that doesn't match the log regexes"
+	awsthrottling             = "level=error\nlevel=error msg=Error: error waiting for Route53 Hosted Zone (Z03821323BADLLI57VSHT) creation: timeout while waiting for state to become 'INSYNC' (last state: 'PENDING', timeout: 15m0s)\nlevel=error\nlevel=error msg=  on ../tmp/openshift-install-cluster-260510522/route53/base.tf line 22, in resource \"aws_route53_zone\" \"new_int\":\nlevel=error msg=  22: resource \"aws_route53_zone\" \"new_int\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -135,6 +136,12 @@ func TestParseInstallLog(t *testing.T) {
 			log:            pointer.StringPtr(proxyInvalidCABundleLog),
 			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "ProxyInvalidCABundle",
+		},
+		{
+			name:           "AWSThrottlingIssues",
+			log:            pointer.StringPtr(awsthrottling),
+			existing:       []runtime.Object{buildRegexConfigMap()},
+			expectedReason: "AWSThrottlingIssues",
 		},
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",

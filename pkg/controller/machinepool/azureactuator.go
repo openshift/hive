@@ -7,15 +7,16 @@ import (
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/to"
-	machineapi "github.com/openshift/api/machine/v1beta1"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	installazure "github.com/openshift/installer/pkg/asset/machines/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/azureclient"
 )
@@ -95,6 +96,25 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		workerRole,
 		workerUserDataName,
 	)
+
+	// Use image set for machinepool azure platform instead of the default
+	if image := pool.Spec.Platform.Azure.Image; (machineapi.Image{}) != image {
+		for _, ms := range installerMachineSets {
+			provider := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)
+			provider.Image = machineapi.Image{
+				Publisher:  image.Publisher,
+				Offer:      image.Offer,
+				SKU:        image.SKU,
+				Version:    image.Version,
+				ResourceID: image.ResourceID,
+				Type:       image.Type,
+			}
+			ms.Spec.Template.Spec.ProviderSpec = machineapi.ProviderSpec{
+				Value: &runtime.RawExtension{Object: provider},
+			}
+		}
+	}
+
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
 

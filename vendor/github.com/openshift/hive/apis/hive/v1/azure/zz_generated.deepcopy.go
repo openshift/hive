@@ -13,6 +13,7 @@ func (in *MachinePool) DeepCopyInto(out *MachinePool) {
 		copy(*out, *in)
 	}
 	out.OSDisk = in.OSDisk
+	out.Image = in.Image
 	return
 }
 

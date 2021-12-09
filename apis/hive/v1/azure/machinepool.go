@@ -1,5 +1,9 @@
 package azure
 
+import (
+	clusterapi "github.com/openshift/api/machine/v1beta1"
+)
+
 // MachinePool stores the configuration for a machine pool installed
 // on Azure.
 type MachinePool struct {
@@ -13,6 +17,9 @@ type MachinePool struct {
 
 	// OSDisk defines the storage for instance.
 	OSDisk `json:"osDisk"`
+
+	// Image is the OS image to use to create the instance.
+	Image clusterapi.Image `json:"image"`
 }
 
 // OSDisk defines the disk for machines on Azure.

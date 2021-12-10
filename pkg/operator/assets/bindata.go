@@ -1808,7 +1808,13 @@ data:
       - "Error waiting for instance .* to become ready"
       installFailingReason: FallbackInstancesFailedToBecomeReady
       installFailingMessage: Unknown error - instances failed to become ready
-`)
+
+    - name: MultiLineWorks
+      searchRegexStrings:
+      # The two chunks of this regex need to match content on separate lines. (?s) makes . match \n.
+      - "(?s)a gcp cluster.*quota issue"
+      installFailingReason: MultiLineWorks
+      installFailingMessage: "It works"`)
 
 func configConfigmapsInstallLogRegexesConfigmapYamlBytes() ([]byte, error) {
 	return _configConfigmapsInstallLogRegexesConfigmapYaml, nil

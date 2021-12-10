@@ -123,6 +123,9 @@ case "${CLOUD}" in
 "azure")
 	CREDS_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
+	# For azure we set managedDNS=false as we are facing issues with this feature currently.
+	# This is a temporary workaround to fix the e2e
+	USE_MANAGED_DNS=false
 	;;
 "gcp")
 	CREDS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"

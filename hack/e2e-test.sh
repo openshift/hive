@@ -52,13 +52,15 @@ ORIG_NS=$HIVE_NS
 export HIVE_NS=hive-e2e-two
 # 2) Patch the hiveconfig
 oc patch hiveconfig hive -n $HIVE_OPERATOR_NS --type=merge -p '{"spec":{"targetNamespace": "'$HIVE_NS'"}}'
-# 3) "Move" the managed DNS creds secret to the new namespace. (In real life the user would be
+# 3) If USE_MANAGED_DNS=true, "Move" the managed DNS creds secret to the new namespace. (In real life the user would be
 #    responsible for making sure the secret referenced by hiveconfig exists in the new target
 #    namespace -- either by moving the secret or creating a new one and updating hiveconfig.)
 #    TODO: Or should  we try to do that for the user?
-oc get secret -l hive.openshift.io/managed-dns-credentials=true -n $ORIG_NS -o json \
-  | jq '.items[0].metadata.namespace = "'$HIVE_NS'"' \
-  | oc apply -f -
+if $USE_MANAGED_DNS; then
+  oc get secret -l hive.openshift.io/managed-dns-credentials=true -n $ORIG_NS -o json \
+    | jq '.items[0].metadata.namespace = "'$HIVE_NS'"' \
+    | oc apply -f -
+fi
 # 4) Rerun postdeploy tests, which wait for everything to come up
 echo "Running post-deploy tests in new namespace $HIVE_NS"
 make test-e2e-postdeploy

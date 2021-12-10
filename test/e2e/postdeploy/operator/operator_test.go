@@ -125,7 +125,7 @@ func TestHiveConfig(t *testing.T) {
 		return
 	}
 	for _, md := range hiveConfig.Spec.ManagedDomains {
-		if md.AWS == nil && md.GCP == nil {
+		if md.AWS == nil && md.GCP == nil && md.Azure == nil {
 			t.Errorf("managed domain entry found without cloud configuration")
 			return
 		}
@@ -146,6 +146,14 @@ func TestHiveConfig(t *testing.T) {
 				return
 			}
 			secretName = md.GCP.CredentialsSecretRef.Name
+		}
+
+		if md.Azure != nil {
+			if len(md.Azure.CredentialsSecretRef.Name) == 0 {
+				t.Errorf("Azure managed DNS configured, but no credentials secret specified")
+				return
+			}
+			secretName = md.Azure.CredentialsSecretRef.Name
 		}
 
 		secret := &corev1.Secret{}

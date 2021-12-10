@@ -19,6 +19,7 @@ import (
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 )
 
+// This comment will test triggering e2e-azure
 func TestAzureActuator(t *testing.T) {
 	tests := []struct {
 		name                       string

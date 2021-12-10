@@ -14,6 +14,7 @@ import (
 )
 
 // TestNewGCPActuator tests that a new GCPActuator object can be created.
+// This comment will test triggering e2e-gcp
 func TestNewGCPActuator(t *testing.T) {
 	cases := []struct {
 		name    string

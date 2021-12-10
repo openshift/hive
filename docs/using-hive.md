@@ -22,8 +22,12 @@
     - [InstallConfig](#installconfig)
     - [ClusterDeployment](#clusterdeployment)
     - [Machine Pools](#machine-pools)
+      - [Configuring Availability Zones](#configuring-availability-zones)
+      - [Auto-scaling](#auto-scaling)
+        - [Integration with Horizontal Pod Autoscalers](#integration-with-horizontal-pod-autoscalers)
       - [Create Cluster on Bare Metal](#create-cluster-on-bare-metal)
   - [Monitor the Install Job](#monitor-the-install-job)
+    - [Saving Logs for Failed Provisions](#saving-logs-for-failed-provisions)
     - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
     - [Access the Web Console](#access-the-web-console)
   - [Managed DNS](#managed-dns-1)
@@ -744,6 +748,42 @@ There is not presently support for "deprovisioning" a bare metal cluster, as suc
   ```
 
 In the event of installation failures, please see [Troubleshooting](./troubleshooting.md).
+
+### Saving Logs for Failed Provisions
+
+Hive can be configured as follows to upload logs to an AWS S3 bucket when provisioning fails.
+
+1. **Create an S3 bucket.** The bucket must be accessible from the environment from which your
+   cluster will be provisioned, using credentials you will specify (below).
+   Take note of the name of the bucket and the region in which you created it.
+2. **Create a credentials secret.** This secret will need to exist in the target namespace of your hive deployment (HiveConfig.spec.targetNamespace, default `hive`), and contain AWS credentials sufficient to write to your bucket.
+   The secret should data contain base64-encoded values for "aws_access_key_id" and "aws_secret_access_key".
+   (You may wish to reuse the secret from your cluster deployment.)
+3. **Create an SSH private key secret.** The secret data must contain a key called `ssh-privatekey`
+   whose value is the base64-encoded contents of the private key file corresponding to the public
+   key in your install config.
+   Create this secret in the namespace of your ClusterDeployment.
+4. **Tell HiveConfig where to find your bucket.** Under `.spec.failedProvisionConfig.aws`, add the
+   bucket name, the reference to the AWS credentials secret, and the region. For example:
+   ```yaml
+   spec:
+     failedProvisionConfig:
+       aws:
+         bucket: failed-provision-logs
+         credentialsSecretRef:
+           name: test-retry-aws-creds
+         region: us-east-1
+   ```
+5. **Ensure your ClusterDeployment is configured with your SSH private key secret.** Reference the
+   SSH private key secret in your ClusterDeployment's `.spec.provisioning.sshPrivateKeySecretRef.
+   For example:
+   ```yaml
+   spec:
+     provisioning:
+       sshPrivateKeySecretRef:
+         name: mycluster-ssh-key
+   ```
+   (If using [hiveutil](hiveutil.md), you can provide the key pair from your file system via `--ssh-private-key-file` and `--ssh-public-key-file`.)
 
 ### Cluster Admin Kubeconfig
 

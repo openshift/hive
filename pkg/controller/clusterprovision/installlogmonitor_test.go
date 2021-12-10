@@ -61,79 +61,66 @@ func TestParseInstallLog(t *testing.T) {
 		{
 			name:           "load balancer service linked role prereq",
 			log:            pointer.StringPtr(accessDeniedSLR),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSAccessDeniedSLR",
 		},
 		{
 			name:           "DNS already exists",
 			log:            pointer.StringPtr(dnsAlreadyExistsLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "DNSAlreadyExists",
 		},
 		{
 			name:           "PendingVerification",
 			log:            pointer.StringPtr(pendingVerificationLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "PendingVerification",
 		},
 		{
 			name:           "Wildcard",
 			log:            pointer.StringPtr(gcpInvalidProjectIDLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPInvalidProjectID",
 		},
 		{
 			name:           "Escaped single quotes",
 			log:            pointer.StringPtr(gcpSSDQUotaLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPQuotaSSDTotalGBExceeded",
 		},
 		{
 			name:           "AWSNATGatewayLimitExceeded",
 			log:            pointer.StringPtr(natGatewayLimitExceeded),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSNATGatewayLimitExceeded",
 		},
 		{
 			name:           "AWSVPCLimitExceeded",
 			log:            pointer.StringPtr(vpcLimitExceeded),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSVPCLimitExceeded",
 		},
 		{
 			name:           "AWSRoute53LimitExceeded",
 			log:            pointer.StringPtr(route53LimitExceeded),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "TooManyRoute53Zones",
 		},
 		{
 			name:           "Generic ResourceLimitExceeded",
 			log:            pointer.StringPtr(genericLimitExceeded),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "FallbackResourceLimitExceeded",
 		},
 		{
 			name:           "Credentials are invalid",
 			log:            pointer.StringPtr(invalidCredentials),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "InvalidCredentials",
 		},
 		{
 			name:           "Failed waiting for Kubernetes API",
 			log:            pointer.StringPtr(kubeAPIWaitFailedLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "KubeAPIWaitFailed",
 		},
 		{
 			name:           "ProxyTimeout",
 			log:            pointer.StringPtr(proxyTimeoutLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "ProxyTimeout",
 		},
 		{
 			name:           "ProxyInvalidCABundle",
 			log:            pointer.StringPtr(proxyInvalidCABundleLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "ProxyInvalidCABundle",
 		},
 		{
@@ -212,19 +199,18 @@ func TestParseInstallLog(t *testing.T) {
 		},
 		{
 			name:           "no log",
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: unknownReason,
 		},
 		{
 			name:            "no matching log",
 			log:             pointer.StringPtr(noMatchLog),
-			existing:        []runtime.Object{buildRegexConfigMap()},
 			expectedReason:  unknownReason,
 			expectedMessage: pointer.StringPtr(noMatchLog),
 		},
 		{
 			name:           "missing regex configmap",
 			log:            pointer.StringPtr(dnsAlreadyExistsLog),
+			existing:       []runtime.Object{},
 			expectedReason: unknownReason,
 		},
 		{
@@ -301,44 +287,42 @@ func TestParseInstallLog(t *testing.T) {
 		{
 			name:           "GCP compute quota",
 			log:            pointer.StringPtr(gcpCPUQuotaLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPComputeQuotaExceeded",
 		},
 		{
 			name:           "GCP service account quota",
 			log:            pointer.StringPtr(gcpServiceAccountQuotaLog),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "GCPServiceAccountQuotaExceeded",
 		},
 		{
 			name:           "Can't delete IAM role",
 			log:            pointer.StringPtr(awsDeleteRoleFailed),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "ErrorDeletingIAMRole",
 		},
 		{
 			name:           "AWSSubnetDoesNotExist",
 			log:            pointer.StringPtr(subnetDoesNotExist),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSSubnetDoesNotExist",
 		},
 		{
 			name:           "AWSInsufficientPermissions",
 			log:            pointer.StringPtr(insufficientPermissions),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSInsufficientPermissions",
 		},
 		{
 			name:           "LoadBalancerLimitExceeded",
 			log:            pointer.StringPtr(loadBalancerLimitExceeded),
-			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "LoadBalancerLimitExceeded",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existing...)
+			existing := test.existing
+			if existing == nil {
+				existing = []runtime.Object{buildRegexConfigMap()}
+			}
+			fakeClient := fake.NewFakeClient(existing...)
 			r := &ReconcileClusterProvision{
 				Client: fakeClient,
 				scheme: scheme.Scheme,

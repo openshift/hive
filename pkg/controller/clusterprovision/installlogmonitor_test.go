@@ -311,63 +311,21 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: "GCPServiceAccountQuotaExceeded",
 		},
 		{
-			name: "Can't delete IAM role",
-			log:  pointer.StringPtr(awsDeleteRoleFailed),
-			existing: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      regexConfigMapName,
-					Namespace: constants.DefaultHiveNamespace,
-				},
-				Data: map[string]string{
-					"regexes": `
-    - name: ErrorDeletingIAMRole
-      searchRegexStrings:
-        - "Error deleting IAM Role .* DeleteConflict: Cannot delete entity, must detach all policies first."
-      installFailingReason: ErrorDeletingIAMRole
-      installFailingMessage: The cluster installer was not able to delete the roles it used during the installation. Ensure that no policies are added to new roles by default and try again.
-`,
-				},
-			}},
+			name:           "Can't delete IAM role",
+			log:            pointer.StringPtr(awsDeleteRoleFailed),
+			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "ErrorDeletingIAMRole",
 		},
 		{
-			name: "AWSSubnetDoesNotExist",
-			log:  pointer.StringPtr(subnetDoesNotExist),
-			existing: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      regexConfigMapName,
-					Namespace: constants.DefaultHiveNamespace,
-				},
-				Data: map[string]string{
-					"regexes": `
-- name: AWSSubnetDoesNotExist
-  searchRegexStrings:
-  - "The subnet ID .* does not exist"
-  installFailingReason: AWSSubnetDoesNotExist
-  installFailingMessage: AWS Subnet Does Not Exist
-`,
-				},
-			}},
+			name:           "AWSSubnetDoesNotExist",
+			log:            pointer.StringPtr(subnetDoesNotExist),
+			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSSubnetDoesNotExist",
 		},
 		{
-			name: "AWSInsufficientPermissions",
-			log:  pointer.StringPtr(insufficientPermissions),
-			existing: []runtime.Object{&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      regexConfigMapName,
-					Namespace: constants.DefaultHiveNamespace,
-				},
-				Data: map[string]string{
-					"regexes": `
-- name: InsufficientPermissions
-  searchRegexStrings:
-  - "current credentials insufficient for performing cluster installation"
-  installFailingReason: AWSInsufficientPermissions
-  installFailingMessage: AWS credentials are insufficient for performing cluster installation
-`,
-				},
-			}},
+			name:           "AWSInsufficientPermissions",
+			log:            pointer.StringPtr(insufficientPermissions),
+			existing:       []runtime.Object{buildRegexConfigMap()},
 			expectedReason: "AWSInsufficientPermissions",
 		},
 		{

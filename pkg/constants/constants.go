@@ -351,6 +351,10 @@ const (
 	// file that includes configuration for aws-private-link-controller
 	AWSPrivateLinkControllerConfigFileEnvVar = "AWS_PRIVATELINK_CONTROLLER_CONFIG_FILE"
 
+	// FailedProvisionConfigFileEnvVar points to a text file containing configuration for
+	// desired behavior when provisions fail. See HiveConfig.Spec.FailedProvisionConfig.
+	FailedProvisionConfigFileEnvVar = "FAILED_PROVISION_CONFIG_FILE"
+
 	// HiveReleaseImageVerificationConfigMapNamespaceEnvVar is used to configure the config map that will be used
 	// to verify the release images being used for cluster deployments.
 	HiveReleaseImageVerificationConfigMapNamespaceEnvVar = "HIVE_RELEASE_IMAGE_VERIFICATION_CONFIGMAP_NS"

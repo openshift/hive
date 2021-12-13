@@ -2,6 +2,7 @@ package clusterdeployment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -93,10 +94,19 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+func fakeReadFile(content string) func(string) ([]byte, error) {
+	return func(string) ([]byte, error) {
+		return []byte(content), nil
+	}
+}
+
 func TestClusterDeploymentReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	openshiftapiv1.Install(scheme.Scheme)
 	routev1.Install(scheme.Scheme)
+
+	// Fake out readProvisionFailedConfig
+	os.Setenv(constants.FailedProvisionConfigFileEnvVar, "fake")
 
 	// Utility function to get the test CD from the fake client
 	getCD := func(c client.Client) *hivev1.ClusterDeployment {
@@ -2685,17 +2695,17 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
-			hiveConfig := &hivev1.HiveConfig{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: constants.HiveConfigName,
-				},
-				Spec: hivev1.HiveConfigSpec{
-					FailedProvisionConfig: hivev1.FailedProvisionConfig{
-						RetryReasons: test.retryReasons,
-					},
-				},
+			if test.retryReasons == nil {
+				readFile = fakeReadFile("")
+			} else {
+				b, _ := json.Marshal(*test.retryReasons)
+				readFile = fakeReadFile(fmt.Sprintf(`
+				{
+					"retryReasons": %s
+				}
+				`, string(b)))
 			}
-			fakeClient := fake.NewFakeClient(append(test.existing, hiveConfig)...)
+			fakeClient := fake.NewFakeClient(test.existing...)
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()

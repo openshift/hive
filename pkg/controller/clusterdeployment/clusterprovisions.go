@@ -2,7 +2,9 @@ package clusterdeployment
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"time"
@@ -135,7 +137,11 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 	labels[constants.ClusterDeploymentNameLabel] = cd.Name
 
-	extraEnvVars := getInstallLogEnvVars(cd.Name)
+	extraEnvVars, err := getInstallLogEnvVars(cd.Name)
+	if err != nil {
+		logger.WithError(err).Error("failed to read failed provision config file")
+		return reconcile.Result{}, err
+	}
 	extraEnvVars = append(extraEnvVars, getAWSServiceProviderEnvVars(cd, cd.Name)...)
 
 	podSpec, err := install.InstallerPodSpec(
@@ -240,14 +246,14 @@ func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev
 		logger.Debug("no failed provisions yet -- allowing retry")
 		return true, nil
 	}
-	// Load up HiveConfig
-	hc := &hivev1.HiveConfig{}
-	if err := r.Get(context.TODO(), types.NamespacedName{Name: constants.HiveConfigName}, hc); err != nil {
-		return false, err // caller logs
+	// Load up FailedProvisionConfig
+	fpConfig, err := readProvisionFailedConfig()
+	if err != nil {
+		return false, err
 	}
 	// If no retry reasons are specified, "always" retry
-	if hc.Spec.FailedProvisionConfig.RetryReasons == nil {
-		logger.Debug("no RetryReasons found in HiveConfig -- allowing retry")
+	if fpConfig.RetryReasons == nil {
+		logger.Debug("no RetryReasons found in FailedProvisionConfig -- allowing retry")
 		return true, nil
 	}
 	// Does our failed provision's reason match?
@@ -257,13 +263,13 @@ func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev
 		return false, errors.New("failed to find ClusterProvisionFailed Condition -- this should never happen!")
 	}
 	rLog := logger.WithField("reason", cond.Reason)
-	for _, reason := range *hc.Spec.FailedProvisionConfig.RetryReasons {
+	for _, reason := range *fpConfig.RetryReasons {
 		if cond.Reason == reason {
 			rLog.Debug("retrying due to matching retry reason")
 			return true, nil
 		}
 	}
-	rLog.Debug("reason not found in HiveConfig RetryReasons -- not retrying")
+	rLog.Debug("reason not found in FailedProvisionConfig RetryReasons -- not retrying")
 	return false, nil
 }
 
@@ -553,34 +559,65 @@ func (r *ReconcileClusterDeployment) copyInstallLogSecret(destNamespace string, 
 	return controllerutils.CopySecret(r, src, dest, nil, nil)
 }
 
-func getInstallLogEnvVars(secretPrefix string) []corev1.EnvVar {
-	extraEnvVars := []corev1.EnvVar{}
+// NOTE: Ugly-but-simple way to mock ioutil.ReadFile for test purposes.
+// https://stackoverflow.com/questions/20923938/how-would-i-mock-a-call-to-ioutil-readfile-in-go/37035375
+// This variable is overridden by fakeReadFile.
+var readFile = ioutil.ReadFile
 
-	cloudProvider, found := os.LookupEnv(constants.InstallLogsUploadProviderEnvVar)
-	if !found {
-		return extraEnvVars
+// readProvisionFailedConfig reads the provision fail config from the file pointed to
+// by the FailedProvisionConfigFileEnvVar environment variable.
+func readProvisionFailedConfig() (*hivev1.FailedProvisionConfig, error) {
+	path := os.Getenv(constants.FailedProvisionConfigFileEnvVar)
+	if len(path) == 0 {
+		return nil, nil
 	}
 
-	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
-		Name:  constants.InstallLogsUploadProviderEnvVar,
-		Value: cloudProvider,
-	})
+	config := &hivev1.FailedProvisionConfig{}
 
-	if cloudProvider == constants.InstallLogsUploadProviderAWS {
-		secretName, foundSrc := os.LookupEnv(constants.InstallLogsCredentialsSecretRefEnvVar)
-		if foundSrc {
-			extraEnvVars = append(extraEnvVars, corev1.EnvVar{
+	fileBytes, err := readFile(path)
+	if err != nil || len(fileBytes) == 0 {
+		return config, err
+	}
+	if err := json.Unmarshal(fileBytes, config); err != nil {
+		return config, err
+	}
+
+	return config, nil
+}
+
+func getInstallLogEnvVars(secretPrefix string) ([]corev1.EnvVar, error) {
+	var extraEnvVars = []corev1.EnvVar{}
+	fpConfig, err := readProvisionFailedConfig()
+	if err != nil || fpConfig == nil {
+		return extraEnvVars, err
+	}
+	if awsSpec := fpConfig.AWS; awsSpec != nil {
+		// By default we will try to gather logs on failed installs:
+		extraEnvVars = []corev1.EnvVar{
+			{
+				Name:  constants.InstallLogsUploadProviderEnvVar,
+				Value: constants.InstallLogsUploadProviderAWS,
+			},
+			{
 				Name:  constants.InstallLogsCredentialsSecretRefEnvVar,
-				Value: secretPrefix + "-" + secretName,
-			})
+				Value: secretPrefix + "-" + awsSpec.CredentialsSecretRef.Name,
+			},
+			{
+				Name:  constants.InstallLogsAWSRegionEnvVar,
+				Value: awsSpec.Region,
+			},
+			{
+				Name:  constants.InstallLogsAWSServiceEndpointEnvVar,
+				Value: awsSpec.ServiceEndpoint,
+			},
+			{
+				Name:  constants.InstallLogsAWSS3BucketEnvVar,
+				Value: awsSpec.Bucket,
+			},
 		}
-
-		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSRegionEnvVar, extraEnvVars)
-		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSServiceEndpointEnvVar, extraEnvVars)
-		extraEnvVars = addEnvVarIfFound(constants.InstallLogsAWSS3BucketEnvVar, extraEnvVars)
 	}
 
-	return extraEnvVars
+	return extraEnvVars, nil
 }
 
 func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeployment, secretPrefix string) []corev1.EnvVar {

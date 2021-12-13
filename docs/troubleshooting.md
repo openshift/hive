@@ -1,26 +1,21 @@
 # Troubleshooting
 
+- [Troubleshooting](#troubleshooting)
+  - [Cluster Install Failure Logs](#cluster-install-failure-logs)
+    - [Setup](#setup)
+    - [Listing stored install logs directories](#listing-stored-install-logs-directories)
+    - [Retrieving stored install logs for a specific cluster provision](#retrieving-stored-install-logs-for-a-specific-cluster-provision)
+  - [Deprovision](#deprovision)
+  - [HiveAdmission](#hiveadmission)
+
 ## Cluster Install Failure Logs
 
 In the event a cluster is brought up but overall installation fails, either during bootstrap or cluster initialization, Hive will attempt to gather logs from the cluster itself. If configured, these logs are stored in an S3 compatible object store under a directory created for each cluster provision. If the install succeeds on the first attempt, then nothing will be stored. If the install has had any errors that cause an install log to be created, then it will uploaded to the configured object store.
 
-### One Time Setup
+### Setup
 
 In order for Hive to gather and upload install logs on cluster provision failure, the object store must have a place for Hive to store data and Hive must be configured with the object store information.
-
-Steps:
-1. Create a storage bucket (or the equivalent if using an S3 compatible service)
-1. Create a secret in the configured Hive namespace with credentials that can access the bucket.
-1. Configure Hive config with the following information:
-```yaml
-  spec:
-    failedProvisionConfig:
-      aws:
-        bucket: name_of_bucket_created_in_above_step
-        credentialsSecretRef:
-          name: name_of_secret_that_can_access_bucket
-        region: region_of_bucket_created_in_above_step
-```
+See [this section](using-hive.md#saving-logs-for-failed-provisions) for setup details.
 
 ### Listing stored install logs directories
 

@@ -785,6 +785,8 @@ Hive can be configured as follows to upload logs to an AWS S3 bucket when provis
    ```
    (If using [hiveutil](hiveutil.md), you can provide the key pair from your file system via `--ssh-private-key-file` and `--ssh-public-key-file`.)
 
+The [troubleshooting doc](troubleshooting.md#cluster-install-failure-logs) provides more information about extracting and processing the logs.
+
 ### Cluster Admin Kubeconfig
 
 Once the cluster is provisioned, the admin kubeconfig will be stored in a secret. You can use this with:

@@ -46,6 +46,7 @@ const (
 	loadBalancerLimitExceeded = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=info msg=\"Cluster operator ingress Available is False with IngressUnavailable: The \"default\" ingress controller reports Available=False: IngressControllerUnavailable: One or more status	conditions indicate unavailable: LoadBalancerReady=False (SyncLoadBalancerFailed: The service-controller component is reporting SyncLoadBalancerFailed events like: Error syncing load balancer: failed to ensure load balancer: TooManyLoadBalancers: Exceeded quota of account 1234567890\n\tstatus code: 400, request id: f0cb17ec-68b6-4f32-8997-cce5049a6a1e\nThe kube-controller-manager logs may contain more details.)"
 	proxyTimeoutLog           = "time=\"2021-11-17T03:56:25Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: i/o timeout]): quay.io/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: i/o timeout"
 	proxyInvalidCABundleLog   = "time=\"2021-08-27T05:56:50Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority]): quay.io/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority"
+	awsEC2QuotaExceeded       = "time=\"2021-12-12T12:54:36Z\" level=fatal msg=\"failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Quota Check\": error(MissingQuota): ec2/L-1234A56B is not available in us-east-1 because the required number of resources (36) is more than the limit of 32\""
 	noMatchLog                = "an example of something that doesn't match the log regexes"
 )
 
@@ -313,6 +314,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "LoadBalancerLimitExceeded",
 			log:            pointer.StringPtr(loadBalancerLimitExceeded),
 			expectedReason: "LoadBalancerLimitExceeded",
+		},
+		{
+			name:           "AWSEC2QuotaExceeded",
+			log:            pointer.StringPtr(awsEC2QuotaExceeded),
+			expectedReason: "AWSEC2QuotaExceeded",
 		},
 	}
 

@@ -1569,6 +1569,11 @@ data:
   regexes: |
 
     # AWS Specific
+    - name: AWSEC2QuotaExceeded
+      searchRegexStrings:
+      - "failed to generate asset.*Platform Quota Check.*MissingQuota.*ec2"
+      installFailingReason: AWSEC2QuotaExceeded
+      installFailingMessage: AWS EC2 Quota Exceeded
     - name: AWSNATGatewayLimitExceeded
       searchRegexStrings:
       - "NatGatewayLimitExceeded"

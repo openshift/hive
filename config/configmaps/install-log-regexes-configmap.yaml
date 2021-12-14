@@ -204,6 +204,12 @@ data:
 
 
     # Generic OpenShift Install
+    
+    - name: BootstrapFailed
+      searchRegexStrings:
+      - "Bootstrap failed to complete: timed out waiting for the condition"
+      installFailingReason: BootstrapFailed
+      installFailingMessage: Bootstrap failed to complete
     - name: KubeAPIWaitTimeout
       searchRegexStrings:
       - "waiting for Kubernetes API: context deadline exceeded"

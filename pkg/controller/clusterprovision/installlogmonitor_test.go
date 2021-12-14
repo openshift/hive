@@ -323,8 +323,8 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "AWSEC2QuotaExceeded",
 			log:            pointer.StringPtr(awsEC2QuotaExceeded),
 			expectedReason: "AWSEC2QuotaExceeded",
-    },
-    {
+		},
+		{
 			name:           "AWSNoWorkerNodes",
 			log:            pointer.StringPtr(fmt.Sprintf(noWorkerNodesFmt, "aws", "aws")),
 			expectedReason: "AWSNoWorkerNodes",

@@ -1780,6 +1780,13 @@ data:
       - "Bootstrap failed to complete: timed out waiting for the condition"
       installFailingReason: BootstrapFailed
       installFailingMessage: Bootstrap failed to complete
+    # https://bugzilla.redhat.com/show_bug.cgi?id=2032521
+    # openshift-installer intermittent failure on AWS with Error: Provider produced inconsistent result after apply
+    - name: InconsistentTerraformResult
+      searchRegexStrings:
+      - "Error: Provider produced inconsistent result after apply"
+      installFailingReason: InconsistentTerraformResult
+      installFailingMessage: Inconsistent result after Terraform apply
     - name: KubeAPIWaitTimeout
       searchRegexStrings:
       - "waiting for Kubernetes API: context deadline exceeded"

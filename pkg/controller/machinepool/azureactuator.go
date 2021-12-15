@@ -98,6 +98,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	)
 
 	// Use image set for machinepool azure platform instead of the default
+	// TODO: Pass the image to installazure.MachineSets when image able to be provided
 	if image := pool.Spec.Platform.Azure.Image; (machineapi.Image{}) != image {
 		for _, ms := range installerMachineSets {
 			provider := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)

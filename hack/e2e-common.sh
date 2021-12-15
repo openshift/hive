@@ -1,8 +1,8 @@
-max_tries=60
+max_tries=120
 sleep_between_tries=10
 # Set timeout for the cluster deployment to install
 # timeout = sleep_between_cluster_deployment_status_checks * max_cluster_deployment_status_checks
-max_cluster_deployment_status_checks=90
+max_cluster_deployment_status_checks=180
 sleep_between_cluster_deployment_status_checks="1m"
 
 export CLUSTER_NAMESPACE="${CLUSTER_NAMESPACE:-cluster-test}"

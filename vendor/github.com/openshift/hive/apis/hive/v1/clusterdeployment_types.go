@@ -293,6 +293,10 @@ type ClusterDeploymentStatus struct {
 	// InstalledTimestamp is the time we first detected that the cluster has been successfully installed.
 	InstalledTimestamp *metav1.Time `json:"installedTimestamp,omitempty"`
 
+	// PowerState indicates the powerstate of cluster
+	// +optional
+	PowerState string `json:"powerState,omitempty"`
+
 	// ProvisionRef is a reference to the last ClusterProvision created for the deployment
 	// +optional
 	ProvisionRef *corev1.LocalObjectReference `json:"provisionRef,omitempty"`
@@ -368,6 +372,10 @@ const (
 	// transitioning to/from a hibernating state or is in a hibernating state.
 	ClusterHibernatingCondition ClusterDeploymentConditionType = "Hibernating"
 
+	// ClusterReadyCondition works in conjunction with ClusterHibernatingCondition and gives more information
+	// pertaining to the transition status of the cluster and whether it is running and ready
+	ClusterReadyCondition ClusterDeploymentConditionType = "Ready"
+
 	// InstallLaunchErrorCondition is set when a cluster provision fails to launch an install pod
 	InstallLaunchErrorCondition ClusterDeploymentConditionType = "InstallLaunchError"
 
@@ -411,6 +419,7 @@ const (
 var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionType{
 	ActiveAPIURLOverrideCondition,
 	ClusterHibernatingCondition,
+	ClusterReadyCondition,
 	AWSPrivateLinkReadyClusterDeploymentCondition,
 	ClusterInstallCompletedClusterDeploymentCondition,
 	ClusterInstallRequirementsMetClusterDeploymentCondition,
@@ -418,17 +427,16 @@ var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionTy
 	ProvisionedCondition,
 }
 
-// Cluster hibernating reasons
+// Cluster hibernating and ready reasons
 const (
-	// ResumingHibernationReason is used as the reason when the cluster is transitioning
-	// from a Hibernating state to a Running state.
-	ResumingHibernationReason = "Resuming"
-	// RunningHibernationReason is used as the reason when the cluster is running and
-	// the Hibernating condition is false.
-	RunningHibernationReason = "Running"
+	// ResumingOrRunningHibernationReason is used as the reason for the Hibernating condition when the cluster
+	// is resuming or running. Precise details are available in the Ready condition.
+	ResumingOrRunningHibernationReason = "ResumingOrRunning"
 	// StoppingHibernationReason is used as the reason when the cluster is transitioning
 	// from a Running state to a Hibernating state.
 	StoppingHibernationReason = "Stopping"
+	// WaitingForMachinesToStopHibernatingReason is used on the Hibernating condition when waiting for cloud VMs to stop
+	WaitingForMachinesToStopHibernatingReason = "WaitingForMachinesToStop"
 	// HibernatingHibernationReason is used as the reason when the cluster is in a
 	// Hibernating state.
 	HibernatingHibernationReason = "Hibernating"
@@ -440,9 +448,6 @@ const (
 	// FailedToStopHibernationReason is used when there was an error stopping machines
 	// to enter hibernation
 	FailedToStopHibernationReason = "FailedToStop"
-	// FailedToStartHibernationReason is used when there was an error starting machines
-	// to leave hibernation
-	FailedToStartHibernationReason = "FailedToStart"
 	// SyncSetsNotAppliedReason is used as the reason when SyncSets have not yet been applied
 	// for the cluster based on ClusterSync.Status.FirstSucessTime
 	SyncSetsNotAppliedReason = "SyncSetsNotApplied"
@@ -450,6 +455,26 @@ const (
 	// (It does not necessarily mean they are currently copacetic -- check ClusterSync status
 	// for that.)
 	SyncSetsAppliedReason = "SyncSetsApplied"
+
+	// StoppingOrHibernatingReadyReason is used as the reason for the Ready condition when the cluster
+	// is stopping or hibernating. Precise details are available in the Hibernating condition.
+	StoppingOrHibernatingReadyReason = "StoppingOrHibernating"
+	// StartingMachinesReadyReason is used to reflect attempt to list and start cloud VMs
+	StartingMachinesReadyReason = "StartingMachines"
+	// FailedToStartMachinesReadyReason is used when there was an error starting machines
+	// to leave hibernation
+	FailedToStartMachinesReadyReason = "FailedToStartMachines"
+	// WaitingForMachinesReadyReason is used on the Ready condition when waiting for cloud VMs to start.
+	WaitingForMachinesReadyReason = "WaitingForMachines"
+	// WaitingForNodesReadyReason is used on the Ready condition when waiting for nodes to become Ready.
+	WaitingForNodesReadyReason = "WaitingForNodes"
+	// PausingForClusterOperatorsToSettleReadyReason is used on the Ready condition when pausing to let ClusterOperators start and post new status before we check it.
+	PausingForClusterOperatorsToSettleReadyReason = "PausingForClusterOperatorsToSettle"
+	// WaitingForClusterOperatorsReadyReason is used on the Ready condition when waiting for ClusterOperators to
+	// get to a good state. (Available=True, Processing=False, Degraded=False)
+	WaitingForClusterOperatorsReadyReason = "WaitingForClusterOperators"
+	// RunningReadyReason is used on the Ready condition as the reason when the cluster is running and ready
+	RunningReadyReason = "Running"
 )
 
 // Provisioned status condition reasons
@@ -484,7 +509,7 @@ const InitializedConditionReason = "Initialized"
 // +kubebuilder:printcolumn:name="Version",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/version-major-minor-patch"
 // +kubebuilder:printcolumn:name="ClusterType",type="string",JSONPath=".metadata.labels.hive\\.openshift\\.io/cluster-type"
 // +kubebuilder:printcolumn:name="ProvisionStatus",type="string",JSONPath=".status.conditions[?(@.type=='Provisioned')].reason"
-// +kubebuilder:printcolumn:name="PowerState",type="string",JSONPath=".status.conditions[?(@.type=='Hibernating')].reason"
+// +kubebuilder:printcolumn:name="PowerState",type="string",JSONPath=".status.powerState"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:resource:path=clusterdeployments,shortName=cd,scope=Namespaced
 type ClusterDeployment struct {

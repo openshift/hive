@@ -88,6 +88,14 @@ data:
       - "Throttling: Rate exceeded"
       installFailingReason: AWSAPIRateLimitExceeded
       installFailingMessage: AWS API rate limit exceeded
+    # This issue is caused by AWS throttling the CreateHostedZone request. The terraform provider is not properly
+    # handling the throttling response and gets stuck in a state where it does not retry the request. Eventually,
+    # the terraform provider times out claiming that it is waiting for the hosted zone to be INSYNC.
+    - name: AWSRoute53Timeout
+      searchRegexStrings:
+      - "error waiting for Route53 Hosted Zone .* creation: timeout while waiting for state to become 'INSYNC'"
+      installFailingReason: AWSRoute53Timeout
+      installFailingMessage: AWS Route53 timeout while waiting for INSYNC. This is usually caused by Route53 rate limiting.
     - name: InvalidCredentials
       searchRegexStrings:
       - "InvalidClientTokenId: The security token included in the request is invalid."

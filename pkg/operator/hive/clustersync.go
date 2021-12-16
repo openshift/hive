@@ -44,7 +44,10 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	asset := assets.MustAsset(ssAsset)
 	hLog.Debug("reading statefulset")
 	newClusterSyncStatefulSet := controllerutils.ReadStatefulsetOrDie(asset)
-	hiveContainer := &newClusterSyncStatefulSet.Spec.Template.Spec.Containers[0]
+	hiveContainer, err := containerByName(&newClusterSyncStatefulSet.Spec.Template.Spec, "clustersync")
+	if err != nil {
+		return err
+	}
 
 	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {

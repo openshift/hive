@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,4 +53,13 @@ func computeHash(data interface{}, additionalHashes ...string) string {
 		hasher.Write([]byte(h))
 	}
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func containerByName(template *corev1.PodSpec, name string) (*corev1.Container, error) {
+	for i, container := range template.Containers {
+		if container.Name == name {
+			return &template.Containers[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no container named %s", name)
 }

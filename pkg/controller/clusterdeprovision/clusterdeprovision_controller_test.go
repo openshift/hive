@@ -44,10 +44,15 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
-		name                           string
-		deployment                     *hivev1.ClusterDeployment
-		deprovision                    *hivev1.ClusterDeprovision
-		mockGetCallerIdentity          bool
+		name                  string
+		deployment            *hivev1.ClusterDeployment
+		deprovision           *hivev1.ClusterDeprovision
+		mockGetCallerIdentity bool
+		// The reconcile flow deletes the existing deprovision job if it failed, or if its spec
+		// needs to be changed. That's the only delete in the flow. Setting this field to `true`
+		// causes the test driver to mock out that deletion to return an error, allowing coverage
+		// of related error paths.
+		mockDeleteFailure              bool
 		expectedGetCallerIdentityError error
 		existing                       []runtime.Object
 		validate                       func(t *testing.T, c client.Client)
@@ -86,7 +91,6 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			validate: func(t *testing.T, c client.Client) {
 				validateNoJobExists(t, c)
 			},
-			expectErr: true,
 		},
 		{
 			name:        "no-op if cluster deployment has delete protection on",
@@ -102,7 +106,6 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			validate: func(t *testing.T, c client.Client) {
 				validateNoJobExists(t, c)
 			},
-			expectErr: true,
 		},
 		{
 			name:                  "create uninstall job",
@@ -139,19 +142,10 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			deprovision: testClusterDeprovision(),
 			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				func() runtime.Object {
-					job := testUninstallJob()
-					job.Status.Conditions = []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
-						},
-					}
-					now := metav1.Now()
-					job.Status.CompletionTime = &now
-					job.Status.StartTime = &now
-					return job
-				}(),
+				testUninstallJob(batchv1.JobCondition{
+					Type:   batchv1.JobComplete,
+					Status: corev1.ConditionTrue,
+				}),
 			},
 			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
@@ -159,23 +153,28 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:        "error on failed delete",
+			deprovision: testClusterDeprovision(),
+			deployment:  testDeletedClusterDeployment(),
+			existing: []runtime.Object{
+				testUninstallJob(batchv1.JobCondition{
+					Type:   batchv1.JobFailed,
+					Status: corev1.ConditionTrue,
+				}),
+			},
+			mockGetCallerIdentity: true,
+			mockDeleteFailure:     true,
+			expectErr:             true,
+		},
+		{
 			name:        "job failed",
 			deprovision: testClusterDeprovision(),
 			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				func() runtime.Object {
-					job := testUninstallJob()
-					job.Status.Conditions = []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobFailed,
-							Status: corev1.ConditionTrue,
-						},
-					}
-					now := metav1.Now()
-					job.Status.CompletionTime = &now
-					job.Status.StartTime = &now
-					return job
-				}(),
+				testUninstallJob(batchv1.JobCondition{
+					Type:   batchv1.JobFailed,
+					Status: corev1.ConditionTrue,
+				}),
 			},
 			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
@@ -194,20 +193,11 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			deprovision: testClusterDeprovision(),
 			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				func() runtime.Object {
-					job := testUninstallJob()
-					job.Status.Conditions = []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobFailed,
-							Status: corev1.ConditionTrue,
-							Reason: "DeadlineExceeded",
-						},
-					}
-					now := metav1.Now()
-					job.Status.CompletionTime = &now
-					job.Status.StartTime = &now
-					return job
-				}(),
+				testUninstallJob(batchv1.JobCondition{
+					Type:   batchv1.JobFailed,
+					Status: corev1.ConditionTrue,
+					Reason: "DeadlineExceeded",
+				}),
 			},
 			mockGetCallerIdentity: true,
 			validate: func(t *testing.T, c client.Client) {
@@ -226,19 +216,10 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			deprovision: testClusterDeprovision(),
 			deployment:  testDeletedClusterDeployment(),
 			existing: []runtime.Object{
-				func() runtime.Object {
-					job := testUninstallJob()
-					job.Status.Conditions = []batchv1.JobCondition{
-						{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
-						},
-					}
-					now := metav1.Now()
-					job.Status.CompletionTime = &now
-					job.Status.StartTime = &now
-					return job
-				}(),
+				testUninstallJob(batchv1.JobCondition{
+					Type:   batchv1.JobComplete,
+					Status: corev1.ConditionTrue,
+				}),
 			},
 			mockGetCallerIdentity:          true,
 			expectedGetCallerIdentityError: awserr.New("InvalidClientTokenId", "", fmt.Errorf("")),
@@ -300,7 +281,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			}
 			existing := append(test.existing, test.deprovision, test.deployment)
 
-			mocks := setupDefaultMocks(t, existing...)
+			mocks := setupDefaultMocks(t, test.mockDeleteFailure, existing...)
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
 			defer mocks.mockCtrl.Finish()
@@ -337,9 +318,12 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				test.validate(t, mocks.fakeKubeClient)
 			}
 
-			if !test.expectErr && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+			if test.expectErr {
+				assert.NotNil(t, err, "Expected error but didn't get one")
+			} else {
+				assert.Nil(t, err, "Unexpected error: %v", err)
 			}
+
 		})
 	}
 }
@@ -384,7 +368,11 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	}
 }
 
-func testUninstallJob() *batchv1.Job {
+// testUninstallJob returns a Job for the deprovision generated by testClusterDeprovision().
+// By default, the start and completion timestamps are unset.
+// If one or more `conditions` are specified, we will set the time stamps in addition to adding the
+// specified conditions.
+func testUninstallJob(conditions ...batchv1.JobCondition) *batchv1.Job {
 	uninstallJob, _ := install.GenerateUninstallerJobForDeprovision(testClusterDeprovision(),
 		"someserviceaccount", "", "", "", nil)
 	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
@@ -393,6 +381,14 @@ func testUninstallJob() *batchv1.Job {
 	}
 
 	uninstallJob.Annotations[jobHashAnnotation] = hash
+
+	if len(conditions) != 0 {
+		uninstallJob.Status.Conditions = conditions
+		now := metav1.Now()
+		uninstallJob.Status.CompletionTime = &now
+		uninstallJob.Status.StartTime = &now
+	}
+
 	return uninstallJob
 }
 

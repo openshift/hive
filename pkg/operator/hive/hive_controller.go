@@ -459,7 +459,12 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	managedDomainsConfigHash, err := r.configureManagedDomains(hLog, h, instance, namespacesToClean)
+	// We used to name the managed domains configmap dynamically and look it up by label. We
+	// stopped doing that, but for upgrade purposes we should continue to look for and delete
+	// any such old configmaps for "a while".
+	r.scrubOldManagedDomainsConfigMaps(h, hLog, append(namespacesToClean, hiveNSName)...)
+
+	managedDomainsConfigHash, err := r.deployConfigMap(hLog, h, instance, managedDomainsConfigMapInfo, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error setting up managed domains")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorSettingUpManagedDomains", err.Error())
@@ -467,7 +472,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	plConfigHash, err := r.deployAWSPrivateLinkConfigMap(hLog, h, instance, namespacesToClean)
+	plConfigHash, err := r.deployConfigMap(hLog, h, instance, awsPrivateLinkConfigMapInfo, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying aws privatelink configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingAWSPrivatelinkConfigmap", err.Error())
@@ -475,7 +480,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	fpConfigHash, err := r.deployFailedProvisionConfigMap(hLog, h, instance, namespacesToClean)
+	fpConfigHash, err := r.deployConfigMap(hLog, h, instance, failedProvisionConfigMapInfo, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying failed provision configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingFailedProvisionConfigmap", err.Error())
@@ -483,22 +488,24 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	scConfigHash, err := r.deploySupportedContractsConfigMap(hLog, h, instance, namespacesToClean)
+	scConfigHash, err := r.deployConfigMap(hLog, h, instance, r.supportedContractsConfigMapInfo(), namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying supported contracts configmap")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
 
-	confighash, err := r.deployHiveControllersConfigMap(hLog, h, instance, namespacesToClean, plConfigHash)
+	confighash, err := r.deployConfigMap(hLog, h, instance, hiveControllersConfigMapInfo, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying controllers configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingControllersConfigmap", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
+	// Incorporate the AWSPrivateLink configmap hash
+	confighash = computeHash("", confighash, plConfigHash)
 
-	fgConfigHash, err := r.deployFeatureGatesConfigMap(hLog, h, instance, namespacesToClean)
+	fgConfigHash, err := r.deployConfigMap(hLog, h, instance, featureGatesConfigMapInfo, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying feature gates configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingFeatureGatesConfigmap", err.Error())

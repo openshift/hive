@@ -184,3 +184,9 @@ func WithRunningCount(size int) Option {
 		clusterPool.Spec.RunningCount = int32(size)
 	}
 }
+
+func WithInventory(inventory []hivev1.InventoryEntry) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.Inventory = inventory
+	}
+}

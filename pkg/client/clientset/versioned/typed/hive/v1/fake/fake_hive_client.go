@@ -24,6 +24,10 @@ func (c *FakeHiveV1) ClusterDeployments(namespace string) v1.ClusterDeploymentIn
 	return &FakeClusterDeployments{c, namespace}
 }
 
+func (c *FakeHiveV1) ClusterDeploymentCustomizations(namespace string) v1.ClusterDeploymentCustomizationInterface {
+	return &FakeClusterDeploymentCustomizations{c, namespace}
+}
+
 func (c *FakeHiveV1) ClusterDeprovisions(namespace string) v1.ClusterDeprovisionInterface {
 	return &FakeClusterDeprovisions{c, namespace}
 }

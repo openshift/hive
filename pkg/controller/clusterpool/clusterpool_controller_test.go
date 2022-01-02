@@ -28,6 +28,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testcdc "github.com/openshift/hive/pkg/test/clusterdeploymentcustomization"
 	testcp "github.com/openshift/hive/pkg/test/clusterpool"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testsecret "github.com/openshift/hive/pkg/test/secret"
@@ -38,6 +39,7 @@ const (
 	testLeasePoolName = "aws-us-east-1"
 	credsSecretName   = "aws-creds"
 	imageSetName      = "test-image-set"
+	cdcName           = "test-cdc"
 )
 
 func TestReconcileClusterPool(t *testing.T) {
@@ -72,6 +74,20 @@ func TestReconcileClusterPool(t *testing.T) {
 			Status: corev1.ConditionUnknown,
 			Type:   hivev1.ClusterPoolAllClustersCurrentCondition,
 		}),
+		testcp.WithCondition(hivev1.ClusterPoolCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterPoolInventoryValidCondition,
+		}),
+	)
+
+	inventoryPoolVersion := "17d682718ef4859e"
+	inventroyPoolBuilder := initializedPoolBuilder.Options(
+		testcp.WithInventory([]hivev1.InventoryEntry{
+			{
+				Kind: hivev1.ClusterDeploymentCustomizationInventoryEntry,
+				Name: cdcName,
+			},
+		}),
 	)
 	cdBuilder := func(name string) testcd.Builder {
 		return testcd.FullBuilder(name, name, scheme).Options(
@@ -92,6 +108,8 @@ func TestReconcileClusterPool(t *testing.T) {
 		existing                           []runtime.Object
 		noClusterImageSet                  bool
 		noCredsSecret                      bool
+		noCustomization                    bool
+		inventory                          bool
 		expectError                        bool
 		expectedTotalClusters              int
 		expectedObservedSize               int32
@@ -101,6 +119,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedMissingDependenciesStatus  corev1.ConditionStatus
 		expectedCapacityStatus             corev1.ConditionStatus
 		expectedCDCurrentStatus            corev1.ConditionStatus
+		expectedInventoryVaildStatus       corev1.ConditionStatus
 		expectedMissingDependenciesMessage string
 		expectedAssignedClaims             int
 		expectedUnassignedClaims           int
@@ -121,6 +140,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedMissingDependenciesStatus: corev1.ConditionUnknown,
 			expectedCapacityStatus:            corev1.ConditionUnknown,
 			expectedCDCurrentStatus:           corev1.ConditionUnknown,
+			expectedInventoryVaildStatus:      corev1.ConditionUnknown,
 		},
 		{
 			name: "copyover fields",
@@ -165,6 +185,72 @@ func TestReconcileClusterPool(t *testing.T) {
 				initializedPoolBuilder.Build(testcp.WithInstallConfigSecretTemplateRef("abc123")),
 			},
 			expectPoolVersionChanged: true,
+		},
+		{
+			name: "poolVersion changes with new Inventory",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithInventory(
+					[]hivev1.InventoryEntry{
+						{
+							Kind: hivev1.ClusterDeploymentCustomizationInventoryEntry,
+							Name: cdcName,
+						},
+					},
+				)),
+			},
+			expectPoolVersionChanged: true,
+		},
+		{
+			name: "poolVersion doens't changes with existing Inventory",
+			existing: []runtime.Object{
+				inventroyPoolBuilder.Build(testcp.WithInventory(
+					[]hivev1.InventoryEntry{
+						{
+							Kind: hivev1.ClusterDeploymentCustomizationInventoryEntry,
+							Name: "test-cdc-2",
+						},
+					},
+				)),
+			},
+			inventory:                true,
+			expectPoolVersionChanged: false,
+		},
+		{
+			name: "poolVersion doens't changes with existing Inventory 2",
+			existing: []runtime.Object{
+				inventroyPoolBuilder.Build(),
+			},
+			inventory:                true,
+			expectPoolVersionChanged: false,
+		},
+		{
+			name: "customized clusterpool will creates a cluster",
+			existing: []runtime.Object{
+				inventroyPoolBuilder.Build(testcp.WithSize(1)),
+			},
+			inventory:                    true,
+			expectedTotalClusters:        1,
+			expectedObservedSize:         0,
+			expectedObservedReady:        0,
+			expectedInventoryVaildStatus: corev1.ConditionUnknown,
+		},
+		{
+			name: "customized clusterpool inventory valid",
+			existing: []runtime.Object{
+				inventroyPoolBuilder.Build(testcp.WithSize(1)),
+				testcd.FullBuilder("c1", "c1", scheme).Build(
+					testcd.WithPoolVersion(inventoryPoolVersion),
+					testcd.WithPowerState(hivev1.ClusterPowerStateHibernating),
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithClusterDeploymentCustomizationReference(cdcName),
+					testcd.Running(),
+				),
+			},
+			inventory:                    true,
+			expectedTotalClusters:        1,
+			expectedObservedSize:         1,
+			expectedObservedReady:        1,
+			expectedInventoryVaildStatus: corev1.ConditionTrue,
 		},
 		{
 			// This also proves we only delete one stale cluster at a time
@@ -1417,6 +1503,12 @@ func TestReconcileClusterPool(t *testing.T) {
 						Build(testsecret.WithDataKeyValue("dummykey", []byte("dummyval"))),
 				)
 			}
+			if !test.noCustomization {
+				test.existing = append(
+					test.existing,
+					testcdc.FullBuilder(testNamespace, cdcName, scheme).Build(),
+				)
+			}
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
@@ -1452,10 +1544,14 @@ func TestReconcileClusterPool(t *testing.T) {
 				assert.Equal(t, test.expectedObservedSize, pool.Status.Size, "unexpected observed size")
 				assert.Equal(t, test.expectedObservedReady, pool.Status.Ready, "unexpected observed ready count")
 				currentPoolVersion := calculatePoolVersion(pool)
+				expectedPoolVersion := initialPoolVersion
+				if test.inventory {
+					expectedPoolVersion = inventoryPoolVersion
+				}
 				assert.Equal(
-					t, test.expectPoolVersionChanged, currentPoolVersion != initialPoolVersion,
+					t, test.expectPoolVersionChanged, currentPoolVersion != expectedPoolVersion,
 					"expectPoolVersionChanged is %t\ninitial %q\nfinal   %q",
-					test.expectPoolVersionChanged, initialPoolVersion, currentPoolVersion)
+					test.expectPoolVersionChanged, expectedPoolVersion, currentPoolVersion)
 				expectedCDCurrentStatus := test.expectedCDCurrentStatus
 				if expectedCDCurrentStatus == "" {
 					expectedCDCurrentStatus = corev1.ConditionTrue
@@ -1483,6 +1579,14 @@ func TestReconcileClusterPool(t *testing.T) {
 				if assert.NotNil(t, capacityAvailableCondition, "did not find CapacityAvailable condition") {
 					assert.Equal(t, test.expectedCapacityStatus, capacityAvailableCondition.Status,
 						"unexpected CapacityAvailable conditon status")
+				}
+			}
+
+			if test.expectedInventoryVaildStatus != "" {
+				inventoryValidCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolInventoryValidCondition)
+				if assert.NotNil(t, inventoryValidCondition, "did not find InventoryValid condition") {
+					assert.Equal(t, test.expectedInventoryVaildStatus, inventoryValidCondition.Status,
+						"unexpcted InventoryValid condition status")
 				}
 			}
 

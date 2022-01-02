@@ -26,6 +26,7 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/hibernation/mock"
@@ -290,6 +291,22 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
 				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
+			},
+		},
+		{
+			name: "customized CD will not hibernate",
+			cd:   cdBuilder.Options(o.customized, o.shouldRun).Build(),
+			// The clustersync controller creates a ClusterSync even when there are no syncsets
+			cs: csBuilder.Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
 			},
 		},
 		{
@@ -1262,6 +1279,13 @@ func readyCondition(status corev1.ConditionStatus, reason string, lastTransition
 }
 
 type clusterDeploymentOptions struct{}
+
+func (*clusterDeploymentOptions) customized(cd *hivev1.ClusterDeployment) {
+	cd.Spec.Platform.OpenStack = &hivev1openstack.Platform{}
+	cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+		ClusterDeploymentCustomizationRef: &corev1.LocalObjectReference{Name: "cdc"},
+	}
+}
 
 func (*clusterDeploymentOptions) notInstalled(cd *hivev1.ClusterDeployment) {
 	cd.Spec.Installed = false

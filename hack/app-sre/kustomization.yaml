@@ -29,6 +29,7 @@ resources:
 - ../../config/crds/hive.openshift.io_selectorsyncsets.yaml
 - ../../config/crds/hive.openshift.io_syncidentityproviders.yaml
 - ../../config/crds/hive.openshift.io_syncsets.yaml
+- ../../config/crds/hive.openshift.io_clusterdeploymentcustomizations.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Use app-sre-supplied variables to pull the image for the current commit

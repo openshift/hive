@@ -564,11 +564,19 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 		cdLog.Debugf("adding clusterdeployment finalizer")
 		if err := r.addClusterDeploymentFinalizer(cd); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding deprovision finalizer")
 			return reconcile.Result{}, err
 		}
 		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
 		return reconcile.Result{}, nil
+	}
+
+	if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.ClusterDeploymentCustomizationRef != nil && !controllerutils.HasFinalizer(cd, hivev1.FinalizerCustomizationRelease) {
+		cdLog.Debugf("adding customization finalizer")
+		if err := r.addClusterDeploymentCustomizationFinalizer(cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding customization finalizer")
+			return reconcile.Result{}, err
+		}
 	}
 
 	if cd.Spec.ManageDNS {
@@ -1184,6 +1192,19 @@ func (r *ReconcileClusterDeployment) setClusterStatusURLs(cd *hivev1.ClusterDepl
 	return reconcile.Result{}, nil
 }
 
+func (r *ReconcileClusterDeployment) ensureClusterDeploymentCustomizationIsReleased(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (gone bool, returnErr error) {
+	if cd.Spec.ClusterPoolRef == nil || cd.Spec.ClusterPoolRef.ClusterDeploymentCustomizationRef == nil {
+		return true, nil
+	}
+
+	if err := r.releaseClusterDeploymentCustomization(cd, cdLog); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error releasing inventory customization")
+		return false, err
+	}
+
+	return true, nil
+}
+
 // ensureManagedDNSZoneDeleted is a safety check to ensure that the child managed DNSZone
 // linked to the parent cluster deployment gets a deletionTimestamp when the parent is deleted.
 // Normally we expect Kube garbage collection to do this for us, but in rare cases we've seen it
@@ -1383,13 +1404,23 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 
+	customizationReleased := false
+	if deprovisioned {
+		customizationReleased, err = r.ensureClusterDeploymentCustomizationIsReleased(cd, cdLog)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	switch {
 	case !deprovisioned:
 		return reconcile.Result{}, nil
 	case !dnsZoneGone:
 		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	case !customizationReleased:
+		return reconcile.Result{}, nil
 	default:
-		cdLog.Infof("DNSZone gone and deprovision request completed, removing finalizer")
+		cdLog.Infof("DNSZone gone, customization released and deprovision request completed, removing finalizer")
 		if err := r.removeClusterDeploymentFinalizer(cd, cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 			return reconcile.Result{}, err
@@ -1401,6 +1432,12 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
 	cd = cd.DeepCopy()
 	controllerutils.AddFinalizer(cd, hivev1.FinalizerDeprovision)
+	return r.Update(context.TODO(), cd)
+}
+
+func (r *ReconcileClusterDeployment) addClusterDeploymentCustomizationFinalizer(cd *hivev1.ClusterDeployment) error {
+	cd = cd.DeepCopy()
+	controllerutils.AddFinalizer(cd, hivev1.FinalizerCustomizationRelease)
 	return r.Update(context.TODO(), cd)
 }
 
@@ -1418,6 +1455,46 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 
 	// Increment the clusters deleted counter:
 	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+
+	return nil
+}
+
+func (r *ReconcileClusterDeployment) releaseClusterDeploymentCustomization(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	customizationRef := cd.Spec.ClusterPoolRef.ClusterDeploymentCustomizationRef
+	cdc := &hivev1.ClusterDeploymentCustomization{}
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: cd.Spec.ClusterPoolRef.Namespace, Name: customizationRef.Name}, cdc)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			cdLog.Infof("customization not found: %s/%s, nothing to release", cd.Namespace, customizationRef.Name)
+			controllerutils.DeleteFinalizer(cd, hivev1.FinalizerCustomizationRelease)
+			return nil
+		}
+		log.WithError(err).Error("error reading customization")
+		return err
+	}
+
+	conds, changed := controllerutils.SetClusterDeploymentCustomizationCondition(
+		cdc.Status.Conditions,
+		hivev1.ClusterDeploymentCustomizationAvailableCondition,
+		corev1.ConditionTrue,
+		"ClusterDeploymentCustomizationAvailable",
+		"Cluster Deployment Customization is available",
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if changed {
+		cdc.Status.Conditions = conds
+		cdc.Status.ClusterDeploymentRef = nil
+		if err := r.Status().Update(context.Background(), cdc); err != nil {
+			cdLog.Infof("Failed to update ClusterDeploymentCustomization %s condition", customizationRef.Name)
+			return err
+		}
+	}
+
+	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerCustomizationRelease)
+	if err := r.Update(context.TODO(), cd); err != nil {
+		cdLog.Infof("Failed to update ClusterDeployment after ClusterDeploymentCustomization finalizer deletion")
+		return err
+	}
 
 	return nil
 }

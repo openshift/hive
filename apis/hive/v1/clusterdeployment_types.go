@@ -52,6 +52,10 @@ const (
 	// FinalizerArgoCDCluster is used on ClusterDeployments to ensure we clean up the ArgoCD cluster
 	// secret before cleaning up the API object.
 	FinalizerArgoCDCluster = "hive.openshift.io/argocd-cluster"
+
+	// FinalizerCustomizationRelease is used on ClusterDeployments to ensure we run a successful
+	// release of ClusterDeploymentCustomization
+	FinalizerCustomizationRelease string = "hive.openshift.io/customization"
 )
 
 // ClusterPowerState is used to indicate whether a cluster is running or in a
@@ -276,6 +280,8 @@ type ClusterPoolReference struct {
 	// ClaimedTimestamp is the time this cluster was assigned to a ClusterClaim. This is only used for
 	// ClusterDeployments belonging to ClusterPools.
 	ClaimedTimestamp *metav1.Time `json:"claimedTimestamp,omitempty"`
+	// ClusterDeploymentCustomizationRef is the ClusterPool Inventory claimed customization for this ClusterDeployment
+	ClusterDeploymentCustomizationRef *corev1.LocalObjectReference `json:"clusterDeploymentCustomization"`
 }
 
 // ClusterMetadata contains metadata information about the installed cluster.

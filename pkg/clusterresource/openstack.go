@@ -15,6 +15,12 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 )
 
+const (
+	computeFlavor   = "m1.large"
+	masterFlavor    = "ci.m4.xlarge"
+	externalNetwork = "provider_net_shared_3"
+)
+
 var _ CloudBuilder = (*OpenStackCloudBuilder)(nil)
 
 // OpenStackCloudBuilder encapsulates cluster artifact generation logic specific to OpenStack.
@@ -41,6 +47,13 @@ type OpenStackCloudBuilder struct {
 
 	// MasterFlavor is the OpenStack flavor type to use for master instances.
 	MasterFlavor string
+}
+
+func NewOpenStackCloudBuilderFromSecret(credsSecret *corev1.Secret) *OpenStackCloudBuilder {
+	cloudsYamlContent := credsSecret.Data[constants.OpenStackCredentialsName]
+	return &OpenStackCloudBuilder{
+		CloudsYAMLContent: cloudsYamlContent,
+	}
 }
 
 func (p *OpenStackCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -80,19 +93,18 @@ func (p *OpenStackCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.Ma
 func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
 	ic.Platform = installertypes.Platform{
 		OpenStack: &installeropenstack.Platform{
-			Cloud:                p.Cloud,
-			ExternalNetwork:      p.ExternalNetwork,
-			DeprecatedFlavorName: p.ComputeFlavor,
+			ExternalNetwork:      externalNetwork,
+			DeprecatedFlavorName: computeFlavor,
 			APIFloatingIP:        p.APIFloatingIP,
 			IngressFloatingIP:    p.IngressFloatingIP,
 		},
 	}
 
 	ic.Compute[0].Platform.OpenStack = &installeropenstack.MachinePool{
-		FlavorName: p.ComputeFlavor,
+		FlavorName: computeFlavor,
 	}
 	ic.ControlPlane.Platform.OpenStack = &installeropenstack.MachinePool{
-		FlavorName: p.MasterFlavor,
+		FlavorName: masterFlavor,
 	}
 }
 

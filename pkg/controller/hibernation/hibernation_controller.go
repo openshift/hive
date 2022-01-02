@@ -223,6 +223,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported, msg,
 			corev1.ConditionFalse, cdLog)
 		if changed {
+			cd.Status.PowerState = hivev1.ClusterPowerStateRunning
 			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
 		}
 	} else if hibernatingCondition.Reason == hivev1.HibernatingReasonUnsupported {
@@ -233,6 +234,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	}
 
 	isFakeCluster := controllerutils.IsFakeCluster(cd)
+	isOnpremCustomized := controllerutils.IsOnpremCustomized(cd)
 
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync); err != nil {
@@ -371,9 +373,15 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return r.checkClusterStopped(cd, false, cdLog)
 	}
 	// If we get here, we're not supposed to be hibernating
-	if isFakeCluster {
-		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonResumingOrRunning,
-			clusterResumingOrRunningMsg, corev1.ConditionFalse, cdLog)
+	if isFakeCluster || isOnpremCustomized {
+		changed := false
+		if supported, msg := r.hibernationSupported(cd); !supported {
+			changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported,
+				msg, corev1.ConditionFalse, cdLog)
+		} else {
+			changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonResumingOrRunning,
+				clusterResumingOrRunningMsg, corev1.ConditionFalse, cdLog)
+		}
 		rChanged := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonRunning, clusterRunningMsg,
 			corev1.ConditionTrue, cdLog)
 		if changed || rChanged {

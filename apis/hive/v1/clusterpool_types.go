@@ -92,6 +92,18 @@ type ClusterPoolSpec struct {
 	// HibernationConfig configures the hibernation/resume behavior of ClusterDeployments owned by the ClusterPool.
 	// +optional
 	HibernationConfig *HibernationConfig `json:"hibernationConfig"`
+
+	// Inventory maintains a list entries consumed by the clusterpool
+	// to customize the default the cluster deployment
+	// +optional
+	Inventory []InventoryEntry `json:"inventory,omitempty"`
+
+	// InventoryAttempts is the number of attempts to provision a ClusterDeployment with a given inventory entry.
+	// On a successful provision, the inventory entry attempts status is updated to this value.
+	// Negative InventoryAttempts means unlimited attempts, and recommended only for debugging purposes.
+	// Default number of InventoryAttempts is 5.
+	// +optional
+	InventoryAttempts *int32 `json:"inventoryAttempts,omitempty"`
 }
 
 type HibernationConfig struct {
@@ -108,6 +120,22 @@ type HibernationConfig struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	ResumeTimeout metav1.Duration `json:"resumeTimeout"`
+}
+
+// InventoryEntryKind in Kind of the inventory entry
+// +kubebuilder:validation:Enum="";ClusterDeploymentCustomization
+type InventoryEntryKind string
+
+const ClusterDeploymentCustomizationInventoryEntry InventoryEntryKind = "ClusterDeploymentCustomization"
+
+// InventoryEntry maintains a reference to a custom resource consumed by a clusterpool to customize the cluster deployment
+type InventoryEntry struct {
+	// Kind denotes the kind of the referenced resource. The default is ClusterDeploymentCustomization, which is also currently the only supported value.
+	// +optional
+	Kind InventoryEntryKind `json:"kind,omitempty"`
+	// Name is the name of the referenced resource.
+	// +required
+	Name string `json:"name,omitempty"`
 }
 
 // ClusterPoolClaimLifetime defines the lifetimes for claims for the cluster pool.
@@ -197,6 +225,8 @@ const (
 	// ClusterPoolAllClustersCurrentCondition indicates whether all unassigned (installing or ready)
 	// ClusterDeployments in the pool match the current configuration of the ClusterPool.
 	ClusterPoolAllClustersCurrentCondition ClusterPoolConditionType = "AllClustersCurrent"
+	// ClusterPoolInventoryValidCondition is set to provide information on whether the cluster pool inventory is valid
+	ClusterPoolInventoryValidCondition ClusterPoolConditionType = "InventoryValid"
 )
 
 // +genclient

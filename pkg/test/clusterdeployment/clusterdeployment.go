@@ -3,6 +3,7 @@ package clusterdeployment
 import (
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -241,5 +242,11 @@ func WithAlibabaCloudPlatform(platform *hivev1alibabacloud.Platform) Option {
 func WithClusterMetadata(clusterMetadata *hivev1.ClusterMetadata) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.ClusterMetadata = clusterMetadata
+	}
+}
+
+func WithClusterDeploymentCustomizationReference(cdcName string) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.ClusterPoolRef.ClusterDeploymentCustomizationRef = &corev1.LocalObjectReference{Name: cdcName}
 	}
 }

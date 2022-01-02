@@ -263,6 +263,19 @@ func isBroken(cd *hivev1.ClusterDeployment, pool *hivev1.ClusterPool, logger log
 		logger.Infof("Cluster %s is broken due to resume timeout", cd.Name)
 		return true
 	}
+	if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.ClusterDeploymentCustomizationRef != nil {
+		customizationExists := false
+		cdcName := cd.Spec.ClusterPoolRef.ClusterDeploymentCustomizationRef.Name
+		for _, entry := range pool.Spec.Inventory {
+			if cdcName == entry.Name {
+				customizationExists = true
+			}
+		}
+		if !customizationExists {
+			logger.Infof("Cluster %s is broken due to removed customization %s", cd.Name, cdcName)
+			return true
+		}
+	}
 
 	return false
 }

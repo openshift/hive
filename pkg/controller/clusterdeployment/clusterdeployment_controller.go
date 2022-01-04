@@ -665,14 +665,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return *result, err
 	}
 
-	// Sanity check the platform/cloud credentials.
-	validCreds, err := r.validatePlatformCreds(cd, cdLog)
-	if err != nil {
-		cdLog.WithError(err).Error("unable to validate platform credentials")
-		return reconcile.Result{}, err
-	}
-	// Make sure the condition is set properly.
-	_, err = r.setAuthenticationFailure(cd, validCreds, cdLog)
+	// Sanity check the platform/cloud credentials and set hivev1.AuthenticationFailureClusterDeploymentCondition
+	validCreds, authError := r.validatePlatformCreds(cd, cdLog)
+	_, err := r.setAuthenticationFailure(cd, validCreds, authError, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to update clusterdeployment")
 		return reconcile.Result{}, err
@@ -1052,7 +1047,7 @@ func (r *ReconcileClusterDeployment) updateCondition(
 	return r.Status().Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.ClusterDeployment, authSuccessful bool, cdLog log.FieldLogger) (bool, error) {
+func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.ClusterDeployment, authSuccessful bool, authError error, cdLog log.FieldLogger) (bool, error) {
 
 	var status corev1.ConditionStatus
 	var reason, message string
@@ -1064,7 +1059,7 @@ func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.Cluster
 	} else {
 		status = corev1.ConditionTrue
 		reason = platformAuthFailureReason
-		message = "Platform credentials failed authentication check"
+		message = fmt.Sprintf("Platform credentials failed authentication check: %s", authError)
 	}
 
 	conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(

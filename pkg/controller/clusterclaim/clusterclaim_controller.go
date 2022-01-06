@@ -337,8 +337,15 @@ func (r *ReconcileClusterClaim) reconcileDeletedClaim(claim *hivev1.ClusterClaim
 		return reconcile.Result{}, nil
 	}
 
-	if err := r.cleanupResources(claim, logger); err != nil {
+	claimReadyForDeletion, err := r.cleanupResources(claim, logger)
+	if err != nil {
 		return reconcile.Result{}, err
+	}
+	if !claimReadyForDeletion {
+		logger.Info("waiting for associated resources to be deleted")
+		// Don't requeue; our watches for CD, role, and rolebinding will trigger the Reconcile as
+		// those resources disappear.
+		return reconcile.Result{}, nil
 	}
 
 	logger.Info("removing finalizer from ClusterClaim")
@@ -351,52 +358,60 @@ func (r *ReconcileClusterClaim) reconcileDeletedClaim(claim *hivev1.ClusterClaim
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, logger log.FieldLogger) error {
+// cleanupResources deletes the ClusterDeployment, Role, and RoleBinding associated with this claim.
+// (The CD deletion is via an annotation that's acted on by the clusterpoolnamespace controller.)
+// The first return value is true iff the associated resources are actually gone (as opposed to
+// just marked for deletion).
+func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, logger log.FieldLogger) (bool, error) {
 	clusterName := claim.Spec.Namespace
 	if clusterName == "" {
 		logger.Info("no resources to clean up since claim was never assigned a cluster")
-		return nil
+		return true, nil
 	}
 	logger = logger.WithField("cluster", clusterName)
+
+	var cdGone, rolebindingGone, roleGone bool
+	var err error
 
 	cd := &hivev1.ClusterDeployment{}
 	switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {
 	case apierrors.IsNotFound(err):
 		logger.Info("cluster does not exist")
-		return nil
+		cdGone = true
 	case err != nil:
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "error getting ClusterDeployment")
-		return err
+		return false, err
 	}
 
 	if poolRef := cd.Spec.ClusterPoolRef; poolRef == nil || poolRef.Namespace != claim.Namespace || poolRef.ClaimName != claim.Name {
 		logger.Info("assigned cluster was not claimed")
-		return nil
+		return true, nil
 	}
 
 	// Delete RoleBinding
-	if err := resource.DeleteAnyExistingObject(
+	rolebindingGone, err = resource.DeleteAnyExistingObject(
 		r,
 		client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleBindingName},
 		&rbacv1.RoleBinding{},
 		logger,
-	); err != nil {
-		return err
+	)
+	if err != nil {
+		return false, err
 	}
 
 	// Delete Role
-	if err := resource.DeleteAnyExistingObject(
+	roleGone, err = resource.DeleteAnyExistingObject(
 		r,
 		client.ObjectKey{Namespace: clusterName, Name: hiveClaimOwnerRoleName},
 		&rbacv1.Role{},
 		logger,
-	); err != nil {
-		return err
+	)
+	if err != nil {
+		return false, err
 	}
 
 	// Delete ClusterDeployment
-	toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(cd)
-	if cd.DeletionTimestamp == nil && !toRemove {
+	if !cdGone && cd.DeletionTimestamp == nil && !controllerutils.IsClaimedClusterMarkedForRemoval(cd) {
 		logger.Info("deleting clusterDeployment")
 		if cd.Annotations == nil {
 			cd.Annotations = map[string]string{}
@@ -404,11 +419,11 @@ func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, log
 		cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation] = "true"
 		if err := r.Update(context.Background(), cd); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating ClusterDeployment to mark it for deletion")
-			return err
+			return false, err
 		}
 	}
 
-	return nil
+	return cdGone && rolebindingGone && roleGone, nil
 }
 
 func (r *ReconcileClusterClaim) reconcileForDeletedCluster(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {

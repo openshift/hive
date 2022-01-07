@@ -114,7 +114,11 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	asset := assets.MustAsset(deploymentAsset)
 	hLog.Debug("reading deployment")
 	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
-	hiveAdmContainer := &hiveAdmDeployment.Spec.Template.Spec.Containers[0]
+	hiveAdmContainer, err := containerByName(&hiveAdmDeployment.Spec.Template.Spec, "hiveadmission")
+	if err != nil {
+		return err
+	}
+
 	hiveAdmDeployment.Namespace = hiveNSName
 	if r.hiveImage != "" {
 		hiveAdmContainer.Image = r.hiveImage

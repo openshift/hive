@@ -96,7 +96,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	asset := assets.MustAsset(deploymentAsset)
 	hLog.Debug("reading deployment")
 	hiveDeployment := resourceread.ReadDeploymentV1OrDie(asset)
-	hiveContainer := &hiveDeployment.Spec.Template.Spec.Containers[0]
+	hiveContainer, err := containerByName(&hiveDeployment.Spec.Template.Spec, "manager")
+	if err != nil {
+		return err
+	}
 
 	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {
@@ -243,11 +246,11 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		})
 	}
 
-	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment, namespacesToClean); err != nil {
+	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment, hiveContainer, namespacesToClean); err != nil {
 		return err
 	}
 
-	r.includeGlobalPullSecret(hLog, h, instance, hiveDeployment)
+	r.includeGlobalPullSecret(hLog, h, instance, hiveContainer)
 
 	if instance.Spec.MaintenanceMode != nil && *instance.Spec.MaintenanceMode {
 		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-controllers replicas to 0")
@@ -341,7 +344,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	return nil
 }
 
-func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment, namespacesToClean []string) error {
+func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment, hiveContainer *corev1.Container, namespacesToClean []string) error {
 	// Delete any additional CA secrets from previous target namespaces
 	for _, ns := range namespacesToClean {
 		hLog.Infof("Deleting secret/%s from old target namespace %s", hiveAdditionalCASecret, ns)
@@ -411,13 +414,13 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 		},
 	})
 
-	hiveDeployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(hiveDeployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+	hiveContainer.VolumeMounts = append(hiveContainer.VolumeMounts, corev1.VolumeMount{
 		Name:      volumeName,
 		MountPath: "/additional/ca",
 		ReadOnly:  true,
 	})
 
-	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+	hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
 		Name:  "ADDITIONAL_CA",
 		Value: "/additional/ca/ca.crt",
 	})
@@ -425,7 +428,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 	return nil
 }
 
-func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment) {
+func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
 	if instance.Spec.GlobalPullSecretRef == nil || instance.Spec.GlobalPullSecretRef.Name == "" {
 		hLog.Debug("GlobalPullSecret is not provided in HiveConfig, it will not be deployed")
 		return
@@ -435,7 +438,7 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h re
 		Name:  hiveconstants.GlobalPullSecret,
 		Value: instance.Spec.GlobalPullSecretRef.Name,
 	}
-	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, globalPullSecretEnvVar)
+	hiveContainer.Env = append(hiveContainer.Env, globalPullSecretEnvVar)
 }
 
 func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) (bool, error) {

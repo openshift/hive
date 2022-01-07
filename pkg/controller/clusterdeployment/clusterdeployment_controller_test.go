@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1883,7 +1884,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testClusterDeploymentWithInitializedConditions(testClusterDeployment()),
 			},
 			platformCredentialsValidation: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
-				return false, nil
+				return false, errors.New("Post \"https://xxx.xxx.xxx.xxx/sdk\": x509: cannot validate certificate for xxx.xxx.xxx.xxx because it doesn't contain any IP SANs")
 			},
 			expectErr: true,
 			validate: func(c client.Client, t *testing.T) {
@@ -1891,6 +1892,16 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 
 				testassert.AssertConditionStatus(t, cd, hivev1.AuthenticationFailureClusterDeploymentCondition, corev1.ConditionTrue)
+
+				// Preflight check happens before we declare provisioning
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:    hivev1.AuthenticationFailureClusterDeploymentCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  platformAuthFailureReason,
+						Message: "Platform credentials failed authentication check: Post \"https://xxx.xxx.xxx.xxx/sdk\": x509: cannot validate certificate for xxx.xxx.xxx.xxx because it doesn't contain any IP SANs",
+					},
+				})
 			},
 		},
 		{

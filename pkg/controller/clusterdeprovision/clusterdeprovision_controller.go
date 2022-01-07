@@ -401,9 +401,10 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 			err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil {
 				rLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting outdated deprovision job")
+				return reconcile.Result{}, err
 			}
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	rLog.Infof("uninstall job not yet successful")

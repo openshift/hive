@@ -1315,7 +1315,8 @@ func (m *InstallManager) cleanupAdminPasswordSecret() error {
 
 // deleteAnyExistingObject will look for any object that exists that matches the passed in 'obj' and will delete it if it exists
 func (m *InstallManager) deleteAnyExistingObject(namespacedName types.NamespacedName, obj hivev1.MetaRuntimeObject) error {
-	return resource.DeleteAnyExistingObject(m.DynamicClient, namespacedName, obj, m.log)
+	_, err := resource.DeleteAnyExistingObject(m.DynamicClient, namespacedName, obj, m.log)
+	return err
 }
 
 func waitForProvisioningStage(provision *hivev1.ClusterProvision, m *InstallManager) error {

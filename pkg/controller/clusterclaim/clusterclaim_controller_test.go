@@ -279,11 +279,10 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testRoleBinding(),
 			},
 			expectCompletedClaim:                   true,
-			expectDeleted:                          true,
 			expectAssignedClusterDeploymentDeleted: true,
 		},
 		{
-			name: "deleted claim with missing clusterdeployment",
+			name: "deleted claim with missing clusterdeployment, role, and rolebinding",
 			claim: initializedClaimBuilder.GenericOptions(
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
@@ -304,7 +303,6 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testRoleBinding(),
 			},
 			expectCompletedClaim: true,
-			expectDeleted:        true,
 		},
 		{
 			name: "deleted claim with clusterdeployment assigned to other claim",
@@ -627,7 +625,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			if test.cd != nil {
 				test.existing = append(test.existing, test.cd)
 			}
-			c := fake.NewFakeClientWithScheme(scheme, test.existing...)
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			rcp := &ReconcileClusterClaim{

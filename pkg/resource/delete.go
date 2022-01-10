@@ -14,27 +14,29 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
-// DeleteAnyExistingObject will look for any object that exists that matches the passed in 'obj' and will delete it if it exists
-func DeleteAnyExistingObject(c client.Client, key client.ObjectKey, obj hivev1.MetaRuntimeObject, logger log.FieldLogger) error {
+// DeleteAnyExistingObject will look for any object that exists that matches the passed in 'obj' and will delete it if it exists.
+// The first return value is true iff the object was already gone.
+func DeleteAnyExistingObject(c client.Client, key client.ObjectKey, obj hivev1.MetaRuntimeObject, logger log.FieldLogger) (bool, error) {
 	logger = logger.WithField("object", key)
 	switch err := c.Get(context.Background(), key, obj); {
 	case apierrors.IsNotFound(err):
 		logger.Debug("object does not exist")
-		return nil
+		return true, nil
 	case err != nil:
 		logger.WithError(err).Error("error getting object")
-		return errors.Wrap(err, "error getting object")
+		return false, errors.Wrap(err, "error getting object")
 	}
 	if obj.GetDeletionTimestamp() != nil {
 		logger.Debug("object has already been deleted")
-		return nil
+		// BUT the object still exists!
+		return false, nil
 	}
 	logger.Info("deleting existing object")
 	if err := c.Delete(context.Background(), obj); err != nil {
 		logger.WithError(err).Error("error deleting object")
-		return errors.Wrap(err, "error deleting object")
+		return false, errors.Wrap(err, "error deleting object")
 	}
-	return nil
+	return false, nil
 }
 
 func (r *helper) Delete(apiVersion, kind, namespace, name string) error {

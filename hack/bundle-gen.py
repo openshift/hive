@@ -99,6 +99,14 @@ def get_params():
     )
     args = parser.parse_args()
 
+    if shutil.which("buildah"):
+        args.build_engine = "buildah"
+    elif shutil.which("docker"):
+        args.build_engine = "docker"
+    else:
+        print("neither buildah nor docker found, please install one or the other.")
+        sys.exit(1)
+
     if not os.path.isfile(args.registry_auth_file):
         parser.error(
             "--registry-auth-file ({}) does not exist, provide --registry-auth-file".format(
@@ -113,18 +121,34 @@ def get_params():
     return args
 
 
-# build_and_push_image uses buildah to build the HIVE image from the current working directory
-# (tagged with "v{hive_version}" eg. "v1.2.3187-18827f6") and then pushes the image to quay
-def build_and_push_image(registry_auth_file, hive_version, dry_run):
+# build_and_push_image uses buildah or docker to build the HIVE image from the current
+# working directory (tagged with "v{hive_version}" eg. "v1.2.3187-18827f6") and then
+# pushes the image to quay.
+def build_and_push_image(registry_auth_file, hive_version, dry_run, build_engine):
     container_name = "{}:v{}".format(OPERATORHUB_HIVE_IMAGE_DEFAULT, hive_version)
 
     if dry_run:
         print("Skipping build of container {} due to dry-run".format(container_name))
         return
 
+    if build_engine == "buildah":
+        build = dict(
+            query="buildah images -nq {}",
+            build="buildah bud --tag {} -f ./Dockerfile",
+            push="buildah push --authfile={} {}",
+        )
+        registry_auth_arg = registry_auth_file
+    elif build_engine == "docker":
+        build = dict(
+            query="docker image inspect {}",
+            build="docker build --tag {} -f ./Dockerfile .",
+            push="docker --config {} push {}",
+        )
+        registry_auth_arg = os.path.dirname(registry_auth_file)
+
     # Did we already build it locally?
     cp = subprocess.run(
-        "buildah images -nq {}".format(container_name).split(),
+        build['query'].format(container_name).split(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -138,15 +162,14 @@ def build_and_push_image(registry_auth_file, hive_version, dry_run):
         # build/push the thing
         print("Building container {}".format(container_name))
 
-        cmd = "buildah bud --tag {} -f ./Dockerfile".format(container_name).split()
+        cmd = build['build'].format(container_name).split()
         subprocess.run(cmd, check=True)
 
     print("Pushing container")
-    cmd = "buildah push "
-    if registry_auth_file != None:
-        cmd = cmd + " --authfile={} ".format(registry_auth_file)
-    cmd = cmd + " {}".format(container_name)
-    subprocess.run(cmd.split(), check=True)
+    subprocess.run(
+        build['push'].format(registry_auth_arg, container_name).split(),
+        check=True,
+    )
 
 
 # gen_hive_version generates and returns the hive version eg. "1.2.3187-18827f6"
@@ -518,10 +541,6 @@ def process_branch(hive_repo, branch_arg):
 if __name__ == "__main__":
     args = get_params()
 
-    if not shutil.which("buildah"):
-        print("buildah not found, please install buildah")
-        sys.exit(1)
-
     hive_repo_dir = tempfile.TemporaryDirectory(prefix="hive-repo-")
 
     print("Cloning {} to {}".format(HIVE_REPO, hive_repo_dir.name))
@@ -556,7 +575,7 @@ if __name__ == "__main__":
         raise
 
     hive_version = gen_hive_version(hive_repo, hive_commit, hive_version_prefix)
-    build_and_push_image(args.registry_auth_file, hive_version, args.dry_run)
+    build_and_push_image(args.registry_auth_file, hive_version, args.dry_run, args.build_engine)
 
     # TODO: We shouldn't need channel here, because the package.yaml file is being updated in open_pr (right????)
     generate_csv_base(

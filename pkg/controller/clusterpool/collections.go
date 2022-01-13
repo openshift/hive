@@ -224,17 +224,6 @@ func isBroken(cd *hivev1.ClusterDeployment) bool {
 	return false
 }
 
-func isRunning(cd *hivev1.ClusterDeployment) bool {
-	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
-	if cond == nil {
-		// Since we should be initializing conditions, this probably means the CD is super fresh
-		// and quite unlikely to be running. (That said, this really should never happen, since we
-		// only check this for Installed clusters.)
-		return false
-	}
-	return cond.Reason == hivev1.RunningReadyReason
-}
-
 func (cds *cdCollection) sortInstalling() {
 	// Sort installing CDs so we prioritize deleting those that are furthest away from completing
 	// their installation (prioritizing preserving those that will be assignable the soonest).
@@ -290,7 +279,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 				cdCol.broken = append(cdCol.broken, ref)
 			} else if cd.Spec.Installed {
 				cdCol.assignable = append(cdCol.assignable, ref)
-				if isRunning(&cd) {
+				if cd.Status.PowerState == string(hivev1.RunningClusterPowerState) {
 					running++
 				}
 			} else {

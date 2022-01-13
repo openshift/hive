@@ -299,7 +299,8 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	cds.SyncClaimAssignments(r.Client, claims, logger)
 
 	origStatus := clp.Status.DeepCopy()
-	clp.Status.Size = int32(len(cds.Installing()) + len(cds.Assignable()) + len(cds.Broken()))
+	clp.Status.Size = int32(len(cds.Unassigned(true)))
+	clp.Status.Standby = int32(len(cds.Standby()))
 	clp.Status.Ready = int32(len(cds.Assignable()))
 	if !reflect.DeepEqual(origStatus, &clp.Status) {
 		if err := r.Status().Update(context.Background(), clp); err != nil {
@@ -311,11 +312,10 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	availableCapacity := math.MaxInt32
 	if clp.Spec.MaxSize != nil {
 		availableCapacity = int(*clp.Spec.MaxSize) - cds.Total()
-		numUnassigned := len(cds.Installing()) + len(cds.Assignable()) + len(cds.Broken())
 		numAssigned := cds.NumAssigned()
 		if availableCapacity <= 0 {
 			logger.WithFields(log.Fields{
-				"UnclaimedSize": numUnassigned,
+				"UnclaimedSize": len(cds.Unassigned(true)),
 				"ClaimedSize":   numAssigned,
 				"Capacity":      *clp.Spec.MaxSize,
 			}).Info("Cannot add more clusters because no capacity available.")
@@ -324,23 +324,6 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	if err := r.setAvailableCapacityCondition(clp, availableCapacity > 0, logger); err != nil {
 		logger.WithError(err).Error("error setting CapacityAvailable condition")
 		return reconcile.Result{}, err
-	}
-
-	// reserveSize is the number of clusters that the pool currently has in reserve
-	reserveSize := len(cds.Installing()) + len(cds.Assignable()) + len(cds.Broken()) - len(claims.Unassigned())
-
-	// excessSize is the number of clusters in excess of the pool's capacity (Size) that we are
-	// creating to satisfy unassigned claims. For example:
-	// - In steady state, if Size=3 and we have 5 unassigned claims, excessSize is 2.
-	// - If Size=3, and we only have 2 clusters in the pool, and we have 6 unassigned claims,
-	//   excessSize is 4: the two existing clusters satisfy two of the claims, leaving four;
-	//   we need three to refill the pool and another four to fulfil the remaining unassigned
-	//   claims.
-	// - Any time the number of unassigned claims is less than the number of clusters in the
-	//   pool, we will be able to satisfy them from the pool, so excessSize is 0.
-	excessSize := 0
-	if reserveSize < 0 {
-		excessSize = -reserveSize
 	}
 
 	if err := assignClustersToClaims(r.Client, claims, cds, logger); err != nil {
@@ -369,7 +352,10 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 	availableCurrent -= toDel
 
-	switch drift := reserveSize - int(clp.Spec.Size); {
+	// drift will indicate how many clusters we need to add or delete to get back to steady state
+	// of the pool's Size. This needs to take into account the clusters we're creating to satisfy
+	// the immediate demand of pending claims.
+	switch drift := len(cds.Unassigned(true)) - int(clp.Spec.Size) - len(claims.Unassigned()); {
 	// activity quota exceeded, so no action
 	case availableCurrent <= 0:
 		logger.WithFields(log.Fields{
@@ -408,7 +394,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		metricStaleClusterDeploymentsDeleted.WithLabelValues(clp.Namespace, clp.Name).Inc()
 	}
 
-	if err := r.reconcileRunningClusters(clp, cds, excessSize, logger); err != nil {
+	if err := r.reconcileRunningClusters(clp, cds, len(claims.Unassigned()), logger); err != nil {
 		log.WithError(err).Error("error updating hibernating/running state")
 		return reconcile.Result{}, err
 	}
@@ -429,19 +415,22 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	return reconcile.Result{}, nil
 }
 
-// reconcileRunningClusters ensures the oldest pool.spec.runningCount unassigned clusters are
-// set to running, and the remainder are set to hibernating.
+// reconcileRunningClusters ensures the oldest unassigned clusters are set to running, and the
+// remainder are set to hibernating. The number of clusters we set to running is determined by
+// adding the cluster's configured runningCount to the number of unsatisfied claims for which we're
+// spinning up new clusters.
 func (r *ReconcileClusterPool) reconcileRunningClusters(
 	clp *hivev1.ClusterPool,
 	cds *cdCollection,
-	excessCount int,
+	extraRunning int,
 	logger log.FieldLogger,
 ) error {
 	// If we're creating excess clusters to satisfy unassigned claims, add that many
 	// to the runningCount. They'll get snatched up immediately, bringing the number
 	// of running clusters back down to runningCount once the pool reaches steady state.
-	runningCount := int(clp.Spec.RunningCount) + excessCount
-	cdList := append(cds.Assignable(), cds.Installing()...)
+	runningCount := int(clp.Spec.RunningCount) + extraRunning
+	// Exclude broken clusters
+	cdList := cds.Unassigned(false)
 	// Sort by age, oldest first
 	sort.Slice(
 		cdList,
@@ -741,6 +730,46 @@ func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool) (*
 	return ns, err
 }
 
+// getClustersToDelete returns a list of length `deletionsNeeded` (to a max of the total number of
+// unclaimed clusters) containing references to clusters that should be deleted. This method is
+// used to reduce the size of the pool, usually in response to the user editing `size` and/or
+// `maxSize`. The logic is such that we prioritize deleting clusters from the longest to the
+// shortest amount of time before they're likely to be able to satisfy claims. That is:
+// - We first queue up Installing clusters. They would need to finish provisioning.
+// - Next, Standby clusters, which would need to be resumed.
+// - Finally, Assignable clusters, which are already ready to be claimed.
+func getClustersToDelete(cds *cdCollection, deletionsNeeded int, logger log.FieldLogger) []*hivev1.ClusterDeployment {
+	installingClusters := cds.Installing()
+	if deletionsNeeded <= len(installingClusters) {
+		return installingClusters[:deletionsNeeded]
+	}
+
+	clustersToDelete := installingClusters
+	origDeletionsNeeded := deletionsNeeded
+	deletionsNeeded -= len(installingClusters)
+
+	standbyClusters := cds.Standby()
+	if deletionsNeeded <= len(standbyClusters) {
+		return append(clustersToDelete, standbyClusters[:deletionsNeeded]...)
+	}
+
+	clustersToDelete = append(clustersToDelete, standbyClusters...)
+	deletionsNeeded -= len(standbyClusters)
+
+	readyClusters := cds.Assignable()
+	if deletionsNeeded <= len(readyClusters) {
+		return append(clustersToDelete, readyClusters[:deletionsNeeded]...)
+	}
+
+	logger.WithField("deletionsNeeded", origDeletionsNeeded).
+		WithField("installingClusters", len(installingClusters)).
+		WithField("standbyClusters", len(standbyClusters)).
+		WithField("readyClusters", len(readyClusters)).
+		Error("trying to delete more clusters than there are available")
+
+	return append(clustersToDelete, readyClusters...)
+}
+
 func (r *ReconcileClusterPool) deleteExcessClusters(
 	cds *cdCollection,
 	deletionsNeeded int,
@@ -748,24 +777,7 @@ func (r *ReconcileClusterPool) deleteExcessClusters(
 ) error {
 
 	logger.WithField("deletionsNeeded", deletionsNeeded).Info("deleting excess clusters")
-	clustersToDelete := make([]*hivev1.ClusterDeployment, 0, deletionsNeeded)
-	installingClusters := cds.Installing()
-	readyClusters := cds.Assignable()
-	if deletionsNeeded < len(installingClusters) {
-		clustersToDelete = installingClusters[:deletionsNeeded]
-	} else {
-		clustersToDelete = append(clustersToDelete, installingClusters...)
-		deletionsOfInstalledClustersNeeded := deletionsNeeded - len(installingClusters)
-		if deletionsOfInstalledClustersNeeded <= len(readyClusters) {
-			clustersToDelete = append(clustersToDelete, readyClusters[:deletionsOfInstalledClustersNeeded]...)
-		} else {
-			logger.WithField("deletionsNeeded", deletionsNeeded).
-				WithField("installingClusters", len(installingClusters)).
-				WithField("installedClusters", len(readyClusters)).
-				Error("trying to delete more clusters than there are available")
-			clustersToDelete = append(clustersToDelete, readyClusters...)
-		}
-	}
+	clustersToDelete := getClustersToDelete(cds, deletionsNeeded, logger)
 	for _, cd := range clustersToDelete {
 		logger := logger.WithField("cluster", cd.Name)
 		logger.Info("deleting cluster deployment")
@@ -802,7 +814,7 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if err != nil {
 		return err
 	}
-	for _, cd := range append(cds.Assignable(), cds.Installing()...) {
+	for _, cd := range cds.Unassigned(true) {
 		if cd.DeletionTimestamp != nil {
 			continue
 		}
@@ -811,6 +823,7 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 			return errors.Wrap(err, "could not delete ClusterDeployment")
 		}
 	}
+	// TODO: Wait to remove finalizer until all (unclaimed??) clusters are gone.
 	controllerutils.DeleteFinalizer(pool, finalizer)
 	if err := r.Update(context.Background(), pool); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer from ClusterPool")

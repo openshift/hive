@@ -190,8 +190,11 @@ func (c *claimCollection) Untrack(claimNames ...string) {
 }
 
 type cdCollection struct {
-	// Unclaimed installed clusters which belong to this pool and are not (marked for) deleting
+	// Unclaimed, installed, running clusters which belong to this pool and are not (marked for) deleting
 	assignable []*hivev1.ClusterDeployment
+	// Unclaimed, installed, clusters which are not marked for deletion, but are not running and
+	// therefore not (yet) assignable
+	standby []*hivev1.ClusterDeployment
 	// Unclaimed installing clusters which belong to this pool and are not (marked for) deleting
 	installing []*hivev1.ClusterDeployment
 	// Clusters with a DeletionTimestamp. Mutually exclusive with markedForDeletion.
@@ -246,6 +249,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 	}
 	cdCol := cdCollection{
 		assignable:            make([]*hivev1.ClusterDeployment, 0),
+		standby:               make([]*hivev1.ClusterDeployment, 0),
 		installing:            make([]*hivev1.ClusterDeployment, 0),
 		deleting:              make([]*hivev1.ClusterDeployment, 0),
 		broken:                make([]*hivev1.ClusterDeployment, 0),
@@ -254,7 +258,6 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		byCDName:              make(map[string]*hivev1.ClusterDeployment),
 		byClaimName:           make(map[string]*hivev1.ClusterDeployment),
 	}
-	running := 0
 	for i, cd := range cdList.Items {
 		poolRef := cd.Spec.ClusterPoolRef
 		if poolRef == nil || poolRef.Namespace != pool.Namespace || poolRef.PoolName != pool.Name {
@@ -278,9 +281,10 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			if isBroken(&cd) {
 				cdCol.broken = append(cdCol.broken, ref)
 			} else if cd.Spec.Installed {
-				cdCol.assignable = append(cdCol.assignable, ref)
-				if cd.Status.PowerState == string(hivev1.RunningClusterPowerState) {
-					running++
+				if cd.Status.PowerState == hivev1.ClusterPowerStateRunning {
+					cdCol.assignable = append(cdCol.assignable, ref)
+				} else {
+					cdCol.standby = append(cdCol.standby, ref)
 				}
 			} else {
 				cdCol.installing = append(cdCol.installing, ref)
@@ -312,6 +316,13 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			return cdCol.assignable[i].CreationTimestamp.Before(&cdCol.assignable[j].CreationTimestamp)
 		},
 	)
+	// Sort standby CDs so we delete them in FIFO order
+	sort.Slice(
+		cdCol.standby,
+		func(i, j int) bool {
+			return cdCol.standby[i].CreationTimestamp.Before(&cdCol.standby[j].CreationTimestamp)
+		},
+	)
 	cdCol.sortInstalling()
 	// Sort stale CDs by age so we delete the oldest first
 	sort.Slice(
@@ -329,11 +340,11 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 
 	logger.WithFields(log.Fields{
 		"assignable": len(cdCol.assignable),
+		"standby":    len(cdCol.standby),
 		"claimed":    len(cdCol.byClaimName),
 		"deleting":   len(cdCol.deleting),
 		"installing": len(cdCol.installing),
 		"unclaimed":  len(cdCol.installing) + len(cdCol.assignable),
-		"running":    running,
 		"stale":      len(cdCol.unknownPoolVersion) + len(cdCol.mismatchedPoolVersion),
 		"broken":     len(cdCol.broken),
 	}).Debug("found clusters for ClusterPool")
@@ -342,8 +353,8 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 	metricClusterDeploymentsClaimed.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.byClaimName)))
 	metricClusterDeploymentsDeleting.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.deleting)))
 	metricClusterDeploymentsInstalling.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.installing)))
-	metricClusterDeploymentsUnclaimed.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.installing) + len(cdCol.assignable)))
-	metricClusterDeploymentsRunning.WithLabelValues(pool.Namespace, pool.Name).Set(float64(running))
+	metricClusterDeploymentsUnclaimed.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.installing) + len(cdCol.standby) + len(cdCol.assignable)))
+	metricClusterDeploymentsStandby.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.standby)))
 	metricClusterDeploymentsStale.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.unknownPoolVersion) + len(cdCol.mismatchedPoolVersion)))
 	metricClusterDeploymentsBroken.WithLabelValues(pool.Namespace, pool.Name).Set(float64(len(cdCol.broken)))
 
@@ -370,6 +381,11 @@ func (cds *cdCollection) Assignable() []*hivev1.ClusterDeployment {
 	return cds.assignable
 }
 
+// Standby returns a list of refs to ClusterDeployments that are not running, but otherwise ready
+func (cds *cdCollection) Standby() []*hivev1.ClusterDeployment {
+	return cds.standby
+}
+
 // Deleting returns the list of ClusterDeployments whose DeletionTimestamp is set. Not to be
 // confused with MarkedForDeletion.
 func (cds *cdCollection) Deleting() []*hivev1.ClusterDeployment {
@@ -392,6 +408,19 @@ func (cds *cdCollection) Installing() []*hivev1.ClusterDeployment {
 // Broken returns the list of ClusterDeployments we've deemed unrecoverably broken.
 func (cds *cdCollection) Broken() []*hivev1.ClusterDeployment {
 	return cds.broken
+}
+
+// Unassigned returns a *copy* of the list of unclaimed ClusterDeployments which are not marked
+// for deletion
+func (cds *cdCollection) Unassigned(includeBroken bool) []*hivev1.ClusterDeployment {
+	ret := make([]*hivev1.ClusterDeployment, len(cds.installing))
+	copy(ret, cds.installing)
+	ret = append(ret, cds.standby...)
+	ret = append(ret, cds.assignable...)
+	if includeBroken {
+		ret = append(ret, cds.broken...)
+	}
+	return ret
 }
 
 // UnknownPoolVersion returns the list of ClusterDeployments whose pool version annotation is

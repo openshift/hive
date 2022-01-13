@@ -605,7 +605,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cd,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionTrue,
-			hivev1.ProvisionedProvisionedReason,
+			hivev1.ProvisionedReasonProvisioned,
 			"Cluster is provisioned",
 			cdLog,
 		); err != nil {
@@ -1254,7 +1254,7 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 			return false, r.updateCondition(cd,
 				hivev1.ProvisionedCondition,
 				corev1.ConditionFalse,
-				hivev1.DeprovisioningProvisionedReason,
+				hivev1.ProvisionedReasonDeprovisioning,
 				"Cluster is being deprovisioned",
 				cdLog)
 		}
@@ -1280,7 +1280,7 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 				conds,
 				hivev1.ProvisionedCondition,
 				corev1.ConditionFalse,
-				hivev1.DeprovisionFailedProvisionedReason,
+				hivev1.ProvisionedReasonDeprovisionFailed,
 				"Cluster deprovision failed",
 				controllerutils.UpdateConditionIfReasonOrMessageChange,
 			)
@@ -1301,7 +1301,7 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 			cd,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionFalse,
-			hivev1.DeprovisioningProvisionedReason,
+			hivev1.ProvisionedReasonDeprovisioning,
 			"Cluster is deprovisioning",
 			cdLog,
 		)
@@ -1312,7 +1312,7 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 		cd,
 		hivev1.ProvisionedCondition,
 		corev1.ConditionFalse,
-		hivev1.DeprovisionedProvisionedReason,
+		hivev1.ProvisionedReasonDeprovisioned,
 		"Cluster is deprovisioned",
 		cdLog,
 	)

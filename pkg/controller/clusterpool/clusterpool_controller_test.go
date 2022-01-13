@@ -76,7 +76,7 @@ func TestReconcileClusterPool(t *testing.T) {
 	)
 	cdBuilder := func(name string) testcd.Builder {
 		return testcd.FullBuilder(name, name, scheme).Options(
-			testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
+			testcd.WithPowerState(hivev1.ClusterPowerStateHibernating),
 			testcd.WithPoolVersion(initialPoolVersion),
 		)
 	}
@@ -1324,8 +1324,8 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcp.WithSize(4),
 					testcp.WithRunningCount(2),
 				),
-				unclaimedCDBuilder("c1").Build(testcd.Generic(testgeneric.Deleted()), testcd.WithPowerState(hivev1.RunningClusterPowerState)),
-				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState)),
+				unclaimedCDBuilder("c1").Build(testcd.Generic(testgeneric.Deleted()), testcd.WithPowerState(hivev1.ClusterPowerStateRunning)),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning)),
 				unclaimedCDBuilder("c3").Build(),
 				unclaimedCDBuilder("c4").Build(),
 			},
@@ -1340,8 +1340,8 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcp.WithSize(4),
 					testcp.WithRunningCount(2),
 				),
-				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
-				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning), testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning), testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(testcd.Installed()),
 				unclaimedCDBuilder("c4").Build(testcd.Installed()),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
@@ -1360,8 +1360,8 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcp.WithSize(4),
 					testcp.WithRunningCount(2),
 				),
-				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
-				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning), testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning), testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(testcd.Installed()),
 				unclaimedCDBuilder("c4").Build(testcd.Installed()),
 				testclaim.FullBuilder(testNamespace, "test-claim1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
@@ -1382,8 +1382,8 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcp.WithSize(4),
 					testcp.WithRunningCount(2),
 				),
-				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
-				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.RunningClusterPowerState), testcd.Installed()),
+				unclaimedCDBuilder("c1").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning), testcd.Installed()),
+				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning), testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(testcd.Installed()),
 				unclaimedCDBuilder("c4").Build(testcd.Installed()),
 				testclaim.FullBuilder(testNamespace, "test-claim1", scheme).Build(testclaim.WithPool(testLeasePoolName)),
@@ -1523,9 +1523,9 @@ func TestReconcileClusterPool(t *testing.T) {
 					}
 				}
 				switch powerState := cd.Spec.PowerState; powerState {
-				case hivev1.RunningClusterPowerState:
+				case hivev1.ClusterPowerStateRunning:
 					actualRunning++
-				case hivev1.HibernatingClusterPowerState:
+				case hivev1.ClusterPowerStateHibernating:
 					actualHibernating++
 				}
 

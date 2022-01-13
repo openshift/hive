@@ -76,7 +76,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionFalse,
-			hivev1.ProvisionStoppedProvisionedReason,
+			hivev1.ProvisionedReasonProvisionStopped,
 			"Provisioning failed terminally (see the ProvisionStopped condition for details)",
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
 
@@ -224,7 +224,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		cd,
 		hivev1.ProvisionedCondition,
 		corev1.ConditionFalse,
-		hivev1.ProvisioningProvisionedReason,
+		hivev1.ProvisionedReasonProvisioning,
 		"Cluster provision created",
 		logger,
 	); err != nil {
@@ -366,7 +366,7 @@ func (r *ReconcileClusterDeployment) reconcileInitializingProvision(cd *hivev1.C
 		cd,
 		hivev1.ProvisionedCondition,
 		corev1.ConditionFalse,
-		hivev1.ProvisioningProvisionedReason,
+		hivev1.ProvisionedReasonProvisioning,
 		"Cluster provision initializing",
 		cdLog,
 	); err != nil {
@@ -386,7 +386,7 @@ func (r *ReconcileClusterDeployment) reconcileProvisioningProvision(cd *hivev1.C
 		cd,
 		hivev1.ProvisionedCondition,
 		corev1.ConditionFalse,
-		hivev1.ProvisioningProvisionedReason,
+		hivev1.ProvisionedReasonProvisioning,
 		"Cluster is provisioning",
 		cdLog,
 	); err != nil {
@@ -459,7 +459,7 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 		cd.Status.Conditions,
 		hivev1.ProvisionedCondition,
 		corev1.ConditionTrue,
-		hivev1.ProvisionedProvisionedReason,
+		hivev1.ProvisionedReasonProvisioned,
 		"Cluster is provisioned",
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)

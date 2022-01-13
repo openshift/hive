@@ -234,7 +234,7 @@ func isRunning(cd *hivev1.ClusterDeployment) bool {
 		// only check this for Installed clusters.)
 		return false
 	}
-	return cond.Reason == hivev1.RunningReadyReason
+	return cond.Reason == hivev1.ReadyReasonRunning
 }
 
 func (cds *cdCollection) sortInstalling() {
@@ -449,7 +449,7 @@ func (cds *cdCollection) Assign(c client.Client, cd *hivev1.ClusterDeployment, c
 			now := metav1.Now()
 			cdi.Spec.ClusterPoolRef.ClaimedTimestamp = &now
 			// This may be redundant if we already did it to satisfy runningCount; but no harm.
-			cdi.Spec.PowerState = hivev1.RunningClusterPowerState
+			cdi.Spec.PowerState = hivev1.ClusterPowerStateRunning
 			if err := c.Update(context.Background(), cdi); err != nil {
 				return err
 			}

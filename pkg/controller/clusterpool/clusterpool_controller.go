@@ -456,9 +456,9 @@ func (r *ReconcileClusterPool) reconcileRunningClusters(
 		cd := cdList[i]
 		var desiredPowerState hivev1.ClusterPowerState
 		if i < runningCount {
-			desiredPowerState = hivev1.RunningClusterPowerState
+			desiredPowerState = hivev1.ClusterPowerStateRunning
 		} else {
-			desiredPowerState = hivev1.HibernatingClusterPowerState
+			desiredPowerState = hivev1.ClusterPowerStateHibernating
 		}
 		if cd.Spec.PowerState == desiredPowerState {
 			continue

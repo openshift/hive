@@ -156,7 +156,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		conditions = controllerutils.SetClusterDeploymentCondition(conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionFalse,
-			hivev1.ProvisionStoppedProvisionedReason,
+			hivev1.ProvisionedReasonProvisionStopped,
 			"Provisioning failed terminally (see the ProvisionStopped condition for details)",
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
@@ -170,7 +170,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			cd.Status.Conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionTrue,
-			hivev1.ProvisionedProvisionedReason,
+			hivev1.ProvisionedReasonProvisioned,
 			"Cluster is provisioned",
 			controllerutils.UpdateConditionAlways,
 		)

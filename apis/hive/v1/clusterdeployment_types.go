@@ -53,17 +53,50 @@ const (
 
 // ClusterPowerState is used to indicate whether a cluster is running or in a
 // hibernating state.
-// +kubebuilder:validation:Enum="";Running;Hibernating
 type ClusterPowerState string
 
 const (
-	// RunningClusterPowerState is the default state of a cluster after it has
+	// ClusterPowerStateRunning is the default state of a cluster after it has
 	// been installed. All of its machines should be running.
-	RunningClusterPowerState ClusterPowerState = "Running"
+	ClusterPowerStateRunning ClusterPowerState = "Running"
 
-	// HibernatingClusterPowerState is used to stop the machines belonging to a cluster
-	// and move it to a hibernating state.
-	HibernatingClusterPowerState ClusterPowerState = "Hibernating"
+	// ClusterPowerStateHibernating indicates the machines belonging to a cluster
+	// are stopped.
+	ClusterPowerStateHibernating ClusterPowerState = "Hibernating"
+
+	// ClusterPowerStateSyncSetsNotApplied indicates SyncSets have not yet been applied
+	// for the cluster based on ClusterSync.Status.FirstSucessTime
+	ClusterPowerStateSyncSetsNotApplied ClusterPowerState = "SyncSetsNotApplied"
+
+	// ClusterPowerStateStartingMachines is used to reflect attempt to list and start cloud VMs
+	ClusterPowerStateStartingMachines ClusterPowerState = "StartingMachines"
+
+	// ClusterPowerStateFailedToStartMachines
+	ClusterPowerStateFailedToStartMachines ClusterPowerState = "FailedToStartMachines"
+
+	// ClusterPowerStateStopping indicates the cluster is transitioning
+	// from a Running state to a Hibernating state.
+	ClusterPowerStateStopping ClusterPowerState = "Stopping"
+
+	// ClusterPowerStateFailedToStop is used when there was an error stopping machines
+	// to enter hibernation
+	ClusterPowerStateFailedToStop ClusterPowerState = "FailedToStop"
+
+	// ClusterPowerStateWaitingForMachinesToStop is used when waiting for cloud VMs to stop
+	ClusterPowerStateWaitingForMachinesToStop ClusterPowerState = "WaitingForMachinesToStop"
+
+	// ClusterPowerStateWaitingForMachines is used when waiting for cloud VMs to start.
+	ClusterPowerStateWaitingForMachines ClusterPowerState = "WaitingForMachines"
+
+	// ClusterPowerStateWaitingForNodes is used when waiting for nodes to become Ready.
+	ClusterPowerStateWaitingForNodes ClusterPowerState = "WaitingForNodes"
+
+	// ClusterPowerStatePausingForClusterOperatorsToSettle is used when pausing to let ClusterOperators start and post new status before we check it.
+	ClusterPowerStatePausingForClusterOperatorsToSettle ClusterPowerState = "PausingForClusterOperatorsToSettle"
+
+	// ClusterPowerStateWaitingForClusterOperators is used when waiting for ClusterOperators to
+	// get to a good state. (Available=True, Processing=False, Degraded=False)
+	ClusterPowerStateWaitingForClusterOperators ClusterPowerState = "WaitingForClusterOperators"
 )
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
@@ -134,6 +167,7 @@ type ClusterDeploymentSpec struct {
 
 	// PowerState indicates whether a cluster should be running or hibernating. When omitted,
 	// PowerState defaults to the Running state.
+	// +kubebuilder:validation:Enum="";Running;Hibernating
 	// +optional
 	PowerState ClusterPowerState `json:"powerState,omitempty"`
 
@@ -295,7 +329,7 @@ type ClusterDeploymentStatus struct {
 
 	// PowerState indicates the powerstate of cluster
 	// +optional
-	PowerState string `json:"powerState,omitempty"`
+	PowerState ClusterPowerState `json:"powerState,omitempty"`
 
 	// ProvisionRef is a reference to the last ClusterProvision created for the deployment
 	// +optional
@@ -429,68 +463,68 @@ var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionTy
 
 // Cluster hibernating and ready reasons
 const (
-	// ResumingOrRunningHibernationReason is used as the reason for the Hibernating condition when the cluster
+	// HibernatingReasonResumingOrRunning is used as the reason for the Hibernating condition when the cluster
 	// is resuming or running. Precise details are available in the Ready condition.
-	ResumingOrRunningHibernationReason = "ResumingOrRunning"
-	// StoppingHibernationReason is used as the reason when the cluster is transitioning
+	HibernatingReasonResumingOrRunning = "ResumingOrRunning"
+	// HibernatingReasonStopping is used as the reason when the cluster is transitioning
 	// from a Running state to a Hibernating state.
-	StoppingHibernationReason = "Stopping"
-	// WaitingForMachinesToStopHibernatingReason is used on the Hibernating condition when waiting for cloud VMs to stop
-	WaitingForMachinesToStopHibernatingReason = "WaitingForMachinesToStop"
-	// HibernatingHibernationReason is used as the reason when the cluster is in a
+	HibernatingReasonStopping = string(ClusterPowerStateStopping)
+	// HibernatingReasonWaitingForMachinesToStop is used on the Hibernating condition when waiting for cloud VMs to stop
+	HibernatingReasonWaitingForMachinesToStop = string(ClusterPowerStateWaitingForMachinesToStop)
+	// HibernatingReasonHibernating is used as the reason when the cluster is in a
 	// Hibernating state.
-	HibernatingHibernationReason = "Hibernating"
-	// UnsupportedHibernationReason is used as the reason when the cluster spec
+	HibernatingReasonHibernating = string(ClusterPowerStateHibernating)
+	// HibernatingReasonUnsupported is used as the reason when the cluster spec
 	// specifies that the cluster be moved to a Hibernating state, but either the cluster
 	// version is not compatible with hibernation (< 4.4.8) or the cloud provider of
 	// the cluster is not supported.
-	UnsupportedHibernationReason = "Unsupported"
-	// FailedToStopHibernationReason is used when there was an error stopping machines
+	HibernatingReasonUnsupported = "Unsupported"
+	// HibernatingReasonFailedToStop is used when there was an error stopping machines
 	// to enter hibernation
-	FailedToStopHibernationReason = "FailedToStop"
-	// SyncSetsNotAppliedReason is used as the reason when SyncSets have not yet been applied
+	HibernatingReasonFailedToStop = string(ClusterPowerStateFailedToStop)
+	// HibernatingReasonSyncSetsNotApplied is used as the reason when SyncSets have not yet been applied
 	// for the cluster based on ClusterSync.Status.FirstSucessTime
-	SyncSetsNotAppliedReason = "SyncSetsNotApplied"
-	// SyncSetsAppliedReason means SyncSets have been successfully applied at some point.
+	HibernatingReasonSyncSetsNotApplied = string(ClusterPowerStateSyncSetsNotApplied)
+	// HibernatingReasonSyncSetsApplied means SyncSets have been successfully applied at some point.
 	// (It does not necessarily mean they are currently copacetic -- check ClusterSync status
 	// for that.)
-	SyncSetsAppliedReason = "SyncSetsApplied"
+	HibernatingReasonSyncSetsApplied = "SyncSetsApplied"
 
-	// StoppingOrHibernatingReadyReason is used as the reason for the Ready condition when the cluster
+	// ReadyReasonStoppingOrHibernating is used as the reason for the Ready condition when the cluster
 	// is stopping or hibernating. Precise details are available in the Hibernating condition.
-	StoppingOrHibernatingReadyReason = "StoppingOrHibernating"
-	// StartingMachinesReadyReason is used to reflect attempt to list and start cloud VMs
-	StartingMachinesReadyReason = "StartingMachines"
-	// FailedToStartMachinesReadyReason is used when there was an error starting machines
+	ReadyReasonStoppingOrHibernating = "StoppingOrHibernating"
+	// ReadyReasonStartingMachines is used to reflect attempt to list and start cloud VMs
+	ReadyReasonStartingMachines = string(ClusterPowerStateStartingMachines)
+	// ReadyReasonFailedToStartMachines is used when there was an error starting machines
 	// to leave hibernation
-	FailedToStartMachinesReadyReason = "FailedToStartMachines"
-	// WaitingForMachinesReadyReason is used on the Ready condition when waiting for cloud VMs to start.
-	WaitingForMachinesReadyReason = "WaitingForMachines"
-	// WaitingForNodesReadyReason is used on the Ready condition when waiting for nodes to become Ready.
-	WaitingForNodesReadyReason = "WaitingForNodes"
-	// PausingForClusterOperatorsToSettleReadyReason is used on the Ready condition when pausing to let ClusterOperators start and post new status before we check it.
-	PausingForClusterOperatorsToSettleReadyReason = "PausingForClusterOperatorsToSettle"
-	// WaitingForClusterOperatorsReadyReason is used on the Ready condition when waiting for ClusterOperators to
+	ReadyReasonFailedToStartMachines = string(ClusterPowerStateFailedToStartMachines)
+	// ReadyReasonWaitingForMachines is used on the Ready condition when waiting for cloud VMs to start.
+	ReadyReasonWaitingForMachines = string(ClusterPowerStateWaitingForMachines)
+	// ReadyReasonWaitingForNodes is used on the Ready condition when waiting for nodes to become Ready.
+	ReadyReasonWaitingForNodes = string(ClusterPowerStateWaitingForNodes)
+	// ReadyReasonPausingForClusterOperatorsToSettle is used on the Ready condition when pausing to let ClusterOperators start and post new status before we check it.
+	ReadyReasonPausingForClusterOperatorsToSettle = string(ClusterPowerStatePausingForClusterOperatorsToSettle)
+	// ReadyReasonWaitingForClusterOperators is used on the Ready condition when waiting for ClusterOperators to
 	// get to a good state. (Available=True, Processing=False, Degraded=False)
-	WaitingForClusterOperatorsReadyReason = "WaitingForClusterOperators"
-	// RunningReadyReason is used on the Ready condition as the reason when the cluster is running and ready
-	RunningReadyReason = "Running"
+	ReadyReasonWaitingForClusterOperators = string(ClusterPowerStateWaitingForClusterOperators)
+	// ReadyReasonRunning is used on the Ready condition as the reason when the cluster is running and ready
+	ReadyReasonRunning = string(ClusterPowerStateRunning)
 )
 
 // Provisioned status condition reasons
 const (
-	// ProvisioningProvisionedReason is set while the cluster is still provisioning.
-	ProvisioningProvisionedReason = "Provisioning"
-	// ProvisionStoppedProvisionedReason means cluster provisioning is stopped. The ProvisionStopped condition may contain more detail.
-	ProvisionStoppedProvisionedReason = "ProvisionStopped"
-	// ProvisionedProvisionedReason is set when the provision is successful.
-	ProvisionedProvisionedReason = "Provisioned"
-	// DeprovisioningProvisionedReason is set when we start to deprovision the cluster.
-	DeprovisioningProvisionedReason = "Deprovisioning"
-	// DeprovisionFailedProvisionedReason means the deprovision failed terminally.
-	DeprovisionFailedProvisionedReason = "DeprovisionFailed"
-	// DeprovisionedProvisionedReason is set when the cluster has been successfully deprovisioned
-	DeprovisionedProvisionedReason = "Deprovisioned"
+	// ProvisionedReasonProvisioning is set while the cluster is still provisioning.
+	ProvisionedReasonProvisioning = "Provisioning"
+	// ProvisionedReasonProvisionStopped means cluster provisioning is stopped. The ProvisionStopped condition may contain more detail.
+	ProvisionedReasonProvisionStopped = "ProvisionStopped"
+	// ProvisionedReasonProvisioned is set when the provision is successful.
+	ProvisionedReasonProvisioned = "Provisioned"
+	// ProvisionedReasonDeprovisioning is set when we start to deprovision the cluster.
+	ProvisionedReasonDeprovisioning = "Deprovisioning"
+	// ProvisionedReasonDeprovisionFailed means the deprovision failed terminally.
+	ProvisionedReasonDeprovisionFailed = "DeprovisionFailed"
+	// ProvisionedReasonDeprovisioned is set when the cluster has been successfully deprovisioned
+	ProvisionedReasonDeprovisioned = "Deprovisioned"
 )
 
 // InitializedConditionReason is used when a condition is initialized for the first time, and the status of the

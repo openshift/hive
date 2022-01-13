@@ -49,9 +49,6 @@ const (
 )
 
 var (
-	// controllerKind contains the schema.GroupVersionKind for this controller type.
-	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterPool")
-
 	// clusterPoolConditions are the cluster pool conditions controlled or initialized by cluster pool controller
 	clusterPoolConditions = []hivev1.ClusterPoolConditionType{
 		hivev1.ClusterPoolMissingDependenciesCondition,

@@ -429,32 +429,32 @@ var PositivePolarityClusterDeploymentConditions = []ClusterDeploymentConditionTy
 
 // Cluster hibernating and ready reasons
 const (
-	// ResumingOrRunningHibernationReason is used as the reason for the Hibernating condition when the cluster
+	// ResumingOrRunningHibernatingReason is used as the reason for the Hibernating condition when the cluster
 	// is resuming or running. Precise details are available in the Ready condition.
-	ResumingOrRunningHibernationReason = "ResumingOrRunning"
-	// StoppingHibernationReason is used as the reason when the cluster is transitioning
+	ResumingOrRunningHibernatingReason = "ResumingOrRunning"
+	// StoppingHibernatingReason is used as the reason when the cluster is transitioning
 	// from a Running state to a Hibernating state.
-	StoppingHibernationReason = "Stopping"
+	StoppingHibernatingReason = "Stopping"
 	// WaitingForMachinesToStopHibernatingReason is used on the Hibernating condition when waiting for cloud VMs to stop
 	WaitingForMachinesToStopHibernatingReason = "WaitingForMachinesToStop"
-	// HibernatingHibernationReason is used as the reason when the cluster is in a
+	// HibernatingHibernatingReason is used as the reason when the cluster is in a
 	// Hibernating state.
-	HibernatingHibernationReason = "Hibernating"
-	// UnsupportedHibernationReason is used as the reason when the cluster spec
+	HibernatingHibernatingReason = string(HibernatingClusterPowerState)
+	// UnsupportedHibernatingReason is used as the reason when the cluster spec
 	// specifies that the cluster be moved to a Hibernating state, but either the cluster
 	// version is not compatible with hibernation (< 4.4.8) or the cloud provider of
 	// the cluster is not supported.
-	UnsupportedHibernationReason = "Unsupported"
-	// FailedToStopHibernationReason is used when there was an error stopping machines
+	UnsupportedHibernatingReason = "Unsupported"
+	// FailedToStopHibernatingReason is used when there was an error stopping machines
 	// to enter hibernation
-	FailedToStopHibernationReason = "FailedToStop"
-	// SyncSetsNotAppliedReason is used as the reason when SyncSets have not yet been applied
+	FailedToStopHibernatingReason = "FailedToStop"
+	// SyncSetsNotAppliedHibernatingReason is used as the reason when SyncSets have not yet been applied
 	// for the cluster based on ClusterSync.Status.FirstSucessTime
-	SyncSetsNotAppliedReason = "SyncSetsNotApplied"
-	// SyncSetsAppliedReason means SyncSets have been successfully applied at some point.
+	SyncSetsNotAppliedHibernatingReason = "SyncSetsNotApplied"
+	// SyncSetsAppliedHibernatingReason means SyncSets have been successfully applied at some point.
 	// (It does not necessarily mean they are currently copacetic -- check ClusterSync status
 	// for that.)
-	SyncSetsAppliedReason = "SyncSetsApplied"
+	SyncSetsAppliedHibernatingReason = "SyncSetsApplied"
 
 	// StoppingOrHibernatingReadyReason is used as the reason for the Ready condition when the cluster
 	// is stopping or hibernating. Precise details are available in the Hibernating condition.
@@ -474,7 +474,7 @@ const (
 	// get to a good state. (Available=True, Processing=False, Degraded=False)
 	WaitingForClusterOperatorsReadyReason = "WaitingForClusterOperators"
 	// RunningReadyReason is used on the Ready condition as the reason when the cluster is running and ready
-	RunningReadyReason = "Running"
+	RunningReadyReason = string(RunningClusterPowerState)
 )
 
 // Provisioned status condition reasons

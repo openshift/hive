@@ -17,11 +17,14 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.ready
-      name: Ready
-      type: string
     - jsonPath: .spec.size
       name: Size
+      type: string
+    - jsonPath: .status.standby
+      name: Standby
+      type: string
+    - jsonPath: .status.ready
+      name: Ready
       type: string
     - jsonPath: .spec.baseDomain
       name: BaseDomain
@@ -541,13 +544,18 @@ spec:
                   type: object
                 type: array
               ready:
-                description: Ready is the number of unclaimed clusters that have been
-                  installed and are ready to be claimed.
+                description: Ready is the number of unclaimed clusters that are installed
+                  and are running and ready to be claimed.
                 format: int32
                 type: integer
               size:
                 description: Size is the number of unclaimed clusters that have been
                   created for the pool.
+                format: int32
+                type: integer
+              standby:
+                description: Standby is the number of unclaimed clusters that are
+                  installed, but not running.
                 format: int32
                 type: integer
             required:

@@ -17,7 +17,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -86,8 +85,7 @@ func getAllClaimsForPool(c client.Client, pool *hivev1.ClusterPool, logger log.F
 
 // ByName returns the named claim from the collection, or nil if no claim by that name exists.
 func (c *claimCollection) ByName(claimName string) *hivev1.ClusterClaim {
-	claim, _ := c.byClaimName[claimName]
-	return claim
+	return c.byClaimName[claimName]
 }
 
 // Unassigned returns a list of claims that are not assigned to clusters yet. The list is sorted by
@@ -102,7 +100,7 @@ func (c *claimCollection) Unassigned() []*hivev1.ClusterClaim {
 // or another claim).
 func (claims *claimCollection) Assign(c client.Client, claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment) error {
 	if claim.Spec.Namespace != "" {
-		return fmt.Errorf("Claim %s is already assigned to %s. This is a bug!", claim.Name, claim.Spec.Namespace)
+		return fmt.Errorf("claim %s is already assigned to %s; this is a bug", claim.Name, claim.Spec.Namespace)
 	}
 	for i, claimi := range claims.unassigned {
 		if claimi.Name == claim.Name {
@@ -131,7 +129,7 @@ func (claims *claimCollection) Assign(c client.Client, claim *hivev1.ClusterClai
 			return nil
 		}
 	}
-	return fmt.Errorf("Claim %s is not assigned, but was not found in the unassigned list. This is a bug!", claim.Name)
+	return fmt.Errorf("claim %s is not assigned, but was not found in the unassigned list; this is a bug", claim.Name)
 }
 
 // SyncClusterDeploymentAssignments makes sure each claim which purports to be assigned has the
@@ -365,9 +363,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 
 // ByName returns the named ClusterDeployment from the cdCollection, or nil if no CD by that name exists.
 func (cds *cdCollection) ByName(cdName string) *hivev1.ClusterDeployment {
-	cd, _ := cds.byCDName[cdName]
-	return cd
-
+	return cds.byCDName[cdName]
 }
 
 // Total returns the total number of ClusterDeployments in the cdCollection.
@@ -439,7 +435,7 @@ func (cds *cdCollection) RegisterNewCluster(cd *hivev1.ClusterDeployment) {
 // (to *any* claim). The CD must be from the Assignable() list; otherwise it is an error.
 func (cds *cdCollection) Assign(c client.Client, cd *hivev1.ClusterDeployment, claim *hivev1.ClusterClaim) error {
 	if cd.Spec.ClusterPoolRef.ClaimName != "" {
-		return fmt.Errorf("ClusterDeployment %s is already assigned to %s. This is a bug!", cd.Name, cd.Spec.ClusterPoolRef.ClaimName)
+		return fmt.Errorf("ClusterDeployment %s is already assigned to %s; this is a bug", cd.Name, cd.Spec.ClusterPoolRef.ClaimName)
 	}
 	// "Move" the cd from assignable to byClaimName
 	for i, cdi := range cds.assignable {
@@ -460,7 +456,7 @@ func (cds *cdCollection) Assign(c client.Client, cd *hivev1.ClusterDeployment, c
 			return nil
 		}
 	}
-	return fmt.Errorf("ClusterDeployment %s is not assigned, but was not found in the assignable list. This is a bug!", cd.Name)
+	return fmt.Errorf("ClusterDeployment %s is not assigned, but was not found in the assignable list; this is a bug", cd.Name)
 }
 
 // SyncClaimAssignments makes sure each ClusterDeployment which purports to be assigned has the
@@ -514,9 +510,9 @@ func (cds *cdCollection) MakeNotAssignable(cdNames ...string) {
 func (cds *cdCollection) Delete(c client.Client, cdName string) error {
 	cd := cds.ByName(cdName)
 	if cd == nil {
-		return errors.New(fmt.Sprintf("No such ClusterDeployment %s to delete. This is a bug!", cdName))
+		return fmt.Errorf("no such ClusterDeployment %s to delete; this is a bug", cdName)
 	}
-	if err := utils.SafeDelete(c, context.Background(), cd); err != nil {
+	if err := controllerutils.SafeDelete(c, context.Background(), cd); err != nil {
 		return err
 	}
 	cds.deleting = append(cds.deleting, cd)

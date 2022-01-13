@@ -29,7 +29,6 @@ import (
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcp "github.com/openshift/hive/pkg/test/clusterpool"
-	"github.com/openshift/hive/pkg/test/generic"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testsecret "github.com/openshift/hive/pkg/test/secret"
 )
@@ -175,12 +174,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(
 					testcd.WithPoolVersion("abc123"),
 					testcd.Installed(),
-					testcd.Generic(generic.WithCreationTimestamp(nowish)),
+					testcd.Generic(testgeneric.WithCreationTimestamp(nowish)),
 				),
 				unclaimedCDBuilder("c2").Build(
 					testcd.WithPoolVersion("def345"),
 					testcd.Installed(),
-					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+					testcd.Generic(testgeneric.WithCreationTimestamp(nowish.Add(-time.Hour))),
 				),
 			},
 			expectedTotalClusters: 1,
@@ -199,12 +198,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(
 					testcd.WithPoolVersion(""),
 					testcd.Installed(),
-					testcd.Generic(generic.WithCreationTimestamp(nowish)),
+					testcd.Generic(testgeneric.WithCreationTimestamp(nowish)),
 				),
 				unclaimedCDBuilder("c2").Build(
 					testcd.WithPoolVersion("bogus, but set"),
 					testcd.Installed(),
-					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+					testcd.Generic(testgeneric.WithCreationTimestamp(nowish.Add(-time.Hour))),
 				),
 			},
 			expectedTotalClusters:   1,
@@ -221,7 +220,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(
 					testcd.WithPoolVersion("stale"),
 					testcd.Installed(),
-					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+					testcd.Generic(testgeneric.WithCreationTimestamp(nowish.Add(-time.Hour))),
 				),
 			},
 			expectedTotalClusters:   2,
@@ -239,7 +238,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(
 					testcd.WithPoolVersion("stale"),
 					testcd.Installed(),
-					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+					testcd.Generic(testgeneric.WithCreationTimestamp(nowish.Add(-time.Hour))),
 				),
 			},
 			expectedTotalClusters:   3,
@@ -257,7 +256,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(
 					testcd.WithPoolVersion("stale"),
 					testcd.Installed(),
-					testcd.Generic(generic.WithCreationTimestamp(nowish.Add(-time.Hour))),
+					testcd.Generic(testgeneric.WithCreationTimestamp(nowish.Add(-time.Hour))),
 				),
 			},
 			// This deletion happens because we're over capacity, not because we have staleness.
@@ -499,7 +498,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			name: "no scale up with max concurrent and some deleting",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
-				unclaimedCDBuilder("c1").GenericOptions(generic.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c1").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
@@ -512,7 +511,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
-				cdBuilder("c1").GenericOptions(generic.Deleted()).Build(
+				cdBuilder("c1").GenericOptions(testgeneric.Deleted()).Build(
 					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 				),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
@@ -528,7 +527,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			name: "scale up with max concurrent and some deleting",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(3)),
-				unclaimedCDBuilder("c1").GenericOptions(generic.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c1").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
@@ -772,7 +771,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				),
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
-				unclaimedCDBuilder("c3").GenericOptions(generic.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
 			},
 			expectedTotalClusters:  3,
 			expectedObservedSize:   2,
@@ -1422,7 +1421,7 @@ func TestReconcileClusterPool(t *testing.T) {
 						Build(testsecret.WithDataKeyValue("dummykey", []byte("dummyval"))),
 				)
 			}
-			fakeClient := fake.NewFakeClientWithScheme(scheme, test.existing...)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			controllerExpectations := controllerutils.NewExpectations(logger)
@@ -2281,7 +2280,7 @@ func TestReconcileRBAC(t *testing.T) {
 	}}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClientWithScheme(scheme, test.existing...)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			controllerExpectations := controllerutils.NewExpectations(logger)

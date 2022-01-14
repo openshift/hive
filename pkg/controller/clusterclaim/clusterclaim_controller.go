@@ -465,8 +465,7 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 	)
 	statusChanged = statusChanged || changed
 
-	hc := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-	if hc.Status == corev1.ConditionFalse {
+	if cd.Status.PowerState == hivev1.RunningReadyReason {
 		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
 			conds,
 			hivev1.ClusterRunningCondition,

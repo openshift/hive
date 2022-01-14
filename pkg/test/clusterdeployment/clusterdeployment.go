@@ -176,6 +176,12 @@ func WithPowerState(powerState hivev1.ClusterPowerState) Option {
 	}
 }
 
+func WithStatusPowerState(powerState string) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Status.PowerState = powerState
+	}
+}
+
 func WithHibernateAfter(dur time.Duration) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.HibernateAfter = &metav1.Duration{Duration: dur}

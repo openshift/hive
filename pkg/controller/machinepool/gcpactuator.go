@@ -10,8 +10,6 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	gcpprovider "github.com/openshift/cluster-api-provider-gcp/pkg/apis"
-	gcpproviderv1beta1 "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,7 +62,7 @@ type GCPActuator struct {
 var _ Actuator = &GCPActuator{}
 
 func addGCPProviderToScheme(scheme *runtime.Scheme) error {
-	return gcpprovider.AddToScheme(scheme)
+	return machineapi.AddToScheme(scheme)
 }
 
 // NewGCPActuator is the constructor for building a GCPActuator
@@ -490,9 +488,9 @@ func getNetwork(remoteMachineSets []machineapi.MachineSet,
 	return network, subnet, nil
 }
 
-func decodeGCPMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*gcpproviderv1beta1.GCPMachineProviderSpec, error) {
+func decodeGCPMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*machineapi.GCPMachineProviderSpec, error) {
 	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(gcpproviderv1beta1.SchemeGroupVersion)
+	decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
 	if rawExt == nil {
 		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
 	}
@@ -500,7 +498,7 @@ func decodeGCPMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.
 	if err != nil {
 		return nil, fmt.Errorf("could not decode GCP ProviderSpec: %v", err)
 	}
-	spec, ok := obj.(*gcpproviderv1beta1.GCPMachineProviderSpec)
+	spec, ok := obj.(*machineapi.GCPMachineProviderSpec)
 	if !ok {
 		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
 	}

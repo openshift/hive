@@ -93,6 +93,12 @@ func WithSubjects(subjects []rbacv1.Subject) Option {
 	}
 }
 
+func WithClusterState(state hivev1.ClusterClaimClusterState) Option {
+	return func(clusterClaim *hivev1.ClusterClaim) {
+		clusterClaim.Status.ClusterState = state
+	}
+}
+
 // WithCondition adds the specified condition to the ClusterClaim
 func WithCondition(cond hivev1.ClusterClaimCondition) Option {
 	return func(clusterClaim *hivev1.ClusterClaim) {

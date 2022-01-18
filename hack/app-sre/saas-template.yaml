@@ -104,11 +104,11 @@ objects:
       - jsonPath: .status.conditions[?(@.type=='Pending')].reason
         name: Pending
         type: string
+      - jsonPath: .status.clusterState
+        name: ClusterState
+        type: string
       - jsonPath: .spec.namespace
         name: ClusterNamespace
-        type: string
-      - jsonPath: .status.conditions[?(@.type=='ClusterRunning')].reason
-        name: ClusterRunning
         type: string
       - jsonPath: .metadata.creationTimestamp
         name: Age
@@ -150,10 +150,7 @@ objects:
                 namespace:
                   description: Namespace is the namespace containing the ClusterDeployment
                     (name will match the namespace) of the claimed cluster. This field
-                    will be set as soon as a suitable cluster can be found, however
-                    that cluster may still be resuming and not yet ready for use.
-                    Wait for the ClusterRunning condition to be true to avoid this
-                    issue.
+                    will be set as soon as a suitable cluster can be found.
                   type: string
                 subjects:
                   description: Subjects hold references to which to authorize access
@@ -194,6 +191,10 @@ objects:
             status:
               description: ClusterClaimStatus defines the observed state of ClusterClaim.
               properties:
+                clusterState:
+                  description: ClusterState indicates the status of the cluster assigned
+                    to this ClusterClaim.
+                  type: string
                 conditions:
                   description: Conditions includes more detailed status for the cluster
                     pool.

@@ -38,7 +38,6 @@ const (
 // clusterClaimConditions are the cluster claim conditions controlled or initialized by cluster claim controller
 var clusterClaimConditions = []hivev1.ClusterClaimConditionType{
 	hivev1.ClusterClaimPendingCondition,
-	hivev1.ClusterRunningCondition,
 }
 
 // Add creates a new ClusterClaim Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -275,18 +274,14 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 }
 
 func (r *ReconcileClusterClaim) setDeletingStatus(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
-	if conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
-		claim.Status.Conditions,
-		hivev1.ClusterRunningCondition,
-		corev1.ConditionFalse,
-		"ClusterDeleting",
-		"Assigned cluster has been marked for deletion",
-		controllerutils.UpdateConditionIfReasonOrMessageChange); changed {
-		claim.Status.Conditions = conds
-		if err := r.Status().Update(context.Background(), claim); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
-			return reconcile.Result{}, err
-		}
+	if claim.Status.ClusterState == hivev1.ClusterStateDeleting {
+		return reconcile.Result{}, nil
+	}
+	logger.Debug("assigned cluster has been marked for deletion")
+	claim.Status.ClusterState = hivev1.ClusterStateDeleting
+	if err := r.Status().Update(context.Background(), claim); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status")
+		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
 }
@@ -427,21 +422,14 @@ func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, log
 }
 
 func (r *ReconcileClusterClaim) reconcileForDeletedCluster(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
+	if claim.Status.ClusterState == hivev1.ClusterStateNoCluster {
+		return reconcile.Result{}, nil
+	}
 	logger.Debug("assigned cluster has been deleted")
-	conds, changed := controllerutils.SetClusterClaimConditionWithChangeCheck(
-		claim.Status.Conditions,
-		hivev1.ClusterRunningCondition,
-		corev1.ConditionFalse,
-		"ClusterDeleted",
-		"Assigned cluster has been deleted",
-		controllerutils.UpdateConditionIfReasonOrMessageChange,
-	)
-	if changed {
-		claim.Status.Conditions = conds
-		if err := r.Status().Update(context.Background(), claim); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status")
-			return reconcile.Result{}, err
-		}
+	claim.Status.ClusterState = hivev1.ClusterStateNoCluster
+	if err := r.Status().Update(context.Background(), claim); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status")
+		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
 }
@@ -452,10 +440,9 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 	var statusChanged bool
-	var changed bool
 	conds := claim.Status.Conditions
 
-	conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
+	conds, statusChanged = controllerutils.SetClusterClaimConditionWithChangeCheck(
 		conds,
 		hivev1.ClusterClaimPendingCondition,
 		corev1.ConditionFalse,
@@ -463,30 +450,12 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 		"Cluster claimed",
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
-	statusChanged = statusChanged || changed
 
-	if cd.Status.PowerState == hivev1.RunningReadyReason {
-		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
-			conds,
-			hivev1.ClusterRunningCondition,
-			corev1.ConditionTrue,
-			"Running",
-			"Cluster is running",
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		)
-		statusChanged = statusChanged || changed
-	} else {
-		log.Debug("waiting for cluster to be running")
-		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
-			conds,
-			hivev1.ClusterRunningCondition,
-			corev1.ConditionFalse,
-			"Resuming",
-			"Waiting for cluster to be running",
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		)
-		statusChanged = statusChanged || changed
+	if claim.Status.ClusterState != hivev1.ClusterStateProvisioned {
+		claim.Status.ClusterState = hivev1.ClusterStateProvisioned
+		statusChanged = true
 	}
+
 	if statusChanged {
 		log.Debug("conditions changed, updating claim status")
 		claim.Status.Conditions = conds

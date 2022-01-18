@@ -16,8 +16,7 @@ type ClusterClaimSpec struct {
 	Subjects []rbacv1.Subject `json:"subjects,omitempty"`
 
 	// Namespace is the namespace containing the ClusterDeployment (name will match the namespace) of the claimed cluster.
-	// This field will be set as soon as a suitable cluster can be found, however that cluster may still be
-	// resuming and not yet ready for use. Wait for the ClusterRunning condition to be true to avoid this issue.
+	// This field will be set as soon as a suitable cluster can be found.
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
@@ -40,7 +39,27 @@ type ClusterClaimStatus struct {
 	// when the lifetime has elapsed, the claim will be deleted by Hive.
 	// +optional
 	Lifetime *metav1.Duration `json:"lifetime,omitempty"`
+
+	// ClusterState indicates the status of the cluster assigned to this ClusterClaim.
+	ClusterState ClusterClaimClusterState `json:"clusterState,omitempty"`
 }
+
+type ClusterClaimClusterState string
+
+var (
+	// ClusterStateNoCluster is set in two cases:
+	// 1) No cluster has yet been assigned to this ClusterClaim.
+	// 2) The cluster assigned to this claim does not exist (usually because it has been deleted).
+	ClusterStateNoCluster ClusterClaimClusterState = "NoCluster"
+	// ClusterStateProvisioned indicates that the assigned cluster exists and is not deleting.
+	// (NB: it is not necessarily Running -- see ClusterDeployment.Status.PowerState for that
+	// level of detail.)
+	ClusterStateProvisioned ClusterClaimClusterState = "Provisioned"
+	// ClusterStateDeleting indicates that the claimed cluster is in the process of being deleted.
+	// Usually this means it is being deprovisioned; but see the ClusterDeployment's Provisioned
+	// condition for details.
+	ClusterStateDeleting ClusterClaimClusterState = "Deleting"
+)
 
 // ClusterClaimCondition contains details for the current condition of a cluster claim.
 type ClusterClaimCondition struct {
@@ -68,8 +87,6 @@ type ClusterClaimConditionType string
 const (
 	// ClusterClaimPendingCondition is set when a cluster has not yet been assigned and made ready to the claim.
 	ClusterClaimPendingCondition ClusterClaimConditionType = "Pending"
-	// ClusterRunningCondition is true when a claimed cluster is running and ready for use.
-	ClusterRunningCondition ClusterClaimConditionType = "ClusterRunning"
 )
 
 // +genclient
@@ -81,8 +98,8 @@ const (
 // +kubebuilder:resource:path=clusterclaims
 // +kubebuilder:printcolumn:name="Pool",type="string",JSONPath=".spec.clusterPoolName"
 // +kubebuilder:printcolumn:name="Pending",type="string",JSONPath=".status.conditions[?(@.type=='Pending')].reason"
+// +kubebuilder:printcolumn:name="ClusterState",type="string",JSONPath=".status.clusterState"
 // +kubebuilder:printcolumn:name="ClusterNamespace",type="string",JSONPath=".spec.namespace"
-// +kubebuilder:printcolumn:name="ClusterRunning",type="string",JSONPath=".status.conditions[?(@.type=='ClusterRunning')].reason"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type ClusterClaim struct {
 	metav1.TypeMeta   `json:",inline"`

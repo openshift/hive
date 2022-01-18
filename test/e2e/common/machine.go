@@ -13,7 +13,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 )
 
 func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool, timeOut time.Duration) error {
@@ -21,7 +21,7 @@ func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool,
 	logger.Infof("Waiting for Machine")
 	done := make(chan struct{})
 	scheme := runtime.NewScheme()
-	err := machinev1.SchemeBuilder.AddToScheme(scheme)
+	err := machinev1.AddToScheme(scheme)
 	if err != nil {
 		return err
 	}

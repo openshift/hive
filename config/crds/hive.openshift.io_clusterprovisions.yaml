@@ -102,6 +102,10 @@ spec:
                 description: PrevInfraID is the infra ID of the previous failed provision
                   attempt.
                 type: string
+              prevProvisionName:
+                description: PrevProvisionName is the name of the previous failed
+                  provision attempt.
+                type: string
               stage:
                 description: Stage is the stage of provisioning that the cluster deployment
                   has reached.

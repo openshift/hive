@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakekubeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -43,6 +44,21 @@ func testClusterProvision() *hivev1.ClusterProvision {
 				Name: testDeploymentName,
 			},
 			Stage: hivev1.ClusterProvisionStageProvisioning,
+		},
+	}
+}
+func testClusterProvisionWithInfraIDSet() *hivev1.ClusterProvision {
+	return &hivev1.ClusterProvision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testProvisionName,
+			Namespace: testNamespace,
+		},
+		Spec: hivev1.ClusterProvisionSpec{
+			ClusterDeploymentRef: corev1.LocalObjectReference{
+				Name: testDeploymentName,
+			},
+			Stage:   hivev1.ClusterProvisionStageProvisioning,
+			InfraID: pointer.StringPtr("dummy-infra-id"),
 		},
 	}
 }

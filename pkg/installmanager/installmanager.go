@@ -344,12 +344,32 @@ func (m *InstallManager) Run() error {
 		}
 	}
 
-	// If the cluster provision has an infraID set, this implies we failed an install
-	// and are re-trying. Cleanup any resources that may have been provisioned.
-	m.log.Info("cleaning up from past install attempts")
-	if err := m.cleanupFailedInstall(cd, provision); err != nil {
-		m.log.WithError(err).Error("error while trying to preemptively clean up")
-		return err
+	// If the cluster provision has a prevInfraID set, this implies we failed a previous
+	// cluster provision attempt. Cleanup any resources that may have been provisioned.
+	if provision.Spec.PrevInfraID != nil {
+		m.log.Info("cleaning up resources from previous provision attempt")
+		if err := m.cleanupFailedInstall(cd, *provision.Spec.PrevInfraID, *provision.Spec.PrevProvisionName, m.Namespace); err != nil {
+			m.log.WithError(err).Error("error while trying to preemptively clean up")
+			return err
+		}
+	}
+
+	// If the cluster provision has an infraID set, this implies that previous install
+	// pod for the current cluster provision got unexpectedly killed or evicted. If we
+	// proceed, the current install will error out updating the infraID on the cluster
+	// provision. The infraID is an immutable write-once field, as we need it to clean
+	// up provisioned resources from a failed provision. So if infraID is already set,
+	// we do not proceed further and fail the provision.
+	if provision.Spec.InfraID != nil {
+		// This error won't be displayed as condition message on the cluster provision
+		// because install log is not generated until we run installer binary. We do
+		// have the option of faking an install log that can then be regexed.
+		m.log.Error("infraID is already set on the ClusterProvision. Unexpected install pod restart detected. Cleaning up resources from previous install attempt")
+		if err := m.cleanupFailedInstall(cd, *provision.Spec.InfraID, m.ClusterProvisionName, m.Namespace); err != nil {
+			m.log.WithError(err).Error("error while trying to preemptively clean up")
+			return err
+		}
+		return fmt.Errorf("infraID is already set on the ClusterProvision. Unexpected install pod restart detected")
 	}
 
 	// Generate installer assets we need to modify or upload.
@@ -543,25 +563,16 @@ func (m *InstallManager) copyFile(src, dst string) error {
 }
 
 // cleanupFailedInstall allows recovering from an installation error and allows retries
-func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision) error {
-	infraID := provision.Spec.InfraID
-	if infraID == nil {
-		infraID = provision.Spec.PrevInfraID
-	}
-	if infraID != nil {
-		m.log.Info("InfraID set from failed install, running deprovison")
-		if err := m.cleanupFailedProvision(m.DynamicClient, cd, *infraID, m.log); err != nil {
-			return err
-		}
-	} else {
-		m.log.Warn("skipping cleanup as no infra ID set")
-	}
-
-	if err := m.cleanupAdminKubeconfigSecret(); err != nil {
+func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, infraID, provisionName, provisionNamespace string) error {
+	if err := m.cleanupFailedProvision(m.DynamicClient, cd, infraID, m.log); err != nil {
 		return err
 	}
 
-	if err := m.cleanupAdminPasswordSecret(); err != nil {
+	if err := m.cleanupAdminKubeconfigSecret(provisionName, provisionNamespace); err != nil {
+		return err
+	}
+
+	if err := m.cleanupAdminPasswordSecret(provisionName, provisionNamespace); err != nil {
 		return err
 	}
 
@@ -1285,11 +1296,11 @@ func createWithRetries(obj client.Object, m *InstallManager) error {
 	return nil
 }
 
-func (m *InstallManager) cleanupAdminKubeconfigSecret() error {
+func (m *InstallManager) cleanupAdminKubeconfigSecret(provisionName, provisionNamespace string) error {
 	// find/delete any previous admin kubeconfig secret
 	namespacedName := types.NamespacedName{
-		Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, m.ClusterProvisionName),
-		Namespace: m.Namespace,
+		Name:      fmt.Sprintf(adminKubeConfigSecretStringTemplate, provisionName),
+		Namespace: provisionNamespace,
 	}
 	if err := m.deleteAnyExistingObject(namespacedName, &corev1.Secret{}); err != nil {
 		m.log.WithError(err).Error("failed to fetch/delete any pre-existing kubeconfig secret")
@@ -1299,11 +1310,11 @@ func (m *InstallManager) cleanupAdminKubeconfigSecret() error {
 	return nil
 }
 
-func (m *InstallManager) cleanupAdminPasswordSecret() error {
+func (m *InstallManager) cleanupAdminPasswordSecret(provisionName, provisionNamespace string) error {
 	// find/delete any previous admin password secret
 	namespacedName := types.NamespacedName{
-		Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, m.ClusterProvisionName),
-		Namespace: m.Namespace,
+		Name:      fmt.Sprintf(adminPasswordSecretStringTemplate, provisionName),
+		Namespace: provisionNamespace,
 	}
 	if err := m.deleteAnyExistingObject(namespacedName, &corev1.Secret{}); err != nil {
 		m.log.WithError(err).Error("failed to fetch/delete any pre-existing admin password secret")

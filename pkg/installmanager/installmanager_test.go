@@ -145,6 +145,11 @@ func TestInstallManager(t *testing.T) {
 			expectPasswordSecret:          true,
 			expectProvisionMetadataUpdate: true,
 		},
+		{
+			name:        "infraID already set on cluster provision", // fatal error
+			existing:    []runtime.Object{testClusterDeployment(), testClusterProvisionWithInfraIDSet()},
+			expectError: true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

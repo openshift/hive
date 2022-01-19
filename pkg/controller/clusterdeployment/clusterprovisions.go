@@ -175,10 +175,11 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		},
 	}
 
-	// Copy over the cluster ID and infra ID from previous provision so that a failed install can be removed.
-	if cd.Spec.ClusterMetadata != nil {
-		provision.Spec.PrevClusterID = &cd.Spec.ClusterMetadata.ClusterID
-		provision.Spec.PrevInfraID = &cd.Spec.ClusterMetadata.InfraID
+	// Copy over the name, cluster ID and infra ID from previous provision so that a failed install can be removed.
+	if lastFailedProvision != nil {
+		provision.Spec.PrevProvisionName = &lastFailedProvision.Name
+		provision.Spec.PrevClusterID = lastFailedProvision.Spec.ClusterID
+		provision.Spec.PrevInfraID = lastFailedProvision.Spec.InfraID
 	}
 
 	logger.WithField("derivedObject", provision.Name).Debug("Setting label on derived object")

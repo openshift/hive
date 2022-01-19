@@ -1536,6 +1536,11 @@ func (in *ClusterProvisionSpec) DeepCopyInto(out *ClusterProvisionSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PrevProvisionName != nil {
+		in, out := &in.PrevProvisionName, &out.PrevProvisionName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

@@ -842,6 +842,61 @@ func TestReconcileClusterSync_NewSyncSetApplied(t *testing.T) {
 	rt.run(t)
 }
 
+func TestReconcileClusterSync_SyncSetRenamed(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	scheme := newScheme()
+
+	// clustersync exists for old syncset
+	clusterSync := clusterSyncBuilder(scheme).Build(
+		testcs.WithSyncSetStatus(
+			newSyncStatusBuilder("test-syncset").Options(
+				withTransitionInThePast(),
+				withFirstSuccessTimeInThePast(),
+				withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
+			).Build(),
+		),
+	)
+
+	// syncset name does not match the existing clustersync
+	syncSet := testsyncset.FullBuilder(testNamespace, "renamed-test-syncset", scheme).Build(
+		testsyncset.ForClusterDeployments(testCDName),
+		testsyncset.WithApplyMode(hivev1.SyncResourceApplyMode),
+		testsyncset.WithGeneration(2),
+		testsyncset.WithResources(testConfigMap("dest-namespace", "dest-name")),
+	)
+
+	lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
+	rt := newReconcileTest(t, mockCtrl, scheme,
+		cdBuilder(scheme).Build(),
+		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+			teststatefulset.WithCurrentReplicas(3),
+			teststatefulset.WithReplicas(3),
+		),
+		syncSet,
+		clusterSync,
+		lease)
+
+	// Configmap managed by original syncset is deleted
+	deleteCall := rt.mockResourceHelper.EXPECT().
+		Delete("v1", "ConfigMap", "dest-namespace", "dest-name").
+		Return(nil)
+
+	// Configmap managed by renamed syncset is applied
+	rt.mockResourceHelper.EXPECT().
+		Apply(newApplyMatcher(testConfigMap("dest-namespace", "dest-name"))).After(deleteCall)
+
+	rt.expectUnchangedLeaseRenewTime = true
+
+	// Expected syncsetstatus contains syncstatus for renamed syncset
+	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("renamed-test-syncset",
+		withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
+		withObservedGeneration(2),
+	)}
+
+	rt.run(t)
+}
+
 func TestReconcileClusterSync_SyncSetDeleted(t *testing.T) {
 	cases := []struct {
 		name                     string

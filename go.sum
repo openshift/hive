@@ -1708,6 +1708,8 @@ github.com/openshift/machine-api-operator v0.2.1-0.20210504014029-a132ec00f7dd/g
 github.com/openshift/machine-api-operator v0.2.1-0.20210820103535-d50698c302f5/go.mod h1:ko7xmso6c25h9UL6Ai0I5l+6OgyVf+ebinAYXnwlGNg=
 github.com/openshift/machine-api-operator v0.2.1-0.20211102083422-ee77ca7b9fd1/go.mod h1:8kWuB/zhnlBsNOyD1yz0epINZX5IodG3Z4iDwQrYKx0=
 github.com/openshift/machine-api-operator v0.2.1-0.20211111133920-c8bba3e64310/go.mod h1:8kWuB/zhnlBsNOyD1yz0epINZX5IodG3Z4iDwQrYKx0=
+github.com/openshift/machine-api-provider-gcp v0.0.0 h1:IJBYVP5RaxmwaG1fYPDFiR7t634LDpllmzN0atmI//A=
+github.com/openshift/machine-api-provider-gcp v0.0.0/go.mod h1:lgTHPL+8qZt/bvkrkxYXroErVmFy4gXn/BhidMI6FQs=
 github.com/openshift/machine-config-operator v0.0.0/go.mod h1:4IzikyGmUVQwlohScKeaAr5n2YzcWXkZvTMGGxDcU2Q=
 github.com/openshift/terraform-provider-aws v1.60.1-0.20211215220004-24df6d73af46/go.mod h1:T4V1hyevFAuS/Bt3dh90ncYdyh2LVXYNK0kN33NTSfc=
 github.com/openshift/terraform-provider-azurerm v1.44.1-0.20210224232508-7509319df0f4/go.mod h1:MohWawSEwkGnsTTEW/U/sPVxsgQVHBNg2LsqQPbMa/U=

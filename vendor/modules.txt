@@ -724,6 +724,9 @@ github.com/openshift/library-go/pkg/verify/store/parallel
 github.com/openshift/library-go/pkg/verify/store/serial
 github.com/openshift/library-go/pkg/verify/store/sigstore
 github.com/openshift/library-go/pkg/verify/util
+# github.com/openshift/machine-api-provider-gcp v0.0.0
+## explicit
+github.com/openshift/machine-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
 # github.com/ovirt/go-ovirt v0.0.0-20210308100159-ac0bcbc88d7c
 github.com/ovirt/go-ovirt
 # github.com/pborman/uuid v1.2.0

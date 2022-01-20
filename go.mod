@@ -19,7 +19,7 @@ require (
 	github.com/golangci/golangci-lint v1.42.1
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.2.0
-	github.com/gophercloud/utils v0.0.0-20210323225332-7b186010c04f
+	github.com/gophercloud/utils v0.0.0-20210720165645-8a3ad2ad9e70
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/json-iterator/go v1.1.11
@@ -29,14 +29,13 @@ require (
 	github.com/onsi/gomega v1.15.0
 	github.com/openshift/api v0.0.0-20211119153416-313e51eab8c8
 	github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37
-	github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201203141909-4dc702fd57a5
-	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20210817084941-2262c7c6cece
+	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20211111151530-06177b773958
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
 	github.com/openshift/hive/apis v0.0.0
-	github.com/openshift/installer v0.9.0-master.0.20211123044139-11bfe563c288
+	github.com/openshift/installer v0.9.0-master.0.20220118155007-ad535d3fdbf4
 	github.com/openshift/library-go v0.0.0-20210811133500-5e31383de2a7
-	github.com/openshift/machine-api-operator v0.2.1-0.20210505133115-b7ef098180db
+	github.com/openshift/machine-api-provider-gcp v0.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.50.0
 	github.com/prometheus/client_golang v1.11.0
@@ -58,16 +57,15 @@ require (
 	k8s.io/api v0.22.2
 	k8s.io/apiextensions-apiserver v0.22.2
 	k8s.io/apimachinery v0.22.2
-	k8s.io/cli-runtime v0.21.2
+	k8s.io/cli-runtime v0.22.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
 	k8s.io/code-generator v0.22.2
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.22.0-rc.0
-	k8s.io/kubectl v0.21.2
+	k8s.io/kubectl v0.22.0
 	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	sigs.k8s.io/cluster-api-provider-aws v0.0.0
-	sigs.k8s.io/cluster-api-provider-azure v0.0.0
 	sigs.k8s.io/cluster-api-provider-openstack v0.0.0
 	sigs.k8s.io/controller-runtime v0.10.2
 	sigs.k8s.io/controller-tools v0.7.0
@@ -81,16 +79,17 @@ replace github.com/openshift/hive/apis => ./apis
 replace (
 	github.com/IBM-Cloud/terraform-provider-ibm => github.com/openshift/terraform-provider-ibm v1.26.2-openshift-2
 	github.com/kubevirt/terraform-provider-kubevirt => github.com/nirarg/terraform-provider-kubevirt v0.0.0-20201222125919-101cee051ed3
-	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20210706141527-5240e42f012a
-	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20210706141527-5240e42f012a
-	github.com/metal3-io/cluster-api-provider-baremetal => github.com/openshift/cluster-api-provider-baremetal v0.0.0-20190821174549-a2a477909c1d
-	github.com/terraform-providers/terraform-provider-aws => github.com/openshift/terraform-provider-aws v1.60.1-0.20200630224953-76d1fb4e5699
+	github.com/metal3-io/baremetal-operator => github.com/openshift/baremetal-operator v0.0.0-20211201170610-92ffa60c683d
+	github.com/metal3-io/baremetal-operator/apis => github.com/openshift/baremetal-operator/apis v0.0.0-20211201170610-92ffa60c683d
+	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20211201170610-92ffa60c683d
+	github.com/terraform-providers/terraform-provider-aws => github.com/openshift/terraform-provider-aws v1.60.1-0.20211215220004-24df6d73af46
 	github.com/terraform-providers/terraform-provider-azurerm => github.com/openshift/terraform-provider-azurerm v1.44.1-0.20210224232508-7509319df0f4
+	github.com/terraform-providers/terraform-provider-azurestack => github.com/openshift/terraform-provider-azurestack v0.10.0-openshift
 	github.com/terraform-providers/terraform-provider-ignition/v2 => github.com/community-terraform-providers/terraform-provider-ignition/v2 v2.1.0
 	kubevirt.io/client-go => kubevirt.io/client-go v0.29.0
 	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20210121023454-5ffc5f422a80
 	sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20210626224711-5d94c794092f
-	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20210302164104-8498241fa4bd
+	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20211111204942-611d320170af
 )
 
 // from installer as part of https://github.com/openshift/installer/pull/4350

@@ -12,7 +12,6 @@ import (
 	"k8s.io/utils/pointer"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
-	azureprovider "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
@@ -146,7 +145,7 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
 		}
 
-		azureProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*azureprovider.AzureMachineProviderSpec)
+		azureProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)
 		if assert.True(t, ok, "failed to convert to azureProviderSpec") {
 			assert.Equal(t, testInstanceType, azureProvider.VMSize, "unexpected instance type")
 		}

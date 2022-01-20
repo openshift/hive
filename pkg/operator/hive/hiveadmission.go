@@ -15,7 +15,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
-	hiveconstants "github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
@@ -447,10 +446,10 @@ func addReleaseImageVerificationConfigMapEnv(podSpec *corev1.PodSpec, instance *
 		return
 	}
 	podSpec.Containers[0].Env = append(podSpec.Containers[0].Env, corev1.EnvVar{
-		Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar,
+		Name:  constants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar,
 		Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Namespace,
 	}, corev1.EnvVar{
-		Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNameEnvVar,
+		Name:  constants.HiveReleaseImageVerificationConfigMapNameEnvVar,
 		Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Name,
 	})
 }

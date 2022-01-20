@@ -25,7 +25,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
-	hiveconstants "github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -151,7 +150,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if instance.Spec.Backup.Velero.Enabled {
 		hLog.Infof("Velero Backup Enabled.")
 		tmpEnvVar := corev1.EnvVar{
-			Name:  hiveconstants.VeleroBackupEnvVar,
+			Name:  constants.VeleroBackupEnvVar,
 			Value: "true",
 		}
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
@@ -159,7 +158,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		if instance.Spec.Backup.Velero.Namespace != "" {
 			hLog.Infof("Velero Backup Namespace specified.")
 			tmpEnvVar := corev1.EnvVar{
-				Name:  hiveconstants.VeleroNamespaceEnvVar,
+				Name:  constants.VeleroNamespaceEnvVar,
 				Value: instance.Spec.Backup.Velero.Namespace,
 			}
 			hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
@@ -169,7 +168,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if instance.Spec.ArgoCD.Enabled {
 		hLog.Infof("ArgoCD integration enabled")
 		tmpEnvVar := corev1.EnvVar{
-			Name:  hiveconstants.ArgoCDEnvVar,
+			Name:  constants.ArgoCDEnvVar,
 			Value: "true",
 		}
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
@@ -178,7 +177,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if instance.Spec.ArgoCD.Namespace != "" {
 		hLog.Infof("ArgoCD namespace specified in hiveconfig")
 		tmpEnvVar := corev1.EnvVar{
-			Name:  hiveconstants.ArgoCDNamespaceEnvVar,
+			Name:  constants.ArgoCDNamespaceEnvVar,
 			Value: instance.Spec.ArgoCD.Namespace,
 		}
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
@@ -187,7 +186,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if instance.Spec.DeprovisionsDisabled != nil && *instance.Spec.DeprovisionsDisabled {
 		hLog.Info("deprovisions disabled in hiveconfig")
 		tmpEnvVar := corev1.EnvVar{
-			Name:  hiveconstants.DeprovisionsDisabledEnvVar,
+			Name:  constants.DeprovisionsDisabledEnvVar,
 			Value: "true",
 		}
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
@@ -196,7 +195,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if instance.Spec.Backup.MinBackupPeriodSeconds != nil {
 		hLog.Infof("MinBackupPeriodSeconds specified.")
 		tmpEnvVar := corev1.EnvVar{
-			Name:  hiveconstants.MinBackupPeriodSecondsEnvVar,
+			Name:  constants.MinBackupPeriodSecondsEnvVar,
 			Value: strconv.Itoa(*instance.Spec.Backup.MinBackupPeriodSeconds),
 		}
 		hiveContainer.Env = append(hiveContainer.Env, tmpEnvVar)
@@ -205,7 +204,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if instance.Spec.DeleteProtection == hivev1.DeleteProtectionEnabled {
 		hLog.Info("Delete Protection enabled")
 		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
-			Name:  hiveconstants.ProtectedDeleteEnvVar,
+			Name:  constants.ProtectedDeleteEnvVar,
 			Value: "true",
 		})
 	}
@@ -213,10 +212,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if instance.Spec.ReleaseImageVerificationConfigMapRef != nil {
 		hLog.Info("Release Image verification enabled")
 		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
-			Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar,
+			Name:  constants.HiveReleaseImageVerificationConfigMapNamespaceEnvVar,
 			Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Namespace,
 		}, corev1.EnvVar{
-			Name:  hiveconstants.HiveReleaseImageVerificationConfigMapNameEnvVar,
+			Name:  constants.HiveReleaseImageVerificationConfigMapNameEnvVar,
 			Value: instance.Spec.ReleaseImageVerificationConfigMapRef.Name,
 		})
 	}
@@ -406,7 +405,7 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h re
 	}
 
 	globalPullSecretEnvVar := corev1.EnvVar{
-		Name:  hiveconstants.GlobalPullSecret,
+		Name:  constants.GlobalPullSecret,
 		Value: instance.Spec.GlobalPullSecretRef.Name,
 	}
 	hiveDeployment.Spec.Template.Spec.Containers[0].Env = append(hiveDeployment.Spec.Template.Spec.Containers[0].Env, globalPullSecretEnvVar)

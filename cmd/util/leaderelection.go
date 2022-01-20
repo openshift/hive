@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
@@ -25,19 +24,26 @@ func RunWithLeaderElection(ctx context.Context, cfg *rest.Config, lockNS, lockNa
 	// https://github.com/kubernetes/kubernetes/blob/f7e3bcdec2e090b7361a61e21c20b3dbbb41b7f0/staging/src/k8s.io/client-go/examples/leader-election/main.go#L92-L154
 	// This gives us ReleaseOnCancel which is not presently exposed in controller-runtime.
 
+	// [Later] Migrated to using resourcelock.New() with ConfigMapsLeasesResourceLock.
+	// TODO: Migrate to LeasesResourceLock after the next version boundary.
+
 	id := uuid.New().String()
 	leLog := log.WithField("id", id)
 	leLog.Info("generated leader election ID")
 
-	lock := &resourcelock.ConfigMapLock{
-		ConfigMapMeta: metav1.ObjectMeta{
-			Namespace: lockNS,
-			Name:      lockName,
-		},
-		Client: kubernetes.NewForConfigOrDie(cfg).CoreV1(),
-		LockConfig: resourcelock.ResourceLockConfig{
+	kubeClient := kubernetes.NewForConfigOrDie(cfg)
+	lock, err := resourcelock.New(
+		resourcelock.ConfigMapsLeasesResourceLock,
+		lockNS,
+		lockName,
+		kubeClient.CoreV1(),
+		kubeClient.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
 			Identity: id,
 		},
+	)
+	if err != nil {
+		log.WithError(err).Fatal("failed to create lock for leader election config")
 	}
 
 	// start the leader election code loop

@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	defaultLogLevel         = "info"
-	leaderElectionConfigMap = "hive-operator-leader"
+	defaultLogLevel        = "info"
+	leaderElectionLockName = "hive-operator-leader"
 )
 
 type controllerManagerOptions struct {
@@ -133,7 +133,7 @@ func newRootCommand() *cobra.Command {
 				cancel()
 			}
 
-			cmdutil.RunWithLeaderElection(ctx, cfg, operatorNS, leaderElectionConfigMap, run)
+			cmdutil.RunWithLeaderElection(ctx, cfg, operatorNS, leaderElectionLockName, run)
 		},
 	}
 

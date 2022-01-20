@@ -9,20 +9,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -34,6 +29,7 @@ import (
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	cmdutil "github.com/openshift/hive/cmd/util"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/argocdregister"
 	"github.com/openshift/hive/pkg/controller/awsprivatelink"
@@ -64,11 +60,8 @@ import (
 )
 
 const (
-	defaultLogLevel             = "info"
-	leaderElectionConfigMap     = "hive-controllers-leader"
-	leaderElectionLeaseDuration = "120s"
-	leaderElectionRenewDeadline = "90s"
-	leaderElectionRetryPeriod   = "30s"
+	defaultLogLevel         = "info"
+	leaderElectionConfigMap = "hive-controllers-leader"
 )
 
 type controllerSetupFunc func(manager.Manager) error
@@ -132,20 +125,6 @@ func newRootCommand() *cobra.Command {
 
 			log.Infof("Version: %s", version.String())
 			log.Debug("debug logging enabled")
-
-			// Parse leader election options
-			leaseDuration, err := time.ParseDuration(leaderElectionLeaseDuration)
-			if err != nil {
-				log.WithError(err).Fatal("Cannot parse lease duration")
-			}
-			renewDeadline, err := time.ParseDuration(leaderElectionRenewDeadline)
-			if err != nil {
-				log.WithError(err).Fatal("Cannot parse renew deadline")
-			}
-			retryPeriod, err := time.ParseDuration(leaderElectionRetryPeriod)
-			if err != nil {
-				log.WithError(err).Fatal("Cannot parse retry period")
-			}
 
 			// Get a config to talk to the apiserver
 			cfg, err := config.GetConfig()
@@ -243,54 +222,10 @@ func newRootCommand() *cobra.Command {
 				cancel()
 			}
 
-			// Leader election code based on:
-			// https://github.com/kubernetes/kubernetes/blob/f7e3bcdec2e090b7361a61e21c20b3dbbb41b7f0/staging/src/k8s.io/client-go/examples/leader-election/main.go#L92-L154
-			// This gives us ReleaseOnCancel which is not presently exposed in controller-runtime.
-
 			if os.Getenv("HIVE_SKIP_LEADER_ELECTION") != "" {
 				run(ctx)
 			} else {
-				id := uuid.New().String()
-				leLog := log.WithField("id", id)
-				leLog.Info("generated leader election ID")
-
-				lock := &resourcelock.ConfigMapLock{
-					ConfigMapMeta: metav1.ObjectMeta{
-						Namespace: hiveNSName,
-						Name:      leaderElectionConfigMap,
-					},
-					Client: kubernetes.NewForConfigOrDie(cfg).CoreV1(),
-					LockConfig: resourcelock.ResourceLockConfig{
-						Identity: id,
-					},
-				}
-
-				// start the leader election code loop
-				leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-					Lock:            lock,
-					ReleaseOnCancel: true,
-					LeaseDuration:   leaseDuration,
-					RenewDeadline:   renewDeadline,
-					RetryPeriod:     retryPeriod,
-					Callbacks: leaderelection.LeaderCallbacks{
-						OnStartedLeading: func(ctx context.Context) {
-							run(ctx)
-						},
-						OnStoppedLeading: func() {
-							// we can do cleanup here if necessary
-							leLog.Infof("leader lost")
-							os.Exit(0)
-						},
-						OnNewLeader: func(identity string) {
-							if identity == id {
-								// We just became the leader
-								leLog.Info("became leader")
-								return
-							}
-							log.Infof("current leader: %s", identity)
-						},
-					},
-				})
+				cmdutil.RunWithLeaderElection(ctx, cfg, hiveNSName, leaderElectionConfigMap, run)
 			}
 		},
 	}

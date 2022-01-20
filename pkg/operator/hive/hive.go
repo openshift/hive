@@ -77,14 +77,20 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
 			}
 		}
-		// The hive-controller binary creates a configmap to handle leader election. Delete it.
-		// TODO: Dedup this with const cmd/manager/main.go:leaderElectionConfigMap
-		leaderCM := "hive-controllers-leader"
-		hLog.Infof("Deleting configmap/%s from old target namespace %s", leaderCM, ns)
-		// h.Delete already no-ops for IsNotFound
+		// The hive-controller binary creates a configmap and lease to handle leader election. Delete them.
+		// TODO: Dedup this with const cmd/manager/main.go:leaderElectionLockName
+		lockName := "hive-controllers-leader"
 		// TODO: Something better than hardcoding apiVersion and kind.
-		if err := h.Delete("v1", "ConfigMap", ns, leaderCM); err != nil {
-			return errors.Wrapf(err, "error deleting configmap/%s from old target namespace %s", leaderCM, ns)
+		toDel := map[string]string{
+			"ConfigMap": "v1",
+			"Lease":     "coordination.k8s.io/v1",
+		}
+		for kind, apiVersion := range toDel {
+			hLog.Infof("Deleting %s/%s from old target namespace %s", kind, lockName, ns)
+			// h.Delete already no-ops for IsNotFound
+			if err := h.Delete(apiVersion, kind, ns, lockName); err != nil {
+				return errors.Wrapf(err, "error deleting %s/%s from old target namespace %s", kind, lockName, ns)
+			}
 		}
 
 	}

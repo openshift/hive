@@ -60,8 +60,8 @@ import (
 )
 
 const (
-	defaultLogLevel         = "info"
-	leaderElectionConfigMap = "hive-controllers-leader"
+	defaultLogLevel        = "info"
+	leaderElectionLockName = "hive-controllers-leader"
 )
 
 type controllerSetupFunc func(manager.Manager) error
@@ -225,7 +225,7 @@ func newRootCommand() *cobra.Command {
 			if os.Getenv("HIVE_SKIP_LEADER_ELECTION") != "" {
 				run(ctx)
 			} else {
-				cmdutil.RunWithLeaderElection(ctx, cfg, hiveNSName, leaderElectionConfigMap, run)
+				cmdutil.RunWithLeaderElection(ctx, cfg, hiveNSName, leaderElectionLockName, run)
 			}
 		},
 	}

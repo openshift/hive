@@ -368,9 +368,9 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: "AWSVPCDoesNotExist",
 		},
 		{
-			name:           "VPCDhcpOptionAssociationAbsent",
+			name:           "VPCDhcpOptionAssociationPresentNowAbsent",
 			log:            pointer.StringPtr(dhcpOptionAssociationAbsent),
-			expectedReason: "VPCDhcpOptionAssociationAbsent",
+			expectedReason: "VPCDhcpOptionAssociationPresentNowAbsent",
 		},
 		{
 			name:           "TargetGroupNotFound",
@@ -378,9 +378,9 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: "TargetGroupNotFound",
 		},
 		{
-			name:           "RouteTablePrivateRoutesAbsent",
+			name:           "RouteTablePrivateRoutesPresentNowAbsent",
 			log:            pointer.StringPtr(routeTablePrivateRoute),
-			expectedReason: "RouteTablePrivateRoutesAbsent",
+			expectedReason: "RouteTablePrivateRoutesPresentNowAbsent",
 		},
 	}
 

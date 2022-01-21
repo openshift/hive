@@ -1711,23 +1711,23 @@ data:
       - "The vpc ID .* does not exist"
       installFailingReason: AWSVPCDoesNotExist
       installFailingMessage: The AWS VPC does not exist
-    - name: VPCDhcpOptionAssociationAbsent
+    - name: VPCDhcpOptionAssociationPresentNowAbsent
     # https://bugzilla.redhat.com/show_bug.cgi?id=2032521
       searchRegexStrings:
-      - "error .* applying changes to module.vpc.aws_vpc_dhcp_options_association"
-      installFailingReason: VPCDhcpOptionAssociationAbsent
+      - "error .* applying changes to module.vpc.aws_vpc_dhcp_options_association.*\n.*\n.*was present, but now absent"
+      installFailingReason: VPCDhcpOptionAssociationPresentNowAbsent
       installFailingMessage: The VPC Dhcp Option Association absent after creation
     - name: TargetGroupNotFound
     # https://bugzilla.redhat.com/show_bug.cgi?id=1898265
       searchRegexStrings:
       - "TargetGroupNotFound"
       installFailingReason: TargetGroupNotFound
-      installFailingMessage: Target Group cannot be found after creation
-    - name: RouteTablePrivateRoutesAbsent
+      installFailingMessage: Target Group cannot be found
+    - name: RouteTablePrivateRoutesPresentNowAbsent
     # https://bugzilla.redhat.com/show_bug.cgi?id=2033256
       searchRegexStrings:
-      - "ERROR When applying changes to module.vpc.aws_route_table.private_routes"
-      installFailingReason: RouteTablePrivateRoutesAbsent
+      - "ERROR When applying changes to module.vpc.aws_route_table.private_routes.*\n.*\n.*was present, but now absent"
+      installFailingReason: RouteTablePrivateRoutesPresentNowAbsent
       installFailingMessage: VPC Route Table private routes absent after creation
 
 

@@ -53,6 +53,7 @@ const (
 	awsInvalidVpcId             = "time=\"2022-01-11T18:25:33Z\" level=error msg=\"Error: InvalidVpcID.NotFound: The vpc ID 'vpc-whatever' does not exist\""
 	route53Timeout              = "level=error\nlevel=error msg=Error: error waiting for Route53 Hosted Zone (Z1234567890ACBD) creation: timeout while waiting for state to become 'INSYNC' (last state: 'PENDING', timeout: 15m0s)\nlevel=error\nlevel=error msg= on ../tmp/openshift-install-cluster-260510522/route53/base.tf line 22, in resource \"aws_route53_zone\" \"new_int\":\nlevel=error msg= 22: resource \"aws_route53_zone\" \"new_int\""
 	inconsistentTerraformResult = "time=\"2021-12-01T16:08:46Z\" level=error msg=\"Error: Provider produced inconsistent result after apply\""
+	targetGroupNotFound         = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:902449478968:targetgroup/cluster-m7rlh-sint/2fb59a8e2fb10d40) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:123456789:targetgroup/cluster-m7rlh-sint/2fb59a8e2fb10d40): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:123456789:targetgroup/napcluster-m7rlh-sint/2fb59a8e2fb10d40' not found"
 	// NOTE: This embedded newline matters: our regex must be able to match the two chunks of the message on separate lines.
 	noWorkerNodesFmt = `time="2021-12-09T10:51:06Z" level=debug msg="Symlinking plugin terraform-provider-%s src: \"/usr/bin/openshift-install\" dst: \"/tmp/openshift-install-cluster-723469510/plugins/terraform-provider-%s\""
 time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 master nodes blah"`
@@ -363,6 +364,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "AWSVPCDoesNotExist",
 			log:            pointer.StringPtr(awsInvalidVpcId),
 			expectedReason: "AWSVPCDoesNotExist",
+		},
+		{
+			name:           "TargetGroupNotFound",
+			log:            pointer.StringPtr(targetGroupNotFound),
+			expectedReason: "TargetGroupNotFound",
 		},
 	}
 

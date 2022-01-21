@@ -149,6 +149,11 @@ data:
       - "The vpc ID .* does not exist"
       installFailingReason: AWSVPCDoesNotExist
       installFailingMessage: The AWS VPC does not exist
+    - name: TargetGroupNotFound
+      searchRegexStrings:
+      - "TargetGroupNotFound: .*:targetgroup\\/.*not found"
+      installFailingReason: TargetGroupNotFound
+      installFailingMessage: Failed to update elasticloadbalancing target group as it was not found
 
 
     # GCP Specific

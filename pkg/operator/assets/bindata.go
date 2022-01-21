@@ -1706,6 +1706,11 @@ data:
       - "Error waiting for instance .* to become ready .* User initiated shutdown"
       installFailingReason: UserInitiatedShutdown
       installFailingMessage: User initiated shutdown of instances as the install was running
+    - name: AWSVPCDoesNotExist
+      searchRegexStrings:
+      - "The vpc ID .* does not exist"
+      installFailingReason: AWSVPCDoesNotExist
+      installFailingMessage: The AWS VPC does not exist
 
 
     # GCP Specific

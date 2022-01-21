@@ -44,12 +44,6 @@ const (
 	inputHashAnnotation = "hive.openshift.io/hive-admission-input-sources-hash"
 )
 
-const (
-	supportedContractsConfigMapName      = "hive-supported-contracts"
-	supportedContractsConfigMapNameKey   = "supported-contracts"
-	supportedContractsConfigMapMountPath = "/data/supported-contracts-config"
-)
-
 var webhookAssets = []string{
 	"config/hiveadmission/clusterdeployment-webhook.yaml",
 	"config/hiveadmission/clusterimageset-webhook.yaml",

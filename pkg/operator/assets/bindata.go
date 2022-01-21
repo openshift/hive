@@ -954,6 +954,18 @@ rules:
   - backups
   verbs:
   - create
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
 `)
 
 func configControllersHive_controllers_roleYamlBytes() ([]byte, error) {

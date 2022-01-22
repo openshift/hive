@@ -9,7 +9,7 @@ import (
 var (
 	metricClusterDeploymentsAssignable = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_clusterpool_clusterdeployments_assignable",
-		Help: "The number of ClusterDeployments ready to be claimed. Contributes to Size and MaxSize.",
+		Help: "The number of ClusterDeployments ready to be claimed (installed and running). Contributes to Size and MaxSize.",
 	}, []string{"clusterpool_namespace", "clusterpool_name"})
 	metricClusterDeploymentsClaimed = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_clusterpool_clusterdeployments_claimed",
@@ -25,11 +25,11 @@ var (
 	}, []string{"clusterpool_namespace", "clusterpool_name"})
 	metricClusterDeploymentsUnclaimed = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_clusterpool_clusterdeployments_unclaimed",
-		Help: "The number of unclaimed ClusterDeployments, including both installing and assignable. Should tend toward the pool Size, unless constrained by MaxConcurrent or exceeded due to excess claims.",
+		Help: "The number of unclaimed ClusterDeployments, including installing, standby, and assignable. Should tend toward the pool Size, unless constrained by MaxConcurrent or exceeded due to excess claims.",
 	}, []string{"clusterpool_namespace", "clusterpool_name"})
-	metricClusterDeploymentsRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "hive_clusterpool_clusterdeployments_running",
-		Help: "The subset of assignable ClusterDeployments that are in Running state. Should tend toward RunningCount plus the number of pending ClusterClaims.",
+	metricClusterDeploymentsStandby = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_clusterpool_clusterdeployments_standby",
+		Help: "The number of ClusterDeployments that are installed but not running. Should tend toward pool Size minus RunningCount minus the number of pending ClusterClaims.",
 	}, []string{"clusterpool_namespace", "clusterpool_name"})
 	metricClusterDeploymentsStale = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_clusterpool_clusterdeployments_stale",
@@ -71,7 +71,7 @@ func init() {
 	metrics.Registry.MustRegister(metricClusterDeploymentsDeleting)
 	metrics.Registry.MustRegister(metricClusterDeploymentsInstalling)
 	metrics.Registry.MustRegister(metricClusterDeploymentsUnclaimed)
-	metrics.Registry.MustRegister(metricClusterDeploymentsRunning)
+	metrics.Registry.MustRegister(metricClusterDeploymentsStandby)
 	metrics.Registry.MustRegister(metricClusterDeploymentsStale)
 	metrics.Registry.MustRegister(metricClusterDeploymentsBroken)
 	metrics.Registry.MustRegister(metricStaleClusterDeploymentsDeleted)

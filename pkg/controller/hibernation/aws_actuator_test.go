@@ -266,7 +266,7 @@ func TestReplacePreemptibleMachines(t *testing.T) {
 		testcd.WithClusterVersion("4.4.9"),
 		testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 			Type:               hivev1.ClusterHibernatingCondition,
-			Reason:             hivev1.HibernatingHibernationReason,
+			Reason:             hivev1.HibernatingReasonHibernating,
 			Status:             corev1.ConditionFalse,
 			LastTransitionTime: metav1.NewTime(time.Now().Add(-5 * time.Minute)),
 		}),

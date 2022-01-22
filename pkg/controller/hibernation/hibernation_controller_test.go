@@ -105,7 +105,7 @@ func TestReconcile(t *testing.T) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonUnsupported, cond.Reason)
 			},
 		},
 		{
@@ -114,7 +114,7 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:    hivev1.ClusterHibernatingCondition,
 					Status:  corev1.ConditionFalse,
-					Reason:  hivev1.UnsupportedHibernationReason,
+					Reason:  hivev1.HibernatingReasonUnsupported,
 					Message: "Unsupported version, need version 4.4.8 or greater"})).Build(),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
@@ -130,10 +130,10 @@ func TestReconcile(t *testing.T) {
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonUnsupported, cond.Reason)
 				require.NotNil(t, runCond)
-				assert.Equal(t, hivev1.RunningReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.RunningReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
 			},
 		},
 		{
@@ -144,7 +144,7 @@ func TestReconcile(t *testing.T) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.UnsupportedHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonUnsupported, cond.Reason)
 			},
 		},
 		{
@@ -164,11 +164,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonStopping, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStopping, cd.Status.PowerState)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
 		{
@@ -179,8 +179,8 @@ func TestReconcile(t *testing.T) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.SyncSetsNotAppliedReason, cond.Reason)
-				assert.Equal(t, hivev1.SyncSetsNotAppliedReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonSyncSetsNotApplied, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateSyncSetsNotApplied, cd.Status.PowerState)
 			},
 			expectError:        false,
 			expectRequeueAfter: time.Duration(time.Minute * 10),
@@ -192,7 +192,7 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:    hivev1.ClusterHibernatingCondition,
 					Status:  corev1.ConditionFalse,
-					Reason:  hivev1.SyncSetsNotAppliedReason,
+					Reason:  hivev1.HibernatingReasonSyncSetsNotApplied,
 					Message: "Cluster SyncSets have not been applied",
 				}),
 			).Build(),
@@ -200,7 +200,7 @@ func TestReconcile(t *testing.T) {
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, hivev1.SyncSetsAppliedReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonSyncSetsApplied, cond.Reason)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 			},
 		},
@@ -210,12 +210,12 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:    hivev1.ClusterHibernatingCondition,
 					Status:  corev1.ConditionFalse,
-					Reason:  hivev1.SyncSetsAppliedReason,
+					Reason:  hivev1.HibernatingReasonSyncSetsApplied,
 					Message: "SyncSets have been applied"}),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterReadyCondition,
 					Status: corev1.ConditionFalse,
-					Reason: hivev1.StartingMachinesReadyReason,
+					Reason: hivev1.ReadyReasonStartingMachines,
 				})).Build(),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
@@ -229,7 +229,7 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, hivev1.RunningReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
 			},
 		},
 		{
@@ -243,11 +243,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonStopping, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStopping, cd.Status.PowerState)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
 		{
@@ -261,11 +261,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonStopping, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStopping, cd.Status.PowerState)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
 		{
@@ -280,11 +280,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.FailedToStopHibernationReason, cond.Reason)
-				assert.Equal(t, hivev1.FailedToStopHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonFailedToStop, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateFailedToStop, cd.Status.PowerState)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
 		{
@@ -293,7 +293,7 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterReadyCondition,
 					Status: corev1.ConditionFalse,
-					Reason: hivev1.StoppingOrHibernatingReadyReason,
+					Reason: hivev1.ReadyReasonStoppingOrHibernating,
 				})).Build(),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
@@ -303,11 +303,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
-				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
-				assert.Equal(t, hivev1.HibernatingHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonHibernating, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateHibernating, cd.Status.PowerState)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
 		{
@@ -323,9 +323,9 @@ func TestReconcile(t *testing.T) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.WaitingForMachinesToStopHibernatingReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonWaitingForMachinesToStop, cond.Reason)
 				assert.Equal(t, "Stopping cluster machines. Some machines have not yet stopped: pending-1,running-1,stopping-1", cond.Message)
-				assert.Equal(t, hivev1.WaitingForMachinesToStopHibernatingReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForMachinesToStop, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Duration(time.Minute * 1),
 		},
@@ -335,7 +335,7 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterReadyCondition,
 					Status: corev1.ConditionFalse,
-					Reason: hivev1.FailedToStartMachinesReadyReason,
+					Reason: hivev1.ReadyReasonFailedToStartMachines,
 				},
 				)),
 			cs: csBuilder.Build(),
@@ -347,11 +347,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonStopping, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStopping, cd.Status.PowerState)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
 		{
@@ -365,11 +365,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StartingMachinesReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.StartingMachinesReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonStartingMachines, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStartingMachines, cd.Status.PowerState)
 			},
 		},
 		{
@@ -384,11 +384,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.FailedToStartMachinesReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.FailedToStartMachinesReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonFailedToStartMachines, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateFailedToStartMachines, cd.Status.PowerState)
 			},
 		},
 		{
@@ -397,9 +397,9 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.ClusterReadyCondition,
 					Status: corev1.ConditionFalse,
-					Reason: hivev1.FailedToStartMachinesReadyReason,
+					Reason: hivev1.ReadyReasonFailedToStartMachines,
 				}),
-				testcd.WithCondition(readyCondition(corev1.ConditionTrue, hivev1.RunningReadyReason, 6*time.Hour))),
+				testcd.WithCondition(readyCondition(corev1.ConditionTrue, hivev1.ReadyReasonRunning, 6*time.Hour))),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
 				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
@@ -408,18 +408,18 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cond.Reason)
-				assert.Equal(t, hivev1.StoppingHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.HibernatingReasonStopping, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStopping, cd.Status.PowerState)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
 		{
 			name: "resuming, machines have not started",
 			cd: cdBuilder.Options(o.shouldRun).Build(
-				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.ResumingOrRunningHibernationReason, 6*time.Hour)),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.StartingMachinesReadyReason, 1*time.Hour))),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonStartingMachines, 1*time.Hour))),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
 				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
@@ -430,19 +430,19 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.WaitingForMachinesReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonWaitingForMachines, runCond.Reason)
 				assert.Equal(t, "Waiting for cluster machines to start. Some machines are not yet running: pending-1,stopped-1 (step 1/4)", runCond.Message)
-				assert.Equal(t, hivev1.WaitingForMachinesReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForMachines, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Duration(time.Minute * 1),
 		},
 		{
 			name: "resuming unready node",
 			cd: cdBuilder.Options().Build(
-				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.ResumingOrRunningHibernationReason, 6*time.Hour)),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
 				testcd.WithCondition(readyCondition(corev1.ConditionFalse, "unused", 6*time.Hour))),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
@@ -458,18 +458,18 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.WaitingForNodesReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.WaitingForNodesReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonWaitingForNodes, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForNodes, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
 		{
 			name: "resuming pending csrs",
 			cd: cdBuilder.Options().Build(
-				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.ResumingOrRunningHibernationReason, 6*time.Hour)),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
 				testcd.WithCondition(readyCondition(corev1.ConditionFalse, "unused", 6*time.Hour))),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
@@ -492,10 +492,10 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.WaitingForNodesReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonWaitingForNodes, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
@@ -505,14 +505,14 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterHibernatingCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.ResumingOrRunningHibernationReason,
+					Reason:             hivev1.HibernatingReasonResumingOrRunning,
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				}),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterReadyCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.WaitingForNodesReadyReason,
+					Reason:             hivev1.ReadyReasonWaitingForNodes,
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				}),
@@ -532,11 +532,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.PausingForClusterOperatorsToSettleReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonPausingForClusterOperatorsToSettle, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Duration(time.Minute * 2),
 		},
@@ -546,14 +546,14 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterHibernatingCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.ResumingOrRunningHibernationReason,
+					Reason:             hivev1.HibernatingReasonResumingOrRunning,
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				}),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterReadyCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.PausingForClusterOperatorsToSettleReadyReason,
+					Reason:             hivev1.ReadyReasonPausingForClusterOperatorsToSettle,
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				}),
@@ -573,10 +573,10 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.WaitingForClusterOperatorsReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonWaitingForClusterOperators, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
@@ -586,14 +586,14 @@ func TestReconcile(t *testing.T) {
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterHibernatingCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.ResumingOrRunningHibernationReason,
+					Reason:             hivev1.HibernatingReasonResumingOrRunning,
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				}),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterReadyCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.PausingForClusterOperatorsToSettleReadyReason,
+					Reason:             hivev1.ReadyReasonPausingForClusterOperatorsToSettle,
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-6 * time.Minute)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				}),
@@ -613,10 +613,10 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.WaitingForClusterOperatorsReadyReason, runCond.Reason)
+				assert.Equal(t, hivev1.ReadyReasonWaitingForClusterOperators, runCond.Reason)
 			},
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
@@ -625,14 +625,14 @@ func TestReconcile(t *testing.T) {
 			cd: cdBuilder.Options().Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 				Type:               hivev1.ClusterHibernatingCondition,
 				Status:             corev1.ConditionFalse,
-				Reason:             hivev1.ResumingOrRunningHibernationReason,
+				Reason:             hivev1.HibernatingReasonResumingOrRunning,
 				LastProbeTime:      metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 			}),
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:               hivev1.ClusterReadyCondition,
 					Status:             corev1.ConditionFalse,
-					Reason:             hivev1.PausingForClusterOperatorsToSettleReadyReason,
+					Reason:             hivev1.ReadyReasonPausingForClusterOperatorsToSettle,
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-6 * time.Minute)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
 				}),
@@ -652,11 +652,11 @@ func TestReconcile(t *testing.T) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
-				assert.Equal(t, hivev1.RunningReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.RunningReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
 			},
 		},
 		{
@@ -667,7 +667,7 @@ func TestReconcile(t *testing.T) {
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				assert.Equal(t, "Hibernation capable", cond.Message)
 			},
 		},
@@ -681,30 +681,30 @@ func TestReconcile(t *testing.T) {
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, hivev1.HibernatingHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonHibernating, cond.Reason)
 				assert.Equal(t, corev1.ConditionTrue, cond.Status)
 				assert.Equal(t, "Fake cluster is stopped", cond.Message)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
-				assert.Equal(t, hivev1.StoppingOrHibernatingReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.HibernatingHibernationReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateHibernating, cd.Status.PowerState)
 			},
 		},
 		{
 			name: "start hibernated fake cluster",
 			cd: cdBuilder.Options(o.hibernating,
-				testcd.WithPowerState(hivev1.RunningClusterPowerState),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")).Build(),
 			cs: csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
-				assert.Equal(t, hivev1.ResumingOrRunningHibernationReason, cond.Reason)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
 				assert.Equal(t, corev1.ConditionFalse, cond.Status)
 				require.NotNil(t, runCond)
 				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
-				assert.Equal(t, hivev1.RunningReadyReason, runCond.Reason)
-				assert.Equal(t, hivev1.RunningReadyReason, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
 			},
 		},
 	}
@@ -805,7 +805,7 @@ func TestHibernateAfter(t *testing.T) {
 				testcd.WithHibernateAfter(8*time.Hour),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs:                 csBuilder.Build(),
-			expectedPowerState: hivev1.HibernatingClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 		{
 			cd: cdBuilder.Build(
@@ -814,7 +814,7 @@ func TestHibernateAfter(t *testing.T) {
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs:                      csBuilder.Build(),
 			expectedPowerState:      "",
-			expectedConditionReason: hivev1.UnsupportedHibernationReason,
+			expectedConditionReason: hivev1.HibernatingReasonUnsupported,
 		},
 		{
 			name: "cluster not yet due for hibernate older version", // cluster that has never been hibernated and thus has no running condition
@@ -826,32 +826,32 @@ func TestHibernateAfter(t *testing.T) {
 				testcs.WithFirstSuccessTime(time.Now().Add(-3 * time.Hour)),
 			).Build(),
 			expectedPowerState:      "",
-			expectedConditionReason: hivev1.UnsupportedHibernationReason,
+			expectedConditionReason: hivev1.HibernatingReasonUnsupported,
 		},
 		{
 			name: "cluster not yet due for hibernate no running condition", // cluster that has never been hibernated
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(12*time.Hour),
-				testcd.WithPowerState(hivev1.RunningClusterPowerState),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs:                 csBuilder.Build(),
 			expectRequeueAfter: 2 * time.Hour,
-			expectedPowerState: hivev1.RunningClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateRunning,
 		},
 		{
 			name: "cluster with running condition due for hibernate",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.RunningReadyReason, 9*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonRunning, 9*time.Hour)),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs:                 csBuilder.Build(),
-			expectedPowerState: hivev1.HibernatingClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 		{
 			name: "cluster with running condition not due for hibernate",
 			cd: cdBuilder.Build(
-				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.ResumingOrRunningHibernationReason, 6*time.Hour)),
-				testcd.WithCondition(readyCondition(corev1.ConditionTrue, hivev1.RunningReadyReason, 6*time.Hour)),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionTrue, hivev1.ReadyReasonRunning, 6*time.Hour)),
 				testcd.WithHibernateAfter(20*time.Hour),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs:                 csBuilder.Build(),
@@ -868,28 +868,28 @@ func TestHibernateAfter(t *testing.T) {
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour)),
-				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.ResumingOrRunningHibernationReason, 8*time.Hour)),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.WaitingForNodesReadyReason, 8*time.Hour)),
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse, hivev1.HibernatingReasonResumingOrRunning, 8*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonWaitingForNodes, 8*time.Hour)),
 				o.shouldRun),
 			cs:                 csBuilder.Build(),
-			expectedPowerState: hivev1.RunningClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateRunning,
 			expectRequeueAfter: stateCheckInterval,
 		},
 		{
 			name: "cluster due for hibernate, no syncsets",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Minute),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.RunningReadyReason, 8*time.Minute)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonRunning, 8*time.Minute)),
 				testcd.InstalledTimestamp(time.Now().Add(-8*time.Minute))),
 			// The clustersync controller creates an empty ClusterSync even when there are no syncsets.
 			cs:                 csBuilder.Build(),
-			expectedPowerState: hivev1.HibernatingClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 		{
 			name: "cluster due for hibernate but syncsets not applied",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Minute),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.RunningReadyReason, 8*time.Minute)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonRunning, 8*time.Minute)),
 				testcd.InstalledTimestamp(time.Now().Add(-8*time.Minute))),
 			cs: csBuilder.Options(
 				testcs.WithNoFirstSuccessTime(),
@@ -902,29 +902,29 @@ func TestHibernateAfter(t *testing.T) {
 			name: "cluster due for hibernate, syncsets not applied but 10 minutes have passed since cd install",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.RunningReadyReason, 9*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonRunning, 9*time.Hour)),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs: csBuilder.Options(
 				testcs.WithNoFirstSuccessTime(),
 			).Build(),
-			expectedPowerState: hivev1.HibernatingClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 		{
 			name: "cluster due for hibernate, syncsets successfully applied",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.RunningReadyReason, 9*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonRunning, 9*time.Hour)),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs: csBuilder.Options(
 				testcs.WithFirstSuccessTime(time.Now()),
 			).Build(),
-			expectedPowerState: hivev1.HibernatingClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 		{
 			name: "fake cluster due for hibernate but syncsets not applied",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Minute),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.RunningReadyReason, 8*time.Minute)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonRunning, 8*time.Minute)),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true"),
 				testcd.InstalledTimestamp(time.Now().Add(-8*time.Minute))),
 			cs: csBuilder.Options(
@@ -938,13 +938,13 @@ func TestHibernateAfter(t *testing.T) {
 			name: "fake cluster due for hibernate, syncsets successfully applied",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
-				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.RunningReadyReason, 9*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse, hivev1.ReadyReasonRunning, 9*time.Hour)),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true"),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
 			cs: csBuilder.Options(
 				testcs.WithFirstSuccessTime(time.Now()),
 			).Build(),
-			expectedPowerState: hivev1.HibernatingClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 		{
 			name: "hibernate fake cluster",
@@ -953,7 +953,7 @@ func TestHibernateAfter(t *testing.T) {
 				testcd.InstalledTimestamp(time.Now().Add(-1*time.Hour)),
 				testcd.WithAnnotation(constants.HiveFakeClusterAnnotation, "true")),
 			cs:                 csBuilder.Build(),
-			expectedPowerState: hivev1.HibernatingClusterPowerState,
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 	}
 
@@ -1037,22 +1037,22 @@ func (*clusterDeploymentOptions) notInstalled(cd *hivev1.ClusterDeployment) {
 	cd.Spec.Installed = false
 }
 func (*clusterDeploymentOptions) shouldHibernate(cd *hivev1.ClusterDeployment) {
-	cd.Spec.PowerState = hivev1.HibernatingClusterPowerState
+	cd.Spec.PowerState = hivev1.ClusterPowerStateHibernating
 }
 func (*clusterDeploymentOptions) shouldRun(cd *hivev1.ClusterDeployment) {
-	cd.Spec.PowerState = hivev1.RunningClusterPowerState
+	cd.Spec.PowerState = hivev1.ClusterPowerStateRunning
 }
 func (*clusterDeploymentOptions) stopping(cd *hivev1.ClusterDeployment) {
 	cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 		Type:   hivev1.ClusterHibernatingCondition,
-		Reason: hivev1.StoppingHibernationReason,
+		Reason: hivev1.HibernatingReasonStopping,
 		Status: corev1.ConditionFalse,
 	})
 }
 func (*clusterDeploymentOptions) hibernating(cd *hivev1.ClusterDeployment) {
 	cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 		Type:   hivev1.ClusterHibernatingCondition,
-		Reason: hivev1.HibernatingHibernationReason,
+		Reason: hivev1.HibernatingReasonHibernating,
 		Status: corev1.ConditionTrue,
 	})
 }
@@ -1060,7 +1060,7 @@ func (*clusterDeploymentOptions) unsupported(cd *hivev1.ClusterDeployment) {
 	cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 		Type:   hivev1.ClusterHibernatingCondition,
 		Status: corev1.ConditionFalse,
-		Reason: hivev1.UnsupportedHibernationReason,
+		Reason: hivev1.HibernatingReasonUnsupported,
 	})
 }
 

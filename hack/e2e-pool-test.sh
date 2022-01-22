@@ -98,7 +98,7 @@ function wait_for_pool_to_be_ready() {
   local poolname=$1
   local i=0
   # NOTE: This will need to change if we add a test with a zero-size pool.
-  while [[ $(oc get clusterpool $poolname -o json | jq '.status.size != 0 and .status.ready == .status.size') != "true" ]] || ! expect_all_clusters_current $poolname True; do
+  while [[ $(oc get clusterpool $poolname -o json | jq '.status.size != 0 and .status.ready + .status.standby == .status.size') != "true" ]] || ! expect_all_clusters_current $poolname True; do
     i=$((i+1))
     if [[ $i -gt $max_cluster_deployment_status_checks ]]; then
       echo "Timed out waiting for clusterpool $poolname to be ready."

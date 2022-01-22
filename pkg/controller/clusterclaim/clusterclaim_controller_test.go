@@ -128,7 +128,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithUnclaimedClusterPoolReference(claimNamespace, "test-pool"),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			expectedConditions: []hivev1.ClusterClaimCondition{
 				{
@@ -146,7 +146,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			expectCompletedClaim: true,
 			expectRBAC:           true,
@@ -170,7 +170,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.RunningReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateRunning),
 			),
 			expectCompletedClaim: true,
 			expectRBAC:           true,
@@ -239,7 +239,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			expectCompletedClaim: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{
@@ -332,7 +332,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			name:  "no RBAC when no subjects",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName), testclaim.WithSubjects(nil)),
 			cd: cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			expectCompletedClaim: true,
 			expectedConditions: []hivev1.ClusterClaimCondition{
@@ -355,7 +355,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				func() runtime.Object {
@@ -386,7 +386,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				func() runtime.Object {
@@ -418,8 +418,8 @@ func TestReconcileClusterClaim(t *testing.T) {
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithPowerState(hivev1.ClusterPowerStateHibernating),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			expectCompletedClaim: true,
 			expectRBAC:           true,
@@ -452,7 +452,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			expectCompletedClaim: true,
 		},
@@ -469,7 +469,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithDefaultClaimLifetime(1 * time.Hour)),
@@ -489,7 +489,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithMaximumClaimLifetime(1 * time.Hour)),
@@ -510,7 +510,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithMaximumClaimLifetime(1 * time.Hour)),
@@ -530,7 +530,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithDefaultClaimLifetime(2*time.Hour), testcp.WithMaximumClaimLifetime(1*time.Hour)),
@@ -551,7 +551,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				poolBuilder.Build(testcp.WithMaximumClaimLifetime(2 * time.Hour)),
@@ -573,7 +573,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			),
 			cd: cdBuilder.Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
-				testcd.WithStatusPowerState(hivev1.StartingMachinesReadyReason),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateStartingMachines),
 			),
 			existing: []runtime.Object{
 				testRole(),
@@ -667,9 +667,9 @@ func TestReconcileClusterClaim(t *testing.T) {
 					toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(&cd)
 					assignedClusterDeploymentExists = !toRemove
 					if test.expectHibernating {
-						assert.Equal(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected ClusterDeployment to be hibernating")
+						assert.Equal(t, hivev1.ClusterPowerStateHibernating, cd.Spec.PowerState, "expected ClusterDeployment to be hibernating")
 					} else {
-						assert.NotEqual(t, hivev1.HibernatingClusterPowerState, cd.Spec.PowerState, "expected ClusterDeployment to not be hibernating")
+						assert.NotEqual(t, hivev1.ClusterPowerStateHibernating, cd.Spec.PowerState, "expected ClusterDeployment to not be hibernating")
 					}
 				}
 			}

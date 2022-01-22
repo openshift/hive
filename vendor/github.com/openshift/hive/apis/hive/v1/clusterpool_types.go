@@ -110,7 +110,11 @@ type ClusterPoolStatus struct {
 	// Size is the number of unclaimed clusters that have been created for the pool.
 	Size int32 `json:"size"`
 
-	// Ready is the number of unclaimed clusters that have been installed and are ready to be claimed.
+	// Standby is the number of unclaimed clusters that are installed, but not running.
+	// +optional
+	Standby int32 `json:"standby"`
+
+	// Ready is the number of unclaimed clusters that are installed and are running and ready to be claimed.
 	Ready int32 `json:"ready"`
 
 	// Conditions includes more detailed status for the cluster pool
@@ -161,8 +165,9 @@ const (
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.size,statuspath=.status.size
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready"
 // +kubebuilder:printcolumn:name="Size",type="string",JSONPath=".spec.size"
+// +kubebuilder:printcolumn:name="Standby",type="string",JSONPath=".status.standby"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready"
 // +kubebuilder:printcolumn:name="BaseDomain",type="string",JSONPath=".spec.baseDomain"
 // +kubebuilder:printcolumn:name="ImageSet",type="string",JSONPath=".spec.imageSetRef.name"
 // +kubebuilder:resource:path=clusterpools,shortName=cp

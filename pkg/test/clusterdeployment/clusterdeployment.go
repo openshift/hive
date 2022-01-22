@@ -153,6 +153,18 @@ func Installed() Option {
 	}
 }
 
+func Running() Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Installed = true
+		clusterDeployment.Spec.PowerState = hivev1.ClusterPowerStateRunning
+		clusterDeployment.Status.PowerState = hivev1.ClusterPowerStateRunning
+		// A little hack to make sure tests don't unexpectedly start swapping which clusters are
+		// running: since we start the oldest clusters first, fake the creation time of this
+		// cluster to be "old".
+		clusterDeployment.CreationTimestamp = metav1.NewTime(time.Now().Add(-6 * time.Hour))
+	}
+}
+
 func InstalledTimestamp(instTime time.Time) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.Installed = true
@@ -176,7 +188,7 @@ func WithPowerState(powerState hivev1.ClusterPowerState) Option {
 	}
 }
 
-func WithStatusPowerState(powerState string) Option {
+func WithStatusPowerState(powerState hivev1.ClusterPowerState) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Status.PowerState = powerState
 	}

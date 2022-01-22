@@ -239,7 +239,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 		)
 	cdBuilder := func(name string) testcd.Builder {
 		return testcd.FullBuilder(name, name, scheme).Options(
-			testcd.WithPowerState(hivev1.HibernatingClusterPowerState),
+			testcd.WithPowerState(hivev1.ClusterPowerStateHibernating),
 		)
 	}
 	cdBuilderWithPool := func(name, pool string) testcd.Builder {

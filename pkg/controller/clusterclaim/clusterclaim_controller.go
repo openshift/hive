@@ -465,7 +465,7 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 	)
 	statusChanged = statusChanged || changed
 
-	if cd.Status.PowerState == hivev1.RunningReadyReason {
+	if cd.Status.PowerState == hivev1.ClusterPowerStateRunning {
 		conds, changed = controllerutils.SetClusterClaimConditionWithChangeCheck(
 			conds,
 			hivev1.ClusterRunningCondition,

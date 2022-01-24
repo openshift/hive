@@ -260,6 +260,8 @@ var _configHiveadmissionClusterdeploymentWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterdeploymentvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterdeploymentvalidators.admission.hive.openshift.io
@@ -305,6 +307,8 @@ var _configHiveadmissionClusterimagesetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterimagesetvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterimagesetvalidators.admission.hive.openshift.io
@@ -349,6 +353,8 @@ var _configHiveadmissionClusterprovisionWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterprovisionvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterprovisionvalidators.admission.hive.openshift.io
@@ -469,6 +475,8 @@ var _configHiveadmissionDnszonesWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
   name: dnszonevalidators.admission.hive.openshift.io
 webhooks:
 - name: dnszonevalidators.admission.hive.openshift.io
@@ -605,6 +613,8 @@ var _configHiveadmissionMachinepoolWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
   name: machinepoolvalidators.admission.hive.openshift.io
 webhooks:
 - name: machinepoolvalidators.admission.hive.openshift.io
@@ -649,6 +659,8 @@ var _configHiveadmissionSelectorsyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
   name: selectorsyncsetvalidators.admission.hive.openshift.io
 webhooks:
 - name: selectorsyncsetvalidators.admission.hive.openshift.io
@@ -748,6 +760,8 @@ var _configHiveadmissionSyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
   name: syncsetvalidators.admission.hive.openshift.io
 webhooks:
 - name: syncsetvalidators.admission.hive.openshift.io

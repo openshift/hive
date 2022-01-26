@@ -621,6 +621,48 @@ func TestReconcile(t *testing.T) {
 			expectRequeueAfter: time.Duration(time.Second * 30),
 		},
 		{
+			name: "resume skips cluster operators",
+			cd: cdBuilder.Options().Build(
+				testcd.WithLabel(constants.ResumeSkipsClusterOperatorsLabel, "true"),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterHibernatingCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.HibernatingReasonResumingOrRunning,
+					LastProbeTime:      metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:               hivev1.ClusterReadyCondition,
+					Status:             corev1.ConditionFalse,
+					Reason:             hivev1.ReadyReasonWaitingForNodes,
+					LastProbeTime:      metav1.Time{Time: time.Now().Add(-6 * time.Minute)},
+					LastTransitionTime: metav1.Time{Time: time.Now().Add(-2 * time.Hour)},
+				}),
+			),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				objs := []runtime.Object{}
+				objs = append(objs, readyNodes()...)
+				// Prove we're skipping these
+				objs = append(objs, degradedClusterOperators()...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
+				builder.EXPECT().Build().Times(1).Return(c, nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
+				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
+			},
+		},
+		{
 			name: "resuming everything ready",
 			cd: cdBuilder.Options().Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 				Type:               hivev1.ClusterHibernatingCondition,

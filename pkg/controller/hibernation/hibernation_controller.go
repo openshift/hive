@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -548,41 +549,50 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		return r.checkCSRs(cd, remoteClient, logger)
 	}
 
-	// Delicate state transitions ahead. If we've now cleared the nodes phase, transition to a pause state
-	// so we can give ClusterOperators time to get their pods running, before we check their status. This is
-	// to avoid prematurely checking and getting good status, but from before hibernation.
-	if readyCondition.Reason == hivev1.ReadyReasonWaitingForNodes {
-		r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonPausingForClusterOperatorsToSettle,
-			fmt.Sprintf("Pausing %s for ClusterOperators to settle (step 3/4)", clusterOperatorSettlePause), corev1.ConditionFalse, logger)
-		cd.Status.PowerState = hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle
-		err := r.updateClusterDeploymentStatus(cd, logger)
-		return reconcile.Result{RequeueAfter: clusterOperatorSettlePause}, err
+	checkClusterOperators := true
+	if skip, err := strconv.ParseBool(cd.Labels[constants.ResumeSkipsClusterOperatorsLabel]); err == nil {
+		checkClusterOperators = !skip
 	}
 
-	// Make sure we wait long enough for operators to start/settle:
-	if readyCondition.Reason == hivev1.ReadyReasonPausingForClusterOperatorsToSettle &&
-		time.Since(readyCondition.LastProbeTime.Time) < clusterOperatorSettlePause {
-		remainingPause := clusterOperatorSettlePause - time.Now().Sub(readyCondition.LastProbeTime.Time)
-		logger.Info("waiting an additional %s for ClusterOperators to settle", remainingPause)
-		return reconcile.Result{RequeueAfter: remainingPause}, nil
-	}
-
-	operatorsReady, err := r.operatorsReady(remoteClient, logger)
-	if err != nil {
-		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether ClusterOperators are ready")
-		return reconcile.Result{}, err
-	}
-	if !operatorsReady {
-		logger.Info("ClusterOperators are not ready")
-		rChanged := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonWaitingForClusterOperators,
-			"Waiting for ClusterOperators to be ready (step 4/4)", corev1.ConditionFalse, logger)
-		if rChanged {
-			cd.Status.PowerState = hivev1.ClusterPowerStateWaitingForClusterOperators
-			if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
-				return reconcile.Result{}, err
-			}
+	if checkClusterOperators {
+		// Delicate state transitions ahead. If we've now cleared the nodes phase, transition to a pause state
+		// so we can give ClusterOperators time to get their pods running, before we check their status. This is
+		// to avoid prematurely checking and getting good status, but from before hibernation.
+		if readyCondition.Reason == hivev1.ReadyReasonWaitingForNodes {
+			r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonPausingForClusterOperatorsToSettle,
+				fmt.Sprintf("Pausing %s for ClusterOperators to settle (step 3/4)", clusterOperatorSettlePause), corev1.ConditionFalse, logger)
+			cd.Status.PowerState = hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle
+			err := r.updateClusterDeploymentStatus(cd, logger)
+			return reconcile.Result{RequeueAfter: clusterOperatorSettlePause}, err
 		}
-		return reconcile.Result{RequeueAfter: clusterOperatorCheckInterval}, nil
+
+		// Make sure we wait long enough for operators to start/settle:
+		if readyCondition.Reason == hivev1.ReadyReasonPausingForClusterOperatorsToSettle &&
+			time.Since(readyCondition.LastProbeTime.Time) < clusterOperatorSettlePause {
+			remainingPause := clusterOperatorSettlePause - time.Now().Sub(readyCondition.LastProbeTime.Time)
+			logger.Info("waiting an additional %s for ClusterOperators to settle", remainingPause)
+			return reconcile.Result{RequeueAfter: remainingPause}, nil
+		}
+
+		operatorsReady, err := r.operatorsReady(remoteClient, logger)
+		if err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether ClusterOperators are ready")
+			return reconcile.Result{}, err
+		}
+		if !operatorsReady {
+			logger.Info("ClusterOperators are not ready")
+			rChanged := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonWaitingForClusterOperators,
+				"Waiting for ClusterOperators to be ready (step 4/4)", corev1.ConditionFalse, logger)
+			if rChanged {
+				cd.Status.PowerState = hivev1.ClusterPowerStateWaitingForClusterOperators
+				if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
+					return reconcile.Result{}, err
+				}
+			}
+			return reconcile.Result{RequeueAfter: clusterOperatorCheckInterval}, nil
+		}
+	} else {
+		logger.Warn("Skipping ClusterOperator health checks!")
 	}
 
 	logger.Info("Cluster has started and is in Running state")

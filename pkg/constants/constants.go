@@ -372,6 +372,13 @@ const (
 	// CreatedByHiveLabel is the label used for artifacts for external systems we integrate with
 	// that were created by Hive. The value for this label should be "true".
 	CreatedByHiveLabel = "hive.openshift.io/created-by"
+
+	// ResumeSkipsClusterOperatorsLabel is used to label a ClusterDeployment or a ClusterPool. If
+	// set to "true", affected ClusterDeployments will skip checking ClusterOperators health when
+	// resuming from hibernation. NOTE: This means when the ClusterDeployment's status.powerState
+	// is "Running", the cluster may not be in the same ready state as when it first finished
+	// installing. Use with caution.
+	ResumeSkipsClusterOperatorsLabel = "hive.openshift.io/resume-skips-cluster-operators"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

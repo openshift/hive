@@ -84,6 +84,19 @@ type ClusterPoolSpec struct {
 	// ClaimLifetime defines the lifetimes for claims for the cluster pool.
 	// +optional
 	ClaimLifetime *ClusterPoolClaimLifetime `json:"claimLifetime,omitempty"`
+
+	// HibernationConfig configures the hibernation/resume behavior of ClusterDeployments owned by the ClusterPool.
+	// +optional
+	HibernationConfig *HibernationConfig `json:"hibernationConfig"`
+}
+
+type HibernationConfig struct {
+	// ResumeTimeout is the maximum amount of time we will wait for an unclaimed ClusterDeployment to resume from
+	// hibernation (e.g. at the behest of runningCount, or in preparation for being claimed). If this time is
+	// exceeded, the ClusterDeployment will be considered Broken and we will replace it. The default (unspecified
+	// or zero) means no timeout -- we will allow the ClusterDeployment to continue trying to resume "forever".
+	// +optional
+	ResumeTimeout metav1.Duration `json:"resumeTimeout"`
 }
 
 // ClusterPoolClaimLifetime defines the lifetimes for claims for the cluster pool.

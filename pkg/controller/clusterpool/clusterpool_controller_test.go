@@ -2313,3 +2313,209 @@ func TestReconcileRBAC(t *testing.T) {
 		})
 	}
 }
+
+func Test_isBroken(t *testing.T) {
+	logger := log.New()
+
+	poolNoHibernationConfig := hivev1.ClusterPool{
+		Spec: hivev1.ClusterPoolSpec{},
+	}
+	poolEmptyHibernationConfig := hivev1.ClusterPool{
+		Spec: hivev1.ClusterPoolSpec{
+			HibernationConfig: &hivev1.HibernationConfig{},
+		},
+	}
+	poolWithTimeout := hivev1.ClusterPool{
+		Spec: hivev1.ClusterPoolSpec{
+			HibernationConfig: &hivev1.HibernationConfig{
+				ResumeTimeout: metav1.Duration{Duration: time.Second * 30},
+			},
+		},
+	}
+
+	tests := []struct {
+		name string
+		cd   *hivev1.ClusterDeployment
+		pool *hivev1.ClusterPool
+		want bool
+	}{
+		{
+			name: "No ProvisionStopped condition (cluster still initializing)",
+			cd:   testcd.BasicBuilder().Build(),
+			pool: &poolNoHibernationConfig,
+			want: false,
+		},
+		{
+			name: "ProvisionStopped",
+			cd: testcd.BasicBuilder().Options(testcd.WithCondition(
+				hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionTrue,
+				},
+			)).Build(),
+			pool: &poolNoHibernationConfig,
+			want: true,
+		},
+		{
+			name: "No hibernation config",
+			cd: testcd.BasicBuilder().Options(testcd.WithCondition(
+				hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionFalse,
+				},
+			)).Build(),
+			pool: &poolNoHibernationConfig,
+			want: false,
+		},
+		{
+			name: "Empty hibernation config",
+			cd: testcd.BasicBuilder().Options(testcd.WithCondition(
+				hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionFalse,
+				},
+			)).Build(),
+			pool: &poolEmptyHibernationConfig,
+			want: false,
+		},
+		{
+			name: "CD not installed",
+			cd: testcd.BasicBuilder().Options(testcd.WithCondition(
+				hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionFalse,
+				},
+			)).Build(),
+			pool: &poolWithTimeout,
+			want: false,
+		},
+		{
+			name: "Desired powerState not Running",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				testcd.Installed(),
+				testcd.WithPowerState(hivev1.ClusterPowerStateHibernating),
+			).Build(),
+			pool: &poolWithTimeout,
+			want: false,
+		},
+		{
+			name: "Actual powerState Hibernating",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				testcd.Installed(),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateHibernating),
+			).Build(),
+			pool: &poolWithTimeout,
+			want: false,
+		},
+		{
+			name: "Actual powerState Running",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				testcd.Installed(),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateRunning),
+			).Build(),
+			pool: &poolWithTimeout,
+			want: false,
+		},
+		{
+			name: "No Hibernating condition",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				testcd.Installed(),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateWaitingForClusterOperators),
+			).Build(),
+			pool: &poolWithTimeout,
+			want: false,
+		},
+		{
+			name: "Hibernating condition nonsensical",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ClusterHibernatingCondition,
+						Reason: hivev1.HibernatingReasonFailedToStop,
+					}),
+				testcd.Installed(),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateWaitingForClusterOperators),
+			).Build(),
+			pool: &poolWithTimeout,
+			want: false,
+		},
+		{
+			name: "Timeout not expired",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:               hivev1.ClusterHibernatingCondition,
+						Reason:             hivev1.HibernatingReasonResumingOrRunning,
+						LastTransitionTime: metav1.Now(),
+					}),
+				testcd.Installed(),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateWaitingForClusterOperators),
+			).Build(),
+			pool: &poolWithTimeout,
+			want: false,
+		},
+		{
+			name: "Timeout expired",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionFalse,
+					}),
+				testcd.WithCondition(
+					hivev1.ClusterDeploymentCondition{
+						Type:               hivev1.ClusterHibernatingCondition,
+						Reason:             hivev1.HibernatingReasonResumingOrRunning,
+						LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * time.Hour)),
+					}),
+				testcd.Installed(),
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateWaitingForClusterOperators),
+			).Build(),
+			pool: &poolWithTimeout,
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isBroken(tt.cd, tt.pool, logger); got != tt.want {
+				t.Errorf("isBroken() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

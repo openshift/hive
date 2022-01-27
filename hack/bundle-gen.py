@@ -88,8 +88,8 @@ def get_params():
     # TODO: Validate this early! As written, if this is wrong you won't bounce until open_pr.
     parser.add_argument(
         "--github-user",
-        default=os.environ["USER"],
-        help="User's github username, if different than $USER",
+        default=os.getenv("GITHUB_USER") or os.environ["USER"],
+        help="User's github username. Defaults to $GITHUB_USER, then $USER.",
     )
     parser.add_argument(
         "--hold",

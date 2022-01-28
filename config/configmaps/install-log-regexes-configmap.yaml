@@ -144,29 +144,23 @@ data:
       - "Error waiting for instance .* to become ready .* User initiated shutdown"
       installFailingReason: UserInitiatedShutdown
       installFailingMessage: User initiated shutdown of instances as the install was running
+    # openshift-installer intermittent failure on AWS with Error: Provider produced inconsistent result after apply
+    - name: InconsistentTerraformResult
+      searchRegexStrings:
+      - "Error: Provider produced inconsistent result after apply"
+      installFailingReason: InconsistentTerraformResult
+      installFailingMessage: Inconsistent result after Terraform apply
     - name: AWSVPCDoesNotExist
       searchRegexStrings:
       - "The vpc ID .* does not exist"
       installFailingReason: AWSVPCDoesNotExist
       installFailingMessage: The AWS VPC does not exist
-    - name: VPCDhcpOptionAssociationPresentNowAbsent
-    # https://bugzilla.redhat.com/show_bug.cgi?id=2032521
-      searchRegexStrings:
-      - "error .* applying changes to module.vpc.aws_vpc_dhcp_options_association.*\n.*\n.*was present, but now absent"
-      installFailingReason: VPCDhcpOptionAssociationPresentNowAbsent
-      installFailingMessage: The VPC Dhcp Option Association absent after creation
     - name: TargetGroupNotFound
     # https://bugzilla.redhat.com/show_bug.cgi?id=1898265
       searchRegexStrings:
       - "TargetGroupNotFound"
       installFailingReason: TargetGroupNotFound
       installFailingMessage: Target Group cannot be found
-    - name: RouteTablePrivateRoutesPresentNowAbsent
-    # https://bugzilla.redhat.com/show_bug.cgi?id=2033256
-      searchRegexStrings:
-      - "ERROR When applying changes to module.vpc.aws_route_table.private_routes.*\n.*\n.*was present, but now absent"
-      installFailingReason: RouteTablePrivateRoutesPresentNowAbsent
-      installFailingMessage: VPC Route Table private routes absent after creation
     - name: ErrorCreatingNetworkLoadBalancer
       searchRegexStrings:
       - "Error creating network Load Balancer: InternalFailure: "
@@ -247,13 +241,6 @@ data:
       - "Bootstrap failed to complete"
       installFailingReason: BootstrapFailed
       installFailingMessage: Bootstrap failed to complete
-    # https://bugzilla.redhat.com/show_bug.cgi?id=2032521
-    # openshift-installer intermittent failure on AWS with Error: Provider produced inconsistent result after apply
-    - name: InconsistentTerraformResult
-      searchRegexStrings:
-      - "Error: Provider produced inconsistent result after apply"
-      installFailingReason: InconsistentTerraformResult
-      installFailingMessage: Inconsistent result after Terraform apply
     - name: KubeAPIWaitTimeout
       searchRegexStrings:
       - "waiting for Kubernetes API: context deadline exceeded"

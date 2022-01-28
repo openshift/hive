@@ -239,7 +239,7 @@ data:
     
     - name: BootstrapFailed
       searchRegexStrings:
-      - "Bootstrap failed to complete: timed out waiting for the condition"
+      - "Bootstrap failed to complete"
       installFailingReason: BootstrapFailed
       installFailingMessage: Bootstrap failed to complete
     # https://bugzilla.redhat.com/show_bug.cgi?id=2032521

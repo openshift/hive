@@ -167,6 +167,11 @@ data:
       - "ERROR When applying changes to module.vpc.aws_route_table.private_routes.*\n.*\n.*was present, but now absent"
       installFailingReason: RouteTablePrivateRoutesPresentNowAbsent
       installFailingMessage: VPC Route Table private routes absent after creation
+    - name: ErrorCreatingNetworkLoadBalancer
+      searchRegexStrings:
+      - "Error creating network Load Balancer: InternalFailure: "
+      installFailingReason: ErrorCreatingNetworkLoadBalancer
+      installFailingMessage: AWS network load balancer creation encountered an error during cluster installation
 
 
     # GCP Specific

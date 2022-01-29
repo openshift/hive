@@ -14,6 +14,7 @@ const (
 	PlatformOpenStack      = "openstack"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
+	PlatformIBMCloud       = "ibmcloud"
 
 	mergedPullSecretSuffix = "merged-pull-secret"
 
@@ -379,6 +380,12 @@ const (
 	// is "Running", the cluster may not be in the same ready state as when it first finished
 	// installing. Use with caution.
 	ResumeSkipsClusterOperatorsLabel = "hive.openshift.io/resume-skips-cluster-operators"
+
+	// IBMCloudAPIKeySecretKey is a key used to store an api key token within a secret
+	IBMCloudAPIKeySecretKey = "ibmcloud_api_key"
+
+	// IBMCloudAPIKeyEnvVar is the name of the environment variable containing an IBM Cloud API key.
+	IBMCloudAPIKeyEnvVar = "IC_API_KEY"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

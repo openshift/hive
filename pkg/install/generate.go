@@ -42,6 +42,7 @@ const (
 	vsphereCloudsDir      = "/vsphere"
 	ovirtCloudsDir        = "/.ovirt"
 	ovirtCADir            = "/.ovirt-ca"
+	ibmCloudsDir          = "/ibmcloud"
 
 	// SSHPrivateKeyDir is the directory where the generated Job will mount the ssh secret to
 	SSHPrivateKeyDir = "/sshkeys"
@@ -375,6 +376,17 @@ func InstallerPodSpec(
 			},
 		)
 		env = append(env, oVirtCredsEnvVars(cd.Spec.Platform.Ovirt.CredentialsSecretRef.Name)...)
+	case cd.Spec.Platform.IBMCloud != nil:
+		env = append(env, corev1.EnvVar{
+			Name: constants.IBMCloudAPIKeyEnvVar,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: cd.Spec.Platform.IBMCloud.CredentialsSecretRef,
+					Key:                  constants.IBMCloudAPIKeySecretKey,
+					Optional:             pointer.BoolPtr(true),
+				},
+			},
+		})
 	}
 
 	if releaseImage != "" {
@@ -664,6 +676,8 @@ func GenerateUninstallerJobForDeprovision(
 		completeVSphereDeprovisionJob(req, job)
 	case req.Spec.Platform.Ovirt != nil:
 		completeOvirtDeprovisionJob(req, job)
+	case req.Spec.Platform.IBMCloud != nil:
+		completeIBMCloudDeprovisionJob(req, job)
 	default:
 		return nil, errors.New("deprovision requests currently not supported for platform")
 	}
@@ -1056,4 +1070,46 @@ func oVirtCredsEnvVars(credentialsSecret string) []corev1.EnvVar {
 		},
 	)
 	return env
+}
+
+func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+	env := []corev1.EnvVar{}
+	env = append(env, corev1.EnvVar{
+		Name: constants.IBMCloudAPIKeyEnvVar,
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: req.Spec.Platform.IBMCloud.CredentialsSecretRef,
+				Key:                  constants.IBMCloudAPIKeySecretKey,
+				Optional:             pointer.BoolPtr(true),
+			},
+		},
+	})
+
+	containers := []corev1.Container{
+		{
+			Name:            "deprovision",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Env:             env,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"deprovision",
+				"ibmcloud",
+				req.Spec.InfraID,
+				"--resource-group-name",
+				req.Spec.InfraID,
+				"--region",
+				req.Spec.Platform.IBMCloud.Region,
+				"--base-domain",
+				req.Spec.Platform.IBMCloud.BaseDomain,
+				"--cis-instance-crn",
+				req.Spec.Platform.IBMCloud.CISInstanceCRN,
+				"--account-id",
+				req.Spec.Platform.IBMCloud.AccountID,
+				"--loglevel",
+				"debug",
+			},
+		},
+	}
+	job.Spec.Template.Spec.Containers = containers
 }

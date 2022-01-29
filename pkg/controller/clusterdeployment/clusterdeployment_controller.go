@@ -1731,6 +1731,14 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CertificatesSecretRef: cd.Spec.Platform.Ovirt.CertificatesSecretRef,
 			ClusterID:             cd.Spec.Platform.Ovirt.ClusterID,
 		}
+	case cd.Spec.Platform.IBMCloud != nil:
+		req.Spec.Platform.IBMCloud = &hivev1.IBMClusterDeprovision{
+			CredentialsSecretRef: cd.Spec.Platform.IBMCloud.CredentialsSecretRef,
+			Region:               cd.Spec.Platform.IBMCloud.Region,
+			AccountID:            cd.Spec.Platform.IBMCloud.AccountID,
+			CISInstanceCRN:       cd.Spec.Platform.IBMCloud.CISInstanceCRN,
+			BaseDomain:           cd.Spec.BaseDomain,
+		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
 	}
@@ -2106,6 +2114,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformBaremetal
 	case cd.Spec.Platform.AgentBareMetal != nil:
 		return constants.PlatformAgentBaremetal
+	case cd.Spec.Platform.IBMCloud != nil:
+		return constants.PlatformIBMCloud
 	}
 	return constants.PlatformUnknown
 }
@@ -2119,6 +2129,8 @@ func getClusterRegion(cd *hivev1.ClusterDeployment) string {
 		return cd.Spec.Platform.Azure.Region
 	case cd.Spec.Platform.GCP != nil:
 		return cd.Spec.Platform.GCP.Region
+	case cd.Spec.Platform.IBMCloud != nil:
+		return cd.Spec.Platform.IBMCloud.Region
 	}
 	return regionUnknown
 }

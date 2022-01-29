@@ -79,6 +79,8 @@ GOVC_NETWORK, GOVC_DATACENTER, GOVC_DATASTORE and GOVC_HOST (vCenter host)
 can be used as alternatives to the associated commandline argument.
 These are only relevant for creating a cluster on vSphere.
 
+IC_API_KEY - Used to determine your IBM Cloud API key.
+
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
 obtained from a the following URL:
@@ -92,6 +94,7 @@ const (
 	cloudOpenStack       = "openstack"
 	cloudVSphere         = "vsphere"
 	cloudOVirt           = "ovirt"
+	cloudIBM             = "ibmcloud"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -110,6 +113,7 @@ var (
 		cloudOpenStack: true,
 		cloudVSphere:   true,
 		cloudOVirt:     true,
+		cloudIBM:       true,
 	}
 )
 
@@ -194,6 +198,10 @@ type Options struct {
 	OvirtIngressVIP      string
 	OvirtCACerts         string
 
+	// IBM
+	IBMCISInstanceCRN string
+	IBMAccountID      string
+
 	homeDir string
 	log     log.FieldLogger
 }
@@ -223,7 +231,8 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resourc
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --ibm-cis-instance-crn=CRN  --ibm-account-id=ACCOUNT_ID --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -243,7 +252,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws|azure|gcp|openstack")
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws|azure|gcp|openstack|vsphere|ibmcloud")
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -273,7 +282,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.BoolVar(&opt.CreateSampleSyncsets, "create-sample-syncsets", false, "Create a set of sample syncsets for testing")
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
-	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, and GCP.")
+	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, GCP and IBM.")
 	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val). Multiple labels may be delimited by commas (key1=val1,key2=val2).")
 	flags.StringSliceVarP(&opt.Annotations, "annotations", "a", nil, "Annotation to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
@@ -326,6 +335,10 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	// Additional CA Trust Bundle
 	flags.StringVar(&opt.AdditionalTrustBundle, "additional-trust-bundle", "", "Path to a CA Trust Bundle which will be added to the nodes trusted certificate store.")
 
+	// IBM flags
+	flags.StringVar(&opt.IBMCISInstanceCRN, "ibm-cis-instance-crn", "", "IBM cloud internet services CRN")
+	flags.StringVar(&opt.IBMAccountID, "ibm-account-id", "", "IBM Cloud account ID")
+
 	return cmd
 }
 
@@ -341,6 +354,8 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 			o.Region = "centralus"
 		case cloudGCP:
 			o.Region = "us-east1"
+		case cloudIBM:
+			o.Region = "us-east"
 		}
 	}
 
@@ -388,6 +403,24 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		}
 	}
 
+	if o.Cloud == cloudIBM {
+		if !o.CredentialsModeManual {
+			return fmt.Errorf("--credentials-mode-manual must be set when using IBM Cloud")
+		}
+		if o.IBMAccountID == "" {
+			o.log.Info("Missing --ibm-account-id parameter")
+			return fmt.Errorf("Missing --ibm-account-id parameter")
+		}
+		if o.IBMCISInstanceCRN == "" {
+			o.log.Info("Missing --ibm-cis-instance-crn parameter")
+			return fmt.Errorf("Missing --ibm-cis-instance-crn parameter")
+		}
+		if o.Region == "" {
+			o.log.Info("Missing --region parameter")
+			return fmt.Errorf("Missing --region parameter")
+		}
+	}
+
 	if o.CredentialsModeManual {
 		if o.ManifestsDir == "" {
 			return fmt.Errorf("--credentials-mode-manual requires --manifests-dir containing custom Secrets with manually provisioned credentials")
@@ -419,7 +452,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 	if o.Region != "" {
 		switch c := o.Cloud; c {
-		case cloudAWS, cloudAzure, cloudGCP:
+		case cloudAWS, cloudAzure, cloudGCP, cloudIBM:
 		default:
 			return fmt.Errorf("cannot specify region when cloud is %q", c)
 		}
@@ -736,6 +769,18 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 		builder.CloudBuilder = oVirtProvider
 		builder.SkipMachinePools = true
+	case cloudIBM:
+		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
+		if ibmCloudAPIKey == "" {
+			return nil, fmt.Errorf("No %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
+		}
+		ibmCloudProvider := &clusterresource.IBMCloudBuilder{
+			APIKey:         ibmCloudAPIKey,
+			Region:         o.Region,
+			AccountID:      o.IBMAccountID,
+			CISInstanceCRN: o.IBMCISInstanceCRN,
+		}
+		builder.CloudBuilder = ibmCloudProvider
 	}
 
 	if o.Internal {

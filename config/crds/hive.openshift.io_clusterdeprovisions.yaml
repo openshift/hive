@@ -138,6 +138,39 @@ spec:
                     required:
                     - region
                     type: object
+                  ibmcloud:
+                    description: IBMCloud contains IBM Cloud specific deprovision
+                      settings
+                    properties:
+                      accountID:
+                        description: AccountID is the IBM Cloud Account ID
+                        type: string
+                      baseDomain:
+                        description: BaseDomain is the DNS base domain
+                        type: string
+                      cisInstanceCRN:
+                        description: CISInstanceCRN is the IBM Cloud Internet Services
+                          Instance CRN
+                        type: string
+                      credentialsSecretRef:
+                        description: CredentialsSecretRef is the IBM Cloud credentials
+                          to use for deprovisioning the cluster
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      region:
+                        description: Region specifies the IBM Cloud region
+                        type: string
+                    required:
+                    - accountID
+                    - baseDomain
+                    - cisInstanceCRN
+                    - credentialsSecretRef
+                    - region
+                    type: object
                   openstack:
                     description: OpenStack contains OpenStack-specific deprovision
                       settings

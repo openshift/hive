@@ -343,6 +343,36 @@ spec:
                     - credentialsSecretRef
                     - region
                     type: object
+                  ibmcloud:
+                    description: IBMCloud is the configuration used when installing
+                      on IBM Cloud
+                    properties:
+                      accountID:
+                        description: AccountID is the IBM Cloud Account ID
+                        type: string
+                      cisInstanceCRN:
+                        description: CISInstanceCRN is the IBM Cloud Internet Services
+                          Instance CRN
+                        type: string
+                      credentialsSecretRef:
+                        description: CredentialsSecretRef refers to a secret that
+                          contains IBM Cloud account access credentials.
+                        properties:
+                          name:
+                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              TODO: Add other useful fields. apiVersion, kind, uid?'
+                            type: string
+                        type: object
+                      region:
+                        description: Region specifies the IBM Cloud region where the
+                          cluster will be created.
+                        type: string
+                    required:
+                    - accountID
+                    - cisInstanceCRN
+                    - credentialsSecretRef
+                    - region
+                    type: object
                   openstack:
                     description: OpenStack is the configuration used when installing
                       on OpenStack

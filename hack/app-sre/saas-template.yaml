@@ -828,6 +828,36 @@ objects:
                       - credentialsSecretRef
                       - region
                       type: object
+                    ibmcloud:
+                      description: IBMCloud is the configuration used when installing
+                        on IBM Cloud
+                      properties:
+                        accountID:
+                          description: AccountID is the IBM Cloud Account ID
+                          type: string
+                        cisInstanceCRN:
+                          description: CISInstanceCRN is the IBM Cloud Internet Services
+                            Instance CRN
+                          type: string
+                        credentialsSecretRef:
+                          description: CredentialsSecretRef refers to a secret that
+                            contains IBM Cloud account access credentials.
+                          properties:
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                          type: object
+                        region:
+                          description: Region specifies the IBM Cloud region where
+                            the cluster will be created.
+                          type: string
+                      required:
+                      - accountID
+                      - cisInstanceCRN
+                      - credentialsSecretRef
+                      - region
+                      type: object
                     openstack:
                       description: OpenStack is the configuration used when installing
                         on OpenStack
@@ -1472,6 +1502,39 @@ objects:
                       required:
                       - region
                       type: object
+                    ibmcloud:
+                      description: IBMCloud contains IBM Cloud specific deprovision
+                        settings
+                      properties:
+                        accountID:
+                          description: AccountID is the IBM Cloud Account ID
+                          type: string
+                        baseDomain:
+                          description: BaseDomain is the DNS base domain
+                          type: string
+                        cisInstanceCRN:
+                          description: CISInstanceCRN is the IBM Cloud Internet Services
+                            Instance CRN
+                          type: string
+                        credentialsSecretRef:
+                          description: CredentialsSecretRef is the IBM Cloud credentials
+                            to use for deprovisioning the cluster
+                          properties:
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                          type: object
+                        region:
+                          description: Region specifies the IBM Cloud region
+                          type: string
+                      required:
+                      - accountID
+                      - baseDomain
+                      - cisInstanceCRN
+                      - credentialsSecretRef
+                      - region
+                      type: object
                     openstack:
                       description: OpenStack contains OpenStack-specific deprovision
                         settings
@@ -2038,6 +2101,36 @@ objects:
                             will be created.
                           type: string
                       required:
+                      - credentialsSecretRef
+                      - region
+                      type: object
+                    ibmcloud:
+                      description: IBMCloud is the configuration used when installing
+                        on IBM Cloud
+                      properties:
+                        accountID:
+                          description: AccountID is the IBM Cloud Account ID
+                          type: string
+                        cisInstanceCRN:
+                          description: CISInstanceCRN is the IBM Cloud Internet Services
+                            Instance CRN
+                          type: string
+                        credentialsSecretRef:
+                          description: CredentialsSecretRef refers to a secret that
+                            contains IBM Cloud account access credentials.
+                          properties:
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                          type: object
+                        region:
+                          description: Region specifies the IBM Cloud region where
+                            the cluster will be created.
+                          type: string
+                      required:
+                      - accountID
+                      - cisInstanceCRN
                       - credentialsSecretRef
                       - region
                       type: object
@@ -4433,6 +4526,50 @@ objects:
                           type: array
                       required:
                       - type
+                      type: object
+                    ibmcloud:
+                      description: IBMCloud is the configuration used when installing
+                        on IBM Cloud.
+                      properties:
+                        bootVolume:
+                          description: BootVolume is the configuration for the machine's
+                            boot volume.
+                          properties:
+                            encryptionKey:
+                              description: EncryptionKey is the CRN referencing a
+                                Key Protect or Hyper Protect Crypto Services key to
+                                use for volume encryption. If not specified, a provider
+                                managed encryption key will be used.
+                              type: string
+                          type: object
+                        dedicatedHosts:
+                          description: DedicatedHosts is the configuration for the
+                            machine's dedicated host and profile.
+                          items:
+                            description: DedicatedHost stores the configuration for
+                              the machine's dedicated host platform.
+                            properties:
+                              name:
+                                description: Name is the name of the dedicated host
+                                  to provision the machine on. If specified, machines
+                                  will be created on pre-existing dedicated host.
+                                type: string
+                              profile:
+                                description: Profile is the profile ID for the dedicated
+                                  host. If specified, new dedicated host will be created
+                                  for machines.
+                                type: string
+                            type: object
+                          type: array
+                        type:
+                          description: InstanceType is the VSI machine profile.
+                          type: string
+                        zones:
+                          description: Zones is the list of availability zones used
+                            for machines in the pool.
+                          items:
+                            type: string
+                          type: array
                       type: object
                     openstack:
                       description: OpenStack is the configuration used when installing

@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/apis/hive/v1/gcp"
+	"github.com/openshift/hive/apis/hive/v1/ibmcloud"
 	"github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/apis/hive/v1/ovirt"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -592,6 +593,9 @@ type Platform struct {
 	// AgentBareMetal is the configuration used when performing an Assisted Agent based installation
 	// to bare metal.
 	AgentBareMetal *agent.BareMetalPlatform `json:"agentBareMetal,omitempty"`
+
+	// IBMCloud is the configuration used when installing on IBM Cloud
+	IBMCloud *ibmcloud.Platform `json:"ibmcloud,omitempty"`
 }
 
 // PlatformStatus contains the observed state for the specific platform upon which to

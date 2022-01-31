@@ -431,11 +431,15 @@ func (r *ReconcileClusterPool) reconcileRunningClusters(
 	runningCount := int(clp.Spec.RunningCount) + extraRunning
 	// Exclude broken clusters
 	cdList := cds.Unassigned(false)
-	// Sort by age, oldest first
+	// Sort by age, oldest first, for FIFO purposes. Include secondary sort by namespace/name as
+	// a tie breaker in case creationTimestamps conflict (which they can, as they have a
+	// granularity of 1s).
 	sort.Slice(
 		cdList,
 		func(i, j int) bool {
-			return cdList[i].CreationTimestamp.Before(&cdList[j].CreationTimestamp)
+			return cdList[i].CreationTimestamp.Before(&cdList[j].CreationTimestamp) ||
+				cdList[i].Namespace < cdList[j].Namespace ||
+				cdList[i].Name < cdList[j].Name
 		},
 	)
 	for i := 0; i < len(cdList); i++ {

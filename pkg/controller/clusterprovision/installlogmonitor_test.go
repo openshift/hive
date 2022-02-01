@@ -56,11 +56,9 @@ const (
 	// NOTE: This embedded newline matters: our regex must be able to match the two chunks of the message on separate lines.
 	noWorkerNodesFmt = `time="2021-12-09T10:51:06Z" level=debug msg="Symlinking plugin terraform-provider-%s src: \"/usr/bin/openshift-install\" dst: \"/tmp/openshift-install-cluster-723469510/plugins/terraform-provider-%s\""
 time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 master nodes blah"`
-	dhcpOptionAssociationAbsent = "level=error msg=Error: Provider produced inconsistent result after apply\nlevel=error\nlevel=error msg=When applying changes to module.vpc.aws_vpc_dhcp_options_association.main[0],\n	level=error msg=provider \"registry.terraform.io/-/aws\" produced an unexpected new value for\nlevel=error msg=was present, but now absent."
-	targetGroupNotFound         = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:0123445698:targetgroup/aaaabbbbcccc/dddd): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd' not found"
-	routeTablePrivateRoute      = "ERROR When applying changes to module.vpc.aws_route_table.private_routes[1],\nERROR provider \"registry.terraform.io/-/aws\" produced an unexpected new value for \nERROR was present, but now absent."
-	errorCreatingNLB            = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
-	noMatchLog                  = "an example of something that doesn't match the log regexes"
+	targetGroupNotFound = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:0123445698:targetgroup/aaaabbbbcccc/dddd): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd' not found"
+	errorCreatingNLB    = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
+	noMatchLog          = "an example of something that doesn't match the log regexes"
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -369,19 +367,9 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: "AWSVPCDoesNotExist",
 		},
 		{
-			name:           "VPCDhcpOptionAssociationPresentNowAbsent",
-			log:            pointer.StringPtr(dhcpOptionAssociationAbsent),
-			expectedReason: "VPCDhcpOptionAssociationPresentNowAbsent",
-		},
-		{
 			name:           "TargetGroupNotFound",
 			log:            pointer.StringPtr(targetGroupNotFound),
 			expectedReason: "TargetGroupNotFound",
-		},
-		{
-			name:           "RouteTablePrivateRoutesPresentNowAbsent",
-			log:            pointer.StringPtr(routeTablePrivateRoute),
-			expectedReason: "RouteTablePrivateRoutesPresentNowAbsent",
 		},
 		{
 			name:           "ErrorCreatingNetworkLoadBalancer",

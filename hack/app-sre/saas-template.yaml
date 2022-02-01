@@ -1789,6 +1789,20 @@ objects:
                     formats.
                   format: duration
                   type: string
+                hibernationConfig:
+                  description: HibernationConfig configures the hibernation/resume
+                    behavior of ClusterDeployments owned by the ClusterPool.
+                  properties:
+                    resumeTimeout:
+                      description: ResumeTimeout is the maximum amount of time we
+                        will wait for an unclaimed ClusterDeployment to resume from
+                        hibernation (e.g. at the behest of runningCount, or in preparation
+                        for being claimed). If this time is exceeded, the ClusterDeployment
+                        will be considered Broken and we will replace it. The default
+                        (unspecified or zero) means no timeout -- we will allow the
+                        ClusterDeployment to continue trying to resume "forever".
+                      type: string
+                  type: object
                 imageSetRef:
                   description: ImageSetRef is a reference to a ClusterImageSet. The
                     release image specified in the ClusterImageSet will be used by

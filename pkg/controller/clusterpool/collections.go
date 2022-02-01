@@ -213,7 +213,11 @@ type cdCollection struct {
 	byClaimName map[string]*hivev1.ClusterDeployment
 }
 
-func isBroken(cd *hivev1.ClusterDeployment) bool {
+// NOTE: This doesn't care about claimed or deleted/deleting status. That's on the caller.
+func isBroken(cd *hivev1.ClusterDeployment, pool *hivev1.ClusterPool, logger log.FieldLogger) bool {
+	////
+	// Check for ProvisionStopped
+	////
 	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition)
 	if cond == nil {
 		// Since we should be initializing conditions, this probably means the CD is super fresh.
@@ -221,9 +225,45 @@ func isBroken(cd *hivev1.ClusterDeployment) bool {
 		return false
 	}
 	if cond.Status == corev1.ConditionTrue {
+		logger.Infof("Cluster %s is broken due to ProvisionStopped", cd.Name)
 		return true
 	}
-	// Other causes of broken-ness to be added here later. E.g. resume failed.
+
+	////
+	// Check for resume timeout
+	////
+	if pool.Spec.HibernationConfig == nil || pool.Spec.HibernationConfig.ResumeTimeout.Duration == 0 {
+		// If no timeout was configured, skip this check.
+		return false
+	}
+	if !cd.Spec.Installed {
+		// Don't bother checking on a cluster that isn't installed yet.
+		return false
+	}
+	if cd.Spec.PowerState != hivev1.ClusterPowerStateRunning {
+		// If spec.powerState isn't Running, we're not resuming.
+		return false
+	}
+	if cd.Status.PowerState == hivev1.ClusterPowerStateHibernating || cd.Status.PowerState == hivev1.ClusterPowerStateRunning {
+		// If the hibernation controller hasn't yet kicked off resume; or if the cluster has already
+		// completed resuming, skip.
+		return false
+	}
+	cond = controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	if cond == nil {
+		// Since we should be initializing conditions, this probably means the CD is super fresh.
+		// Don't declare it broken yet -- give it a chance to come to life.
+		return false
+	}
+	if cond.Reason != hivev1.HibernatingReasonResumingOrRunning {
+		// It would be weird if we got here, but better safe.
+		return false
+	}
+	if time.Since(cond.LastTransitionTime.Time) >= pool.Spec.HibernationConfig.ResumeTimeout.Duration {
+		logger.Infof("Cluster %s is broken due to resume timeout", cd.Name)
+		return true
+	}
+
 	return false
 }
 
@@ -278,7 +318,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			// Do *not* double count "deleting" and "marked for deletion"
 			cdCol.markedForDeletion = append(cdCol.markedForDeletion, ref)
 		} else if claimName == "" {
-			if isBroken(&cd) {
+			if isBroken(&cd, pool, logger) {
 				cdCol.broken = append(cdCol.broken, ref)
 			} else if cd.Spec.Installed {
 				if cd.Status.PowerState == hivev1.ClusterPowerStateRunning {

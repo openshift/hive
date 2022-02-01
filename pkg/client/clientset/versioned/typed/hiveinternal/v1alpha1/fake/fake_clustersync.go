@@ -101,7 +101,7 @@ func (c *FakeClusterSyncs) UpdateStatus(ctx context.Context, clusterSync *v1alph
 // Delete takes name of the clusterSync and deletes it. Returns an error if one occurs.
 func (c *FakeClusterSyncs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clustersyncsResource, c.ns, name), &v1alpha1.ClusterSync{})
+		Invokes(testing.NewDeleteActionWithOptions(clustersyncsResource, c.ns, name, opts), &v1alpha1.ClusterSync{})
 
 	return err
 }

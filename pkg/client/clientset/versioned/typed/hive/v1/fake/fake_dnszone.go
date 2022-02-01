@@ -101,7 +101,7 @@ func (c *FakeDNSZones) UpdateStatus(ctx context.Context, dNSZone *hivev1.DNSZone
 // Delete takes name of the dNSZone and deletes it. Returns an error if one occurs.
 func (c *FakeDNSZones) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(dnszonesResource, c.ns, name), &hivev1.DNSZone{})
+		Invokes(testing.NewDeleteActionWithOptions(dnszonesResource, c.ns, name, opts), &hivev1.DNSZone{})
 
 	return err
 }

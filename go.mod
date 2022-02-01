@@ -14,7 +14,7 @@ require (
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-logr/logr v0.4.0
+	github.com/go-logr/logr v1.2.0
 	github.com/golang/mock v1.6.0
 	github.com/golangci/golangci-lint v1.42.1
 	github.com/google/go-cmp v0.5.6
@@ -22,9 +22,9 @@ require (
 	github.com/gophercloud/utils v0.0.0-20210720165645-8a3ad2ad9e70
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.2.2
-	github.com/json-iterator/go v1.1.11
+	github.com/json-iterator/go v1.1.12
 	github.com/miekg/dns v1.1.35
-	github.com/modern-go/reflect2 v1.0.1
+	github.com/modern-go/reflect2 v1.0.2
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0
 	github.com/openshift/api v0.0.0-20211119153416-313e51eab8c8
@@ -47,8 +47,8 @@ require (
 	github.com/vmware/govmomi v0.24.0
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-	golang.org/x/mod v0.4.2
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
+	golang.org/x/mod v0.5.1
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/api v0.44.0
@@ -60,7 +60,7 @@ require (
 	k8s.io/cli-runtime v0.22.0
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
-	k8s.io/code-generator v0.22.2
+	k8s.io/code-generator v0.24.0-alpha.2
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.22.0-rc.0
 	k8s.io/kubectl v0.22.0

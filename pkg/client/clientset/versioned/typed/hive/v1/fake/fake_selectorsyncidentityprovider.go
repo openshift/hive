@@ -94,7 +94,7 @@ func (c *FakeSelectorSyncIdentityProviders) UpdateStatus(ctx context.Context, se
 // Delete takes name of the selectorSyncIdentityProvider and deletes it. Returns an error if one occurs.
 func (c *FakeSelectorSyncIdentityProviders) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(selectorsyncidentityprovidersResource, name), &hivev1.SelectorSyncIdentityProvider{})
+		Invokes(testing.NewRootDeleteActionWithOptions(selectorsyncidentityprovidersResource, name, opts), &hivev1.SelectorSyncIdentityProvider{})
 	return err
 }
 

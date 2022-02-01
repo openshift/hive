@@ -101,7 +101,7 @@ func (c *FakeFakeClusterInstalls) UpdateStatus(ctx context.Context, fakeClusterI
 // Delete takes name of the fakeClusterInstall and deletes it. Returns an error if one occurs.
 func (c *FakeFakeClusterInstalls) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(fakeclusterinstallsResource, c.ns, name), &v1alpha1.FakeClusterInstall{})
+		Invokes(testing.NewDeleteActionWithOptions(fakeclusterinstallsResource, c.ns, name, opts), &v1alpha1.FakeClusterInstall{})
 
 	return err
 }

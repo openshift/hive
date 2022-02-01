@@ -101,7 +101,7 @@ func (c *FakeCheckpoints) UpdateStatus(ctx context.Context, checkpoint *hivev1.C
 // Delete takes name of the checkpoint and deletes it. Returns an error if one occurs.
 func (c *FakeCheckpoints) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(checkpointsResource, c.ns, name), &hivev1.Checkpoint{})
+		Invokes(testing.NewDeleteActionWithOptions(checkpointsResource, c.ns, name, opts), &hivev1.Checkpoint{})
 
 	return err
 }

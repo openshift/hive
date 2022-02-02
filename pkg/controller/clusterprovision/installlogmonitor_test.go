@@ -42,6 +42,7 @@ const (
 	kubeAPIWaitFailedLog        = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane.\""
 	awsDeleteRoleFailed         = "time=\"2021-09-22T12:25:40Z\" level=error msg=\"Error: Error deleting IAM Role (my-fake-cluster-hashn0s-bootstrap-role): DeleteConflict: Cannot delete entity, must detach all policies first.\""
 	subnetDoesNotExist          = "blahblah\nlevel=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": [platform.aws.subnets: Invalid value: []string{\"subnet-whatever\", \"subnet-whatever2\"}: describing subnets: InvalidSubnetID.NotFound: The subnet ID 'subnet-whatever' does not exist"
+	natGateWayFailed            = "blahblah\nlevel=fatal msg=\"Error: Error waiting for NAT Gateway (\"nat-0f7125846e6561839\") to become available: unexpected state 'failed', wanted target 'available'."
 	insufficientPermissions     = "level=fatal msg=failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Permissions Check\": validate AWS credentials: current credentials insufficient for performing cluster installation"
 	accessDeniedSLR             = "blahblah\nError: Error creating network Load Balancer: AccessDenied: User: arn:aws:sts::123456789:assumed-role/ManagedOpenShift-Installer-Role/123456789 is not authorized to perform: iam:CreateServiceLinkedRole on resource: arn:aws:iam::123456789:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing"
 	loadBalancerLimitExceeded   = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=info msg=\"Cluster operator ingress Available is False with IngressUnavailable: The \"default\" ingress controller reports Available=False: IngressControllerUnavailable: One or more status	conditions indicate unavailable: LoadBalancerReady=False (SyncLoadBalancerFailed: The service-controller component is reporting SyncLoadBalancerFailed events like: Error syncing load balancer: failed to ensure load balancer: TooManyLoadBalancers: Exceeded quota of account 1234567890\n\tstatus code: 400, request id: f0cb17ec-68b6-4f32-8997-cce5049a6a1e\nThe kube-controller-manager logs may contain more details.)"
@@ -320,6 +321,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "AWSSubnetDoesNotExist",
 			log:            pointer.StringPtr(subnetDoesNotExist),
 			expectedReason: "AWSSubnetDoesNotExist",
+		},
+		{
+			name:           "NATGatewayFailed",
+			log:            pointer.StringPtr(natGateWayFailed),
+			expectedReason: "NATGatewayFailed",
 		},
 		{
 			name:           "AWSInsufficientPermissions",

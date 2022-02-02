@@ -124,6 +124,11 @@ data:
       installFailingMessage: AWS Subnet Does Not Exist
     # iam:CreateServiceLinkedRole is a super powerful permission that we don't give to STS clusters. We require it's done as a one-time prereq.
     # This is the error we see when the prereq step was missed.
+    - name: NATGatewayFailed 
+      searchRegexStrings:
+      - "Error waiting for NAT Gateway (.*) to become available"
+      installFailingReason: NATGatewayFailed
+      installFailingMessage: Error waiting for NAT Gateway to become available.
     - name: AWSAccessDeniedSLR
       searchRegexStrings:
       - "Error creating network Load Balancer: AccessDenied.*iam:CreateServiceLinkedRole"

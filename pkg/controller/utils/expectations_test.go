@@ -23,8 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
+	clock "k8s.io/utils/clock/testing"
 )
 
 // NewFakeExpectationsLookup creates a fake store for Expectations.

@@ -101,7 +101,7 @@ func (c *FakeSyncSets) UpdateStatus(ctx context.Context, syncSet *hivev1.SyncSet
 // Delete takes name of the syncSet and deletes it. Returns an error if one occurs.
 func (c *FakeSyncSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(syncsetsResource, c.ns, name), &hivev1.SyncSet{})
+		Invokes(testing.NewDeleteActionWithOptions(syncsetsResource, c.ns, name, opts), &hivev1.SyncSet{})
 
 	return err
 }

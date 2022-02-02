@@ -96,6 +96,11 @@ type loggingQueue struct {
 	queue  workqueue.RateLimitingInterface
 }
 
+// ShutDownWithDrain implements workqueue.Interface
+func (q *loggingQueue) ShutDownWithDrain() {
+	q.queue.ShutDownWithDrain()
+}
+
 // Add implements workqueue.Interface
 func (q *loggingQueue) Add(item interface{}) {
 	q.logger.Debugf("Adding %v", item)

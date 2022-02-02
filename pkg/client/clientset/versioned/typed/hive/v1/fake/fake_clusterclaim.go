@@ -101,7 +101,7 @@ func (c *FakeClusterClaims) UpdateStatus(ctx context.Context, clusterClaim *hive
 // Delete takes name of the clusterClaim and deletes it. Returns an error if one occurs.
 func (c *FakeClusterClaims) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clusterclaimsResource, c.ns, name), &hivev1.ClusterClaim{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterclaimsResource, c.ns, name, opts), &hivev1.ClusterClaim{})
 
 	return err
 }

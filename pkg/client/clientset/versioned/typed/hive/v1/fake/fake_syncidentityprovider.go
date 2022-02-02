@@ -101,7 +101,7 @@ func (c *FakeSyncIdentityProviders) UpdateStatus(ctx context.Context, syncIdenti
 // Delete takes name of the syncIdentityProvider and deletes it. Returns an error if one occurs.
 func (c *FakeSyncIdentityProviders) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(syncidentityprovidersResource, c.ns, name), &hivev1.SyncIdentityProvider{})
+		Invokes(testing.NewDeleteActionWithOptions(syncidentityprovidersResource, c.ns, name, opts), &hivev1.SyncIdentityProvider{})
 
 	return err
 }

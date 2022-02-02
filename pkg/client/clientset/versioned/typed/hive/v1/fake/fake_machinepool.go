@@ -101,7 +101,7 @@ func (c *FakeMachinePools) UpdateStatus(ctx context.Context, machinePool *hivev1
 // Delete takes name of the machinePool and deletes it. Returns an error if one occurs.
 func (c *FakeMachinePools) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(machinepoolsResource, c.ns, name), &hivev1.MachinePool{})
+		Invokes(testing.NewDeleteActionWithOptions(machinepoolsResource, c.ns, name, opts), &hivev1.MachinePool{})
 
 	return err
 }

@@ -94,7 +94,7 @@ func (c *FakeSelectorSyncSets) UpdateStatus(ctx context.Context, selectorSyncSet
 // Delete takes name of the selectorSyncSet and deletes it. Returns an error if one occurs.
 func (c *FakeSelectorSyncSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(selectorsyncsetsResource, name), &hivev1.SelectorSyncSet{})
+		Invokes(testing.NewRootDeleteActionWithOptions(selectorsyncsetsResource, name, opts), &hivev1.SelectorSyncSet{})
 	return err
 }
 

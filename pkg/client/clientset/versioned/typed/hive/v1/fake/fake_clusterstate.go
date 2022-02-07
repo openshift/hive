@@ -101,7 +101,7 @@ func (c *FakeClusterStates) UpdateStatus(ctx context.Context, clusterState *hive
 // Delete takes name of the clusterState and deletes it. Returns an error if one occurs.
 func (c *FakeClusterStates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clusterstatesResource, c.ns, name), &hivev1.ClusterState{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterstatesResource, c.ns, name, opts), &hivev1.ClusterState{})
 
 	return err
 }

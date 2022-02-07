@@ -101,7 +101,7 @@ func (c *FakeClusterProvisions) UpdateStatus(ctx context.Context, clusterProvisi
 // Delete takes name of the clusterProvision and deletes it. Returns an error if one occurs.
 func (c *FakeClusterProvisions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clusterprovisionsResource, c.ns, name), &hivev1.ClusterProvision{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterprovisionsResource, c.ns, name, opts), &hivev1.ClusterProvision{})
 
 	return err
 }

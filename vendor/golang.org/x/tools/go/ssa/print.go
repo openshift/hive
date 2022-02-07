@@ -14,6 +14,7 @@ import (
 	"io"
 	"reflect"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/types/typeutil"
 )
@@ -38,8 +39,16 @@ func relName(v Value, i Instruction) string {
 	return v.Name()
 }
 
+// normalizeAnyFortesting controls whether we replace occurrences of
+// interface{} with any. It is only used for normalizing test output.
+var normalizeAnyForTesting bool
+
 func relType(t types.Type, from *types.Package) string {
-	return types.TypeString(t, types.RelativeTo(from))
+	s := types.TypeString(t, types.RelativeTo(from))
+	if normalizeAnyForTesting {
+		s = strings.ReplaceAll(s, "interface{}", "any")
+	}
+	return s
 }
 
 func relString(m Member, from *types.Package) string {
@@ -159,10 +168,11 @@ func printConv(prefix string, v, x Value) string {
 		relName(x, v.(Instruction)))
 }
 
-func (v *ChangeType) String() string      { return printConv("changetype", v, v.X) }
-func (v *Convert) String() string         { return printConv("convert", v, v.X) }
-func (v *ChangeInterface) String() string { return printConv("change interface", v, v.X) }
-func (v *MakeInterface) String() string   { return printConv("make", v, v.X) }
+func (v *ChangeType) String() string          { return printConv("changetype", v, v.X) }
+func (v *Convert) String() string             { return printConv("convert", v, v.X) }
+func (v *ChangeInterface) String() string     { return printConv("change interface", v, v.X) }
+func (v *SliceToArrayPointer) String() string { return printConv("slice to array pointer", v, v.X) }
+func (v *MakeInterface) String() string       { return printConv("make", v, v.X) }
 
 func (v *MakeClosure) String() string {
 	var b bytes.Buffer

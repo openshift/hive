@@ -14,38 +14,34 @@ type lgr struct {
 // NewLogr returns a new logger that implements logr.Logger interface
 // using the FieldLogger.
 func NewLogr(logger log.FieldLogger) logr.Logger {
-	return lgr{logger: logger}
+	return logr.New(lgr{logger})
 }
 
-var _ logr.Logger = lgr{}
+// Init implements logr.LogSink
+func (lgr) Init(logr.RuntimeInfo) {}
 
-// Info implements logr.InfoLogger
-func (l lgr) Info(msg string, keyAndValues ...interface{}) {
+// Info implements logr.LogSink
+func (l lgr) Info(level int, msg string, keyAndValues ...interface{}) {
 	l.logger.WithFields(keyAndValuesToFields(keyAndValues...)).Debug(msg)
 }
 
-// Error implements logr.Logger
+// Error implements logr.LogSink
 func (l lgr) Error(err error, msg string, keyAndValues ...interface{}) {
 	l.logger.WithError(err).WithFields(keyAndValuesToFields(keyAndValues...)).Error(msg)
 }
 
-// Enabled implements logr.InfoLogger
-func (lgr) Enabled() bool {
+// Enabled implements logr.LogSink
+func (lgr) Enabled(int) bool {
 	return true
 }
 
-// V implements logr.Logger
-func (l lgr) V(_ int) logr.InfoLogger {
-	return l
-}
-
-// WithName implements logr.Logger
-func (l lgr) WithName(name string) logr.Logger {
+// WithName implements logr.LogSink
+func (l lgr) WithName(name string) logr.LogSink {
 	return lgr{logger: l.logger.WithField("_name", name)}
 }
 
-// WithValues implements logr.Logger
-func (l lgr) WithValues(keyAndValues ...interface{}) logr.Logger {
+// WithValues implements logr.LogSink
+func (l lgr) WithValues(keyAndValues ...interface{}) logr.LogSink {
 	return lgr{logger: l.logger.WithFields(keyAndValuesToFields(keyAndValues...))}
 }
 

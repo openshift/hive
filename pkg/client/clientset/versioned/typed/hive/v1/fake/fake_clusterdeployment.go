@@ -101,7 +101,7 @@ func (c *FakeClusterDeployments) UpdateStatus(ctx context.Context, clusterDeploy
 // Delete takes name of the clusterDeployment and deletes it. Returns an error if one occurs.
 func (c *FakeClusterDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clusterdeploymentsResource, c.ns, name), &hivev1.ClusterDeployment{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterdeploymentsResource, c.ns, name, opts), &hivev1.ClusterDeployment{})
 
 	return err
 }

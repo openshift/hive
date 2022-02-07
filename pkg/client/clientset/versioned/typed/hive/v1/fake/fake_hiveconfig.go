@@ -94,7 +94,7 @@ func (c *FakeHiveConfigs) UpdateStatus(ctx context.Context, hiveConfig *hivev1.H
 // Delete takes name of the hiveConfig and deletes it. Returns an error if one occurs.
 func (c *FakeHiveConfigs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(hiveconfigsResource, name), &hivev1.HiveConfig{})
+		Invokes(testing.NewRootDeleteActionWithOptions(hiveconfigsResource, name, opts), &hivev1.HiveConfig{})
 	return err
 }
 

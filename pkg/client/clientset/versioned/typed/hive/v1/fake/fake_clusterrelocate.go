@@ -94,7 +94,7 @@ func (c *FakeClusterRelocates) UpdateStatus(ctx context.Context, clusterRelocate
 // Delete takes name of the clusterRelocate and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRelocates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrelocatesResource, name), &hivev1.ClusterRelocate{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterrelocatesResource, name, opts), &hivev1.ClusterRelocate{})
 	return err
 }
 

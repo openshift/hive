@@ -94,7 +94,7 @@ func (c *FakeClusterImageSets) UpdateStatus(ctx context.Context, clusterImageSet
 // Delete takes name of the clusterImageSet and deletes it. Returns an error if one occurs.
 func (c *FakeClusterImageSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterimagesetsResource, name), &hivev1.ClusterImageSet{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterimagesetsResource, name, opts), &hivev1.ClusterImageSet{})
 	return err
 }
 

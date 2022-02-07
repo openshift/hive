@@ -101,7 +101,7 @@ func (c *FakeClusterPools) UpdateStatus(ctx context.Context, clusterPool *hivev1
 // Delete takes name of the clusterPool and deletes it. Returns an error if one occurs.
 func (c *FakeClusterPools) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clusterpoolsResource, c.ns, name), &hivev1.ClusterPool{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterpoolsResource, c.ns, name, opts), &hivev1.ClusterPool{})
 
 	return err
 }

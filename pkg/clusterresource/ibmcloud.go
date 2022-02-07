@@ -48,7 +48,11 @@ func (p *IBMCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			constants.IBMCloudAPIKeySecretKey:         p.APIKey,
+			// This API KEY will be passed to the installer as constants.IBMCloudAPIKeyEnvVar
+			constants.IBMCloudAPIKeySecretKey: p.APIKey,
+			// IBMCloud libraries support reading different auth from environment using GetAuthenticatorFromEnvironment
+			// ref: https://github.com/IBM/cloudant-go-sdk/blob/931e800d66b843b79a23b439fec43a90509c649e/common/cloudant_base.go#L171
+			// This secret key is currently not passed to the installer pod's environment but may be in the future
 			constants.IBMCloudCredentialsEnvSecretKey: fmt.Sprintf("IBMCLOUD_AUTHTYPE=iam\nIBMCLOUD_APIKEY=%s", p.APIKey),
 		},
 	}

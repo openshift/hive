@@ -386,6 +386,9 @@ const (
 
 	// IBMCloudAPIKeyEnvVar is the name of the environment variable containing an IBM Cloud API key.
 	IBMCloudAPIKeyEnvVar = "IC_API_KEY"
+
+	// IBMCloudCredentialsSecretKey is a key used to store IBM environment variable credentials
+	IBMCloudCredentialsEnvSecretKey = "ibm-credentials.env"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

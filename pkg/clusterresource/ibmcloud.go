@@ -48,7 +48,8 @@ func (p *IBMCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 		},
 		Type: corev1.SecretTypeOpaque,
 		StringData: map[string]string{
-			constants.IBMCloudAPIKeySecretKey: p.APIKey,
+			constants.IBMCloudAPIKeySecretKey:         p.APIKey,
+			constants.IBMCloudCredentialsEnvSecretKey: fmt.Sprintf("IBMCLOUD_AUTHTYPE=iam\nIBMCLOUD_APIKEY=%s", p.APIKey),
 		},
 	}
 }

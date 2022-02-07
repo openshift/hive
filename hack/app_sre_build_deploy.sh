@@ -91,6 +91,8 @@ image_exists_in_repo() {
 if image_exists_in_repo "${IMG}"; then
     echo "Skipping image build/push for ${IMG}"
     exit 0
+else
+    echo "Building and pushing ${IMG}..."
 fi
 
 # build the image

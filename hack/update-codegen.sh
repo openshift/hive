@@ -12,7 +12,7 @@ GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "all" \
   github.com/openshift/hive/apis \
   "hive:v1 hiveinternal:v1alpha1" \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
-  --trim-path-prefix github.com/openshift/hive
+  --trim-path-prefix github.com/openshift/hive \
   ${verify}
 
 # Generate deepcopy for platform-specific types.
@@ -21,7 +21,7 @@ GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "deepcopy" \
   github.com/openshift/hive/apis \
   "hive:v1/agent hive:v1/aws hive:v1/azure hive:v1/baremetal hive:v1/gcp hive:v1/openstack hive:v1/ovirt hive:v1/vsphere hive:v1/ibmcloud hivecontracts:v1alpha1" \
   --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
-  --trim-path-prefix github.com/openshift/hive
+  --trim-path-prefix github.com/openshift/hive \
   ${verify}
 
 # deepcopy generators place the generated files in vendor directory, so move them back

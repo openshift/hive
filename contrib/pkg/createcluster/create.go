@@ -201,6 +201,7 @@ type Options struct {
 	// IBM
 	IBMCISInstanceCRN string
 	IBMAccountID      string
+	IBMInstanceType   string
 
 	homeDir string
 	log     log.FieldLogger
@@ -229,10 +230,10 @@ func NewCreateClusterCommand() *cobra.Command {
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --ibm-cis-instance-crn=CRN  --ibm-account-id=ACCOUNT_ID --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --ibm-cis-instance-crn=CRN  --ibm-account-id=ACCOUNT_ID --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -252,7 +253,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --ibm
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws|azure|gcp|openstack|vsphere|ibmcloud")
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws|azure|gcp|ibmcloud|openstack|vsphere")
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -338,6 +339,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	// IBM flags
 	flags.StringVar(&opt.IBMCISInstanceCRN, "ibm-cis-instance-crn", "", "IBM cloud internet services CRN")
 	flags.StringVar(&opt.IBMAccountID, "ibm-account-id", "", "IBM Cloud account ID")
+	flags.StringVar(&opt.IBMInstanceType, "ibm-instance-type", "bx2-4x16", "IBM Cloud instance type")
 
 	return cmd
 }
@@ -414,10 +416,6 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		if o.IBMCISInstanceCRN == "" {
 			o.log.Info("Missing --ibm-cis-instance-crn parameter")
 			return fmt.Errorf("Missing --ibm-cis-instance-crn parameter")
-		}
-		if o.Region == "" {
-			o.log.Info("Missing --region parameter")
-			return fmt.Errorf("Missing --region parameter")
 		}
 	}
 
@@ -779,6 +777,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			Region:         o.Region,
 			AccountID:      o.IBMAccountID,
 			CISInstanceCRN: o.IBMCISInstanceCRN,
+			InstanceType:   o.IBMInstanceType,
 		}
 		builder.CloudBuilder = ibmCloudProvider
 	}

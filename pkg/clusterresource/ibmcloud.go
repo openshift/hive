@@ -15,10 +15,6 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 )
 
-const (
-	ibmInstanceType = "bx2-4x16"
-)
-
 var _ CloudBuilder = (*IBMCloudBuilder)(nil)
 
 // IBMCloudBuilder encapsulates cluster artifact generation logic specific to IBM Cloud.
@@ -35,6 +31,9 @@ type IBMCloudBuilder struct {
 	// Region specifies the IBM Cloud region where the cluster will be
 	// created.
 	Region string `json:"region"`
+
+	// InstanceType specifies the IBM Cloud instance type
+	InstanceType string `json:"instanceType"`
 }
 
 func (p *IBMCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -73,7 +72,7 @@ func (p *IBMCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 
 func (p *IBMCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.IBMCloud = &hivev1ibmcloud.MachinePool{
-		InstanceType: ibmInstanceType,
+		InstanceType: p.InstanceType,
 	}
 }
 

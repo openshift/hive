@@ -524,7 +524,7 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		numberOfPlatforms++
 		ibmCloudPath := path.Child("ibmcloud")
 		if ibmCloud.CredentialsSecretRef.Name == "" {
-			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("credentialsSecretRef", "name"), "must specify secrets for oVirt access"))
+			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("credentialsSecretRef", "name"), "must specify secrets for IBM access"))
 		}
 		if ibmCloud.AccountID == "" {
 			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("accountID"), "must specify IBM accountID"))

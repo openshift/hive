@@ -274,7 +274,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
 	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, and GCP.")
-	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val)")
+	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val). Multiple labels may be delimited by commas (key1=val1,key2=val2).")
 	flags.StringSliceVarP(&opt.Annotations, "annotations", "a", nil, "Annotation to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
 	flags.BoolVar(&opt.Internal, "internal", false, `When set, it configures the install-config.yaml's publish field to Internal.

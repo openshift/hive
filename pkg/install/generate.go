@@ -383,7 +383,7 @@ func InstallerPodSpec(
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: cd.Spec.Platform.IBMCloud.CredentialsSecretRef,
 					Key:                  constants.IBMCloudAPIKeySecretKey,
-					Optional:             pointer.BoolPtr(true),
+					Optional:             pointer.BoolPtr(false),
 				},
 			},
 		})
@@ -1080,7 +1080,7 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 			SecretKeyRef: &corev1.SecretKeySelector{
 				LocalObjectReference: req.Spec.Platform.IBMCloud.CredentialsSecretRef,
 				Key:                  constants.IBMCloudAPIKeySecretKey,
-				Optional:             pointer.BoolPtr(true),
+				Optional:             pointer.BoolPtr(false),
 			},
 		},
 	})

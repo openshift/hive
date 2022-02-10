@@ -68,9 +68,13 @@ type ClusterPoolSpec struct {
 	// that a cluster has been running is the time since the cluster was installed or the time since the cluster last came
 	// out of hibernation.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
 	// +optional
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Format=duration
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 
 	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.
@@ -95,7 +99,14 @@ type HibernationConfig struct {
 	// hibernation (e.g. at the behest of runningCount, or in preparation for being claimed). If this time is
 	// exceeded, the ClusterDeployment will be considered Broken and we will replace it. The default (unspecified
 	// or zero) means no timeout -- we will allow the ClusterDeployment to continue trying to resume "forever".
+	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
 	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	ResumeTimeout metav1.Duration `json:"resumeTimeout"`
 }
 
@@ -103,18 +114,26 @@ type HibernationConfig struct {
 type ClusterPoolClaimLifetime struct {
 	// Default is the default lifetime of the claim when no lifetime is set on the claim itself.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
 	// +optional
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Format=duration
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	Default *metav1.Duration `json:"default,omitempty"`
 
 	// Maximum is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
 	// when the lifetime has elapsed, the claim will be deleted by Hive.
 	// The lifetime of a claim is the mimimum of the lifetimes set by the cluster pool and the claim itself.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
 	// +optional
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Format=duration
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	Maximum *metav1.Duration `json:"maximum,omitempty"`
 }
 

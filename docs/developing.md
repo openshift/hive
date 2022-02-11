@@ -41,12 +41,13 @@
 
 - Git
 - Make
-- A recent Go distribution (>=1.15)
+- A recent Go distribution (>=1.17)
 
 ### External tools
 
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
-- [imagebuilder](https://github.com/openshift/imagebuilder)
+- [imagebuilder](https://github.com/openshift/imagebuilder)\
+- [mockgen](https://github.com/golang/mock)
 
 ## Build and run tests
 

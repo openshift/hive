@@ -298,6 +298,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
 		}
+		if cd.Spec.Platform.IBMCloud != nil && cd.Spec.Provisioning.ManifestsConfigMapRef == nil {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "manifestsConfigMapRef"), "must specify manifestsConfigMapRef when platform is IBM Cloud"))
+		}
 	}
 
 	if cd.Spec.ClusterInstallRef != nil {
@@ -515,6 +518,22 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		}
 		if ovirt.StorageDomainID == "" {
 			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_storage_domain_id"), "must specify ovirt_storage_domain_id"))
+		}
+	}
+	if ibmCloud := platform.IBMCloud; ibmCloud != nil {
+		numberOfPlatforms++
+		ibmCloudPath := path.Child("ibmcloud")
+		if ibmCloud.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("credentialsSecretRef", "name"), "must specify secrets for IBM access"))
+		}
+		if ibmCloud.AccountID == "" {
+			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("accountID"), "must specify IBM accountID"))
+		}
+		if ibmCloud.CISInstanceCRN == "" {
+			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("cisInstanceCRN"), "must specify IBM cisInstanceCRN"))
+		}
+		if ibmCloud.Region == "" {
+			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("region"), "must specify IBM region"))
 		}
 	}
 	if baremetal := platform.BareMetal; baremetal != nil {

@@ -42,6 +42,7 @@ import (
 	"github.com/openshift/installer/pkg/destroy/aws"
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
+	"github.com/openshift/installer/pkg/destroy/ibmcloud"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/providers"
@@ -49,6 +50,7 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
+	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
@@ -681,6 +683,24 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		}
 		var err error
 		uninstaller, err = ovirt.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+	case cd.Spec.Platform.IBMCloud != nil:
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				IBMCloud: &installertypesibmcloud.Metadata{
+					AccountID:         cd.Spec.Platform.IBMCloud.AccountID,
+					BaseDomain:        cd.Spec.BaseDomain,
+					CISInstanceCRN:    cd.Spec.Platform.IBMCloud.CISInstanceCRN,
+					Region:            cd.Spec.Platform.IBMCloud.Region,
+					ResourceGroupName: cd.Spec.ClusterMetadata.InfraID,
+				},
+			},
+		}
+		var err error
+		uninstaller, err = ibmcloud.New(logger, metadata)
 		if err != nil {
 			return err
 		}

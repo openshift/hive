@@ -19,6 +19,7 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -140,6 +141,18 @@ func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
 		CertificatesSecretRef: corev1.LocalObjectReference{Name: "fake-cert-secret"},
 		StorageDomainID:       "fake-storage-domain-uuid",
 	}
+	return cd
+}
+
+func validIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.IBMCloud = &hivev1ibmcloud.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		AccountID:            "fakeaccountid",
+		CISInstanceCRN:       "arn://fake::",
+		Region:               "us-east",
+	}
+	cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{Name: "fake-manifests-configmap"}
 	return cd
 }
 
@@ -968,6 +981,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name:            "oVirt create valid",
 			newObject:       validOvirtClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name:            "IBMCloud create valid",
+			newObject:       validIBMCloudClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},

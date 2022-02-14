@@ -210,9 +210,7 @@ def get_previous_version(channel_name):
 
 # generate_csv_base generates a hive bundle from the current working directory
 # and deposits all artifacts in the specified bundle_dir
-def generate_csv_base(bundle_dir, version, prev_version, channel):
-    if version == prev_version:
-        raise ValueError("Version {} already exists upstream".format(version))
+def generate_csv_base(bundle_dir, version, prev_version):
     print("Writing bundle files to directory: %s" % bundle_dir)
     print("Generating CSV for version: %s" % version)
 
@@ -220,7 +218,6 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
     csv_template = "config/templates/hive-csv-template.yaml"
     operator_role = "config/operator/operator_role.yaml"
     deployment_spec = "config/operator/operator_deployment.yaml"
-    package_file = os.path.join(bundle_dir, "hive.package.yaml")
 
     # The bundle directory doesn't have the 'v'
     version_dir = os.path.join(bundle_dir, version)
@@ -298,9 +295,6 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
     with open(csv_file, "w") as outfile:
         yaml.dump(csv, outfile, default_flow_style=False)
     print("Wrote ClusterServiceVersion: %s" % csv_file)
-
-    # generate package
-    generate_package(package_file, channel, version)
 
 
 def generate_package(package_file, channel, version):
@@ -577,10 +571,12 @@ if __name__ == "__main__":
     hive_version = gen_hive_version(hive_repo, hive_commit, hive_version_prefix)
     build_and_push_image(args.registry_auth_file, hive_version, args.dry_run, args.build_engine)
 
-    # TODO: We shouldn't need channel here, because the package.yaml file is being updated in open_pr (right????)
-    generate_csv_base(
-        bundle_dir.name, hive_version, get_previous_version(channel), channel
-    )
+    prev_version = get_previous_version(channel)
+    if hive_version == prev_version:
+        raise ValueError("Version {} already exists upstream".format(hive_version))
+
+    generate_csv_base(bundle_dir.name, hive_version, prev_version)
+    generate_package(os.path.join(bundle_dir.name, "hive.package.yaml"), channel, hive_version)
 
     # redhat-openshift-ecosystem/community-operators-prod
     open_pr(

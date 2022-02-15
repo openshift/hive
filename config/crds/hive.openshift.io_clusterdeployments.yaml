@@ -242,13 +242,15 @@ spec:
                     type: object
                 type: object
               hibernateAfter:
-                description: HibernateAfter will transition a cluster to hibernating
+                description: 'HibernateAfter will transition a cluster to hibernating
                   power state after it has been running for the given duration. The
                   time that a cluster has been running is the time since the cluster
                   was installed or the time since the cluster last came out of hibernation.
                   This is a Duration value; see https://pkg.go.dev/time#ParseDuration
-                  for accepted formats.
-                format: duration
+                  for accepted formats. Note: due to discrepancies in validation vs
+                  parsing, we use a Pattern instead of `Format=duration`. See https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+                  https://github.com/kubernetes/apimachinery/issues/131 https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                 type: string
               ingress:
                 description: Ingress allows defining desired clusteringress/shards

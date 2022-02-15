@@ -24,9 +24,13 @@ type ClusterClaimSpec struct {
 	// Lifetime is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
 	// when the lifetime has elapsed, the claim will be deleted by Hive.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
 	// +optional
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Format=duration
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	Lifetime *metav1.Duration `json:"lifetime,omitempty"`
 }
 

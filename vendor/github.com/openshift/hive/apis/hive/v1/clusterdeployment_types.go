@@ -145,9 +145,13 @@ type ClusterDeploymentSpec struct {
 	// given duration. The time that a cluster has been running is the time since the cluster was installed or the
 	// time since the cluster last came out of hibernation.
 	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
 	// +optional
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Format=duration
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	HibernateAfter *metav1.Duration `json:"hibernateAfter,omitempty"`
 
 	// InstallAttemptsLimit is the maximum number of times Hive will attempt to install the cluster.

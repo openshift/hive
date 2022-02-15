@@ -14,6 +14,8 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 )
 
+// boo!
+
 type releasePayload struct {
 	PullSpec string `json:"pullSpec"`
 }

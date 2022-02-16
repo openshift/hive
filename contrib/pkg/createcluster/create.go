@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -79,7 +80,8 @@ GOVC_NETWORK, GOVC_DATACENTER, GOVC_DATASTORE and GOVC_HOST (vCenter host)
 can be used as alternatives to the associated commandline argument.
 These are only relevant for creating a cluster on vSphere.
 
-IC_API_KEY - Used to determine your IBM Cloud API key.
+IC_API_KEY - Used to determine your IBM Cloud API key. Required when
+using --cloud=ibmcloud.
 
 RELEASE_IMAGE - Release image to use to install the cluster. If not specified,
 the --release-image flag is used. If that's not specified, a default image is
@@ -91,10 +93,10 @@ const (
 	cloudAWS             = "aws"
 	cloudAzure           = "azure"
 	cloudGCP             = "gcp"
-	cloudOpenStack       = "openstack"
-	cloudVSphere         = "vsphere"
-	cloudOVirt           = "ovirt"
 	cloudIBM             = "ibmcloud"
+	cloudOpenStack       = "openstack"
+	cloudOVirt           = "ovirt"
+	cloudVSphere         = "vsphere"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -110,10 +112,10 @@ var (
 		cloudAWS:       true,
 		cloudAzure:     true,
 		cloudGCP:       true,
-		cloudOpenStack: true,
-		cloudVSphere:   true,
-		cloudOVirt:     true,
 		cloudIBM:       true,
+		cloudOpenStack: true,
+		cloudOVirt:     true,
+		cloudVSphere:   true,
 	}
 )
 
@@ -252,8 +254,16 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 		},
 	}
 
+	clouds := []string{}
+	for cloud, valid := range validClouds {
+		if valid {
+			clouds = append(clouds, cloud)
+		}
+	}
+	sort.Strings(clouds)
+
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws|azure|gcp|ibmcloud|openstack|vsphere")
+	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, fmt.Sprintf("Cloud provider: %s", strings.Join(clouds, "|")))
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -396,26 +406,32 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 	}
 	if o.Cloud == cloudOpenStack {
 		if o.OpenStackAPIFloatingIP == "" {
-			o.log.Info("Missing openstack-api-floating-ip parameter")
-			return fmt.Errorf("Missing openstack-api-floating-ip parameter")
+			msg := fmt.Sprintf("--openstack-api-floating-ip must be set when using --cloud=%q", cloudOpenStack)
+			o.log.Info(msg)
+			return fmt.Errorf(msg)
 		}
 		if o.OpenStackCloud == "" {
-			o.log.Info("Missing openstack-cloud parameter")
-			return fmt.Errorf("Missing openstack-cloud parameter")
+			msg := fmt.Sprintf("--openstack-cloud must be set when using --cloud=%q", cloudOpenStack)
+			o.log.Info(msg)
+			return fmt.Errorf(msg)
 		}
 	}
 
 	if o.Cloud == cloudIBM {
 		if !o.CredentialsModeManual {
-			return fmt.Errorf("--credentials-mode-manual must be set when using IBM Cloud")
+			msg := fmt.Sprintf("--credentials-mode-manual must be set when using --cloud=%q", cloudIBM)
+			o.log.Info(msg)
+			return fmt.Errorf(msg)
 		}
 		if o.IBMAccountID == "" {
-			o.log.Info("Missing --ibm-account-id parameter")
-			return fmt.Errorf("Missing --ibm-account-id parameter")
+			msg := fmt.Sprintf("--ibm-accound-id must be set when using --cloud=%q", cloudIBM)
+			o.log.Info(msg)
+			return fmt.Errorf(msg)
 		}
 		if o.IBMCISInstanceCRN == "" {
-			o.log.Info("Missing --ibm-cis-instance-crn parameter")
-			return fmt.Errorf("Missing --ibm-cis-instance-crn parameter")
+			msg := fmt.Sprintf("--ibm-cis-instance-crn must be set when using --cloud=%q", cloudIBM)
+			o.log.Info(msg)
+			return fmt.Errorf(msg)
 		}
 	}
 
@@ -426,7 +442,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 	}
 
 	if o.AWSPrivateLink && o.Cloud != cloudAWS {
-		return fmt.Errorf("--aws-private-link can only be enabled for AWS cloud platform")
+		return fmt.Errorf("--aws-private-link can only be enabled when using --cloud=%q", cloudAWS)
 	}
 
 	if o.Adopt {
@@ -452,7 +468,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		switch c := o.Cloud; c {
 		case cloudAWS, cloudAzure, cloudGCP, cloudIBM:
 		default:
-			return fmt.Errorf("cannot specify region when cloud is %q", c)
+			return fmt.Errorf("cannot specify --region when using --cloud=%q", c)
 		}
 	}
 
@@ -770,7 +786,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	case cloudIBM:
 		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
 		if ibmCloudAPIKey == "" {
-			return nil, fmt.Errorf("No %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
+			return nil, fmt.Errorf("%s env var is required when using --cloud=%q", constants.IBMCloudAPIKeyEnvVar, cloudIBM)
 		}
 		ibmCloudProvider := &clusterresource.IBMCloudBuilder{
 			APIKey:         ibmCloudAPIKey,

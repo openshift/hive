@@ -1670,7 +1670,6 @@ github.com/openshift/cluster-api-actuator-pkg v0.0.0-20190614215203-42228d06a2ca
 github.com/openshift/cluster-api-provider-alibaba v0.0.0-20211123142315-d16daa4e6349/go.mod h1:vJHKJg2+CEt1wmawpkFrg1IRlgyeaaGtzz76IM/z2os=
 github.com/openshift/cluster-api-provider-aws v0.2.1-0.20210121023454-5ffc5f422a80 h1:fFHoy/1QCLUcfo/NceEM8jGY2Tafl1BmyLa7tReN328=
 github.com/openshift/cluster-api-provider-aws v0.2.1-0.20210121023454-5ffc5f422a80/go.mod h1:JV7aXj/LZ8B4MwIQdhGxpTO2PCG8+7UKFd6FaOZCSzA=
-github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20210626224711-5d94c794092f h1:rQwvVLPZfM5o0USkVY6mrAyJwzMUkhjn9Wz2D5vX81k=
 github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20210626224711-5d94c794092f/go.mod h1:GR+ocB8I+Z7JTSBdO+DMu/diBfH66lRlRpnc1KWysUM=
 github.com/openshift/cluster-api-provider-baremetal v0.0.0-20210924143856-c2d3ece4da38/go.mod h1:TyotVVwHJhqcDfX/0MkCjLOh7y6+RshdurRIboZ0/Hk=
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200701112720-3a7d727c9a10/go.mod h1:wgkZrOlcIMWTzo8khB4Js2PoDJDlIUUdzCBm7BuDdqw=
@@ -1678,7 +1677,6 @@ github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200713133651-5c8a640669
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20200901173901-9056dbc8c9b9/go.mod h1:rcwAydGZX+z4l91wtOdbq+fqDwuo6iu0YuFik3UUc+8=
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201002065957-9854f7420570/go.mod h1:7NRECVE26rvP1/fs1CbhfY5gsgnnFQNhb9txTFzWmUw=
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20201201000827-1117a4fc438c/go.mod h1:21N0wWjiTQypZ7WosEYhcGJHr9JoDR1RBFztE0NvdYM=
-github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20210615203611-a02074e8d5bb h1:vFMc7likijMQ1u4yhrjv2JDaK6wrXwC+iP3CaHHG6sE=
 github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20210615203611-a02074e8d5bb/go.mod h1:KLZ9LTM+EPEny4VXWNbBkJndhfKakmlqafeOfC0jxXA=
 github.com/openshift/cluster-api-provider-ibmcloud v0.0.0-20211008100740-4d7907adbd6b/go.mod h1:xkkPB22FMQyrv3G0HLobylRsosJP4Voi8Yojg5WEYrs=
 github.com/openshift/cluster-api-provider-libvirt v0.2.1-0.20191219173431-2336783d4603/go.mod h1:7pQ9Bzha+ug/5zd+0ufbDEcnn2OnNlPwRwYrzhXk4NM=
@@ -1710,6 +1708,8 @@ github.com/openshift/machine-api-operator v0.2.1-0.20210504014029-a132ec00f7dd/g
 github.com/openshift/machine-api-operator v0.2.1-0.20210820103535-d50698c302f5/go.mod h1:ko7xmso6c25h9UL6Ai0I5l+6OgyVf+ebinAYXnwlGNg=
 github.com/openshift/machine-api-operator v0.2.1-0.20211102083422-ee77ca7b9fd1/go.mod h1:8kWuB/zhnlBsNOyD1yz0epINZX5IodG3Z4iDwQrYKx0=
 github.com/openshift/machine-api-operator v0.2.1-0.20211111133920-c8bba3e64310/go.mod h1:8kWuB/zhnlBsNOyD1yz0epINZX5IodG3Z4iDwQrYKx0=
+github.com/openshift/machine-api-provider-gcp v0.0.0 h1:IJBYVP5RaxmwaG1fYPDFiR7t634LDpllmzN0atmI//A=
+github.com/openshift/machine-api-provider-gcp v0.0.0/go.mod h1:lgTHPL+8qZt/bvkrkxYXroErVmFy4gXn/BhidMI6FQs=
 github.com/openshift/machine-config-operator v0.0.0/go.mod h1:4IzikyGmUVQwlohScKeaAr5n2YzcWXkZvTMGGxDcU2Q=
 github.com/openshift/terraform-provider-aws v1.60.1-0.20211215220004-24df6d73af46/go.mod h1:T4V1hyevFAuS/Bt3dh90ncYdyh2LVXYNK0kN33NTSfc=
 github.com/openshift/terraform-provider-azurerm v1.44.1-0.20210224232508-7509319df0f4/go.mod h1:MohWawSEwkGnsTTEW/U/sPVxsgQVHBNg2LsqQPbMa/U=

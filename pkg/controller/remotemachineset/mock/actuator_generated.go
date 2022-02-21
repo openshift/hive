@@ -5,37 +5,38 @@
 package mock
 
 import (
-	gomock "github.com/golang/mock/gomock"
-	v1 "github.com/openshift/hive/apis/hive/v1"
-	v1beta1 "github.com/openshift/api/machine/v1beta1"
-	logrus "github.com/sirupsen/logrus"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
+	v1beta1 "github.com/openshift/api/machine/v1beta1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	logrus "github.com/sirupsen/logrus"
 )
 
-// MockActuator is a mock of Actuator interface
+// MockActuator is a mock of Actuator interface.
 type MockActuator struct {
 	ctrl     *gomock.Controller
 	recorder *MockActuatorMockRecorder
 }
 
-// MockActuatorMockRecorder is the mock recorder for MockActuator
+// MockActuatorMockRecorder is the mock recorder for MockActuator.
 type MockActuatorMockRecorder struct {
 	mock *MockActuator
 }
 
-// NewMockActuator creates a new mock instance
+// NewMockActuator creates a new mock instance.
 func NewMockActuator(ctrl *gomock.Controller) *MockActuator {
 	mock := &MockActuator{ctrl: ctrl}
 	mock.recorder = &MockActuatorMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockActuator) EXPECT() *MockActuatorMockRecorder {
 	return m.recorder
 }
 
-// GenerateMachineSets mocks base method
+// GenerateMachineSets mocks base method.
 func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.MachinePool, arg2 logrus.FieldLogger) ([]*v1beta1.MachineSet, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateMachineSets", arg0, arg1, arg2)
@@ -45,7 +46,7 @@ func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.
 	return ret0, ret1, ret2
 }
 
-// GenerateMachineSets indicates an expected call of GenerateMachineSets
+// GenerateMachineSets indicates an expected call of GenerateMachineSets.
 func (mr *MockActuatorMockRecorder) GenerateMachineSets(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateMachineSets", reflect.TypeOf((*MockActuator)(nil).GenerateMachineSets), arg0, arg1, arg2)

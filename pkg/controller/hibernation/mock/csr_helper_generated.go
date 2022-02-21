@@ -6,37 +6,66 @@ package mock
 
 import (
 	x509 "crypto/x509"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	v1beta1 "github.com/openshift/api/machine/v1beta1"
 	v1 "k8s.io/api/certificates/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
-	reflect "reflect"
 )
 
-// MockcsrHelper is a mock of csrHelper interface
+// MockcsrHelper is a mock of csrHelper interface.
 type MockcsrHelper struct {
 	ctrl     *gomock.Controller
 	recorder *MockcsrHelperMockRecorder
 }
 
-// MockcsrHelperMockRecorder is the mock recorder for MockcsrHelper
+// MockcsrHelperMockRecorder is the mock recorder for MockcsrHelper.
 type MockcsrHelperMockRecorder struct {
 	mock *MockcsrHelper
 }
 
-// NewMockcsrHelper creates a new mock instance
+// NewMockcsrHelper creates a new mock instance.
 func NewMockcsrHelper(ctrl *gomock.Controller) *MockcsrHelper {
 	mock := &MockcsrHelper{ctrl: ctrl}
 	mock.recorder = &MockcsrHelperMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockcsrHelper) EXPECT() *MockcsrHelperMockRecorder {
 	return m.recorder
 }
 
-// IsApproved mocks base method
+// Approve mocks base method.
+func (m *MockcsrHelper) Approve(client kubernetes.Interface, csr *v1.CertificateSigningRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Approve", client, csr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Approve indicates an expected call of Approve.
+func (mr *MockcsrHelperMockRecorder) Approve(client, csr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Approve", reflect.TypeOf((*MockcsrHelper)(nil).Approve), client, csr)
+}
+
+// Authorize mocks base method.
+func (m *MockcsrHelper) Authorize(machines []v1beta1.Machine, nodes kubernetes.Interface, req *v1.CertificateSigningRequest, csr *x509.CertificateRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Authorize", machines, nodes, req, csr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Authorize indicates an expected call of Authorize.
+func (mr *MockcsrHelperMockRecorder) Authorize(machines, nodes, req, csr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Authorize", reflect.TypeOf((*MockcsrHelper)(nil).Authorize), machines, nodes, req, csr)
+}
+
+// IsApproved mocks base method.
 func (m *MockcsrHelper) IsApproved(csr *v1.CertificateSigningRequest) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsApproved", csr)
@@ -44,13 +73,13 @@ func (m *MockcsrHelper) IsApproved(csr *v1.CertificateSigningRequest) bool {
 	return ret0
 }
 
-// IsApproved indicates an expected call of IsApproved
+// IsApproved indicates an expected call of IsApproved.
 func (mr *MockcsrHelperMockRecorder) IsApproved(csr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsApproved", reflect.TypeOf((*MockcsrHelper)(nil).IsApproved), csr)
 }
 
-// Parse mocks base method
+// Parse mocks base method.
 func (m *MockcsrHelper) Parse(obj *v1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Parse", obj)
@@ -59,36 +88,8 @@ func (m *MockcsrHelper) Parse(obj *v1.CertificateSigningRequest) (*x509.Certific
 	return ret0, ret1
 }
 
-// Parse indicates an expected call of Parse
+// Parse indicates an expected call of Parse.
 func (mr *MockcsrHelperMockRecorder) Parse(obj interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Parse", reflect.TypeOf((*MockcsrHelper)(nil).Parse), obj)
-}
-
-// Authorize mocks base method
-func (m *MockcsrHelper) Authorize(machines []v1beta1.Machine, nodes kubernetes.Interface, req *v1.CertificateSigningRequest, csr *x509.CertificateRequest) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Authorize", machines, nodes, req, csr)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Authorize indicates an expected call of Authorize
-func (mr *MockcsrHelperMockRecorder) Authorize(machines, nodes, req, csr interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Authorize", reflect.TypeOf((*MockcsrHelper)(nil).Authorize), machines, nodes, req, csr)
-}
-
-// Approve mocks base method
-func (m *MockcsrHelper) Approve(client kubernetes.Interface, csr *v1.CertificateSigningRequest) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Approve", client, csr)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Approve indicates an expected call of Approve
-func (mr *MockcsrHelperMockRecorder) Approve(client, csr interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Approve", reflect.TypeOf((*MockcsrHelper)(nil).Approve), client, csr)
 }

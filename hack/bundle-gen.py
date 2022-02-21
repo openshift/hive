@@ -22,7 +22,7 @@ import re
 # e.g. "v1.2.3187-18827f6"
 HIVE_VERSION_PREFIX = "1.2"
 
-HIVE_REPO = "git@github.com:openshift/hive.git"
+HIVE_REPO_DEFAULT = "git@github.com:openshift/hive.git"
 
 # Hive dir within both:
 # https://github.com/redhat-openshift-ecosystem/community-operators-prod
@@ -96,6 +96,11 @@ def get_params():
         default=False,
         help='Adds a /hold comment in commit body to prevent the PR from merging (use "/hold cancel" to remove)',
         action="store_true",
+    )
+    parser.add_argument(
+        "--hive-repo",
+        default=HIVE_REPO_DEFAULT,
+        help="The hive git repository to clone. E.g. save time by using a local directory (but make sure it's up to date!)"
     )
     args = parser.parse_args()
 
@@ -507,8 +512,23 @@ def process_branch(hive_repo, branch_arg):
     # This will raise an exception if there's no such commit-ish
     commit_hash = hive_repo.rev_parse(branch_arg).hexsha
 
-    # This had better exist
-    master_hash = hive_repo.rev_parse(HIVE_BRANCH_DEFAULT).hexsha
+    # We need to know where master is, even if we're processing a different branch. However, if
+    # we've cloned from something other than HIVE_REPO_DEFAULT, there may not be a local `master`
+    # branch. So we may need to try origin and upstream to find it.
+    for remote in ("", "origin/", "upstream/"):
+        master_branch = remote + HIVE_BRANCH_DEFAULT
+        print("Trying to find master at {}".format(master_branch))
+        try:
+            master_hash = hive_repo.rev_parse(master_branch).hexsha
+        except git.BadName:
+            print("Couldn't find master at `{}`".format(master_branch))
+        else:
+            print("Found master at `{}`".format(master_branch))
+            break
+    else:
+        print("Couldn't find master branch!")
+        sys.exit(1)
+
     is_master_ancestor = hive_repo.git.rev_list(
         "--ancestry-path", "{}..{}".format(commit_hash, master_hash)
     )
@@ -559,11 +579,11 @@ if __name__ == "__main__":
 
     hive_repo_dir = tempfile.TemporaryDirectory(prefix="hive-repo-")
 
-    print("Cloning {} to {}".format(HIVE_REPO, hive_repo_dir.name))
+    print("Cloning {} to {}".format(args.hive_repo, hive_repo_dir.name))
     try:
-        git.Repo.clone_from(HIVE_REPO, hive_repo_dir.name)
+        git.Repo.clone_from(args.hive_repo, hive_repo_dir.name)
     except:
-        print("Failed to clone repo {} to {}".format(HIVE_REPO, hive_repo_dir.name))
+        print("Failed to clone repo {} to {}".format(args.hive_repo, hive_repo_dir.name))
         raise
 
     hive_repo = git.Repo(hive_repo_dir.name)

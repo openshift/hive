@@ -7,7 +7,7 @@ package mock
 import (
 	x509 "crypto/x509"
 	gomock "github.com/golang/mock/gomock"
-	v1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	v1beta1 "github.com/openshift/api/machine/v1beta1"
 	v1 "k8s.io/api/certificates/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
 	reflect "reflect"

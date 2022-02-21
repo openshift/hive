@@ -35,10 +35,10 @@ type ClusterUninstaller struct {
 	GraphAuthorizer autorest.Authorizer
 	Authorizer      autorest.Authorizer
 	Environment     azureenv.Environment
+	CloudName       azure.CloudEnvironment
 
 	InfraID                     string
 	ResourceGroupName           string
-	ClusterName                 string
 	BaseDomainResourceGroupName string
 
 	Logger logrus.FieldLogger
@@ -101,12 +101,12 @@ func New(logger logrus.FieldLogger, metadata *types.ClusterMetadata) (providers.
 		ResourceGroupName:           group,
 		Logger:                      logger,
 		BaseDomainResourceGroupName: metadata.Azure.BaseDomainResourceGroupName,
-		ClusterName:                 metadata.ClusterName,
+		CloudName:                   cloudName,
 	}, nil
 }
 
 // Run is the entrypoint to start the uninstall process.
-func (o *ClusterUninstaller) Run() error {
+func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 	var errs []error
 	var err error
 
@@ -121,7 +121,7 @@ func (o *ClusterUninstaller) Run() error {
 		waitCtx,
 		func(ctx context.Context) {
 			o.Logger.Debugf("deleting public records")
-			if o.Environment.Name == azure.StackCloud.Name() {
+			if o.CloudName == azure.StackCloud {
 				err = deleteAzureStackPublicRecords(ctx, o)
 			} else {
 				err = deletePublicRecords(ctx, o.zonesClient, o.recordsClient, o.privateZonesClient, o.privateRecordSetsClient, o.Logger, o.ResourceGroupName)
@@ -205,7 +205,7 @@ func (o *ClusterUninstaller) Run() error {
 		o.Logger.Debug(err)
 	}
 
-	return utilerrors.NewAggregate(errs)
+	return nil, utilerrors.NewAggregate(errs)
 }
 
 func deleteAzureStackPublicRecords(ctx context.Context, o *ClusterUninstaller) error {
@@ -220,7 +220,6 @@ func deleteAzureStackPublicRecords(ctx context.Context, o *ClusterUninstaller) e
 
 	recordsClient := azurestackdns.NewRecordSetsClientWithBaseURI(o.Environment.ResourceManagerEndpoint, o.SubscriptionID)
 	recordsClient.Authorizer = o.Authorizer
-	clusterName := o.ClusterName
 
 	var errs []error
 
@@ -248,7 +247,7 @@ func deleteAzureStackPublicRecords(ctx context.Context, o *ClusterUninstaller) e
 		}
 	}
 
-	clusterTag := fmt.Sprintf("kubernetes.io_cluster.%s", clusterName)
+	clusterTag := fmt.Sprintf("kubernetes.io_cluster.%s", o.InfraID)
 	for _, zone := range allZones.List() {
 		for recordPages, err := recordsClient.ListByDNSZone(ctx, rgName, zone, to.Int32Ptr(100), ""); recordPages.NotDone(); err = recordPages.NextWithContext(ctx) {
 			if err != nil {
@@ -466,17 +465,11 @@ func deleteResourceGroup(ctx context.Context, client resources.GroupsClient, log
 	defer cancel()
 
 	delFuture, err := client.Delete(ctx, name)
-	if err != nil {
-		if wasNotFound(delFuture.Response()) {
-			logger.Debug("already deleted")
-			return nil
-		}
-		return err
+	if err == nil {
+		err = delFuture.WaitForCompletionRef(ctx, client.Client)
 	}
-
-	err = delFuture.WaitForCompletionRef(ctx, client.Client)
 	if err != nil {
-		if wasNotFound(delFuture.Response()) {
+		if isNotFoundError(err) {
 			logger.Debug("already deleted")
 			return nil
 		}
@@ -488,6 +481,30 @@ func deleteResourceGroup(ctx context.Context, client resources.GroupsClient, log
 
 func wasNotFound(resp *http.Response) bool {
 	return resp != nil && resp.StatusCode == http.StatusNotFound
+}
+
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var dErr autorest.DetailedError
+	errors.As(err, &dErr)
+
+	if dErr.StatusCode == http.StatusNotFound {
+		return true
+	}
+
+	if dErr.StatusCode == 0 {
+		serviceErr, ok := dErr.Original.(*azureenv.ServiceError)
+		if ok {
+			if strings.HasSuffix(serviceErr.Code, "NotFound") {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func isAuthError(err error) bool {

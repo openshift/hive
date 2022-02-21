@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/types"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -33,7 +34,9 @@ func NewGocritic() *goanalysis.Linter {
 	}
 	return goanalysis.NewLinter(
 		gocriticName,
-		"The most opinionated Go source code linter",
+		`Provides many diagnostics that check for bugs, performance and style issues.
+Extensible without recompilation through dynamic rules.
+Dynamic rules are written declaratively with AST patterns, filters, report message and optional suggestion.`,
 		[]*analysis.Analyzer{analyzer},
 		nil,
 	).WithContextSetter(func(lintCtx *linter.Context) {
@@ -85,7 +88,7 @@ func configureCheckerInfo(info *gocriticlinter.CheckerInfo, allParams map[string
 	for k, p := range params {
 		v, ok := infoParams[k]
 		if ok {
-			v.Value = p
+			v.Value = normalizeCheckerParamsValue(p)
 			continue
 		}
 
@@ -108,6 +111,26 @@ func configureCheckerInfo(info *gocriticlinter.CheckerInfo, allParams map[string
 	return nil
 }
 
+// normalizeCheckerParamsValue normalizes value types.
+// go-critic asserts that CheckerParam.Value has some specific types,
+// but the file parsers (TOML, YAML, JSON) don't create the same representation for raw type.
+// then we have to convert value types into the expected value types.
+// Maybe in the future, this kind of conversion will be done in go-critic itself.
+//nolint:exhaustive // only 3 types (int, bool, and string) are supported by CheckerParam.Value
+func normalizeCheckerParamsValue(p interface{}) interface{} {
+	rv := reflect.ValueOf(p)
+	switch rv.Type().Kind() {
+	case reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.Int:
+		return int(rv.Int())
+	case reflect.Bool:
+		return rv.Bool()
+	case reflect.String:
+		return rv.String()
+	default:
+		return p
+	}
+}
+
 func buildEnabledCheckers(lintCtx *linter.Context, linterCtx *gocriticlinter.Context) ([]*gocriticlinter.Checker, error) {
 	s := lintCtx.Settings().Gocritic
 	allParams := s.GetLowercasedParams()
@@ -122,7 +145,10 @@ func buildEnabledCheckers(lintCtx *linter.Context, linterCtx *gocriticlinter.Con
 			return nil, err
 		}
 
-		c := gocriticlinter.NewChecker(linterCtx, info)
+		c, err := gocriticlinter.NewChecker(linterCtx, info)
+		if err != nil {
+			return nil, err
+		}
 		enabledCheckers = append(enabledCheckers, c)
 	}
 

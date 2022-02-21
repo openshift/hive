@@ -23,7 +23,7 @@ spec:
         status: {}
       schema:
         openAPIV3Schema:
-          description: "DNS manages the CoreDNS component to provide a name resolution service for pods and services in the cluster. \n This supports the DNS-based service discovery specification: https://github.com/kubernetes/dns/blob/master/docs/specification.md \n More details: https://kubernetes.io/docs/tasks/administer-cluster/coredns"
+          description: "DNS manages the CoreDNS component to provide a name resolution service for pods and services in the cluster. \n This supports the DNS-based service discovery specification: https://github.com/kubernetes/dns/blob/master/docs/specification.md \n More details: https://kubernetes.io/docs/tasks/administer-cluster/coredns \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
           type: object
           properties:
             apiVersion:
@@ -38,6 +38,18 @@ spec:
               description: spec is the specification of the desired behavior of the DNS.
               type: object
               properties:
+                logLevel:
+                  description: 'logLevel describes the desired logging verbosity for CoreDNS. Any one of the following values may be specified: * Normal logs errors from upstream resolvers. * Debug logs errors, NXDOMAIN responses, and NODATA responses. * Trace logs errors and all responses.  Setting logLevel: Trace will produce extremely verbose logs. Valid values are: "Normal", "Debug", "Trace". Defaults to "Normal".'
+                  type: string
+                  default: Normal
+                  enum:
+                    - Normal
+                    - Debug
+                    - Trace
+                managementState:
+                  description: managementState indicates whether the DNS operator should manage cluster DNS
+                  type: string
+                  pattern: ^(Managed|Unmanaged|Force|Removed)$
                 nodePlacement:
                   description: "nodePlacement provides explicit control over the scheduling of DNS pods. \n Generally, it is useful to run a DNS pod on every node so that DNS queries are always handled by a local DNS pod instead of going over the network to a DNS pod on another node.  However, security policies may require restricting the placement of DNS pods to specific nodes. For example, if a security policy prohibits pods on arbitrary nodes from communicating with the API, a node selector can be specified to restrict DNS pods to nodes that are permitted to communicate with the API.  Conversely, if running DNS pods on nodes with a particular taint is desired, a toleration can be specified for that taint. \n If unset, defaults are used. See nodePlacement for more details."
                   type: object
@@ -70,6 +82,14 @@ spec:
                           value:
                             description: Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.
                             type: string
+                operatorLogLevel:
+                  description: 'operatorLogLevel controls the logging level of the DNS Operator. Valid values are: "Normal", "Debug", "Trace". Defaults to "Normal". setting operatorLogLevel: Trace will produce extremely verbose logs.'
+                  type: string
+                  default: Normal
+                  enum:
+                    - Normal
+                    - Debug
+                    - Trace
                 servers:
                   description: "servers is a list of DNS resolvers that provide name query delegation for one or more subdomains outside the scope of the cluster domain. If servers consists of more than one Server, longest suffix match will be used to determine the Server. \n For example, if there are two Servers, one for \"foo.com\" and another for \"a.foo.com\", and the name query is for \"www.a.foo.com\", it will be routed to the Server with Zone \"a.foo.com\". \n If this field is nil, no servers are created."
                   type: array
@@ -81,8 +101,16 @@ spec:
                         description: forwardPlugin defines a schema for configuring CoreDNS to proxy DNS messages to upstream resolvers.
                         type: object
                         properties:
+                          policy:
+                            description: "policy is used to determine the order in which upstream servers are selected for querying. Any one of the following values may be specified: \n * \"Random\" picks a random upstream server for each query. * \"RoundRobin\" picks upstream servers in a round-robin order, moving to the next server for each new query. * \"Sequential\" tries querying upstream servers in a sequential order until one responds, starting with the first server for each new query. \n The default value is \"Random\""
+                            type: string
+                            default: Random
+                            enum:
+                              - Random
+                              - RoundRobin
+                              - Sequential
                           upstreams:
-                            description: "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Upstreams are randomized when more than 1 upstream is specified. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53. \n A maximum of 15 upstreams is allowed per ForwardPlugin."
+                            description: "upstreams is a list of resolvers to forward name queries for subdomains of Zones. Each instance of CoreDNS performs health checking of Upstreams. When a healthy upstream returns an error during the exchange, another resolver is tried from Upstreams. The Upstreams are selected in the order specified in Policy. Each upstream is represented by an IP address or IP:port if the upstream listens on a port other than 53. \n A maximum of 15 upstreams is allowed per ForwardPlugin."
                             type: array
                             maxItems: 15
                             items:

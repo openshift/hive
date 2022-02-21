@@ -639,9 +639,6 @@ github.com/openshift/build-machinery-go/scripts
 github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
 github.com/openshift/cloud-credential-operator/pkg/aws
 github.com/openshift/cloud-credential-operator/version
-# github.com/openshift/cluster-api-provider-gcp v0.0.1-0.20210615203611-a02074e8d5bb
-## explicit
-github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
 # github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20211111151530-06177b773958
 ## explicit
 github.com/openshift/cluster-api-provider-ovirt/pkg/apis
@@ -728,6 +725,9 @@ github.com/openshift/library-go/pkg/verify/store/parallel
 github.com/openshift/library-go/pkg/verify/store/serial
 github.com/openshift/library-go/pkg/verify/store/sigstore
 github.com/openshift/library-go/pkg/verify/util
+# github.com/openshift/machine-api-provider-gcp v0.0.0
+## explicit
+github.com/openshift/machine-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
 # github.com/ovirt/go-ovirt v0.0.0-20210308100159-ac0bcbc88d7c
 github.com/ovirt/go-ovirt
 # github.com/pborman/uuid v1.2.0
@@ -1999,9 +1999,6 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 ## explicit
 sigs.k8s.io/cluster-api-provider-aws/pkg/apis
 sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1
-# sigs.k8s.io/cluster-api-provider-azure v0.0.0-00010101000000-000000000000 => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20210626224711-5d94c794092f
-## explicit
-sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1
 # sigs.k8s.io/cluster-api-provider-openstack v0.0.0 => github.com/openshift/cluster-api-provider-openstack v0.0.0-20211111204942-611d320170af
 ## explicit
 sigs.k8s.io/cluster-api-provider-openstack/pkg/apis

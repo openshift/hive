@@ -22,7 +22,7 @@ import re
 # e.g. "v1.2.3187-18827f6"
 HIVE_VERSION_PREFIX = "1.2"
 
-HIVE_REPO = "git@github.com:openshift/hive.git"
+HIVE_REPO_DEFAULT = "git@github.com:openshift/hive.git"
 
 # Hive dir within both:
 # https://github.com/redhat-openshift-ecosystem/community-operators-prod
@@ -96,6 +96,11 @@ def get_params():
         default=False,
         help='Adds a /hold comment in commit body to prevent the PR from merging (use "/hold cancel" to remove)',
         action="store_true",
+    )
+    parser.add_argument(
+        "--hive-repo",
+        default=HIVE_REPO_DEFAULT,
+        help="The hive git repository to clone. E.g. save time by using a local directory (but make sure it's up to date!)"
     )
     args = parser.parse_args()
 
@@ -208,11 +213,13 @@ def get_previous_version(channel_name):
         )
         raise
 
+    # Channel not found -- no previous version.
+    return None
+
 # generate_csv_base generates a hive bundle from the current working directory
-# and deposits all artifacts in the specified bundle_dir
-def generate_csv_base(bundle_dir, version, prev_version, channel):
-    if version == prev_version:
-        raise ValueError("Version {} already exists upstream".format(version))
+# and deposits all artifacts in the specified bundle_dir.
+# If prev_version is not None, the CSV will include it as `replaces`.
+def generate_csv_base(bundle_dir, version, prev_version):
     print("Writing bundle files to directory: %s" % bundle_dir)
     print("Generating CSV for version: %s" % version)
 
@@ -220,7 +227,6 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
     csv_template = "config/templates/hive-csv-template.yaml"
     operator_role = "config/operator/operator_role.yaml"
     deployment_spec = "config/operator/operator_deployment.yaml"
-    package_file = os.path.join(bundle_dir, "hive.package.yaml")
 
     # The bundle directory doesn't have the 'v'
     version_dir = os.path.join(bundle_dir, version)
@@ -279,7 +285,8 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
     # Update the versions to include git hash:
     csv["metadata"]["name"] = "hive-operator.v%s" % version
     csv["spec"]["version"] = version
-    csv["spec"]["replaces"] = "hive-operator.v%s" % prev_version
+    if prev_version is not None:
+        csv["spec"]["replaces"] = "hive-operator.v%s" % prev_version
 
     # Update the deployment to use the defined image:
     image_ref = "%s:v%s" % (OPERATORHUB_HIVE_IMAGE_DEFAULT, version)
@@ -298,9 +305,6 @@ def generate_csv_base(bundle_dir, version, prev_version, channel):
     with open(csv_file, "w") as outfile:
         yaml.dump(csv, outfile, default_flow_style=False)
     print("Wrote ClusterServiceVersion: %s" % csv_file)
-
-    # generate package
-    generate_package(package_file, channel, version)
 
 
 def generate_package(package_file, channel, version):
@@ -330,6 +334,7 @@ def open_pr(
     gh_username,
     bundle_source_dir,
     new_version,
+    prev_version,
     update_channels,
     hold,
     dry_run,
@@ -380,8 +385,6 @@ def open_pr(
         raise
 
     branch_name = "update-hive-{}".format(new_version)
-    pr_title = "Update Hive community operator to {}".format(new_version)
-    print("Starting {}".format(pr_title))
 
     print("Create branch {}".format(branch_name))
     try:
@@ -411,9 +414,27 @@ def open_pr(
             found = True
             channel["currentCSV"] = "hive-operator.v{}".format(new_version)
 
-    if not found:
-        print("did not find a CSV channel to update")
-        sys.exit(1)
+    if prev_version is None:
+        # New channel! Sanity check a couple things.
+        if found:
+            print("Unexpectedly got prev_version==None but found at least one of the following channels: {}".format(update_channels))
+            sys.exit(1)
+        if len(update_channels) != 1:
+            print("Expected exactly one channel name (got [{}])!".format(update_channels))
+            sys.exit(1)
+        # All good.
+        print("Adding new channel {}".format(update_channels[0]))
+        # TODO: sort?
+        bundle["channels"].append({
+            "name": update_channels[0],
+            "currentCSV": "hive-operator.v{}".format(new_version),
+        })
+        pr_title = "Create channel {} for Hive community operator at {}".format(update_channels[0], new_version)
+    else:
+        if not found:
+            print("did not find a CSV channel to update")
+            sys.exit(1)
+        pr_title = "Update Hive community operator channel(s) [{}] to {}".format(update_channels, new_version)
 
     with open(bundle_manifests_file, "w") as outfile:
         yaml.dump(bundle, outfile, default_flow_style=False)
@@ -491,8 +512,23 @@ def process_branch(hive_repo, branch_arg):
     # This will raise an exception if there's no such commit-ish
     commit_hash = hive_repo.rev_parse(branch_arg).hexsha
 
-    # This had better exist
-    master_hash = hive_repo.rev_parse(HIVE_BRANCH_DEFAULT).hexsha
+    # We need to know where master is, even if we're processing a different branch. However, if
+    # we've cloned from something other than HIVE_REPO_DEFAULT, there may not be a local `master`
+    # branch. So we may need to try origin and upstream to find it.
+    for remote in ("", "origin/", "upstream/"):
+        master_branch = remote + HIVE_BRANCH_DEFAULT
+        print("Trying to find master at {}".format(master_branch))
+        try:
+            master_hash = hive_repo.rev_parse(master_branch).hexsha
+        except git.BadName:
+            print("Couldn't find master at `{}`".format(master_branch))
+        else:
+            print("Found master at `{}`".format(master_branch))
+            break
+    else:
+        print("Couldn't find master branch!")
+        sys.exit(1)
+
     is_master_ancestor = hive_repo.git.rev_list(
         "--ancestry-path", "{}..{}".format(commit_hash, master_hash)
     )
@@ -514,7 +550,7 @@ def process_branch(hive_repo, branch_arg):
                 # entry in this list AND we're not tracking master
                 maybe_prefix = m.group(3)
 
-    if commit_hash == master_hash or is_master_ancestor:
+    if commit_hash == master_hash or (is_master_ancestor and not maybe_prefix):
         prefix = HIVE_VERSION_PREFIX
         if commit_hash == master_hash:
             channels.append(CHANNEL_DEFAULT)
@@ -543,11 +579,11 @@ if __name__ == "__main__":
 
     hive_repo_dir = tempfile.TemporaryDirectory(prefix="hive-repo-")
 
-    print("Cloning {} to {}".format(HIVE_REPO, hive_repo_dir.name))
+    print("Cloning {} to {}".format(args.hive_repo, hive_repo_dir.name))
     try:
-        git.Repo.clone_from(HIVE_REPO, hive_repo_dir.name)
+        git.Repo.clone_from(args.hive_repo, hive_repo_dir.name)
     except:
-        print("Failed to clone repo {} to {}".format(HIVE_REPO, hive_repo_dir.name))
+        print("Failed to clone repo {} to {}".format(args.hive_repo, hive_repo_dir.name))
         raise
 
     hive_repo = git.Repo(hive_repo_dir.name)
@@ -575,12 +611,13 @@ if __name__ == "__main__":
         raise
 
     hive_version = gen_hive_version(hive_repo, hive_commit, hive_version_prefix)
-    build_and_push_image(args.registry_auth_file, hive_version, args.dry_run, args.build_engine)
+    prev_version = get_previous_version(channel)
+    if hive_version == prev_version:
+        raise ValueError("Version {} already exists upstream".format(hive_version))
 
-    # TODO: We shouldn't need channel here, because the package.yaml file is being updated in open_pr (right????)
-    generate_csv_base(
-        bundle_dir.name, hive_version, get_previous_version(channel), channel
-    )
+    build_and_push_image(args.registry_auth_file, hive_version, args.dry_run, args.build_engine)
+    generate_csv_base(bundle_dir.name, hive_version, prev_version)
+    generate_package(os.path.join(bundle_dir.name, "hive.package.yaml"), channel, hive_version)
 
     # redhat-openshift-ecosystem/community-operators-prod
     open_pr(
@@ -590,6 +627,7 @@ if __name__ == "__main__":
         args.github_user,
         bundle_dir.name,
         hive_version,
+        prev_version,
         update_channels,
         args.hold,
         args.dry_run,
@@ -602,6 +640,7 @@ if __name__ == "__main__":
         args.github_user,
         bundle_dir.name,
         hive_version,
+        prev_version,
         update_channels,
         args.hold,
         args.dry_run,

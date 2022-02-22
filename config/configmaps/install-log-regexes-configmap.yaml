@@ -245,7 +245,7 @@ data:
       searchRegexStrings:
       - "Bootstrap failed to complete"
       installFailingReason: BootstrapFailed
-      installFailingMessage: Bootstrap failed to complete
+      installFailingMessage: Installation Bootstrap failed to complete. Verify the networking configuration and account permissions and try again.
     - name: KubeAPIWaitTimeout
       searchRegexStrings:
       - "waiting for Kubernetes API: context deadline exceeded"

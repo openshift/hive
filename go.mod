@@ -7,6 +7,10 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.18
 	github.com/Azure/go-autorest/autorest/azure/auth v0.4.1
 	github.com/Azure/go-autorest/autorest/to v0.4.0
+	github.com/IBM/go-sdk-core/v5 v5.4.3
+	github.com/IBM/networking-go-sdk v0.14.0
+	github.com/IBM/platform-services-go-sdk v0.18.16
+	github.com/IBM/vpc-go-sdk v1.0.1
 	github.com/aws/aws-sdk-go v1.38.41
 	github.com/blang/semver/v4 v4.0.0
 	github.com/davecgh/go-spew v1.1.1
@@ -29,6 +33,7 @@ require (
 	github.com/onsi/gomega v1.17.0
 	github.com/openshift/api v0.0.0-20211119153416-313e51eab8c8
 	github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37
+	github.com/openshift/cluster-api-provider-ibmcloud v0.0.0-20211008100740-4d7907adbd6b
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20211111151530-06177b773958
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
@@ -87,11 +92,8 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/Djarvur/go-err113 v0.1.0 // indirect
+	github.com/IBM-Cloud/bluemix-go v0.0.0-20210611051827-cdc80c935c05 // indirect
 	github.com/IBM/go-sdk-core/v4 v4.10.0 // indirect
-	github.com/IBM/go-sdk-core/v5 v5.4.3 // indirect
-	github.com/IBM/networking-go-sdk v0.14.0 // indirect
-	github.com/IBM/platform-services-go-sdk v0.18.16 // indirect
-	github.com/IBM/vpc-go-sdk v1.0.1 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect

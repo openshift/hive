@@ -84,6 +84,9 @@ func Add(mgr manager.Manager) error {
 	if err := addVSphereProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add vSphere provider to scheme")
 	}
+	if err := addIBMCloudProviderToScheme(scheme); err != nil {
+		return errors.Wrap(err, "cannot add IBMCloud provider to scheme")
+	}
 	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
@@ -1014,6 +1017,19 @@ func (r *ReconcileMachinePool) createActuator(
 		return NewVSphereActuator(masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.Ovirt != nil:
 		return NewOvirtActuator(masterMachine, r.scheme, logger)
+	case cd.Spec.Platform.IBMCloud != nil:
+		creds := &corev1.Secret{}
+		if err := r.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      cd.Spec.Platform.IBMCloud.CredentialsSecretRef.Name,
+				Namespace: cd.Namespace,
+			},
+			creds,
+		); err != nil {
+			return nil, err
+		}
+		return NewIBMCloudActuator(creds, r.scheme, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

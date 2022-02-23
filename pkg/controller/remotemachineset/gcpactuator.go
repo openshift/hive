@@ -10,20 +10,18 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	gcpprovider "github.com/openshift/cluster-api-provider-gcp/pkg/apis"
-	gcpproviderv1beta1 "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	installgcp "github.com/openshift/installer/pkg/asset/machines/gcp"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	gcpprovider "github.com/openshift/machine-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -64,7 +62,7 @@ type GCPActuator struct {
 var _ Actuator = &GCPActuator{}
 
 func addGCPProviderToScheme(scheme *runtime.Scheme) error {
-	return gcpprovider.AddToScheme(scheme)
+	return machineapi.AddToScheme(scheme)
 }
 
 // NewGCPActuator is the constructor for building a GCPActuator
@@ -449,7 +447,7 @@ func requireLeases(clusterVersion string, remoteMachineSets []machineapi.Machine
 
 // Get the image ID from an existing master machine.
 func getGCPImageID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
-	providerSpec, err := decodeGCPMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	providerSpec, err := gcpprovider.ProviderSpecFromRawExtension(masterMachine.Spec.ProviderSpec.Value)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode GCPMachineProviderSpec from master machine")
 		return "", errors.Wrap(err, "cannot decode GCPMachineProviderSpec from master machine")
@@ -471,9 +469,8 @@ func getNetwork(remoteMachineSets []machineapi.MachineSet,
 		return "", "", nil
 	}
 
-	remoteMachineProviderSpec, err := decodeGCPMachineProviderSpec(
+	remoteMachineProviderSpec, err := gcpprovider.ProviderSpecFromRawExtension(
 		remoteMachineSets[0].Spec.Template.Spec.ProviderSpec.Value,
-		scheme,
 	)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode GCPMachineProviderSpec from remote machinesets")
@@ -481,28 +478,11 @@ func getNetwork(remoteMachineSets []machineapi.MachineSet,
 	}
 
 	if len(remoteMachineProviderSpec.NetworkInterfaces) == 0 {
-		logger.Warn("remote machine do not have any network interfaces")
-		return "", "", errors.Wrap(err, "remote machine do not have any network interfaces")
+		logger.Error("remote machine does not have any network interfaces")
+		return "", "", errors.New("remote machine does not have any network interfaces")
 	}
 
 	network := remoteMachineProviderSpec.NetworkInterfaces[0].Network
 	subnet := remoteMachineProviderSpec.NetworkInterfaces[0].Subnetwork
 	return network, subnet, nil
-}
-
-func decodeGCPMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*gcpproviderv1beta1.GCPMachineProviderSpec, error) {
-	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(gcpproviderv1beta1.SchemeGroupVersion)
-	if rawExt == nil {
-		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
-	}
-	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode GCP ProviderSpec: %v", err)
-	}
-	spec, ok := obj.(*gcpproviderv1beta1.GCPMachineProviderSpec)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
-	}
-	return spec, nil
 }

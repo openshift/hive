@@ -11,6 +11,9 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // OAuth holds cluster-wide information about OAuth.  The canonical name is `cluster`.
 // It is used to configure the integrated OAuth server.
 // This configuration is only honored when the top level Authentication config has type set to IntegratedOAuth.
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type OAuth struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -28,6 +31,7 @@ type OAuthSpec struct {
 	// identityProviders is an ordered list of ways for a user to identify themselves.
 	// When this list is empty, no identities are provisioned for users.
 	// +optional
+	// +listType=atomic
 	IdentityProviders []IdentityProvider `json:"identityProviders,omitempty"`
 
 	// tokenConfig contains options for authorization and access tokens
@@ -36,7 +40,35 @@ type OAuthSpec struct {
 	// templates allow you to customize pages like the login page.
 	// +optional
 	Templates OAuthTemplates `json:"templates"`
+	// audit specifies what should be audited in the context of OAuthServer. By
+	// default the Audit is turned on.
+	// +optional
+	// +kubebuilder:default:={"profile":"WriteLoginEvents"}
+	Audit OAuthAudit `json:"audit"`
 }
+
+// OAuthAudit specifies the Audit profile in use.
+type OAuthAudit struct {
+	// profile is a simple drop in profile type that can be turned off by
+	// setting it to "None" or it can be turned on by setting it to
+	// "WriteLoginEvents". By default the profile is set to "WriteLoginEvents".
+	// +kubebuilder:default:="WriteLoginEvents"
+	Profile OAuthAuditProfileType `json:"profile,omitempty"`
+}
+
+// OAuthAuditProfileType defines a simple audit profile, which can turn OAuth
+// authentication audit logging on or off.
+// +kubebuilder:validation:Enum=None;WriteLoginEvents
+type OAuthAuditProfileType string
+
+const (
+	// "None" disables audit logs.
+	OAuthNoneAuditProfileType AuditProfileType = "None"
+
+	// "WriteLoginEvents" logs login and login failure events.
+	// This is the default.
+	OAuthWriteLoginEventsProfileType AuditProfileType = "WriteLoginEvents"
+)
 
 // OAuthStatus shows current known state of OAuth server in the cluster
 type OAuthStatus struct {
@@ -63,6 +95,8 @@ type TokenConfig struct {
 	// per client, then that value takes precedence. If the timeout value is
 	// not specified and the client does not override the value, then tokens
 	// are valid until their lifetime.
+	//
+	// WARNING: existing tokens' timeout will not be affected (lowered) by changing this value
 	// +optional
 	AccessTokenInactivityTimeout *metav1.Duration `json:"accessTokenInactivityTimeout,omitempty"`
 }
@@ -534,26 +568,43 @@ type OpenIDIdentityProvider struct {
 //   iss Claim and the sub Claim."
 const UserIDClaim = "sub"
 
+// OpenIDClaim represents a claim retrieved from an OpenID provider's tokens or userInfo
+// responses
+// +kubebuilder:validation:MinLength=1
+type OpenIDClaim string
+
 // OpenIDClaims contains a list of OpenID claims to use when authenticating with an OpenID identity provider
 type OpenIDClaims struct {
 	// preferredUsername is the list of claims whose values should be used as the preferred username.
 	// If unspecified, the preferred username is determined from the value of the sub claim
+	// +listType=atomic
 	// +optional
 	PreferredUsername []string `json:"preferredUsername,omitempty"`
 
 	// name is the list of claims whose values should be used as the display name. Optional.
 	// If unspecified, no display name is set for the identity
+	// +listType=atomic
 	// +optional
 	Name []string `json:"name,omitempty"`
 
 	// email is the list of claims whose values should be used as the email address. Optional.
 	// If unspecified, no email is set for the identity
+	// +listType=atomic
 	// +optional
 	Email []string `json:"email,omitempty"`
+
+	// groups is the list of claims value of which should be used to synchronize groups
+	// from the OIDC provider to OpenShift for the user.
+	// If multiple claims are specified, the first one with a non-empty value is used.
+	// +listType=atomic
+	// +optional
+	Groups []OpenIDClaim `json:"groups,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type OAuthList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

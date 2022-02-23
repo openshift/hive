@@ -662,7 +662,8 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		return errors.New("unknown platform for re-try cleanup")
 	}
 
-	if err := uninstaller.Run(); err != nil {
+	// ClusterQuota stomped in return
+	if _, err := uninstaller.Run(); err != nil {
 		return err
 	}
 

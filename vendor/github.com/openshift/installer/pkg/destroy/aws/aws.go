@@ -109,9 +109,9 @@ func (o *ClusterUninstaller) validate() error {
 }
 
 // Run is the entrypoint to start the uninstall process
-func (o *ClusterUninstaller) Run() error {
+func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 	_, err := o.RunWithContext(context.Background())
-	return err
+	return nil, err
 }
 
 // RunWithContext runs the uninstall process with a context.
@@ -452,7 +452,7 @@ func (o *ClusterUninstaller) findIAMUsers(ctx context.Context, search *iamUserSe
 func (o *ClusterUninstaller) findUntaggableResources(ctx context.Context, iamClient *iam.IAM, deleted sets.String) (sets.String, error) {
 	resources := sets.NewString()
 	o.Logger.Debug("search for IAM instance profiles")
-	for _, profileType := range []string{"master", "worker"} {
+	for _, profileType := range []string{"master", "worker", "bootstrap"} {
 		profile := fmt.Sprintf("%s-%s-profile", o.ClusterID, profileType)
 		response, err := iamClient.GetInstanceProfileWithContext(ctx, &iam.GetInstanceProfileInput{InstanceProfileName: &profile})
 		if err != nil {

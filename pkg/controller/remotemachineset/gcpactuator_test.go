@@ -19,8 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	gcpprovider "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
-	machineapi "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machineapi "github.com/openshift/api/machine/v1beta1"
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -225,7 +224,7 @@ func TestGCPActuator(t *testing.T) {
 						assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
 					}
 
-					gcpProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*gcpprovider.GCPMachineProviderSpec)
+					gcpProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.GCPMachineProviderSpec)
 					assert.True(t, ok, "failed to convert to gcpProviderSpec")
 
 					assert.Equal(t, testInstanceType, gcpProvider.MachineType, "unexpected instance type")
@@ -244,7 +243,7 @@ func TestGCPActuator(t *testing.T) {
 						expectedDiskSizeGB = defaultGCPDiskSizeGB
 					}
 					assert.Equal(t, expectedDiskType, gcpProvider.Disks[0].Type)
-					assert.Equal(t, expectedDiskSizeGB, gcpProvider.Disks[0].SizeGb)
+					assert.Equal(t, expectedDiskSizeGB, gcpProvider.Disks[0].SizeGB)
 
 					// Ensure GCP disk encryption settings made it to the resulting MachineSet (if specified):
 					encKey := test.pool.Spec.Platform.GCP.OSDisk.EncryptionKey
@@ -706,8 +705,7 @@ func TestGetNetwork(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
-			machineapi.SchemeBuilder.AddToScheme(scheme)
-			gcpprovider.SchemeBuilder.AddToScheme(scheme)
+			machineapi.AddToScheme(scheme)
 			network, subnet, actualErr := getNetwork(tc.remoteMachineSets, scheme, log.StandardLogger())
 			if tc.expectError {
 				assert.Error(t, actualErr, "expected an error")
@@ -782,13 +780,13 @@ func mockMachineSpec(machineType string) machineapi.MachineSpec {
 	}
 }
 
-func testGCPProviderSpec() *gcpprovider.GCPMachineProviderSpec {
-	return &gcpprovider.GCPMachineProviderSpec{
+func testGCPProviderSpec() *machineapi.GCPMachineProviderSpec {
+	return &machineapi.GCPMachineProviderSpec{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GCPMachineProviderSpec",
-			APIVersion: gcpprovider.SchemeGroupVersion.String(),
+			APIVersion: machineapi.SchemeGroupVersion.String(),
 		},
-		NetworkInterfaces: []*gcpprovider.GCPNetworkInterface{
+		NetworkInterfaces: []*machineapi.GCPNetworkInterface{
 			{
 				Network:    testNetworkID,
 				Subnetwork: testSubnetID,
@@ -797,7 +795,7 @@ func testGCPProviderSpec() *gcpprovider.GCPMachineProviderSpec {
 	}
 }
 
-func encodeGCPMachineProviderSpec(gcoProviderSpec *gcpprovider.GCPMachineProviderSpec, scheme *runtime.Scheme) (*runtime.RawExtension, error) {
+func encodeGCPMachineProviderSpec(gcoProviderSpec *machineapi.GCPMachineProviderSpec, scheme *runtime.Scheme) (*runtime.RawExtension, error) {
 	serializer := jsonserializer.NewSerializer(jsonserializer.DefaultMetaFactory, scheme, scheme, false)
 	var buffer bytes.Buffer
 	err := serializer.Encode(gcoProviderSpec, &buffer)

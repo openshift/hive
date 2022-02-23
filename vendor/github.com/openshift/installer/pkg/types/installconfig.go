@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/openshift/installer/pkg/ipnet"
+	"github.com/openshift/installer/pkg/types/alibabacloud"
 	"github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
-	"github.com/openshift/installer/pkg/types/kubevirt"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
@@ -32,9 +32,11 @@ var (
 	// platform names in alphabetical order. This is the list of
 	// platforms presented to the user in the interactive wizard.
 	PlatformNames = []string{
+		alibabacloud.Name,
 		aws.Name,
 		azure.Name,
 		gcp.Name,
+		ibmcloud.Name,
 		openstack.Name,
 		ovirt.Name,
 		vsphere.Name,
@@ -44,8 +46,6 @@ var (
 	// to the user in the interactive wizard.
 	HiddenPlatformNames = []string{
 		baremetal.Name,
-		ibmcloud.Name,
-		kubevirt.Name,
 		none.Name,
 	}
 
@@ -147,6 +147,7 @@ type InstallConfig struct {
 	// AzureStack: "Manual"
 	// GCP: "Mint", "Passthrough", "Manual"
 	// IBMCloud: "Manual"
+	// AlibabaCloud: "Manual"
 	// +optional
 	CredentialsMode CredentialsMode `json:"credentialsMode,omitempty"`
 
@@ -168,6 +169,10 @@ func (c *InstallConfig) IsOKD() bool {
 // Platform is the configuration for the specific platform upon which to perform
 // the installation. Only one of the platform configuration should be set.
 type Platform struct {
+	// AlibabaCloud is the configuration used when installing on Alibaba Cloud.
+	// +optional
+	AlibabaCloud *alibabacloud.Platform `json:"alibabacloud,omitempty"`
+
 	// AWS is the configuration used when installing on AWS.
 	// +optional
 	AWS *aws.Platform `json:"aws,omitempty"`
@@ -207,10 +212,6 @@ type Platform struct {
 	// Ovirt is the configuration used when installing on oVirt.
 	// +optional
 	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
-
-	// Kubevirt is the configuration used when installing on kubevirt.
-	// +optional
-	Kubevirt *kubevirt.Platform `json:"kubevirt,omitempty"`
 }
 
 // Name returns a string representation of the platform (e.g. "aws" if
@@ -220,6 +221,8 @@ func (p *Platform) Name() string {
 	switch {
 	case p == nil:
 		return ""
+	case p.AlibabaCloud != nil:
+		return alibabacloud.Name
 	case p.AWS != nil:
 		return aws.Name
 	case p.Azure != nil:
@@ -240,8 +243,6 @@ func (p *Platform) Name() string {
 		return vsphere.Name
 	case p.Ovirt != nil:
 		return ovirt.Name
-	case p.Kubevirt != nil:
-		return kubevirt.Name
 	default:
 		return ""
 	}
@@ -280,8 +281,8 @@ type Networking struct {
 
 	// Deprecated types, scheduled to be removed
 
-	// Deprecated name for MachineCIDRs. If set, MachineCIDRs must
-	// be empty or the first index must match.
+	// Deprecated way to configure an IP address pool for machines.
+	// Replaced by MachineNetwork which allows for multiple pools.
 	// +optional
 	DeprecatedMachineCIDR *ipnet.IPNet `json:"machineCIDR,omitempty"`
 
@@ -289,7 +290,8 @@ type Networking struct {
 	// +optional
 	DeprecatedType string `json:"type,omitempty"`
 
-	// Deprecated name for ServiceNetwork
+	// Deprecated way to configure an IP address pool for services.
+	// Replaced by ServiceNetwork which allows for multiple pools.
 	// +optional
 	DeprecatedServiceCIDR *ipnet.IPNet `json:"serviceCIDR,omitempty"`
 

@@ -37,7 +37,9 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 				log.WithError(err).Error("Cannot complete command")
 				return
 			}
-			if err := uninstaller.Run(); err != nil {
+
+			// ClusterQuota stomped in return
+			if _, err := uninstaller.Run(); err != nil {
 				log.WithError(err).Fatal("Runtime error")
 			}
 		},

@@ -5,39 +5,40 @@
 package mock
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	remoteclient "github.com/openshift/hive/pkg/remoteclient"
 	dynamic "k8s.io/client-go/dynamic"
 	kubernetes "k8s.io/client-go/kubernetes"
 	rest "k8s.io/client-go/rest"
-	reflect "reflect"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// MockBuilder is a mock of Builder interface
+// MockBuilder is a mock of Builder interface.
 type MockBuilder struct {
 	ctrl     *gomock.Controller
 	recorder *MockBuilderMockRecorder
 }
 
-// MockBuilderMockRecorder is the mock recorder for MockBuilder
+// MockBuilderMockRecorder is the mock recorder for MockBuilder.
 type MockBuilderMockRecorder struct {
 	mock *MockBuilder
 }
 
-// NewMockBuilder creates a new mock instance
+// NewMockBuilder creates a new mock instance.
 func NewMockBuilder(ctrl *gomock.Controller) *MockBuilder {
 	mock := &MockBuilder{ctrl: ctrl}
 	mock.recorder = &MockBuilderMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockBuilder) EXPECT() *MockBuilderMockRecorder {
 	return m.recorder
 }
 
-// Build mocks base method
+// Build mocks base method.
 func (m *MockBuilder) Build() (client.Client, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Build")
@@ -46,13 +47,13 @@ func (m *MockBuilder) Build() (client.Client, error) {
 	return ret0, ret1
 }
 
-// Build indicates an expected call of Build
+// Build indicates an expected call of Build.
 func (mr *MockBuilderMockRecorder) Build() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Build", reflect.TypeOf((*MockBuilder)(nil).Build))
 }
 
-// BuildDynamic mocks base method
+// BuildDynamic mocks base method.
 func (m *MockBuilder) BuildDynamic() (dynamic.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BuildDynamic")
@@ -61,13 +62,13 @@ func (m *MockBuilder) BuildDynamic() (dynamic.Interface, error) {
 	return ret0, ret1
 }
 
-// BuildDynamic indicates an expected call of BuildDynamic
+// BuildDynamic indicates an expected call of BuildDynamic.
 func (mr *MockBuilderMockRecorder) BuildDynamic() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildDynamic", reflect.TypeOf((*MockBuilder)(nil).BuildDynamic))
 }
 
-// BuildKubeClient mocks base method
+// BuildKubeClient mocks base method.
 func (m *MockBuilder) BuildKubeClient() (kubernetes.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BuildKubeClient")
@@ -76,13 +77,13 @@ func (m *MockBuilder) BuildKubeClient() (kubernetes.Interface, error) {
 	return ret0, ret1
 }
 
-// BuildKubeClient indicates an expected call of BuildKubeClient
+// BuildKubeClient indicates an expected call of BuildKubeClient.
 func (mr *MockBuilderMockRecorder) BuildKubeClient() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BuildKubeClient", reflect.TypeOf((*MockBuilder)(nil).BuildKubeClient))
 }
 
-// RESTConfig mocks base method
+// RESTConfig mocks base method.
 func (m *MockBuilder) RESTConfig() (*rest.Config, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RESTConfig")
@@ -91,13 +92,13 @@ func (m *MockBuilder) RESTConfig() (*rest.Config, error) {
 	return ret0, ret1
 }
 
-// RESTConfig indicates an expected call of RESTConfig
+// RESTConfig indicates an expected call of RESTConfig.
 func (mr *MockBuilderMockRecorder) RESTConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RESTConfig", reflect.TypeOf((*MockBuilder)(nil).RESTConfig))
 }
 
-// UsePrimaryAPIURL mocks base method
+// UsePrimaryAPIURL mocks base method.
 func (m *MockBuilder) UsePrimaryAPIURL() remoteclient.Builder {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UsePrimaryAPIURL")
@@ -105,13 +106,13 @@ func (m *MockBuilder) UsePrimaryAPIURL() remoteclient.Builder {
 	return ret0
 }
 
-// UsePrimaryAPIURL indicates an expected call of UsePrimaryAPIURL
+// UsePrimaryAPIURL indicates an expected call of UsePrimaryAPIURL.
 func (mr *MockBuilderMockRecorder) UsePrimaryAPIURL() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UsePrimaryAPIURL", reflect.TypeOf((*MockBuilder)(nil).UsePrimaryAPIURL))
 }
 
-// UseSecondaryAPIURL mocks base method
+// UseSecondaryAPIURL mocks base method.
 func (m *MockBuilder) UseSecondaryAPIURL() remoteclient.Builder {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UseSecondaryAPIURL")
@@ -119,7 +120,7 @@ func (m *MockBuilder) UseSecondaryAPIURL() remoteclient.Builder {
 	return ret0
 }
 
-// UseSecondaryAPIURL indicates an expected call of UseSecondaryAPIURL
+// UseSecondaryAPIURL indicates an expected call of UseSecondaryAPIURL.
 func (mr *MockBuilderMockRecorder) UseSecondaryAPIURL() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UseSecondaryAPIURL", reflect.TypeOf((*MockBuilder)(nil).UseSecondaryAPIURL))

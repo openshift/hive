@@ -1006,7 +1006,7 @@ func completeOvirtDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 				fmt.Sprintf(
 					"cp -vr %s/. /etc/pki/ca-trust/source/anchors/ && "+
 						"update-ca-trust && "+
-						"/usr/bin/hiveutil deprovision ovirt --ovirt-cluster-id %s --loglevel debug --certs-dir=%s %s",
+						"/usr/bin/hiveutil deprovision ovirt --ovirt-cluster-id %s --loglevel debug --creds-dir=%s %s",
 					ovirtCADir,
 					req.Spec.Platform.Ovirt.ClusterID,
 					ovirtCloudsDir,

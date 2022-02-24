@@ -15,15 +15,16 @@ import (
 
 // ibmCloudDeprovisionOptions is the set of options to deprovision an IBM Cloud cluster
 type ibmCloudDeprovisionOptions struct {
-	logLevel          string
-	infraID           string
-	region            string
 	accountID         string
 	baseDomain        string
 	cisInstanceCRN    string
+	clusterName       string
+	infraID           string
+	logLevel          string
+	region            string
 	resourceGroupName string
-	vpc               string
 	subnets           []string
+	vpc               string
 }
 
 // NewDeprovisionIBMCloudCommand is the entrypoint to create the IBM Cloud deprovision subcommand
@@ -52,6 +53,7 @@ func NewDeprovisionIBMCloudCommand() *cobra.Command {
 	// Required flags
 	flags.StringVar(&opt.accountID, "account-id", "", "IBM Cloud account ID")
 	flags.StringVar(&opt.baseDomain, "base-domain", "", "cluster's base domain")
+	flags.StringVar(&opt.clusterName, "cluster-name", "", "cluster's name")
 	flags.StringVar(&opt.cisInstanceCRN, "cis-instance-crn", "", "IBM cloud internet services CRN")
 	flags.StringVar(&opt.region, "region", "", "region in which to deprovision cluster")
 	flags.StringVar(&opt.resourceGroupName, "resource-group-name", "", "IBM resource group name from user provided VPC")
@@ -91,6 +93,10 @@ func (o *ibmCloudDeprovisionOptions) Validate(cmd *cobra.Command) error {
 		cmd.Usage()
 		return fmt.Errorf("No --resource-group-name provided, cannot proceed")
 	}
+	if o.clusterName == "" {
+		cmd.Usage()
+		return fmt.Errorf("No --cluster-name provided, cannot proceed")
+	}
 	return nil
 }
 
@@ -113,7 +119,8 @@ func (o *ibmCloudDeprovisionOptions) Run() error {
 	})
 
 	metadata := &types.ClusterMetadata{
-		InfraID: o.infraID,
+		ClusterName: o.clusterName,
+		InfraID:     o.infraID,
 		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
 			IBMCloud: &typesibmcloud.Metadata{
 				AccountID:         o.accountID,

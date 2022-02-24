@@ -1104,6 +1104,8 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 				req.Spec.Platform.IBMCloud.BaseDomain,
 				"--cis-instance-crn",
 				req.Spec.Platform.IBMCloud.CISInstanceCRN,
+				"--cluster-name",
+				req.Spec.ClusterName,
 				"--account-id",
 				req.Spec.Platform.IBMCloud.AccountID,
 				"--loglevel",

@@ -15,6 +15,11 @@ type ClusterDeprovisionSpec struct {
 	// ClusterID is a globally unique identifier for the cluster to deprovision. It will be used if specified.
 	ClusterID string `json:"clusterID,omitempty"`
 
+	// ClusterName is the friendly name of the cluster. It is used for subdomains,
+	// some resource tagging, and other instances where a friendly name for the
+	// cluster is useful.
+	ClusterName string `json:"clusterName,omitempty"`
+
 	// Platform contains platform-specific configuration for a ClusterDeprovision
 	Platform ClusterDeprovisionPlatform `json:"platform,omitempty"`
 }

@@ -54,6 +54,11 @@ spec:
                 description: ClusterID is a globally unique identifier for the cluster
                   to deprovision. It will be used if specified.
                 type: string
+              clusterName:
+                description: ClusterName is the friendly name of the cluster. It is
+                  used for subdomains, some resource tagging, and other instances
+                  where a friendly name for the cluster is useful.
+                type: string
               infraID:
                 description: InfraID is the identifier generated during installation
                   for a cluster. It is used for tagging/naming resources in cloud

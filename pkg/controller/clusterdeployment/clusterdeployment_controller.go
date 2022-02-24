@@ -1691,8 +1691,9 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			Namespace: cd.Namespace,
 		},
 		Spec: hivev1.ClusterDeprovisionSpec{
-			InfraID:   cd.Spec.ClusterMetadata.InfraID,
-			ClusterID: cd.Spec.ClusterMetadata.ClusterID,
+			InfraID:     cd.Spec.ClusterMetadata.InfraID,
+			ClusterID:   cd.Spec.ClusterMetadata.ClusterID,
+			ClusterName: cd.Spec.ClusterName,
 		},
 	}
 

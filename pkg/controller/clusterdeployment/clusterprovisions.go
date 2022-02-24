@@ -569,11 +569,10 @@ var readFile = ioutil.ReadFile
 // by the FailedProvisionConfigFileEnvVar environment variable.
 func readProvisionFailedConfig() (*hivev1.FailedProvisionConfig, error) {
 	path := os.Getenv(constants.FailedProvisionConfigFileEnvVar)
-	if len(path) == 0 {
-		return nil, nil
-	}
-
 	config := &hivev1.FailedProvisionConfig{}
+	if len(path) == 0 {
+		return config, nil
+	}
 
 	fileBytes, err := readFile(path)
 	if err != nil || len(fileBytes) == 0 {

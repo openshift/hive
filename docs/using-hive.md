@@ -194,16 +194,33 @@ Create a `secret` containing your oVirt credentials information:
 ```yaml
 apiVersion: v1
 stringData:
-  ovirt_url: https://ovirt.example.com/ovirt-engine/api
-  ovirt_username: admin@internal
-  ovirt_password: secretpassword
-  ovirt_ca_bundle: |-
+  ovirt-config.yaml: |
+    ovirt_url: https://ovirt.example.com/ovirt-engine/api
+    ovirt_username: admin@internal
+    ovirt_password: secretpassword
+    ovirt_ca_bundle: |-
+      -----BEGIN CERTIFICATE-----
+      CA BUNDLE DATA HERE
+      -----END CERTIFICATE-----
+kind: Secret
+metadata:
+  name: mycluster-ovirt-creds
+  namespace: mynamespace
+type: Opaque
+```
+
+Create a `secret` containing your oVirt CA certificate:
+
+```yaml
+apiVersion: v1
+stringData:
+  .cacert: |
     -----BEGIN CERTIFICATE-----
     CA BUNDLE DATA HERE
     -----END CERTIFICATE-----
 kind: Secret
 metadata:
-  name: mycluster-ovirt-creds
+  name: mycluster-ovirt-certs
   namespace: mynamespace
 type: Opaque
 ```

@@ -55,9 +55,6 @@ func TestIBMCloudActuator(t *testing.T) {
 				p.Spec.Platform.IBMCloud.Zones = []string{"test-region-A", "test-region-B", "test-region-C"}
 				return p
 			}(),
-			mockIBMClient: func(client *mockibm.MockAPI) {
-				mockGetVPCZonesForRegion(client, []string{"zone1", "zone2", "zone3"}, testRegion)
-			},
 			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "A"): 1,
 				generateIBMCloudMachineSetName("worker", "B"): 1,
@@ -202,5 +199,5 @@ func generateIBMCloudMachineSetName(leaseChar, zone string) string {
 }
 
 func mockGetVPCZonesForRegion(ibmClient *mockibm.MockAPI, zones []string, region string) {
-	ibmClient.EXPECT().GetVPCZonesForRegion(gomock.Any(), testRegion).Return(zones, nil).AnyTimes()
+	ibmClient.EXPECT().GetVPCZonesForRegion(gomock.Any(), testRegion).Return(zones, nil).Times(1)
 }

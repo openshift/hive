@@ -137,7 +137,7 @@ func TestIBMCloudActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				require.NoError(t, err, "unexpected error for test cast")
+				require.NoError(t, err, "unexpected error for test case")
 
 				// Ensure the correct number of machinesets were generated
 				if assert.Equal(t, len(test.expectedMachineSetReplicas), len(generatedMachineSets), "different number of machine sets generated than expected") {

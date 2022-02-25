@@ -36,7 +36,7 @@ func addIBMCloudProviderToScheme(scheme *runtime.Scheme) error {
 func NewIBMCloudActuator(ibmCreds *corev1.Secret, scheme *runtime.Scheme, logger log.FieldLogger) (*IBMCloudActuator, error) {
 	ibmClient, err := ibmclient.NewClientFromSecret(ibmCreds)
 	if err != nil {
-		logger.WithError(err).Error("failed to create IBM client with creds in clusterDeployment's secret")
+		logger.WithError(err).Warn("failed to create IBM client with creds in clusterDeployment's secret")
 		return nil, err
 	}
 	actuator := &IBMCloudActuator{

@@ -9,10 +9,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
-	ibmcloudprovider "github.com/openshift/cluster-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1beta1"
 	installibmcloud "github.com/openshift/installer/pkg/asset/machines/ibmcloud"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
@@ -38,7 +36,7 @@ func addIBMCloudProviderToScheme(scheme *runtime.Scheme) error {
 func NewIBMCloudActuator(ibmCreds *corev1.Secret, scheme *runtime.Scheme, logger log.FieldLogger) (*IBMCloudActuator, error) {
 	ibmClient, err := ibmclient.NewClientFromSecret(ibmCreds)
 	if err != nil {
-		logger.WithError(err).Warn("failed to create IBM client with creds in clusterDeployment's secret")
+		logger.WithError(err).Error("failed to create IBM client with creds in clusterDeployment's secret")
 		return nil, err
 	}
 	actuator := &IBMCloudActuator{
@@ -118,21 +116,4 @@ func (a *IBMCloudActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, poo
 	}
 
 	return installerMachineSets, true, nil
-}
-
-func decodeIBMCloudMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*ibmcloudprovider.IBMCloudMachineProviderSpec, error) {
-	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
-	if rawExt == nil {
-		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
-	}
-	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode IBMCloud ProviderSpec: %v", err)
-	}
-	spec, ok := obj.(*ibmcloudprovider.IBMCloudMachineProviderSpec)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
-	}
-	return spec, nil
 }

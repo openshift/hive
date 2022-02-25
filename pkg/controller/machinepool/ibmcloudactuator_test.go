@@ -11,7 +11,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	machineapi "github.com/openshift/api/machine/v1beta1"
 	ibmcloudprovider "github.com/openshift/cluster-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -19,18 +18,98 @@ import (
 	mockibm "github.com/openshift/hive/pkg/ibmclient/mock"
 )
 
+const (
+	testIBMInstanceType      = "bx2-4x16"
+	testEncryptionKey        = "key1234"
+	testDedicatedHostName    = "foo"
+	testDedicatedHostProfile = "bar"
+)
+
 func TestIBMCloudActuator(t *testing.T) {
 	tests := []struct {
 		name                       string
 		clusterDeployment          *hivev1.ClusterDeployment
 		pool                       *hivev1.MachinePool
+		mockIBMClient              func(*mockibm.MockAPI)
 		expectedMachineSetReplicas map[string]int64
 		expectedErr                bool
 	}{
 		{
-			name:              "generate machineset",
+			name:              "generate machinesets for default region zones",
 			clusterDeployment: testIBMCloudClusterDeployment(),
 			pool:              testIBMCloudPool(),
+			mockIBMClient: func(client *mockibm.MockAPI) {
+				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateIBMCloudMachineSetName("worker", "1"): 1,
+				generateIBMCloudMachineSetName("worker", "2"): 1,
+				generateIBMCloudMachineSetName("worker", "3"): 1,
+			},
+		},
+		{
+			name:              "generate machinesets for specified Zones",
+			clusterDeployment: testIBMCloudClusterDeployment(),
+			pool: func() *hivev1.MachinePool {
+				p := testIBMCloudPool()
+				p.Spec.Platform.IBMCloud.Zones = []string{"test-region-A", "test-region-B", "test-region-C"}
+				return p
+			}(),
+			mockIBMClient: func(client *mockibm.MockAPI) {
+				mockGetVPCZonesForRegion(client, []string{"zone1", "zone2", "zone3"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateIBMCloudMachineSetName("worker", "A"): 1,
+				generateIBMCloudMachineSetName("worker", "B"): 1,
+				generateIBMCloudMachineSetName("worker", "C"): 1,
+			},
+		},
+		{
+			name:              "no zones returned for specified region",
+			clusterDeployment: testIBMCloudClusterDeployment(),
+			pool:              testIBMCloudPool(),
+			mockIBMClient: func(client *mockibm.MockAPI) {
+				mockGetVPCZonesForRegion(client, []string{}, testRegion)
+			},
+			expectedErr: true,
+		},
+		{
+			name:              "generate machinesets with specified BootVolume",
+			clusterDeployment: testIBMCloudClusterDeployment(),
+			pool: func() *hivev1.MachinePool {
+				p := testIBMCloudPool()
+				p.Spec.Platform.IBMCloud.BootVolume = &hivev1ibmcloud.BootVolume{
+					EncryptionKey: "key1234",
+				}
+				return p
+			}(),
+			mockIBMClient: func(client *mockibm.MockAPI) {
+				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateIBMCloudMachineSetName("worker", "1"): 1,
+				generateIBMCloudMachineSetName("worker", "2"): 1,
+				generateIBMCloudMachineSetName("worker", "3"): 1,
+			},
+		},
+		{
+			name:              "generate machinesets with specified DedicatedHosts",
+			clusterDeployment: testIBMCloudClusterDeployment(),
+			pool: func() *hivev1.MachinePool {
+				p := testIBMCloudPool()
+				p.Spec.Platform.IBMCloud.DedicatedHosts = []hivev1ibmcloud.DedicatedHost{
+					{
+						Name: "foo",
+					},
+					{
+						Profile: "bar",
+					},
+				}
+				return p
+			}(),
+			mockIBMClient: func(client *mockibm.MockAPI) {
+				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
+			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateIBMCloudMachineSetName("worker", "1"): 1,
 				generateIBMCloudMachineSetName("worker", "2"): 1,
@@ -46,7 +125,10 @@ func TestIBMCloudActuator(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			ibmcloudClient := mockibm.NewMockAPI(mockCtrl)
-			ibmcloudClient.EXPECT().GetVPCZonesForRegion(gomock.Any(), "us-east").Return([]string{"us-east-1", "us-east-2", "us-east-3"}, nil).AnyTimes()
+
+			if test.mockIBMClient != nil {
+				test.mockIBMClient(ibmcloudClient)
+			}
 
 			actuator := &IBMCloudActuator{
 				logger:    log.WithField("actuator", "ibmcloudactuator_test"),
@@ -59,25 +141,27 @@ func TestIBMCloudActuator(t *testing.T) {
 				assert.Error(t, err, "expected error for test case")
 			} else {
 				require.NoError(t, err, "unexpected error for test cast")
-				validateIBMCloudMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
+
+				// Ensure the correct number of machinesets were generated
+				assert.Equal(t, len(test.expectedMachineSetReplicas), len(generatedMachineSets), "different number of machine sets generated than expected")
+
+				for _, ms := range generatedMachineSets {
+					ibmCloudProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*ibmcloudprovider.IBMCloudMachineProviderSpec)
+					if assert.True(t, ok, "failed to convert to ibmcloud provider spec") {
+						assert.Equal(t, testIBMInstanceType, ibmCloudProvider.Profile, "unexpected InstanceType")
+					}
+					// Ensure BootVolume disk encryption settings made it to the resulting MachineSet (if specified):
+					if bootVolume := test.pool.Spec.Platform.IBMCloud.BootVolume; bootVolume != nil {
+						assert.Equal(t, testEncryptionKey, bootVolume.EncryptionKey, "expected BootVolume EncryptionKey")
+					}
+					// Ensure DedicatedHosts settings made it to the resulting MachineSet (if specified):
+					if dedicatedHosts := test.pool.Spec.Platform.IBMCloud.DedicatedHosts; dedicatedHosts != nil {
+						assert.Equal(t, testDedicatedHostName, dedicatedHosts[0].Name, "unexpected DedicatedHost Name")
+						assert.Equal(t, testDedicatedHostProfile, dedicatedHosts[1].Profile, "unexpected DedicatedHost Profile")
+					}
+				}
 			}
 		})
-	}
-}
-
-func validateIBMCloudMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64) {
-	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
-
-	for _, ms := range mSets {
-		expectedReplicas, ok := expectedMSReplicas[ms.Name]
-		if assert.True(t, ok, "unexpected machine set") {
-			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
-		}
-
-		ibmCloudProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*ibmcloudprovider.IBMCloudMachineProviderSpec)
-		if assert.True(t, ok, "failed to convert to ibmcloud provider spec") {
-			assert.Equal(t, "bx2-4x16", ibmCloudProvider.Profile, "unexpected InstanceType")
-		}
 	}
 }
 
@@ -85,7 +169,7 @@ func testIBMCloudPool() *hivev1.MachinePool {
 	p := testMachinePool()
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
 		IBMCloud: &hivev1ibmcloud.MachinePool{
-			InstanceType: "bx2-4x16",
+			InstanceType: testIBMInstanceType,
 		},
 	}
 	return p
@@ -100,7 +184,7 @@ func testIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
 			},
 			AccountID:      "accountid",
 			CISInstanceCRN: "cisinstancecrn",
-			Region:         "us-east",
+			Region:         testRegion,
 		},
 	}
 	return cd
@@ -108,4 +192,8 @@ func testIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
 
 func generateIBMCloudMachineSetName(leaseChar, zone string) string {
 	return fmt.Sprintf("%s-%s-%s", testInfraID, leaseChar, zone)
+}
+
+func mockGetVPCZonesForRegion(ibmClient *mockibm.MockAPI, zones []string, region string) {
+	ibmClient.EXPECT().GetVPCZonesForRegion(gomock.Any(), testRegion).Return(zones, nil).AnyTimes()
 }

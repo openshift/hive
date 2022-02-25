@@ -72,21 +72,18 @@ func Add(mgr manager.Manager) error {
 	if err := addAWSProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add AWS provider to scheme")
 	}
-	if err := addGCPProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add GCP provider to scheme")
-	}
 	if err := addOpenStackProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add OpenStack provider to scheme")
 	}
 	if err := addOvirtProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add OVirt provider to scheme")
 	}
-	if err := addVSphereProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add vSphere provider to scheme")
+	// GCP, VSphere, and IBMCloud are added via the machineapi
+	err := machineapi.AddToScheme(scheme)
+	if err != nil {
+		return errors.Wrap(err, "cannot add Machine API to scheme")
 	}
-	if err := addIBMCloudProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add IBMCloud provider to scheme")
-	}
+
 	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")

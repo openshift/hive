@@ -26,10 +26,6 @@ type VSphereActuator struct {
 
 var _ Actuator = &VSphereActuator{}
 
-func addVSphereProviderToScheme(scheme *runtime.Scheme) error {
-	return machineapi.AddToScheme(scheme)
-}
-
 // NewVSphereActuator is the constructor for building a VSphereActuator
 func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*VSphereActuator, error) {
 	osImage, err := getVSphereOSImage(masterMachine, scheme, logger)

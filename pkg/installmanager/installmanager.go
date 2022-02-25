@@ -688,7 +688,8 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		}
 	case cd.Spec.Platform.IBMCloud != nil:
 		metadata := &installertypes.ClusterMetadata{
-			InfraID: infraID,
+			InfraID:     infraID,
+			ClusterName: cd.Spec.ClusterName,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				IBMCloud: &installertypesibmcloud.Metadata{
 					AccountID:         cd.Spec.Platform.IBMCloud.AccountID,

@@ -96,10 +96,10 @@ func TestIBMCloudActuator(t *testing.T) {
 				p := testIBMCloudPool()
 				p.Spec.Platform.IBMCloud.DedicatedHosts = []hivev1ibmcloud.DedicatedHost{
 					{
-						Name: "foo",
+						Name: testDedicatedHostName,
 					},
 					{
-						Profile: "bar",
+						Profile: testDedicatedHostProfile,
 					},
 				}
 				return p

@@ -31,7 +31,7 @@ func TestIBMCloudActuator(t *testing.T) {
 		clusterDeployment          *hivev1.ClusterDeployment
 		pool                       *hivev1.MachinePool
 		mockIBMClient              func(*mockibm.MockAPI)
-		expectedMachineSetReplicas map[string]int64
+		expectedMachineSetReplicas map[string]int32
 		expectedErr                bool
 	}{
 		{
@@ -41,7 +41,7 @@ func TestIBMCloudActuator(t *testing.T) {
 			mockIBMClient: func(client *mockibm.MockAPI) {
 				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
 			},
-			expectedMachineSetReplicas: map[string]int64{
+			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "1"): 1,
 				generateIBMCloudMachineSetName("worker", "2"): 1,
 				generateIBMCloudMachineSetName("worker", "3"): 1,
@@ -58,7 +58,7 @@ func TestIBMCloudActuator(t *testing.T) {
 			mockIBMClient: func(client *mockibm.MockAPI) {
 				mockGetVPCZonesForRegion(client, []string{"zone1", "zone2", "zone3"}, testRegion)
 			},
-			expectedMachineSetReplicas: map[string]int64{
+			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "A"): 1,
 				generateIBMCloudMachineSetName("worker", "B"): 1,
 				generateIBMCloudMachineSetName("worker", "C"): 1,
@@ -86,7 +86,7 @@ func TestIBMCloudActuator(t *testing.T) {
 			mockIBMClient: func(client *mockibm.MockAPI) {
 				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
 			},
-			expectedMachineSetReplicas: map[string]int64{
+			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "1"): 1,
 				generateIBMCloudMachineSetName("worker", "2"): 1,
 				generateIBMCloudMachineSetName("worker", "3"): 1,
@@ -110,7 +110,7 @@ func TestIBMCloudActuator(t *testing.T) {
 			mockIBMClient: func(client *mockibm.MockAPI) {
 				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
 			},
-			expectedMachineSetReplicas: map[string]int64{
+			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "1"): 1,
 				generateIBMCloudMachineSetName("worker", "2"): 1,
 				generateIBMCloudMachineSetName("worker", "3"): 1,
@@ -143,7 +143,14 @@ func TestIBMCloudActuator(t *testing.T) {
 				require.NoError(t, err, "unexpected error for test cast")
 
 				// Ensure the correct number of machinesets were generated
-				assert.Equal(t, len(test.expectedMachineSetReplicas), len(generatedMachineSets), "different number of machine sets generated than expected")
+				if assert.Equal(t, len(test.expectedMachineSetReplicas), len(generatedMachineSets), "different number of machine sets generated than expected") {
+					for _, ms := range generatedMachineSets {
+						expReplicas, ok := test.expectedMachineSetReplicas[ms.Name]
+						if assert.True(t, ok, fmt.Sprintf("machine set with name %s not expected", ms.Name)) {
+							assert.Equal(t, expReplicas, *ms.Spec.Replicas, "unexpected number of replicas")
+						}
+					}
+				}
 
 				for _, ms := range generatedMachineSets {
 					ibmCloudProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*ibmcloudprovider.IBMCloudMachineProviderSpec)

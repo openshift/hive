@@ -74,6 +74,9 @@ github.com/BurntSushi/toml/internal
 # github.com/Djarvur/go-err113 v0.1.0
 ## explicit; go 1.13
 github.com/Djarvur/go-err113
+# github.com/IBM-Cloud/bluemix-go v0.0.0-20210611051827-cdc80c935c05
+## explicit; go 1.13
+github.com/IBM-Cloud/bluemix-go/crn
 # github.com/IBM/go-sdk-core/v4 v4.10.0
 ## explicit; go 1.12
 github.com/IBM/go-sdk-core/v4/core
@@ -88,6 +91,7 @@ github.com/IBM/networking-go-sdk/zonesv1
 # github.com/IBM/platform-services-go-sdk v0.18.16
 ## explicit; go 1.12
 github.com/IBM/platform-services-go-sdk/common
+github.com/IBM/platform-services-go-sdk/iamidentityv1
 github.com/IBM/platform-services-go-sdk/iampolicymanagementv1
 github.com/IBM/platform-services-go-sdk/resourcecontrollerv2
 github.com/IBM/platform-services-go-sdk/resourcemanagerv2
@@ -840,6 +844,9 @@ github.com/openshift/build-machinery-go/scripts
 github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
 github.com/openshift/cloud-credential-operator/pkg/aws
 github.com/openshift/cloud-credential-operator/version
+# github.com/openshift/cluster-api-provider-ibmcloud v0.0.0-20211008100740-4d7907adbd6b
+## explicit; go 1.16
+github.com/openshift/cluster-api-provider-ibmcloud/pkg/apis/ibmcloudprovider/v1beta1
 # github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20211111151530-06177b773958
 ## explicit; go 1.16
 github.com/openshift/cluster-api-provider-ovirt/pkg/apis
@@ -877,10 +884,12 @@ github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset/installconfig/aws
 github.com/openshift/installer/pkg/asset/installconfig/azure
 github.com/openshift/installer/pkg/asset/installconfig/gcp
+github.com/openshift/installer/pkg/asset/installconfig/ibmcloud
 github.com/openshift/installer/pkg/asset/installconfig/ovirt
 github.com/openshift/installer/pkg/asset/machines/aws
 github.com/openshift/installer/pkg/asset/machines/azure
 github.com/openshift/installer/pkg/asset/machines/gcp
+github.com/openshift/installer/pkg/asset/machines/ibmcloud
 github.com/openshift/installer/pkg/asset/machines/openstack
 github.com/openshift/installer/pkg/asset/machines/ovirt
 github.com/openshift/installer/pkg/asset/machines/vsphere
@@ -903,6 +912,7 @@ github.com/openshift/installer/pkg/types/baremetal
 github.com/openshift/installer/pkg/types/gcp
 github.com/openshift/installer/pkg/types/gcp/validation
 github.com/openshift/installer/pkg/types/ibmcloud
+github.com/openshift/installer/pkg/types/ibmcloud/validation
 github.com/openshift/installer/pkg/types/libvirt
 github.com/openshift/installer/pkg/types/none
 github.com/openshift/installer/pkg/types/openstack

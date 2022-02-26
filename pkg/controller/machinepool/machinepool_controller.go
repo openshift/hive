@@ -72,18 +72,18 @@ func Add(mgr manager.Manager) error {
 	if err := addAWSProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add AWS provider to scheme")
 	}
-	if err := addGCPProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add GCP provider to scheme")
-	}
 	if err := addOpenStackProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add OpenStack provider to scheme")
 	}
 	if err := addOvirtProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add OVirt provider to scheme")
 	}
-	if err := addVSphereProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add vSphere provider to scheme")
+	// GCP, VSphere, and IBMCloud are added via the machineapi
+	err := machineapi.AddToScheme(scheme)
+	if err != nil {
+		return errors.Wrap(err, "cannot add Machine API to scheme")
 	}
+
 	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
@@ -1014,6 +1014,19 @@ func (r *ReconcileMachinePool) createActuator(
 		return NewVSphereActuator(masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.Ovirt != nil:
 		return NewOvirtActuator(masterMachine, r.scheme, logger)
+	case cd.Spec.Platform.IBMCloud != nil:
+		creds := &corev1.Secret{}
+		if err := r.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      cd.Spec.Platform.IBMCloud.CredentialsSecretRef.Name,
+				Namespace: cd.Namespace,
+			},
+			creds,
+		); err != nil {
+			return nil, err
+		}
+		return NewIBMCloudActuator(creds, r.scheme, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

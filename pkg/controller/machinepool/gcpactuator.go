@@ -61,10 +61,6 @@ type GCPActuator struct {
 
 var _ Actuator = &GCPActuator{}
 
-func addGCPProviderToScheme(scheme *runtime.Scheme) error {
-	return machineapi.AddToScheme(scheme)
-}
-
 // NewGCPActuator is the constructor for building a GCPActuator
 func NewGCPActuator(
 	client client.Client,

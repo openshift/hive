@@ -303,6 +303,9 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if cd.Spec.Platform.IBMCloud != nil && cd.Spec.Provisioning.ManifestsConfigMapRef == nil {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "manifestsConfigMapRef"), "must specify manifestsConfigMapRef when platform is IBM Cloud"))
 		}
+		if cd.Spec.Platform.AlibabaCloud != nil && cd.Spec.Provisioning.ManifestsConfigMapRef == nil {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "manifestsConfigMapRef"), "must specify manifestsConfigMapRef when platform is Alibaba Cloud"))
+		}
 	}
 
 	if cd.Spec.ClusterInstallRef != nil {
@@ -441,6 +444,16 @@ func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1
 func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.ErrorList {
 	allErrs := field.ErrorList{}
 	numberOfPlatforms := 0
+	if alibabacloud := platform.AlibabaCloud; alibabacloud != nil {
+		numberOfPlatforms++
+		alibabaCloudPath := path.Child("alibabacloud")
+		if alibabacloud.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(alibabaCloudPath.Child("credentialsSecretRef", "name"), "must specify secrets for alibaba cloud access"))
+		}
+		if alibabacloud.Region == "" {
+			allErrs = append(allErrs, field.Required(alibabaCloudPath.Child("region"), "must specify alibaba cloud region"))
+		}
+	}
 	if aws := platform.AWS; aws != nil {
 		numberOfPlatforms++
 		awsPath := path.Child("aws")

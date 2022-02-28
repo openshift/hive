@@ -16,6 +16,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1agent "github.com/openshift/hive/apis/hive/v1/agent"
+	hivev1alibabacloud "github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
@@ -73,6 +74,16 @@ func validGCPClusterDeployment() *hivev1.ClusterDeployment {
 		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
 		Region:               "us-central1",
 	}
+	return cd
+}
+
+func validAlibabaCloudClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.AlibabaCloud = &hivev1alibabacloud.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		Region:               "test-alibaba-cloud-region",
+	}
+	cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{Name: "fake-manifests-configmap"}
 	return cd
 }
 
@@ -995,6 +1006,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name:            "IBMCloud create valid",
 			newObject:       validIBMCloudClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name:            "Alibaba Cloud create valid",
+			newObject:       validAlibabaCloudClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},

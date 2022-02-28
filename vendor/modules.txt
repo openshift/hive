@@ -876,6 +876,7 @@ github.com/openshift/hive/apis
 github.com/openshift/hive/apis/helpers
 github.com/openshift/hive/apis/hive/v1
 github.com/openshift/hive/apis/hive/v1/agent
+github.com/openshift/hive/apis/hive/v1/alibabacloud
 github.com/openshift/hive/apis/hive/v1/aws
 github.com/openshift/hive/apis/hive/v1/azure
 github.com/openshift/hive/apis/hive/v1/baremetal

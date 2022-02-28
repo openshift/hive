@@ -186,9 +186,7 @@ func testIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: "ibmcloud-credentials",
 			},
-			AccountID:      "accountid",
-			CISInstanceCRN: "cisinstancecrn",
-			Region:         testRegion,
+			Region: testRegion,
 		},
 	}
 	return cd

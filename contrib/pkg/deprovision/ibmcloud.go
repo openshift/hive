@@ -1,13 +1,16 @@
 package deprovision
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
 	"github.com/openshift/installer/pkg/types"
 	typesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
@@ -51,10 +54,8 @@ func NewDeprovisionIBMCloudCommand() *cobra.Command {
 	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 
 	// Required flags
-	flags.StringVar(&opt.accountID, "account-id", "", "IBM Cloud account ID")
 	flags.StringVar(&opt.baseDomain, "base-domain", "", "cluster's base domain")
 	flags.StringVar(&opt.clusterName, "cluster-name", "", "cluster's name")
-	flags.StringVar(&opt.cisInstanceCRN, "cis-instance-crn", "", "IBM cloud internet services CRN")
 	flags.StringVar(&opt.region, "region", "", "region in which to deprovision cluster")
 	flags.StringVar(&opt.resourceGroupName, "resource-group-name", "", "IBM resource group name from user provided VPC")
 
@@ -64,30 +65,43 @@ func NewDeprovisionIBMCloudCommand() *cobra.Command {
 // Complete finishes parsing arguments for the command
 func (o *ibmCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.infraID = args[0]
+
+	// Create IBMCloud Client
+	ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
+	if ibmCloudAPIKey == "" {
+		return fmt.Errorf("No %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
+	}
+	ibmClient, err := ibmclient.NewClient(ibmCloudAPIKey)
+	if err != nil {
+		return errors.Wrap(err, "Unable to create IBM Cloud client")
+	}
+
+	// Retrieve CISInstanceCRN
+	cisInstanceCRN, err := ibmclient.GetCISInstanceCRN(ibmClient, context.TODO(), o.baseDomain)
+	if err != nil {
+		return err
+	}
+	o.cisInstanceCRN = cisInstanceCRN
+
+	// Retrieve AccountID
+	accountID, err := ibmclient.GetAccountID(ibmClient, context.TODO())
+	if err != nil {
+		return err
+	}
+	o.accountID = accountID
+
 	return nil
 }
 
 // Validate ensures that option values make sense
 func (o *ibmCloudDeprovisionOptions) Validate(cmd *cobra.Command) error {
-	ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
-	if ibmCloudAPIKey == "" {
-		return fmt.Errorf("No %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
-	}
 	if o.region == "" {
 		cmd.Usage()
 		return fmt.Errorf("No --region provided, cannot proceed")
 	}
-	if o.accountID == "" {
-		cmd.Usage()
-		return fmt.Errorf("No --acount-id provided, cannot proceed")
-	}
 	if o.baseDomain == "" {
 		cmd.Usage()
 		return fmt.Errorf("No --base-domain provided, cannot proceed")
-	}
-	if o.cisInstanceCRN == "" {
-		cmd.Usage()
-		return fmt.Errorf("No --cis-instance-crn provided, cannot proceed")
 	}
 	if o.resourceGroupName == "" {
 		cmd.Usage()

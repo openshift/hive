@@ -148,8 +148,6 @@ func validIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.IBMCloud = &hivev1ibmcloud.Platform{
 		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
-		AccountID:            "fakeaccountid",
-		CISInstanceCRN:       "arn://fake::",
 		Region:               "us-east",
 	}
 	cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{Name: "fake-manifests-configmap"}

@@ -59,6 +59,7 @@ import (
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
+	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/hive/pkg/resource"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
@@ -687,23 +688,42 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			return err
 		}
 	case cd.Spec.Platform.IBMCloud != nil:
+		// Create IBMCloud Client
+		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
+		if ibmCloudAPIKey == "" {
+			return fmt.Errorf("No %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
+		}
+		ibmClient, err := ibmclient.NewClient(ibmCloudAPIKey)
+		if err != nil {
+			return errors.Wrap(err, "Unable to create IBM Cloud client")
+		}
+		// Retrieve CISInstanceCRN
+		cisInstanceCRN, err := ibmclient.GetCISInstanceCRN(ibmClient, context.TODO(), cd.Spec.BaseDomain)
+		if err != nil {
+			return err
+		}
+		// Retrieve AccountID
+		accountID, err := ibmclient.GetAccountID(ibmClient, context.TODO())
+		if err != nil {
+			return err
+		}
 		metadata := &installertypes.ClusterMetadata{
 			InfraID:     infraID,
 			ClusterName: cd.Spec.ClusterName,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				IBMCloud: &installertypesibmcloud.Metadata{
-					AccountID:         cd.Spec.Platform.IBMCloud.AccountID,
+					AccountID:         accountID,
 					BaseDomain:        cd.Spec.BaseDomain,
-					CISInstanceCRN:    cd.Spec.Platform.IBMCloud.CISInstanceCRN,
+					CISInstanceCRN:    cisInstanceCRN,
 					Region:            cd.Spec.Platform.IBMCloud.Region,
 					ResourceGroupName: cd.Spec.ClusterMetadata.InfraID,
 				},
 			},
 		}
-		var err error
-		uninstaller, err = ibmcloud.New(logger, metadata)
-		if err != nil {
-			return err
+		var ibmCloudDestroyerErr error
+		uninstaller, ibmCloudDestroyerErr = ibmcloud.New(logger, metadata)
+		if ibmCloudDestroyerErr != nil {
+			return ibmCloudDestroyerErr
 		}
 	default:
 		logger.Warn("unknown platform for re-try cleanup")

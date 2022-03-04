@@ -19,12 +19,6 @@ var _ CloudBuilder = (*IBMCloudBuilder)(nil)
 
 // IBMCloudBuilder encapsulates cluster artifact generation logic specific to IBM Cloud.
 type IBMCloudBuilder struct {
-	// AccountID is the IBM Cloud Account ID
-	AccountID string `json:"accountID"`
-
-	// CISInstanceCRN is the IBM Cloud Internet Services Instance CRN
-	CISInstanceCRN string `json:"cisInstanceCRN"`
-
 	// APIKey is the IBM Cloud api key.
 	APIKey string
 
@@ -64,9 +58,7 @@ func (p *IBMCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.CredsSecretName(o),
 			},
-			AccountID:      p.AccountID,
-			CISInstanceCRN: p.CISInstanceCRN,
-			Region:         p.Region,
+			Region: p.Region,
 		},
 	}
 }

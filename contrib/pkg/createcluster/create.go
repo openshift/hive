@@ -232,7 +232,7 @@ func NewCreateClusterCommand() *cobra.Command {
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --ibm-cis-instance-crn=CRN  --ibm-account-id=ACCOUNT_ID --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca`,
@@ -347,8 +347,6 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.AdditionalTrustBundle, "additional-trust-bundle", "", "Path to a CA Trust Bundle which will be added to the nodes trusted certificate store.")
 
 	// IBM flags
-	flags.StringVar(&opt.IBMCISInstanceCRN, "ibm-cis-instance-crn", "", "IBM cloud internet services CRN")
-	flags.StringVar(&opt.IBMAccountID, "ibm-account-id", "", "IBM Cloud account ID")
 	flags.StringVar(&opt.IBMInstanceType, "ibm-instance-type", "bx2-4x16", "IBM Cloud instance type")
 
 	return cmd
@@ -420,16 +418,6 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 	if o.Cloud == cloudIBM {
 		if !o.CredentialsModeManual {
 			msg := fmt.Sprintf("--credentials-mode-manual must be set when using --cloud=%q", cloudIBM)
-			o.log.Info(msg)
-			return fmt.Errorf(msg)
-		}
-		if o.IBMAccountID == "" {
-			msg := fmt.Sprintf("--ibm-accound-id must be set when using --cloud=%q", cloudIBM)
-			o.log.Info(msg)
-			return fmt.Errorf(msg)
-		}
-		if o.IBMCISInstanceCRN == "" {
-			msg := fmt.Sprintf("--ibm-cis-instance-crn must be set when using --cloud=%q", cloudIBM)
 			o.log.Info(msg)
 			return fmt.Errorf(msg)
 		}
@@ -789,11 +777,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			return nil, fmt.Errorf("%s env var is required when using --cloud=%q", constants.IBMCloudAPIKeyEnvVar, cloudIBM)
 		}
 		ibmCloudProvider := &clusterresource.IBMCloudBuilder{
-			APIKey:         ibmCloudAPIKey,
-			Region:         o.Region,
-			AccountID:      o.IBMAccountID,
-			CISInstanceCRN: o.IBMCISInstanceCRN,
-			InstanceType:   o.IBMInstanceType,
+			APIKey:       ibmCloudAPIKey,
+			Region:       o.Region,
+			InstanceType: o.IBMInstanceType,
 		}
 		builder.CloudBuilder = ibmCloudProvider
 	}

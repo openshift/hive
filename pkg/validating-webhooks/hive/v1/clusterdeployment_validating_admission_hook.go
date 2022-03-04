@@ -526,12 +526,6 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		if ibmCloud.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("credentialsSecretRef", "name"), "must specify secrets for IBM access"))
 		}
-		if ibmCloud.AccountID == "" {
-			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("accountID"), "must specify IBM accountID"))
-		}
-		if ibmCloud.CISInstanceCRN == "" {
-			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("cisInstanceCRN"), "must specify IBM cisInstanceCRN"))
-		}
 		if ibmCloud.Region == "" {
 			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("region"), "must specify IBM region"))
 		}

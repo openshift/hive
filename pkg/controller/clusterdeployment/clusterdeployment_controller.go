@@ -1736,8 +1736,6 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 		req.Spec.Platform.IBMCloud = &hivev1.IBMClusterDeprovision{
 			CredentialsSecretRef: cd.Spec.Platform.IBMCloud.CredentialsSecretRef,
 			Region:               cd.Spec.Platform.IBMCloud.Region,
-			AccountID:            cd.Spec.Platform.IBMCloud.AccountID,
-			CISInstanceCRN:       cd.Spec.Platform.IBMCloud.CISInstanceCRN,
 			BaseDomain:           cd.Spec.BaseDomain,
 		}
 	default:

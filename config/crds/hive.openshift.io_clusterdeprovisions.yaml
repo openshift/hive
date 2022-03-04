@@ -147,15 +147,8 @@ spec:
                     description: IBMCloud contains IBM Cloud specific deprovision
                       settings
                     properties:
-                      accountID:
-                        description: AccountID is the IBM Cloud Account ID
-                        type: string
                       baseDomain:
                         description: BaseDomain is the DNS base domain
-                        type: string
-                      cisInstanceCRN:
-                        description: CISInstanceCRN is the IBM Cloud Internet Services
-                          Instance CRN
                         type: string
                       credentialsSecretRef:
                         description: CredentialsSecretRef is the IBM Cloud credentials
@@ -170,9 +163,7 @@ spec:
                         description: Region specifies the IBM Cloud region
                         type: string
                     required:
-                    - accountID
                     - baseDomain
-                    - cisInstanceCRN
                     - credentialsSecretRef
                     - region
                     type: object

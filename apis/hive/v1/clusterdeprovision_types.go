@@ -127,10 +127,6 @@ type OvirtClusterDeprovision struct {
 type IBMClusterDeprovision struct {
 	// CredentialsSecretRef is the IBM Cloud credentials to use for deprovisioning the cluster
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
-	// AccountID is the IBM Cloud Account ID
-	AccountID string `json:"accountID"`
-	// CISInstanceCRN is the IBM Cloud Internet Services Instance CRN
-	CISInstanceCRN string `json:"cisInstanceCRN"`
 	// Region specifies the IBM Cloud region
 	Region string `json:"region"`
 	// BaseDomain is the DNS base domain

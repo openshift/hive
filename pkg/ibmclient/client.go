@@ -451,3 +451,29 @@ func (c *Client) setVPCServiceURLForRegion(ctx context.Context, region string) e
 	}
 	return nil
 }
+
+func GetCISInstanceCRN(client API, ctx context.Context, baseDomain string) (string, error) {
+	zones, err := client.GetDNSZones(ctx)
+	if err != nil {
+		return "", errors.Wrap(err, "Unable to retrieve IBM Cloud DNS zones")
+	}
+	cisInstanceCRN := ""
+	for _, z := range zones {
+		if z.Name == baseDomain {
+			cisInstanceCRN = z.CISInstanceCRN
+			break
+		}
+	}
+	if cisInstanceCRN == "" {
+		return "", errors.Errorf("Could not determine CISInstanceCRN, no DNS zone found for base domain %s", baseDomain)
+	}
+	return cisInstanceCRN, nil
+}
+
+func GetAccountID(client API, ctx context.Context) (string, error) {
+	apiKeyDetails, err := client.GetAuthenticatorAPIKeyDetails(context.TODO())
+	if err != nil {
+		return "", errors.Wrap(err, "Unable to retrieve IBM Cloud APIKeyDetails")
+	}
+	return *apiKeyDetails.AccountID, nil
+}

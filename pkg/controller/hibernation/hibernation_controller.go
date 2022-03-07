@@ -351,7 +351,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		if shouldStopMachines(cd, hibernatingCondition) {
 			return r.stopMachines(cd, cdLog)
 		}
-		return r.checkClusterStopped(cd, false, cdLog)
+		return r.checkClusterStopped(cd, readyCondition, false, cdLog)
 	}
 	// If we get here, we're not supposed to be hibernating
 	if isFakeCluster {
@@ -371,7 +371,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if shouldStartMachines(cd, hibernatingCondition, readyCondition) {
 		return r.startMachines(cd, cdLog)
 	}
-	return r.checkClusterRunning(cd, cdLog, readyCondition)
+	return r.checkClusterRunning(cd, cdLog, readyCondition, hibernatingCondition)
 }
 
 func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
@@ -434,7 +434,8 @@ func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logge
 	return reconcile.Result{}, err
 }
 
-func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, expectRunning bool, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, readyCondition *hivev1.ClusterDeploymentCondition,
+	expectRunning bool, logger log.FieldLogger) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to check machine status")
@@ -474,12 +475,20 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
 			return reconcile.Result{}, err
 		}
+		poolNS, poolName := "", ""
+		if cd.Spec.ClusterPoolRef != nil {
+			poolNS = cd.Spec.ClusterPoolRef.Namespace
+			poolName = cd.Spec.ClusterPoolRef.PoolName
+		}
+		// logging with time since ready condition was set to StoppingOrHibernating state
+		hivemetrics.MetricClusterHibernationTransitionSeconds.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
+			cd.Labels[hivev1.HiveClusterPlatformLabel], poolNS, poolName).Observe(time.Since(readyCondition.LastTransitionTime.Time).Seconds())
 	}
 	return reconcile.Result{}, nil
 }
 
 func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment, logger log.FieldLogger,
-	readyCondition *hivev1.ClusterDeploymentCondition) (reconcile.Result, error) {
+	readyCondition *hivev1.ClusterDeploymentCondition, hibernatingCondition *hivev1.ClusterDeploymentCondition) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to check machine status")
@@ -600,9 +609,19 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		corev1.ConditionTrue, logger)
 	if rChanged {
 		cd.Status.PowerState = hivev1.ClusterPowerStateRunning
-		err = r.updateClusterDeploymentStatus(cd, logger)
+		if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
+			return reconcile.Result{}, err
+		}
+		poolNS, poolName := "", ""
+		if cd.Spec.ClusterPoolRef != nil {
+			poolNS = cd.Spec.ClusterPoolRef.Namespace
+			poolName = cd.Spec.ClusterPoolRef.PoolName
+		}
+		// logging with time since hibernating condition was set to ResumingOrRunning state
+		hivemetrics.MetricClusterReadyTransitionSeconds.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
+			cd.Labels[hivev1.HiveClusterPlatformLabel], poolNS, poolName).Observe(time.Since(hibernatingCondition.LastTransitionTime.Time).Seconds())
 	}
-	return reconcile.Result{}, err
+	return reconcile.Result{}, nil
 }
 
 // timeBeforeClusterSyncCheck returns a duration for requeue use when we find that (Selector)SyncSets

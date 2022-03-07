@@ -87,6 +87,24 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
+	// MetricClusterHibernationTransitionSeconds is a prometheus metric that tracks the number of seconds it takes for
+	// clusters to transition to hibernated powerstate
+	MetricClusterHibernationTransitionSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_hibernation_transition_seconds",
+			Help:    "Distribution of the length of time for clusters to transition to the hibernated power state",
+			Buckets: []float64{30, 60, 180, 300, 600},
+		},
+		[]string{"cluster_version", "platform", "cluster_pool_namespace", "cluster_pool_name"})
+	// MetricClusterReadyTransitionSeconds is a prometheus metric that tracks the number of seconds it takes for hibernated
+	// clusters to transition to running powerstate
+	MetricClusterReadyTransitionSeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_running_transition_seconds",
+			Help:    "Distribution of the length of time for clusters to transition to running power state",
+			Buckets: []float64{60, 90, 180, 300, 600, 1200},
+		},
+		[]string{"cluster_version", "platform", "cluster_pool_namespace", "cluster_pool_name"})
 	// metricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
@@ -142,6 +160,9 @@ func init() {
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
 	metrics.Registry.MustRegister(metricClusterDeploymentSyncsetPaused)
+
+	metrics.Registry.MustRegister(MetricClusterHibernationTransitionSeconds)
+	metrics.Registry.MustRegister(MetricClusterReadyTransitionSeconds)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.

@@ -18,23 +18,22 @@ import (
 
 // ibmCloudDeprovisionOptions is the set of options to deprovision an IBM Cloud cluster
 type ibmCloudDeprovisionOptions struct {
-	accountID         string
-	baseDomain        string
-	cisInstanceCRN    string
-	clusterName       string
-	infraID           string
-	logLevel          string
-	region            string
-	resourceGroupName string
-	subnets           []string
-	vpc               string
+	accountID      string
+	baseDomain     string
+	cisInstanceCRN string
+	clusterName    string
+	infraID        string
+	logLevel       string
+	region         string
+	subnets        []string
+	vpc            string
 }
 
 // NewDeprovisionIBMCloudCommand is the entrypoint to create the IBM Cloud deprovision subcommand
 func NewDeprovisionIBMCloudCommand() *cobra.Command {
 	opt := &ibmCloudDeprovisionOptions{}
 	cmd := &cobra.Command{
-		Use:   "ibmcloud INFRAID --region=us-east --base-domain=BASE_DOMAIN",
+		Use:   "ibmcloud INFRAID --region=us-east --base-domain=BASE_DOMAIN --cluster-name=CLUSTERNAME",
 		Short: "Deprovision IBM Cloud assets (as created by openshift-installer)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -57,7 +56,6 @@ func NewDeprovisionIBMCloudCommand() *cobra.Command {
 	flags.StringVar(&opt.baseDomain, "base-domain", "", "cluster's base domain")
 	flags.StringVar(&opt.clusterName, "cluster-name", "", "cluster's name")
 	flags.StringVar(&opt.region, "region", "", "region in which to deprovision cluster")
-	flags.StringVar(&opt.resourceGroupName, "resource-group-name", "", "IBM resource group name from user provided VPC")
 
 	return cmd
 }
@@ -103,10 +101,6 @@ func (o *ibmCloudDeprovisionOptions) Validate(cmd *cobra.Command) error {
 		cmd.Usage()
 		return fmt.Errorf("No --base-domain provided, cannot proceed")
 	}
-	if o.resourceGroupName == "" {
-		cmd.Usage()
-		return fmt.Errorf("No --resource-group-name provided, cannot proceed")
-	}
 	if o.clusterName == "" {
 		cmd.Usage()
 		return fmt.Errorf("No --cluster-name provided, cannot proceed")
@@ -141,7 +135,7 @@ func (o *ibmCloudDeprovisionOptions) Run() error {
 				BaseDomain:        o.baseDomain,
 				CISInstanceCRN:    o.cisInstanceCRN,
 				Region:            o.region,
-				ResourceGroupName: o.resourceGroupName,
+				ResourceGroupName: o.infraID,
 			},
 		},
 	}

@@ -1096,8 +1096,6 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 				"deprovision",
 				"ibmcloud",
 				req.Spec.InfraID,
-				"--resource-group-name",
-				req.Spec.InfraID,
 				"--region",
 				req.Spec.Platform.IBMCloud.Region,
 				"--base-domain",

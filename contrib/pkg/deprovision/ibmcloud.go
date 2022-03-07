@@ -34,7 +34,7 @@ type ibmCloudDeprovisionOptions struct {
 func NewDeprovisionIBMCloudCommand() *cobra.Command {
 	opt := &ibmCloudDeprovisionOptions{}
 	cmd := &cobra.Command{
-		Use:   "ibmcloud INFRAID --region=us-east --account-id=ACCOUNT_ID --base-domain=BASE_DOMAIN --cis-instance-crn=CIS_INSTANCE_CRN",
+		Use:   "ibmcloud INFRAID --region=us-east --base-domain=BASE_DOMAIN",
 		Short: "Deprovision IBM Cloud assets (as created by openshift-installer)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

@@ -119,6 +119,14 @@ clouds:
 bin/hiveutil create-cluster --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud mycluster
 ```
 
+#### Create Cluster on IBM Cloud
+
+The IBM Cloud API key will be read from an `IC_API_KEY` environment variable. An [IBM Cloud credential manifests](./using-hive.md#ibm-cloud-credential-manifests) directory containing cloud credential secrets for OpenShift components must be provided.
+
+```bash
+bin/hiveutil create-cluster --cloud=ibmcloud --region="us-south" --base-domain=ibm.hive.openshift.com --manifests=/path/to/manifests/ --credentials-mode-manual mycluster
+```
+
 ### Cluster Pools
 
 Create a [ClusterPool](./clusterpools.md):

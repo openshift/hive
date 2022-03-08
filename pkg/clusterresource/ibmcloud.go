@@ -76,6 +76,15 @@ func (p *IBMCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 		},
 	}
 
+	// Used for both control plane and workers.
+	if p.InstanceType != "" {
+		mpp := &installeribmcloud.MachinePool{
+			InstanceType: p.InstanceType,
+		}
+		ic.ControlPlane.Platform.IBMCloud = mpp
+		ic.Compute[0].Platform.IBMCloud = mpp
+	}
+
 	// IBM Cloud only supports manual credentials mode. Manifests including required secrets
 	// must be passed to hive via cd.spec.provisioning.manifestsConfigmapRef
 	ic.CredentialsMode = installertypes.ManualCredentialsMode

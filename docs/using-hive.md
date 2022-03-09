@@ -137,7 +137,7 @@ spec:
 
 ### Cloud credentials
 
-Hive requires credentials to the cloud account into which it will install OpenShift clusters.
+Hive requires credentials to the cloud account into which it will install OpenShift clusters. Refer to the [installer](https://github.com/openshift/installer) documentation for required level of permissions for each cloud.
 
 #### AWS
 
@@ -941,6 +941,7 @@ To use this feature:
        type: Opaque
        ```
      - Azure
+       Service principal needs DNS Zone Contributor role on DNS zone resource.
        ```yaml
        apiVersion: v1
        data:

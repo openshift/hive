@@ -56,6 +56,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		met.InfraID != "" &&
 		met.ClusterID != "" &&
 		met.AdminKubeconfigSecretRef.Name != "" &&
+		met.AdminPasswordSecretRef != nil &&
 		met.AdminPasswordSecretRef.Name != "" {
 		if !reflect.DeepEqual(cd.Spec.ClusterMetadata, ci.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = ci.Spec.ClusterMetadata

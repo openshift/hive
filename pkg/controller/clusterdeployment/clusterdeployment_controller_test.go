@@ -2435,6 +2435,32 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "clusterinstallref exists, cluster metadata available partially (no AdminPasswordSecretRef)",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterInstallRefClusterDeployment("test-fake")
+					cd.Spec.ClusterMetadata = nil
+					return cd
+				}(),
+				testFakeClusterInstallWithClusterMetadata("test-fake", hivev1.ClusterMetadata{
+					InfraID:   testInfraID,
+					ClusterID: testClusterID,
+					AdminKubeconfigSecretRef: corev1.LocalObjectReference{
+						Name: adminKubeconfigSecret,
+					},
+				}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				// Metadata wasn't copied because metadata was incomplete (no AdminPasswordSecretRef)
+				assert.Nil(t, cd.Spec.ClusterMetadata)
+			},
+		},
+		{
 			name: "clusterinstallref exists, cluster metadata available",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {

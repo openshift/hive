@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types/alibabacloud"
 	"github.com/openshift/installer/pkg/types/aws"
@@ -15,8 +18,8 @@ import (
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
 	"github.com/openshift/installer/pkg/types/ovirt"
+	"github.com/openshift/installer/pkg/types/powervs"
 	"github.com/openshift/installer/pkg/types/vsphere"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -39,6 +42,7 @@ var (
 		ibmcloud.Name,
 		openstack.Name,
 		ovirt.Name,
+		powervs.Name,
 		vsphere.Name,
 	}
 	// HiddenPlatformNames is a slice with all the
@@ -148,12 +152,17 @@ type InstallConfig struct {
 	// GCP: "Mint", "Passthrough", "Manual"
 	// IBMCloud: "Manual"
 	// AlibabaCloud: "Manual"
+	// PowerVS: "Manual"
 	// +optional
 	CredentialsMode CredentialsMode `json:"credentialsMode,omitempty"`
 
 	// BootstrapInPlace is the configuration for installing a single node
 	// with bootstrap in place installation.
 	BootstrapInPlace *BootstrapInPlace `json:"bootstrapInPlace,omitempty"`
+
+	// Capabilities configures the installation of optional core cluster components.
+	// +optional
+	Capabilities *Capabilities `json:"capabilities,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.
@@ -205,6 +214,10 @@ type Platform struct {
 	// +optional
 	OpenStack *openstack.Platform `json:"openstack,omitempty"`
 
+	// PowerVS is the configuration used when installing on Power VS.
+	// +optional
+	PowerVS *powervs.Platform `json:"powervs,omitempty"`
+
 	// VSphere is the configuration used when installing on vSphere.
 	// +optional
 	VSphere *vsphere.Platform `json:"vsphere,omitempty"`
@@ -243,6 +256,8 @@ func (p *Platform) Name() string {
 		return vsphere.Name
 	case p.Ovirt != nil:
 		return ovirt.Name
+	case p.PowerVS != nil:
+		return powervs.Name
 	default:
 		return ""
 	}
@@ -371,6 +386,21 @@ const (
 type BootstrapInPlace struct {
 	// InstallationDisk is the target disk drive for coreos-installer
 	InstallationDisk string `json:"installationDisk"`
+}
+
+// Capabilities selects the managed set of optional, core cluster components.
+type Capabilities struct {
+	// baselineCapabilitySet selects an initial set of
+	// optional capabilities to enable, which can be extended via
+	// additionalEnabledCapabilities. The default is vCurrent.
+	// +optional
+	BaselineCapabilitySet configv1.ClusterVersionCapabilitySet `json:"baselineCapabilitySet,omitempty"`
+
+	// additionalEnabledCapabilities extends the set of managed
+	// capabilities beyond the baseline defined in
+	// baselineCapabilitySet. The default is an empty set.
+	// +optional
+	AdditionalEnabledCapabilities []configv1.ClusterVersionCapability `json:"additionalEnabledCapabilities,omitempty"`
 }
 
 // WorkerMachinePool retrieves the worker MachinePool from InstallConfig.Compute

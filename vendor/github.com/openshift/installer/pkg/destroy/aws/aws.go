@@ -30,6 +30,7 @@ import (
 	awssession "github.com/openshift/installer/pkg/asset/installconfig/aws"
 	"github.com/openshift/installer/pkg/destroy/providers"
 	"github.com/openshift/installer/pkg/types"
+	awstypes "github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/version"
 )
 
@@ -101,8 +102,7 @@ func (o *ClusterUninstaller) validate() error {
 	if len(o.Filters) == 0 {
 		return errors.Errorf("you must specify at least one tag filter")
 	}
-	switch r := o.Region; r {
-	case "us-iso-east-1":
+	if r := o.Region; awstypes.IsSecretRegion(r) {
 		return errors.Errorf("cannot destroy cluster in region %q", r)
 	}
 	return nil
@@ -760,6 +760,8 @@ func deleteEC2(ctx context.Context, session *session.Session, arn arn.ARN, logge
 		return deleteEC2InternetGateway(ctx, client, id, logger)
 	case "natgateway":
 		return deleteEC2NATGateway(ctx, client, id, logger)
+	case "placement-group":
+		return deleteEC2PlacementGroup(ctx, client, id, logger)
 	case "route-table":
 		return deleteEC2RouteTable(ctx, client, id, logger)
 	case "security-group":
@@ -994,6 +996,29 @@ func deleteEC2NATGatewaysByVPC(ctx context.Context, client *ec2.EC2, vpc string,
 		return lastError
 	}
 	return err
+}
+
+func deleteEC2PlacementGroup(ctx context.Context, client *ec2.EC2, id string, logger logrus.FieldLogger) error {
+	response, err := client.DescribePlacementGroupsWithContext(ctx, &ec2.DescribePlacementGroupsInput{
+		GroupIds: []*string{aws.String(id)},
+	})
+	if err != nil {
+		if err.(awserr.Error).Code() == "InvalidPlacementGroup.Unknown" {
+			return nil
+		}
+		return err
+	}
+
+	for _, placementGroup := range response.PlacementGroups {
+		if _, err := client.DeletePlacementGroupWithContext(ctx, &ec2.DeletePlacementGroupInput{
+			GroupName: placementGroup.GroupName,
+		}); err != nil {
+			return err
+		}
+	}
+
+	logger.Info("Deleted")
+	return nil
 }
 
 func deleteEC2RouteTable(ctx context.Context, client *ec2.EC2, id string, logger logrus.FieldLogger) error {

@@ -517,10 +517,13 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 			allErrs = append(allErrs, field.Required(ovirtPath.Child("ovirt_storage_domain_id"), "must specify ovirt_storage_domain_id"))
 		}
 	}
-	if baremetal := platform.BareMetal; baremetal != nil {
+	if platform.BareMetal != nil {
 		numberOfPlatforms++
 	}
-	if agent := platform.AgentBareMetal; agent != nil {
+	if platform.AgentBareMetal != nil {
+		numberOfPlatforms++
+	}
+	if platform.None != nil {
 		numberOfPlatforms++
 	}
 	switch {

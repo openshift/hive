@@ -579,7 +579,7 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		if readyCondition.Reason == hivev1.ReadyReasonPausingForClusterOperatorsToSettle &&
 			time.Since(readyCondition.LastProbeTime.Time) < clusterOperatorSettlePause {
 			remainingPause := clusterOperatorSettlePause - time.Now().Sub(readyCondition.LastProbeTime.Time)
-			logger.Info("waiting an additional %s for ClusterOperators to settle", remainingPause)
+			logger.WithField("timeRemaining", remainingPause).Info("still waiting for ClusterOperators to settle")
 			return reconcile.Result{RequeueAfter: remainingPause}, nil
 		}
 

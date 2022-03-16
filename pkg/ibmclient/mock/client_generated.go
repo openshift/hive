@@ -220,6 +220,21 @@ func (mr *MockAPIMockRecorder) GetVPC(ctx, vpcID interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVPC", reflect.TypeOf((*MockAPI)(nil).GetVPC), ctx, vpcID)
 }
 
+// GetVPCInstances mocks base method.
+func (m *MockAPI) GetVPCInstances(ctx context.Context, resourceGroupID string) ([]vpcv1.Instance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVPCInstances", ctx, resourceGroupID)
+	ret0, _ := ret[0].([]vpcv1.Instance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVPCInstances indicates an expected call of GetVPCInstances.
+func (mr *MockAPIMockRecorder) GetVPCInstances(ctx, resourceGroupID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVPCInstances", reflect.TypeOf((*MockAPI)(nil).GetVPCInstances), ctx, resourceGroupID)
+}
+
 // GetVPCZonesForRegion mocks base method.
 func (m *MockAPI) GetVPCZonesForRegion(ctx context.Context, region string) ([]string, error) {
 	m.ctrl.T.Helper()
@@ -248,4 +263,32 @@ func (m *MockAPI) GetVSIProfiles(ctx context.Context) ([]vpcv1.InstanceProfile, 
 func (mr *MockAPIMockRecorder) GetVSIProfiles(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVSIProfiles", reflect.TypeOf((*MockAPI)(nil).GetVSIProfiles), ctx)
+}
+
+// StartInstances mocks base method.
+func (m *MockAPI) StartInstances(instances []vpcv1.Instance) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartInstances", instances)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StartInstances indicates an expected call of StartInstances.
+func (mr *MockAPIMockRecorder) StartInstances(instances interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartInstances", reflect.TypeOf((*MockAPI)(nil).StartInstances), instances)
+}
+
+// StopInstances mocks base method.
+func (m *MockAPI) StopInstances(instances []vpcv1.Instance) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StopInstances", instances)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StopInstances indicates an expected call of StopInstances.
+func (mr *MockAPIMockRecorder) StopInstances(instances interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopInstances", reflect.TypeOf((*MockAPI)(nil).StopInstances), instances)
 }

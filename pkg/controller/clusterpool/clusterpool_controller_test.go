@@ -48,7 +48,7 @@ func TestReconcileClusterPool(t *testing.T) {
 
 	// See calculatePoolVersion. If this changes, the easiest way to figure out the new value is
 	// to pull it from the test failure :)
-	initialPoolVersion := "9a824709257980be"
+	initialPoolVersion := "ac2dc91b241dd33d"
 
 	poolBuilder := testcp.FullBuilder(testNamespace, testLeasePoolName, scheme).
 		GenericOptions(

@@ -479,7 +479,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	// Set region label on the ClusterDeployment
 	if region := getClusterRegion(cd); cd.Spec.Platform.BareMetal == nil && cd.Spec.Platform.AgentBareMetal == nil &&
-		cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+		cd.Spec.Platform.None == nil && cd.Labels[hivev1.HiveClusterRegionLabel] != region {
 
 		if cd.Labels == nil {
 			cd.Labels = make(map[string]string)
@@ -2115,6 +2115,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformAgentBaremetal
 	case cd.Spec.Platform.IBMCloud != nil:
 		return constants.PlatformIBMCloud
+	case cd.Spec.Platform.None != nil:
+		return constants.PlatformNone
 	}
 	return constants.PlatformUnknown
 }

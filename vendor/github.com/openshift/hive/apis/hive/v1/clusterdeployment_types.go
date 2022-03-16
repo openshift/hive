@@ -10,6 +10,7 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	"github.com/openshift/hive/apis/hive/v1/none"
 	"github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/apis/hive/v1/ovirt"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -600,6 +601,10 @@ type Platform struct {
 
 	// IBMCloud is the configuration used when installing on IBM Cloud
 	IBMCloud *ibmcloud.Platform `json:"ibmcloud,omitempty"`
+
+	// None indicates platform-agnostic install.
+	// https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html
+	None *none.Platform `json:"none,omitempty"`
 }
 
 // PlatformStatus contains the observed state for the specific platform upon which to

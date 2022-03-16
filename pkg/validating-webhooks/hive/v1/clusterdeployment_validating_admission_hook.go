@@ -530,10 +530,13 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("region"), "must specify IBM region"))
 		}
 	}
-	if baremetal := platform.BareMetal; baremetal != nil {
+	if platform.BareMetal != nil {
 		numberOfPlatforms++
 	}
-	if agent := platform.AgentBareMetal; agent != nil {
+	if platform.AgentBareMetal != nil {
+		numberOfPlatforms++
+	}
+	if platform.None != nil {
 		numberOfPlatforms++
 	}
 	switch {

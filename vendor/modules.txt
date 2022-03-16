@@ -120,6 +120,29 @@ github.com/PuerkitoBio/urlesc
 # github.com/alexkohler/prealloc v1.0.0
 ## explicit; go 1.15
 github.com/alexkohler/prealloc/pkg
+# github.com/aliyun/alibaba-cloud-sdk-go v1.61.1264
+## explicit; go 1.13
+github.com/aliyun/alibaba-cloud-sdk-go/sdk
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/provider
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/signers
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/responses
+github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils
+github.com/aliyun/alibaba-cloud-sdk-go/services/alidns
+github.com/aliyun/alibaba-cloud-sdk-go/services/ecs
+github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz
+github.com/aliyun/alibaba-cloud-sdk-go/services/ram
+github.com/aliyun/alibaba-cloud-sdk-go/services/resourcemanager
+github.com/aliyun/alibaba-cloud-sdk-go/services/slb
+github.com/aliyun/alibaba-cloud-sdk-go/services/tag
+github.com/aliyun/alibaba-cloud-sdk-go/services/vpc
+# github.com/aliyun/aliyun-oss-go-sdk v2.1.8+incompatible
+## explicit
+github.com/aliyun/aliyun-oss-go-sdk/oss
 # github.com/apparentlymart/go-cidr v1.1.0 => github.com/apparentlymart/go-cidr v1.0.1
 ## explicit
 github.com/apparentlymart/go-cidr/cidr
@@ -892,6 +915,7 @@ github.com/openshift/hive/apis/scheme
 # github.com/openshift/installer v0.9.0-master.0.20220309133600-6f7dcb29bac7
 ## explicit; go 1.17
 github.com/openshift/installer/data
+github.com/openshift/installer/pkg/asset/installconfig/alibabacloud
 github.com/openshift/installer/pkg/asset/installconfig/aws
 github.com/openshift/installer/pkg/asset/installconfig/azure
 github.com/openshift/installer/pkg/asset/installconfig/gcp
@@ -904,6 +928,7 @@ github.com/openshift/installer/pkg/asset/machines/ibmcloud
 github.com/openshift/installer/pkg/asset/machines/openstack
 github.com/openshift/installer/pkg/asset/machines/ovirt
 github.com/openshift/installer/pkg/asset/machines/vsphere
+github.com/openshift/installer/pkg/destroy/alibabacloud
 github.com/openshift/installer/pkg/destroy/aws
 github.com/openshift/installer/pkg/destroy/azure
 github.com/openshift/installer/pkg/destroy/gcp

@@ -95,6 +95,8 @@ func CredentialsSecretName(cd *hivev1.ClusterDeployment) string {
 		return ""
 	case p.AgentBareMetal != nil:
 		return ""
+	case p.None != nil:
+		return ""
 	default:
 		return ""
 	}

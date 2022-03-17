@@ -11,6 +11,7 @@ const (
 	PlatformBaremetal      = "baremetal"
 	PlatformAgentBaremetal = "agent-baremetal"
 	PlatformGCP            = "gcp"
+	PlatformNone           = "none-platform"
 	PlatformOpenStack      = "openstack"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"

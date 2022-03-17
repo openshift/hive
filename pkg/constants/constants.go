@@ -12,6 +12,7 @@ const (
 	PlatformBaremetal      = "baremetal"
 	PlatformGCP            = "gcp"
 	PlatformIBMCloud       = "ibmcloud"
+	PlatformNone           = "none-platform"
 	PlatformOpenStack      = "openstack"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"

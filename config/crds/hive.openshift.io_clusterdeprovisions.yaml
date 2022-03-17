@@ -85,6 +85,7 @@ spec:
                         description: Region is the Alibaba region for this deprovision
                         type: string
                     required:
+                    - credentialsSecretRef
                     - region
                     type: object
                   aws:

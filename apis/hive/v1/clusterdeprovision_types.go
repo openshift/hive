@@ -60,7 +60,7 @@ type AlibabaCloudClusterDeprovision struct {
 	// Region is the Alibaba region for this deprovision
 	Region string `json:"region"`
 	// CredentialsSecretRef is the Alibaba account credentials to use for deprovisioning the cluster
-	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 }
 
 // AWSClusterDeprovision contains AWS-specific configuration for a ClusterDeprovision

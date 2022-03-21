@@ -96,7 +96,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			resources: []runtime.Object{
 				poolBuilder.Build(),
 				testcd.FullBuilder(namespaceName, "test-cd", scheme).
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
 				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
 					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim-2")),
@@ -109,7 +109,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			namespaceBuilder: namespaceBuilder,
 			resources: []runtime.Object{
 				testcd.FullBuilder(namespaceName, "test-cd", scheme).
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
 				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
 					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim-2")),
@@ -133,7 +133,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			namespaceBuilder: namespaceBuilder,
 			resources: []runtime.Object{
 				testcd.FullBuilder(namespaceName, "test-cd", scheme).
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true"), testgeneric.Deleted()).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true"), testgeneric.Deleted()).
 					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
 				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
 					GenericOptions(testgeneric.Deleted()).
@@ -275,7 +275,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 		name: "no cleanup as cluster pool exists with marked for removal clusters",
 		resources: []runtime.Object{
 			poolBuilder.Build(),
-			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
 		},
 		expectedErr:      "",
@@ -302,7 +302,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 	}, {
 		name: "no cleanup as clusters marked for removal already deleted",
 		resources: []runtime.Object{
-			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
 		},
 		expectedErr:      "",
@@ -311,7 +311,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 	}, {
 		name: "some cleanup",
 		resources: []runtime.Object{
-			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
 		},
 		expectedErr:      "",
@@ -320,8 +320,8 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 	}, {
 		name: "some cleanup 2",
 		resources: []runtime.Object{
-			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
-			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 		},
 		expectedErr:      "",
 		expectedCleanup:  true,
@@ -329,10 +329,10 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 	}, {
 		name: "some cleanup 3",
 		resources: []runtime.Object{
-			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
-			cdBuilderWithPool("cd3", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
-			cdBuilderWithPool("cd4", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd3", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd4", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 		},
 		expectedErr:      "",
 		expectedCleanup:  true,

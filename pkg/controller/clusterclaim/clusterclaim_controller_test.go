@@ -664,7 +664,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					assert.NotEqual(t, claimName, cd.Spec.ClusterPoolRef.ClaimName, "expected ClusterDeployment to not be claimed by ClusterClaim")
 				}
 				if isAssignedCD {
-					toRemove := controllerutils.IsClaimedClusterMarkedForRemoval(&cd)
+					toRemove := controllerutils.IsClusterMarkedForRemoval(&cd)
 					assignedClusterDeploymentExists = !toRemove
 					if test.expectHibernating {
 						assert.Equal(t, hivev1.ClusterPowerStateHibernating, cd.Spec.PowerState, "expected ClusterDeployment to be hibernating")

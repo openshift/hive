@@ -330,10 +330,13 @@ const (
 	// group for which first applied metrics can be reported
 	SyncSetMetricsGroupAnnotation = "hive.openshift.io/syncset-metrics-group"
 
-	// ClusterClaimRemoveClusterAnnotation is used by the cluster claim controller to mark that the cluster
-	// that are previously claimed is no longer required and therefore should be removed/deprovisioned and removed
-	// from the pool.
-	ClusterClaimRemoveClusterAnnotation = "hive.openshift.io/remove-claimed-cluster-from-pool"
+	// RemovePoolClusterAnnotation is used on a ClusterDeployment to indicate that the cluster
+	// is no longer required and therefore should be removed/deprovisioned and removed from the pool.
+	// The ClusterPool must observe its MaxConcurrent budget; so this annotation is used to delegate the
+	// actual deletion to the ClusterPool controller when the logic that detects that the deletion is
+	// necessary resides elsewhere (e.g. so the ClusterClaim controller can request deletion of a claimed
+	// CD when the claim is deleted).
+	RemovePoolClusterAnnotation = "hive.openshift.io/remove-cluster-from-pool"
 
 	// ClusterDeploymentPoolSpecHashAnnotation annotates a ClusterDeployment. It is an opaque value representing
 	// the state of the important (to ClusterDeployments) fields of the ClusterPool at the time this CD was created.

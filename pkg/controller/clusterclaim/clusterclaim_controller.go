@@ -22,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
@@ -256,7 +255,7 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	switch err := r.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); {
 	case apierrors.IsNotFound(err):
 		return r.reconcileForDeletedCluster(claim, logger)
-	case cd.DeletionTimestamp != nil || controllerutils.IsClaimedClusterMarkedForRemoval(cd):
+	case cd.DeletionTimestamp != nil || controllerutils.IsClusterMarkedForRemoval(cd):
 		return r.setDeletingStatus(claim, logger)
 	case err != nil:
 		logger.Log(controllerutils.LogLevel(err), "error getting ClusterDeployment")
@@ -411,12 +410,9 @@ func (r *ReconcileClusterClaim) cleanupResources(claim *hivev1.ClusterClaim, log
 	}
 
 	// Delete ClusterDeployment
-	if !cdGone && cd.DeletionTimestamp == nil && !controllerutils.IsClaimedClusterMarkedForRemoval(cd) {
-		logger.Info("deleting clusterDeployment")
-		if cd.Annotations == nil {
-			cd.Annotations = map[string]string{}
-		}
-		cd.Annotations[constants.ClusterClaimRemoveClusterAnnotation] = "true"
+	if !cdGone && cd.DeletionTimestamp == nil && !controllerutils.IsClusterMarkedForRemoval(cd) {
+		logger.Info("marking clusterDeployment for deletion by the clusterpool controller")
+		controllerutils.MarkClusterForRemoval(cd)
 		if err := r.Update(context.Background(), cd); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating ClusterDeployment to mark it for deletion")
 			return false, err

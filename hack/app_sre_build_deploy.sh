@@ -24,6 +24,9 @@ export REGISTRY_AUTH_FILE=${CONTAINER_ENGINE_CONFIG_DIR}/config.json
 # dozen other ways to do this. This was the least ugly one that actually
 # works.)
 CONTAINER_ENGINE=$(command -v podman 2>/dev/null || echo docker --config=${CONTAINER_ENGINE_CONFIG_DIR})
+# Build Schema v2 compatible images. Recent versions of docker should do this
+# automatically; if we're running podman, it should pick up this env var.
+export BUILDAH_FORMAT=docker
 
 # Make sure we can log into quay; otherwise we won't be able to push
 ${CONTAINER_ENGINE} login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io

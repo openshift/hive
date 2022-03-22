@@ -36,7 +36,8 @@ type SpotMarketOptions struct {
 // EC2RootVolume defines the storage for an ec2 instance.
 type EC2RootVolume struct {
 	// IOPS defines the iops for the storage.
-	IOPS int `json:"iops"`
+	// +optional
+	IOPS int `json:"iops,omitempty"`
 	// Size defines the size of the storage.
 	Size int `json:"size"`
 	// Type defines the type of the storage.

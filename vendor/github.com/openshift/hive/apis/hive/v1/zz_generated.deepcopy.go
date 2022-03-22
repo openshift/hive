@@ -13,6 +13,7 @@ import (
 	baremetal "github.com/openshift/hive/apis/hive/v1/baremetal"
 	gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	none "github.com/openshift/hive/apis/hive/v1/none"
 	openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -3000,6 +3001,11 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.IBMCloud != nil {
 		in, out := &in.IBMCloud, &out.IBMCloud
 		*out = new(ibmcloud.Platform)
+		**out = **in
+	}
+	if in.None != nil {
+		in, out := &in.None, &out.None
+		*out = new(none.Platform)
 		**out = **in
 	}
 	return

@@ -9,11 +9,12 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-
-	// "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/openshift/hive/test/e2e/common"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -74,14 +75,22 @@ func TestHiveControllersMetrics(t *testing.T) {
 
 	kubeClient := common.MustGetKubernetesClient()
 
-	// Query the metrics port in the hive-controllers service using the apiserver proxy
-	body, err := kubeClient.CoreV1().RESTClient().Get().Namespace(common.GetHiveNamespaceOrDie()).Name(fmt.Sprintf("%s:%d", hiveControllersService, metricsPort)).Resource("services").SubResource("proxy").Suffix("metrics").DoRaw(context.Background())
-	if err != nil {
-		t.Errorf("failed to reach metrics endpoint: %v", err)
-		return
+	failedToReachMsg := "failed to reach metrics endpoint"
+	if err := retry.OnError(
+		wait.Backoff{Duration: 10 * time.Second, Cap: 1 * time.Minute},
+		func(e error) bool { return strings.Contains(e.Error(), failedToReachMsg) },
+		func() error {
+			// Query the metrics port in the hive-controllers service using the apiserver proxy
+			body, err := kubeClient.CoreV1().RESTClient().Get().Namespace(common.GetHiveNamespaceOrDie()).Name(fmt.Sprintf("%s:%d", hiveControllersService, metricsPort)).Resource("services").SubResource("proxy").Suffix("metrics").DoRaw(context.Background())
+			if err != nil {
+				return errors.Wrap(err, failedToReachMsg)
+			}
+			if !strings.Contains(string(body), "hive_cluster_deployment_install_job_delay_seconds_bucket") {
+				return errors.New("metrics response does not contain expected metric name")
+			}
+			t.Logf("metrics response:\n%s\n", string(body))
+			return nil
+		}); err != nil {
+		t.Error(err)
 	}
-	if !strings.Contains(string(body), "hive_cluster_deployment_install_job_delay_seconds_bucket") {
-		t.Errorf("metrics response does not contain expected metric name")
-	}
-	t.Logf("metrics response:\n%s\n", string(body))
 }

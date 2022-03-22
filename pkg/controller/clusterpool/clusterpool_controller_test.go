@@ -977,7 +977,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -995,7 +995,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1013,7 +1013,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1030,7 +1030,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1047,7 +1047,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1063,7 +1063,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1079,12 +1079,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(testcd.Running()),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
 				cdBuilder("c5").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1101,12 +1101,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
 				cdBuilder("c5").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1124,7 +1124,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1142,12 +1142,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
 				unclaimedCDBuilder("c3").Build(testcd.Running()),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
 				cdBuilder("c5").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1165,12 +1165,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
 				cdBuilder("c5").
-					GenericOptions(testgeneric.WithAnnotation(constants.ClusterClaimRemoveClusterAnnotation, "true")).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),

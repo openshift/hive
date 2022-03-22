@@ -314,7 +314,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		claimName := poolRef.ClaimName
 		if ref.DeletionTimestamp != nil {
 			cdCol.deleting = append(cdCol.deleting, ref)
-		} else if controllerutils.IsClaimedClusterMarkedForRemoval(ref) {
+		} else if controllerutils.IsClusterMarkedForRemoval(ref) {
 			// Do *not* double count "deleting" and "marked for deletion"
 			cdCol.markedForDeletion = append(cdCol.markedForDeletion, ref)
 		} else if claimName == "" {

@@ -107,7 +107,6 @@ spec:
                             description: Type defines the type of the storage.
                             type: string
                         required:
-                        - iops
                         - size
                         - type
                         type: object

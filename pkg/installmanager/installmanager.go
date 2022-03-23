@@ -675,7 +675,8 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			InfraID: infraID,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				Ovirt: &installertypesovirt.Metadata{
-					ClusterID: cd.Spec.Platform.Ovirt.ClusterID,
+					ClusterID:      cd.Spec.Platform.Ovirt.ClusterID,
+					RemoveTemplate: true,
 				},
 			},
 		}

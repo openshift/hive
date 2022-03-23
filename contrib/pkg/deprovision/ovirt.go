@@ -80,7 +80,8 @@ func (o *oVirtOptions) Run() error {
 		InfraID: o.infraID,
 		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
 			Ovirt: &typesovirt.Metadata{
-				ClusterID: o.clusterID,
+				ClusterID:      o.clusterID,
+				RemoveTemplate: true,
 			},
 		},
 	}

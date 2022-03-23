@@ -475,7 +475,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
 			return reconcile.Result{}, err
 		}
-		poolNS, poolName := "", ""
+		poolNS, poolName := "unknown", "unknown"
 		if cd.Spec.ClusterPoolRef != nil {
 			poolNS = cd.Spec.ClusterPoolRef.Namespace
 			poolName = cd.Spec.ClusterPoolRef.PoolName
@@ -483,6 +483,19 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		// logging with time since ready condition was set to StoppingOrHibernating state
 		hivemetrics.MetricClusterHibernationTransitionSeconds.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
 			cd.Labels[hivev1.HiveClusterPlatformLabel], poolNS, poolName).Observe(time.Since(readyCondition.LastTransitionTime.Time).Seconds())
+		// Clear entry from currently stopping and waiting for cluster operators clusters if exists
+		hivemetrics.MetricStoppingClusters.Delete(map[string]string{
+			"cluster_deployment":     cd.Name,
+			"platform":               cd.Labels[hivev1.HiveClusterPlatformLabel],
+			"cluster_version":        cd.Labels[constants.VersionMajorMinorPatchLabel],
+			"cluster_pool_namespace": poolNS,
+		})
+		hivemetrics.MetricWaitingForCOClusters.Delete(map[string]string{
+			"cluster_deployment":     cd.Name,
+			"platform":               cd.Labels[hivev1.HiveClusterPlatformLabel],
+			"cluster_version":        cd.Labels[constants.VersionMajorMinorPatchLabel],
+			"cluster_pool_namespace": poolNS,
+		})
 	}
 	return reconcile.Result{}, nil
 }
@@ -612,7 +625,7 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
 			return reconcile.Result{}, err
 		}
-		poolNS, poolName := "", ""
+		poolNS, poolName := "unknown", "unknown"
 		if cd.Spec.ClusterPoolRef != nil {
 			poolNS = cd.Spec.ClusterPoolRef.Namespace
 			poolName = cd.Spec.ClusterPoolRef.PoolName
@@ -620,6 +633,13 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		// logging with time since hibernating condition was set to ResumingOrRunning state
 		hivemetrics.MetricClusterReadyTransitionSeconds.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
 			cd.Labels[hivev1.HiveClusterPlatformLabel], poolNS, poolName).Observe(time.Since(hibernatingCondition.LastTransitionTime.Time).Seconds())
+		// Clear entry from currently resuming clusters if exists
+		hivemetrics.MetricResumingClusters.Delete(map[string]string{
+			"cluster_deployment":     cd.Name,
+			"platform":               cd.Labels[hivev1.HiveClusterPlatformLabel],
+			"cluster_version":        cd.Labels[constants.VersionMajorMinorPatchLabel],
+			"cluster_pool_namespace": poolNS,
+		})
 	}
 	return reconcile.Result{}, nil
 }

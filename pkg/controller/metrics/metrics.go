@@ -105,6 +105,31 @@ var (
 			Buckets: []float64{60, 90, 180, 300, 600, 1200},
 		},
 		[]string{"cluster_version", "platform", "cluster_pool_namespace", "cluster_pool_name"})
+	// MetricStoppingClusters is a prometheus metric that tracks the transition time for currently stopping clusters
+	MetricStoppingClusters = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployments_stopping",
+			Help:    "Distribution of the length of transition time for clusters currently stopping",
+			Buckets: []float64{30, 60, 180, 300, 600},
+		},
+		[]string{"cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
+	// MetricResumingClusters is a prometheus metric that tracks the transition time for currently resuming clusters
+	MetricResumingClusters = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployments_resuming",
+			Help:    "Distribution of the length of transition time for clusters currently resuming",
+			Buckets: []float64{60, 90, 180, 300, 600, 1200},
+		},
+		[]string{"cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
+	// MetricWaitingForCOClusters is a prometheus metric that tracks the transition time for clusters currently in
+	// waiting for cluster operators state
+	MetricWaitingForCOClusters = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployments_waiting_for_cluster_operators",
+			Help:    "Distribution of the length of transition time for clusters currently waiting for cluster operators",
+			Buckets: []float64{60, 90, 180, 300, 600, 3000, 6000},
+		},
+		[]string{"cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
 	// metricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
@@ -163,6 +188,10 @@ func init() {
 
 	metrics.Registry.MustRegister(MetricClusterHibernationTransitionSeconds)
 	metrics.Registry.MustRegister(MetricClusterReadyTransitionSeconds)
+
+	metrics.Registry.MustRegister(MetricStoppingClusters)
+	metrics.Registry.MustRegister(MetricResumingClusters)
+	metrics.Registry.MustRegister(MetricWaitingForCOClusters)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -245,6 +274,39 @@ func (mc *Calculator) Start(ctx context.Context) error {
 					if cleared {
 						mcLog.Infof("cleared metric: %v", metricClusterDeploymentSyncsetPaused)
 					}
+				}
+
+				// Check if cluster is currently transitioning and set the appropriate metrics
+				poolNS := "unknown"
+				if cd.Spec.ClusterPoolRef != nil {
+					poolNS = cd.Spec.ClusterPoolRef.Namespace
+				}
+				hibernatingCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+					hivev1.ClusterHibernatingCondition)
+				readyCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+					hivev1.ClusterReadyCondition)
+				if readyCond.Reason == hivev1.ReadyReasonStoppingOrHibernating &&
+					hibernatingCond.Reason != hivev1.HibernatingReasonHibernating {
+					MetricStoppingClusters.WithLabelValues(
+						cd.Name,
+						cd.Labels[hivev1.HiveClusterPlatformLabel],
+						cd.Labels[constants.VersionMajorMinorPatchLabel],
+						poolNS).Observe(time.Since(readyCond.LastTransitionTime.Time).Seconds())
+				}
+				if hibernatingCond.Reason == hivev1.HibernatingReasonResumingOrRunning &&
+					readyCond.Reason != hivev1.ReadyReasonRunning {
+					MetricResumingClusters.WithLabelValues(
+						cd.Name,
+						cd.Labels[hivev1.HiveClusterPlatformLabel],
+						cd.Labels[constants.VersionMajorMinorPatchLabel],
+						poolNS).Observe(time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
+				}
+				if readyCond.Reason == hivev1.ReadyReasonWaitingForClusterOperators {
+					MetricWaitingForCOClusters.WithLabelValues(
+						cd.Name,
+						cd.Labels[hivev1.HiveClusterPlatformLabel],
+						cd.Labels[constants.VersionMajorMinorPatchLabel],
+						poolNS).Observe(time.Since(readyCond.LastTransitionTime.Time).Seconds())
 				}
 			}
 

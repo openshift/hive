@@ -33,6 +33,7 @@ func TestOvirtActuator(t *testing.T) {
 		pool                       *hivev1.MachinePool
 		expectedMachineSetReplicas map[string]int64
 		expectedErr                bool
+		validatePlatform           func(*testing.T, *ovirtprovider.OvirtMachineProviderSpec)
 	}{
 		{
 			name:              "generate machineset",
@@ -40,6 +41,28 @@ func TestOvirtActuator(t *testing.T) {
 			pool:              testOvirtPool(),
 			expectedMachineSetReplicas: map[string]int64{
 				fmt.Sprintf("%s-worker-0", testInfraID): 3,
+			},
+			validatePlatform: func(t *testing.T, ovirtProvider *ovirtprovider.OvirtMachineProviderSpec) {
+				assert.Equal(t, memoryMB, ovirtProvider.MemoryMB, "unexpected MemeoryMiB")
+				assert.Equal(t, cores, ovirtProvider.CPU.Cores, "unexpected number of CPU Cores")
+				assert.Equal(t, sockets, ovirtProvider.CPU.Sockets, "unexpected number of CPU Sockets")
+				assert.Equal(t, sizeGB, ovirtProvider.OSDisk.SizeGB, "unexpected DiskGiB")
+				assert.Equal(t, vmTypeServer, ovirtProvider.VMType, "unexpected VMType")
+			},
+		},
+		{
+			name:              "empty pool platform config",
+			clusterDeployment: testOvirtClusterDeployment(),
+			pool: func() *hivev1.MachinePool {
+				m := testOvirtPool()
+				m.Spec.Platform.Ovirt = &hivev1ovirt.MachinePool{}
+				return m
+			}(),
+			expectedMachineSetReplicas: map[string]int64{
+				fmt.Sprintf("%s-worker-0", testInfraID): 3,
+			},
+			validatePlatform: func(t *testing.T, ovirtProvider *ovirtprovider.OvirtMachineProviderSpec) {
+				assert.Equal(t, workerUserDataName, ovirtProvider.UserDataSecret.Name, "unexpected UserDataSecret")
 			},
 		},
 	}
@@ -60,13 +83,16 @@ func TestOvirtActuator(t *testing.T) {
 				assert.Error(t, err, "expected error for test case")
 			} else {
 				require.NoError(t, err, "unexpected error for test cast")
-				validateOvirtMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
+				validateOvirtMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.validatePlatform)
 			}
 		})
 	}
 }
 
-func validateOvirtMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64) {
+func validateOvirtMachineSets(t *testing.T,
+	mSets []*machineapi.MachineSet,
+	expectedMSReplicas map[string]int64,
+	validatePlatform func(*testing.T, *ovirtprovider.OvirtMachineProviderSpec)) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -77,11 +103,7 @@ func validateOvirtMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 
 		ovirtProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*ovirtprovider.OvirtMachineProviderSpec)
 		if assert.True(t, ok, "failed to convert to ovirt provider spec") {
-			assert.Equal(t, memoryMB, ovirtProvider.MemoryMB, "unexpected MemeoryMiB")
-			assert.Equal(t, cores, ovirtProvider.CPU.Cores, "unexpected number of CPU Cores")
-			assert.Equal(t, sockets, ovirtProvider.CPU.Sockets, "unexpected number of CPU Sockets")
-			assert.Equal(t, sizeGB, ovirtProvider.OSDisk.SizeGB, "unexpected DiskGiB")
-			assert.Equal(t, vmTypeServer, ovirtProvider.VMType, "unexpected VMType")
+			validatePlatform(t, ovirtProvider)
 		}
 	}
 }

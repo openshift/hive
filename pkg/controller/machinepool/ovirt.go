@@ -62,16 +62,27 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 
 	computePool := baseMachinePool(pool)
 
-	computePool.Platform.Ovirt = &installertypesovirt.MachinePool{
-		CPU: &installertypesovirt.CPU{
-			Cores:   pool.Spec.Platform.Ovirt.CPU.Cores,
-			Sockets: pool.Spec.Platform.Ovirt.CPU.Sockets,
-		},
-		MemoryMB: pool.Spec.Platform.Ovirt.MemoryMB,
-		OSDisk: &installertypesovirt.Disk{
-			SizeGB: pool.Spec.Platform.Ovirt.OSDisk.SizeGB,
-		},
-		VMType: installertypesovirt.VMType(pool.Spec.Platform.Ovirt.VMType),
+	computePool.Platform.Ovirt = &installertypesovirt.MachinePool{}
+
+	if cpu := pool.Spec.Platform.Ovirt.CPU; cpu != nil {
+		computePool.Platform.Ovirt.CPU = &installertypesovirt.CPU{
+			Cores:   cpu.Cores,
+			Sockets: cpu.Sockets,
+		}
+	}
+
+	if pool.Spec.Platform.Ovirt.MemoryMB != int32(0) {
+		computePool.Platform.Ovirt.MemoryMB = pool.Spec.Platform.Ovirt.MemoryMB
+	}
+
+	if disk := pool.Spec.Platform.Ovirt.OSDisk; disk != nil {
+		computePool.Platform.Ovirt.OSDisk = &installertypesovirt.Disk{
+			SizeGB: disk.SizeGB,
+		}
+	}
+
+	if vmType := pool.Spec.Platform.Ovirt.VMType; vmType != "" {
+		computePool.Platform.Ovirt.VMType = installertypesovirt.VMType(vmType)
 	}
 
 	// Fake an install config as we do with other actuators. We only populate what we know is needed today.

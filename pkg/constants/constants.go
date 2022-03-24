@@ -380,6 +380,11 @@ const (
 	// is "Running", the cluster may not be in the same ready state as when it first finished
 	// installing. Use with caution.
 	ResumeSkipsClusterOperatorsLabel = "hive.openshift.io/resume-skips-cluster-operators"
+
+	// DisableCreationWebHookForDisasterRecovery is a label that can be added to CRs for which we
+	// normally validate creation. Specific hooks can be disabled by setting this label to (string)
+	// "true".
+	DisableCreationWebHookForDisasterRecovery = "hive.openshift.io/disable-creation-webhook-for-dr"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

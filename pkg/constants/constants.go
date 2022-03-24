@@ -393,6 +393,11 @@ const (
 
 	// IBMCloudCredentialsSecretKey is a key used to store IBM environment variable credentials
 	IBMCloudCredentialsEnvSecretKey = "ibm-credentials.env"
+
+	// DisableCreationWebHookForDisasterRecovery is a label that can be added to CRs for which we
+	// normally validate creation. Specific hooks can be disabled by setting this label to (string)
+	// "true".
+	DisableCreationWebHookForDisasterRecovery = "hive.openshift.io/disable-creation-webhook-for-dr"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -302,6 +302,16 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name: "Test DR create (restore) with Claimed ClusterPoolReference",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim")
+				cd.Labels = map[string]string{constants.DisableCreationWebHookForDisasterRecovery: "true"}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
 			name:            "Test update with removed ClusterPoolReference",
 			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", ""),
 			newObject:       validAWSClusterDeployment(),

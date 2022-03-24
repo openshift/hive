@@ -2,7 +2,6 @@ package machinepool
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -62,16 +61,27 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 
 	computePool := baseMachinePool(pool)
 
-	computePool.Platform.Ovirt = &installertypesovirt.MachinePool{
-		CPU: &installertypesovirt.CPU{
-			Cores:   pool.Spec.Platform.Ovirt.CPU.Cores,
-			Sockets: pool.Spec.Platform.Ovirt.CPU.Sockets,
-		},
-		MemoryMB: pool.Spec.Platform.Ovirt.MemoryMB,
-		OSDisk: &installertypesovirt.Disk{
-			SizeGB: pool.Spec.Platform.Ovirt.OSDisk.SizeGB,
-		},
-		VMType: installertypesovirt.VMType(pool.Spec.Platform.Ovirt.VMType),
+	computePool.Platform.Ovirt = &installertypesovirt.MachinePool{}
+
+	if cpu := pool.Spec.Platform.Ovirt.CPU; cpu != nil {
+		computePool.Platform.Ovirt.CPU = &installertypesovirt.CPU{
+			Cores:   cpu.Cores,
+			Sockets: cpu.Sockets,
+		}
+	}
+
+	if pool.Spec.Platform.Ovirt.MemoryMB != int32(0) {
+		computePool.Platform.Ovirt.MemoryMB = pool.Spec.Platform.Ovirt.MemoryMB
+	}
+
+	if disk := pool.Spec.Platform.Ovirt.OSDisk; disk != nil {
+		computePool.Platform.Ovirt.OSDisk = &installertypesovirt.Disk{
+			SizeGB: disk.SizeGB,
+		}
+	}
+
+	if vmType := pool.Spec.Platform.Ovirt.VMType; vmType != "" {
+		computePool.Platform.Ovirt.VMType = installertypesovirt.VMType(vmType)
 	}
 
 	// Fake an install config as we do with other actuators. We only populate what we know is needed today.
@@ -98,20 +108,8 @@ func (a *OvirtActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
 	}
-	installerMachineSets = preserveOvirtMachineSetNameSuffix(installerMachineSets)
 
 	return installerMachineSets, true, nil
-}
-
-// preserveOvirtMachineSetNameSuffix ensures that machineset names have a "-0" suffix. The suffix was
-// removed from instalovirt.MachineSets so we maintain it here to prevent machineset replacement.
-func preserveOvirtMachineSetNameSuffix(machineSets []*machineapi.MachineSet) []*machineapi.MachineSet {
-	for _, ms := range machineSets {
-		if !strings.HasSuffix(ms.Name, "-0") {
-			ms.Name = fmt.Sprintf("%s-0", ms.Name)
-		}
-	}
-	return machineSets
 }
 
 // Get the OS image from an existing master machine.

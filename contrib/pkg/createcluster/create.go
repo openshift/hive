@@ -770,7 +770,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			CACert:          bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = oVirtProvider
-		builder.SkipMachinePools = true
 	case cloudIBM:
 		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
 		if ibmCloudAPIKey == "" {

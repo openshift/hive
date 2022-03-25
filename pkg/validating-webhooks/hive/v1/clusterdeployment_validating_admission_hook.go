@@ -215,6 +215,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
+	dr := creationHooksDisabled(cd)
+
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = cd.Name
 
@@ -316,9 +318,12 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
-		if claimName := poolRef.ClaimName; claimName != "" {
-			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "claimName"), claimName, "cannot create a ClusterDeployment that is already claimed"))
+	// Disable this check for DR
+	if !dr {
+		if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
+			if claimName := poolRef.ClaimName; claimName != "" {
+				allErrs = append(allErrs, field.Invalid(specPath.Child("clusterPoolRef", "claimName"), claimName, "cannot create a ClusterDeployment that is already claimed"))
+			}
 		}
 	}
 

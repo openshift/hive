@@ -13,6 +13,7 @@ const (
 	PlatformGCP            = "gcp"
 	PlatformNone           = "none-platform"
 	PlatformOpenStack      = "openstack"
+	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
 

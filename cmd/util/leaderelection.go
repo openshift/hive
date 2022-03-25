@@ -25,7 +25,7 @@ func RunWithLeaderElection(ctx context.Context, cfg *rest.Config, lockNS, lockNa
 	// This gives us ReleaseOnCancel which is not presently exposed in controller-runtime.
 
 	// [Later] Migrated to using resourcelock.New() with ConfigMapsLeasesResourceLock.
-	// TODO: Migrate to LeasesResourceLock after the next version boundary.
+	// [Later] Migrated to using LeasesResourceLock.
 
 	id := uuid.New().String()
 	leLog := log.WithField("id", id)
@@ -33,7 +33,7 @@ func RunWithLeaderElection(ctx context.Context, cfg *rest.Config, lockNS, lockNa
 
 	kubeClient := kubernetes.NewForConfigOrDie(cfg)
 	lock, err := resourcelock.New(
-		resourcelock.ConfigMapsLeasesResourceLock,
+		resourcelock.LeasesResourceLock,
 		lockNS,
 		lockName,
 		kubeClient.CoreV1(),

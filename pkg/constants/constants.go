@@ -14,6 +14,7 @@ const (
 	PlatformIBMCloud       = "ibmcloud"
 	PlatformNone           = "none-platform"
 	PlatformOpenStack      = "openstack"
+	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -475,27 +476,12 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
 			return reconcile.Result{}, err
 		}
-		poolNS, poolName := "unknown", "unknown"
-		if cd.Spec.ClusterPoolRef != nil {
-			poolNS = cd.Spec.ClusterPoolRef.Namespace
-			poolName = cd.Spec.ClusterPoolRef.PoolName
-		}
 		// logging with time since ready condition was set to StoppingOrHibernating state
-		hivemetrics.MetricClusterHibernationTransitionSeconds.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
-			cd.Labels[hivev1.HiveClusterPlatformLabel], poolNS, poolName).Observe(time.Since(readyCondition.LastTransitionTime.Time).Seconds())
+		logCumulativeMetric(hivemetrics.MetricClusterHibernationTransitionSeconds, cd,
+			time.Since(readyCondition.LastTransitionTime.Time).Seconds())
 		// Clear entry from currently stopping and waiting for cluster operators clusters if exists
-		hivemetrics.MetricStoppingClusters.Delete(map[string]string{
-			"cluster_deployment":     cd.Name,
-			"platform":               cd.Labels[hivev1.HiveClusterPlatformLabel],
-			"cluster_version":        cd.Labels[constants.VersionMajorMinorPatchLabel],
-			"cluster_pool_namespace": poolNS,
-		})
-		hivemetrics.MetricWaitingForCOClusters.Delete(map[string]string{
-			"cluster_deployment":     cd.Name,
-			"platform":               cd.Labels[hivev1.HiveClusterPlatformLabel],
-			"cluster_version":        cd.Labels[constants.VersionMajorMinorPatchLabel],
-			"cluster_pool_namespace": poolNS,
-		})
+		deleteTransitionMetric(hivemetrics.MetricStoppingClustersSeconds, cd)
+		deleteTransitionMetric(hivemetrics.MetricWaitingForCOClustersSeconds, cd)
 	}
 	return reconcile.Result{}, nil
 }
@@ -625,23 +611,45 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		if err := r.updateClusterDeploymentStatus(cd, logger); err != nil {
 			return reconcile.Result{}, err
 		}
-		poolNS, poolName := "unknown", "unknown"
-		if cd.Spec.ClusterPoolRef != nil {
-			poolNS = cd.Spec.ClusterPoolRef.Namespace
-			poolName = cd.Spec.ClusterPoolRef.PoolName
-		}
 		// logging with time since hibernating condition was set to ResumingOrRunning state
-		hivemetrics.MetricClusterReadyTransitionSeconds.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
-			cd.Labels[hivev1.HiveClusterPlatformLabel], poolNS, poolName).Observe(time.Since(hibernatingCondition.LastTransitionTime.Time).Seconds())
+		logCumulativeMetric(hivemetrics.MetricClusterReadyTransitionSeconds, cd,
+			time.Since(hibernatingCondition.LastTransitionTime.Time).Seconds())
 		// Clear entry from currently resuming clusters if exists
-		hivemetrics.MetricResumingClusters.Delete(map[string]string{
-			"cluster_deployment":     cd.Name,
-			"platform":               cd.Labels[hivev1.HiveClusterPlatformLabel],
-			"cluster_version":        cd.Labels[constants.VersionMajorMinorPatchLabel],
-			"cluster_pool_namespace": poolNS,
-		})
+		deleteTransitionMetric(hivemetrics.MetricResumingClustersSeconds, cd)
 	}
 	return reconcile.Result{}, nil
+}
+
+// deleteTransitionMetric has the knowledge of labels needed to clear the metrics for currently transitioning clusters
+// Note: do not use for cumulative metrics - they have different labels and are not designed to be cleared
+func deleteTransitionMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment) {
+	poolNS := "<none>"
+	if cd.Spec.ClusterPoolRef != nil {
+		poolNS = cd.Spec.ClusterPoolRef.Namespace
+	}
+	metric.Delete(map[string]string{
+		"cluster_deployment_namespace": cd.Namespace,
+		"cluster_deployment":           cd.Name,
+		"platform":                     cd.Labels[hivev1.HiveClusterPlatformLabel],
+		"cluster_version":              cd.Labels[constants.VersionMajorMinorPatchLabel],
+		"cluster_pool_namespace":       poolNS,
+	})
+}
+
+// logCumulativeMetric should be used to log cumulative metrics
+func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment, time float64) {
+	if !hivemetrics.ShouldLogDurationMetric(metric, time) {
+		return
+	}
+	poolNS, poolName := "<none>", "<none>"
+	if cd.Spec.ClusterPoolRef != nil {
+		poolNS = cd.Spec.ClusterPoolRef.Namespace
+		poolName = cd.Spec.ClusterPoolRef.PoolName
+	}
+	metric.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
+		cd.Labels[hivev1.HiveClusterPlatformLabel],
+		poolNS,
+		poolName).Observe(time)
 }
 
 // timeBeforeClusterSyncCheck returns a duration for requeue use when we find that (Selector)SyncSets

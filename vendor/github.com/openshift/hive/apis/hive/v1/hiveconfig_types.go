@@ -1,9 +1,11 @@
 package v1
 
 import (
-	"github.com/openshift/hive/apis/hive/v1/azure"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 )
 
 // HiveConfigSpec defines the desired state of Hive
@@ -144,38 +146,9 @@ type HiveConfigSpec struct {
 	// prometheus in the cluster can list/access objects required to pull metrics.
 	ExportMetrics bool `json:"exportMetrics,omitempty"`
 
-	// MetricsConfig encapsulates metrics specific configurations, like signing up for opt-in metrics
+	// MetricsConfig encapsulates metrics specific configurations, like opting in for certain metrics.
 	// +optional
-	MetricsConfig *MetricsConfig `json:"metricsConfig,omitempty"`
-}
-
-type MetricsConfig struct {
-	// Optional metrics and their configurations
-	// +optional
-	MetricsWithDuration []MetricsWithDuration `json:"metricsWithDuration"`
-}
-
-// MetricsWithDuration represent metrics that report time as values,like transition seconds
-type MetricsWithDuration struct {
-	// Name of the metric. It will correspond to an optional relevant metric in hive
-	Name DurationMetric `json:"name"`
-	// Duration is the minimum time taken - the relevant metric will be logged only if the value reported by that metric
-	// is more than the time mentioned here. For example, if a user opts-in for current clusters stopping and mentions
-	// 1 hour here, only the clusters stopping for more than an hour will be reported
-	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
-	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
-	Duration *metav1.Duration `json:"duration"`
-}
-
-type DurationMetric struct {
-	CurrentStopping     string `json:"currentStopping,omitempty"`
-	CurrentResuming     string `json:"currentResuming,omitempty"`
-	CurrentWaitingForCO string `json:"currentWaitingForCO,omitempty"`
-
-	// These metrics will not be cleared and can potentially blow up the cardinality
-	CumulativeHibernated string `json:"cumulativeHibernated,omitempty"`
-	CumulativeResumed    string `json:"cumulativeResumed,omitempty"`
+	MetricsConfig *metricsconfig.MetricsConfig `json:"metricsConfig,omitempty"`
 }
 
 // ReleaseImageVerificationConfigMapReference is a reference to the ConfigMap that

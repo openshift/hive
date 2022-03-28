@@ -2,6 +2,10 @@ package metrics
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"io/ioutil"
+	"os"
 	"strconv"
 	"time"
 
@@ -15,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -105,31 +110,31 @@ var (
 			Buckets: []float64{60, 90, 180, 300, 600, 1200},
 		},
 		[]string{"cluster_version", "platform", "cluster_pool_namespace", "cluster_pool_name"})
-	// MetricStoppingClusters is a prometheus metric that tracks the transition time for currently stopping clusters
-	MetricStoppingClusters = prometheus.NewHistogramVec(
+	// MetricStoppingClustersSeconds is a prometheus metric that tracks the transition time for currently stopping clusters
+	MetricStoppingClustersSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployments_stopping",
+			Name:    "hive_cluster_deployments_stopping_seconds",
 			Help:    "Distribution of the length of transition time for clusters currently stopping",
 			Buckets: []float64{30, 60, 180, 300, 600},
 		},
-		[]string{"cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
-	// MetricResumingClusters is a prometheus metric that tracks the transition time for currently resuming clusters
-	MetricResumingClusters = prometheus.NewHistogramVec(
+		[]string{"cluster_deployment_namespace", "cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
+	// MetricResumingClustersSeconds is a prometheus metric that tracks the transition time for currently resuming clusters
+	MetricResumingClustersSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployments_resuming",
+			Name:    "hive_cluster_deployments_resuming_seconds",
 			Help:    "Distribution of the length of transition time for clusters currently resuming",
 			Buckets: []float64{60, 90, 180, 300, 600, 1200},
 		},
-		[]string{"cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
-	// MetricWaitingForCOClusters is a prometheus metric that tracks the transition time for clusters currently in
+		[]string{"cluster_deployment_namespace", "cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
+	// MetricWaitingForCOClustersSeconds is a prometheus metric that tracks the transition time for clusters currently in
 	// waiting for cluster operators state
-	MetricWaitingForCOClusters = prometheus.NewHistogramVec(
+	MetricWaitingForCOClustersSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployments_waiting_for_cluster_operators",
+			Name:    "hive_cluster_deployments_waiting_for_cluster_operators_seconds",
 			Help:    "Distribution of the length of transition time for clusters currently waiting for cluster operators",
 			Buckets: []float64{60, 90, 180, 300, 600, 3000, 6000},
 		},
-		[]string{"cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
+		[]string{"cluster_deployment_namespace", "cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
 	// metricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
@@ -152,6 +157,9 @@ var (
 		},
 		[]string{"cluster_deployment", "namespace", "cluster_type"},
 	)
+
+	// mapMetricToDuration is a map of optional durationMetrics to their specific duration, if mentioned
+	mapMetricToDuration map[*prometheus.HistogramVec]time.Duration
 )
 
 // ReconcileOutcome is used in controller "reconcile complete" log entries, and the metricControllerReconcileTime
@@ -185,13 +193,6 @@ func init() {
 
 	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
 	metrics.Registry.MustRegister(metricClusterDeploymentSyncsetPaused)
-
-	metrics.Registry.MustRegister(MetricClusterHibernationTransitionSeconds)
-	metrics.Registry.MustRegister(MetricClusterReadyTransitionSeconds)
-
-	metrics.Registry.MustRegister(MetricStoppingClusters)
-	metrics.Registry.MustRegister(MetricResumingClusters)
-	metrics.Registry.MustRegister(MetricWaitingForCOClusters)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -200,8 +201,10 @@ func Add(mgr manager.Manager) error {
 		Client:   mgr.GetClient(),
 		Interval: 2 * time.Minute,
 	}
+	// TODO: Make these optional & configurable via HiveConfig.Spec.MetricsConfig
 	metrics.Registry.MustRegister(newProvisioningUnderwaySecondsCollector(mgr.GetClient(), 1*time.Hour))
 	metrics.Registry.MustRegister(newProvisioningUnderwayInstallRestartsCollector(mgr.GetClient(), 1))
+
 	err := mgr.Add(mc)
 	if err != nil {
 		return err
@@ -225,6 +228,15 @@ type Calculator struct {
 // Start begins the metrics calculation loop.
 func (mc *Calculator) Start(ctx context.Context) error {
 	log.Info("started metrics calculator goroutine")
+	// Get the metrics config from hiveConfig
+	mConfig, err := readMetricsConfig()
+	if err != nil {
+		log.WithError(err).Error("error reading metrics config")
+		return err
+	}
+	// Register optional metrics and update them in their corresponding maps, so controllers logging them can access
+	// the information
+	registerOptionalMetrics(mConfig)
 
 	// Run forever, sleep at the end:
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
@@ -235,7 +247,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		mcLog.Info("calculating metrics across all ClusterDeployments")
 		// Load all ClusterDeployments so we can accumulate facts about them.
 		clusterDeployments := &hivev1.ClusterDeploymentList{}
-		err := mc.Client.List(ctx, clusterDeployments)
+		err = mc.Client.List(ctx, clusterDeployments)
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
@@ -277,36 +289,21 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				}
 
 				// Check if cluster is currently transitioning and set the appropriate metrics
-				poolNS := "unknown"
-				if cd.Spec.ClusterPoolRef != nil {
-					poolNS = cd.Spec.ClusterPoolRef.Namespace
-				}
-				hibernatingCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
-					hivev1.ClusterHibernatingCondition)
-				readyCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
-					hivev1.ClusterReadyCondition)
+				hibernatingCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+				readyCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 				if readyCond.Reason == hivev1.ReadyReasonStoppingOrHibernating &&
 					hibernatingCond.Reason != hivev1.HibernatingReasonHibernating {
-					MetricStoppingClusters.WithLabelValues(
-						cd.Name,
-						cd.Labels[hivev1.HiveClusterPlatformLabel],
-						cd.Labels[constants.VersionMajorMinorPatchLabel],
-						poolNS).Observe(time.Since(readyCond.LastTransitionTime.Time).Seconds())
+					logDurationMetric(MetricStoppingClustersSeconds, &cd,
+						time.Since(readyCond.LastTransitionTime.Time).Seconds())
 				}
 				if hibernatingCond.Reason == hivev1.HibernatingReasonResumingOrRunning &&
 					readyCond.Reason != hivev1.ReadyReasonRunning {
-					MetricResumingClusters.WithLabelValues(
-						cd.Name,
-						cd.Labels[hivev1.HiveClusterPlatformLabel],
-						cd.Labels[constants.VersionMajorMinorPatchLabel],
-						poolNS).Observe(time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
+					logDurationMetric(MetricResumingClustersSeconds, &cd,
+						time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
 				}
 				if readyCond.Reason == hivev1.ReadyReasonWaitingForClusterOperators {
-					MetricWaitingForCOClusters.WithLabelValues(
-						cd.Name,
-						cd.Labels[hivev1.HiveClusterPlatformLabel],
-						cd.Labels[constants.VersionMajorMinorPatchLabel],
-						poolNS).Observe(time.Since(readyCond.LastTransitionTime.Time).Seconds())
+					logDurationMetric(MetricWaitingForCOClustersSeconds, &cd,
+						time.Since(readyCond.LastTransitionTime.Time).Seconds())
 				}
 			}
 
@@ -399,6 +396,37 @@ func (mc *Calculator) Start(ctx context.Context) error {
 	}, mc.Interval)
 
 	return nil
+}
+
+// registerOptionalMetrics registers the metrics, and stores their configs in the corresponding maps
+func registerOptionalMetrics(mConfig *metricsconfig.MetricsConfig) {
+	mapMetricToDuration = make(map[*prometheus.HistogramVec]time.Duration)
+	for _, metric := range mConfig.MetricsWithDuration {
+		switch metric.Name {
+		case metricsconfig.CurrentStopping:
+			metrics.Registry.MustRegister(MetricStoppingClustersSeconds)
+			mapMetricToDuration[MetricStoppingClustersSeconds] = metric.Duration.Duration
+		case metricsconfig.CurrentResuming:
+			metrics.Registry.MustRegister(MetricResumingClustersSeconds)
+			mapMetricToDuration[MetricResumingClustersSeconds] = metric.Duration.Duration
+		case metricsconfig.CurrentWaitingForCO:
+			metrics.Registry.MustRegister(MetricWaitingForCOClustersSeconds)
+			mapMetricToDuration[MetricWaitingForCOClustersSeconds] = metric.Duration.Duration
+		case metricsconfig.CumulativeHibernated:
+			metrics.Registry.MustRegister(MetricClusterHibernationTransitionSeconds)
+			mapMetricToDuration[MetricClusterHibernationTransitionSeconds] = metric.Duration.Duration
+		case metricsconfig.CumulativeResumed:
+			metrics.Registry.MustRegister(MetricClusterReadyTransitionSeconds)
+			mapMetricToDuration[MetricClusterReadyTransitionSeconds] = metric.Duration.Duration
+		}
+	}
+}
+
+// ShouldLogDurationMetric decides whether the corresponding duration metric should be logged. It first checks if that
+// optional metric has been opted into for logging, and the duration has crossed the threshold set
+func ShouldLogDurationMetric(metricToLog *prometheus.HistogramVec, timeToLog float64) bool {
+	duration, ok := mapMetricToDuration[metricToLog]
+	return ok && duration.Seconds() <= timeToLog
 }
 
 func (mc *Calculator) calculateSelectorSyncSetMetrics(mcLog log.FieldLogger) {
@@ -715,6 +743,43 @@ func (ca *clusterAccumulator) addConditionToMap(cond hivev1.ClusterDeploymentCon
 		ca.conditions[cond] = map[string]int{}
 	}
 	ca.conditions[cond][clusterType]++
+}
+
+// readMetricsConfig reads the metrics config from the file pointed to by the MetricsConfigFileEnvVar
+// environment variable.
+func readMetricsConfig() (*metricsconfig.MetricsConfig, error) {
+	path := os.Getenv(constants.MetricsConfigFileEnvVar)
+	config := &metricsconfig.MetricsConfig{}
+	if len(path) == 0 {
+		return config, errors.New("metrics config environment variable not set")
+	}
+
+	fileBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return config, err
+	}
+	if err = json.Unmarshal(fileBytes, config); err != nil {
+		return config, err
+	}
+
+	return config, nil
+}
+
+// logDurationMetric should be used to log duration metrics
+func logDurationMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment, time float64) {
+	if !ShouldLogDurationMetric(metric, time) {
+		return
+	}
+	poolNS := "<none>"
+	if cd.Spec.ClusterPoolRef != nil {
+		poolNS = cd.Spec.ClusterPoolRef.Namespace
+	}
+	metric.WithLabelValues(
+		cd.Namespace,
+		cd.Name,
+		cd.Labels[hivev1.HiveClusterPlatformLabel],
+		cd.Labels[constants.VersionMajorMinorPatchLabel],
+		poolNS).Observe(time)
 }
 
 var elapsedDurationBuckets = []time.Duration{2 * time.Minute, time.Minute, 30 * time.Second, 10 * time.Second, 5 * time.Second, time.Second, 0}

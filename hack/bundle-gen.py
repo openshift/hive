@@ -40,6 +40,11 @@ HIVE_BRANCH_DEFAULT = "master"
 
 SUBPROCESS_REDIRECT = subprocess.DEVNULL
 
+# Match things like 'ocm-2.5-mce-2.0' or origin/ocm-2.5-mce-2.0, capturing:
+# 1: 'origin/'
+# 2: '2.5' (used for the bundle semver prefix)
+# 3: 'mce-2.0' (used for the channel name)
+MCE_BRANCH_RE = re.compile("^([^/]+/)?ocm-(\d+\.\d+)-(mce-\d+\.\d+)$")
 # Match things like 'ocm-2.3' or 'origin/ocm-2.3', capturing:
 # 1: 'origin/'
 # 2: 'ocm-2.3'
@@ -72,7 +77,9 @@ def get_params():
                                 update the `{}` channel. If BRANCH *also* corresponds to an `ocm-X.Y`,
                                 we'll also update that channel with the same bundle. If BRANCH corresponds
                                 to an `ocm-X.Y` but *not* `{}`, we'll generate the bundle version
-                                number based on `X.Y` and update only that channel.""".format(
+                                number based on `X.Y` and update only that channel. A BRANCH named
+                                `ocm-X.Y-mce-M.N` will result in a bundle with semver prefix `X.Y` in a
+                                channel named `mce-M.N`.""".format(
             HIVE_BRANCH_DEFAULT,
             HIVE_BRANCH_DEFAULT,
             HIVE_VERSION_PREFIX,
@@ -487,6 +494,31 @@ def open_pr(
     print()
 
 
+def parse_branch_name(branch_name):
+    """Split up a branch name of the form 'ocm-X.Y[-mce-M.N].
+
+    :param branch_name: A branch name. If of the form [remote/]ocm-X.Y[-mce-M.N] we will parse
+        it as noted below; otherwise the first return will be False.
+    :return parsed (bool): True if the branch_name was parseable; False otherwise.
+    :return remote (str): If parsed and the branch_name contained a remote/ prefix, it is
+        returned here; otherwise this is the empty string.
+    :return prefix (str): Two-digit semver prefix of the bundle to be generated. If the branch
+        name is of the form [remote/]ocm-X.Y, this will be X.Y; if of the form
+        [remote/]ocm-X.Y-mce-M.N it will be M.N. If not parseable, it will be the empty string.
+    :return channel (str): The name of the channel in which we'll include the bundle. If the
+        branch name is of the form [remote/]ocm-X.Y, this will be ocm-X.Y; if of the form
+        [remote/]ocm-X.Y-mce-M.N it will be mce-M.N. If not parseable, it will be the empty
+        string.
+    """
+    m = MCE_BRANCH_RE.match(branch_name)
+    if m:
+        return True, m.group(1), m.group(2), m.group(3)
+    m = OCM_BRANCH_RE.match(branch_name)
+    if m:
+        return True, m.group(1), m.group(3), m.group(2)
+    return False, '', '', ''
+
+
 def process_branch(hive_repo, branch_arg):
     """Validate and process the input (or default) branch.
 
@@ -502,12 +534,11 @@ def process_branch(hive_repo, branch_arg):
     :raise: If we get a branch_arg that's invalid (doesn't correspond to a real commit in hive_repo),
         or that's not 'ocm-X.Y' or (a descendant of) master.
     """
-    # We're cloning the hive repo, so there's no local branch for ocm-X.Y; but we don't want to
-    # force the user to say 'origin/ocm-X.Y'. Accommodate...
-    m = OCM_BRANCH_RE.match(branch_arg)
-    if m:
-        # Second capture group is ocm-X.Y
-        branch_arg = "origin/{}".format(m.group(2))
+    # We're cloning the hive repo, so there's no local branch for ocm-X.Y[-mce-M.N]; but we don't want to
+    # force the user to say 'origin/ocm-X.Y[-mce-M.N]'. Accommodate...
+    parsed, remote, _, _ = parse_branch_name(branch_arg)
+    if parsed and not remote:
+        branch_arg = "origin/{}".format(branch_arg)
 
     # This will raise an exception if there's no such commit-ish
     commit_hash = hive_repo.rev_parse(branch_arg).hexsha
@@ -533,22 +564,21 @@ def process_branch(hive_repo, branch_arg):
         "--ancestry-path", "{}..{}".format(commit_hash, master_hash)
     )
 
-    # Was (a commit on) an ocm-X.Y branch specified?
+    # Was (a commit on) an ocm-X.Y[-mce-M.N] branch specified?
     # This will find all such branch names and add them to the channel list.
     # However, we'll only support >1 entry in this list if we're tracking
     # master, because otherwise which would we use to compute the semver?
     channels = []
     maybe_prefix = None
     for ref in hive_repo.refs:
-        m = OCM_BRANCH_RE.match(ref.name)
+        parsed, remote, prefix, channel = parse_branch_name(ref.name)
         # Only pay attention to remote refs
-        if m and m.group(1) == "origin/":
+        if parsed and remote == "origin/":
             if hive_repo.rev_parse(ref.name).hexsha == commit_hash:
-                # Second capture group is ocm-X.Y
-                channels.append(m.group(2))
-                # Third capture group is X.Y. We'll only use this if we end up with one
+                channels.append(channel)
+                # We'll only use this if we end up with one
                 # entry in this list AND we're not tracking master
-                maybe_prefix = m.group(3)
+                maybe_prefix = prefix
 
     if commit_hash == master_hash or (is_master_ancestor and not maybe_prefix):
         prefix = HIVE_VERSION_PREFIX
@@ -557,7 +587,7 @@ def process_branch(hive_repo, branch_arg):
     else:
         if len(channels) > 1:
             raise ValueError(
-                "Found more than one ocm-X.Y branch at {}: {}.\n".format(
+                "Found more than one channel candidate at {}: {}.\n".format(
                     branch_arg, channels
                 )
                 + "I can't handle this unless they're direct descendants of master -- "
@@ -567,7 +597,7 @@ def process_branch(hive_repo, branch_arg):
 
     if not channels or not prefix:
         raise ValueError(
-            "Can't make sense of branch {}: expected {}, a direct descendant thereof, or 'ocm-X.Y'.".format(
+            "Can't make sense of branch {}: expected {}, a direct descendant thereof, 'ocm-X.Y', or 'ocm-X.Y-mce-M.N'.".format(
                 branch_arg, HIVE_BRANCH_DEFAULT
             )
         )

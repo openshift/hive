@@ -58,7 +58,7 @@ func (a *ibmCloudActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient
 		logger.Info("No instances were found to stop")
 		return nil
 	}
-	err = ibmCloudClient.StopInstances(instances)
+	err = ibmCloudClient.StopInstances(context.TODO(), instances, cd.Spec.Platform.IBMCloud.Region)
 	if err != nil {
 		logger.WithError(err).Error("failed to stop IBM Cloud instances")
 		return err
@@ -83,7 +83,7 @@ func (a *ibmCloudActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClien
 		logger.Info("No instances were found to start")
 		return nil
 	}
-	err = ibmCloudClient.StartInstances(instances)
+	err = ibmCloudClient.StartInstances(context.TODO(), instances, cd.Spec.Platform.IBMCloud.Region)
 	if err != nil {
 		logger.WithError(err).Error("failed to start IBM Cloud instances")
 		return err
@@ -149,7 +149,7 @@ func getIBMCloudClusterInstances(cd *hivev1.ClusterDeployment, c ibmclient.API, 
 	logger = logger.WithField("infraID", infraID)
 	logger.Debug("listing cluster instances")
 
-	instances, err := c.GetVPCInstances(context.TODO(), infraID)
+	instances, err := c.GetVPCInstances(context.TODO(), infraID, cd.Spec.Platform.IBMCloud.Region)
 	if err != nil {
 		logger.WithError(err).Error("failed to list instances")
 		return nil, err

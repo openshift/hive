@@ -38,9 +38,9 @@ type API interface {
 	GetVSIProfiles(ctx context.Context) ([]vpcv1.InstanceProfile, error)
 	GetVPC(ctx context.Context, vpcID string) (*vpcv1.VPC, error)
 	GetVPCZonesForRegion(ctx context.Context, region string) ([]string, error)
-	GetVPCInstances(ctx context.Context, resourceGroupID string) ([]vpcv1.Instance, error)
-	StartInstances(instances []vpcv1.Instance) error
-	StopInstances(instances []vpcv1.Instance) error
+	GetVPCInstances(ctx context.Context, infraID, region string) ([]vpcv1.Instance, error)
+	StartInstances(ctx context.Context, instances []vpcv1.Instance, region string) error
+	StopInstances(ctx context.Context, instances []vpcv1.Instance, region string) error
 }
 
 // Client makes calls to the IBM Cloud API.
@@ -482,8 +482,12 @@ func GetAccountID(client API, ctx context.Context) (string, error) {
 	return *apiKeyDetails.AccountID, nil
 }
 
-func (c *Client) GetVPCInstances(ctx context.Context, infraID string) ([]vpcv1.Instance, error) {
-	options := &vpcv1.ListInstancesOptions{}
+func (c *Client) GetVPCInstances(ctx context.Context, infraID, region string) ([]vpcv1.Instance, error) {
+	err := c.setVPCServiceURLForRegion(ctx, region)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to set vpc service url for region %s", region)
+	}
+	options := c.vpcAPI.NewListInstancesOptions()
 	options.SetVPCName(fmt.Sprintf("%s-vpc", infraID))
 	result, _, err := c.vpcAPI.ListInstances(options)
 	if err != nil {
@@ -498,11 +502,13 @@ func (c *Client) GetVPCInstances(ctx context.Context, infraID string) ([]vpcv1.I
 	return instances, nil
 }
 
-func (c *Client) StopInstances(instances []vpcv1.Instance) error {
+func (c *Client) StopInstances(ctx context.Context, instances []vpcv1.Instance, region string) error {
+	err := c.setVPCServiceURLForRegion(ctx, region)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set vpc service url for region %s", region)
+	}
 	for _, instance := range instances {
-		options := &vpcv1.CreateInstanceActionOptions{}
-		options.SetInstanceID(*instance.ID)
-		options.SetType(vpcv1.CreateInstanceActionOptionsTypeStopConst)
+		options := c.vpcAPI.NewCreateInstanceActionOptions(*instance.ID, vpcv1.CreateInstanceActionOptionsTypeStopConst)
 		_, _, err := c.vpcAPI.CreateInstanceAction(options)
 		if err != nil {
 			return errors.Wrap(err, "failed to create stop instance action")
@@ -511,11 +517,13 @@ func (c *Client) StopInstances(instances []vpcv1.Instance) error {
 	return nil
 }
 
-func (c *Client) StartInstances(instances []vpcv1.Instance) error {
+func (c *Client) StartInstances(ctx context.Context, instances []vpcv1.Instance, region string) error {
+	err := c.setVPCServiceURLForRegion(ctx, region)
+	if err != nil {
+		return errors.Wrapf(err, "failed to set vpc service url for region %s", region)
+	}
 	for _, instance := range instances {
-		options := &vpcv1.CreateInstanceActionOptions{}
-		options.SetInstanceID(*instance.ID)
-		options.SetType(vpcv1.CreateInstanceActionOptionsTypeStartConst)
+		options := c.vpcAPI.NewCreateInstanceActionOptions(*instance.ID, vpcv1.CreateInstanceActionOptionsTypeStartConst)
 		_, _, err := c.vpcAPI.CreateInstanceAction(options)
 		if err != nil {
 			return errors.Wrapf(err, "failed to create start instance action for instance %q", *instance.Name)

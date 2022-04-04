@@ -1,6 +1,7 @@
 package hibernation
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -17,6 +18,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	"github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	"github.com/openshift/hive/pkg/ibmclient"
 	mockibmclient "github.com/openshift/hive/pkg/ibmclient/mock"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
@@ -51,8 +53,8 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			testFunc:  "StopMachines",
 			instances: map[string]int{"deleting": 5, "running": 2},
 			setupClient: func(t *testing.T, c *mockibmclient.MockAPI) {
-				c.EXPECT().StopInstances(gomock.Any()).Times(1).Do(
-					func(instances []vpcv1.Instance) {
+				c.EXPECT().StopInstances(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Do(
+					func(ctx context.Context, instances []vpcv1.Instance, region string) {
 						assert.Equal(t, 2, len(instances), "unexpected number of instances provided to StopInstances")
 						for _, i := range instances {
 							assert.Equal(t, *i.Status, "running")
@@ -66,8 +68,8 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			testFunc:  "StopMachines",
 			instances: map[string]int{"deleting": 5, "stopping": 3, "stopped": 4, "pending": 7, "running": 3},
 			setupClient: func(t *testing.T, c *mockibmclient.MockAPI) {
-				c.EXPECT().StopInstances(gomock.Any()).Times(1).Do(
-					func(instances []vpcv1.Instance) {
+				c.EXPECT().StopInstances(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Do(
+					func(ctx context.Context, instances []vpcv1.Instance, region string) {
 						assert.Equal(t, 10, len(instances), "unexpected number of instances provided to StopInstances")
 						for _, i := range instances {
 							assert.True(t, *i.Status == "pending" || *i.Status == "running")
@@ -86,8 +88,8 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			testFunc:  "StartMachines",
 			instances: map[string]int{"stopped": 3, "running": 4},
 			setupClient: func(t *testing.T, c *mockibmclient.MockAPI) {
-				c.EXPECT().StartInstances(gomock.Any()).Times(1).Do(
-					func(instances []vpcv1.Instance) {
+				c.EXPECT().StartInstances(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Do(
+					func(ctx context.Context, instances []vpcv1.Instance, region string) {
 						assert.Equal(t, 3, len(instances), "unexpected number of instances provided to StartInstances")
 						for _, i := range instances {
 							assert.True(t, *i.Status == "stopped")
@@ -101,8 +103,8 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			testFunc:  "StartMachines",
 			instances: map[string]int{"stopped": 3, "stopping": 1, "deleting": 7},
 			setupClient: func(t *testing.T, c *mockibmclient.MockAPI) {
-				c.EXPECT().StartInstances(gomock.Any()).Times(1).Do(
-					func(instances []vpcv1.Instance) {
+				c.EXPECT().StartInstances(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Do(
+					func(ctx context.Context, instances []vpcv1.Instance, region string) {
 						assert.Equal(t, 4, len(instances), "unexpected number of instances provided to StartInstances")
 						for _, i := range instances {
 							assert.True(t, *i.Status == "stopped" || *i.Status == "stopping")
@@ -116,7 +118,7 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			testFunc:  "StopMachines",
 			instances: map[string]int{"deleting": 5, "running": 2},
 			setupClient: func(t *testing.T, c *mockibmclient.MockAPI) {
-				c.EXPECT().GetVPCInstances(gomock.Any(), gomock.Any()).Times(1).Return(nil, errors.New("cannot list instances"))
+				c.EXPECT().GetVPCInstances(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil, errors.New("cannot list instances"))
 			},
 			expectErr: true,
 		},
@@ -136,9 +138,9 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			var err error
 			switch test.testFunc {
 			case "StopMachines":
-				err = actuator.StopMachines(testClusterDeployment(), nil, log.New())
+				err = actuator.StopMachines(testIBMCloudClusterDeployment(), nil, log.New())
 			case "StartMachines":
-				err = actuator.StartMachines(testClusterDeployment(), nil, log.New())
+				err = actuator.StartMachines(testIBMCloudClusterDeployment(), nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}
@@ -219,9 +221,9 @@ func TestIBMCloudMachinesStoppedAndRunning(t *testing.T) {
 			var remaining []string
 			switch test.testFunc {
 			case "MachinesStopped":
-				result, remaining, err = actuator.MachinesStopped(testClusterDeployment(), nil, log.New())
+				result, remaining, err = actuator.MachinesStopped(testIBMCloudClusterDeployment(), nil, log.New())
 			case "MachinesRunning":
-				result, remaining, err = actuator.MachinesRunning(testClusterDeployment(), nil, log.New())
+				result, remaining, err = actuator.MachinesRunning(testIBMCloudClusterDeployment(), nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}
@@ -255,5 +257,13 @@ func setupIBMCloudClientInstances(ibmCloudClient *mockibmclient.MockAPI, statuse
 			})
 		}
 	}
-	ibmCloudClient.EXPECT().GetVPCInstances(gomock.Any(), gomock.Any()).Times(1).Return(instances, nil)
+	ibmCloudClient.EXPECT().GetVPCInstances(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(instances, nil)
+}
+
+func testIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
+	cdBuilder := testcd.FullBuilder("testns", "testibmcluster", scheme.Scheme)
+	return cdBuilder.Build(
+		testcd.WithIBMCloudPlatform(&hivev1ibmcloud.Platform{Region: "us-south"}),
+		testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: "testibmcluster-foobarbaz"}),
+	)
 }

@@ -11,6 +11,7 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/test/generic"
 )
@@ -218,5 +219,19 @@ func WithGCPPlatform(platform *hivev1gcp.Platform) Option {
 func WithAzurePlatform(platform *hivev1azure.Platform) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.Platform.Azure = platform
+	}
+}
+
+// WithIBMCloudPlatform sets the specified IBM Cloud platform on the cd.
+func WithIBMCloudPlatform(platform *hivev1ibmcloud.Platform) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.Platform.IBMCloud = platform
+	}
+}
+
+// WithClusterMetadata sets the specified cluster metadata on the cd.
+func WithClusterMetadata(clusterMetadata *hivev1.ClusterMetadata) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Spec.ClusterMetadata = clusterMetadata
 	}
 }

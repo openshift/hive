@@ -399,6 +399,11 @@ const (
 	// normally validate creation. Specific hooks can be disabled by setting this label to (string)
 	// "true".
 	DisableCreationWebHookForDisasterRecovery = "hive.openshift.io/disable-creation-webhook-for-dr"
+
+	// ExtraWorkerSecurityGroupAnnotation is an annotation that can be applied to Hive MachinePools
+	// containing an extra AWS Security Group that will be applied to worker MachineSet manifests
+	// prior to installation.
+	ExtraWorkerSecurityGroupAnnotation = "hive.openshift.io/extra-worker-security-group"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

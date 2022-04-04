@@ -18,12 +18,16 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 
-	installertypes "github.com/openshift/installer/pkg/types"
+	awsproviderv1beta1 "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	machineapi "github.com/openshift/api/machine/v1beta1"
+	installertypes "github.com/openshift/installer/pkg/types"
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -714,6 +718,144 @@ func Test_pasteInPullSecret(t *testing.T) {
 			actual, err := pasteInPullSecret(icData, filepath.Join("testdata", "pull-secret.json"))
 			assert.NoError(t, err, "unexpected error pasting in pull secret")
 			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig with pasted pull secret")
+		})
+	}
+}
+
+func TestPatchWorkerMachineSet(t *testing.T) {
+	machineSetYAMLBase := `---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: test-czcpt
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: test-czcpt-worker-us-east-1a
+    spec:
+      providerSpec:
+        value:
+          ami:
+            id: ami-03d1c2cba04df838c
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              volumeSize: 120
+              volumeType: gp2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          iamInstanceProfile:
+            id: test-czcpt-worker-profile
+          instanceType: m4.large
+          kind: AWSMachineProviderConfig
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:` // doesn't end in a newline, each test appends to the string
+
+	cases := []struct {
+		name           string
+		manifestYAML   string
+		expectModified bool
+		expectErr      bool
+	}{
+		{
+			name: "Patch applies with one security group",
+			manifestYAML: machineSetYAMLBase +
+				"\n              - test-czcpt-worker-sg",
+			expectModified: true,
+		},
+		{
+			name: "Patch applies with more than one security group",
+			manifestYAML: machineSetYAMLBase +
+				"\n              - an-extra-sg" +
+				"\n              - another-sg",
+			expectModified: true,
+		},
+		{
+			name:           "Patch applies with no security groups",
+			manifestYAML:   machineSetYAMLBase + " []",
+			expectModified: true,
+		},
+		{
+			name: "Manifest is not a MachineSet",
+			manifestYAML: `---
+kind: Potato
+spec:
+  template:
+    metadata:
+      labels:
+      - "potato.openshift.io/potato-api-potato-type": "yukongold"
+`,
+			expectModified: false,
+		},
+		{
+			name: "Manifest is not a worker MachineSet",
+			manifestYAML: `---
+kind: MachineSet
+spec:
+  template:
+    metadata:
+      labels:
+      - "machine.openshift.io/cluster-api-machine-type": "infra"
+`,
+			expectModified: false,
+		},
+		{
+			name: "Security group is already configured",
+			manifestYAML: machineSetYAMLBase +
+				"\n              - test-security-group",
+			expectModified: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			machineapi.AddToScheme(scheme.Scheme)
+			awsproviderv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
+
+			pool := &hivev1.MachinePool{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testpool",
+					Namespace: "testnamespace",
+					Annotations: map[string]string{
+						constants.ExtraWorkerSecurityGroupAnnotation: "test-security-group",
+					},
+				},
+			}
+			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
+			modifiedBytes, err := patchWorkerMachineSetManifest([]byte(tc.manifestYAML), pool, logger)
+			if tc.expectModified {
+				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
+			} else {
+				assert.Nil(t, modifiedBytes, "expected manifest to not be modified")
+			}
+			if tc.expectErr {
+				assert.Error(t, err, "expected error patching worker machineset manifests")
+			} else {
+				assert.NoError(t, err, "unexpected error patching worker machineset manifests")
+			}
+
+			codecFactory := serializer.NewCodecFactory(scheme.Scheme)
+			decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion, awsproviderv1beta1.SchemeGroupVersion)
+
+			if tc.expectModified {
+				machineSetObj, _, err := decoder.Decode(*modifiedBytes, nil, nil)
+				assert.NoError(t, err, "expected to be able to decode MachineSet yaml")
+				machineSet, _ := machineSetObj.(*machineapi.MachineSet)
+
+				awsMachineTemplateObj, _, err := decoder.Decode(machineSet.Spec.Template.Spec.ProviderSpec.Value.Raw, nil, nil)
+				assert.NoError(t, err, "expected to be able to decode AWSMachineProviderConfig")
+				awsMachineTemplate, _ := awsMachineTemplateObj.(*awsproviderv1beta1.AWSMachineProviderConfig)
+
+				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within AWSMachineProviderConfig")
+			}
 		})
 	}
 }

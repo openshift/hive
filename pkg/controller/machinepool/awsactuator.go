@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -26,6 +27,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -302,6 +304,16 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 			Values: []string{fmt.Sprintf("%s-worker-sg", infraID)},
 		}},
 	}}
+
+	// Day 2: Hive MachinePools with an ExtraWorkerSecurityGroupAnnotation are configured with the additional
+	// security group value specified in the annotation. For details, see HIVE-1802.
+	//
+	// NOTE: modifying the security group of an existing MachineSet will NOT result in updates to the
+	// corresponding instances in AWS and will only be configured for newly created instances.
+	if metav1.HasAnnotation(pool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) {
+		providerConfig.SecurityGroups[0].Filters[0].Values = append(providerConfig.SecurityGroups[0].Filters[0].Values, pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
+	}
+
 	if pool.Spec.Platform.AWS.SpotMarketOptions != nil {
 		providerConfig.SpotMarketOptions = &awsproviderv1beta1.SpotMarketOptions{
 			MaxPrice: pool.Spec.Platform.AWS.SpotMarketOptions.MaxPrice,

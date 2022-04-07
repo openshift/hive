@@ -847,6 +847,9 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 // security group filter if that manifest is the definition of a worker MachineSet. The security group is obtained from
 // an annotation (constants.ExtraWorkerSecurityGroupAnnotation) on the provided MachinePool and is the value of the
 // annotation (singular).
+// The first return value points to the modified manifest. It is `nil` if the manifest was not modified.
+// The second return value indicates an error from which we should not proceed.
+// Of note, it is not an error if `manifestBytes` represents valid yaml that is not a worker MachineSet.
 func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, logger log.FieldLogger) (*[]byte, error) {
 	c, err := yamlutils.Decode(manifestBytes)
 	// Decoding the yaml here shouldn't produce an error. An error indicates that the

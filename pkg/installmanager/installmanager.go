@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -62,6 +64,7 @@ import (
 	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/hive/pkg/resource"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
+	yamlutils "github.com/openshift/hive/pkg/util/yaml"
 )
 
 const (
@@ -375,9 +378,18 @@ func (m *InstallManager) Run() error {
 		return fmt.Errorf("infraID is already set on the ClusterProvision. Unexpected install pod restart detected")
 	}
 
+	// Get worker MachinePool for the ClusterDeployment if one exists.
+	workerMachinePool, err := m.loadWorkerMachinePool(cd)
+	if err != nil {
+		// Error indicates we weren't able to check if there was a worker MachinePool
+		// associated with the ClusterDeployment.
+		m.log.WithError(err).Error("error looking up worker machine pool")
+		return err
+	}
+
 	// Generate installer assets we need to modify or upload.
 	m.log.Info("generating assets")
-	if err := m.generateAssets(cd); err != nil {
+	if err := m.generateAssets(cd, workerMachinePool); err != nil {
 		m.log.Info("reading installer log")
 		installLog, readErr := m.readInstallerLog(provision, m, scrubInstallLog)
 		if readErr != nil {
@@ -741,7 +753,7 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 
 // generateAssets runs openshift-install commands to generate on-disk assets we need to
 // upload or modify prior to provisioning resources in the cloud.
-func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
+func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMachinePool *hivev1.MachinePool) error {
 	m.log.Info("running openshift-install create manifests")
 	err := m.runOpenShiftInstallCommand("create", "manifests")
 	if err != nil {
@@ -766,6 +778,49 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 		}
 	}
 
+	// Day 0: Configure Hive worker MachinePool manifests with additional security group when
+	// ExtraWorkerSecurityGroupAnnotation has been set in annotations for the worker MachinePool.
+	// For details, see HIVE-1802.
+	if workerMachinePool != nil && metav1.HasAnnotation(workerMachinePool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) {
+		m.log.Info("modifying worker machineset manifests")
+
+		err = filepath.WalkDir(filepath.Join(m.WorkDir, "openshift"), func(path string, d fs.DirEntry, err error) error {
+			if d.IsDir() || (filepath.Ext(path) != ".yaml" && filepath.Ext(path) != ".yml") {
+				return nil
+			}
+
+			manifestBytes, err := ioutil.ReadFile(path)
+			if err != nil {
+				m.log.WithError(err).Error("error reading manifest file")
+				return err
+			}
+
+			modifiedManifestBytes, err := patchWorkerMachineSetManifest(manifestBytes, workerMachinePool, m.log)
+			if err != nil {
+				m.log.WithError(err).Error("error patching worker machineset manifest")
+				return err
+			}
+			if modifiedManifestBytes != nil {
+				info, err := d.Info()
+				if err != nil {
+					m.log.WithError(err).Error("error retrieving file info")
+					return err
+				}
+				err = ioutil.WriteFile(path, *modifiedManifestBytes, info.Mode())
+				if err != nil {
+					m.log.WithError(err).Error("error writing manifest")
+					return err
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			m.log.WithError(err).Error("error finding machine pool manifests")
+			return err
+		}
+	}
+
 	if src := m.ManifestsMountPath; isDirNonEmpty(src) {
 		m.log.Info("copying user-provided manifests")
 		dest := filepath.Join(m.WorkDir, "manifests")
@@ -786,6 +841,49 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment) error {
 
 	m.log.Info("assets generated successfully")
 	return nil
+}
+
+// patchWorkerMachineSetManifest accepts a yaml manifest as []byte and patches the manifest to include an additional
+// security group filter if that manifest is the definition of a worker MachineSet. The security group is obtained from
+// an annotation (constants.ExtraWorkerSecurityGroupAnnotation) on the provided MachinePool and is the value of the
+// annotation (singular).
+// The first return value points to the modified manifest. It is `nil` if the manifest was not modified.
+// The second return value indicates an error from which we should not proceed.
+// Of note, it is not an error if `manifestBytes` represents valid yaml that is not a worker MachineSet.
+func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, logger log.FieldLogger) (*[]byte, error) {
+	c, err := yamlutils.Decode(manifestBytes)
+	// Decoding the yaml here shouldn't produce an error. An error indicates that the
+	// installer produced yaml that could not be decoded.
+	if err != nil {
+		logger.WithError(err).Error("unable to decode manifest bytes")
+		return nil, err
+	}
+
+	// Return if file is not a worker MachineSet manifest
+	if isMachineSet, _ := yamlutils.Test(c, "/kind", "MachineSet"); !isMachineSet {
+		return nil, nil
+	}
+	// Note: We have to escape the `/` in the label key as `~1` per https://datatracker.ietf.org/doc/html/rfc6901#section-3
+	if isWorkerMachineSet, _ := yamlutils.Test(c, "/spec/template/metadata/labels/machine.openshift.io~1cluster-api-machine-type", "worker"); !isWorkerMachineSet {
+		return nil, nil
+	}
+
+	securityGroupFilter := interface{}(pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
+	ops := yamlpatch.Patch{
+		yamlpatch.Operation{
+			Op:    "add",
+			Path:  yamlpatch.OpPath("/spec/template/spec/providerSpec/value/securityGroups/0/filters/0/values/-"),
+			Value: yamlpatch.NewNode(&securityGroupFilter),
+		},
+	}
+
+	// Apply patch to manifest
+	modifiedBytes, err := ops.Apply(manifestBytes)
+	if err != nil {
+		logger.WithError(err).Error("error applying patch")
+		return nil, err
+	}
+	return &modifiedBytes, nil
 }
 
 // provisionCluster invokes the openshift-install create cluster command to provision resources
@@ -942,6 +1040,20 @@ func (m *InstallManager) loadClusterDeployment(provision *hivev1.ClusterProvisio
 		return nil, err
 	}
 	return cd, nil
+}
+
+func (m *InstallManager) loadWorkerMachinePool(cd *hivev1.ClusterDeployment) (*hivev1.MachinePool, error) {
+	mpL := &hivev1.MachinePoolList{}
+	if err := m.DynamicClient.List(context.Background(), mpL, &client.ListOptions{Namespace: m.Namespace}); err != nil {
+		return nil, err
+	}
+	for _, pool := range mpL.Items {
+		if pool.Spec.ClusterDeploymentRef.Name == cd.Name && pool.Spec.Name == "worker" {
+			return &pool, nil
+		}
+	}
+	// No worker pool is associated with the ClusterDeployment (no error)
+	return nil, nil
 }
 
 // gatherLogs will attempt to gather logs after a failed install. First we attempt

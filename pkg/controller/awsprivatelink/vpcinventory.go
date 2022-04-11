@@ -1,6 +1,7 @@
 package awsprivatelink
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -73,6 +74,12 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 		logger.WithField("vpcs", vpcs).Error(errNoVPCWithQuotaInInventory.Error())
 		return nil, errNoVPCWithQuotaInInventory
 	}
+
+	// "Spread" strategy: sort the candidates by the number of endpoints already used, ascending,
+	// and return the first (emptiest) one.
+	sort.Slice(candidates, func(i, j int) bool {
+		return endpointsPerVPC[candidates[i].VPCID] < endpointsPerVPC[candidates[j].VPCID]
+	})
 
 	return &candidates[0], nil
 }

@@ -442,6 +442,24 @@ func testSecret(name string, data map[string]string) *corev1.Secret {
 	return s
 }
 
+// createVpcEndpointInputMatcher implements gomock.Matcher, succeeding if the input is an
+// ec2.CreateVpcEndpointInput whose VpcId equals the configured vpcId.
+type createVpcEndpointInputMatcher struct {
+	vpcId string
+}
+
+func (m createVpcEndpointInputMatcher) Matches(o interface{}) bool {
+	i, ok := o.(*ec2.CreateVpcEndpointInput)
+	if !ok {
+		return false
+	}
+	return *i.VpcId == m.vpcId
+}
+
+func (m createVpcEndpointInputMatcher) String() string {
+	return fmt.Sprintf("has VPC ID %s", m.vpcId)
+}
+
 func TestReconcile(t *testing.T) {
 	scheme := runtime.NewScheme()
 	hivev1.AddToScheme(scheme)
@@ -555,8 +573,20 @@ users:
 	}
 
 	mockCreateEndpoint := func(m *mock.MockClient, service *ec2.ServiceConfiguration) *ec2.VpcEndpoint {
-		m.EXPECT().DescribeVpcEndpoints(gomock.Any()).
-			Return(&ec2.DescribeVpcEndpointsOutput{}, nil).Times(2)
+		m.EXPECT().DescribeVpcEndpoints(
+			&ec2.DescribeVpcEndpointsInput{
+				Filters: []*ec2.Filter{{
+					Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
+					Values: aws.StringSlice([]string{"test-cd-1234"}),
+				}}}).
+			Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
+		m.EXPECT().DescribeVpcEndpoints(
+			&ec2.DescribeVpcEndpointsInput{
+				Filters: []*ec2.Filter{{
+					Name:   aws.String("vpc-id"),
+					Values: aws.StringSlice([]string{"vpc-1"}),
+				}}}).
+			Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
 		m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
 			ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
 		}).Return(&ec2.DescribeVpcEndpointServicesOutput{
@@ -1045,6 +1075,140 @@ users:
 		expectedConditions: getExpectedConditions(true, "NoVPCWithQuotaInInventory",
 			"no supported VPC in inventory with available quota"),
 		err: "failed to reconcile the VPC Endpoint: no supported VPC in inventory with available quota",
+	}, {
+		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, validate spread",
+
+		existing: []runtime.Object{
+			testSecret("test-cd-provision-0-kubeconfig", kubeConfigSecret),
+			testProvision("test-cd-provision-0",
+				provisionWithInfraID("test-cd-1234"),
+				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
+			enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0")),
+		},
+		// An inventory with more than one VPC
+		inventory: []hivev1.AWSPrivateLinkInventory{
+			{
+				AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+					Region: "us-east-1",
+					VPCID:  "vpc-1",
+				},
+				Subnets: []hivev1.AWSPrivateLinkSubnet{{
+					AvailabilityZone: "us-east-1a",
+					SubnetID:         "subnet-1",
+				}, {
+					AvailabilityZone: "us-east-1b",
+					SubnetID:         "subnet-2",
+				}, {
+					AvailabilityZone: "us-east-1c",
+					SubnetID:         "subnet-3",
+				}},
+			},
+			{
+				AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+					Region: "us-east-1",
+					VPCID:  "vpc-2",
+				},
+				Subnets: []hivev1.AWSPrivateLinkSubnet{{
+					AvailabilityZone: "us-east-1a",
+					SubnetID:         "subnet-4",
+				}, {
+					AvailabilityZone: "us-east-1b",
+					SubnetID:         "subnet-5",
+				}, {
+					AvailabilityZone: "us-east-1c",
+					SubnetID:         "subnet-6",
+				}},
+			},
+		},
+		configureAWSClient: func(m *mock.MockClient) {
+			clusternlb := mockDiscoverLB(m)
+			service := mockCreateService(m, clusternlb)
+			mockServicePerms(m, service)
+
+			// Query endpoints for the cluster. There are none, triggering the create path.
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters: []*ec2.Filter{{
+						Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
+						Values: aws.StringSlice([]string{"test-cd-1234"}),
+					}}}).
+				Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
+			m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
+				ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
+			}).Return(&ec2.DescribeVpcEndpointServicesOutput{
+				ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
+			}, nil)
+
+			// Query all endpoints for the VPCs in the inventory. There are two in vpc-1 and one in vpc-2.
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters: []*ec2.Filter{{
+						Name:   aws.String("vpc-id"),
+						Values: aws.StringSlice([]string{"vpc-1", "vpc-2"}),
+					}}}).
+				Return(&ec2.DescribeVpcEndpointsOutput{
+					VpcEndpoints: []*ec2.VpcEndpoint{
+						{
+							VpcEndpointId: aws.String("vpce-11"),
+							VpcId:         aws.String("vpc-1"),
+						},
+						{
+							VpcEndpointId: aws.String("vpce-12"),
+							VpcId:         aws.String("vpc-1"),
+						},
+						{
+							VpcEndpointId: aws.String("vpce-21"),
+							VpcId:         aws.String("vpc-2"),
+						},
+					},
+				}, nil)
+
+			createdEndpoint := &ec2.VpcEndpoint{
+				VpcEndpointId: aws.String("vpce-22"),
+				VpcId:         aws.String("vpc-2"),
+				State:         aws.String("available"),
+				DnsEntries: []*ec2.DnsEntry{{
+					DnsName:      aws.String("vpce-22-us-east-1.vpce-svc-12345.vpc.amazonaws.com"),
+					HostedZoneId: aws.String("HZ22"),
+				}},
+			}
+
+			// This is the crux of the test. Expect to be asked to create the endpoint in vpc-2 due
+			// to "spread" logic, since vpc-2 was emptier.
+			m.EXPECT().CreateVpcEndpoint(createVpcEndpointInputMatcher{"vpc-2"}).
+				Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: createdEndpoint}, nil)
+
+			m.EXPECT().DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
+				VpcEndpointIds: aws.StringSlice([]string{*createdEndpoint.VpcEndpointId}),
+			}).Return(&ec2.DescribeVpcEndpointsOutput{
+				VpcEndpoints: []*ec2.VpcEndpoint{createdEndpoint},
+			}, nil)
+
+			hzID := mockPHZ(m, createdEndpoint, "api.test-cluster", &route53.HostedZoneSummary{
+				HostedZoneId: aws.String("HZ22"),
+				Name:         aws.String("api.test-cluster"),
+			})
+
+			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
+				HostedZone: &route53.HostedZone{
+					Id: aws.String(hzID),
+				},
+				VPCs: []*route53.VPC{{
+					VPCId:     createdEndpoint.VpcId,
+					VPCRegion: aws.String("us-east-1"),
+				}},
+			}, nil)
+
+		},
+
+		hasFinalizer: true,
+		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointID:      "vpce-22",
+			HostedZoneID:       "HZ22",
+		},
+		expectedConditions: getExpectedConditions(false, "PrivateLinkAccessReady",
+			"private link access is ready for use"),
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no kubeconfig secret",
 

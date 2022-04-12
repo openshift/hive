@@ -493,12 +493,8 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 	if err != nil {
 		logger.WithError(err).Error("failed to reconcile the VPC Endpoint")
 		reason := "VPCEndpointReconcileFailed"
-		switch {
-		case errors.Is(err, errNoVPCWithQuotaInInventory):
-			reason = "NoVPCWithQuotaInInventory"
-		case errors.Is(err, errNoSupportedAZsInInventory):
+		if errors.Is(err, errNoSupportedAZsInInventory) {
 			reason = "NoSupportedAZsInInventory"
-
 		}
 		if err := r.setErrCondition(cd, reason, err, logger); err != nil {
 			logger.WithError(err).Error("failed to update condition on cluster deployment")
@@ -788,7 +784,7 @@ func createVPCEndpointService(awsClient awsclient.Client, cd *hivev1.ClusterDepl
 // It chooses a VPC from the list of VPCs given to the controller using criteria like
 // 	- VPC that is in the same region as the VPC endpoint service
 //	- VPC that has at least one subnet in the AZs supported by the VPC endpoint service
-//	- VPC that has VPC endpoints < 255
+//	- VPC that has the fewest existing VPC endpoints ("spread" strategy)
 // It currently doesn't manage any properties of the VPC endpoint once it is created.
 func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,

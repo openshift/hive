@@ -1031,51 +1031,6 @@ users:
 			"no supported VPC in inventory which support the AZs of the service"),
 		err: "failed to reconcile the VPC Endpoint: no supported VPC in inventory which support the AZs of the service",
 	}, {
-		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no quota in vpc",
-
-		existing: []runtime.Object{
-			testProvision("test-cd-provision-0",
-				provisionWithInfraID("test-cd-1234"),
-				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
-			enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0")),
-		},
-		inventory: validInventory,
-		configureAWSClient: func(m *mock.MockClient) {
-			clusternlb := mockDiscoverLB(m)
-			service := mockCreateService(m, clusternlb)
-			mockServicePerms(m, service)
-
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).
-				Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
-			m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
-				ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
-			}).Return(&ec2.DescribeVpcEndpointServicesOutput{
-				ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
-			}, nil)
-
-			out := &ec2.DescribeVpcEndpointsOutput{}
-			for i := 0; i < 255; i++ {
-				out.VpcEndpoints = append(out.VpcEndpoints, &ec2.VpcEndpoint{
-					VpcEndpointId: aws.String(fmt.Sprintf("vpce-%d", i)),
-					VpcId:         aws.String("vpc-1"),
-				})
-			}
-			m.EXPECT().DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-				Filters: []*ec2.Filter{{
-					Name:   aws.String("vpc-id"),
-					Values: aws.StringSlice([]string{"vpc-1"}),
-				}},
-			}).Return(out, nil)
-		},
-
-		hasFinalizer: true,
-		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
-		},
-		expectedConditions: getExpectedConditions(true, "NoVPCWithQuotaInInventory",
-			"no supported VPC in inventory with available quota"),
-		err: "failed to reconcile the VPC Endpoint: no supported VPC in inventory with available quota",
-	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, validate spread",
 
 		existing: []runtime.Object{

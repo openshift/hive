@@ -296,7 +296,7 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 	if cp.Spec.InfraID == nil ||
 		(cp.Spec.InfraID != nil && *cp.Spec.InfraID == "") ||
 		(cp.Spec.AdminKubeconfigSecretRef == nil) ||
-		(cp.Spec.AdminKubeconfigSecretRef != nil && *&cp.Spec.AdminKubeconfigSecretRef.Name == "") {
+		(cp.Spec.AdminKubeconfigSecretRef != nil && cp.Spec.AdminKubeconfigSecretRef.Name == "") {
 		logger.Debug("waiting for cluster deployment provision to provide ClusterMetadata, will retry soon.")
 		return reconcile.Result{}, nil
 	}
@@ -325,7 +325,7 @@ func shouldSync(desired *hivev1.ClusterDeployment) (bool, time.Duration) {
 	if readyCondition == nil || readyCondition.Status != corev1.ConditionTrue {
 		return true, 0 // we have not reached Ready level
 	}
-	delta := time.Now().Sub(readyCondition.LastProbeTime.Time)
+	delta := time.Since(readyCondition.LastProbeTime.Time)
 
 	if !desired.Spec.Installed {
 		// as cluster is installing, but the private link has been setup once, we wait

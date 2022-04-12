@@ -115,7 +115,7 @@ func Test_setErrCondition(t *testing.T) {
 			cd := testcd.FullBuilder(testNS, "test", scheme).Build()
 			cd.Status.Conditions = test.conditions
 
-			fakeClient := fake.NewFakeClientWithScheme(scheme, cd)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(cd).Build()
 			reconciler := &ReconcileAWSPrivateLink{
 				Client: fakeClient,
 			}
@@ -295,7 +295,7 @@ func Test_setProgressCondition(t *testing.T) {
 			cd := testcd.FullBuilder(testNS, "test", scheme).Build()
 			cd.Status.Conditions = test.conditions
 
-			fakeClient := fake.NewFakeClientWithScheme(scheme, cd)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(cd).Build()
 			reconciler := &ReconcileAWSPrivateLink{
 				Client: fakeClient,
 			}
@@ -415,7 +415,7 @@ users:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := testSecret("test", tt.existing)
-			fakeClient := fake.NewFakeClientWithScheme(scheme, s)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(s).Build()
 
 			got, err := initialURL(fakeClient, client.ObjectKey{Namespace: testNS, Name: "test"})
 			require.NoError(t, err)
@@ -1742,7 +1742,7 @@ users:
 				test.configureAWSClient(mockedAWSClient)
 			}
 
-			fakeClient := fake.NewFakeClientWithScheme(scheme, test.existing...)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			log.SetLevel(log.DebugLevel)
 			reconciler := &ReconcileAWSPrivateLink{
 				Client: fakeClient,

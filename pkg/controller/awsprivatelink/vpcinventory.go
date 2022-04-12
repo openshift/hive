@@ -107,9 +107,6 @@ func toSupportedSubnets(azs sets.String) filterVPCInventoryFn {
 			}
 		}
 		inv.Subnets = inv.Subnets[:n]
-		if len(inv.Subnets) > 0 {
-			return true
-		}
-		return false
+		return len(inv.Subnets) > 0
 	}
 }

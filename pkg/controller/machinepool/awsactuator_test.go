@@ -27,6 +27,7 @@ import (
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awshivev1 "github.com/openshift/hive/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/awsclient"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -40,35 +41,35 @@ func TestAWSActuator(t *testing.T) {
 		name                         string
 		mockAWSClient                func(*mockaws.MockClient)
 		clusterDeployment            *hivev1.ClusterDeployment
-		poolName                     string
-		existing                     []runtime.Object
+		machinePool                  *hivev1.MachinePool
+		masterMachine                *machineapi.Machine
 		expectedMachineSetReplicas   map[string]int64
 		expectedSubnetIDInMachineSet bool
 		expectedErr                  bool
 		expectedCondition            *hivev1.MachinePoolCondition
 		expectedKMSKey               string
+		expectedAMI                  *awsprovider.AWSResourceReference
 	}{
 		{
 			name:              "generate single machineset for single zone",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				testMachinePool(),
-			},
+			machinePool:       testMachinePool(),
+			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "generate machinesets across zones",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				testMachinePool(),
-			},
+			machinePool:       testMachinePool(),
+			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1", "zone2", "zone3"})
 			},
@@ -77,37 +78,39 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 				generateAWSMachineSetName("zone3"): 1,
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "generate machinesets for specified zones",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 1,
 				generateAWSMachineSetName("zone2"): 1,
 				generateAWSMachineSetName("zone3"): 1,
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "generate machinesets for specified zones and subnets",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
-					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "subnet-zone3",
-						"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "subnet-zone3",
+					"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"},
 					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"},
@@ -127,31 +130,33 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone3"): 1,
 			},
 			expectedSubnetIDInMachineSet: true,
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "list zones returns zero",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				testMachinePool(),
-			},
+			machinePool:       testMachinePool(),
+			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, nil)
 			},
 			expectedErr: true,
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "subnets specfied in the machinepool do not exist",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
-					pool.Spec.Platform.AWS.Subnets = []string{"missing-subnet1", "missing-subnet2", "missing-subnet3"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
+				pool.Spec.Platform.AWS.Subnets = []string{"missing-subnet1", "missing-subnet2", "missing-subnet3"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeMissingSubnets(client, []string{"missing-subnet1", "missing-subnet2", "missing-subnet3"})
 			},
@@ -161,19 +166,20 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "SubnetsNotFound",
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "more than one private subnet for availability zone",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
-					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone1", "zone2"},
 					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}, []string{}, "vpc-1")
@@ -189,19 +195,20 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "MoreThanOneSubnetForZone",
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "no private subnet for availability zone",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
-					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2", "zone3"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"},
 					[]string{"subnet-zone1", "subnet-zone2"}, []string{}, "vpc-1")
@@ -216,19 +223,20 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "NoSubnetForAvailabilityZone",
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "no public subnet for availability zone and private subnet",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
-					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2"},
 					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1"}, "vpc-1")
@@ -244,19 +252,20 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "InsufficientPublicSubnets",
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "public subnets all don't have route tables pointing to igw",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
-					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2"},
 					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
@@ -277,19 +286,20 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedSubnetIDInMachineSet: true,
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "public subnets some don't have route tables pointing to igw",
 			clusterDeployment: testClusterDeployment(),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() *hivev1.MachinePool {
-					pool := testMachinePool()
-					pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
-					pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
-					return pool
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2"},
 					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
@@ -310,41 +320,44 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedSubnetIDInMachineSet: true,
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "supported spot market options",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				withSpotMarketOptions(testMachinePool()),
-			},
+			machinePool:       withSpotMarketOptions(testMachinePool()),
+			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "unsupported spot market options",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.4.0"),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				withSpotMarketOptions(testMachinePool()),
-			},
+			machinePool:       withSpotMarketOptions(testMachinePool()),
+			masterMachine:     testMachine("master0", "master"),
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
 				Status: corev1.ConditionTrue,
 				Reason: "UnsupportedSpotMarketOptions",
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "kms key disk encryption",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				withKMSKey(testMachinePool()),
-			},
+			machinePool:       withKMSKey(testMachinePool()),
+			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
 			},
@@ -352,21 +365,22 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone1"): 3,
 			},
 			expectedKMSKey: fakeKMSKeyARN,
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "unsupported configuration condition cleared",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.4.0"),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				func() runtime.Object {
-					mp := testMachinePool()
-					mp.Status.Conditions = []hivev1.MachinePoolCondition{{
-						Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
-						Status: corev1.ConditionTrue,
-					}}
-					return mp
-				}(),
-			},
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Status.Conditions = []hivev1.MachinePoolCondition{{
+					Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
+					Status: corev1.ConditionTrue,
+				}}
+				return mp
+			}(),
+			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
 			},
@@ -378,30 +392,82 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionFalse,
 				Reason: "ConfigurationSupported",
 			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
 		},
 		{
 			name:              "malformed cluster version",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "bad-version"),
-			poolName:          testMachinePool().Name,
-			existing: []runtime.Object{
-				withSpotMarketOptions(testMachinePool()),
-			},
+			machinePool:       withSpotMarketOptions(testMachinePool()),
+			masterMachine:     testMachine("master0", "master"),
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
 				Status: corev1.ConditionTrue,
 				Reason: "UnsupportedSpotMarketOptions",
+			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
+		},
+		{
+			name:              "master machine references AMI by tag",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			masterMachine: func() *machineapi.Machine {
+				m := testMachine("master0", "master")
+				awsMachineProviderConfig := testAWSProviderSpec()
+				awsMachineProviderConfig.AMI = awsprovider.AWSResourceReference{
+					Filters: []awsprovider.Filter{
+						{
+							Name: "tag:Name",
+							Values: []string{
+								fmt.Sprintf("%s-ami-%s",
+									testClusterDeployment().Spec.ClusterMetadata.InfraID,
+									testClusterDeployment().Spec.Platform.AWS.Region),
+							},
+						},
+					},
+				}
+				m.Spec.ProviderSpec.Value, _ = encodeAWSMachineProviderSpec(awsMachineProviderConfig, scheme.Scheme)
+				return m
+			}(),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeAvailabilityZones(client, []string{"zone1", "zone2", "zone3"})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 1,
+				generateAWSMachineSetName("zone2"): 1,
+				generateAWSMachineSetName("zone3"): 1,
+			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				Filters: []awsprovider.Filter{
+					{
+						Name: "tag:Name",
+						Values: []string{
+							fmt.Sprintf("%s-ami-%s",
+								testClusterDeployment().Spec.ClusterMetadata.InfraID,
+								testClusterDeployment().Spec.Platform.AWS.Region),
+						},
+					},
+				},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		apis.AddToScheme(scheme.Scheme)
+		awsprovider.SchemeBuilder.AddToScheme(scheme.Scheme)
+		machineapi.AddToScheme(scheme.Scheme)
+
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewFakeClient([]runtime.Object{
+				test.machinePool,
+			}...)
 			awsClient := mockaws.NewMockClient(mockCtrl)
 
 			// set up mock expectations
@@ -409,23 +475,20 @@ func TestAWSActuator(t *testing.T) {
 				test.mockAWSClient(awsClient)
 			}
 
-			actuator := &AWSActuator{
-				client:    fakeClient,
-				awsClient: awsClient,
-				logger:    log.WithField("actuator", "awsactuator"),
-				region:    testRegion,
-				amiID:     testAMI,
-			}
+			logger := log.WithFields(log.Fields{"machinePool": test.machinePool.Name})
+			actuator, err := NewAWSActuator(fakeClient, awsclient.CredentialsSource{}, test.clusterDeployment.Spec.Platform.AWS.Region, test.machinePool, test.masterMachine, scheme.Scheme, logger)
+			require.NoError(t, err)
+			actuator.awsClient = awsClient
 
 			pool := &hivev1.MachinePool{}
-			err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: test.poolName}, pool)
+			err = fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: test.machinePool.Name}, pool)
 			require.NoError(t, err)
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, pool, actuator.logger)
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey)
+				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey, test.expectedAMI)
 			}
 			if test.expectedCondition != nil {
 				cond := controllerutils.FindMachinePoolCondition(pool.Status.Conditions, test.expectedCondition.Type)
@@ -475,7 +538,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 }
 
-func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string) {
+func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *awsprovider.AWSResourceReference) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -489,8 +552,13 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 
 		assert.Equal(t, testInstanceType, awsProvider.InstanceType, "unexpected instance type")
 
-		if assert.NotNil(t, awsProvider.AMI.ID, "missing AMI ID") {
-			assert.Equal(t, testAMI, *awsProvider.AMI.ID, "unexpected AMI ID")
+		if assert.NotNil(t, awsProvider.AMI, "missing AMI") {
+			if expectedAMI.ID != nil {
+				assert.Equal(t, *expectedAMI.ID, *awsProvider.AMI.ID, "unexpected AMI ID")
+			}
+			if len(expectedAMI.Filters) > 0 {
+				assert.Equal(t, expectedAMI.Filters, awsProvider.AMI.Filters, "unexpected AMI filter")
+			}
 		}
 
 		assert.Equal(t, expectedKMSKey, *awsProvider.BlockDevices[0].EBS.KMSKey.ARN)

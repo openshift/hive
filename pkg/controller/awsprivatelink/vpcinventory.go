@@ -1,6 +1,7 @@
 package awsprivatelink
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -16,7 +17,6 @@ import (
 
 var (
 	errNoSupportedAZsInInventory = errors.New("no supported VPC in inventory which support the AZs of the service")
-	errNoVPCWithQuotaInInventory = errors.New("no supported VPC in inventory with available quota")
 )
 
 func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Client,
@@ -68,11 +68,11 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 		endpointsPerVPC[vpcID] = endpointsPerVPC[vpcID] + 1
 	}
 
-	candidates = filterVPCInventory(candidates, toAvailableQuota(endpointsPerVPC))
-	if len(candidates) == 0 {
-		logger.WithField("vpcs", vpcs).Error(errNoVPCWithQuotaInInventory.Error())
-		return nil, errNoVPCWithQuotaInInventory
-	}
+	// "Spread" strategy: sort the candidates by the number of endpoints already used, ascending,
+	// and return the first (emptiest) one.
+	sort.Slice(candidates, func(i, j int) bool {
+		return endpointsPerVPC[candidates[i].VPCID] < endpointsPerVPC[candidates[j].VPCID]
+	})
 
 	return &candidates[0], nil
 }
@@ -107,27 +107,6 @@ func toSupportedSubnets(azs sets.String) filterVPCInventoryFn {
 			}
 		}
 		inv.Subnets = inv.Subnets[:n]
-		if len(inv.Subnets) > 0 {
-			return true
-		}
-		return false
-	}
-}
-
-const (
-	// VPCEndpointPerVPCLimit is a limit on the maximum number of VPC endpoints that can
-	// be created in a VPC. This limit is used to filter out any VPCs in the inventory
-	// that are already at the this upper limit.
-	// The actual limit is 255, but we limit to lower limit.
-	VPCEndpointPerVPCLimit = 250
-)
-
-func toAvailableQuota(existingPerVPC map[string]int) filterVPCInventoryFn {
-	return func(inv *hivev1.AWSPrivateLinkInventory) bool {
-		avail := VPCEndpointPerVPCLimit - existingPerVPC[inv.VPCID]
-		if avail > 0 {
-			return true
-		}
-		return false
+		return len(inv.Subnets) > 0
 	}
 }

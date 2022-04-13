@@ -296,7 +296,7 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 	if cp.Spec.InfraID == nil ||
 		(cp.Spec.InfraID != nil && *cp.Spec.InfraID == "") ||
 		(cp.Spec.AdminKubeconfigSecretRef == nil) ||
-		(cp.Spec.AdminKubeconfigSecretRef != nil && *&cp.Spec.AdminKubeconfigSecretRef.Name == "") {
+		(cp.Spec.AdminKubeconfigSecretRef != nil && cp.Spec.AdminKubeconfigSecretRef.Name == "") {
 		logger.Debug("waiting for cluster deployment provision to provide ClusterMetadata, will retry soon.")
 		return reconcile.Result{}, nil
 	}
@@ -325,7 +325,7 @@ func shouldSync(desired *hivev1.ClusterDeployment) (bool, time.Duration) {
 	if readyCondition == nil || readyCondition.Status != corev1.ConditionTrue {
 		return true, 0 // we have not reached Ready level
 	}
-	delta := time.Now().Sub(readyCondition.LastProbeTime.Time)
+	delta := time.Since(readyCondition.LastProbeTime.Time)
 
 	if !desired.Spec.Installed {
 		// as cluster is installing, but the private link has been setup once, we wait
@@ -493,12 +493,8 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 	if err != nil {
 		logger.WithError(err).Error("failed to reconcile the VPC Endpoint")
 		reason := "VPCEndpointReconcileFailed"
-		switch {
-		case errors.Is(err, errNoVPCWithQuotaInInventory):
-			reason = "NoVPCWithQuotaInInventory"
-		case errors.Is(err, errNoSupportedAZsInInventory):
+		if errors.Is(err, errNoSupportedAZsInInventory) {
 			reason = "NoSupportedAZsInInventory"
-
 		}
 		if err := r.setErrCondition(cd, reason, err, logger); err != nil {
 			logger.WithError(err).Error("failed to update condition on cluster deployment")
@@ -788,7 +784,7 @@ func createVPCEndpointService(awsClient awsclient.Client, cd *hivev1.ClusterDepl
 // It chooses a VPC from the list of VPCs given to the controller using criteria like
 // 	- VPC that is in the same region as the VPC endpoint service
 //	- VPC that has at least one subnet in the AZs supported by the VPC endpoint service
-//	- VPC that has VPC endpoints < 255
+//	- VPC that has the fewest existing VPC endpoints ("spread" strategy)
 // It currently doesn't manage any properties of the VPC endpoint once it is created.
 func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,

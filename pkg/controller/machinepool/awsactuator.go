@@ -73,10 +73,20 @@ func NewAWSActuator(
 	if amiID != "" {
 		log.Infof("using AMI override from %s annotation: %s", hivev1.MachinePoolImageIDOverrideAnnotation, amiID)
 	} else {
-		amiID, err = getAWSAMIID(masterMachine, scheme, logger)
+		refByTag, err := masterAMIRefByTag(masterMachine, scheme, logger)
 		if err != nil {
-			logger.WithError(err).Warn("failed to get AMI ID")
+			logger.WithError(err).Warn("unable to determine if master machine references AMI by tag")
 			return nil, err
+		}
+		// We assume an AMI ID will be set within the master machine's AWSMachineProviderConfig when the master
+		// machine doesn't reference an AMI by tag. When refByTag is true, amiID will remain an empty string and
+		// will be provided to installer's machineset generation as an empty string.
+		if !refByTag {
+			amiID, err = getAWSAMIID(masterMachine, scheme, logger)
+			if err != nil {
+				logger.WithError(err).Warn("failed to get AMI ID")
+				return nil, err
+			}
 		}
 	}
 	actuator := &AWSActuator{
@@ -239,6 +249,15 @@ func getAWSAMIID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logg
 	amiID := *providerSpec.AMI.ID
 	logger.WithField("ami", amiID).Debug("resolved AMI to use for new machinesets")
 	return amiID, nil
+}
+
+// Return true if the provided master machine references AMI by tag
+func masterAMIRefByTag(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (bool, error) {
+	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	if err != nil {
+		return false, errors.Wrap(err, "cannot decode AWSMachineProviderConfig from master machine")
+	}
+	return len(providerSpec.AMI.Filters) > 0, nil
 }
 
 // fetchAvailabilityZones fetches availability zones for the AWS region

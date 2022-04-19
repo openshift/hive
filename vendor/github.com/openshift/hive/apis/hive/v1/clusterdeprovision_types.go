@@ -59,6 +59,8 @@ type ClusterDeprovisionPlatform struct {
 type AlibabaCloudClusterDeprovision struct {
 	// Region is the Alibaba region for this deprovision
 	Region string `json:"region"`
+	// BaseDomain is the DNS base domain
+	BaseDomain string `json:"baseDomain"`
 	// CredentialsSecretRef is the Alibaba account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 }

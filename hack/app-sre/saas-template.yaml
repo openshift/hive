@@ -1466,6 +1466,9 @@ objects:
                       description: AlibabaCloud contains Alibaba Cloud specific deprovision
                         settings
                       properties:
+                        baseDomain:
+                          description: BaseDomain is the DNS base domain
+                          type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef is the Alibaba account
                             credentials to use for deprovisioning the cluster
@@ -1479,6 +1482,8 @@ objects:
                           description: Region is the Alibaba region for this deprovision
                           type: string
                       required:
+                      - baseDomain
+                      - credentialsSecretRef
                       - region
                       type: object
                     aws:

@@ -48,11 +48,7 @@ func TestReconcileClusterPool(t *testing.T) {
 
 	// See calculatePoolVersion. If this changes, the easiest way to figure out the new value is
 	// to pull it from the test failure :)
-<<<<<<< HEAD
-	initialPoolVersion := "ac2dc91b241dd33d"
-=======
-	initialPoolVersion := "dea31eb5cf3eeec1"
->>>>>>> 371514a29... Add Alibaba Cloud APIs
+	initialPoolVersion := "182b591e56ca056b"
 
 	poolBuilder := testcp.FullBuilder(testNamespace, testLeasePoolName, scheme).
 		GenericOptions(

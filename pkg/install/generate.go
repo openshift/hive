@@ -222,6 +222,29 @@ func InstallerPodSpec(
 	}
 
 	switch {
+	case cd.Spec.Platform.AlibabaCloud != nil:
+		env = append(
+			env,
+			corev1.EnvVar{
+				Name: "ALIBABA_CLOUD_ACCESS_KEY_ID",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Platform.AlibabaCloud.CredentialsSecretRef,
+						Key:                  constants.AlibabaCloudAccessKeyIDSecretKey,
+						Optional:             pointer.BoolPtr(false),
+					},
+				},
+			},
+			corev1.EnvVar{
+				Name: "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: cd.Spec.Platform.AlibabaCloud.CredentialsSecretRef,
+						Key:                  constants.AlibabaCloudAccessKeySecretSecretKey,
+						Optional:             pointer.BoolPtr(false),
+					},
+				},
+			})
 	case cd.Spec.Platform.AWS != nil:
 		credentialRef := cd.Spec.Platform.AWS.CredentialsSecretRef
 		if credentialRef.Name == "" {
@@ -664,6 +687,8 @@ func GenerateUninstallerJobForDeprovision(
 	}
 
 	switch {
+	case req.Spec.Platform.AlibabaCloud != nil:
+		completeAlibabaCloudDeprovisionJob(req, job)
 	case req.Spec.Platform.AWS != nil:
 		completeAWSDeprovisionJob(req, job)
 	case req.Spec.Platform.Azure != nil:
@@ -1102,6 +1127,56 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 				req.Spec.Platform.IBMCloud.BaseDomain,
 				"--cluster-name",
 				req.Spec.ClusterName,
+				"--loglevel",
+				"debug",
+			},
+		},
+	}
+	job.Spec.Template.Spec.Containers = containers
+}
+
+func completeAlibabaCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+	env := []corev1.EnvVar{}
+	env = append(
+		env,
+		corev1.EnvVar{
+			Name: "ALIBABA_CLOUD_ACCESS_KEY_ID",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: req.Spec.Platform.AlibabaCloud.CredentialsSecretRef,
+					Key:                  constants.AlibabaCloudAccessKeyIDSecretKey,
+					Optional:             pointer.BoolPtr(false),
+				},
+			},
+		},
+		corev1.EnvVar{
+			Name: "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: req.Spec.Platform.AlibabaCloud.CredentialsSecretRef,
+					Key:                  constants.AlibabaCloudAccessKeySecretSecretKey,
+					Optional:             pointer.BoolPtr(false),
+				},
+			},
+		})
+
+	containers := []corev1.Container{
+		{
+			Name:            "deprovision",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Env:             env,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"deprovision",
+				"alibabacloud",
+				req.Spec.InfraID,
+				"--region",
+				req.Spec.Platform.AlibabaCloud.Region,
+				"--cluster-name",
+				req.Spec.ClusterName,
+				"--base-domain",
+				req.Spec.Platform.AlibabaCloud.BaseDomain,
 				"--loglevel",
 				"debug",
 			},

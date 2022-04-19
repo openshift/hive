@@ -7,6 +7,7 @@ import (
 
 const (
 	PlatformAgentBaremetal = "agent-baremetal"
+	PlatformAlibabaCloud   = "alibabacloud"
 	PlatformAWS            = "aws"
 	PlatformAzure          = "azure"
 	PlatformBaremetal      = "baremetal"
@@ -404,6 +405,12 @@ const (
 	// containing an extra AWS Security Group that will be applied to worker MachineSet manifests
 	// prior to installation.
 	ExtraWorkerSecurityGroupAnnotation = "hive.openshift.io/extra-worker-security-group"
+
+	// AlibabaCloudAccessKeyIDSecretKey is the key we use in a Kubernetes Secret containing Alibaba Cloud credentials for the access key ID.
+	AlibabaCloudAccessKeyIDSecretKey = "alibaba_cloud_access_key_id"
+
+	// AlibabaCloudAccessKeySecretSecretKey is the key we use in a Kubernetes Secret containing Alibaba Cloud credentials for the access key secret.
+	AlibabaCloudAccessKeySecretSecretKey = "alibaba_cloud_access_key_secret"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

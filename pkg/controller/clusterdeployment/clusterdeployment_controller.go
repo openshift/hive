@@ -1738,6 +1738,12 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			Region:               cd.Spec.Platform.IBMCloud.Region,
 			BaseDomain:           cd.Spec.BaseDomain,
 		}
+	case cd.Spec.Platform.AlibabaCloud != nil:
+		req.Spec.Platform.AlibabaCloud = &hivev1.AlibabaCloudClusterDeprovision{
+			CredentialsSecretRef: cd.Spec.Platform.AlibabaCloud.CredentialsSecretRef,
+			Region:               cd.Spec.Platform.AlibabaCloud.Region,
+			BaseDomain:           cd.Spec.BaseDomain,
+		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
 	}
@@ -2099,6 +2105,8 @@ func (r *ReconcileClusterDeployment) addOwnershipToSecret(cd *hivev1.ClusterDepl
 // getClusterPlatform returns the platform of a given ClusterDeployment
 func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 	switch {
+	case cd.Spec.Platform.AlibabaCloud != nil:
+		return constants.PlatformAlibabaCloud
 	case cd.Spec.Platform.AWS != nil:
 		return constants.PlatformAWS
 	case cd.Spec.Platform.Azure != nil:
@@ -2126,6 +2134,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 // getClusterRegion returns the region of a given ClusterDeployment
 func getClusterRegion(cd *hivev1.ClusterDeployment) string {
 	switch {
+	case cd.Spec.Platform.AlibabaCloud != nil:
+		return cd.Spec.Platform.AlibabaCloud.Region
 	case cd.Spec.Platform.AWS != nil:
 		return cd.Spec.Platform.AWS.Region
 	case cd.Spec.Platform.Azure != nil:

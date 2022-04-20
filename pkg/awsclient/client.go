@@ -75,6 +75,8 @@ type Client interface {
 	ModifyVpcEndpointServicePermissions(*ec2.ModifyVpcEndpointServicePermissionsInput) (*ec2.ModifyVpcEndpointServicePermissionsOutput, error)
 	DescribeVpcEndpointServices(*ec2.DescribeVpcEndpointServicesInput) (*ec2.DescribeVpcEndpointServicesOutput, error)
 	DescribeVpcEndpoints(*ec2.DescribeVpcEndpointsInput) (*ec2.DescribeVpcEndpointsOutput, error)
+	DescribeVpcEndpointsPages(*ec2.DescribeVpcEndpointsInput, func(*ec2.DescribeVpcEndpointsOutput, bool) bool) error
+
 	DescribeNetworkInterfaces(input *ec2.DescribeNetworkInterfacesInput) (*ec2.DescribeNetworkInterfacesOutput, error)
 	CreateVpcEndpoint(*ec2.CreateVpcEndpointInput) (*ec2.CreateVpcEndpointOutput, error)
 	DeleteVpcEndpoints(*ec2.DeleteVpcEndpointsInput) (*ec2.DeleteVpcEndpointsOutput, error)
@@ -193,6 +195,11 @@ func (c *awsClient) DescribeVpcEndpointServices(input *ec2.DescribeVpcEndpointSe
 func (c *awsClient) DescribeVpcEndpoints(input *ec2.DescribeVpcEndpointsInput) (*ec2.DescribeVpcEndpointsOutput, error) {
 	metricAWSAPICalls.WithLabelValues("DescribeVpcEndpoints").Inc()
 	return c.ec2Client.DescribeVpcEndpoints(input)
+}
+
+func (c *awsClient) DescribeVpcEndpointsPages(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) error {
+	metricAWSAPICalls.WithLabelValues("DescribeVpcEndpointsPages").Inc()
+	return c.ec2Client.DescribeVpcEndpointsPages(input, fn)
 }
 
 func (c *awsClient) DescribeNetworkInterfaces(input *ec2.DescribeNetworkInterfacesInput) (*ec2.DescribeNetworkInterfacesOutput, error) {

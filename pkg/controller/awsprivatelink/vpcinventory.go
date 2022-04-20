@@ -56,14 +56,20 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 		vpcs = append(vpcs, cand.VPCID)
 		endpointsPerVPC[cand.VPCID] = 0
 	}
-	endpointsResp, err := awsClient.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
+
+	var endpoints []*ec2.VpcEndpoint
+	err = awsClient.DescribeVpcEndpointsPages(&ec2.DescribeVpcEndpointsInput{
 		Filters: []*ec2.Filter{{Name: aws.String("vpc-id"), Values: aws.StringSlice(vpcs)}},
+	}, func(page *ec2.DescribeVpcEndpointsOutput, lastPage bool) bool {
+		endpoints = append(endpoints, page.VpcEndpoints...)
+		return !lastPage
 	})
 	if err != nil {
 		logger.WithField("vpcs", vpcs).WithError(err).Error("error getting VPC Endpoints in the selected VPCs")
 		return nil, err
 	}
-	for _, vEnd := range endpointsResp.VpcEndpoints {
+
+	for _, vEnd := range endpoints {
 		vpcID := aws.StringValue(vEnd.VpcId)
 		endpointsPerVPC[vpcID] = endpointsPerVPC[vpcID] + 1
 	}

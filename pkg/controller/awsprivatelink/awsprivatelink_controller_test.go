@@ -580,13 +580,16 @@ users:
 					Values: aws.StringSlice([]string{"test-cd-1234"}),
 				}}}).
 			Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
-		m.EXPECT().DescribeVpcEndpoints(
+		m.EXPECT().DescribeVpcEndpointsPages(
 			&ec2.DescribeVpcEndpointsInput{
 				Filters: []*ec2.Filter{{
 					Name:   aws.String("vpc-id"),
 					Values: aws.StringSlice([]string{"vpc-1"}),
-				}}}).
-			Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
+				}}}, gomock.Any()).
+			Do(func(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) {
+				describeVpcEndpointsOutput := &ec2.DescribeVpcEndpointsOutput{}
+				fn(describeVpcEndpointsOutput, true)
+			})
 		m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
 			ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
 		}).Return(&ec2.DescribeVpcEndpointServicesOutput{
@@ -1095,28 +1098,31 @@ users:
 			}, nil)
 
 			// Query all endpoints for the VPCs in the inventory. There are two in vpc-1 and one in vpc-2.
-			m.EXPECT().DescribeVpcEndpoints(
+			m.EXPECT().DescribeVpcEndpointsPages(
 				&ec2.DescribeVpcEndpointsInput{
 					Filters: []*ec2.Filter{{
 						Name:   aws.String("vpc-id"),
 						Values: aws.StringSlice([]string{"vpc-1", "vpc-2"}),
-					}}}).
-				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{
-						{
-							VpcEndpointId: aws.String("vpce-11"),
-							VpcId:         aws.String("vpc-1"),
+					}}}, gomock.Any()).
+				Do(func(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) {
+					describeVpcEndpointsOutput := &ec2.DescribeVpcEndpointsOutput{
+						VpcEndpoints: []*ec2.VpcEndpoint{
+							{
+								VpcEndpointId: aws.String("vpce-11"),
+								VpcId:         aws.String("vpc-1"),
+							},
+							{
+								VpcEndpointId: aws.String("vpce-12"),
+								VpcId:         aws.String("vpc-1"),
+							},
+							{
+								VpcEndpointId: aws.String("vpce-21"),
+								VpcId:         aws.String("vpc-2"),
+							},
 						},
-						{
-							VpcEndpointId: aws.String("vpce-12"),
-							VpcId:         aws.String("vpc-1"),
-						},
-						{
-							VpcEndpointId: aws.String("vpce-21"),
-							VpcId:         aws.String("vpc-2"),
-						},
-					},
-				}, nil)
+					}
+					fn(describeVpcEndpointsOutput, true)
+				})
 
 			createdEndpoint := &ec2.VpcEndpoint{
 				VpcEndpointId: aws.String("vpce-22"),

@@ -355,6 +355,20 @@ func (mr *MockClientMockRecorder) DescribeVpcEndpoints(arg0 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVpcEndpoints", reflect.TypeOf((*MockClient)(nil).DescribeVpcEndpoints), arg0)
 }
 
+// DescribeVpcEndpointsPages mocks base method.
+func (m *MockClient) DescribeVpcEndpointsPages(arg0 *ec2.DescribeVpcEndpointsInput, arg1 func(*ec2.DescribeVpcEndpointsOutput, bool) bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeVpcEndpointsPages", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DescribeVpcEndpointsPages indicates an expected call of DescribeVpcEndpointsPages.
+func (mr *MockClientMockRecorder) DescribeVpcEndpointsPages(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVpcEndpointsPages", reflect.TypeOf((*MockClient)(nil).DescribeVpcEndpointsPages), arg0, arg1)
+}
+
 // DisassociateVPCFromHostedZone mocks base method.
 func (m *MockClient) DisassociateVPCFromHostedZone(input *route53.DisassociateVPCFromHostedZoneInput) (*route53.DisassociateVPCFromHostedZoneOutput, error) {
 	m.ctrl.T.Helper()

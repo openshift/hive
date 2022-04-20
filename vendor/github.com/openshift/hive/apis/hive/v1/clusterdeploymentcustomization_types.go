@@ -5,6 +5,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// LastApplyStatusType indicates the status of the customization on the last
+// applied cluster deployment. This is needed to for inventory sorting process to
+// avoid using same broken customization
+type LastApplyStatusType string
+
+const (
+	// LastApplySucceeded indicates that the customization
+	// worked properly on the last applied cluster deployment
+	LastApplySucceeded LastApplyStatusType = "Succeeded"
+	// LastApplyBrokenSyntax indicates that Hive failed to apply
+	// customization patches on install-config. More detailes would be found in
+	// Valid condition message.
+	LastApplyBrokenSyntax LastApplyStatusType = "BrokenBySyntax"
+	// LastApplyBrokenCloud indicates that cluser deployment provision has failed
+	// when used this customization. More detailes would be found in the Valid condition message.
+	LastApplyBrokenCloud LastApplyStatusType = "BrokenByCloud"
+	// LastApplyInstallationPending indicates that the customization patches have
+	// been successfully applied but provisioning is not completed yet.
+	LastApplyInstallationPending LastApplyStatusType = "InstallationPending"
+)
+
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -23,31 +44,36 @@ type ClusterDeploymentCustomization struct {
 
 // ClusterDeploymentCustomizationSpec defines the desired state of ClusterDeploymentCustomization
 type ClusterDeploymentCustomizationSpec struct {
-	// TODO: documentation
+	// InstallConfigPatches is a list of patches to be applied to the install-config
 	InstallConfigPatches []PatchEntity `json:"installConfigPatches,omitempty"`
 }
 
-// TODO: documentation
+// PatchEntity represent a json patch (RFC 6902) to be applied to the install-config
 type PatchEntity struct {
+	// Op is the operation to perform: add, remove, replace, move, copy, test
 	// +required
 	Op string `json:"op"`
+	// Path is the json path to the value to be modified
 	// +required
 	Path string `json:"path"`
+	// Value is the value to be used in the operation
 	// +required
 	Value string `json:"value"`
 }
 
 // ClusterDeploymentCustomizationStatus defines the observed state of ClusterDeploymentCustomization
 type ClusterDeploymentCustomizationStatus struct {
-	// TODO: documentation
+	// ClusterDeploymentRef is a reference to the cluster deployment that this customization is applied on
 	// +optional
-	ClusterDeploymentRef *corev1.ObjectReference `json:"clusterDeploymentRef,omitempty"`
+	ClusterDeploymentRef *corev1.LocalObjectReference `json:"clusterDeploymentRef,omitempty"`
 
+	// LastApplyTime indicates the time when the customization was applied on a cluster deployment
 	// +optional
 	LastApplyTime metav1.Time `json:"lastApplyTime,omitempty"`
 
+	// LastApplyStatus indicates the customization status in the last applied cluster deployment
 	// +optional
-	LastApplyStatus string `json:"lastApplyStatus,omitempty"`
+	LastApplyStatus LastApplyStatusType `json:"lastApplyStatus,omitempty"`
 
 	// Conditions includes more detailed status for the cluster deployment customization status.
 	// +optional
@@ -77,9 +103,8 @@ type ClusterDeploymentCustomizationCondition struct {
 type ClusterDeploymentCustomizationConditionType string
 
 const (
-	// TODO: add more types
-	// TODO: shorter name?
 	ClusterDeploymentCustomizationAvailableCondition ClusterDeploymentCustomizationConditionType = "Available"
+	ClusterDeploymentCustomizationValid              ClusterDeploymentCustomizationConditionType = "Valid"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

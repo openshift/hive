@@ -291,15 +291,21 @@ objects:
                 state of ClusterDeploymentCustomization
               properties:
                 installConfigPatches:
-                  description: 'TODO: documentation'
+                  description: InstallConfigPatches is a list of patches to be applied
+                    to the install-config
                   items:
-                    description: 'TODO: documentation'
+                    description: PatchEntity represent a json patch (RFC 6902) to
+                      be applied to the install-config
                     properties:
                       op:
+                        description: 'Op is the operation to perform: add, remove,
+                          replace, move, copy, test'
                         type: string
                       path:
+                        description: Path is the json path to the value to be modified
                         type: string
                       value:
+                        description: Value is the value to be used in the operation
                         type: string
                     required:
                     - op
@@ -313,39 +319,12 @@ objects:
                 state of ClusterDeploymentCustomization
               properties:
                 clusterDeploymentRef:
-                  description: 'TODO: documentation'
+                  description: ClusterDeploymentRef is a reference to the cluster
+                    deployment that this customization is applied on
                   properties:
-                    apiVersion:
-                      description: API version of the referent.
-                      type: string
-                    fieldPath:
-                      description: 'If referring to a piece of an object instead of
-                        an entire object, this string should contain a valid JSON/Go
-                        field access statement, such as desiredState.manifest.containers[2].
-                        For example, if the object reference is to a container within
-                        a pod, this would take on a value like: "spec.containers{name}"
-                        (where "name" refers to the name of the container that triggered
-                        the event) or if no container name is specified "spec.containers[2]"
-                        (container with index 2 in this pod). This syntax is chosen
-                        only to have some well-defined way of referencing a part of
-                        an object. TODO: this design is not final and this field is
-                        subject to change in the future.'
-                      type: string
-                    kind:
-                      description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-                      type: string
                     name:
-                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
-                      type: string
-                    namespace:
-                      description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
-                      type: string
-                    resourceVersion:
-                      description: 'Specific resourceVersion to which this reference
-                        is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
-                      type: string
-                    uid:
-                      description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
                 conditions:
@@ -383,8 +362,12 @@ objects:
                     type: object
                   type: array
                 lastApplyStatus:
+                  description: LastApplyStatus indicates the customization status
+                    in the last applied cluster deployment
                   type: string
                 lastApplyTime:
+                  description: LastApplyTime indicates the time when the customization
+                    was applied on a cluster deployment
                   format: date-time
                   type: string
               type: object
@@ -593,8 +576,9 @@ objects:
                       format: date-time
                       type: string
                     clusterDeploymentCustomization:
-                      description: ClusterDeploymentCustomizationRef is the ClusterPool
-                        Inventory claimed customization for this ClusterDeployment
+                      description: CustomizationRef is the ClusterPool Inventory claimed
+                        customization for this ClusterDeployment The Customization
+                        exists in the ClusterPool namespace.
                       properties:
                         name:
                           description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -610,7 +594,6 @@ objects:
                         the cluster was created.
                       type: string
                   required:
-                  - clusterDeploymentCustomization
                   - namespace
                   - poolName
                   type: object
@@ -2128,14 +2111,15 @@ objects:
                       type: string
                   type: object
                 inventory:
-                  description: Inventory maintains a list entries consumed by the
-                    clusterpool to customize the default the cluster deployment
+                  description: Inventory maintains a list of entries consumed by the
+                    ClusterPool to customize the default the ClusterDeployment
                   items:
                     description: InventoryEntry maintains a reference to a custom
                       resource consumed by a clusterpool to customize the cluster
                       deployment
                     properties:
                       kind:
+                        default: ClusterDeploymentCustomization
                         description: Kind denotes the kind of the referenced resource.
                           The default is ClusterDeploymentCustomization, which is
                           also currently the only supported value.
@@ -2148,15 +2132,6 @@ objects:
                         type: string
                     type: object
                   type: array
-                inventoryAttempts:
-                  description: InventoryAttempts is the number of attempts to provision
-                    a ClusterDeployment with a given inventory entry. On a successful
-                    provision, the inventory entry attempts status is updated to this
-                    value. Negative InventoryAttempts means unlimited attempts, and
-                    recommended only for debugging purposes. Default number of InventoryAttempts
-                    is 5.
-                  format: int32
-                  type: integer
                 labels:
                   additionalProperties:
                     type: string

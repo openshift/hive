@@ -222,7 +222,9 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		// set hibernating condition to false for unsupported clouds
 		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported, msg,
 			corev1.ConditionFalse, cdLog)
-		if changed {
+		rChanged := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonRunning, clusterRunningMsg,
+			corev1.ConditionTrue, cdLog)
+		if changed || rChanged {
 			cd.Status.PowerState = hivev1.ClusterPowerStateRunning
 			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
 		}
@@ -234,7 +236,6 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	}
 
 	isFakeCluster := controllerutils.IsFakeCluster(cd)
-	isOnpremCustomized := controllerutils.IsOnpremCustomized(cd)
 
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync); err != nil {
@@ -373,15 +374,9 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return r.checkClusterStopped(cd, false, cdLog)
 	}
 	// If we get here, we're not supposed to be hibernating
-	if isFakeCluster || isOnpremCustomized {
-		changed := false
-		if supported, msg := r.hibernationSupported(cd); !supported {
-			changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported,
-				msg, corev1.ConditionFalse, cdLog)
-		} else {
-			changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonResumingOrRunning,
-				clusterResumingOrRunningMsg, corev1.ConditionFalse, cdLog)
-		}
+	if isFakeCluster {
+		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonResumingOrRunning,
+			clusterResumingOrRunningMsg, corev1.ConditionFalse, cdLog)
 		rChanged := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonRunning, clusterRunningMsg,
 			corev1.ConditionTrue, cdLog)
 		if changed || rChanged {
@@ -915,6 +910,9 @@ func shouldStopMachines(cd *hivev1.ClusterDeployment, hibernatingCondition *hive
 // shouldStartMachines decides if machines should be started
 func shouldStartMachines(cd *hivev1.ClusterDeployment, hibernatingCondition *hivev1.ClusterDeploymentCondition,
 	readyCondition *hivev1.ClusterDeploymentCondition) bool {
+	if hibernatingCondition.Reason == hivev1.HibernatingReasonUnsupported {
+		return true
+	}
 	if cd.Spec.PowerState == hivev1.ClusterPowerStateHibernating {
 		return false
 	}

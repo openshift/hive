@@ -119,14 +119,7 @@ func TestReconcile(t *testing.T) {
 					Message: "Unsupported version, need version 4.4.8 or greater"})).Build(),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
-			},
-			setupRemote: func(builder *remoteclientmock.MockBuilder) {
-				objs := []runtime.Object{}
-				objs = append(objs, readyNodes()...)
-				objs = append(objs, readyClusterOperators()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
-				builder.EXPECT().Build().Times(1).Return(c, nil)
+				actuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(false)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
@@ -293,22 +286,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
-		{
-			name: "customized CD will not hibernate",
-			cd:   cdBuilder.Options(o.customized, o.shouldRun).Build(),
-			// The clustersync controller creates a ClusterSync even when there are no syncsets
-			cs: csBuilder.Build(),
-			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				cond, runCond := getHibernatingAndRunningConditions(cd)
-				require.NotNil(t, cond)
-				assert.Equal(t, corev1.ConditionFalse, cond.Status)
-				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
-				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
-				require.NotNil(t, runCond)
-				assert.Equal(t, corev1.ConditionTrue, runCond.Status)
-				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
-			},
-		},
+
 		{
 			name: "start hibernating, syncsets not applied",
 			cd:   cdBuilder.Options(o.shouldHibernate, testcd.InstalledTimestamp(time.Now())).Build(),
@@ -960,10 +938,10 @@ func TestReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockActuator := mock.NewMockHibernationActuator(ctrl)
-			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(true)
 			if test.setupActuator != nil {
 				test.setupActuator(mockActuator)
 			}
+			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(true)
 			mockBuilder := remoteclientmock.NewMockBuilder(ctrl)
 			if test.setupRemote != nil {
 				test.setupRemote(mockBuilder)
@@ -1283,7 +1261,7 @@ type clusterDeploymentOptions struct{}
 func (*clusterDeploymentOptions) customized(cd *hivev1.ClusterDeployment) {
 	cd.Spec.Platform.OpenStack = &hivev1openstack.Platform{}
 	cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
-		ClusterDeploymentCustomizationRef: &corev1.LocalObjectReference{Name: "cdc"},
+		CustomizationRef: &corev1.LocalObjectReference{Name: "cdc"},
 	}
 }
 

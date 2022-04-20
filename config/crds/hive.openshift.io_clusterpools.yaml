@@ -153,13 +153,14 @@ spec:
                     type: string
                 type: object
               inventory:
-                description: Inventory maintains a list entries consumed by the clusterpool
-                  to customize the default the cluster deployment
+                description: Inventory maintains a list of entries consumed by the
+                  ClusterPool to customize the default the ClusterDeployment
                 items:
                   description: InventoryEntry maintains a reference to a custom resource
                     consumed by a clusterpool to customize the cluster deployment
                   properties:
                     kind:
+                      default: ClusterDeploymentCustomization
                       description: Kind denotes the kind of the referenced resource.
                         The default is ClusterDeploymentCustomization, which is also
                         currently the only supported value.
@@ -172,15 +173,6 @@ spec:
                       type: string
                   type: object
                 type: array
-              inventoryAttempts:
-                description: InventoryAttempts is the number of attempts to provision
-                  a ClusterDeployment with a given inventory entry. On a successful
-                  provision, the inventory entry attempts status is updated to this
-                  value. Negative InventoryAttempts means unlimited attempts, and
-                  recommended only for debugging purposes. Default number of InventoryAttempts
-                  is 5.
-                format: int32
-                type: integer
               labels:
                 additionalProperties:
                   type: string

@@ -247,6 +247,6 @@ func WithClusterMetadata(clusterMetadata *hivev1.ClusterMetadata) Option {
 
 func WithClusterDeploymentCustomizationReference(cdcName string) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
-		clusterDeployment.Spec.ClusterPoolRef.ClusterDeploymentCustomizationRef = &corev1.LocalObjectReference{Name: cdcName}
+		clusterDeployment.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcName}
 	}
 }

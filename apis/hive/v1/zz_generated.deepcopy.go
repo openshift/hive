@@ -781,7 +781,7 @@ func (in *ClusterDeploymentCustomizationStatus) DeepCopyInto(out *ClusterDeploym
 	*out = *in
 	if in.ClusterDeploymentRef != nil {
 		in, out := &in.ClusterDeploymentRef, &out.ClusterDeploymentRef
-		*out = new(corev1.ObjectReference)
+		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
 	if in.Conditions != nil {
@@ -1469,8 +1469,8 @@ func (in *ClusterPoolReference) DeepCopyInto(out *ClusterPoolReference) {
 		in, out := &in.ClaimedTimestamp, &out.ClaimedTimestamp
 		*out = (*in).DeepCopy()
 	}
-	if in.ClusterDeploymentCustomizationRef != nil {
-		in, out := &in.ClusterDeploymentCustomizationRef, &out.ClusterDeploymentCustomizationRef
+	if in.CustomizationRef != nil {
+		in, out := &in.CustomizationRef, &out.CustomizationRef
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}

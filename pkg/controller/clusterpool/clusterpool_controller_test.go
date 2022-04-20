@@ -80,7 +80,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		}),
 	)
 
-	inventoryPoolVersion := "17d682718ef4859e"
+	inventoryPoolVersion := "06983eaafac7f695"
 	inventroyPoolBuilder := initializedPoolBuilder.Options(
 		testcp.WithInventory([]hivev1.InventoryEntry{
 			{
@@ -201,7 +201,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectPoolVersionChanged: true,
 		},
 		{
-			name: "poolVersion doens't changes with existing Inventory",
+			name: "poolVersion doens't change with existing Inventory",
 			existing: []runtime.Object{
 				inventroyPoolBuilder.Build(testcp.WithInventory(
 					[]hivev1.InventoryEntry{
@@ -216,7 +216,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectPoolVersionChanged: false,
 		},
 		{
-			name: "poolVersion doens't changes with existing Inventory 2",
+			name: "poolVersion doens't change with existing Inventory 2",
 			existing: []runtime.Object{
 				inventroyPoolBuilder.Build(),
 			},
@@ -224,7 +224,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectPoolVersionChanged: false,
 		},
 		{
-			name: "customized clusterpool will creates a cluster",
+			name: "customized clusterpool will create a cluster",
 			existing: []runtime.Object{
 				inventroyPoolBuilder.Build(testcp.WithSize(1)),
 			},
@@ -232,7 +232,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:        1,
 			expectedObservedSize:         0,
 			expectedObservedReady:        0,
-			expectedInventoryVaildStatus: corev1.ConditionUnknown,
+			expectedInventoryVaildStatus: corev1.ConditionTrue,
 		},
 		{
 			name: "customized clusterpool inventory valid",

@@ -15,12 +15,6 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 )
 
-const (
-	computeFlavor   = "m1.large"
-	masterFlavor    = "ci.m4.xlarge"
-	externalNetwork = "provider_net_shared_3"
-)
-
 var _ CloudBuilder = (*OpenStackCloudBuilder)(nil)
 
 // OpenStackCloudBuilder encapsulates cluster artifact generation logic specific to OpenStack.
@@ -93,18 +87,19 @@ func (p *OpenStackCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.Ma
 func (p *OpenStackCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
 	ic.Platform = installertypes.Platform{
 		OpenStack: &installeropenstack.Platform{
-			ExternalNetwork:      externalNetwork,
-			DeprecatedFlavorName: computeFlavor,
+			Cloud:                p.Cloud,
+			ExternalNetwork:      p.ExternalNetwork,
+			DeprecatedFlavorName: p.ComputeFlavor,
 			APIFloatingIP:        p.APIFloatingIP,
 			IngressFloatingIP:    p.IngressFloatingIP,
 		},
 	}
 
 	ic.Compute[0].Platform.OpenStack = &installeropenstack.MachinePool{
-		FlavorName: computeFlavor,
+		FlavorName: p.ComputeFlavor,
 	}
 	ic.ControlPlane.Platform.OpenStack = &installeropenstack.MachinePool{
-		FlavorName: masterFlavor,
+		FlavorName: p.MasterFlavor,
 	}
 }
 

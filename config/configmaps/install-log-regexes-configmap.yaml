@@ -171,6 +171,11 @@ data:
       - "Error creating network Load Balancer: InternalFailure: "
       installFailingReason: ErrorCreatingNetworkLoadBalancer
       installFailingMessage: AWS network load balancer creation encountered an error during cluster installation
+    - name: ProxyCABundleTooLarge
+      searchRegexStrings:
+      - "level=fatal.*try reducing the size of your CA cert bundle"
+      installFailingReason: ProxyCABundleTooLarge
+      installFailingMessage: Failed to load ignition config, provided CA Cert Bundle is too large
 
 
     # GCP Specific

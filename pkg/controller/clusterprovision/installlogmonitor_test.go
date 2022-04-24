@@ -49,6 +49,7 @@ const (
 	proxyTimeoutLog             = "time=\"2021-11-17T03:56:25Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: i/o timeout]): quay.io/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: i/o timeout"
 	proxyConnectionRefused      = "time=\"2021-11-17T03:56:25Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: connect: connection refused]): quay.io/openshift-release-dev/ocp-release@sha256:53576e4df71a5f00f77718f25aec6ac7946eaaab998d99d3e3f03fcb403364db: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: dial tcp 10.0.125.189:8080: connect: connection refused"
 	proxyInvalidCABundleLog     = "time=\"2021-08-27T05:56:50Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority]): quay.io/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority"
+	proxyCABundleTooLarge		= "time=\"2022-04-24T12:28:00Z\" level=fatal msg=\"failed to fetch Terraform Variables: failed to generate asset \"Terraform Variables\": failed to get aws Terraform variables: rendered bootstrap ignition shim exceeds the 16KB limit for AWS user data -- try reducing the size of your CA cert bundle"
 	awsEC2QuotaExceeded         = "time=\"2021-12-12T12:54:36Z\" level=fatal msg=\"failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Quota Check\": error(MissingQuota): ec2/L-1234A56B is not available in us-east-1 because the required number of resources (36) is more than the limit of 32\""
 	bootstrapFailed             = "time=\"2022-01-26T17:44:03Z\" level=error msg=\"Bootstrap failed to complete: Get \"https://api.blahblah.kay6.p1.openshiftapps.com:6443/version?timeout=32s\": dial tcp 12.23.34.45:6443: connect: connection refused\""
 	awsInvalidVpcId             = "time=\"2022-01-11T18:25:33Z\" level=error msg=\"Error: InvalidVpcID.NotFound: The vpc ID 'vpc-whatever' does not exist\""
@@ -140,6 +141,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "ProxyInvalidCABundle",
 			log:            pointer.StringPtr(proxyInvalidCABundleLog),
 			expectedReason: "ProxyInvalidCABundle",
+		},
+		{
+			name:			"ProxyCABundleTooLarge",
+			log:			pointer.Stringptr(proxyCABundleTooLarge),
+			expectedReason: "ProxyCABundleTooLarge",
 		},
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",

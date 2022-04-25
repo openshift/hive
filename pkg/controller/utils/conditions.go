@@ -6,6 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
@@ -542,51 +543,7 @@ func SetMachinePoolCondition(
 	return newConditions
 }
 
-// SetClusterDeploymentCustomizationCondition sets a condition on a ClusterDeploymentCustomization resource's status
-func SetClusterDeploymentCustomizationCondition(
-	conditions []hivev1.ClusterDeploymentCustomizationCondition,
-	conditionType hivev1.ClusterDeploymentCustomizationConditionType,
-	status corev1.ConditionStatus,
-	reason string,
-	message string,
-	updateConditionCheck UpdateConditionCheck,
-) ([]hivev1.ClusterDeploymentCustomizationCondition, bool) {
-	now := metav1.Now()
-	changed := false
-	existingCondition := FindClusterDeploymentCustomizationCondition(conditions, conditionType)
-	if existingCondition == nil {
-		changed = true
-		conditions = append(
-			conditions,
-			hivev1.ClusterDeploymentCustomizationCondition{
-				Type:               conditionType,
-				Status:             status,
-				Reason:             reason,
-				Message:            message,
-				LastTransitionTime: now,
-				LastProbeTime:      now,
-			},
-		)
-	} else {
-		if shouldUpdateCondition(
-			existingCondition.Status, existingCondition.Reason, existingCondition.Message,
-			status, reason, message,
-			updateConditionCheck,
-		) {
-			if existingCondition.Status != status {
-				existingCondition.LastTransitionTime = now
-			}
-			existingCondition.Status = status
-			existingCondition.Reason = reason
-			existingCondition.Message = message
-			existingCondition.LastProbeTime = now
-			changed = true
-		}
-	}
-	return conditions, changed
-}
-
-func FindClusterDeploymentCustomizationCondition(conditions []hivev1.ClusterDeploymentCustomizationCondition, conditionType hivev1.ClusterDeploymentCustomizationConditionType) *hivev1.ClusterDeploymentCustomizationCondition {
+func FindClusterDeploymentCustomizationCondition(conditions []conditionsv1.Condition, conditionType conditionsv1.ConditionType) *conditionsv1.Condition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]

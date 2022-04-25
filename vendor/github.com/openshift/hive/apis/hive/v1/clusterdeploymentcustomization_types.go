@@ -1,6 +1,7 @@
 package v1
 
 import (
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -15,11 +16,11 @@ const (
 	// worked properly on the last applied cluster deployment
 	LastApplySucceeded LastApplyStatusType = "Succeeded"
 	// LastApplyBrokenSyntax indicates that Hive failed to apply
-	// customization patches on install-config. More detailes would be found in
+	// customization patches on install-config. More details would be found in
 	// Valid condition message.
 	LastApplyBrokenSyntax LastApplyStatusType = "BrokenBySyntax"
-	// LastApplyBrokenCloud indicates that cluser deployment provision has failed
-	// when used this customization. More detailes would be found in the Valid condition message.
+	// LastApplyBrokenCloud indicates that cluster deployment provision has failed
+	// when used this customization. More details would be found in the Valid condition message.
 	LastApplyBrokenCloud LastApplyStatusType = "BrokenByCloud"
 	// LastApplyInstallationPending indicates that the customization patches have
 	// been successfully applied but provisioning is not completed yet.
@@ -75,44 +76,24 @@ type ClusterDeploymentCustomizationStatus struct {
 	// +optional
 	LastApplyStatus LastApplyStatusType `json:"lastApplyStatus,omitempty"`
 
-	// Conditions includes more detailed status for the cluster deployment customization status.
+	// Conditions describes the state of the operator's reconciliation functionality.
+	// +patchMergeKey=type
+	// +patchStrategy=merge
 	// +optional
-	Conditions []ClusterDeploymentCustomizationCondition `json:"conditions,omitempty"`
+	// Conditions is a list of conditions related to operator reconciliation
+	Conditions []conditionsv1.Condition `json:"conditions,omitempty"  patchStrategy:"merge" patchMergeKey:"type"`
 }
-
-type ClusterDeploymentCustomizationCondition struct {
-	// Type is the type of the condition.
-	Type ClusterDeploymentCustomizationConditionType `json:"type"`
-	// Status is the status of the condition.
-	Status corev1.ConditionStatus `json:"status"`
-	// LastProbeTime is the last time we probed the condition.
-	// +optional
-	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
-	// LastTransitionTime is the last time the condition transitioned from one status to another.
-	// +optional
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-	// Reason is a unique, one-word, CamelCase reason for the condition's last transition.
-	// +optional
-	Reason string `json:"reason,omitempty"`
-	// Message is a human-readable message indicating details about last transition.
-	// +optional
-	Message string `json:"message,omitempty"`
-}
-
-// ClusterDeploymentCustomizationConditionType is a valid value for ClusterDeploymentCustomizationCondition.Type
-type ClusterDeploymentCustomizationConditionType string
 
 const (
-	ClusterDeploymentCustomizationAvailableCondition ClusterDeploymentCustomizationConditionType = "Available"
-	ClusterDeploymentCustomizationValid              ClusterDeploymentCustomizationConditionType = "Valid"
+	ClusterDeploymentCustomizationValid conditionsv1.ConditionType = "Valid"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterDeploymentCustomizationLis contains the list of ClusterDeploymentCustomization
+// ClusterDeploymentCustomizationList contains a list of ClusterDeploymentCustomizations
 type ClusterDeploymentCustomizationList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
+	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterDeploymentCustomization `json:"items"`
 }
 

@@ -74,32 +74,28 @@ spec:
                     type: string
                 type: object
               conditions:
-                description: Conditions includes more detailed status for the cluster
-                  deployment customization status.
+                description: Conditions describes the state of the operator's reconciliation
+                  functionality. Conditions is a list of conditions related to operator
+                  reconciliation
                 items:
+                  description: Condition represents the state of the operator's reconciliation
+                    functionality.
                   properties:
-                    lastProbeTime:
-                      description: LastProbeTime is the last time we probed the condition.
+                    lastHeartbeatTime:
                       format: date-time
                       type: string
                     lastTransitionTime:
-                      description: LastTransitionTime is the last time the condition
-                        transitioned from one status to another.
                       format: date-time
                       type: string
                     message:
-                      description: Message is a human-readable message indicating
-                        details about last transition.
                       type: string
                     reason:
-                      description: Reason is a unique, one-word, CamelCase reason
-                        for the condition's last transition.
                       type: string
                     status:
-                      description: Status is the status of the condition.
                       type: string
                     type:
-                      description: Type is the type of the condition.
+                      description: ConditionType is the state of the operator's reconciliation
+                        functionality.
                       type: string
                   required:
                   - status

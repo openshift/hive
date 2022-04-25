@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 	"github.com/openshift/library-go/pkg/manifest"
 	"github.com/openshift/library-go/pkg/verify"
@@ -1453,21 +1454,17 @@ func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDepl
 		return err
 	}
 
-	conds, changed := controllerutils.SetClusterDeploymentCustomizationCondition(
-		cdc.Status.Conditions,
-		hivev1.ClusterDeploymentCustomizationAvailableCondition,
-		corev1.ConditionTrue,
-		"ClusterDeploymentCustomizationAvailable",
-		"Cluster Deployment Customization is available",
-		controllerutils.UpdateConditionIfReasonOrMessageChange,
-	)
-	if changed {
-		cdc.Status.Conditions = conds
-		cdc.Status.ClusterDeploymentRef = nil
-		if err := r.Status().Update(context.Background(), cdc); err != nil {
-			cdLog.WithError(err).WithField("Customization", customizationRef.Name).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
-			return err
-		}
+	conditionsv1.SetStatusCondition(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    conditionsv1.ConditionAvailable,
+		Status:  corev1.ConditionFalse,
+		Reason:  "ClusterDeploymentCustomizationAvailable",
+		Message: "Cluster Deployment Customization is available",
+	})
+
+	cdc.Status.ClusterDeploymentRef = nil
+	if err := r.Status().Update(context.Background(), cdc); err != nil {
+		cdLog.WithError(err).WithField("Customization", customizationRef.Name).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
+		return err
 	}
 
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerCustomizationRelease)

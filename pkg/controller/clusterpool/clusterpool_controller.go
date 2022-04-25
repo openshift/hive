@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/clusterresource"
@@ -492,7 +493,7 @@ func (r *ReconcileClusterPool) updateInventory(clp *hivev1.ClusterPool, cds []*h
 			// 2. CDC is reserved but it doesn't have a reference to a ClusterDeployment
 			currentAvailability := controllerutils.FindClusterDeploymentCustomizationCondition(
 				cdc.Status.Conditions,
-				hivev1.ClusterDeploymentCustomizationAvailableCondition,
+				conditionsv1.ConditionAvailable,
 			)
 			if cdc.Status.ClusterDeploymentRef != nil {
 				cd := &hivev1.ClusterDeployment{}
@@ -530,21 +531,16 @@ func (r *ReconcileClusterPool) setCustomizationAvailabilityCondition(cdc *hivev1
 		reason = "Reserved"
 	}
 
-	conditions, changed := controllerutils.SetClusterDeploymentCustomizationCondition(
-		cdc.Status.Conditions,
-		hivev1.ClusterDeploymentCustomizationAvailableCondition,
-		status,
-		reason,
-		message,
-		controllerutils.UpdateConditionIfReasonOrMessageChange,
-	)
+	conditionsv1.SetStatusCondition(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    conditionsv1.ConditionAvailable,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	})
 
-	if changed {
-		cdc.Status.Conditions = conditions
-		if err := r.Status().Update(context.TODO(), cdc); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterDeploymentCustomization conditions")
-			return errors.Wrap(err, "could not update ClusterDeploymentCustomization conditions")
-		}
+	if err := r.Status().Update(context.TODO(), cdc); err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterDeploymentCustomization conditions")
+		return errors.Wrap(err, "could not update ClusterDeploymentCustomization conditions")
 	}
 
 	return nil
@@ -910,20 +906,14 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 
 	// Reserving ClusterDeploymentCustomization
 	cdc.Status.LastApplyTime = metav1.Now()
-	conds, changed := controllerutils.SetClusterDeploymentCustomizationCondition(
-		cdc.Status.Conditions,
-		hivev1.ClusterDeploymentCustomizationAvailableCondition,
-		corev1.ConditionFalse,
-		"reserved",
-		"Reserved",
-		controllerutils.UpdateConditionIfReasonOrMessageChange,
-	)
+	conditionsv1.SetStatusCondition(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    conditionsv1.ConditionAvailable,
+		Status:  corev1.ConditionFalse,
+		Reason:  "Reserved",
+		Message: "Reserved",
+	})
 
-	if changed {
-		cdc.Status.Conditions = conds
-	}
-
-	if updateErr := r.Status().Update(context.Background(), cdc); updateErr != nil {
+	if err := r.Status().Update(context.Background(), cdc); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.updateInventoryValidMessage(clp, cdc.Name, hivev1.InventoryReasonMissing, true, logger)
 		}
@@ -1319,11 +1309,11 @@ func (r *ReconcileClusterPool) getInventoryCustomization(pool *hivev1.ClusterPoo
 				if apierrors.IsNotFound(err) {
 					r.updateInventoryValidMessage(pool, cdc.Name, hivev1.InventoryReasonMissing, true, logger)
 				}
-				continue
+				return err
 			}
 			currentAvailability := controllerutils.FindClusterDeploymentCustomizationCondition(
 				cdc.Status.Conditions,
-				hivev1.ClusterDeploymentCustomizationAvailableCondition,
+				conditionsv1.ConditionAvailable,
 			)
 			if currentAvailability == nil || currentAvailability.Status == corev1.ConditionTrue {
 				inventory = append(inventory, *cdc)

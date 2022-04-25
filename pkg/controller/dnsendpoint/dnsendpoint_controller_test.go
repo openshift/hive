@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
@@ -68,6 +69,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 		nameServers              rootDomainsMap
 		configureQuery           func(*mock.MockQuery)
 		expectErr                bool
+		requeueAfter             time.Duration
 		expectedNameServers      rootDomainsMap
 		expectedCreatedCondition bool
 		expectDNSZoneDeleted     bool
@@ -230,7 +232,8 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nil,
 			},
-			expectErr: true,
+			expectErr:    true,
+			requeueAfter: 15 * time.Second,
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nil,
 			},
@@ -323,7 +326,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			logger := log.WithField("controller", ControllerName)
-			fakeClient := fake.NewFakeClient(tc.dnsZone)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(tc.dnsZone).Build()
 			mockQuery := mock.NewMockQuery(mockCtrl)
 			if tc.configureQuery != nil {
 				tc.configureQuery(mockQuery)
@@ -352,7 +355,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			} else {
 				assert.NoError(t, err, "expected no error from reconcile")
 			}
-			assert.Equal(t, reconcile.Result{}, result, "unexpected reconcile result")
+			assert.Equal(t, reconcile.Result{RequeueAfter: tc.requeueAfter}, result, "unexpected reconcile result")
 			assertRootDomainsMapEqual(t, tc.expectedNameServers, scraper.nameServers)
 			dnsZone := &hivev1.DNSZone{}
 			err = fakeClient.Get(context.Background(), objectKey, dnsZone)
@@ -567,7 +570,7 @@ func TestMultiCloudDNSSetup(t *testing.T) {
 			}
 
 			// Run/set up reconciler
-			fakeClient := fake.NewFakeClient()
+			fakeClient := fake.NewClientBuilder().Build()
 			fakeMgr := &fakeManager{
 				watchedDomains: map[string]bool{},
 			}

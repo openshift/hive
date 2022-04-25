@@ -3,6 +3,7 @@ package dnsendpoint
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -220,7 +221,9 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	if !nsTool.scraper.HasBeenScraped(rootDomain) {
-		return reconcile.Result{}, errors.New("name servers have not yet been scraped")
+		// HIVE-1855: Delay this requeue to give the scraping a chance to complete, reducing
+		// thrashing and error rate in the controller.
+		return reconcile.Result{RequeueAfter: 15 * time.Second}, errors.New("name servers have not yet been scraped")
 	}
 
 	if !hasFinalizer {

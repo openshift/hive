@@ -3,7 +3,6 @@ package dnsendpoint
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -211,7 +210,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	if rootDomain == "" {
-		dnsLog.WithField("domain", fullDomain).Error("no scraper for domain found, skipping reconcile")
+		dnsLog.Error("no scraper for domain found, skipping reconcile")
 		_, err := updateDomainNotManagedCondition(r.Client, dnsLog, instance, true)
 		return reconcile.Result{}, err
 	}
@@ -221,9 +220,13 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	if !nsTool.scraper.HasBeenScraped(rootDomain) {
-		// HIVE-1855: Delay this requeue to give the scraping a chance to complete, reducing
-		// thrashing and error rate in the controller.
-		return reconcile.Result{RequeueAfter: 15 * time.Second}, errors.New("name servers have not yet been scraped")
+		// HIVE-1855:
+		// a) Do not consider this an error. We're just waiting for the scrape to happen.
+		// b) Do not requeue. The scraper posts an event that will enqueue the DNSZone once it has
+		// been scraped. (Follow nameServerChangeNotifier in this file and notifyChange in
+		// nameserverscraper.go.)
+		dnsLog.Info("name servers have not yet been scraped")
+		return reconcile.Result{}, nil
 	}
 
 	if !hasFinalizer {

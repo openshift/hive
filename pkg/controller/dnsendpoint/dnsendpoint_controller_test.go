@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
@@ -69,7 +68,6 @@ func TestDNSEndpointReconcile(t *testing.T) {
 		nameServers              rootDomainsMap
 		configureQuery           func(*mock.MockQuery)
 		expectErr                bool
-		requeueAfter             time.Duration
 		expectedNameServers      rootDomainsMap
 		expectedCreatedCondition bool
 		expectDNSZoneDeleted     bool
@@ -232,8 +230,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			nameServers: rootDomainsMap{
 				rootDomain: nil,
 			},
-			expectErr:    true,
-			requeueAfter: 15 * time.Second,
+			expectErr: false,
 			expectedNameServers: rootDomainsMap{
 				rootDomain: nil,
 			},
@@ -355,7 +352,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			} else {
 				assert.NoError(t, err, "expected no error from reconcile")
 			}
-			assert.Equal(t, reconcile.Result{RequeueAfter: tc.requeueAfter}, result, "unexpected reconcile result")
+			assert.Equal(t, reconcile.Result{}, result, "unexpected reconcile result")
 			assertRootDomainsMapEqual(t, tc.expectedNameServers, scraper.nameServers)
 			dnsZone := &hivev1.DNSZone{}
 			err = fakeClient.Get(context.Background(), objectKey, dnsZone)

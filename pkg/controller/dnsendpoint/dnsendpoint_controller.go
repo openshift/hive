@@ -78,13 +78,20 @@ func Add(mgr manager.Manager) error {
 	}
 
 	if nameServerChangeNotifier != nil {
-		if err := ctrl.Watch(&source.Channel{Source: nameServerChangeNotifier}, &handler.EnqueueRequestForObject{}); err != nil {
+		if err := ctrl.Watch(&source.Channel{Source: nameServerChangeNotifier}, LogAndEnqueueRequestForObject(logger)); err != nil {
 			log.WithField("controller", ControllerName).WithError(err).Error("unable to set up watch for name server changes")
 			return err
 		}
 	}
 
 	return nil
+}
+
+func LogAndEnqueueRequestForObject(logger log.FieldLogger) handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+		logger.Info(fmt.Sprintf("EFRIED: Enqueueing for object %#v", obj))
+		return []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(obj)}}
+	})
 }
 
 type nameServerTool struct {
@@ -126,6 +133,7 @@ func newReconciler(mgr manager.Manager, kubeClient client.Client) (*ReconcileDNS
 		}
 
 		registerNameServerChange := func(obj client.Object) {
+			logger.Info(fmt.Sprintf("EFRIED: sending event for object %#v", obj))
 			nameServerChangeNotifier <- event.GenericEvent{Object: obj}
 		}
 		nameServerScraper := newNameServerScraper(logger, nameServerQuery, md.Domains, registerNameServerChange)

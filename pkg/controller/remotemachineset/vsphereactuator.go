@@ -1,18 +1,16 @@
 package remotemachineset
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	installvsphere "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
+	vsphereutil "github.com/openshift/machine-api-operator/pkg/controller/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
@@ -100,7 +98,7 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 
 // Get the OS image from an existing master machine.
 func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
-	providerSpec, err := decodeVSphereMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	providerSpec, err := vsphereutil.ProviderSpecFromRawExtension(masterMachine.Spec.ProviderSpec.Value)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode VSphereMachineProviderSpec from master machine")
 		return "", errors.Wrap(err, "cannot decode VSphereMachineProviderSpec from master machine")
@@ -108,21 +106,4 @@ func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme
 	osImage := providerSpec.Template
 	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
 	return osImage, nil
-}
-
-func decodeVSphereMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*machineapi.VSphereMachineProviderSpec, error) {
-	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
-	if rawExt == nil {
-		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
-	}
-	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode VSphere ProviderSpec: %v", err)
-	}
-	spec, ok := obj.(*machineapi.VSphereMachineProviderSpec)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
-	}
-	return spec, nil
 }

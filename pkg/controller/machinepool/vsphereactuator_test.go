@@ -10,8 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
+	vsphereutil "github.com/openshift/machine-api-operator/pkg/controller/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -22,6 +25,7 @@ func TestVSphereActuator(t *testing.T) {
 		name                       string
 		clusterDeployment          *hivev1.ClusterDeployment
 		pool                       *hivev1.MachinePool
+		masterMachine              *machineapi.Machine
 		expectedMachineSetReplicas map[string]int64
 		expectedErr                bool
 	}{
@@ -32,18 +36,19 @@ func TestVSphereActuator(t *testing.T) {
 			expectedMachineSetReplicas: map[string]int64{
 				fmt.Sprintf("%s-worker", testInfraID): 3,
 			},
+			masterMachine: testVSphereMachine("master0", "master"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			machineapi.AddToScheme(scheme.Scheme)
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			actuator := &VSphereActuator{
-				logger: log.WithField("actuator", "vsphereactuator_test"),
-			}
+			actuator, err := NewVSphereActuator(test.masterMachine, scheme.Scheme, log.WithField("actuator", "vsphereactuator_test"))
+			assert.NoError(t, err, "unexpected error creating VSphereActuator")
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
 
@@ -101,4 +106,54 @@ func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
 		},
 	}
 	return cd
+}
+
+func testVSphereMachineSpec(machineType string) machineapi.MachineSpec {
+	rawVSphereProviderSpec, err := vsphereutil.RawExtensionFromProviderSpec(testVSphereProviderSpec())
+	if err != nil {
+		log.WithError(err).Fatal("error encoding VSphere machine provider spec")
+	}
+	return machineapi.MachineSpec{
+		ObjectMeta: machineapi.ObjectMeta{
+			Labels: map[string]string{
+				"machine.openshift.io/cluster-api-cluster":      testInfraID,
+				"machine.openshift.io/cluster-api-machine-role": machineType,
+				"machine.openshift.io/cluster-api-machine-type": machineType,
+			},
+		},
+		ProviderSpec: machineapi.ProviderSpec{
+			Value: rawVSphereProviderSpec,
+		},
+		Taints: []corev1.Taint{
+			{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: corev1.TaintEffectNoSchedule,
+			},
+		},
+	}
+}
+
+func testVSphereMachine(name string, machineType string) *machineapi.Machine {
+	return &machineapi.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: machineAPINamespace,
+			Labels: map[string]string{
+				"machine.openshift.io/cluster-api-cluster": testInfraID,
+			},
+		},
+		Spec: testVSphereMachineSpec(machineType),
+	}
+}
+
+func testVSphereProviderSpec() *machineapi.VSphereMachineProviderSpec {
+	return &machineapi.VSphereMachineProviderSpec{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "VSphereMachineProviderSpec",
+			APIVersion: machineapi.SchemeGroupVersion.String(),
+		},
+		NumCPUs: 8,
+		DiskGiB: 120,
+	}
 }

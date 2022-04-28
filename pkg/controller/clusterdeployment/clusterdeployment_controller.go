@@ -564,11 +564,21 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 		cdLog.Debugf("adding clusterdeployment deprovision finalizer")
-		if err := r.addClusterDeploymentFinalizer(cd); err != nil {
+		if err := r.addClusterDeploymentFinalizer(cd, hivev1.FinalizerDeprovision); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding deprovision finalizer")
 			return reconcile.Result{}, err
 		}
 		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+		return reconcile.Result{}, nil
+	}
+
+	if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.CustomizationRef != nil && !controllerutils.HasFinalizer(cd, hivev1.FinalizerCustomizationRelease) {
+		cdLog.Debugf("adding clusterdeployment customization release finalizer")
+		if err := r.addClusterDeploymentFinalizer(cd, hivev1.FinalizerCustomizationRelease); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding customization finalizer")
+			return reconcile.Result{}, err
+		}
+
 		return reconcile.Result{}, nil
 	}
 
@@ -1397,7 +1407,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	case !dnsZoneGone:
 		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	default:
-		cdLog.Infof("DNSZone gone, customization gone and deprovision request completed, removing finalizer")
+		cdLog.Infof("DNSZone gone, customization gone and deprovision request completed, removing deprovision finalizer")
 		if err := r.removeClusterDeploymentFinalizer(cd, cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 			return reconcile.Result{}, err
@@ -1406,12 +1416,9 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 }
 
-func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
+func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment, finalizer string) error {
 	cd = cd.DeepCopy()
-	controllerutils.AddFinalizer(cd, hivev1.FinalizerDeprovision)
-	if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.CustomizationRef != nil && !controllerutils.HasFinalizer(cd, hivev1.FinalizerCustomizationRelease) {
-		controllerutils.AddFinalizer(cd, hivev1.FinalizerCustomizationRelease)
-	}
+	controllerutils.AddFinalizer(cd, finalizer)
 
 	return r.Update(context.TODO(), cd)
 }
@@ -1435,41 +1442,48 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 }
 
 func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	if cd.Spec.ClusterPoolRef == nil || cd.Spec.ClusterPoolRef.CustomizationRef == nil {
+	if cd.Spec.ClusterPoolRef == nil || cd.Spec.ClusterPoolRef.CustomizationRef == nil || !controllerutils.HasFinalizer(cd, hivev1.FinalizerCustomizationRelease) {
 		return nil
 	}
 	customizationRef := cd.Spec.ClusterPoolRef.CustomizationRef
 	cdc := &hivev1.ClusterDeploymentCustomization{}
-	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: cd.Spec.ClusterPoolRef.Namespace, Name: customizationRef.Name}, cdc)
+	cdcNamespace := cd.Spec.ClusterPoolRef.Namespace
+	cdcName := customizationRef.Name
+	cdcLog := cdLog.WithField("customization", cdcName).WithField("namespace", cdcNamespace)
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: cdcNamespace, Name: cdcName}, cdc)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			cdLog.WithField("Customization", customizationRef.Name).Info("customization not found, nothing to release")
+			cdcLog.Info("customization not found, nothing to release")
 			controllerutils.DeleteFinalizer(cd, hivev1.FinalizerCustomizationRelease)
 			if err := r.Update(context.TODO(), cd); err != nil {
-				cdLog.WithError(err).WithField("Customization", customizationRef.Name).Error("failed to update ClusterDeployment")
+				cdcLog.WithError(err).Error("failed to update ClusterDeployment")
+				return err
 			}
-			return nil
+			return err
 		}
 		log.WithError(err).Error("error reading customization")
 		return err
 	}
 
-	conditionsv1.SetStatusCondition(&cdc.Status.Conditions, conditionsv1.Condition{
-		Type:    conditionsv1.ConditionAvailable,
-		Status:  corev1.ConditionFalse,
-		Reason:  "ClusterDeploymentCustomizationAvailable",
-		Message: "Cluster Deployment Customization is available",
-	})
+	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+	if existingCondition.Reason != "Available" || existingCondition.Message != "available" {
+		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+			Type:    conditionsv1.ConditionAvailable,
+			Status:  corev1.ConditionFalse,
+			Reason:  "Available",
+			Message: "available",
+		})
+	}
 
 	cdc.Status.ClusterDeploymentRef = nil
 	if err := r.Status().Update(context.Background(), cdc); err != nil {
-		cdLog.WithError(err).WithField("Customization", customizationRef.Name).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
+		cdcLog.WithError(err).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
 		return err
 	}
 
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerCustomizationRelease)
 	if err := r.Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).WithField("Customization", customizationRef.Name).Error("Failed to update ClusterDeployment after ClusterDeploymentCustomization finalizer deletion")
+		cdcLog.WithError(err).Error("Failed to update ClusterDeployment after ClusterDeploymentCustomization finalizer deletion")
 		return err
 	}
 

@@ -7,20 +7,20 @@ import (
 )
 
 // LastApplyStatusType indicates the status of the customization on the last
-// applied cluster deployment. This is needed to for inventory sorting process to
-// avoid using same broken customization
+// applied cluster deployment. This is used for inventory sorting process to
+// reduce the likelihood of using a broken customization repeatedly.
 type LastApplyStatusType string
 
 const (
 	// LastApplySucceeded indicates that the customization
-	// worked properly on the last applied cluster deployment
+	// worked properly on the last applied cluster deployment.
 	LastApplySucceeded LastApplyStatusType = "Succeeded"
 	// LastApplyBrokenSyntax indicates that Hive failed to apply
 	// customization patches on install-config. More details would be found in
 	// Valid condition message.
 	LastApplyBrokenSyntax LastApplyStatusType = "BrokenBySyntax"
 	// LastApplyBrokenCloud indicates that cluster deployment provision has failed
-	// when used this customization. More details would be found in the Valid condition message.
+	// when using this customization. More details would be found in the Valid condition message.
 	LastApplyBrokenCloud LastApplyStatusType = "BrokenByCloud"
 	// LastApplyInstallationPending indicates that the customization patches have
 	// been successfully applied but provisioning is not completed yet.
@@ -28,10 +28,9 @@ const (
 )
 
 // +genclient
-// +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterDeploymentCustomization is the Schema for clusterdeploymentcustomizations API
+// ClusterDeploymentCustomization is the Schema for clusterdeploymentcustomizations API.
 // +kubebuilder:subresource:status
 // +k8s:openapi-gen=true
 // +kubebuilder:resource:scope=Namespaced
@@ -43,9 +42,9 @@ type ClusterDeploymentCustomization struct {
 	Status ClusterDeploymentCustomizationStatus `json:"status,omitempty"`
 }
 
-// ClusterDeploymentCustomizationSpec defines the desired state of ClusterDeploymentCustomization
+// ClusterDeploymentCustomizationSpec defines the desired state of ClusterDeploymentCustomization.
 type ClusterDeploymentCustomizationSpec struct {
-	// InstallConfigPatches is a list of patches to be applied to the install-config
+	// InstallConfigPatches is a list of patches to be applied to the install-config.
 	InstallConfigPatches []PatchEntity `json:"installConfigPatches,omitempty"`
 }
 
@@ -62,17 +61,17 @@ type PatchEntity struct {
 	Value string `json:"value"`
 }
 
-// ClusterDeploymentCustomizationStatus defines the observed state of ClusterDeploymentCustomization
+// ClusterDeploymentCustomizationStatus defines the observed state of ClusterDeploymentCustomization.
 type ClusterDeploymentCustomizationStatus struct {
-	// ClusterDeploymentRef is a reference to the cluster deployment that this customization is applied on
+	// ClusterDeploymentRef is a reference to the cluster deployment that this customization is applied on.
 	// +optional
 	ClusterDeploymentRef *corev1.LocalObjectReference `json:"clusterDeploymentRef,omitempty"`
 
-	// LastApplyTime indicates the time when the customization was applied on a cluster deployment
+	// LastApplyTime indicates the time when the customization was applied on a cluster deployment.
 	// +optional
 	LastApplyTime metav1.Time `json:"lastApplyTime,omitempty"`
 
-	// LastApplyStatus indicates the customization status in the last applied cluster deployment
+	// LastApplyStatus indicates the customization status in the last applied cluster deployment.
 	// +optional
 	LastApplyStatus LastApplyStatusType `json:"lastApplyStatus,omitempty"`
 
@@ -80,7 +79,6 @@ type ClusterDeploymentCustomizationStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +optional
-	// Conditions is a list of conditions related to operator reconciliation
 	Conditions []conditionsv1.Condition `json:"conditions,omitempty"  patchStrategy:"merge" patchMergeKey:"type"`
 }
 
@@ -90,7 +88,7 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterDeploymentCustomizationList contains a list of ClusterDeploymentCustomizations
+// ClusterDeploymentCustomizationList contains a list of ClusterDeploymentCustomizations.
 type ClusterDeploymentCustomizationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -154,10 +154,10 @@ spec:
                 type: object
               inventory:
                 description: Inventory maintains a list of entries consumed by the
-                  ClusterPool to customize the default the ClusterDeployment
+                  ClusterPool to customize the default ClusterDeployment.
                 items:
                   description: InventoryEntry maintains a reference to a custom resource
-                    consumed by a clusterpool to customize the cluster deployment
+                    consumed by a clusterpool to customize the cluster deployment.
                   properties:
                     kind:
                       default: ClusterDeploymentCustomization

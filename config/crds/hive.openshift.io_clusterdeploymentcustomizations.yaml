@@ -18,7 +18,7 @@ spec:
     schema:
       openAPIV3Schema:
         description: ClusterDeploymentCustomization is the Schema for clusterdeploymentcustomizations
-          API
+          API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -34,11 +34,11 @@ spec:
             type: object
           spec:
             description: ClusterDeploymentCustomizationSpec defines the desired state
-              of ClusterDeploymentCustomization
+              of ClusterDeploymentCustomization.
             properties:
               installConfigPatches:
                 description: InstallConfigPatches is a list of patches to be applied
-                  to the install-config
+                  to the install-config.
                 items:
                   description: PatchEntity represent a json patch (RFC 6902) to be
                     applied to the install-config
@@ -62,11 +62,11 @@ spec:
             type: object
           status:
             description: ClusterDeploymentCustomizationStatus defines the observed
-              state of ClusterDeploymentCustomization
+              state of ClusterDeploymentCustomization.
             properties:
               clusterDeploymentRef:
                 description: ClusterDeploymentRef is a reference to the cluster deployment
-                  that this customization is applied on
+                  that this customization is applied on.
                 properties:
                   name:
                     description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -75,8 +75,7 @@ spec:
                 type: object
               conditions:
                 description: Conditions describes the state of the operator's reconciliation
-                  functionality. Conditions is a list of conditions related to operator
-                  reconciliation
+                  functionality.
                 items:
                   description: Condition represents the state of the operator's reconciliation
                     functionality.
@@ -104,11 +103,11 @@ spec:
                 type: array
               lastApplyStatus:
                 description: LastApplyStatus indicates the customization status in
-                  the last applied cluster deployment
+                  the last applied cluster deployment.
                 type: string
               lastApplyTime:
                 description: LastApplyTime indicates the time when the customization
-                  was applied on a cluster deployment
+                  was applied on a cluster deployment.
                 format: date-time
                 type: string
             type: object

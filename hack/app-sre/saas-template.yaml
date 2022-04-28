@@ -271,7 +271,7 @@ objects:
       schema:
         openAPIV3Schema:
           description: ClusterDeploymentCustomization is the Schema for clusterdeploymentcustomizations
-            API
+            API.
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation
@@ -288,11 +288,11 @@ objects:
               type: object
             spec:
               description: ClusterDeploymentCustomizationSpec defines the desired
-                state of ClusterDeploymentCustomization
+                state of ClusterDeploymentCustomization.
               properties:
                 installConfigPatches:
                   description: InstallConfigPatches is a list of patches to be applied
-                    to the install-config
+                    to the install-config.
                   items:
                     description: PatchEntity represent a json patch (RFC 6902) to
                       be applied to the install-config
@@ -316,11 +316,11 @@ objects:
               type: object
             status:
               description: ClusterDeploymentCustomizationStatus defines the observed
-                state of ClusterDeploymentCustomization
+                state of ClusterDeploymentCustomization.
               properties:
                 clusterDeploymentRef:
                   description: ClusterDeploymentRef is a reference to the cluster
-                    deployment that this customization is applied on
+                    deployment that this customization is applied on.
                   properties:
                     name:
                       description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
@@ -329,8 +329,7 @@ objects:
                   type: object
                 conditions:
                   description: Conditions describes the state of the operator's reconciliation
-                    functionality. Conditions is a list of conditions related to operator
-                    reconciliation
+                    functionality.
                   items:
                     description: Condition represents the state of the operator's
                       reconciliation functionality.
@@ -358,11 +357,11 @@ objects:
                   type: array
                 lastApplyStatus:
                   description: LastApplyStatus indicates the customization status
-                    in the last applied cluster deployment
+                    in the last applied cluster deployment.
                   type: string
                 lastApplyTime:
                   description: LastApplyTime indicates the time when the customization
-                    was applied on a cluster deployment
+                    was applied on a cluster deployment.
                   format: date-time
                   type: string
               type: object
@@ -572,7 +571,7 @@ objects:
                       type: string
                     clusterDeploymentCustomization:
                       description: CustomizationRef is the ClusterPool Inventory claimed
-                        customization for this ClusterDeployment The Customization
+                        customization for this ClusterDeployment. The Customization
                         exists in the ClusterPool namespace.
                       properties:
                         name:
@@ -2107,11 +2106,11 @@ objects:
                   type: object
                 inventory:
                   description: Inventory maintains a list of entries consumed by the
-                    ClusterPool to customize the default the ClusterDeployment
+                    ClusterPool to customize the default ClusterDeployment.
                   items:
                     description: InventoryEntry maintains a reference to a custom
                       resource consumed by a clusterpool to customize the cluster
-                      deployment
+                      deployment.
                     properties:
                       kind:
                         default: ClusterDeploymentCustomization

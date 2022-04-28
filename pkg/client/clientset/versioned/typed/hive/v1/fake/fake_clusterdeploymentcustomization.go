@@ -86,6 +86,18 @@ func (c *FakeClusterDeploymentCustomizations) Update(ctx context.Context, cluste
 	return obj.(*hivev1.ClusterDeploymentCustomization), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeClusterDeploymentCustomizations) UpdateStatus(ctx context.Context, clusterDeploymentCustomization *hivev1.ClusterDeploymentCustomization, opts v1.UpdateOptions) (*hivev1.ClusterDeploymentCustomization, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(clusterdeploymentcustomizationsResource, "status", c.ns, clusterDeploymentCustomization), &hivev1.ClusterDeploymentCustomization{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*hivev1.ClusterDeploymentCustomization), err
+}
+
 // Delete takes name of the clusterDeploymentCustomization and deletes it. Returns an error if one occurs.
 func (c *FakeClusterDeploymentCustomizations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

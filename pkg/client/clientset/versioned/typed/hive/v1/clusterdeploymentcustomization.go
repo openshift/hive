@@ -24,6 +24,7 @@ type ClusterDeploymentCustomizationsGetter interface {
 type ClusterDeploymentCustomizationInterface interface {
 	Create(ctx context.Context, clusterDeploymentCustomization *v1.ClusterDeploymentCustomization, opts metav1.CreateOptions) (*v1.ClusterDeploymentCustomization, error)
 	Update(ctx context.Context, clusterDeploymentCustomization *v1.ClusterDeploymentCustomization, opts metav1.UpdateOptions) (*v1.ClusterDeploymentCustomization, error)
+	UpdateStatus(ctx context.Context, clusterDeploymentCustomization *v1.ClusterDeploymentCustomization, opts metav1.UpdateOptions) (*v1.ClusterDeploymentCustomization, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterDeploymentCustomization, error)
@@ -112,6 +113,22 @@ func (c *clusterDeploymentCustomizations) Update(ctx context.Context, clusterDep
 		Namespace(c.ns).
 		Resource("clusterdeploymentcustomizations").
 		Name(clusterDeploymentCustomization.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(clusterDeploymentCustomization).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *clusterDeploymentCustomizations) UpdateStatus(ctx context.Context, clusterDeploymentCustomization *v1.ClusterDeploymentCustomization, opts metav1.UpdateOptions) (result *v1.ClusterDeploymentCustomization, err error) {
+	result = &v1.ClusterDeploymentCustomization{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("clusterdeploymentcustomizations").
+		Name(clusterDeploymentCustomization.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterDeploymentCustomization).
 		Do(ctx).

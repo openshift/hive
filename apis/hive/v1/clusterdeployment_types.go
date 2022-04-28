@@ -280,7 +280,7 @@ type ClusterPoolReference struct {
 	// ClaimedTimestamp is the time this cluster was assigned to a ClusterClaim. This is only used for
 	// ClusterDeployments belonging to ClusterPools.
 	ClaimedTimestamp *metav1.Time `json:"claimedTimestamp,omitempty"`
-	// CustomizationRef is the ClusterPool Inventory claimed customization for this ClusterDeployment
+	// CustomizationRef is the ClusterPool Inventory claimed customization for this ClusterDeployment.
 	// The Customization exists in the ClusterPool namespace.
 	// +optional
 	CustomizationRef *corev1.LocalObjectReference `json:"clusterDeploymentCustomization,omitempty"`

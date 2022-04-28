@@ -189,8 +189,8 @@ spec:
                     type: string
                   clusterDeploymentCustomization:
                     description: CustomizationRef is the ClusterPool Inventory claimed
-                      customization for this ClusterDeployment The Customization exists
-                      in the ClusterPool namespace.
+                      customization for this ClusterDeployment. The Customization
+                      exists in the ClusterPool namespace.
                     properties:
                       name:
                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names

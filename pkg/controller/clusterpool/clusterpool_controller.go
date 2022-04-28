@@ -8,13 +8,12 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/ghodss/yaml"
+	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/davegardnerisme/deephash"
-	jsonpatch "github.com/evanphx/json-patch"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -296,7 +295,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 	r.updateInventory(clp, cds.Unassigned(false), hivev1.LastApplySucceeded, logger)
-	r.updateInventory(clp, cds.Installing(), hivev1.LastApplySucceeded, logger)
+	r.updateInventory(clp, cds.Installing(), hivev1.LastApplyInstallationPending, logger)
 
 	claims, err := getAllClaimsForPool(r.Client, clp, logger)
 	if err != nil {
@@ -435,9 +434,9 @@ func (r *ReconcileClusterPool) updateInventory(clp *hivev1.ClusterPool, cds []*h
 	reason := hivev1.InventoryReasonValid
 	switch status {
 	case hivev1.LastApplyBrokenCloud:
-		reason = hivev1.InventoryReasonBrokenByCloud
+		reason = string(hivev1.LastApplyBrokenCloud)
 	case hivev1.LastApplyBrokenSyntax:
-		reason = hivev1.InvenotryReasonBrokenBySyntax
+		reason = string(hivev1.LastApplyBrokenSyntax)
 	}
 
 	// Helper functions to get and update ClusterDeploymentCustomization, and update inventory message if missing
@@ -445,8 +444,7 @@ func (r *ReconcileClusterPool) updateInventory(clp *hivev1.ClusterPool, cds []*h
 		cdc := &hivev1.ClusterDeploymentCustomization{}
 		if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: clp.Namespace, Name: name}, cdc); err != nil {
 			if apierrors.IsNotFound(err) {
-				reason := hivev1.InventoryReasonMissing
-				r.updateInventoryValidMessage(clp, cdc.Name, reason, false, logger)
+				r.updateInventoryValidMessage(clp, cdc.Name, "missing", false, logger)
 			}
 			log.WithError(err).Warn("error reading customization")
 			return nil
@@ -460,9 +458,22 @@ func (r *ReconcileClusterPool) updateInventory(clp *hivev1.ClusterPool, cds []*h
 		}
 	}
 
+	contains := func(s []string, str string) bool {
+		for _, v := range s {
+			if v == str {
+				return true
+			}
+		}
+
+		return false
+	}
+
 	// First update the inventory and ClusterDeploymentCustomizations related to changed ClusterDeployments
 	var active_cdc []string
 	for _, cd := range cds {
+		if cd.Spec.ClusterPoolRef.CustomizationRef == nil {
+			continue
+		}
 		active_cdc = append(active_cdc, cd.Spec.ClusterPoolRef.CustomizationRef.Name)
 		if cdc := getCDC(cd.Spec.ClusterPoolRef.CustomizationRef.Name); cdc != nil {
 			r.updateInventoryValidMessage(clp, cdc.Name, reason, false, logger)
@@ -481,41 +492,40 @@ func (r *ReconcileClusterPool) updateInventory(clp *hivev1.ClusterPool, cds []*h
 
 	// Next update the rest of the inventory and ClusterDeploymentCustomizations
 	for _, item := range clp.Spec.Inventory {
-		pos := sort.SearchStrings(active_cdc, item.Name)
-		if !(pos < len(active_cdc) && active_cdc[pos] == item.Name) {
+		if !contains(active_cdc, item.Name) {
 			continue
 		}
-		if cdc := getCDC(item.Name); cdc != nil {
-			// This will fix the message if CDC was missing before
-			r.updateInventoryValidMessage(clp, cdc.Name, hivev1.InventoryReasonFound, false, logger)
-			// The following part will try to fix the following scenarios:
-			// 1. CDC condition is available but it has reference to existing ClusterDeployment
-			// 2. CDC is reserved but it doesn't have a reference to a ClusterDeployment
-			currentAvailability := controllerutils.FindClusterDeploymentCustomizationCondition(
-				cdc.Status.Conditions,
-				conditionsv1.ConditionAvailable,
-			)
-			if cdc.Status.ClusterDeploymentRef != nil {
-				cd := &hivev1.ClusterDeployment{}
-				ref := client.ObjectKey{Namespace: cdc.Status.ClusterDeploymentRef.Name, Name: cdc.Status.ClusterDeploymentRef.Name}
-				if err := r.Client.Get(context.Background(), ref, cd); err != nil {
-					if apierrors.IsNotFound(err) {
-						cdc.Status.ClusterDeploymentRef = nil
-					}
-				}
-			}
-			availableWithCD := (currentAvailability != nil && currentAvailability.Status == corev1.ConditionTrue) && cdc.Status.ClusterDeploymentRef != nil
-			reservedWithoutCD := (currentAvailability != nil && currentAvailability.Status == corev1.ConditionFalse) && cdc.Status.ClusterDeploymentRef == nil
-			if availableWithCD || reservedWithoutCD {
-				status := true
-				msg := "Available"
-				if availableWithCD {
-					status = false
-					msg = "Fixed reservation"
-				}
 
-				updateCDC(cdc, status, msg)
+		cdc := getCDC(item.Name)
+		if cdc == nil {
+			continue
+		}
+		// This will fix the message if CDC was missing before
+		r.updateInventoryValidMessage(clp, cdc.Name, "found", false, logger)
+		// The following part will try to fix the following scenarios:
+		// 1. CDC condition is available but it has reference to existing ClusterDeployment
+		// 2. CDC is reserved but it doesn't have a reference to a ClusterDeployment
+		currentAvailability := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+		if cdc.Status.ClusterDeploymentRef != nil {
+			cd := &hivev1.ClusterDeployment{}
+			ref := client.ObjectKey{Namespace: cdc.Status.ClusterDeploymentRef.Name, Name: cdc.Status.ClusterDeploymentRef.Name}
+			if err := r.Client.Get(context.Background(), ref, cd); err != nil {
+				if apierrors.IsNotFound(err) {
+					cdc.Status.ClusterDeploymentRef = nil
+				}
 			}
+		}
+		availableWithCD := (currentAvailability != nil && currentAvailability.Status == corev1.ConditionTrue) && cdc.Status.ClusterDeploymentRef != nil
+		reservedWithoutCD := (currentAvailability != nil && currentAvailability.Status == corev1.ConditionFalse) && cdc.Status.ClusterDeploymentRef == nil
+		if availableWithCD || reservedWithoutCD {
+			status := true
+			msg := "available"
+			if availableWithCD {
+				status = false
+				msg = "fixed reservation"
+			}
+
+			updateCDC(cdc, status, msg)
 		}
 
 	}
@@ -531,16 +541,19 @@ func (r *ReconcileClusterPool) setCustomizationAvailabilityCondition(cdc *hivev1
 		reason = "Reserved"
 	}
 
-	conditionsv1.SetStatusCondition(&cdc.Status.Conditions, conditionsv1.Condition{
-		Type:    conditionsv1.ConditionAvailable,
-		Status:  status,
-		Reason:  reason,
-		Message: message,
-	})
+	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+	if existingCondition.Reason != reason || existingCondition.Message != message {
+		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+			Type:    conditionsv1.ConditionAvailable,
+			Status:  status,
+			Reason:  reason,
+			Message: message,
+		})
 
-	if err := r.Status().Update(context.TODO(), cdc); err != nil {
-		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterDeploymentCustomization conditions")
-		return errors.Wrap(err, "could not update ClusterDeploymentCustomization conditions")
+		if err := r.Status().Update(context.TODO(), cdc); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterDeploymentCustomization conditions")
+			return errors.Wrap(err, "could not update ClusterDeploymentCustomization conditions")
+		}
 	}
 
 	return nil
@@ -886,18 +899,28 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 	cdc := &hivev1.ClusterDeploymentCustomization{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: clp.Namespace, Name: cd.Spec.ClusterPoolRef.CustomizationRef.Name}, cdc); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.updateInventoryValidMessage(clp, cdc.Name, hivev1.InventoryReasonMissing, true, logger)
+			r.updateInventoryValidMessage(clp, cdc.Name, "missing", true, logger)
 		}
 		return err
 	}
 
-	installConfig, err := applyPatches(cdc.Spec.InstallConfigPatches, secret.StringData["install-config.yaml"], logger)
+	newPatch := yamlpatch.Patch{}
+	for _, patch := range cdc.Spec.InstallConfigPatches {
+		var value interface{}
+		value = patch.Value
+		newPatch = append(newPatch, yamlpatch.Operation{
+			Op:    yamlpatch.Op(patch.Op),
+			Path:  yamlpatch.OpPath(patch.Path),
+			Value: yamlpatch.NewNode(&value),
+		})
+	}
+	installConfig, err := newPatch.Apply(secret.Data["install-config.yaml"])
 	if err != nil {
-		r.updateInventoryValidMessage(clp, cdc.Name, hivev1.InvenotryReasonBrokenBySyntax, true, logger)
+		r.updateInventoryValidMessage(clp, cdc.Name, string(hivev1.LastApplyBrokenSyntax), true, logger)
 		cdc.Status.LastApplyStatus = hivev1.LastApplyBrokenSyntax
 		if updateErr := r.Status().Update(context.Background(), cdc); updateErr != nil {
 			if apierrors.IsNotFound(err) {
-				r.updateInventoryValidMessage(clp, cdc.Name, hivev1.InventoryReasonMissing, true, logger)
+				r.updateInventoryValidMessage(clp, cdc.Name, "missing", true, logger)
 			}
 		}
 
@@ -905,22 +928,25 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 	}
 
 	// Reserving ClusterDeploymentCustomization
-	cdc.Status.LastApplyTime = metav1.Now()
-	conditionsv1.SetStatusCondition(&cdc.Status.Conditions, conditionsv1.Condition{
-		Type:    conditionsv1.ConditionAvailable,
-		Status:  corev1.ConditionFalse,
-		Reason:  "Reserved",
-		Message: "Reserved",
-	})
+	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+	if existingCondition.Reason != "Reserved" || existingCondition.Message != "reserved" {
+		cdc.Status.LastApplyTime = metav1.Now()
+		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+			Type:    conditionsv1.ConditionAvailable,
+			Status:  corev1.ConditionFalse,
+			Reason:  "Reserved",
+			Message: "reserved",
+		})
 
-	if err := r.Status().Update(context.Background(), cdc); err != nil {
-		if apierrors.IsNotFound(err) {
-			r.updateInventoryValidMessage(clp, cdc.Name, hivev1.InventoryReasonMissing, true, logger)
+		if err := r.Status().Update(context.Background(), cdc); err != nil {
+			if apierrors.IsNotFound(err) {
+				r.updateInventoryValidMessage(clp, cdc.Name, "missing", true, logger)
+			}
+			return err
 		}
-		return err
 	}
 
-	secret.StringData["install-config.yaml"] = installConfig
+	secret.Data["install-config.yaml"] = installConfig
 	return nil
 }
 
@@ -1132,7 +1158,7 @@ func (r *ReconcileClusterPool) updateInventoryValidMessage(pool *hivev1.ClusterP
 	// Replace the entry for this CDC -- but omit if it's valid
 	if cdcName != "" && cdcState != "" {
 		delete(curMap, cdcName)
-		if cdcState != hivev1.InventoryReasonValid && cdcState != hivev1.InventoryReasonFound {
+		if cdcState != hivev1.InventoryReasonValid || cdcState != "found" {
 			curMap[cdcName] = string(cdcState)
 		}
 	}
@@ -1307,14 +1333,11 @@ func (r *ReconcileClusterPool) getInventoryCustomization(pool *hivev1.ClusterPoo
 			cdc := &hivev1.ClusterDeploymentCustomization{}
 			if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: pool.Namespace, Name: entry.Name}, cdc); err != nil {
 				if apierrors.IsNotFound(err) {
-					r.updateInventoryValidMessage(pool, cdc.Name, hivev1.InventoryReasonMissing, true, logger)
+					r.updateInventoryValidMessage(pool, cdc.Name, "missing", true, logger)
 				}
 				return err
 			}
-			currentAvailability := controllerutils.FindClusterDeploymentCustomizationCondition(
-				cdc.Status.Conditions,
-				conditionsv1.ConditionAvailable,
-			)
+			currentAvailability := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
 			if currentAvailability == nil || currentAvailability.Status == corev1.ConditionTrue {
 				inventory = append(inventory, *cdc)
 			}
@@ -1338,37 +1361,6 @@ func (r *ReconcileClusterPool) getInventoryCustomization(pool *hivev1.ClusterPoo
 	}
 
 	return errors.New("no customization available")
-}
-
-// applyPatches is for applying JSON patches (RFC 6902) on install-config (YAML format)
-func applyPatches(patches []hivev1.PatchEntity, data string, logger log.FieldLogger) (string, error) {
-	targetJson, err := yaml.YAMLToJSON([]byte(data))
-	if err != nil {
-		log.WithError(err).Error("unable to parse install-config template")
-		return data, err
-	}
-
-	patchJson, err := json.Marshal(patches)
-	if err != nil {
-		log.WithError(err).Error("unable to marshal patches to json")
-		return data, err
-	}
-
-	patch, err := jsonpatch.DecodePatch(patchJson)
-	if err != nil {
-		log.WithError(err).Error("unable to create json patch")
-		return data, err
-	}
-
-	patchedJson, err := patch.Apply(targetJson)
-	if err != nil {
-		log.WithError(err).Error("unable to patch install-config template")
-		return data, err
-	}
-
-	patchedYaml, _ := yaml.JSONToYAML(patchedJson)
-
-	return string(patchedYaml), nil
 }
 
 func isInstallConfigSecret(obj interface{}) *corev1.Secret {

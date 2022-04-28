@@ -6,7 +6,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
@@ -541,15 +540,6 @@ func SetMachinePoolCondition(
 		updateConditionCheck,
 	)
 	return newConditions
-}
-
-func FindClusterDeploymentCustomizationCondition(conditions []conditionsv1.Condition, conditionType conditionsv1.ConditionType) *conditionsv1.Condition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
 }
 
 // SetMachinePoolConditionWithChangeCheck sets a condition on a MachinePool resource's status.

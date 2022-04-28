@@ -21,7 +21,7 @@ var _ CloudBuilder = (*AlibabaCloudBuilder)(nil)
 type AlibabaCloudBuilder struct {
 	// AccessKeyID is the Alibaba Cloud access key ID.
 	AccessKeyID string
-	// AccessKeySecret is the AWS access key secret.
+	// AccessKeySecret is the Alibaba Cloud access key secret.
 	AccessKeySecret string
 	// Region specifies the Alibaba Cloud region where the cluster will be
 	// created.

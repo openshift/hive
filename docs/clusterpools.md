@@ -202,7 +202,7 @@ metadata:
 
 Below is the sample configuration for the CronJob to scale up a clusterpool to size 10 at 6:00 AM everyday. It uses the serviceAccountName `sa-scale-clusterpool` created above.  
 ```yaml
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: scale-up-clusterpool
@@ -226,7 +226,7 @@ spec:
 
 Below is the sample configuration for the CronJob to scale down a clusterpool to size 0 at 20:00 (8:00 PM) everyday. It uses the serviceAccountName `sa-scale-clusterpool` created above.  
 ```yaml
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: scale-down-clusterpool

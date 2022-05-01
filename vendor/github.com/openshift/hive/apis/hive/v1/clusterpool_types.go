@@ -222,20 +222,12 @@ const (
 	ClusterPoolInventoryValidCondition ClusterPoolConditionType = "InventoryValid"
 )
 
-// Inventory (in)valid reasons
 const (
 	// InventoryReasonValid is used when all ClusterDeploymentCustomization are
-	// available and when used the ClusterDeployments are successfully installed
+	// available and when used the ClusterDeployments are successfully installed.
 	InventoryReasonValid = "Valid"
-	// InventoryReasonMissing is used when one or more ClusterDeploymentCustomization are missing
-	InventoryReasonMissing = "Missing"
-	// InventoryReasonFound is used cancel a missing ClusterDeploymentCustomization
-	InventoryReasonFound = "Found"
-	// InventoryReasonBrokenByCloud is used when one or more ClusterDeployments installations failed
-	InventoryReasonBrokenByCloud = "BrokenByCloud"
-	// InvenotryReasonBrokenBySyntax is used when one or more ClusterDeploymentCustomization patching failed
-	InvenotryReasonBrokenBySyntax = "BrokenBySyntax"
-	// InventoryReasonInvalid is used when multiple reasons and ClusterDeploymentCustomizations are incompatible
+	// InventoryReasonInvalid is used when there is something wrong with ClusterDeploymentCustomization, for example
+	// patching issue, provisioning failure, missing, etc.
 	InventoryReasonInvalid = "Invalid"
 )
 

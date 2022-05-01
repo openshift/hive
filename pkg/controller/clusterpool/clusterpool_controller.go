@@ -2,7 +2,6 @@ package clusterpool
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -49,6 +48,7 @@ const (
 	icSecretDependent               = "install config template secret"
 	cdClusterPoolIndex              = "spec.clusterpool.namespacedname"
 	claimClusterPoolIndex           = "spec.clusterpoolname"
+	cdcClusterPoolIndex             = "status.clusterpoolname"
 	defaultInventoryAttempts        = 5
 )
 
@@ -294,16 +294,21 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	r.updateInventory(clp, cds.Unassigned(false), hivev1.LastApplySucceeded, logger)
-	r.updateInventory(clp, cds.Installing(), hivev1.LastApplyInstallationPending, logger)
-
 	claims, err := getAllClaimsForPool(r.Client, clp, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	cdcs, err := getAllCustomizationsForPool(r.Client, clp, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
 
 	claims.SyncClusterDeploymentAssignments(r.Client, cds, logger)
 	cds.SyncClaimAssignments(r.Client, claims, logger)
+	if err := cdcs.SyncClusterDeploymentCustomizationAssignments(r.Client, clp, cds, logger); err != nil {
+		return reconcile.Result{}, err
+	}
 
 	origStatus := clp.Status.DeepCopy()
 	clp.Status.Size = int32(len(cds.Unassigned(true)))
@@ -380,7 +385,6 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// consume our maxConcurrent with additions than deletions. But we put it before the
 	// "deleteExcessClusters" case because we would rather trim broken clusters than viable ones.
 	case len(cds.Broken()) > 0:
-		r.updateInventory(clp, cds.Broken(), hivev1.LastApplyBrokenCloud, logger)
 		if err := r.deleteBrokenClusters(cds, availableCurrent, logger); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -421,142 +425,6 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	return reconcile.Result{}, nil
-}
-
-// updateInventory ensures that the inventory of the cluster pool and the related ClusterDeploymentCustomizations are up to date.
-// This includes validating resources existance and updating references when needed.
-func (r *ReconcileClusterPool) updateInventory(clp *hivev1.ClusterPool, cds []*hivev1.ClusterDeployment, status hivev1.LastApplyStatusType, logger log.FieldLogger) {
-	// no need to update Inventory if it doesn't exist
-	if clp.Spec.Inventory == nil {
-		return
-	}
-	// InventoryValid condition and reason
-	reason := hivev1.InventoryReasonValid
-	switch status {
-	case hivev1.LastApplyBrokenCloud:
-		reason = string(hivev1.LastApplyBrokenCloud)
-	case hivev1.LastApplyBrokenSyntax:
-		reason = string(hivev1.LastApplyBrokenSyntax)
-	}
-
-	// Helper functions to get and update ClusterDeploymentCustomization, and update inventory message if missing
-	getCDC := func(name string) *hivev1.ClusterDeploymentCustomization {
-		cdc := &hivev1.ClusterDeploymentCustomization{}
-		if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: clp.Namespace, Name: name}, cdc); err != nil {
-			if apierrors.IsNotFound(err) {
-				r.updateInventoryValidMessage(clp, cdc.Name, "missing", false, logger)
-			}
-			log.WithError(err).Warn("error reading customization")
-			return nil
-		}
-		return cdc
-	}
-
-	updateCDC := func(cdc *hivev1.ClusterDeploymentCustomization, status bool, msg string) {
-		if err := r.setCustomizationAvailabilityCondition(cdc, status, msg, logger); err != nil {
-			log.WithError(err).Warn("failed to update customization status")
-		}
-	}
-
-	contains := func(s []string, str string) bool {
-		for _, v := range s {
-			if v == str {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	// First update the inventory and ClusterDeploymentCustomizations related to changed ClusterDeployments
-	var active_cdc []string
-	for _, cd := range cds {
-		if cd.Spec.ClusterPoolRef.CustomizationRef == nil {
-			continue
-		}
-		active_cdc = append(active_cdc, cd.Spec.ClusterPoolRef.CustomizationRef.Name)
-		if cdc := getCDC(cd.Spec.ClusterPoolRef.CustomizationRef.Name); cdc != nil {
-			r.updateInventoryValidMessage(clp, cdc.Name, reason, false, logger)
-			// Fix missing ClusterDeployment Reference
-			if cdc.Status.ClusterDeploymentRef == nil {
-				cdc.Status.ClusterDeploymentRef = &corev1.LocalObjectReference{Name: cd.Name}
-			}
-
-			cdc.Status.LastApplyStatus = status
-
-			updateCDC(cdc, false, "reserved")
-		}
-	}
-	r.updateInventoryValidMessage(clp, "", "", true, logger) // just the inventory condition is being updated
-	sort.Strings(active_cdc)
-
-	// Next update the rest of the inventory and ClusterDeploymentCustomizations
-	for _, item := range clp.Spec.Inventory {
-		if !contains(active_cdc, item.Name) {
-			continue
-		}
-
-		cdc := getCDC(item.Name)
-		if cdc == nil {
-			continue
-		}
-		// This will fix the message if CDC was missing before
-		r.updateInventoryValidMessage(clp, cdc.Name, "found", false, logger)
-		// The following part will try to fix the following scenarios:
-		// 1. CDC condition is available but it has reference to existing ClusterDeployment
-		// 2. CDC is reserved but it doesn't have a reference to a ClusterDeployment
-		currentAvailability := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-		if cdc.Status.ClusterDeploymentRef != nil {
-			cd := &hivev1.ClusterDeployment{}
-			ref := client.ObjectKey{Namespace: cdc.Status.ClusterDeploymentRef.Name, Name: cdc.Status.ClusterDeploymentRef.Name}
-			if err := r.Client.Get(context.Background(), ref, cd); err != nil {
-				if apierrors.IsNotFound(err) {
-					cdc.Status.ClusterDeploymentRef = nil
-				}
-			}
-		}
-		availableWithCD := (currentAvailability != nil && currentAvailability.Status == corev1.ConditionTrue) && cdc.Status.ClusterDeploymentRef != nil
-		reservedWithoutCD := (currentAvailability != nil && currentAvailability.Status == corev1.ConditionFalse) && cdc.Status.ClusterDeploymentRef == nil
-		if availableWithCD || reservedWithoutCD {
-			status := true
-			msg := "available"
-			if availableWithCD {
-				status = false
-				msg = "fixed reservation"
-			}
-
-			updateCDC(cdc, status, msg)
-		}
-
-	}
-	r.updateInventoryValidMessage(clp, "", "", true, logger) // just the inventory condition is being updated
-}
-
-func (r *ReconcileClusterPool) setCustomizationAvailabilityCondition(cdc *hivev1.ClusterDeploymentCustomization, available bool, message string, logger log.FieldLogger) error {
-	status := corev1.ConditionTrue
-	reason := "Available"
-
-	if !available {
-		status = corev1.ConditionFalse
-		reason = "Reserved"
-	}
-
-	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-	if existingCondition.Reason != reason || existingCondition.Message != message {
-		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
-			Type:    conditionsv1.ConditionAvailable,
-			Status:  status,
-			Reason:  reason,
-			Message: message,
-		})
-
-		if err := r.Status().Update(context.TODO(), cdc); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterDeploymentCustomization conditions")
-			return errors.Wrap(err, "could not update ClusterDeploymentCustomization conditions")
-		}
-	}
-
-	return nil
 }
 
 // reconcileRunningClusters ensures the oldest unassigned clusters are set to running, and the
@@ -899,7 +767,7 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 	cdc := &hivev1.ClusterDeploymentCustomization{}
 	if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: clp.Namespace, Name: cd.Spec.ClusterPoolRef.CustomizationRef.Name}, cdc); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.updateInventoryValidMessage(clp, cdc.Name, "missing", true, logger)
+			return errors.New("missing customization")
 		}
 		return err
 	}
@@ -914,13 +782,14 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 			Value: yamlpatch.NewNode(&value),
 		})
 	}
-	installConfig, err := newPatch.Apply(secret.Data["install-config.yaml"])
+	installConfig, err := newPatch.Apply([]byte(secret.StringData["install-config.yaml"]))
 	if err != nil {
-		r.updateInventoryValidMessage(clp, cdc.Name, string(hivev1.LastApplyBrokenSyntax), true, logger)
+		cdcs := cdcCollection{syntax: []*hivev1.ClusterDeploymentCustomization{cdc}}
+		cdcs.SyncClusterDeploymentCustomizationAssignments(r.Client, clp, &cdCollection{}, logger)
 		cdc.Status.LastApplyStatus = hivev1.LastApplyBrokenSyntax
 		if updateErr := r.Status().Update(context.Background(), cdc); updateErr != nil {
 			if apierrors.IsNotFound(err) {
-				r.updateInventoryValidMessage(clp, cdc.Name, "missing", true, logger)
+				return errors.New("missing customization")
 			}
 		}
 
@@ -930,6 +799,7 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 	// Reserving ClusterDeploymentCustomization
 	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
 	if existingCondition.Reason != "Reserved" || existingCondition.Message != "reserved" {
+		cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: clp.Name}
 		cdc.Status.LastApplyTime = metav1.Now()
 		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
 			Type:    conditionsv1.ConditionAvailable,
@@ -940,13 +810,13 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 
 		if err := r.Status().Update(context.Background(), cdc); err != nil {
 			if apierrors.IsNotFound(err) {
-				r.updateInventoryValidMessage(clp, cdc.Name, "missing", true, logger)
+				return errors.New("missing customization")
 			}
 			return err
 		}
 	}
 
-	secret.Data["install-config.yaml"] = installConfig
+	secret.StringData["install-config.yaml"] = string(installConfig)
 	return nil
 }
 
@@ -1145,73 +1015,6 @@ func (r *ReconcileClusterPool) setAvailableCapacityCondition(pool *hivev1.Cluste
 	return nil
 }
 
-// updateInventoryValidMessage maintaince cluster pool inventory status. If there is an issue with any of the ClusterDeploymentCustomizations then the inventory is invalid.
-// When the inventory is invalid, the functions keeps track of the reason and related ClusterDeploymentCustomization name in the condition message.
-func (r *ReconcileClusterPool) updateInventoryValidMessage(pool *hivev1.ClusterPool, cdcName string, cdcState string, update bool, logger log.FieldLogger) error {
-	currentCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolInventoryValidCondition)
-	// Decode the current message
-	curMap := map[string]string{}
-	if err := json.Unmarshal([]byte(currentCondition.Message), &curMap); err != nil {
-		log.WithField("message", currentCondition.Message).Warning("Could not decode current message, reset inventory status")
-	}
-
-	// Replace the entry for this CDC -- but omit if it's valid
-	if cdcName != "" && cdcState != "" {
-		delete(curMap, cdcName)
-		if cdcState != hivev1.InventoryReasonValid || cdcState != "found" {
-			curMap[cdcName] = string(cdcState)
-		}
-	}
-
-	// Default condition settings to "valid"
-	message := ""
-	reason := hivev1.InventoryReasonValid
-
-	if len(curMap) != 0 {
-		for _, c := range curMap {
-			switch {
-			case reason == hivev1.InventoryReasonValid:
-				reason = c
-			case reason != c:
-				reason = hivev1.InventoryReasonInvalid
-				break
-			}
-		}
-		messageByte, err := json.Marshal(curMap)
-		if err != nil {
-			log.WithError(err).Error("Could not encode current message")
-			return err
-		}
-		message = string(messageByte)
-	}
-
-	status := corev1.ConditionTrue
-	if reason != hivev1.InventoryReasonValid {
-		status = corev1.ConditionFalse
-	}
-
-	conditions, changed := controllerutils.SetClusterPoolConditionWithChangeCheck(
-		pool.Status.Conditions,
-		hivev1.ClusterPoolInventoryValidCondition,
-		status,
-		reason,
-		message,
-		controllerutils.UpdateConditionIfReasonOrMessageChange,
-	)
-
-	if changed {
-		pool.Status.Conditions = conditions
-		if update {
-			if err := r.Status().Update(context.TODO(), pool); err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool conditions")
-				return errors.Wrap(err, "could not update ClusterPool conditions")
-			}
-		}
-	}
-
-	return nil
-}
-
 func (r *ReconcileClusterPool) verifyClusterImageSet(pool *hivev1.ClusterPool, logger log.FieldLogger) error {
 	err := r.Get(context.Background(), client.ObjectKey{Name: pool.Spec.ImageSetRef.Name}, &hivev1.ClusterImageSet{})
 	if err != nil {
@@ -1327,40 +1130,36 @@ func (r *ReconcileClusterPool) getInventoryCustomization(pool *hivev1.ClusterPoo
 	if pool.Spec.Inventory == nil {
 		return nil
 	}
-	var inventory []hivev1.ClusterDeploymentCustomization
-	for _, entry := range pool.Spec.Inventory {
-		if entry.Kind == hivev1.ClusterDeploymentCustomizationInventoryEntry {
-			cdc := &hivev1.ClusterDeploymentCustomization{}
-			if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: pool.Namespace, Name: entry.Name}, cdc); err != nil {
-				if apierrors.IsNotFound(err) {
-					r.updateInventoryValidMessage(pool, cdc.Name, "missing", true, logger)
-				}
-				return err
-			}
-			currentAvailability := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-			if currentAvailability == nil || currentAvailability.Status == corev1.ConditionTrue {
-				inventory = append(inventory, *cdc)
-			}
-		}
-	}
-	if len(inventory) > 0 {
-		sort.Slice(
-			inventory,
-			func(i, j int) bool {
-				if inventory[i].Status.LastApplyStatus == inventory[j].Status.LastApplyStatus {
-					return inventory[i].Status.LastApplyTime.Before(&inventory[j].Status.LastApplyTime)
-				}
-				if inventory[i].Status.LastApplyStatus == hivev1.LastApplySucceeded {
-					return inventory[i].Name < inventory[j].Name
-				}
-				return inventory[i].Name < inventory[j].Name
-			},
-		)
-		cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: inventory[0].Name}
-		return nil
+	cdcs, err := getAllCustomizationsForPool(r.Client, pool, logger)
+	if err != nil {
+		return err
 	}
 
-	return errors.New("no customization available")
+	if len(cdcs.unassigned) == 0 {
+		return errors.New("no customization available")
+	}
+
+	sort.Slice(
+		cdcs.unassigned,
+		func(i, j int) bool {
+			iName := cdcs.unassigned[i].Name
+			jName := cdcs.unassigned[j].Name
+			iStatus := cdcs.unassigned[i].Status.LastApplyStatus
+			jStatus := cdcs.unassigned[j].Status.LastApplyStatus
+			iTime := cdcs.unassigned[i].Status.LastApplyTime
+			jTime := cdcs.unassigned[j].Status.LastApplyTime
+			if iStatus == jStatus {
+				return iTime.Before(&jTime)
+			}
+			if iStatus == hivev1.LastApplySucceeded {
+				return iName < jName
+			}
+			return iName < jName
+		},
+	)
+
+	cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcs.unassigned[0].Name}
+	return nil
 }
 
 func isInstallConfigSecret(obj interface{}) *corev1.Secret {

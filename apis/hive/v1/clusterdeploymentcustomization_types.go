@@ -67,6 +67,10 @@ type ClusterDeploymentCustomizationStatus struct {
 	// +optional
 	ClusterDeploymentRef *corev1.LocalObjectReference `json:"clusterDeploymentRef,omitempty"`
 
+	// ClusterPoolRef is the name of the current cluster pool the CDC used at.
+	// +optional
+	ClusterPoolRef *corev1.LocalObjectReference `json:"clusterPoolRef,omitempty"`
+
 	// LastApplyTime indicates the time when the customization was applied on a cluster deployment.
 	// +optional
 	LastApplyTime metav1.Time `json:"lastApplyTime,omitempty"`

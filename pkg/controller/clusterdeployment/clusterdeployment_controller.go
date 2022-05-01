@@ -563,7 +563,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-		cdLog.Debugf("adding clusterdeployment deprovision finalizer")
+		cdLog.Debug("adding clusterdeployment deprovision finalizer")
 		if err := r.addClusterDeploymentFinalizer(cd, hivev1.FinalizerDeprovision); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding deprovision finalizer")
 			return reconcile.Result{}, err
@@ -573,7 +573,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.CustomizationRef != nil && !controllerutils.HasFinalizer(cd, hivev1.FinalizerCustomizationRelease) {
-		cdLog.Debugf("adding clusterdeployment customization release finalizer")
+		cdLog.Debug("adding clusterdeployment customization release finalizer")
 		if err := r.addClusterDeploymentFinalizer(cd, hivev1.FinalizerCustomizationRelease); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding customization finalizer")
 			return reconcile.Result{}, err
@@ -1459,14 +1459,16 @@ func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDepl
 				cdcLog.WithError(err).Error("failed to update ClusterDeployment")
 				return err
 			}
-			return err
+			return nil
 		}
 		log.WithError(err).Error("error reading customization")
 		return err
 	}
 
+	changed := false
 	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
 	if existingCondition.Reason != "Available" || existingCondition.Message != "available" {
+		changed = true
 		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
 			Type:    conditionsv1.ConditionAvailable,
 			Status:  corev1.ConditionFalse,
@@ -1475,10 +1477,15 @@ func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDepl
 		})
 	}
 
-	cdc.Status.ClusterDeploymentRef = nil
-	if err := r.Status().Update(context.Background(), cdc); err != nil {
-		cdcLog.WithError(err).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
-		return err
+	if cdc.Status.ClusterDeploymentRef != nil {
+		changed = true
+		cdc.Status.ClusterDeploymentRef = nil
+	}
+	if changed {
+		if err := r.Status().Update(context.Background(), cdc); err != nil {
+			cdcLog.WithError(err).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
+			return err
+		}
 	}
 
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerCustomizationRelease)

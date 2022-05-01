@@ -1506,7 +1506,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			if !test.noCustomization {
 				test.existing = append(
 					test.existing,
-					testcdc.FullBuilder(testNamespace, cdcName, scheme).Build(),
+					testcdc.FullBuilder(testNamespace, cdcName, scheme).Build(testcdc.Available()),
 				)
 			}
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()

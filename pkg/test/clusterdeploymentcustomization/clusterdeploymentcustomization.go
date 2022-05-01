@@ -3,7 +3,9 @@ package clusterdeploymentcustomization
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/openshift/hive/pkg/test/generic"
 )
@@ -67,7 +69,18 @@ func (b *builder) GenericOptions(opts ...generic.Option) Builder {
 
 // Generic allows common functions applicable to all objects to be used as Options to Build
 func Generic(opt generic.Option) Option {
-	return func(clusterDeployment *hivev1.ClusterDeploymentCustomization) {
-		opt(clusterDeployment)
+	return func(cdc *hivev1.ClusterDeploymentCustomization) {
+		opt(cdc)
+	}
+}
+
+func Available() Option {
+	return func(cdc *hivev1.ClusterDeploymentCustomization) {
+		cdc.Status.Conditions = append(cdc.Status.Conditions, conditionsv1.Condition{
+			Type:    conditionsv1.ConditionAvailable,
+			Status:  corev1.ConditionTrue,
+			Reason:  "Available",
+			Message: "available",
+		})
 	}
 }

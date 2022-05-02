@@ -1,1 +1,2 @@
 GitPython
+PyYAML>=6.0

@@ -53,6 +53,14 @@ else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
 	SUDO_CMD = sudo
 endif
 
+# build-machinery-go adds a versionFromGit to -ldflags that by default constructs the version
+# string based on the most recent repository tag in this branch. That doesn't work for us, since
+# we don't tag versions. Override using the same versioning we apply to OperatorHub builds:
+# v{major}.{minor}.{commitcount}-{sha}
+# Note that building against a local commit may result in {major}.{minor} being rendered as
+# `UnknownBranch`. However, the {commitcount} and {sha} should still be accurate.
+SOURCE_GIT_TAG := v$(shell hack/version.py)
+
 BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/... ./config/monitoring/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 

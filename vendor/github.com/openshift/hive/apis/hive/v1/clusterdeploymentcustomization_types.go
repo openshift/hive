@@ -56,6 +56,9 @@ type PatchEntity struct {
 	// Path is the json path to the value to be modified
 	// +required
 	Path string `json:"path"`
+	// From is the json path to copy or move the value from
+	// +optional
+	From string `json:"from,omitempty"`
 	// Value is the value to be used in the operation
 	// +required
 	Value string `json:"value"`

@@ -1467,7 +1467,7 @@ func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDepl
 
 	changed := false
 	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-	if existingCondition.Reason != "Available" || existingCondition.Message != "available" {
+	if existingCondition == nil || existingCondition.Reason != "Available" || existingCondition.Message != "available" {
 		changed = true
 		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
 			Type:    conditionsv1.ConditionAvailable,

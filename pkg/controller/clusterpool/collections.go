@@ -625,7 +625,7 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 		context.Background(), cdcList,
 		client.MatchingFields{claimClusterPoolIndex: pool.Name},
 		client.InNamespace(pool.Namespace)); err != nil {
-		logger.WithError(err).Error("error listing ClusterClaims")
+		logger.WithError(err).Error("error listing ClusterDeploymentCustomizations")
 		return nil, err
 	}
 
@@ -640,22 +640,23 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 
 	for _, item := range pool.Spec.Inventory {
 		missing := true
-		for _, cdc := range cdcList.Items {
+		for i, cdc := range cdcList.Items {
+			ref := &cdcList.Items[i]
 			if cdc.Name != item.Name {
 				continue
 			}
 			missing = false
-			cdcCol.byCDCName[item.Name] = &cdc
+			cdcCol.byCDCName[item.Name] = ref
 			if cdRef := cdc.Status.ClusterDeploymentRef; cdRef == nil {
-				cdcCol.unassigned = append(cdcCol.unassigned, &cdc)
+				cdcCol.unassigned = append(cdcCol.unassigned, ref)
 			} else {
-				cdcCol.reserved = append(cdcCol.unassigned, &cdc)
+				cdcCol.reserved = append(cdcCol.reserved, ref)
 			}
 			if cdc.Status.LastApplyStatus == hivev1.LastApplyBrokenCloud {
-				cdcCol.cloud = append(cdcCol.cloud, &cdc)
+				cdcCol.cloud = append(cdcCol.cloud, ref)
 			}
 			if cdc.Status.LastApplyStatus == hivev1.LastApplyBrokenSyntax {
-				cdcCol.syntax = append(cdcCol.cloud, &cdc)
+				cdcCol.syntax = append(cdcCol.cloud, ref)
 			}
 		}
 		if missing {
@@ -696,9 +697,9 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 		cdNames = append(cdNames, cdName)
 	}
 
+	// If there is no CD, but CDC is reserved, then we release the CDC
 	for _, cdc := range cdcs.reserved {
 		if !contains(cdNames, cdc.Status.ClusterDeploymentRef.Name) {
-			// If there is no CD, but CDC is reserved, then we release the CDC
 			if err := setCustomizationAvailabilityCondition(c, cdc, nil, logger); err != nil {
 				return err
 			}
@@ -743,12 +744,16 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 	}
 	// Notice a CD has finished installing => update the CDC's LastApplyStatus to Success;
 	for _, cd := range cds.Unassigned(false) {
-		cdc := cdcs.byCDCName[cd.Spec.ClusterPoolRef.CustomizationRef.Name]
-		if cdc.Status.LastApplyStatus != hivev1.LastApplySucceeded {
-			cdc.Status.LastApplyStatus = hivev1.LastApplySucceeded
-			cdc.Status.LastApplyTime = metav1.Now()
-			if err := c.Status().Update(context.TODO(), cdc); err != nil {
-				return err
+		if cd.Spec.ClusterPoolRef.CustomizationRef == nil {
+			continue
+		}
+		if cdc, ok := cdcs.byCDCName[cd.Spec.ClusterPoolRef.CustomizationRef.Name]; ok {
+			if cdc.Status.LastApplyStatus != hivev1.LastApplySucceeded {
+				cdc.Status.LastApplyStatus = hivev1.LastApplySucceeded
+				cdc.Status.LastApplyTime = metav1.Now()
+				if err := c.Status().Update(context.TODO(), cdc); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -793,7 +798,7 @@ func (cdcs *cdcCollection) MarshalJSON() ([]byte, error) {
 	}
 	syntax := []string{}
 	for _, cdc := range cdcs.syntax {
-		cloud = append(syntax, cdc.Name)
+		syntax = append(syntax, cdc.Name)
 	}
 
 	return json.Marshal(&struct {
@@ -823,7 +828,7 @@ func setCustomizationAvailabilityCondition(c client.Client, cdc *hivev1.ClusterD
 	}
 
 	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-	if existingCondition.Reason != reason || existingCondition.Message != message {
+	if existingCondition == nil || existingCondition.Reason != reason || existingCondition.Message != message {
 		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
 			Type:    conditionsv1.ConditionAvailable,
 			Status:  status,

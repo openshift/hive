@@ -779,6 +779,7 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 		newPatch = append(newPatch, yamlpatch.Operation{
 			Op:    yamlpatch.Op(patch.Op),
 			Path:  yamlpatch.OpPath(patch.Path),
+			From:  yamlpatch.OpPath(patch.From),
 			Value: yamlpatch.NewNode(&value),
 		})
 	}
@@ -798,7 +799,7 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 
 	// Reserving ClusterDeploymentCustomization
 	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-	if existingCondition.Reason != "Reserved" || existingCondition.Message != "reserved" {
+	if existingCondition == nil || existingCondition.Status == corev1.ConditionFalse {
 		cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: clp.Name}
 		cdc.Status.LastApplyTime = metav1.Now()
 		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
@@ -1148,11 +1149,20 @@ func (r *ReconcileClusterPool) getInventoryCustomization(pool *hivev1.ClusterPoo
 			jStatus := cdcs.unassigned[j].Status.LastApplyStatus
 			iTime := cdcs.unassigned[i].Status.LastApplyTime
 			jTime := cdcs.unassigned[j].Status.LastApplyTime
+			if iStatus == "" {
+				iStatus = hivev1.LastApplySucceeded
+			}
+			if jStatus == "" {
+				iStatus = hivev1.LastApplySucceeded
+			}
 			if iStatus == jStatus {
 				return iTime.Before(&jTime)
 			}
 			if iStatus == hivev1.LastApplySucceeded {
-				return iName < jName
+				return false
+			}
+			if jStatus == hivev1.LastApplySucceeded {
+				return true
 			}
 			return iName < jName
 		},

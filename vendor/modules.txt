@@ -849,6 +849,7 @@ github.com/openshift/api/config/v1
 github.com/openshift/api/image/docker10
 github.com/openshift/api/image/dockerpre012
 github.com/openshift/api/image/v1
+github.com/openshift/api/machine/v1
 github.com/openshift/api/machine/v1beta1
 github.com/openshift/api/operator/v1
 github.com/openshift/api/pkg/serialization
@@ -921,6 +922,7 @@ github.com/openshift/installer/pkg/asset/installconfig/azure
 github.com/openshift/installer/pkg/asset/installconfig/gcp
 github.com/openshift/installer/pkg/asset/installconfig/ibmcloud
 github.com/openshift/installer/pkg/asset/installconfig/ovirt
+github.com/openshift/installer/pkg/asset/machines/alibabacloud
 github.com/openshift/installer/pkg/asset/machines/aws
 github.com/openshift/installer/pkg/asset/machines/azure
 github.com/openshift/installer/pkg/asset/machines/gcp

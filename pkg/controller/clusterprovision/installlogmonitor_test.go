@@ -54,6 +54,7 @@ const (
 	awsInvalidVpcId             = "time=\"2022-01-11T18:25:33Z\" level=error msg=\"Error: InvalidVpcID.NotFound: The vpc ID 'vpc-whatever' does not exist\""
 	route53Timeout              = "level=error\nlevel=error msg=Error: error waiting for Route53 Hosted Zone (Z1234567890ACBD) creation: timeout while waiting for state to become 'INSYNC' (last state: 'PENDING', timeout: 15m0s)\nlevel=error\nlevel=error msg= on ../tmp/openshift-install-cluster-260510522/route53/base.tf line 22, in resource \"aws_route53_zone\" \"new_int\":\nlevel=error msg= 22: resource \"aws_route53_zone\" \"new_int\""
 	inconsistentTerraformResult = "time=\"2021-12-01T16:08:46Z\" level=error msg=\"Error: Provider produced inconsistent result after apply\""
+	multipleRoute53ZonesFound   = "time=\"2022-03-30T06:51:12Z\" level=error msg=\"Error: multiple Route53Zone found please use vpc_id option to filter\""
 	// NOTE: This embedded newline matters: our regex must be able to match the two chunks of the message on separate lines.
 	noWorkerNodesFmt = `time="2021-12-09T10:51:06Z" level=debug msg="Symlinking plugin terraform-provider-%s src: \"/usr/bin/openshift-install\" dst: \"/tmp/openshift-install-cluster-723469510/plugins/terraform-provider-%s\""
 time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 master nodes blah"`
@@ -366,6 +367,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "InconsistentTerraformResult",
 			log:            pointer.StringPtr(inconsistentTerraformResult),
 			expectedReason: "InconsistentTerraformResult",
+		},
+		{
+			name:           "MultipleRoute53ZonesFound",
+			log:            pointer.StringPtr(multipleRoute53ZonesFound),
+			expectedReason: "MultipleRoute53ZonesFound",
 		},
 		{
 			name:           "AWSVPCDoesNotExist",

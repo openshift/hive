@@ -362,6 +362,10 @@ const (
 	// desired behavior when provisions fail. See HiveConfig.Spec.FailedProvisionConfig.
 	FailedProvisionConfigFileEnvVar = "FAILED_PROVISION_CONFIG_FILE"
 
+	// MetricsConfigFileEnvVar points to a text file containing configuration for metrics specific
+	// configurations. See HiveConfig.Spec.MetricsConfig.
+	MetricsConfigFileEnvVar = "METRICS_CONFIG_FILE"
+
 	// HiveReleaseImageVerificationConfigMapNamespaceEnvVar is used to configure the config map that will be used
 	// to verify the release images being used for cluster deployments.
 	HiveReleaseImageVerificationConfigMapNamespaceEnvVar = "HIVE_RELEASE_IMAGE_VERIFICATION_CONFIGMAP_NS"

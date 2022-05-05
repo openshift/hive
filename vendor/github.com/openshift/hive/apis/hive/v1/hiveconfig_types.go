@@ -5,6 +5,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 )
 
 // HiveConfigSpec defines the desired state of Hive
@@ -144,6 +145,10 @@ type HiveConfigSpec struct {
 	// extract metrics. The operator also sets up RBAC in the TargetNamespace so that openshift
 	// prometheus in the cluster can list/access objects required to pull metrics.
 	ExportMetrics bool `json:"exportMetrics,omitempty"`
+
+	// MetricsConfig encapsulates metrics specific configurations, like opting in for certain metrics.
+	// +optional
+	MetricsConfig *metricsconfig.MetricsConfig `json:"metricsConfig,omitempty"`
 }
 
 // ReleaseImageVerificationConfigMapReference is a reference to the ConfigMap that

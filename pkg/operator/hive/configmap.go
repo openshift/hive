@@ -104,6 +104,17 @@ var failedProvisionConfigMapInfo = configMapInfo{
 	},
 }
 
+var metricsConfigConfigMapInfo = configMapInfo{
+	name:                 "hive-metrics-config",
+	nameKey:              "hive-metrics-config",
+	mountPath:            "/data/metrics-config",
+	envVar:               constants.MetricsConfigFileEnvVar,
+	volumeSourceOptional: true,
+	getData: func(instance *hivev1.HiveConfig) (interface{}, error) {
+		return &instance.Spec.MetricsConfig, nil
+	},
+}
+
 func (r *ReconcileHiveConfig) supportedContractsConfigMapInfo() configMapInfo {
 	f := func(instance *hivev1.HiveConfig) (interface{}, error) {
 		supported := map[string][]contracts.ContractImplementation{}

@@ -14,6 +14,7 @@ import (
 	baremetal "github.com/openshift/hive/apis/hive/v1/baremetal"
 	gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	metricsconfig "github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	none "github.com/openshift/hive/apis/hive/v1/none"
 	openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
@@ -2423,6 +2424,11 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 	if in.FeatureGates != nil {
 		in, out := &in.FeatureGates, &out.FeatureGates
 		*out = new(FeatureGateSelection)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.MetricsConfig != nil {
+		in, out := &in.MetricsConfig, &out.MetricsConfig
+		*out = new(metricsconfig.MetricsConfig)
 		(*in).DeepCopyInto(*out)
 	}
 	return

@@ -550,6 +550,44 @@ spec:
                   - domains
                   type: object
                 type: array
+              metricsConfig:
+                description: MetricsConfig encapsulates metrics specific configurations,
+                  like opting in for certain metrics.
+                properties:
+                  metricsWithDuration:
+                    description: Optional metrics and their configurations
+                    items:
+                      description: MetricsWithDuration represents metrics that report
+                        time as values,like transition seconds. The purpose of these
+                        metrics should be to track outliers - ensure their duration
+                        is not set too low.
+                      properties:
+                        duration:
+                          description: Duration is the minimum time taken - the relevant
+                            metric will be logged only if the value reported by that
+                            metric is more than the time mentioned here. For example,
+                            if a user opts-in for current clusters stopping and mentions
+                            1 hour here, only the clusters stopping for more than
+                            an hour will be reported. This is a Duration value; see
+                            https://pkg.go.dev/time#ParseDuration for accepted formats.
+                          pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
+                          type: string
+                        name:
+                          description: Name of the metric. It will correspond to an
+                            optional relevant metric in hive
+                          enum:
+                          - currentStopping
+                          - currentResuming
+                          - currentWaitingForCO
+                          - cumulativeHibernated
+                          - cumulativeResumed
+                          type: string
+                      required:
+                      - duration
+                      - name
+                      type: object
+                    type: array
+                type: object
               releaseImageVerificationConfigMapRef:
                 description: "ReleaseImageVerificationConfigMapRef is a reference
                   to the ConfigMap that will be used to verify release images. \n

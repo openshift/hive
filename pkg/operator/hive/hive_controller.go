@@ -488,6 +488,14 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	mcConfigHash, err := r.deployConfigMap(hLog, h, instance, metricsConfigConfigMapInfo, namespacesToClean)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying metrics config configmap")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingMetricsConfigConfigmap", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
 	scConfigHash, err := r.deployConfigMap(hLog, h, instance, r.supportedContractsConfigMapInfo(), namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying supported contracts configmap")
@@ -513,7 +521,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, namespacesToClean, confighash, managedDomainsConfigHash, fpConfigHash)
+	err = r.deployHive(hLog, h, instance, namespacesToClean, confighash, managedDomainsConfigHash, fpConfigHash, mcConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHive", err.Error())

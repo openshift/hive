@@ -11,6 +11,7 @@ require (
 	github.com/IBM/networking-go-sdk v0.14.0
 	github.com/IBM/platform-services-go-sdk v0.18.16
 	github.com/IBM/vpc-go-sdk v1.0.1
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1264
 	github.com/aws/aws-sdk-go v1.38.41
 	github.com/blang/semver/v4 v4.0.0
 	github.com/davecgh/go-spew v1.1.1
@@ -103,7 +104,6 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1264 // indirect
 	github.com/aliyun/aliyun-oss-go-sdk v2.1.8+incompatible // indirect
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect

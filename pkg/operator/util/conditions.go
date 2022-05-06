@@ -53,8 +53,9 @@ func FindHiveConfigCondition(conditions []hivev1.HiveConfigCondition, conditionT
 }
 
 // InitializeHiveConfigConditions initializes the given set of conditions for the first time, set with Status Unknown
-func InitializeHiveConfigConditions(existingConditions []hivev1.HiveConfigCondition, conditionsToBeAdded []hivev1.HiveConfigConditionType) []hivev1.HiveConfigCondition {
+func InitializeHiveConfigConditions(existingConditions []hivev1.HiveConfigCondition, conditionsToBeAdded []hivev1.HiveConfigConditionType) ([]hivev1.HiveConfigCondition, bool) {
 	now := metav1.Now()
+	changed := false
 	for _, conditionType := range conditionsToBeAdded {
 		if FindHiveConfigCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
@@ -67,7 +68,8 @@ func InitializeHiveConfigConditions(existingConditions []hivev1.HiveConfigCondit
 					LastTransitionTime: now,
 					LastProbeTime:      now,
 				})
+			changed = true
 		}
 	}
-	return existingConditions
+	return existingConditions, changed
 }

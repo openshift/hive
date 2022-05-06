@@ -252,8 +252,8 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	// Initialize cluster pool conditions if not set
-	newConditions := controllerutils.InitializeClusterPoolConditions(clp.Status.Conditions, clusterPoolConditions)
-	if len(newConditions) > len(clp.Status.Conditions) {
+	newConditions, changed := controllerutils.InitializeClusterPoolConditions(clp.Status.Conditions, clusterPoolConditions)
+	if changed {
 		clp.Status.Conditions = newConditions
 		logger.Info("initializing cluster pool conditions")
 		if err := r.Status().Update(context.TODO(), clp); err != nil {

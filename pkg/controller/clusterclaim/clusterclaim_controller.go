@@ -177,8 +177,8 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	}
 
 	// Initialize cluster claim conditions if not set
-	newConditions := controllerutils.InitializeClusterClaimConditions(claim.Status.Conditions, clusterClaimConditions)
-	if len(newConditions) > len(claim.Status.Conditions) {
+	newConditions, changed := controllerutils.InitializeClusterClaimConditions(claim.Status.Conditions, clusterClaimConditions)
+	if changed {
 		claim.Status.Conditions = newConditions
 		logger.Infof("initializing cluster claim conditions")
 		if err := r.Status().Update(context.TODO(), claim); err != nil {

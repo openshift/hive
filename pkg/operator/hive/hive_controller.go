@@ -365,8 +365,8 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	hiveNSName := getHiveNamespace(instance)
 
 	// Initialize HiveConfig conditions if not present
-	newConditions := util.InitializeHiveConfigConditions(instance.Status.Conditions, HiveConfigConditions)
-	if len(newConditions) > len(origHiveConfig.Status.Conditions) {
+	newConditions, changed := util.InitializeHiveConfigConditions(instance.Status.Conditions, HiveConfigConditions)
+	if changed {
 		instance.Status.Conditions = newConditions
 		hLog.Info("initializing hive controller conditions")
 		err = r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)

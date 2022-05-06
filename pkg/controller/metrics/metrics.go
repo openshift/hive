@@ -291,19 +291,22 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				// Check if cluster is currently transitioning and set the appropriate metrics
 				hibernatingCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 				readyCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
-				if readyCond.Reason == hivev1.ReadyReasonStoppingOrHibernating &&
-					hibernatingCond.Reason != hivev1.HibernatingReasonHibernating {
-					logDurationMetric(MetricStoppingClustersSeconds, &cd,
-						time.Since(readyCond.LastTransitionTime.Time).Seconds())
-				}
-				if hibernatingCond.Reason == hivev1.HibernatingReasonResumingOrRunning &&
-					readyCond.Reason != hivev1.ReadyReasonRunning {
-					logDurationMetric(MetricResumingClustersSeconds, &cd,
-						time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
-				}
-				if readyCond.Reason == hivev1.ReadyReasonWaitingForClusterOperators {
-					logDurationMetric(MetricWaitingForCOClustersSeconds, &cd,
-						time.Since(readyCond.LastTransitionTime.Time).Seconds())
+				// Ensure it is not too early in the cluster provisioning state and the conditions have been set at this point
+				if readyCond != nil && hibernatingCond != nil {
+					if readyCond.Reason == hivev1.ReadyReasonStoppingOrHibernating &&
+						hibernatingCond.Reason != hivev1.HibernatingReasonHibernating {
+						logDurationMetric(MetricStoppingClustersSeconds, &cd,
+							time.Since(readyCond.LastTransitionTime.Time).Seconds())
+					}
+					if hibernatingCond.Reason == hivev1.HibernatingReasonResumingOrRunning &&
+						readyCond.Reason != hivev1.ReadyReasonRunning {
+						logDurationMetric(MetricResumingClustersSeconds, &cd,
+							time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
+					}
+					if readyCond.Reason == hivev1.ReadyReasonWaitingForClusterOperators {
+						logDurationMetric(MetricWaitingForCOClustersSeconds, &cd,
+							time.Since(readyCond.LastTransitionTime.Time).Seconds())
+					}
 				}
 			}
 

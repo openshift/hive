@@ -174,9 +174,9 @@ func (r *ReconcileClusterRelocate) Reconcile(ctx context.Context, request reconc
 	}
 
 	// Initialize cluster deployment conditions if not present
-	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions,
+	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions,
 		clusterDeploymentClusterRelocateConditions)
-	if len(newConditions) > len(cd.Status.Conditions) {
+	if changed {
 		cd.Status.Conditions = newConditions
 		logger.Info("initializing cluster relocate controller conditions")
 		if err := r.Status().Update(context.TODO(), cd); err != nil {

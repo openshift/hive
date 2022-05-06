@@ -186,8 +186,8 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	}
 
 	// Initialize cluster deployment conditions if not present
-	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentHibernationConditions)
-	if len(newConditions) > len(cd.Status.Conditions) {
+	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentHibernationConditions)
+	if changed {
 		cd.Status.Conditions = newConditions
 		cdLog.Info("initializing hibernating controller conditions")
 		if err := r.updateClusterDeploymentStatus(cd, cdLog); err != nil {

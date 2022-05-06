@@ -43,9 +43,14 @@ func shouldUpdateCondition(
 	return updateConditionCheck(oldReason, oldMessage, newReason, newMessage)
 }
 
-// InitializeClusterDeploymentConditions initializes the given set of conditions for the first time, set with Status Unknown
-func InitializeClusterDeploymentConditions(existingConditions []hivev1.ClusterDeploymentCondition, conditionsToBeAdded []hivev1.ClusterDeploymentConditionType) []hivev1.ClusterDeploymentCondition {
+// InitializeClusterDeploymentConditions initializes the given set of conditions for the first time, set with Status Unknown.
+// If the conditions already exist, they are not affected.
+// The first return is the updated list of conditions (those passed in via `existingConditions` plus any new ones.)
+// The second return indicates whether we made any changes. It should be used by the caller to decide whether to perform a
+// Status().Update().
+func InitializeClusterDeploymentConditions(existingConditions []hivev1.ClusterDeploymentCondition, conditionsToBeAdded []hivev1.ClusterDeploymentConditionType) ([]hivev1.ClusterDeploymentCondition, bool) {
 	now := metav1.Now()
+	changed := false
 	for _, conditionType := range conditionsToBeAdded {
 		if FindClusterDeploymentCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
@@ -58,9 +63,10 @@ func InitializeClusterDeploymentConditions(existingConditions []hivev1.ClusterDe
 					LastTransitionTime: now,
 					LastProbeTime:      now,
 				})
+			changed = true
 		}
 	}
-	return existingConditions
+	return existingConditions, changed
 }
 
 // SetClusterDeploymentCondition sets a condition on a ClusterDeployment resource's status

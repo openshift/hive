@@ -144,8 +144,8 @@ func (r *ReconcileControlPlaneCerts) Reconcile(ctx context.Context, request reco
 	}
 
 	// Initialize cluster deployment conditions if not present
-	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentControlPlaneCertsConditions)
-	if len(newConditions) > len(cd.Status.Conditions) {
+	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentControlPlaneCertsConditions)
+	if changed {
 		cd.Status.Conditions = newConditions
 		cdLog.Info("initializing control plane certs controller conditions")
 		if err := r.Status().Update(context.TODO(), cd); err != nil {

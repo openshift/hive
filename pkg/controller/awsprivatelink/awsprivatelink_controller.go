@@ -173,8 +173,8 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 	}
 
 	// Initialize cluster deployment conditions if not present
-	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentAWSPrivateLinkConditions)
-	if len(newConditions) > len(cd.Status.Conditions) {
+	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentAWSPrivateLinkConditions)
+	if changed {
 		cd.Status.Conditions = newConditions
 		logger.Info("initializing AWS private link controller conditions")
 		if err := r.Status().Update(context.TODO(), cd); err != nil {

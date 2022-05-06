@@ -159,8 +159,8 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 	rContext.clusterDeployment = cd
 
 	// Initialize cluster deployment conditions if not present
-	newConditions := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentRemoteIngressConditions)
-	if len(newConditions) > len(cd.Status.Conditions) {
+	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentRemoteIngressConditions)
+	if changed {
 		cd.Status.Conditions = newConditions
 		cdLog.Info("initializing remote ingress controller conditions")
 		if err := r.Status().Update(context.TODO(), cd); err != nil {

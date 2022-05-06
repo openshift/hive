@@ -143,8 +143,8 @@ func TestParseInstallLog(t *testing.T) {
 			expectedReason: "ProxyInvalidCABundle",
 		},
 		{
-			name:			"ProxyCABundleTooLarge",
-			log:			pointer.Stringptr(proxyCABundleTooLarge),
+			name:		"ProxyCABundleTooLarge",
+			log:		pointer.Stringptr(proxyCABundleTooLarge),
 			expectedReason: "ProxyCABundleTooLarge",
 		},
 		{

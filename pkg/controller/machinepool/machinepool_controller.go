@@ -225,8 +225,8 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	// Initialize machine pool conditions if not present
-	newConditions := controllerutils.InitializeMachinePoolConditions(pool.Status.Conditions, machinePoolConditions)
-	if len(newConditions) > len(pool.Status.Conditions) {
+	newConditions, changed := controllerutils.InitializeMachinePoolConditions(pool.Status.Conditions, machinePoolConditions)
+	if changed {
 		pool.Status.Conditions = newConditions
 		logger.Info("initializing remote machineset controller conditions")
 		if err := r.Status().Update(context.TODO(), pool); err != nil {

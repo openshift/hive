@@ -160,10 +160,15 @@ func SortClusterDeploymentConditions(conditions []hivev1.ClusterDeploymentCondit
 	return conditions
 }
 
-// InitializeClusterClaimConditions initializes the given set of conditions for the first time, set with Status Unknown
+// InitializeClusterClaimConditions initializes the given set of conditions for the first time, set with Status Unknown.
+// If the conditions already exist, they are not affected.
+// The first return is the updated list of conditions (those passed in via `existingConditions` plus any new ones.)
+// The second return indicates whether we made any changes. It should be used by the caller to decide whether to perform a
+// Status().Update().
 func InitializeClusterClaimConditions(existingConditions []hivev1.ClusterClaimCondition,
-	conditionsToBeAdded []hivev1.ClusterClaimConditionType) []hivev1.ClusterClaimCondition {
+	conditionsToBeAdded []hivev1.ClusterClaimConditionType) ([]hivev1.ClusterClaimCondition, bool) {
 	now := metav1.Now()
+	changed := false
 	for _, conditionType := range conditionsToBeAdded {
 		if FindClusterClaimCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
@@ -176,9 +181,10 @@ func InitializeClusterClaimConditions(existingConditions []hivev1.ClusterClaimCo
 					LastTransitionTime: now,
 					LastProbeTime:      now,
 				})
+			changed = true
 		}
 	}
-	return existingConditions
+	return existingConditions, changed
 }
 
 // SetClusterClaimCondition sets a condition on a ClusterClaim resource's status
@@ -247,10 +253,15 @@ func SetClusterClaimConditionWithChangeCheck(
 	return conditions, changed
 }
 
-// InitializeClusterPoolConditions initializes the given set of conditions for the first time, set with Status Unknown
+// InitializeClusterPoolConditions initializes the given set of conditions for the first time, set with Status Unknown.
+// If the conditions already exist, they are not affected.
+// The first return is the updated list of conditions (those passed in via `existingConditions` plus any new ones.)
+// The second return indicates whether we made any changes. It should be used by the caller to decide whether to perform a
+// Status().Update().
 func InitializeClusterPoolConditions(existingConditions []hivev1.ClusterPoolCondition,
-	conditionsToBeAdded []hivev1.ClusterPoolConditionType) []hivev1.ClusterPoolCondition {
+	conditionsToBeAdded []hivev1.ClusterPoolConditionType) ([]hivev1.ClusterPoolCondition, bool) {
 	now := metav1.Now()
+	changed := false
 	for _, conditionType := range conditionsToBeAdded {
 		if FindClusterPoolCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
@@ -263,9 +274,10 @@ func InitializeClusterPoolConditions(existingConditions []hivev1.ClusterPoolCond
 					LastTransitionTime: now,
 					LastProbeTime:      now,
 				})
+			changed = true
 		}
 	}
-	return existingConditions
+	return existingConditions, changed
 }
 
 // SetClusterPoolCondition sets a condition on a ClusterPool resource's status
@@ -489,8 +501,9 @@ func SetDNSZoneConditionWithChangeCheck(
 }
 
 // InitializeMachinePoolConditions initializes the given set of conditions for the first time, set with Status Unknown
-func InitializeMachinePoolConditions(existingConditions []hivev1.MachinePoolCondition, conditionsToBeAdded []hivev1.MachinePoolConditionType) []hivev1.MachinePoolCondition {
+func InitializeMachinePoolConditions(existingConditions []hivev1.MachinePoolCondition, conditionsToBeAdded []hivev1.MachinePoolConditionType) ([]hivev1.MachinePoolCondition, bool) {
 	now := metav1.Now()
+	changed := false
 	for _, conditionType := range conditionsToBeAdded {
 		if FindMachinePoolCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
@@ -503,9 +516,10 @@ func InitializeMachinePoolConditions(existingConditions []hivev1.MachinePoolCond
 					LastTransitionTime: now,
 					LastProbeTime:      now,
 				})
+			changed = true
 		}
 	}
-	return existingConditions
+	return existingConditions, changed
 }
 
 // SetMachinePoolCondition sets a condition on a MachinePool resource's status

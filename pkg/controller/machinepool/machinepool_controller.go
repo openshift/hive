@@ -270,6 +270,14 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return r.removeFinalizer(pool, logger)
 	}
 
+	if controllerutils.IsFakeCluster(cd) {
+		logger.Info("skipping reconcile for fake cluster")
+		if pool.DeletionTimestamp != nil {
+			return r.removeFinalizer(pool, logger)
+		}
+		return reconcile.Result{}, nil
+	}
+
 	if !cd.Spec.Installed {
 		// Cluster isn't installed yet, return
 		logger.Debug("cluster installation is not complete")
@@ -288,11 +296,6 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not add finalizer")
 		}
 		return reconcile.Result{}, err
-	}
-
-	if controllerutils.IsFakeCluster(cd) {
-		logger.Info("skipping reconcile for fake cluster")
-		return reconcile.Result{}, nil
 	}
 
 	remoteClusterAPIClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(

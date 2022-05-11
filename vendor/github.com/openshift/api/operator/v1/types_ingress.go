@@ -76,7 +76,17 @@ type IngressControllerSpec struct {
 	HttpErrorCodePages configv1.ConfigMapNameReference `json:"httpErrorCodePages,omitempty"`
 
 	// replicas is the desired number of ingress controller replicas. If unset,
-	// defaults to 2.
+	// the default depends on the value of the defaultPlacement field in the
+	// cluster config.openshift.io/v1/ingresses status.
+	//
+	// The value of replicas is set based on the value of a chosen field in the
+	// Infrastructure CR. If defaultPlacement is set to ControlPlane, the
+	// chosen field will be controlPlaneTopology. If it is set to Workers the
+	// chosen field will be infrastructureTopology. Replicas will then be set to 1
+	// or 2 based whether the chosen field's value is SingleReplica or
+	// HighlyAvailable, respectively.
+	//
+	// These defaults are subject to change.
 	//
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
@@ -292,12 +302,22 @@ type NodePlacement struct {
 	// nodeSelector is the node selector applied to ingress controller
 	// deployments.
 	//
-	// If unset, the default is:
+	// If set, the specified selector is used and replaces the default.
+	//
+	// If unset, the default depends on the value of the defaultPlacement
+	// field in the cluster config.openshift.io/v1/ingresses status.
+	//
+	// When defaultPlacement is Workers, the default is:
 	//
 	//   kubernetes.io/os: linux
 	//   node-role.kubernetes.io/worker: ''
 	//
-	// If set, the specified selector is used and replaces the default.
+	// When defaultPlacement is ControlPlane, the default is:
+	//
+	//   kubernetes.io/os: linux
+	//   node-role.kubernetes.io/master: ''
+	//
+	// These defaults are subject to change.
 	//
 	// +optional
 	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
@@ -371,8 +391,8 @@ type LoadBalancerStrategy struct {
 // +union
 type ProviderLoadBalancerParameters struct {
 	// type is the underlying infrastructure provider for the load balancer.
-	// Allowed values are "AWS", "Azure", "BareMetal", "GCP", "OpenStack",
-	// and "VSphere".
+	// Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Nutanix",
+	// "OpenStack", and "VSphere".
 	//
 	// +unionDiscriminator
 	// +kubebuilder:validation:Required
@@ -399,10 +419,10 @@ type ProviderLoadBalancerParameters struct {
 }
 
 // LoadBalancerProviderType is the underlying infrastructure provider for the
-// load balancer. Allowed values are "AWS", "Azure", "BareMetal", "GCP",
+// load balancer. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Nutanix",
 // "OpenStack", and "VSphere".
 //
-// +kubebuilder:validation:Enum=AWS;Azure;BareMetal;GCP;OpenStack;VSphere;IBM
+// +kubebuilder:validation:Enum=AWS;Azure;BareMetal;GCP;Nutanix;OpenStack;VSphere;IBM
 type LoadBalancerProviderType string
 
 const (
@@ -414,6 +434,7 @@ const (
 	IBMLoadBalancerProvider          LoadBalancerProviderType = "IBM"
 	BareMetalLoadBalancerProvider    LoadBalancerProviderType = "BareMetal"
 	AlibabaCloudLoadBalancerProvider LoadBalancerProviderType = "AlibabaCloud"
+	NutanixLoadBalancerProvider      LoadBalancerProviderType = "Nutanix"
 )
 
 // AWSLoadBalancerParameters provides configuration settings that are
@@ -536,6 +557,49 @@ type HostNetworkStrategy struct {
 	// +kubebuilder:validation:Optional
 	// +optional
 	Protocol IngressControllerProtocol `json:"protocol,omitempty"`
+
+	// httpPort is the port on the host which should be used to listen for
+	// HTTP requests. This field should be set when port 80 is already in use.
+	// The value should not coincide with the NodePort range of the cluster.
+	// When the value is 0 or is not specified it defaults to 80.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=80
+	// +optional
+	HTTPPort int32 `json:"httpPort,omitempty"`
+
+	// httpsPort is the port on the host which should be used to listen for
+	// HTTPS requests. This field should be set when port 443 is already in use.
+	// The value should not coincide with the NodePort range of the cluster.
+	// When the value is 0 or is not specified it defaults to 443.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=443
+	// +optional
+	HTTPSPort int32 `json:"httpsPort,omitempty"`
+
+	// statsPort is the port on the host where the stats from the router are
+	// published. The value should not coincide with the NodePort range of the
+	// cluster. If an external load balancer is configured to forward connections
+	// to this IngressController, the load balancer should use this port for
+	// health checks. The load balancer can send HTTP probes on this port on a
+	// given node, with the path /healthz/ready to determine if the ingress
+	// controller is ready to receive traffic on the node. For proper operation
+	// the load balancer must not forward traffic to a node until the health
+	// check reports ready. The load balancer should also stop forwarding requests
+	// within a maximum of 45 seconds after /healthz/ready starts reporting
+	// not-ready. Probing every 5 to 10 seconds, with a 5-second timeout and with
+	// a threshold of two successful or failed requests to become healthy or
+	// unhealthy respectively, are well-tested values. When the value is 0 or
+	// is not specified it defaults to 1936.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=1936
+	// +optional
+	StatsPort int32 `json:"statsPort,omitempty"`
 }
 
 // PrivateStrategy holds parameters for the Private endpoint publishing
@@ -1306,6 +1370,28 @@ type IngressControllerTuningOptions struct {
 	// +kubebuilder:validation:Format=duration
 	// +optional
 	TLSInspectDelay *metav1.Duration `json:"tlsInspectDelay,omitempty"`
+
+	// healthCheckInterval defines how long the router waits between two consecutive
+	// health checks on its configured backends.  This value is applied globally as
+	// a default for all routes, but may be overridden per-route by the route annotation
+	// "router.openshift.io/haproxy.health.check.interval".
+	//
+	// Setting this to less than 5s can cause excess traffic due to too frequent
+	// TCP health checks and accompanying SYN packet storms.  Alternatively, setting
+	// this too high can result in increased latency, due to backend servers that are no
+	// longer available, but haven't yet been detected as such.
+	//
+	// An empty or zero healthCheckInterval means no opinion and IngressController chooses
+	// a default, which is subject to change over time.
+	// Currently the default healthCheckInterval value is 5s.
+	//
+	// Currently the minimum allowed value is 1s and the maximum allowed value is
+	// 2147483647ms (24.85 days).  Both are subject to change over time.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Format=duration
+	// +optional
+	HealthCheckInterval *metav1.Duration `json:"healthCheckInterval,omitempty"`
 }
 
 // HTTPEmptyRequestsPolicy indicates how HTTP connections for which no request
@@ -1397,6 +1483,14 @@ type IngressControllerStatus struct {
 	// observedGeneration is the most recent generation observed.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// namespaceSelector is the actual namespaceSelector in use.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
+
+	// routeSelector is the actual routeSelector in use.
+	// +optional
+	RouteSelector *metav1.LabelSelector `json:"routeSelector,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

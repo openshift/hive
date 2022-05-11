@@ -20,7 +20,7 @@ const (
 )
 
 // Machines returns a list of machines for a machinepool.
-func Machines(clusterID string, config *types.InstallConfig, pool *types.MachinePool, osImage, role, userDataSecret string) ([]machineapi.Machine, error) {
+func Machines(clusterID string, config *types.InstallConfig, pool *types.MachinePool, osImage, role, userDataSecret string, hyperVGen string) ([]machineapi.Machine, error) {
 	if configPlatform := config.Platform.Name(); configPlatform != azure.Name {
 		return nil, fmt.Errorf("non-Azure configuration: %q", configPlatform)
 	}
@@ -46,7 +46,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 		if len(azs) > 0 {
 			azIndex = int(idx) % len(azs)
 		}
-		provider, err := provider(platform, mpool, osImage, userDataSecret, clusterID, role, &azIndex)
+		provider, err := provider(platform, mpool, osImage, userDataSecret, clusterID, role, &azIndex, hyperVGen)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create provider")
 		}
@@ -78,13 +78,28 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 	return machines, nil
 }
 
-func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string, userDataSecret string, clusterID string, role string, azIdx *int) (*machineapi.AzureMachineProviderSpec, error) {
+func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string, userDataSecret string, clusterID string, role string, azIdx *int, hyperVGen string) (*machineapi.AzureMachineProviderSpec, error) {
 	var az *string
 	if len(mpool.Zones) > 0 && azIdx != nil {
 		az = &mpool.Zones[*azIdx]
 	}
 
 	rg := platform.ClusterResourceGroupName(clusterID)
+
+	var image machineapi.Image
+	if mpool.OSImage.Publisher != "" {
+		image.Type = machineapi.AzureImageTypeMarketplaceWithPlan
+		image.Publisher = mpool.OSImage.Publisher
+		image.Offer = mpool.OSImage.Offer
+		image.SKU = mpool.OSImage.SKU
+		image.Version = mpool.OSImage.Version
+	} else {
+		imageID := fmt.Sprintf("/resourceGroups/%s/providers/Microsoft.Compute/images/%s", rg, clusterID)
+		if hyperVGen == "V2" {
+			imageID += "-gen2"
+		}
+		image.ResourceID = imageID
+	}
 
 	networkResourceGroup, virtualNetwork, subnet, err := getNetworkInfo(platform, clusterID, role)
 	if err != nil {
@@ -105,6 +120,22 @@ func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string
 		managedIdentity = ""
 	}
 
+	var diskEncryptionSet *machineapi.DiskEncryptionSetParameters
+	if mpool.OSDisk.DiskEncryptionSet != nil {
+		diskEncryptionSet = &machineapi.DiskEncryptionSetParameters{
+			ID: mpool.OSDisk.DiskEncryptionSet.ToID(),
+		}
+	}
+
+	var securityProfile *machineapi.SecurityProfile
+	if mpool.EncryptionAtHost {
+		securityProfile = &machineapi.SecurityProfile{
+			EncryptionAtHost: &mpool.EncryptionAtHost,
+		}
+	}
+
+	ultraSSDCapability := machineapi.AzureUltraSSDCapabilityState(mpool.UltraSSDCapability)
+
 	spec := &machineapi.AzureMachineProviderSpec{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "machine.openshift.io/v1beta1",
@@ -114,23 +145,25 @@ func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string
 		CredentialsSecret: &corev1.SecretReference{Name: cloudsSecret, Namespace: cloudsSecretNamespace},
 		Location:          platform.Region,
 		VMSize:            mpool.InstanceType,
-		Image: machineapi.Image{
-			ResourceID: fmt.Sprintf("/resourceGroups/%s/providers/Microsoft.Compute/images/%s", rg, clusterID),
-		},
+		Image:             image,
 		OSDisk: machineapi.OSDisk{
 			OSType:     "Linux",
 			DiskSizeGB: mpool.OSDisk.DiskSizeGB,
-			ManagedDisk: machineapi.ManagedDiskParameters{
+			ManagedDisk: machineapi.OSDiskManagedDiskParameters{
 				StorageAccountType: mpool.OSDisk.DiskType,
+				DiskEncryptionSet:  diskEncryptionSet,
 			},
 		},
-		Zone:                 az,
-		Subnet:               subnet,
-		ManagedIdentity:      managedIdentity,
-		Vnet:                 virtualNetwork,
-		ResourceGroup:        rg,
-		NetworkResourceGroup: networkResourceGroup,
-		PublicLoadBalancer:   publicLB,
+		SecurityProfile:       securityProfile,
+		UltraSSDCapability:    ultraSSDCapability,
+		Zone:                  az,
+		Subnet:                subnet,
+		ManagedIdentity:       managedIdentity,
+		Vnet:                  virtualNetwork,
+		ResourceGroup:         rg,
+		NetworkResourceGroup:  networkResourceGroup,
+		PublicLoadBalancer:    publicLB,
+		AcceleratedNetworking: getVMNetworkingType(mpool.VMNetworkingType),
 	}
 
 	if platform.CloudName == azure.StackCloud {
@@ -158,4 +191,8 @@ func getNetworkInfo(platform *azure.Platform, clusterID, role string) (string, s
 	default:
 		return "", "", "", fmt.Errorf("unrecognized machine role %s", role)
 	}
+}
+
+func getVMNetworkingType(value string) bool {
+	return value == string(azure.VMnetworkingTypeAccelerated)
 }

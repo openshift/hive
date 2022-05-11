@@ -13,7 +13,6 @@ import (
 	aznetwork "github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/installer/pkg/types"
@@ -50,11 +49,46 @@ func Validate(client API, ic *types.InstallConfig) error {
 		}
 		allErrs = append(allErrs, validateAzureStackClusterOSImage(StorageEndpointSuffix, ic.Azure.ClusterOSImage, field.NewPath("platform").Child("azure"))...)
 	}
+	allErrs = append(allErrs, validateMarketplaceImage(client, ic)...)
 	return allErrs.ToAggregate()
 }
 
+// ValidateDiskEncryptionSet ensures the disk encryption set exists and is valid.
+func ValidateDiskEncryptionSet(client API, ic *types.InstallConfig) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if ic.Platform.Azure.DefaultMachinePlatform != nil && ic.Platform.Azure.DefaultMachinePlatform.OSDisk.DiskEncryptionSet != nil {
+		diskEncryptionSet := ic.Platform.Azure.DefaultMachinePlatform.OSDisk.DiskEncryptionSet
+		_, err := client.GetDiskEncryptionSet(context.TODO(), diskEncryptionSet.SubscriptionID, diskEncryptionSet.ResourceGroup, diskEncryptionSet.Name)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("platform").Child("azure", "defaultMachinePlatform", "osDisk", "diskEncryptionSet"), diskEncryptionSet, err.Error()))
+		}
+	}
+
+	if ic.ControlPlane != nil && ic.ControlPlane.Platform.Azure != nil && ic.ControlPlane.Platform.Azure.OSDisk.DiskEncryptionSet != nil {
+		diskEncryptionSet := ic.ControlPlane.Platform.Azure.OSDisk.DiskEncryptionSet
+		_, err := client.GetDiskEncryptionSet(context.TODO(), diskEncryptionSet.SubscriptionID, diskEncryptionSet.ResourceGroup, diskEncryptionSet.Name)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("platform").Child("azure", "osDisk", "diskEncryptionSet"), diskEncryptionSet, err.Error()))
+		}
+	}
+
+	for idx, compute := range ic.Compute {
+		fieldPath := field.NewPath("compute").Index(idx)
+		if compute.Platform.Azure != nil && compute.Platform.Azure.OSDisk.DiskEncryptionSet != nil {
+			diskEncryptionSet := compute.Platform.Azure.OSDisk.DiskEncryptionSet
+			_, err := client.GetDiskEncryptionSet(context.TODO(), diskEncryptionSet.SubscriptionID, diskEncryptionSet.ResourceGroup, diskEncryptionSet.Name)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("platform", "azure", "osDisk", "diskEncryptionSet"), diskEncryptionSet, err.Error()))
+			}
+		}
+	}
+
+	return allErrs
+}
+
 // ValidateInstanceType ensures the instance type has sufficient Vcpu and Memory.
-func ValidateInstanceType(client API, fieldPath *field.Path, region, instanceType string, diskType string, req resourceRequirements) field.ErrorList {
+func ValidateInstanceType(client API, fieldPath *field.Path, region, instanceType string, diskType string, req resourceRequirements, ultraSSDEnabled bool, vmNetworkingType string) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	typeMeta, err := client.GetVirtualMachineSku(context.TODO(), instanceType, region)
@@ -67,6 +101,7 @@ func ValidateInstanceType(client API, fieldPath *field.Path, region, instanceTyp
 		return append(allErrs, field.Invalid(fieldPath.Child("type"), instanceType, errMsg))
 	}
 
+	ultraSSDAvailable := false
 	for _, capability := range *typeMeta.Capabilities {
 
 		if strings.EqualFold(*capability.Name, "vCPUsAvailable") {
@@ -77,16 +112,6 @@ func ValidateInstanceType(client API, fieldPath *field.Path, region, instanceTyp
 			if cpus < float64(req.minimumVCpus) {
 				errMsg := fmt.Sprintf("instance type does not meet minimum resource requirements of %d vCPUsAvailable", req.minimumVCpus)
 				allErrs = append(allErrs, field.Invalid(fieldPath.Child("type"), instanceType, errMsg))
-			}
-		} else if strings.EqualFold(*capability.Name, "HyperVGenerations") {
-			generations := sets.NewString()
-			for _, g := range strings.Split(to.String(capability.Value), ",") {
-				g = strings.TrimSpace(g)
-				g = strings.ToUpper(g)
-				generations.Insert(g)
-			}
-			if !generations.Has("V1") {
-				allErrs = append(allErrs, field.Invalid(fieldPath.Child("type"), instanceType, "only disks with HyperVGeneration V1 are supported"))
 			}
 		} else if strings.EqualFold(*capability.Name, "MemoryGB") {
 			memory, err := strconv.ParseFloat(*capability.Value, 0)
@@ -102,7 +127,20 @@ func ValidateInstanceType(client API, fieldPath *field.Path, region, instanceTyp
 				errMsg := fmt.Sprintf("PremiumIO not supported for instance type %s", instanceType)
 				allErrs = append(allErrs, field.Invalid(fieldPath.Child("osDisk", "diskType"), diskType, errMsg))
 			}
+		} else if strings.EqualFold(*capability.Name, "UltraSSDAvailable") {
+			ultraSSDAvailable = strings.EqualFold(*capability.Value, "True")
+		} else if strings.EqualFold(*capability.Name, string(aztypes.VMnetworkingTypeAccelerated)) {
+			if vmNetworkingType == string(aztypes.VMnetworkingTypeAccelerated) && !strings.EqualFold(*capability.Value, "True") {
+				errMsg := fmt.Sprintf("vm networking type is not supported for instance type %s", instanceType)
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("vmNetworkingType"), vmNetworkingType, errMsg))
+			}
 		}
+	}
+
+	// The UltraSSDAvailable capability might not be present at all, in which case it must assumed to be false
+	if ultraSSDEnabled && !ultraSSDAvailable {
+		errMsg := fmt.Sprintf("UltraSSD capability not supported for this instance type in the %s region", region)
+		allErrs = append(allErrs, field.Invalid(fieldPath.Child("type"), instanceType, errMsg))
 	}
 
 	return allErrs
@@ -114,17 +152,29 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 
 	defaultDiskType := aztypes.DefaultDiskType
 	defaultInstanceType := ""
+	defaultUltraSSDCapability := "Disabled"
+	defaultVMNetworkingType := string(aztypes.VMnetworkingTypeAccelerated)
 
-	if ic.Platform.Azure.DefaultMachinePlatform != nil && ic.Platform.Azure.DefaultMachinePlatform.OSDisk.DiskType != "" {
-		defaultDiskType = ic.Platform.Azure.DefaultMachinePlatform.OSDisk.DiskType
-	}
-	if ic.Platform.Azure.DefaultMachinePlatform != nil && ic.Platform.Azure.DefaultMachinePlatform.InstanceType != "" {
-		defaultInstanceType = ic.Platform.Azure.DefaultMachinePlatform.InstanceType
+	if ic.Platform.Azure.DefaultMachinePlatform != nil {
+		if ic.Platform.Azure.DefaultMachinePlatform.OSDisk.DiskType != "" {
+			defaultDiskType = ic.Platform.Azure.DefaultMachinePlatform.OSDisk.DiskType
+		}
+		if ic.Platform.Azure.DefaultMachinePlatform.InstanceType != "" {
+			defaultInstanceType = ic.Platform.Azure.DefaultMachinePlatform.InstanceType
+		}
+		if ic.Platform.Azure.DefaultMachinePlatform.UltraSSDCapability != "" {
+			defaultUltraSSDCapability = ic.Platform.Azure.DefaultMachinePlatform.UltraSSDCapability
+		}
+		if ic.Platform.Azure.DefaultMachinePlatform.VMNetworkingType != "" {
+			defaultVMNetworkingType = ic.Platform.Azure.DefaultMachinePlatform.VMNetworkingType
+		}
 	}
 
 	if ic.ControlPlane != nil && ic.ControlPlane.Platform.Azure != nil {
 		diskType := ic.ControlPlane.Platform.Azure.OSDisk.DiskType
 		instanceType := ic.ControlPlane.Platform.Azure.InstanceType
+		ultraSSDCapability := ic.ControlPlane.Platform.Azure.UltraSSDCapability
+		vmNetworkingType := ic.ControlPlane.Platform.Azure.VMNetworkingType
 
 		if diskType == "" {
 			diskType = defaultDiskType
@@ -135,7 +185,14 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 		if instanceType == "" {
 			instanceType = defaults.ControlPlaneInstanceType(ic.Azure.CloudName, ic.Azure.Region)
 		}
-		allErrs = append(allErrs, ValidateInstanceType(client, field.NewPath("controlPlane", "platform", "azure"), ic.Azure.Region, instanceType, diskType, controlPlaneReq)...)
+		if ultraSSDCapability == "" {
+			ultraSSDCapability = defaultUltraSSDCapability
+		}
+		if vmNetworkingType == "" {
+			vmNetworkingType = defaultVMNetworkingType
+		}
+		ultraSSDEnabled := strings.EqualFold(ultraSSDCapability, "Enabled")
+		allErrs = append(allErrs, ValidateInstanceType(client, field.NewPath("controlPlane", "platform", "azure"), ic.Azure.Region, instanceType, diskType, controlPlaneReq, ultraSSDEnabled, vmNetworkingType)...)
 	}
 
 	for idx, compute := range ic.Compute {
@@ -143,6 +200,8 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 		if compute.Platform.Azure != nil {
 			diskType := compute.Platform.Azure.OSDisk.DiskType
 			instanceType := compute.Platform.Azure.InstanceType
+			ultraSSDCapability := compute.Platform.Azure.UltraSSDCapability
+			vmNetworkingType := compute.Platform.Azure.VMNetworkingType
 
 			if diskType == "" {
 				diskType = defaultDiskType
@@ -153,8 +212,15 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 			if instanceType == "" {
 				instanceType = defaults.ComputeInstanceType(ic.Azure.CloudName, ic.Azure.Region)
 			}
+			if ultraSSDCapability == "" {
+				ultraSSDCapability = defaultUltraSSDCapability
+			}
+			if vmNetworkingType == "" {
+				vmNetworkingType = defaultVMNetworkingType
+			}
+			ultraSSDEnabled := strings.EqualFold(ultraSSDCapability, "Enabled")
 			allErrs = append(allErrs, ValidateInstanceType(client, fieldPath.Child("platform", "azure"),
-				ic.Azure.Region, instanceType, diskType, computeReq)...)
+				ic.Azure.Region, instanceType, diskType, computeReq, ultraSSDEnabled, vmNetworkingType)...)
 		}
 	}
 
@@ -293,6 +359,7 @@ func ValidatePublicDNS(ic *types.InstallConfig, azureDNS *DNSConfig) error {
 func ValidateForProvisioning(client API, ic *types.InstallConfig) error {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateResourceGroup(client, field.NewPath("platform").Child("azure"), ic.Azure)...)
+	allErrs = append(allErrs, ValidateDiskEncryptionSet(client, ic)...)
 	if ic.Azure.CloudName == aztypes.StackCloud {
 		allErrs = append(allErrs, checkAzureStackClusterOSImageSet(ic.Azure.ClusterOSImage, field.NewPath("platform").Child("azure"))...)
 	}
@@ -329,15 +396,18 @@ func validateResourceGroup(client API, fieldPath *field.Path, platform *aztypes.
 		allErrs = append(allErrs, field.Invalid(fieldPath.Child("resourceGroupName"), platform.ResourceGroupName, fmt.Sprintf("resource group has conflicting tags %s", strings.Join(conflictingTagKeys, ", "))))
 	}
 
-	ids, err := client.ListResourceIDsByGroup(context.TODO(), platform.ResourceGroupName)
-	if err != nil {
-		return append(allErrs, field.InternalError(fieldPath.Child("resourceGroupName"), errors.Wrap(err, "failed to list resources in the resource group")))
-	}
-	if l := len(ids); l > 0 {
-		if len(ids) > 2 {
-			ids = ids[:2]
+	// ARO provisions Azure resources before resolving the asset graph.
+	if !platform.IsARO() {
+		ids, err := client.ListResourceIDsByGroup(context.TODO(), platform.ResourceGroupName)
+		if err != nil {
+			return append(allErrs, field.InternalError(fieldPath.Child("resourceGroupName"), errors.Wrap(err, "failed to list resources in the resource group")))
 		}
-		allErrs = append(allErrs, field.Invalid(fieldPath.Child("resourceGroupName"), platform.ResourceGroupName, fmt.Sprintf("resource group must be empty but it has %d resources like %s ...", l, strings.Join(ids, ", "))))
+		if l := len(ids); l > 0 {
+			if len(ids) > 2 {
+				ids = ids[:2]
+			}
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("resourceGroupName"), platform.ResourceGroupName, fmt.Sprintf("resource group must be empty but it has %d resources like %s ...", l, strings.Join(ids, ", "))))
+		}
 	}
 	return allErrs
 }
@@ -359,6 +429,42 @@ func validateAzureStackClusterOSImage(StorageEndpointSuffix string, ClusterOSIma
 	// If the URL for the image isn't in the Azure Stack environment we can't use it.
 	if !strings.HasSuffix(imageParsedURL.Host, StorageEndpointSuffix) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterOSImage"), ClusterOSImage, "clusterOSImage must be in the Azure Stack environment"))
+	}
+	return allErrs
+}
+
+func validateMarketplaceImage(client API, installConfig *types.InstallConfig) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, compute := range installConfig.Compute {
+		platform := compute.Platform.Azure
+		if platform == nil {
+			continue
+		}
+		if platform.OSImage.Publisher == "" {
+			continue
+		}
+		osImageFieldPath := field.NewPath("compute").Index(i).Child("platform", "azure", "osImage")
+		_, err := client.GetMarketplaceImage(
+			context.Background(),
+			installConfig.Platform.Azure.Region,
+			platform.OSImage.Publisher,
+			platform.OSImage.Offer,
+			platform.OSImage.SKU,
+			platform.OSImage.Version,
+		)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(osImageFieldPath, platform.OSImage, err.Error()))
+			continue
+		}
+		termsAccepted, err := client.AreMarketplaceImageTermsAccepted(context.Background(), platform.OSImage.Publisher, platform.OSImage.Offer, platform.OSImage.SKU)
+		if err == nil {
+			if !termsAccepted {
+				allErrs = append(allErrs, field.Invalid(osImageFieldPath, platform.OSImage, "the license terms for the marketplace image have not been accepted"))
+			}
+		} else {
+			allErrs = append(allErrs, field.Invalid(osImageFieldPath, platform.OSImage,
+				fmt.Sprintf("could not determine if the license terms for the marketplace image have been accepted: %v", err)))
+		}
 	}
 	return allErrs
 }

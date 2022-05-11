@@ -110,11 +110,10 @@ func getVSphereConfig(c runtimeclient.Reader) (*vSphereConfig, error) {
 	return &vcfg, nil
 }
 
-func setVSphereMachineProviderConditions(condition machinev1.VSphereMachineProviderCondition, conditions []machinev1.VSphereMachineProviderCondition) []machinev1.VSphereMachineProviderCondition {
+func setConditions(condition metav1.Condition, conditions []metav1.Condition) []metav1.Condition {
 	now := metav1.Now()
 
-	if existingCondition := findProviderCondition(conditions, condition.Type); existingCondition == nil {
-		condition.LastProbeTime = now
+	if existingCondition := findCondition(conditions, condition.Type); existingCondition == nil {
 		condition.LastTransitionTime = now
 		conditions = append(conditions, condition)
 	} else {
@@ -124,7 +123,7 @@ func setVSphereMachineProviderConditions(condition machinev1.VSphereMachineProvi
 	return conditions
 }
 
-func findProviderCondition(conditions []machinev1.VSphereMachineProviderCondition, conditionType machinev1.ConditionType) *machinev1.VSphereMachineProviderCondition {
+func findCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
 	for i := range conditions {
 		if conditions[i].Type == conditionType {
 			return &conditions[i]
@@ -133,7 +132,7 @@ func findProviderCondition(conditions []machinev1.VSphereMachineProviderConditio
 	return nil
 }
 
-func updateExistingCondition(newCondition, existingCondition *machinev1.VSphereMachineProviderCondition) {
+func updateExistingCondition(newCondition, existingCondition *metav1.Condition) {
 	if !shouldUpdateCondition(newCondition, existingCondition) {
 		return
 	}
@@ -144,26 +143,25 @@ func updateExistingCondition(newCondition, existingCondition *machinev1.VSphereM
 	existingCondition.Status = newCondition.Status
 	existingCondition.Reason = newCondition.Reason
 	existingCondition.Message = newCondition.Message
-	existingCondition.LastProbeTime = newCondition.LastProbeTime
 }
 
-func shouldUpdateCondition(newCondition, existingCondition *machinev1.VSphereMachineProviderCondition) bool {
+func shouldUpdateCondition(newCondition, existingCondition *metav1.Condition) bool {
 	return newCondition.Reason != existingCondition.Reason || newCondition.Message != existingCondition.Message
 }
 
-func conditionSuccess() machinev1.VSphereMachineProviderCondition {
-	return machinev1.VSphereMachineProviderCondition{
-		Type:    machinev1.MachineCreation,
-		Status:  corev1.ConditionTrue,
+func conditionSuccess() metav1.Condition {
+	return metav1.Condition{
+		Type:    string(machinev1.MachineCreation),
+		Status:  metav1.ConditionTrue,
 		Reason:  machinev1.MachineCreationSucceededConditionReason,
 		Message: "Machine successfully created",
 	}
 }
 
-func conditionFailed() machinev1.VSphereMachineProviderCondition {
-	return machinev1.VSphereMachineProviderCondition{
-		Type:   machinev1.MachineCreation,
-		Status: corev1.ConditionFalse,
+func conditionFailed() metav1.Condition {
+	return metav1.Condition{
+		Type:   string(machinev1.MachineCreation),
+		Status: metav1.ConditionFalse,
 		Reason: machinev1.MachineCreationSucceededConditionReason,
 	}
 }

@@ -72,16 +72,13 @@ func Add(mgr manager.Manager) error {
 	if err := addAlibabaCloudProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add Alibaba provider to scheme")
 	}
-	if err := addAWSProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add AWS provider to scheme")
-	}
 	if err := addOpenStackProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add OpenStack provider to scheme")
 	}
 	if err := addOvirtProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add OVirt provider to scheme")
 	}
-	// GCP, VSphere, and IBMCloud are added via the machineapi
+	// AWS, GCP, VSphere, and IBMCloud are added via the machineapi
 	err := machineapi.AddToScheme(scheme)
 	if err != nil {
 		return errors.Wrap(err, "cannot add Machine API to scheme")

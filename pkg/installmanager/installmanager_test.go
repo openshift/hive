@@ -2,6 +2,7 @@ package installmanager
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -23,7 +24,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 
-	awsproviderv1beta1 "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
@@ -819,7 +819,6 @@ spec:
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			machineapi.AddToScheme(scheme.Scheme)
-			awsproviderv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 
 			pool := &hivev1.MachinePool{
 				ObjectMeta: metav1.ObjectMeta{
@@ -844,16 +843,16 @@ spec:
 			}
 
 			codecFactory := serializer.NewCodecFactory(scheme.Scheme)
-			decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion, awsproviderv1beta1.SchemeGroupVersion)
+			decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
 
 			if tc.expectModified {
 				machineSetObj, _, err := decoder.Decode(*modifiedBytes, nil, nil)
 				assert.NoError(t, err, "expected to be able to decode MachineSet yaml")
 				machineSet, _ := machineSetObj.(*machineapi.MachineSet)
 
-				awsMachineTemplateObj, _, err := decoder.Decode(machineSet.Spec.Template.Spec.ProviderSpec.Value.Raw, nil, nil)
+				awsMachineTemplate := new(machineapi.AWSMachineProviderConfig)
+				err = json.Unmarshal(machineSet.Spec.Template.Spec.ProviderSpec.Value.Raw, &awsMachineTemplate)
 				assert.NoError(t, err, "expected to be able to decode AWSMachineProviderConfig")
-				awsMachineTemplate, _ := awsMachineTemplateObj.(*awsproviderv1beta1.AWSMachineProviderConfig)
 
 				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within Security Group Filters in AWSMachineProviderConfig")
 				assert.Equal(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Name, "vpc-id", "expected an vpc-id named filter to be configured within Security Group Filters in AWSMachineProviderConfig")

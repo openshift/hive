@@ -2,6 +2,7 @@ package clusterpool
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -28,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/clusterresource"
@@ -48,7 +48,6 @@ const (
 	icSecretDependent               = "install config template secret"
 	cdClusterPoolIndex              = "spec.clusterpool.namespacedname"
 	claimClusterPoolIndex           = "spec.clusterpoolname"
-	cdcClusterPoolIndex             = "status.clusterpoolname"
 	defaultInventoryAttempts        = 5
 )
 
@@ -171,6 +170,11 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 		handler.EnqueueRequestsFromMapFunc(
 			requestsForCDRBACResources(r.Client, clusterPoolAdminRoleBindingName, r.logger)),
 	); err != nil {
+		return err
+	}
+
+	// Watch for changes to ClusterDeploymentCustomizations
+	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeploymentCustomization{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
@@ -377,7 +381,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// If too few, create new InstallConfig and ClusterDeployment.
 	case drift < 0 && availableCapacity > 0:
 		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
-		if err := r.addClusters(clp, poolVersion, cds, toAdd, logger); err != nil {
+		if err := r.addClusters(clp, poolVersion, cds, toAdd, cdcs, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
@@ -427,7 +431,6 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	return reconcile.Result{}, nil
 }
 
-// reconcileRunningClusters ensures the oldest unassigned clusters are set to running, and the
 // remainder are set to hibernating. The number of clusters we set to running is determined by
 // adding the cluster's configured runningCount to the number of unsatisfied claims for which we're
 // spinning up new clusters.
@@ -457,10 +460,7 @@ func (r *ReconcileClusterPool) reconcileRunningClusters(
 	for i := 0; i < len(cdList); i++ {
 		cd := cdList[i]
 		hibernateCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-		hibernateUnsupported := false
-		if hibernateCondition != nil && hibernateCondition.Reason == hivev1.HibernatingReasonUnsupported {
-			hibernateUnsupported = true
-		}
+		hibernateUnsupported := hibernateCondition != nil && hibernateCondition.Reason == hivev1.HibernatingReasonUnsupported
 		var desiredPowerState hivev1.ClusterPowerState
 		if i < runningCount || hibernateUnsupported {
 			desiredPowerState = hivev1.ClusterPowerStateRunning
@@ -620,6 +620,7 @@ func (r *ReconcileClusterPool) addClusters(
 	poolVersion string,
 	cds *cdCollection,
 	newClusterCount int,
+	cdcs *cdcCollection,
 	logger log.FieldLogger,
 ) error {
 	logger.WithField("count", newClusterCount).Info("Adding new clusters")
@@ -658,7 +659,7 @@ func (r *ReconcileClusterPool) addClusters(
 	}
 
 	for i := 0; i < newClusterCount; i++ {
-		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, logger)
+		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, cdcs, logger)
 		if err != nil {
 			return err
 		}
@@ -674,8 +675,15 @@ func (r *ReconcileClusterPool) createCluster(
 	pullSecret string,
 	installConfigTemplate string,
 	poolVersion string,
+	cdcs *cdcCollection,
 	logger log.FieldLogger,
 ) (*hivev1.ClusterDeployment, error) {
+	if clp.Spec.Inventory != nil {
+		if len(cdcs.unassigned) == 0 {
+			return nil, errors.New("no customization available")
+		}
+	}
+
 	var err error
 
 	ns, err := r.createRandomNamespace(clp)
@@ -729,15 +737,15 @@ func (r *ReconcileClusterPool) createCluster(
 			cdPos = i
 			poolRef := poolReference(clp)
 			cd.Spec.ClusterPoolRef = &poolRef
-			if err := r.getInventoryCustomization(clp, cd, logger); err != nil {
-				return nil, err
+			if clp.Spec.Inventory != nil {
+				cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcs.unassigned[0].Name}
 			}
 		} else if secretTmp := isInstallConfigSecret(obj); secretTmp != nil {
 			secret = secretTmp
 		}
 	}
 
-	if err := r.patchInstallConfig(clp, cd, secret, logger); err != nil {
+	if err := r.patchInstallConfig(clp, cd, secret, cdcs, logger); err != nil {
 		return nil, err
 	}
 
@@ -756,7 +764,7 @@ func (r *ReconcileClusterPool) createCluster(
 }
 
 // patchInstallConfig responsible for applying ClusterDeploymentCustomization and its reservation
-func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *hivev1.ClusterDeployment, secret *corev1.Secret, logger log.FieldLogger) error {
+func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *hivev1.ClusterDeployment, secret *corev1.Secret, cdcs *cdcCollection, logger log.FieldLogger) error {
 	if clp.Spec.Inventory == nil {
 		return nil
 	}
@@ -783,38 +791,23 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 			Value: yamlpatch.NewNode(&value),
 		})
 	}
+
 	installConfig, err := newPatch.Apply([]byte(secret.StringData["install-config.yaml"]))
 	if err != nil {
-		cdcs := cdcCollection{syntax: []*hivev1.ClusterDeploymentCustomization{cdc}}
-		cdcs.SyncClusterDeploymentCustomizationAssignments(r.Client, clp, &cdCollection{}, logger)
-		cdc.Status.LastApplyStatus = hivev1.LastApplyBrokenSyntax
-		if updateErr := r.Status().Update(context.Background(), cdc); updateErr != nil {
-			if apierrors.IsNotFound(err) {
-				return errors.New("missing customization")
-			}
-		}
-
+		cdcs.BrokenSyntax(r, cdc, fmt.Sprint(err))
+		cdcs.UpdateInventoryValidCondition(r, clp)
 		return err
 	}
 
-	// Reserving ClusterDeploymentCustomization
-	existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-	if existingCondition == nil || existingCondition.Status == corev1.ConditionFalse {
-		cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: clp.Name}
-		cdc.Status.LastApplyTime = metav1.Now()
-		conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
-			Type:    conditionsv1.ConditionAvailable,
-			Status:  corev1.ConditionFalse,
-			Reason:  "Reserved",
-			Message: "reserved",
-		})
+	configJson, err := json.Marshal(cdc.Spec)
+	if err != nil {
+		return err
+	}
 
-		if err := r.Status().Update(context.Background(), cdc); err != nil {
-			if apierrors.IsNotFound(err) {
-				return errors.New("missing customization")
-			}
-			return err
-		}
+	cdc.Status.LastAppliedConfiguration = string(configJson)
+	cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: clp.Name}
+	if err := cdcs.Reserve(r, cdc); err != nil {
+		return err
 	}
 
 	secret.StringData["install-config.yaml"] = string(installConfig)
@@ -1121,55 +1114,6 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")
 	}
-}
-
-// getInventoryCustomization retrieves available ClusterDeploymentCustomizations
-// and picks oldest successful customizations to avoid using the same broken
-// customization.  When customizations have the same last apply status, the
-// oldest used customization will be prioritized.
-func (r *ReconcileClusterPool) getInventoryCustomization(pool *hivev1.ClusterPool, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
-	if pool.Spec.Inventory == nil {
-		return nil
-	}
-	cdcs, err := getAllCustomizationsForPool(r.Client, pool, logger)
-	if err != nil {
-		return err
-	}
-
-	if len(cdcs.unassigned) == 0 {
-		return errors.New("no customization available")
-	}
-
-	sort.Slice(
-		cdcs.unassigned,
-		func(i, j int) bool {
-			iName := cdcs.unassigned[i].Name
-			jName := cdcs.unassigned[j].Name
-			iStatus := cdcs.unassigned[i].Status.LastApplyStatus
-			jStatus := cdcs.unassigned[j].Status.LastApplyStatus
-			iTime := cdcs.unassigned[i].Status.LastApplyTime
-			jTime := cdcs.unassigned[j].Status.LastApplyTime
-			if iStatus == "" {
-				iStatus = hivev1.LastApplySucceeded
-			}
-			if jStatus == "" {
-				iStatus = hivev1.LastApplySucceeded
-			}
-			if iStatus == jStatus {
-				return iTime.Before(&jTime)
-			}
-			if iStatus == hivev1.LastApplySucceeded {
-				return false
-			}
-			if jStatus == hivev1.LastApplySucceeded {
-				return true
-			}
-			return iName < jName
-		},
-	)
-
-	cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcs.unassigned[0].Name}
-	return nil
 }
 
 func isInstallConfigSecret(obj interface{}) *corev1.Secret {

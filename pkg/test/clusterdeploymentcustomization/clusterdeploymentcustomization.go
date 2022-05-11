@@ -109,15 +109,31 @@ func WithPatch(path, op, value string) Option {
 	}
 }
 
-func WithLastStatus(status hivev1.LastApplyStatusType) Option {
+func WithApplySucceeded(reason string, change time.Time) Option {
 	return func(cdc *hivev1.ClusterDeploymentCustomization) {
-		cdc.Status.LastApplyStatus = status
-	}
-}
+		status := corev1.ConditionTrue
+		if reason != hivev1.CustomizationApplyReasonSucceeded {
+			status = corev1.ConditionFalse
+		}
 
-func WithLastTime(lastTime time.Time) Option {
-	return func(cdc *hivev1.ClusterDeploymentCustomization) {
-		cdc.Status.LastApplyTime = metav1.NewTime(lastTime)
+		if cdc.Status.Conditions == nil {
+			cdc.Status.Conditions = []conditionsv1.Condition{}
+		}
+		existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
+		if existingCondition == nil {
+			newCondition := conditionsv1.Condition{
+				Type:    hivev1.ApplySucceededCondition,
+				Status:  status,
+				Reason:  reason,
+				Message: reason,
+			}
+			newCondition.LastTransitionTime = metav1.NewTime(change)
+			cdc.Status.Conditions = append(cdc.Status.Conditions, newCondition)
+		} else {
+			existingCondition.LastTransitionTime = metav1.NewTime(change)
+			existingCondition.Status = status
+			existingCondition.Reason = reason
+		}
 	}
 }
 

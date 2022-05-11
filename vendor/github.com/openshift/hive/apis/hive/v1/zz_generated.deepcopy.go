@@ -767,7 +767,11 @@ func (in *ClusterDeploymentCustomizationStatus) DeepCopyInto(out *ClusterDeploym
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
-	in.LastApplyTime.DeepCopyInto(&out.LastApplyTime)
+	if in.ClusterPoolRef != nil {
+		in, out := &in.ClusterPoolRef, &out.ClusterPoolRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]conditionsv1.Condition, len(*in))

@@ -38,7 +38,7 @@ require (
 	github.com/openshift/cluster-api-provider-ibmcloud v0.0.1-0.20220201105455-8014e5e894b0
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551
-	github.com/openshift/custom-resource-status v1.1.2
+	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v0.9.0-master.0.20220711145509-cdb9627de7ef

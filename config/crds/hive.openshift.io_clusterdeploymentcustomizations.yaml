@@ -114,14 +114,9 @@ spec:
                   - type
                   type: object
                 type: array
-              lastApplyStatus:
-                description: LastApplyStatus indicates the customization status in
-                  the last applied cluster deployment.
-                type: string
-              lastApplyTime:
-                description: LastApplyTime indicates the time when the customization
-                  was applied on a cluster deployment.
-                format: date-time
+              lastAppliedConfiguration:
+                description: LastAppliedConfiguration contains the last applied patches
+                  to the install-config.
                 type: string
             type: object
         required:

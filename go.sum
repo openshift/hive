@@ -1046,8 +1046,9 @@ github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850d
 github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519/go.mod h1:C7unCUThP8eqT4xQfbvg3oIDn2S9TYtb0wbBoH/SR2U=
 github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551 h1:nGa6igwzG7smZOACUsovgf9XG8vT96Zdyc4H6r2rqS0=
 github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551/go.mod h1:72ieWchfTx9U7UbQO47vhSXBoCi2IJGZhXoCezan4EM=
-github.com/openshift/custom-resource-status v1.1.2 h1:C3DL44LEbvlbItfd8mT5jWrqPfHnSOQoQf/sypqA6A4=
 github.com/openshift/custom-resource-status v1.1.2/go.mod h1:DB/Mf2oTeiAmVVX1gN+NEqweonAPY0TKUwADizj8+ZA=
+github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87 h1:cHyxR+Y8rAMT6m1jQCaYGRwikqahI0OjjUDhFNf3ySQ=
+github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87/go.mod h1:DB/Mf2oTeiAmVVX1gN+NEqweonAPY0TKUwADizj8+ZA=
 github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480 h1:y47BAJFepK8Xls1c+quIOyc46OXiT9LRiqGVjIaMlSA=
 github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480/go.mod h1:OAHL5WnZphlhVEf5fTdeGLvNwMu1B2zCWpmxJpCA35o=
 github.com/openshift/installer v0.9.0-master.0.20220711145509-cdb9627de7ef h1:y3d9tfJqoKLsUwOJHi3iPBYmJe4Ukj8n19SkUsZbVUA=

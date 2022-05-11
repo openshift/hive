@@ -24,12 +24,6 @@ func IsFakeCluster(cd *hivev1.ClusterDeployment) bool {
 	return fakeCluster && err == nil
 }
 
-func IsOnpremCustomized(cd *hivev1.ClusterDeployment) bool {
-	customized := cd.Spec.ClusterPoolRef != nil
-	onprem := cd.Spec.Platform.OpenStack != nil
-	return customized && onprem
-}
-
 // IsClusterPausedOrRelocating checks if the syncing to the cluster is paused or if the cluster is relocating
 func IsClusterPausedOrRelocating(cd *hivev1.ClusterDeployment, logger log.FieldLogger) bool {
 	if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused {

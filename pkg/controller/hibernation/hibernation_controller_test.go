@@ -26,7 +26,6 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/hibernation/mock"
@@ -1257,13 +1256,6 @@ func readyCondition(status corev1.ConditionStatus, reason string, lastTransition
 }
 
 type clusterDeploymentOptions struct{}
-
-func (*clusterDeploymentOptions) customized(cd *hivev1.ClusterDeployment) {
-	cd.Spec.Platform.OpenStack = &hivev1openstack.Platform{}
-	cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
-		CustomizationRef: &corev1.LocalObjectReference{Name: "cdc"},
-	}
-}
 
 func (*clusterDeploymentOptions) notInstalled(cd *hivev1.ClusterDeployment) {
 	cd.Spec.Installed = false

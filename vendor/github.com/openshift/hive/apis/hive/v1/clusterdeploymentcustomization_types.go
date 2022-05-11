@@ -6,25 +6,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LastApplyStatusType indicates the status of the customization on the last
-// applied cluster deployment. This is used for inventory sorting process to
-// reduce the likelihood of using a broken customization repeatedly.
-type LastApplyStatusType string
-
 const (
-	// LastApplySucceeded indicates that the customization
+	// CustomizationApplyReasonSucceeded indicates that the customization
 	// worked properly on the last applied cluster deployment.
-	LastApplySucceeded LastApplyStatusType = "Succeeded"
-	// LastApplyBrokenSyntax indicates that Hive failed to apply
+	CustomizationApplyReasonSucceeded = "Succeeded"
+	// CustomizationApplyReasonBrokenSyntax indicates that Hive failed to apply
 	// customization patches on install-config. More details would be found in
 	// Valid condition message.
-	LastApplyBrokenSyntax LastApplyStatusType = "BrokenBySyntax"
-	// LastApplyBrokenCloud indicates that cluster deployment provision has failed
+	CustomizationApplyReasonBrokenSyntax = "BrokenBySyntax"
+	// CustomizationApplyReasonBrokenCloud indicates that cluster deployment provision has failed
 	// when using this customization. More details would be found in the Valid condition message.
-	LastApplyBrokenCloud LastApplyStatusType = "BrokenByCloud"
-	// LastApplyInstallationPending indicates that the customization patches have
+	CustomizationApplyReasonBrokenCloud = "BrokenByCloud"
+	// CustomizationApplyReasonInstallationPending indicates that the customization patches have
 	// been successfully applied but provisioning is not completed yet.
-	LastApplyInstallationPending LastApplyStatusType = "InstallationPending"
+	CustomizationApplyReasonInstallationPending = "InstallationPending"
 )
 
 // +genclient
@@ -74,13 +69,9 @@ type ClusterDeploymentCustomizationStatus struct {
 	// +optional
 	ClusterPoolRef *corev1.LocalObjectReference `json:"clusterPoolRef,omitempty"`
 
-	// LastApplyTime indicates the time when the customization was applied on a cluster deployment.
+	// LastAppliedConfiguration contains the last applied patches to the install-config.
 	// +optional
-	LastApplyTime metav1.Time `json:"lastApplyTime,omitempty"`
-
-	// LastApplyStatus indicates the customization status in the last applied cluster deployment.
-	// +optional
-	LastApplyStatus LastApplyStatusType `json:"lastApplyStatus,omitempty"`
+	LastAppliedConfiguration string `json:"lastAppliedConfiguration,omitempty"`
 
 	// Conditions describes the state of the operator's reconciliation functionality.
 	// +patchMergeKey=type
@@ -90,7 +81,7 @@ type ClusterDeploymentCustomizationStatus struct {
 }
 
 const (
-	ClusterDeploymentCustomizationValid conditionsv1.ConditionType = "Valid"
+	ApplySucceededCondition conditionsv1.ConditionType = "ApplySucceeded"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

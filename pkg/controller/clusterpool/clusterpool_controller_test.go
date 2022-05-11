@@ -310,12 +310,9 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcp.WithInventory([]string{"test-cdc-successful-old", "test-cdc-unused-new"}),
 				),
 				testcdc.FullBuilder(testNamespace, "test-cdc-successful-old", scheme).Build(
-					testcdc.WithLastStatus(hivev1.LastApplySucceeded),
-					testcdc.WithLastTime(nowish.Add(-time.Hour)),
+					testcdc.WithApplySucceeded(hivev1.CustomizationApplyReasonSucceeded, nowish.Add(-time.Hour)),
 				),
-				testcdc.FullBuilder(testNamespace, "test-cdc-unused-new", scheme).Build(
-					testcdc.WithLastTime(nowish),
-				),
+				testcdc.FullBuilder(testNamespace, "test-cdc-unused-new", scheme).Build(),
 			},
 			expectedTotalClusters:        1,
 			expectedInventoryVaildStatus: corev1.ConditionTrue,
@@ -332,12 +329,10 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcp.WithInventory([]string{"test-cdc-successful-new", "test-cdc-broken-old"}),
 				),
 				testcdc.FullBuilder(testNamespace, "test-cdc-broken-old", scheme).Build(
-					testcdc.WithLastStatus(hivev1.LastApplySucceeded),
-					testcdc.WithLastTime(nowish.Add(-time.Hour)),
+					testcdc.WithApplySucceeded(hivev1.CustomizationApplyReasonSucceeded, nowish.Add(-time.Hour)),
 				),
 				testcdc.FullBuilder(testNamespace, "test-cdc-successful-new", scheme).Build(
-					testcdc.WithLastStatus(hivev1.LastApplyBrokenCloud),
-					testcdc.WithLastTime(nowish),
+					testcdc.WithApplySucceeded(hivev1.CustomizationApplyReasonBrokenCloud, nowish),
 				),
 			},
 			expectedTotalClusters:        1,
@@ -349,10 +344,12 @@ func TestReconcileClusterPool(t *testing.T) {
 		{
 			name: "cp with inventory - release cdc when cd is missing",
 			existing: []runtime.Object{
-				inventoryPoolBuilder.Build(testcp.WithSize(1)),
-				testcdc.FullBuilder(testNamespace, "test-cdc-broken-old", scheme).Build(
-					testcdc.WithLastStatus(hivev1.LastApplySucceeded),
-					testcdc.WithLastTime(nowish.Add(-time.Hour)),
+				inventoryPoolBuilder.Build(
+					testcp.WithSize(1),
+					testcp.WithInventory([]string{"test-cdc-1"}),
+				),
+				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(
+					testcdc.WithApplySucceeded(hivev1.CustomizationApplyReasonSucceeded, nowish.Add(-time.Hour)),
 					testcdc.WithPool(testLeasePoolName),
 					testcdc.WithCD("c1"),
 					testcdc.Reserved(),
@@ -360,13 +357,15 @@ func TestReconcileClusterPool(t *testing.T) {
 			},
 			expectedTotalClusters: 1,
 			expectedPoolVersion:   "06983eaafac7f695",
-			expectedAssignedCDCs:  0,
+			expectedAssignedCDCs:  1, // The CDC will be assigned to a new cluster
 		},
-		// ####################
 		{
 			name: "cp with inventory - fix cdc when cd reference exists",
 			existing: []runtime.Object{
-				inventoryPoolBuilder.Build(testcp.WithSize(1)),
+				inventoryPoolBuilder.Build(
+					testcp.WithSize(1),
+					testcp.WithInventory([]string{"test-cdc-1"}),
+				),
 				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(
 					testcdc.Available(),
 				),
@@ -378,7 +377,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:   1,
 			expectedObservedSize:    1,
 			expectedPoolVersion:     "06983eaafac7f695",
-			expectedAssignedCDCs:    0,
+			expectedAssignedCDCs:    1,
 			expectedCDCurrentStatus: corev1.ConditionUnknown,
 		},
 		{
@@ -1616,9 +1615,6 @@ func TestReconcileClusterPool(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if test.name != "cp with inventory - fix cdc when cd reference exists" {
-			// continue
-		}
 		t.Run(test.name, func(t *testing.T) {
 			if !test.noClusterImageSet {
 				test.existing = append(
@@ -1661,7 +1657,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			} else {
 				assert.NoError(t, err, "expected no error from reconcile")
 			}
-
+			cdcs := &hivev1.ClusterDeploymentCustomizationList{}
+			fakeClient.List(context.Background(), cdcs)
 			pool := &hivev1.ClusterPool{}
 			err = fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)
 
@@ -1808,7 +1805,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			assert.Equal(t, test.expectedUnassignedClaims, actualUnassignedClaims, "unexpected number of unassigned claims")
 
 			actualAssignedCDCs := 0
-			cdcs := &hivev1.ClusterDeploymentCustomizationList{}
+			// cdcs := &hivev1.ClusterDeploymentCustomizationList{}
 			err = fakeClient.List(context.Background(), cdcs)
 			require.NoError(t, err)
 			for _, cdc := range cdcs.Items {

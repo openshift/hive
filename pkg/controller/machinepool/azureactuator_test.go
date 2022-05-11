@@ -1,6 +1,7 @@
 package machinepool
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -25,6 +26,7 @@ func TestAzureActuator(t *testing.T) {
 		clusterDeployment          *hivev1.ClusterDeployment
 		pool                       *hivev1.MachinePool
 		expectedMachineSetReplicas map[string]int64
+		expectedImage              *machineapi.Image
 		expectedErr                bool
 	}{
 		{
@@ -33,6 +35,9 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1"})
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 3,
@@ -44,6 +49,9 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -59,7 +67,11 @@ func TestAzureActuator(t *testing.T) {
 				pool.Spec.Platform.Azure.Zones = []string{"zone1", "zone2", "zone3"}
 				return pool
 			}(),
-			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {},
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
+			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
 				generateAzureMachineSetName("zone2"): 1,
@@ -76,6 +88,9 @@ func TestAzureActuator(t *testing.T) {
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 2,
@@ -89,6 +104,9 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3", "zone4", "zone5"})
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAzureMachineSetName("zone1"): 1,
@@ -104,8 +122,79 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{})
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
 			},
 			expectedErr: true,
+		},
+		{
+			name:              "V2 image does not exist, don't check if instance can support V2",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+			expectedImage: &machineapi.Image{
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345",
+			},
+		},
+		{
+			name:              "default V2 image exists and instance supports V2 images",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetHyperVGeneration(mockCtrl, client, "V2")
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV2),
+				})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+			expectedImage: &machineapi.Image{
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345-gen2",
+			},
+		},
+		{
+			name:              "machinepool provides osImage",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool: func() *hivev1.MachinePool {
+				mp := testAzurePool()
+				mp.Spec.Platform.Azure.OSImage = hivev1azure.OSImage{
+					Publisher: "testpublisher",
+					Offer:     "testoffer",
+					SKU:       "testsku",
+					Version:   "testversion",
+				}
+				return mp
+			}(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+			expectedImage: &machineapi.Image{
+				Publisher: "testpublisher",
+				Offer:     "testoffer",
+				SKU:       "testsku",
+				Version:   "testversion",
+				Type:      "MarketplaceWithPlan",
+			},
 		},
 	}
 
@@ -130,13 +219,13 @@ func TestAzureActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
+				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage)
 			}
 		})
 	}
 }
 
-func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64) {
+func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedImage *machineapi.Image) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -148,6 +237,9 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 		azureProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)
 		if assert.True(t, ok, "failed to convert to azureProviderSpec") {
 			assert.Equal(t, testInstanceType, azureProvider.VMSize, "unexpected instance type")
+		}
+		if expectedImage != nil {
+			assert.Equal(t, expectedImage, &azureProvider.Image)
 		}
 	}
 }
@@ -171,6 +263,17 @@ func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockCli
 	)
 }
 
+func mockGetHyperVGeneration(mockCtrl *gomock.Controller, client *mockazure.MockClient, hyperVGen string) {
+	client.EXPECT().GetHyperVGenerationVersion(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(hyperVGen, nil)
+}
+
+func mockListImagesByResourceGroup(mockCtrl *gomock.Controller, client *mockazure.MockClient, images []compute.Image) {
+	resultPage := compute.NewImageListResultPage(compute.ImageListResult{Value: &images}, func(context.Context, compute.ImageListResult) (compute.ImageListResult, error) {
+		return compute.ImageListResult{}, nil
+	})
+	client.EXPECT().ListImagesByResourceGroup(gomock.Any(), gomock.Any()).Return(&resultPage, nil)
+}
+
 func generateAzureMachineSetName(zone string) string {
 	return fmt.Sprintf("%s-%s-%s%s", testInfraID, testPoolName, testRegion, zone)
 }
@@ -180,6 +283,10 @@ func testAzurePool() *hivev1.MachinePool {
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
 		Azure: &hivev1azure.MachinePool{
 			InstanceType: testInstanceType,
+			OSDisk: hivev1azure.OSDisk{
+				DiskSizeGB: 120,
+				DiskType:   hivev1azure.DefaultDiskType,
+			},
 		},
 	}
 	return p
@@ -196,4 +303,12 @@ func testAzureClusterDeployment() *hivev1.ClusterDeployment {
 		},
 	}
 	return cd
+}
+
+func testAzureImage(hyperVGen compute.HyperVGenerationTypes) compute.Image {
+	return compute.Image{
+		ImageProperties: &compute.ImageProperties{
+			HyperVGeneration: hyperVGen,
+		},
+	}
 }

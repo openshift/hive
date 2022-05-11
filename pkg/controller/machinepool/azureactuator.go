@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	"github.com/pkg/errors"
@@ -73,6 +74,48 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		},
 	}
 
+	if pool.Spec.Platform.Azure.OSDisk.DiskType != "" {
+		computePool.Platform.Azure.OSDisk.DiskType = pool.Spec.Platform.Azure.OSDisk.DiskType
+	}
+
+	if diskEncryptionSet := pool.Spec.Platform.Azure.OSDisk.DiskEncryptionSet; diskEncryptionSet != nil {
+		computePool.Platform.Azure.OSDisk.DiskEncryptionSet = &installertypesazure.DiskEncryptionSet{
+			SubscriptionID: diskEncryptionSet.SubscriptionID,
+			ResourceGroup:  diskEncryptionSet.ResourceGroup,
+			Name:           diskEncryptionSet.Name,
+		}
+	}
+
+	var hyperVGen string
+	if osImage := pool.Spec.Platform.Azure.OSImage; osImage.Publisher != "" {
+		computePool.Platform.Azure.OSImage = installertypesazure.OSImage{
+			Publisher: osImage.Publisher,
+			Offer:     osImage.Offer,
+			SKU:       osImage.SKU,
+			Version:   osImage.Version,
+		}
+	} else {
+		// An image was not provided so check if the installer created a "gen2" image
+		// to determine if we should allow resultant machinesets to consume a "gen2" image.
+		gen2ImageExists, err := a.gen2ImageExists(cd.Spec.ClusterMetadata.InfraID, ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
+		if err != nil {
+			return nil, false, err
+		}
+		if gen2ImageExists {
+			// Get HyperV Generation to provide to installer machineset generation. The HyperV Generation is germane to the instance/disk
+			// type and affects the image used for the instance. "-gen-2" will be appended to the image name when the
+			// hyperVGen == "V2".
+			hyperVGen, err = a.client.GetHyperVGenerationVersion(context.TODO(),
+				computePool.Platform.Azure.InstanceType,
+				computePool.Platform.Azure.OSDisk.DiskType,
+				cd.Spec.Platform.Azure.Region,
+			)
+			if err != nil {
+				return nil, false, err
+			}
+		}
+	}
+
 	if len(computePool.Platform.Azure.Zones) == 0 {
 		zones, err := a.getZones(cd.Spec.Platform.Azure.Region, pool.Spec.Platform.Azure.InstanceType)
 		if err != nil {
@@ -94,6 +137,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		imageID,
 		workerRole,
 		workerUserDataName,
+		hyperVGen,
 	)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
@@ -117,4 +161,33 @@ func (a *AzureActuator) getZones(region string, instanceType string) ([]string, 
 	}
 
 	return nil, err
+}
+
+func (a *AzureActuator) getImagesByResourceGroup(resourceGroupName string) ([]compute.Image, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	var images []compute.Image
+	var res azureclient.ImageListResultPage
+	var err error
+	for res, err = a.client.ListImagesByResourceGroup(ctx, resourceGroupName); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
+		for _, image := range res.Values() {
+			images = append(images, image)
+		}
+	}
+
+	return images, err
+}
+
+func (a *AzureActuator) gen2ImageExists(infraID, resourceGroupName string) (bool, error) {
+	images, err := a.getImagesByResourceGroup(resourceGroupName)
+	if err != nil {
+		return false, errors.Wrapf(err, "error listing images by resourceGroup: %s", resourceGroupName)
+	}
+	for _, image := range images {
+		if image.ImageProperties.HyperVGeneration == compute.HyperVGenerationTypesV2 {
+			return true, nil
+		}
+	}
+	return false, nil
 }

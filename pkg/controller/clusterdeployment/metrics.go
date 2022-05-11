@@ -21,14 +21,14 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_install_job_duration_seconds",
 			Help:    "Distribution of the runtime of completed install jobs.",
-			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
+			Buckets: []float64{1800, 2400, 3000, 3600, 4500, 5400, 7200},
 		},
 	)
 	metricInstallDelaySeconds = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_install_job_delay_seconds",
 			Help:    "Time between cluster deployment creation and creation of the job to install/provision the cluster.",
-			Buckets: []float64{30, 60, 120, 300, 600, 1200, 1800},
+			Buckets: []float64{60, 120, 180, 240, 300, 600, 1200, 1800, 2700, 3600},
 		},
 	)
 	metricImageSetDelaySeconds = prometheus.NewHistogram(

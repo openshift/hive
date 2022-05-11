@@ -61,8 +61,8 @@ func (q *azureQuery) Get(domain string) (map[string]sets.String, error) {
 	return currentNameServers, errors.Wrap(err, "error querying name servers")
 }
 
-// Create implements Query.Create.
-func (q *azureQuery) Create(rootDomain string, domain string, values sets.String) error {
+// CreateOrUpdate implements Query.Create.
+func (q *azureQuery) CreateOrUpdate(rootDomain string, domain string, values sets.String) error {
 	azureClient, err := q.getAzureClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get Azure client")

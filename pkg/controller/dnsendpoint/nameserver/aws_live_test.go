@@ -82,7 +82,7 @@ func (s *LiveAWSTestSuite) TestCreateAndDelete() {
 			cut := s.getCUT()
 			domain := fmt.Sprintf("live-aws-test-%08d.%s", rand.Intn(100000000), s.rootDomain)
 			s.T().Logf("domain = %q", domain)
-			err := cut.Create(s.rootDomain, domain, sets.NewString(tc.createValues...))
+			err := cut.CreateOrUpdate(s.rootDomain, domain, sets.NewString(tc.createValues...))
 			if s.NoError(err, "unexpected error creating NS") {
 				defer func() {
 					err := cut.Delete(s.rootDomain, domain, sets.NewString(tc.deleteValues...))

@@ -47,8 +47,8 @@ func (q *awsQuery) Get(domain string) (map[string]sets.String, error) {
 	return currentNameServers, errors.Wrap(err, "error querying name servers")
 }
 
-// Create implements Query.Create.
-func (q *awsQuery) Create(rootDomain string, domain string, values sets.String) error {
+// CreateOrUpdate implements Query.CreateOrUpdate.
+func (q *awsQuery) CreateOrUpdate(rootDomain string, domain string, values sets.String) error {
 	awsClient, err := q.getAWSClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get AWS client")

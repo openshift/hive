@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/golang/mock/gomock"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,7 @@ import (
 	awshivev1 "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -49,6 +51,7 @@ func TestAWSActuator(t *testing.T) {
 		expectedCondition            *hivev1.MachinePoolCondition
 		expectedKMSKey               string
 		expectedAMI                  *awsprovider.AWSResourceReference
+		expectedSGFilters            []awsprovider.Filter
 	}{
 		{
 			name:              "generate single machineset for single zone",
@@ -453,6 +456,86 @@ func TestAWSActuator(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:              "machinepool has an ExtraWorkerSecurityGroup annotation",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Annotations = map[string]string{
+					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+				}
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				firstCall := mockDescribeSubnets(client, []string{"zone1", "zone2"},
+					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
+				// When an ExtraWorkerSecurityGroup annotation is configured we query the subnets for the first subnet
+				// in the list configured for a MachinePool to discover the VPC ID of the subnet.
+				mockDescribeSubnets(client, []string{"zone1"},
+					[]string{"subnet-zone1"}, []string{}, "vpc-1").After(firstCall)
+				mockDescribeRouteTables(client,
+					map[string]bool{
+						"subnet-zone1":    false,
+						"subnet-zone2":    false,
+						"pubSubnet-zone1": true,
+						"pubSubnet-zone2": true,
+					},
+					"vpc-1")
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 2,
+				generateAWSMachineSetName("zone2"): 1,
+			},
+			expectedAMI: &awsprovider.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
+			expectedSGFilters: []awsprovider.Filter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"foo-12345-worker-sg", "extra-security-group"},
+				},
+				{
+					Name:   "vpc-id",
+					Values: []string{"vpc-1"},
+				},
+			},
+		},
+		{
+			name:              "machinepool has an ExtraWorkerSecurityGroup annotation but has no subnets",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Annotations = map[string]string{
+					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+				}
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			expectedErr:   true,
+		},
+		{
+			name:              "machinepool has an ExtraWorkerSecurityGroup annotation but no subnets found in AWS",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Annotations = map[string]string{
+					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+				}
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				client.EXPECT().DescribeSubnets(gomock.Any()).Return(&ec2.DescribeSubnetsOutput{Subnets: []*ec2.Subnet{}}, errors.New("not found"))
+			},
+			expectedErr: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -488,7 +571,7 @@ func TestAWSActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey, test.expectedAMI)
+				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey, test.expectedAMI, test.expectedSGFilters)
 			}
 			if test.expectedCondition != nil {
 				cond := controllerutils.FindMachinePoolCondition(pool.Status.Conditions, test.expectedCondition.Type)
@@ -538,7 +621,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 }
 
-func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *awsprovider.AWSResourceReference) {
+func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *awsprovider.AWSResourceReference, expectedSGFilters []awsprovider.Filter) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -568,10 +651,13 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 			assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID")
 			assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
 		}
+		if expectedSGFilters != nil {
+			assert.Equal(t, awsProvider.SecurityGroups[0].Filters, expectedSGFilters, "unexpected security group filters")
+		}
 	}
 }
 
-func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) {
+func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) *gomock.Call {
 	input := &ec2.DescribeAvailabilityZonesInput{
 		Filters: []*ec2.Filter{{
 			Name:   pointer.StringPtr("region-name"),
@@ -587,10 +673,10 @@ func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) {
 	output := &ec2.DescribeAvailabilityZonesOutput{
 		AvailabilityZones: availabilityZones,
 	}
-	client.EXPECT().DescribeAvailabilityZones(input).Return(output, nil)
+	return client.EXPECT().DescribeAvailabilityZones(input).Return(output, nil)
 }
 
-func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubnetIDs []string, pubSubnetIDs []string, vpcID string) {
+func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubnetIDs []string, pubSubnetIDs []string, vpcID string) *gomock.Call {
 	idPointers := make([]*string, 0, len(privateSubnetIDs)+len(pubSubnetIDs))
 	for _, id := range privateSubnetIDs {
 		idPointers = append(idPointers, aws.String(id))
@@ -623,10 +709,10 @@ func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubn
 	output := &ec2.DescribeSubnetsOutput{
 		Subnets: subnets,
 	}
-	client.EXPECT().DescribeSubnets(input).Return(output, nil)
+	return client.EXPECT().DescribeSubnets(input).Return(output, nil)
 }
 
-func mockDescribeMissingSubnets(client *mockaws.MockClient, subnetIDs []string) {
+func mockDescribeMissingSubnets(client *mockaws.MockClient, subnetIDs []string) *gomock.Call {
 	idPointers := make([]*string, 0, len(subnetIDs))
 	for _, id := range subnetIDs {
 		idPointers = append(idPointers, aws.String(id))
@@ -634,10 +720,10 @@ func mockDescribeMissingSubnets(client *mockaws.MockClient, subnetIDs []string) 
 	input := &ec2.DescribeSubnetsInput{
 		SubnetIds: idPointers,
 	}
-	client.EXPECT().DescribeSubnets(input).Return(nil, fmt.Errorf("InvalidSubnets"))
+	return client.EXPECT().DescribeSubnets(input).Return(nil, fmt.Errorf("InvalidSubnets"))
 }
 
-func mockDescribeRouteTables(client *mockaws.MockClient, subnets map[string]bool, vpc string) {
+func mockDescribeRouteTables(client *mockaws.MockClient, subnets map[string]bool, vpc string) *gomock.Call {
 	input := &ec2.DescribeRouteTablesInput{
 		Filters: []*ec2.Filter{{
 			Name:   aws.String("vpc-id"),
@@ -649,7 +735,7 @@ func mockDescribeRouteTables(client *mockaws.MockClient, subnets map[string]bool
 		RouteTables: constructRouteTables(subnets),
 	}
 
-	client.EXPECT().DescribeRouteTables(input).Return(output, nil)
+	return client.EXPECT().DescribeRouteTables(input).Return(output, nil)
 }
 
 // Takes a list of subnets with bool indicating if the corresponding subnet is public

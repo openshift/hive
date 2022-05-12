@@ -227,9 +227,17 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		}
 	}
 
+	var vpcID string
+	if metav1.HasAnnotation(pool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) {
+		vpcID, err = GetVPCIDForMachinePool(a.awsClient, pool)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
 	// Re-use existing AWS resources for generated MachineSets.
 	for _, ms := range installerMachineSets {
-		a.updateProviderConfig(ms, cd.Spec.ClusterMetadata.InfraID, pool)
+		a.updateProviderConfig(ms, cd.Spec.ClusterMetadata.InfraID, pool, vpcID)
 	}
 
 	return installerMachineSets, true, nil
@@ -300,7 +308,7 @@ func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.
 // updateProviderConfig modifies values in a MachineSet's AWSMachineProviderConfig.
 // Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
 // the values match the worker pool originally created by the installer.
-func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, infraID string, pool *hivev1.MachinePool) {
+func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, infraID string, pool *hivev1.MachinePool, vpcID string) {
 	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsproviderv1beta1.AWSMachineProviderConfig)
 
 	// TODO: assumptions about pre-existing objects by name here is quite dangerous, it's already
@@ -329,8 +337,14 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 	//
 	// NOTE: modifying the security group of an existing MachineSet will NOT result in updates to the
 	// corresponding instances in AWS and will only be configured for newly created instances.
-	if metav1.HasAnnotation(pool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) {
+	if metav1.HasAnnotation(pool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) && vpcID != "" {
+		// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
+		// annotation found on the MachinePool to the existing tag:Name filter in the worker
+		// MachineSet manifest
 		providerConfig.SecurityGroups[0].Filters[0].Values = append(providerConfig.SecurityGroups[0].Filters[0].Values, pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
+		// Add a filter for the vpcID since the names of security groups may be the same within a
+		// given AWS account. HIVE-1874
+		providerConfig.SecurityGroups[0].Filters = append(providerConfig.SecurityGroups[0].Filters, awsproviderv1beta1.Filter{Name: "vpc-id", Values: []string{vpcID}})
 	}
 
 	if pool.Spec.Platform.AWS.SpotMarketOptions != nil {
@@ -342,7 +356,6 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 	machineSet.Spec.Template.Spec.ProviderSpec = machineapi.ProviderSpec{
 		Value: &runtime.RawExtension{Object: providerConfig},
 	}
-
 }
 
 // getPrivateSubnetsByAvailabilityZones maps availability zones to private subnet
@@ -561,4 +574,30 @@ func (a *AWSActuator) validateSubnets(subnets map[string]ec2.Subnet, pool *hivev
 		return nil, errors.Errorf("more than one subnet found for some availability zones, conflicting subnets: %s", strings.Join(conflictingSubnets.List(), ", "))
 	}
 	return subnetsByAvailabilityZone, nil
+}
+
+// GetVPCIDForMachinePool retrieves the VPC ID of the first subnet configured in pool.Spec.Platform.AWS.Subnets
+// using the provided AWS Client.
+func GetVPCIDForMachinePool(awsClient awsclient.Client, pool *hivev1.MachinePool) (string, error) {
+	if len(pool.Spec.Platform.AWS.Subnets) == 0 {
+		return "", errors.New("MachinePool platform contains no subnets, cannot retrieve VPC ID")
+	}
+	subnetID := pool.Spec.Platform.AWS.Subnets[0]
+	subnetsOutput, err := awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{
+		SubnetIds: []*string{
+			aws.String(subnetID),
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	// An error should be produced if no subnets are returned. This is here as a safety net.
+	if len(subnetsOutput.Subnets) == 0 {
+		return "", errors.Errorf("DescribeSubnets unexpectedly returned no results for subnet ID %s", subnetID)
+	}
+	vpcID := *subnetsOutput.Subnets[0].VpcId
+	if vpcID == "" {
+		return "", errors.Errorf("DescribeSubnets unexpectedly returned a subnet without a VPC ID %s", subnetID)
+	}
+	return vpcID, nil
 }

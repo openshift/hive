@@ -70,6 +70,7 @@ type ClusterDeploymentCustomizationStatus struct {
 	ClusterPoolRef *corev1.LocalObjectReference `json:"clusterPoolRef,omitempty"`
 
 	// LastAppliedConfiguration contains the last applied patches to the install-config.
+	// The information will retain for reference in case the customization is updated.
 	// +optional
 	LastAppliedConfiguration string `json:"lastAppliedConfiguration,omitempty"`
 

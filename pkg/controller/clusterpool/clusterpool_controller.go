@@ -174,11 +174,42 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	}
 
 	// Watch for changes to ClusterDeploymentCustomizations
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeploymentCustomization{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(
+		&source.Kind{Type: &hivev1.ClusterDeploymentCustomization{}},
+		handler.EnqueueRequestsFromMapFunc(
+			requestsForCDCResources(r.Client, r.logger)),
+	); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
+	return func(o client.Object) []reconcile.Request {
+		_, ok := o.(*hivev1.ClusterDeploymentCustomization)
+		if !ok {
+			return nil
+		}
+
+		cpList := &hivev1.ClusterPoolList{}
+		if err := c.List(context.Background(), cpList, client.InNamespace(o.GetNamespace())); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to list cluster pools for CDC resource")
+			return nil
+		}
+
+		var requests []reconcile.Request
+		for _, cpl := range cpList.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: cpl.Namespace,
+					Name:      cpl.Name,
+				},
+			})
+		}
+
+		return requests
+	}
 }
 
 func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
@@ -794,7 +825,7 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 
 	installConfig, err := newPatch.Apply([]byte(secret.StringData["install-config.yaml"]))
 	if err != nil {
-		cdcs.BrokenSyntax(r, cdc, fmt.Sprint(err))
+		cdcs.BrokenBySyntax(r, cdc, fmt.Sprint(err))
 		cdcs.UpdateInventoryValidCondition(r, clp)
 		return err
 	}
@@ -804,12 +835,14 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 		return err
 	}
 
-	cdc.Status.LastAppliedConfiguration = string(configJson)
-	cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: clp.Name}
-	if err := cdcs.Reserve(r, cdc); err != nil {
+	if err := cdcs.Reserve(r, cdc, cd.Name, clp.Name); err != nil {
+		return err
+	}
+	if err := cdcs.InstallationPending(r, cdc); err != nil {
 		return err
 	}
 
+	cdc.Status.LastAppliedConfiguration = string(configJson)
 	secret.StringData["install-config.yaml"] = string(installConfig)
 	return nil
 }

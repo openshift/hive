@@ -1442,13 +1442,14 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 }
 
 func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	if cpRef := cd.Spec.ClusterPoolRef; cpRef == nil || cpRef.CustomizationRef == nil {
+	cpRef := cd.Spec.ClusterPoolRef
+	if cpRef == nil || cpRef.CustomizationRef == nil {
 		return nil
 	}
 
 	cdc := &hivev1.ClusterDeploymentCustomization{}
-	cdcNamespace := cd.Spec.ClusterPoolRef.Namespace
-	cdcName := cd.Spec.ClusterPoolRef.CustomizationRef.Name
+	cdcNamespace := cpRef.Namespace
+	cdcName := cpRef.CustomizationRef.Name
 	cdcLog := cdLog.WithField("customization", cdcName).WithField("namespace", cdcNamespace)
 	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: cdcNamespace, Name: cdcName}, cdc)
 	if err != nil {
@@ -1462,14 +1463,18 @@ func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDepl
 
 	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
 		Type:    conditionsv1.ConditionAvailable,
-		Status:  corev1.ConditionFalse,
+		Status:  corev1.ConditionTrue,
 		Reason:  "Available",
 		Message: "available",
 	})
 
-	if changed {
+	if cdc.Status.ClusterPoolRef != nil || cdc.Status.ClusterDeploymentRef != nil {
 		cdc.Status.ClusterPoolRef = nil
 		cdc.Status.ClusterDeploymentRef = nil
+		changed = true
+	}
+
+	if changed {
 		if err := r.Status().Update(context.Background(), cdc); err != nil {
 			cdcLog.WithError(err).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
 			return err

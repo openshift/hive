@@ -445,7 +445,6 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 
 func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable bool, dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
 	orig := dnsZone.DeepCopy()
-	logger.Debug("Updating DNSZone status")
 
 	dnsZone.Status.NameServers = nameServers
 
@@ -474,6 +473,7 @@ func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable boo
 		controllerutils.UpdateConditionNever)
 
 	if !reflect.DeepEqual(orig.Status, dnsZone.Status) {
+		logger.Debug("Updating DNSZone status")
 		err := r.Client.Status().Update(context.TODO(), dnsZone)
 		if err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "Cannot update DNSZone status")

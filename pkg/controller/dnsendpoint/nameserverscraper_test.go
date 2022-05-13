@@ -32,20 +32,20 @@ func TestGetEndpoint(t *testing.T) {
 		{
 			name: "no root domain",
 			nameServers: rootDomainsMap{
-				"other-domain": nameServersMap{},
+				"other-domain": endpointsBySubdomain{},
 			},
 		},
 		{
 			name: "empty root domain",
 			nameServers: rootDomainsMap{
-				"domain.com": nameServersMap{},
+				"domain.com": endpointsBySubdomain{},
 			},
 			expectRootDomain: true,
 		},
 		{
 			name: "no domain",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 				},
 			},
@@ -54,7 +54,7 @@ func TestGetEndpoint(t *testing.T) {
 		{
 			name: "single namespace value",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					domain: endpointState{
 						nsValues: sets.NewString("test-value"),
 					},
@@ -66,7 +66,7 @@ func TestGetEndpoint(t *testing.T) {
 		{
 			name: "multiple namespace values",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					domain: endpointState{
 						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
 					},
@@ -78,7 +78,7 @@ func TestGetEndpoint(t *testing.T) {
 		{
 			name: "many root domains and domains",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					domain: endpointState{
 						nsValues: sets.NewString("test-value"),
 					},
@@ -86,7 +86,7 @@ func TestGetEndpoint(t *testing.T) {
 						nsValues: sets.NewString("other-value"),
 					},
 				},
-				"other-domain": nameServersMap{
+				"other-domain": endpointsBySubdomain{
 					"sub-domain.other-domain": endpointState{
 						nsValues: sets.NewString("another-value"),
 					},
@@ -98,7 +98,7 @@ func TestGetEndpoint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := &nameServerScraper{nameServers: tc.nameServers}
+			cut := &nameServerScraper{rootDomainsMap: tc.nameServers}
 			actualRootDomain, actualValues := cut.GetEndpoint("test.domain.com")
 			if tc.expectRootDomain {
 				assert.Equal(t, "domain.com", actualRootDomain, "unexpected root domain")
@@ -125,19 +125,19 @@ func TestAddEndpoint(t *testing.T) {
 		{
 			name: "no root domain",
 			nameServers: rootDomainsMap{
-				"other-domain": nameServersMap{},
+				"other-domain": endpointsBySubdomain{},
 			},
 			expectedNameServers: rootDomainsMap{
-				"other-domain": nameServersMap{},
+				"other-domain": endpointsBySubdomain{},
 			},
 		},
 		{
 			name: "empty root domain",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{},
+				rootDomain: endpointsBySubdomain{},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					domain: endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: values,
@@ -148,12 +148,12 @@ func TestAddEndpoint(t *testing.T) {
 		{
 			name: "no domain",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
 						dnsZone:  testDNSZone(),
@@ -165,7 +165,7 @@ func TestAddEndpoint(t *testing.T) {
 		{
 			name: "update domain",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					domain: endpointState{
 						dnsZone: func() *hivev1.DNSZone {
 							dz := testDNSZone()
@@ -178,7 +178,7 @@ func TestAddEndpoint(t *testing.T) {
 				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					domain: endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: values,
@@ -189,22 +189,22 @@ func TestAddEndpoint(t *testing.T) {
 		{
 			name: "multiple root domains",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 				},
-				"other-domain": nameServersMap{
+				"other-domain": endpointsBySubdomain{
 					"subdomain.other-domain": endpointState{},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: values,
 					},
 				},
-				"other-domain": nameServersMap{
+				"other-domain": endpointsBySubdomain{
 					"subdomain.other-domain": endpointState{},
 				},
 			},
@@ -212,9 +212,9 @@ func TestAddEndpoint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := &nameServerScraper{nameServers: tc.nameServers}
-			cut.AddEndpoint(testDNSZone(), domain, values)
-			assert.Equal(t, tc.expectedNameServers, cut.nameServers, "unexpected changes to name servers")
+			cut := &nameServerScraper{rootDomainsMap: tc.nameServers}
+			cut.SyncEndpoint(testDNSZone(), domain, values)
+			assert.Equal(t, tc.expectedNameServers, cut.rootDomainsMap, "unexpected changes to name servers")
 		})
 	}
 }
@@ -233,30 +233,30 @@ func TestRemoveEndpoint(t *testing.T) {
 		{
 			name: "no root domain",
 			nameServers: rootDomainsMap{
-				"other-domain": nameServersMap{},
+				"other-domain": endpointsBySubdomain{},
 			},
 			expectedNameServers: rootDomainsMap{
-				"other-domain": nameServersMap{},
+				"other-domain": endpointsBySubdomain{},
 			},
 		},
 		{
 			name: "empty root domain",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{},
+				rootDomain: endpointsBySubdomain{},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{},
+				rootDomain: endpointsBySubdomain{},
 			},
 		},
 		{
 			name: "no domain",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 				},
 			},
@@ -264,7 +264,7 @@ func TestRemoveEndpoint(t *testing.T) {
 		{
 			name: "remove domain",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					domain: endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
@@ -272,28 +272,28 @@ func TestRemoveEndpoint(t *testing.T) {
 				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{},
+				rootDomain: endpointsBySubdomain{},
 			},
 		},
 		{
 			name: "multiple root domains",
 			nameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 					domain: endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
 					},
 				},
-				"other-domain": nameServersMap{
+				"other-domain": endpointsBySubdomain{
 					"subdomain.other-domain": endpointState{},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nameServersMap{
+				rootDomain: endpointsBySubdomain{
 					"other.domain.com": endpointState{},
 				},
-				"other-domain": nameServersMap{
+				"other-domain": endpointsBySubdomain{
 					"subdomain.other-domain": endpointState{},
 				},
 			},
@@ -301,9 +301,9 @@ func TestRemoveEndpoint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := &nameServerScraper{nameServers: tc.nameServers}
+			cut := &nameServerScraper{rootDomainsMap: tc.nameServers}
 			cut.RemoveEndpoint(domain)
-			assert.Equal(t, tc.expectedNameServers, cut.nameServers, "unexpected changes to name servers")
+			assert.Equal(t, tc.expectedNameServers, cut.rootDomainsMap, "unexpected changes to name servers")
 		})
 	}
 }
@@ -418,7 +418,7 @@ func TestScrape(t *testing.T) {
 			name:        "update domain",
 			rootDomains: []string{"domain.com"},
 			nameServers: rootDomainsMap{
-				"domain.com": nameServersMap{
+				"domain.com": endpointsBySubdomain{
 					"test.domain.com": endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("old-value"),
@@ -435,7 +435,7 @@ func TestScrape(t *testing.T) {
 					)
 			},
 			expectedNameServers: rootDomainsMap{
-				"domain.com": nameServersMap{
+				"domain.com": endpointsBySubdomain{
 					"test.domain.com": endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
@@ -448,7 +448,7 @@ func TestScrape(t *testing.T) {
 			name:        "no changes to domain",
 			rootDomains: []string{"domain.com"},
 			nameServers: rootDomainsMap{
-				"domain.com": nameServersMap{
+				"domain.com": endpointsBySubdomain{
 					"test.domain.com": endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
@@ -465,7 +465,7 @@ func TestScrape(t *testing.T) {
 					)
 			},
 			expectedNameServers: rootDomainsMap{
-				"domain.com": nameServersMap{
+				"domain.com": endpointsBySubdomain{
 					"test.domain.com": endpointState{
 						dnsZone:  testDNSZone(),
 						nsValues: sets.NewString("test-value"),
@@ -477,7 +477,7 @@ func TestScrape(t *testing.T) {
 			name:        "update multiple domains",
 			rootDomains: []string{"domain.com"},
 			nameServers: rootDomainsMap{
-				"domain.com": nameServersMap{
+				"domain.com": endpointsBySubdomain{
 					"changed-1.domain.com": endpointState{
 						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-1"),
 						nsValues: sets.NewString("old-value-1"),
@@ -510,7 +510,7 @@ func TestScrape(t *testing.T) {
 					)
 			},
 			expectedNameServers: rootDomainsMap{
-				"domain.com": nameServersMap{
+				"domain.com": endpointsBySubdomain{
 					"changed-1.domain.com": endpointState{
 						dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-1"),
 						nsValues: sets.NewString("test-value-1"),
@@ -551,7 +551,7 @@ func TestScrape(t *testing.T) {
 				cut.scrapePeriod = tc.scrapePeriod
 			}
 			if tc.nameServers != nil {
-				cut.nameServers = tc.nameServers
+				cut.rootDomainsMap = tc.nameServers
 			}
 			ctx, stop := context.WithCancel(context.Background())
 			go func() {
@@ -568,10 +568,10 @@ func TestScrape(t *testing.T) {
 			if len(expectedNameServers) == 0 {
 				expectedNameServers = make(rootDomainsMap, len(tc.rootDomains))
 				for _, d := range tc.rootDomains {
-					expectedNameServers[d] = nameServersMap{}
+					expectedNameServers[d] = endpointsBySubdomain{}
 				}
 			}
-			assert.Equal(t, expectedNameServers, cut.nameServers, "unexpected changes to name servers")
+			assert.Equal(t, expectedNameServers, cut.rootDomainsMap, "unexpected changes to name servers")
 			actualChanges := []client.Object{}
 			for {
 				empty := false

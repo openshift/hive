@@ -155,6 +155,7 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 		return reconcile.Result{}, err
 	}
 
+	// NOTE: Can race with call to same in dnsendpoint controller
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {
 		var changed bool
 		desiredState.Status.Conditions, changed = controllerutils.SetDNSZoneConditionWithChangeCheck(

@@ -34,18 +34,18 @@ func (m *MockQuery) EXPECT() *MockQueryMockRecorder {
 	return m.recorder
 }
 
-// Create mocks base method.
-func (m *MockQuery) Create(rootDomain, domain string, values sets.String) error {
+// CreateOrUpdate mocks base method.
+func (m *MockQuery) CreateOrUpdate(rootDomain, domain string, values sets.String) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", rootDomain, domain, values)
+	ret := m.ctrl.Call(m, "CreateOrUpdate", rootDomain, domain, values)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Create indicates an expected call of Create.
-func (mr *MockQueryMockRecorder) Create(rootDomain, domain, values interface{}) *gomock.Call {
+// CreateOrUpdate indicates an expected call of CreateOrUpdate.
+func (mr *MockQueryMockRecorder) CreateOrUpdate(rootDomain, domain, values interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockQuery)(nil).Create), rootDomain, domain, values)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockQuery)(nil).CreateOrUpdate), rootDomain, domain, values)
 }
 
 // Delete mocks base method.

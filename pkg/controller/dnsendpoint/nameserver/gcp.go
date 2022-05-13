@@ -58,8 +58,8 @@ func (q *gcpQuery) Get(domain string) (map[string]sets.String, error) {
 	return currentNameServers, errors.Wrap(err, "error querying name servers")
 }
 
-// Create implements Query.Create.
-func (q *gcpQuery) Create(rootDomain string, domain string, values sets.String) error {
+// CreateOrUpdate implements Query.CreateOrUpdate.
+func (q *gcpQuery) CreateOrUpdate(rootDomain string, domain string, values sets.String) error {
 	gcpClient, err := q.getGCPClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get GCP client")

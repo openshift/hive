@@ -32,8 +32,9 @@ const (
 	ControllerName = hivev1.DNSEndpointControllerName
 )
 
-// Add creates a new DNSZone Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
-// and Start it when the Manager is Started.
+// Add creates one controller for DNSZone and one with a nameServerScraper for each root domain in
+// HiveConfig.spec.managedDomains.domains[]. The controllers are added to the Manager with default
+// RBAC. The Manager will set fields on the Controllers and Start them when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
 	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
@@ -78,6 +79,7 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
+	// Reconcile DNSZones enqueued by nameServerScraper.
 	if nameServerChangeNotifier != nil {
 		if err := ctrl.Watch(&source.Channel{Source: nameServerChangeNotifier}, &handler.EnqueueRequestForObject{}); err != nil {
 			log.WithField("controller", ControllerName).WithError(err).Error("unable to set up watch for name server changes")
@@ -131,7 +133,7 @@ func newReconciler(mgr manager.Manager, kubeClient client.Client) (*ReconcileDNS
 		}
 		nameServerScraper := newNameServerScraper(logger, nameServerQuery, md.Domains, registerNameServerChange)
 		if err := mgr.Add(nameServerScraper); err != nil {
-			logger.WithError(err).WithField("domains", md.Domains).Warn("unable to add name server scraper for domains")
+			logger.WithError(err).WithField("domains", md.Domains).Warn("unable to add name server scraper for root domains")
 			continue
 		}
 
@@ -149,7 +151,6 @@ func newReconciler(mgr manager.Manager, kubeClient client.Client) (*ReconcileDNS
 
 var _ reconcile.Reconciler = &ReconcileDNSEndpoint{}
 
-// ReconcileDNSEndpoint reconciles a DNSEndpoint object
 type ReconcileDNSEndpoint struct {
 	client.Client
 	scheme          *runtime.Scheme
@@ -157,8 +158,7 @@ type ReconcileDNSEndpoint struct {
 	nameServerTools []nameServerTool
 }
 
-// Reconcile reads that state of the cluster for a DNSEndpoint object and makes changes based on the state read
-// and what is in the DNSEndpoint.Spec
+// Reconcile syncs the name server entries for a DNSZone subdomain in the root domain's hosted zone.
 func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	dnsLog := controllerutils.BuildControllerLogger(ControllerName, "dnsZone", request.NamespacedName)
 	dnsLog.Info("reconciling dns endpoint")
@@ -180,6 +180,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, nil
 	}
 
+	// NOTE: Can race with call to same in dnszone controller
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, instance, hivev1.FinalizerDNSEndpoint); err != nil {
 		return reconcile.Result{}, err
 	} else if result != nil {
@@ -195,7 +196,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 
 	fullDomain := instance.Spec.Zone
 
-	dnsLog = dnsLog.WithField("domain", fullDomain)
+	dnsLog = dnsLog.WithField("subdomain", fullDomain)
 
 	var rootDomain string
 	var currentNameServers sets.String
@@ -211,7 +212,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	if rootDomain == "" {
-		dnsLog.WithField("domain", fullDomain).Error("no scraper for domain found, skipping reconcile")
+		dnsLog.Error("no scraper for domain found, skipping reconcile")
 		_, err := updateDomainNotManagedCondition(r.Client, dnsLog, instance, true)
 		return reconcile.Result{}, err
 	}
@@ -239,18 +240,25 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 
 	switch {
 	// NS is up-to-date
+	// TODO: If this controller hits a new DNSZone first, currentNameServers and desiredNameServers
+	// are both empty, and therefore equal, so we'll hit this case; but that's not actually "NS
+	// record is up to date". Consider a new `case` with a better message ("name servers not yet
+	// discovered for dnszone/domain"?)
 	case !isDeleted && currentNameServers.Equal(desiredNameServers):
 		dnsLog.Debug("NS record is up to date")
 
 	// NS needs to be created or updated
 	case !isDeleted && len(desiredNameServers) > 0:
-		dnsLog.Info("creating NS record")
-		if err := nsTool.queryClient.Create(rootDomain, fullDomain, desiredNameServers); err != nil {
+		// Add/update NS entries for the subdomain in the root domain's hosted zone.
+		dnsLog.Info("creating/updating NS records for subdomain")
+		if err := nsTool.queryClient.CreateOrUpdate(rootDomain, fullDomain, desiredNameServers); err != nil {
 			dnsLog.WithError(err).Error("error creating NS record")
 			return reconcile.Result{}, err
 		}
 
-		nsTool.scraper.AddEndpoint(instance, fullDomain, desiredNameServers)
+		// Sync the cache so the nameserverscraper doesn't re-notify this controller the next time
+		// it scrapes.
+		nsTool.scraper.SyncEndpoint(instance, fullDomain, desiredNameServers)
 
 	// NS needs to be deleted, either because the DNSZone has been deleted or because
 	// there are no targets for the NS.

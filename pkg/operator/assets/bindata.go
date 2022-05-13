@@ -1665,6 +1665,11 @@ data:
       - "error creating Route53 Hosted Zone: TooManyHostedZones: Limits Exceeded"
       installFailingReason: TooManyRoute53Zones
       installFailingMessage: Route53 hosted zone limit exceeded
+    - name: MultipleRoute53ZonesFound
+      searchRegexStrings:
+        - "Error: multiple Route53Zone found"
+      installFailingReason: MultipleRoute53ZonesFound
+      installFailingMessage: Multiple Route53 zones found
     - name: SimulatorThrottling
       searchRegexStrings:
       - "validate AWS credentials: checking install permissions: error simulating policy: Throttling: Rate exceeded"

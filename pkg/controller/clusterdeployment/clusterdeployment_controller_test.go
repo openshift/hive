@@ -1877,6 +1877,32 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "release customization on deprovision",
+			existing: []runtime.Object{
+				testClusterDeploymentCustomization("cdc"),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.Installed = true
+					cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+						Namespace:        testNamespace,
+						CustomizationRef: &corev1.LocalObjectReference{Name: "cdc"},
+					}
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+					testclusterdeprovision.Completed(),
+				),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.Nil(t, cd, "expected ClusterDeployment to be deleted")
+			},
+		},
+		{
 			name: "deprovision finished",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -3211,6 +3237,13 @@ func testClusterDeploymentWithInitializedConditions(cd *hivev1.ClusterDeployment
 		})
 	}
 	return cd
+}
+
+func testClusterDeploymentCustomization(name string) *hivev1.ClusterDeploymentCustomization {
+	cdc := &hivev1.ClusterDeploymentCustomization{}
+	cdc.Name = name
+	cdc.Namespace = testNamespace
+	return cdc
 }
 
 func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeployment {

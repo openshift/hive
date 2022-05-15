@@ -285,7 +285,6 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
 			},
 		},
-
 		{
 			name: "start hibernating, syncsets not applied",
 			cd:   cdBuilder.Options(o.shouldHibernate, testcd.InstalledTimestamp(time.Now())).Build(),

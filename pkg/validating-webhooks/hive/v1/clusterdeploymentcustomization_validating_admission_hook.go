@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	yamlpatch "github.com/krishicks/yaml-patch"
 	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -260,7 +261,7 @@ func validateInstallConfigPatches(path *field.Path, patches []hivev1.PatchEntity
 	allErrs := field.ErrorList{}
 
 	for i, patch := range patches {
-		if !isValidOP(patch.Op) {
+		if !isValidOP(yamlpatch.Op(patch.Op)) {
 			allErrs = append(allErrs, field.Invalid(path.Index(i), patch, "install config patch op must be a valid json patch operation"))
 		}
 		if len(patch.Path) == 0 || !strings.HasPrefix(patch.Path, "/") {
@@ -270,15 +271,15 @@ func validateInstallConfigPatches(path *field.Path, patches []hivev1.PatchEntity
 	return allErrs
 }
 
-func isValidOP(op string) bool {
+func isValidOP(op yamlpatch.Op) bool {
 	switch op {
 	case
-		"replace",
-		"add",
-		"remove",
-		"test",
-		"copy",
-		"move":
+		yamlpatch.OpAdd,
+		yamlpatch.OpRemove,
+		yamlpatch.OpMove,
+		yamlpatch.OpCopy,
+		yamlpatch.OpTest,
+		yamlpatch.OpReplace:
 		return true
 	}
 	return false

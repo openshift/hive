@@ -179,10 +179,6 @@ func (a *ClusterPoolValidatingAdmissionHook) validateCreate(admissionSpec *admis
 
 	allErrs = append(allErrs, validateClusterPlatform(specPath, newObject.Spec.Platform)...)
 
-	if newObject.Spec.Inventory != nil {
-		allErrs = append(allErrs, validateInventory(specPath, newObject.Spec.Inventory)...)
-	}
-
 	if len(allErrs) > 0 {
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
 		return &admissionv1beta1.AdmissionResponse{
@@ -243,10 +239,6 @@ func (a *ClusterPoolValidatingAdmissionHook) validateUpdate(admissionSpec *admis
 
 	allErrs = append(allErrs, validateClusterPlatform(specPath, newObject.Spec.Platform)...)
 
-	if newObject.Spec.Inventory != nil {
-		allErrs = append(allErrs, validateInventory(specPath, newObject.Spec.Inventory)...)
-	}
-
 	if len(allErrs) > 0 {
 		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
 		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
@@ -261,12 +253,4 @@ func (a *ClusterPoolValidatingAdmissionHook) validateUpdate(admissionSpec *admis
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
-}
-
-func validateInventory(path *field.Path, inventory []hivev1.InventoryEntry) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(inventory) == 0 {
-		allErrs = append(allErrs, field.Invalid(path, inventory, "inventory can't be empty"))
-	}
-	return allErrs
 }

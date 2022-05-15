@@ -116,7 +116,8 @@ spec:
                 type: array
               lastAppliedConfiguration:
                 description: LastAppliedConfiguration contains the last applied patches
-                  to the install-config.
+                  to the install-config. The information will retain for reference
+                  in case the customization is updated.
                 type: string
             type: object
         required:

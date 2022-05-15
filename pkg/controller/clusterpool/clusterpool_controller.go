@@ -48,7 +48,6 @@ const (
 	icSecretDependent               = "install config template secret"
 	cdClusterPoolIndex              = "spec.clusterpool.namespacedname"
 	claimClusterPoolIndex           = "spec.clusterpoolname"
-	defaultInventoryAttempts        = 5
 )
 
 var (
@@ -329,6 +328,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	if err != nil {
 		return reconcile.Result{}, err
 	}
+
 	claims, err := getAllClaimsForPool(r.Client, clp, logger)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -462,6 +462,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	return reconcile.Result{}, nil
 }
 
+// reconcileRunningClusters ensures the oldest unassigned clusters are set to running, and the
 // remainder are set to hibernating. The number of clusters we set to running is determined by
 // adding the cluster's configured runningCount to the number of unsatisfied claims for which we're
 // spinning up new clusters.
@@ -762,6 +763,7 @@ func (r *ReconcileClusterPool) createCluster(
 	var cd *hivev1.ClusterDeployment
 	var secret *corev1.Secret
 	var cdPos int
+	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
 	for i, obj := range objs {
 		if cdTmp, ok := obj.(*hivev1.ClusterDeployment); ok {
 			cd = cdTmp
@@ -792,6 +794,16 @@ func (r *ReconcileClusterPool) createCluster(
 	}
 
 	return cd, nil
+}
+
+func isInstallConfigSecret(obj interface{}) *corev1.Secret {
+	if secret, ok := obj.(*corev1.Secret); ok {
+		_, ok := secret.StringData["install-config.yaml"]
+		if ok {
+			return secret
+		}
+	}
+	return nil
 }
 
 // patchInstallConfig responsible for applying ClusterDeploymentCustomization and its reservation
@@ -1147,14 +1159,4 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")
 	}
-}
-
-func isInstallConfigSecret(obj interface{}) *corev1.Secret {
-	if secret, ok := obj.(*corev1.Secret); ok {
-		_, ok := secret.StringData["install-config.yaml"]
-		if ok {
-			return secret
-		}
-	}
-	return nil
 }

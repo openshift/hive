@@ -52,10 +52,6 @@ const (
 	// FinalizerArgoCDCluster is used on ClusterDeployments to ensure we clean up the ArgoCD cluster
 	// secret before cleaning up the API object.
 	FinalizerArgoCDCluster = "hive.openshift.io/argocd-cluster"
-
-	// FinalizerCustomizationRelease is used on ClusterDeployments to ensure we run a successful
-	// release of ClusterDeploymentCustomization
-	FinalizerCustomizationRelease string = "hive.openshift.io/customization"
 )
 
 // ClusterPowerState is used to indicate whether a cluster is running or in a

@@ -563,22 +563,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-		cdLog.Debug("adding clusterdeployment deprovision finalizer")
-		if err := r.addClusterDeploymentFinalizer(cd, hivev1.FinalizerDeprovision); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding deprovision finalizer")
+		cdLog.Debugf("adding clusterdeployment finalizer")
+		if err := r.addClusterDeploymentFinalizer(cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
 		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
-		return reconcile.Result{}, nil
-	}
-
-	if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.CustomizationRef != nil && !controllerutils.HasFinalizer(cd, hivev1.FinalizerCustomizationRelease) {
-		cdLog.Debug("adding clusterdeployment customization release finalizer")
-		if err := r.addClusterDeploymentFinalizer(cd, hivev1.FinalizerCustomizationRelease); err != nil {
-			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding customization finalizer")
-			return reconcile.Result{}, err
-		}
-
 		return reconcile.Result{}, nil
 	}
 
@@ -1416,10 +1406,9 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 	}
 }
 
-func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment, finalizer string) error {
+func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
 	cd = cd.DeepCopy()
-	controllerutils.AddFinalizer(cd, finalizer)
-
+	controllerutils.AddFinalizer(cd, hivev1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cd)
 }
 

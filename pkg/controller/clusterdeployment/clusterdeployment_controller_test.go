@@ -2740,7 +2740,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 				`, string(b)))
 			}
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -2829,7 +2829,7 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -2956,7 +2956,7 @@ func TestDeleteStaleProvisions(t *testing.T) {
 			for i, a := range tc.existingAttempts {
 				provisions[i] = testProvision(tcp.Failed(), tcp.Attempt(a))
 			}
-			fakeClient := fake.NewFakeClient(provisions...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
@@ -3008,7 +3008,7 @@ func TestDeleteOldFailedProvisions(t *testing.T) {
 						tcp.Attempt(i))
 				}
 			}
-			fakeClient := fake.NewFakeClient(provisions...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
@@ -3312,7 +3312,7 @@ func testRemoteClusterAPIClient() client.Client {
 	}
 	remoteClusterRouteObject.Spec.Host = "bar-api.clusters.example.com:6443/console"
 
-	return fake.NewFakeClient(remoteClusterRouteObject)
+	return fake.NewClientBuilder().WithRuntimeObjects(remoteClusterRouteObject).Build()
 }
 
 func testClusterImageSet() *hivev1.ClusterImageSet {
@@ -3512,7 +3512,7 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingCD...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingCD...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -3676,7 +3676,7 @@ func TestMergePullSecrets(t *testing.T) {
 				localSecretObject := testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, test.localPullSecret)
 				test.existingObjs = append(test.existingObjs, localSecretObject)
 			}
-			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -3743,7 +3743,7 @@ func TestCopyInstallLogSecret(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -3886,7 +3886,7 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
-			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)

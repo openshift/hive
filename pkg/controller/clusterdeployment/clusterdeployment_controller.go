@@ -44,7 +44,6 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -539,7 +538,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.Debugf("cluster expires at: %s", expiry)
 			if time.Now().After(expiry) {
 				cdLog.WithField("expiry", expiry).Info("cluster has expired, issuing delete")
-				err := utils.SafeDelete(r, context.TODO(), cd)
+				err := controllerutils.SafeDelete(r, context.TODO(), cd)
 				if err != nil {
 					cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting expired cluster")
 				}
@@ -576,12 +575,18 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 		if dnsZone == nil {
 			// dnsNotReady condition was set.
-			if isSet, _ := isDNSNotReadyConditionSet(cd); isSet {
-				// dnsNotReadyReason is why the dnsNotReady condition was set, therefore requeue so that we check to see if it times out.
-				// add defaultRequeueTime to avoid the race condition where the controller is reconciled at the exact time of the timeout (unlikely, but possible).
-				return reconcile.Result{RequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime}, nil
+			isSet, timeToTimeout := isDNSNotReadyConditionSet(cd)
+			if isSet {
+				// dnsNotReadyReason is why the dnsNotReady condition was set.
+				// If the DNSZone becomes ready, it'll pop this controller right away.
+				// If it never becomes ready, we want to reconcile again to set the timed-out conditions.
+				// Note that it's possible for timeToTimeout to be zero, e.g. if we hit the reconcile
+				// right before the timeout, but then took enough time to get to/through
+				// ensureManagedDNSZone. In that case this will requeue immediately, which is what we want.
+				return reconcile.Result{Requeue: true, RequeueAfter: timeToTimeout}, nil
 			}
 
+			// Any other situation where ensureManagedDNSZone returned a nil DNSZone is terminal. Don't requeue.
 			return reconcile.Result{}, nil
 		}
 
@@ -852,11 +857,24 @@ func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev
 	return r.reconcileExistingInstallingClusterInstall(cd, logger)
 }
 
-func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, *hivev1.ClusterDeploymentCondition) {
-	dnsNotReadyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
-	return dnsNotReadyCondition.Status == corev1.ConditionTrue &&
-			(dnsNotReadyCondition.Reason == dnsNotReadyReason || dnsNotReadyCondition.Reason == dnsNotReadyTimedoutReason),
-		dnsNotReadyCondition
+// isDNSNotReadyConditionSet returns:
+// - A bool, true iff the DNSNotReady condition is set to DNSNotReady.
+// - The amount of time until we'll declare DNSNotReadyTimedOut. Only set (nonzero) if the above is
+//   true. However, we'll also floor this value at zero -- e.g. if we hit this func after the
+//   timeout has passed.
+func isDNSNotReadyConditionSet(cd *hivev1.ClusterDeployment) (bool, time.Duration) {
+	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+	if cond == nil || cond.Status != corev1.ConditionTrue {
+		return false, time.Duration(0)
+	}
+	notReady := cond.Reason == dnsNotReadyReason
+	var timeToTimeout time.Duration
+	if notReady {
+		if timeToTimeout = time.Until(cond.LastTransitionTime.Add(defaultDNSNotReadyTimeout)); timeToTimeout <= 0 {
+			timeToTimeout = time.Duration(0)
+		}
+	}
+	return notReady, timeToTimeout
 }
 
 // getReleaseImage looks for a a release image in clusterdeployment or its corresponding imageset in the following order:
@@ -1499,8 +1517,9 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	apiOptInRequiredCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.APIOptInRequiredCondition)
 	dnsErrorCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.GenericDNSErrorsCondition)
 	var (
-		status          corev1.ConditionStatus
-		reason, message string
+		status                           corev1.ConditionStatus
+		reason, message                  string
+		provCondsChanged, dnsCondChanged bool
 	)
 	switch {
 	case availableCondition != nil && availableCondition.Status == corev1.ConditionTrue:
@@ -1528,21 +1547,45 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		reason = dnsNotReadyReason
 		message = "DNS Zone not yet available"
 
-		isDNSNotReadyConditionSet, dnsNotReadyCondition := isDNSNotReadyConditionSet(cd)
-		if isDNSNotReadyConditionSet {
-			// Timeout if it has been in this state for longer than allowed.
-			timeSinceLastTransition := time.Since(dnsNotReadyCondition.LastTransitionTime.Time)
-			if timeSinceLastTransition >= defaultDNSNotReadyTimeout {
-				// We've timed out, set the dnsNotReadyTimedoutReason for the DNSNotReady condition
-				cdLog.WithField("timeout", defaultDNSNotReadyTimeout).Warn("Timed out waiting on managed dns creation")
-				reason = dnsNotReadyTimedoutReason
-				message = "DNS Zone timed out in DNSNotReady state"
-			}
+		isDNSNotReadyConditionSet, timeToTimeout := isDNSNotReadyConditionSet(cd)
+		if isDNSNotReadyConditionSet && timeToTimeout <= 0 {
+			// We've timed out, set the dnsNotReadyTimedoutReason for the DNSNotReady condition
+			cdLog.WithField("timeout", defaultDNSNotReadyTimeout).Warn("Timed out waiting on managed dns creation")
+			reason = dnsNotReadyTimedoutReason
+			message = "DNS Zone timed out in DNSNotReady state"
+
+			// This is terminal
+			var changed1, changed2 bool
+			cd.Status.Conditions, changed1 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.ProvisionStoppedCondition,
+				corev1.ConditionTrue,
+				dnsNotReadyTimedoutReason,
+				"Timed out waiting on managed dns creation",
+				controllerutils.UpdateConditionIfReasonOrMessageChange)
+			// This is what shows up under ProvisionStatus in oc tabular output
+			cd.Status.Conditions, changed2 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionFalse,
+				hivev1.ProvisionedReasonProvisionStopped,
+				"Provisioning failed terminally (see the ProvisionStopped condition for details)",
+				controllerutils.UpdateConditionIfReasonOrMessageChange)
+			provCondsChanged = changed1 || changed2
 		}
 	}
-	if err := r.updateCondition(cd, hivev1.DNSNotReadyCondition, status, reason, message, cdLog); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
-		return nil, err
+	cd.Status.Conditions, dnsCondChanged = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+		cd.Status.Conditions,
+		hivev1.DNSNotReadyCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange)
+	if provCondsChanged || dnsCondChanged {
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
+			return nil, err
+		}
 	}
 
 	if reason != dnsReadyReason {

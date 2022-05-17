@@ -149,6 +149,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		riVerifier                    verify.Interface
 		pendingCreation               bool
 		expectErr                     bool
+		expectExplicitRequeue         bool
 		expectedRequeueAfter          time.Duration
 		expectPendingCreation         bool
 		expectConsoleRouteFetch       bool
@@ -956,7 +957,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Wait when DNSZone is not available yet",
+			name: "DNSZone is not available yet",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
@@ -967,28 +968,96 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZone(),
 			},
-			expectedRequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime,
+			expectExplicitRequeue: true,
+			expectedRequeueAfter:  defaultDNSNotReadyTimeout,
 			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.DNSNotReadyCondition,
+						Status: corev1.ConditionTrue,
+						Reason: dnsNotReadyReason,
+					},
+				})
 				provisions := getProvisions(c)
 				assert.Empty(t, provisions, "provision should not exist")
 			},
 		},
 		{
-			name: "Set condition when DNSZone is not available yet",
+			name: "DNSZone is not available: requeue time",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
+					// Pretend DNSNotReady happened 4m ago
+					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					cond.Status = corev1.ConditionTrue
+					cond.Reason = dnsNotReadyReason
+					cond.Message = "DNS Zone not yet available"
+					cond.LastTransitionTime.Time = time.Now().Add(-4 * time.Minute)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZone(),
 			},
-			expectedRequeueAfter: defaultDNSNotReadyTimeout + defaultRequeueTime,
+			expectExplicitRequeue: true,
+			expectedRequeueAfter:  defaultDNSNotReadyTimeout - (4 * time.Minute),
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				testassert.AssertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionTrue)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.DNSNotReadyCondition,
+						Status: corev1.ConditionTrue,
+						Reason: dnsNotReadyReason,
+					},
+				})
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "provision should not exist")
+			},
+		},
+		{
+			name: "DNSZone timeout",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.ManageDNS = true
+					// Pretend DNSNotReady happened >10m ago
+					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					cond.Status = corev1.ConditionTrue
+					cond.Reason = dnsNotReadyReason
+					cond.Message = "DNS Zone not yet available"
+					cond.LastTransitionTime.Time = time.Now().Add(-11 * time.Minute)
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testDNSZone(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// DNS timed out
+					{
+						Type:   hivev1.DNSNotReadyCondition,
+						Status: corev1.ConditionTrue,
+						Reason: dnsNotReadyTimedoutReason,
+					},
+					// Not Provisioned
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionFalse,
+						Reason: hivev1.ProvisionedReasonProvisionStopped,
+					},
+					// Provision stopped
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+						Reason: dnsNotReadyTimedoutReason,
+					},
+				})
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "provision should not exist")
 			},
 		},
 		{
@@ -1312,7 +1381,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
-			expectedRequeueAfter: 8 * time.Hour,
+			expectExplicitRequeue: true,
+			expectedRequeueAfter:  8 * time.Hour,
 		},
 		{
 			name: "Wait after failed provision",
@@ -2740,7 +2810,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 				`, string(b)))
 			}
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -2802,6 +2872,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			} else {
 				assert.InDelta(t, test.expectedRequeueAfter, result.RequeueAfter, float64(10*time.Second), "unexpected requeue after")
 			}
+			assert.Equal(t, test.expectExplicitRequeue, result.Requeue, "unexpected requeue")
 
 			actualPendingCreation := !controllerExpectations.SatisfiedExpectations(reconcileRequest.String())
 			assert.Equal(t, test.expectPendingCreation, actualPendingCreation, "unexpected pending creation")
@@ -2829,7 +2900,7 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -2956,7 +3027,7 @@ func TestDeleteStaleProvisions(t *testing.T) {
 			for i, a := range tc.existingAttempts {
 				provisions[i] = testProvision(tcp.Failed(), tcp.Attempt(a))
 			}
-			fakeClient := fake.NewFakeClient(provisions...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
@@ -3008,7 +3079,7 @@ func TestDeleteOldFailedProvisions(t *testing.T) {
 						tcp.Attempt(i))
 				}
 			}
-			fakeClient := fake.NewFakeClient(provisions...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
@@ -3312,7 +3383,7 @@ func testRemoteClusterAPIClient() client.Client {
 	}
 	remoteClusterRouteObject.Spec.Host = "bar-api.clusters.example.com:6443/console"
 
-	return fake.NewFakeClient(remoteClusterRouteObject)
+	return fake.NewClientBuilder().WithRuntimeObjects(remoteClusterRouteObject).Build()
 }
 
 func testClusterImageSet() *hivev1.ClusterImageSet {
@@ -3512,7 +3583,7 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingCD...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingCD...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -3676,7 +3747,7 @@ func TestMergePullSecrets(t *testing.T) {
 				localSecretObject := testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, test.localPullSecret)
 				test.existingObjs = append(test.existingObjs, localSecretObject)
 			}
-			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -3743,7 +3814,7 @@ func TestCopyInstallLogSecret(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -3886,7 +3957,7 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
-			fakeClient := fake.NewFakeClient(test.existingObjs...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)

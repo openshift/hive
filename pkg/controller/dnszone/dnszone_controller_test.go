@@ -206,7 +206,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			}
 
 			// Act
-			_, err := r.reconcileDNSProvider(zr, tc.dnsZone)
+			_, err := r.reconcileDNSProvider(zr, tc.dnsZone, zr.logger)
 
 			// Assert
 			if tc.errorExpected {
@@ -358,7 +358,7 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			}
 
 			// Act
-			_, err = r.reconcileDNSProvider(zr, tc.dnsZone)
+			_, err = r.reconcileDNSProvider(zr, tc.dnsZone, zr.logger)
 
 			// Assert
 			if tc.errorExpected {
@@ -492,7 +492,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			}
 
 			// Act
-			_, err := r.reconcileDNSProvider(zr, tc.dnsZone)
+			_, err := r.reconcileDNSProvider(zr, tc.dnsZone, zr.logger)
 
 			// Assert
 			if tc.errorExpected {
@@ -608,7 +608,7 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 			}
 
 			// Act
-			_, err := r.reconcileDNSProvider(zr, tc.dnsZone)
+			_, err := r.reconcileDNSProvider(zr, tc.dnsZone, zr.logger)
 			zr.SetConditionsForError(err)
 
 			// Assert

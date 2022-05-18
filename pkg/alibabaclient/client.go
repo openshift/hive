@@ -38,6 +38,9 @@ access_key_secret = %s
 type API interface {
 	DescribeAvailableZoneByInstanceType(string) (*ecs.DescribeAvailableResourceResponse, error)
 	GetAvailableZonesByInstanceType(string) ([]string, error)
+	DescribeInstances(request *ecs.DescribeInstancesRequest) (response *ecs.DescribeInstancesResponse, err error)
+	StartInstances(request *ecs.StartInstancesRequest) (response *ecs.StartInstancesResponse, err error)
+	StopInstances(request *ecs.StopInstancesRequest) (response *ecs.StopInstancesResponse, err error)
 }
 
 // Client makes calls to the Alibaba Cloud API.
@@ -186,4 +189,31 @@ func storeCredentials(accessKeyID string, accessKeySecret string) (err error) {
 	file.WriteString(fmt.Sprintf(configurationTemplate, accessKeyID, accessKeySecret))
 
 	return nil
+}
+
+// DescribeInstances queries the details of one or more ECS instances
+func (client *Client) DescribeInstances(request *ecs.DescribeInstancesRequest) (response *ecs.DescribeInstancesResponse, err error) {
+	response = &ecs.DescribeInstancesResponse{
+		BaseResponse: &responses.BaseResponse{},
+	}
+	err = client.doActionWithSetDomain(request, response)
+	return
+}
+
+// StartInstances starts one or more ECS instances
+func (client *Client) StartInstances(request *ecs.StartInstancesRequest) (response *ecs.StartInstancesResponse, err error) {
+	response = &ecs.StartInstancesResponse{
+		BaseResponse: &responses.BaseResponse{},
+	}
+	err = client.doActionWithSetDomain(request, response)
+	return
+}
+
+// StopInstances stops one or more ECS instances
+func (client *Client) StopInstances(request *ecs.StopInstancesRequest) (response *ecs.StopInstancesResponse, err error) {
+	response = &ecs.StopInstancesResponse{
+		BaseResponse: &responses.BaseResponse{},
+	}
+	err = client.doActionWithSetDomain(request, response)
+	return
 }

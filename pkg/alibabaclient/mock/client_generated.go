@@ -49,6 +49,21 @@ func (mr *MockAPIMockRecorder) DescribeAvailableZoneByInstanceType(arg0 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeAvailableZoneByInstanceType", reflect.TypeOf((*MockAPI)(nil).DescribeAvailableZoneByInstanceType), arg0)
 }
 
+// DescribeInstances mocks base method.
+func (m *MockAPI) DescribeInstances(request *ecs.DescribeInstancesRequest) (*ecs.DescribeInstancesResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeInstances", request)
+	ret0, _ := ret[0].(*ecs.DescribeInstancesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeInstances indicates an expected call of DescribeInstances.
+func (mr *MockAPIMockRecorder) DescribeInstances(request interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeInstances", reflect.TypeOf((*MockAPI)(nil).DescribeInstances), request)
+}
+
 // GetAvailableZonesByInstanceType mocks base method.
 func (m *MockAPI) GetAvailableZonesByInstanceType(arg0 string) ([]string, error) {
 	m.ctrl.T.Helper()
@@ -62,4 +77,34 @@ func (m *MockAPI) GetAvailableZonesByInstanceType(arg0 string) ([]string, error)
 func (mr *MockAPIMockRecorder) GetAvailableZonesByInstanceType(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAvailableZonesByInstanceType", reflect.TypeOf((*MockAPI)(nil).GetAvailableZonesByInstanceType), arg0)
+}
+
+// StartInstances mocks base method.
+func (m *MockAPI) StartInstances(request *ecs.StartInstancesRequest) (*ecs.StartInstancesResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartInstances", request)
+	ret0, _ := ret[0].(*ecs.StartInstancesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartInstances indicates an expected call of StartInstances.
+func (mr *MockAPIMockRecorder) StartInstances(request interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartInstances", reflect.TypeOf((*MockAPI)(nil).StartInstances), request)
+}
+
+// StopInstances mocks base method.
+func (m *MockAPI) StopInstances(request *ecs.StopInstancesRequest) (*ecs.StopInstancesResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StopInstances", request)
+	ret0, _ := ret[0].(*ecs.StopInstancesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StopInstances indicates an expected call of StopInstances.
+func (mr *MockAPIMockRecorder) StopInstances(request interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopInstances", reflect.TypeOf((*MockAPI)(nil).StopInstances), request)
 }

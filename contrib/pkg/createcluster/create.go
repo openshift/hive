@@ -620,7 +620,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 
 	switch o.Cloud {
 	case cloudAlibaba:
-		defaultCredsFilePath := filepath.Join(o.homeDir, ".alibaba", "credentials")
+		defaultCredsFilePath := filepath.Join(o.homeDir, ".alibabacloud", "credentials")
 		accessKeyID, accessKeySecret, err := alibabacloudutils.GetAlibabaCloud(o.CredsFile, defaultCredsFilePath)
 		if err != nil {
 			return nil, err

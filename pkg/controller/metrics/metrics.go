@@ -96,7 +96,7 @@ var (
 	// clusters to transition to hibernated powerstate
 	MetricClusterHibernationTransitionSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_hibernation_transition_seconds",
+			Name:    "hive_cluster_deployments_hibernation_transition_seconds",
 			Help:    "Distribution of the length of time for clusters to transition to the hibernated power state",
 			Buckets: []float64{30, 60, 180, 300, 600},
 		},
@@ -105,7 +105,7 @@ var (
 	// clusters to transition to running powerstate
 	MetricClusterReadyTransitionSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_running_transition_seconds",
+			Name:    "hive_cluster_deployments_running_transition_seconds",
 			Help:    "Distribution of the length of time for clusters to transition to running power state",
 			Buckets: []float64{60, 90, 180, 300, 600, 1200},
 		},
@@ -132,7 +132,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployments_waiting_for_cluster_operators_seconds",
 			Help:    "Distribution of the length of transition time for clusters currently waiting for cluster operators",
-			Buckets: []float64{60, 90, 180, 300, 600, 3000, 6000},
+			Buckets: []float64{180, 300, 600, 1800, 3600, 7200},
 		},
 		[]string{"cluster_deployment_namespace", "cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"})
 	// metricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
@@ -303,9 +303,12 @@ func (mc *Calculator) Start(ctx context.Context) error {
 						logDurationMetric(MetricResumingClustersSeconds, &cd,
 							time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
 					}
+					// While logging for WaitingForClusterOperators, account for the hard coded pause while waiting
+					// after nodes are ready, before we could query status of cluster operators
 					if readyCond.Reason == hivev1.ReadyReasonWaitingForClusterOperators {
 						logDurationMetric(MetricWaitingForCOClustersSeconds, &cd,
-							time.Since(readyCond.LastTransitionTime.Time).Seconds())
+							(time.Since(readyCond.LastTransitionTime.Time).Seconds())+
+								constants.ClusterOperatorSettlePause.Seconds())
 					}
 				}
 			}

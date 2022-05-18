@@ -9,9 +9,11 @@ The Hive service can be used to provision and perform initial configuration of O
 
 ## Supported cloud providers
 
+* Alibaba Cloud
 * AWS
 * Azure
 * Google Cloud Platform
+* IBM Cloud
 * OpenStack
 * oVirt
 * vSphere

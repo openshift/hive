@@ -244,7 +244,7 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 		"currentGeneration":  desiredState.Generation,
 		"lastSyncGeneration": desiredState.Status.LastSyncGeneration,
 	}).Info("Syncing DNS Zone")
-	result, err := r.reconcileDNSProvider(actuator, desiredState)
+	result, err := r.reconcileDNSProvider(actuator, desiredState, dnsLog)
 	conditionsChanged := actuator.SetConditionsForError(err)
 
 	if conditionsChanged {
@@ -259,32 +259,32 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 }
 
 // ReconcileDNSProvider attempts to make the current state reflect the desired state. It does this idempotently.
-func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hivev1.DNSZone) (reconcile.Result, error) {
+func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hivev1.DNSZone, logger log.FieldLogger) (reconcile.Result, error) {
 
 	// If deleted and set to PreserveOnDelete, we need to skip any
 	// attempts to use the cluster's cloud credentials as they may no longer be good.
 	if dnsZone.DeletionTimestamp != nil && dnsZone.Spec.PreserveOnDelete {
-		r.logger.Info("DNSZone set to PreserveOnDelete, skipping cleanup and removing finalizer")
-		err := r.removeDNSZoneFinalizer(dnsZone)
+		logger.Info("DNSZone set to PreserveOnDelete, skipping cleanup and removing finalizer")
+		err := r.removeDNSZoneFinalizer(dnsZone, logger)
 		return reconcile.Result{}, err
 	}
 
-	r.logger.Debug("Retrieving current state")
+	logger.Debug("Retrieving current state")
 	err := actuator.Refresh()
 	if err != nil {
-		r.logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
+		logger.WithError(err).Error("Failed to retrieve hosted zone and corresponding tags")
 		return reconcile.Result{}, err
 	}
 
 	zoneFound, err := actuator.Exists()
 	if err != nil {
-		r.logger.WithError(err).Error("Failed while checking if hosted zone exists")
+		logger.WithError(err).Error("Failed while checking if hosted zone exists")
 		return reconcile.Result{}, err
 	}
 
 	if dnsZone.DeletionTimestamp != nil {
 		if zoneFound {
-			r.logger.Debug("DNSZone resource is deleted, deleting hosted zone")
+			logger.Debug("DNSZone resource is deleted, deleting hosted zone")
 			err = actuator.Delete()
 			if err != nil {
 				return reconcile.Result{}, err
@@ -292,7 +292,7 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 		}
 		if controllerutils.HasFinalizer(dnsZone, hivev1.FinalizerDNSZone) {
 			// Remove the finalizer from the DNSZone. It will be persisted when we persist status
-			err = r.removeDNSZoneFinalizer(dnsZone)
+			err = r.removeDNSZoneFinalizer(dnsZone, logger)
 			if err != nil {
 				return reconcile.Result{}, err
 			}
@@ -301,57 +301,57 @@ func (r *ReconcileDNSZone) reconcileDNSProvider(actuator Actuator, dnsZone *hive
 		return reconcile.Result{}, err
 	}
 	if !controllerutils.HasFinalizer(dnsZone, hivev1.FinalizerDNSZone) {
-		r.logger.Info("DNSZone does not have a finalizer. Adding one.")
+		logger.Info("DNSZone does not have a finalizer. Adding one.")
 		controllerutils.AddFinalizer(dnsZone, hivev1.FinalizerDNSZone)
 		err := r.Client.Update(context.TODO(), dnsZone)
 		if err != nil {
-			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to add finalizer to DNSZone")
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to add finalizer to DNSZone")
 		}
 		return reconcile.Result{}, err
 	}
 	if !zoneFound {
-		r.logger.Info("No corresponding hosted zone found on cloud provider, creating one")
+		logger.Info("No corresponding hosted zone found on cloud provider, creating one")
 		err := actuator.Create()
 		if err != nil {
-			r.logger.WithError(err).Error("Failed to create hosted zone")
+			logger.WithError(err).Error("Failed to create hosted zone")
 			return reconcile.Result{}, err
 		}
 	} else {
-		r.logger.Info("Existing hosted zone found. Syncing with DNSZone resource")
+		logger.Info("Existing hosted zone found. Syncing with DNSZone resource")
 		err := actuator.UpdateMetadata()
 		if err != nil {
-			r.logger.WithError(err).Error("failed to sync tags for hosted zone")
+			logger.WithError(err).Error("failed to sync tags for hosted zone")
 			return reconcile.Result{}, err
 		}
 	}
 
 	nameServers, err := actuator.GetNameServers()
 	if err != nil {
-		r.logger.WithError(err).Error("Failed to get hosted zone name servers")
+		logger.WithError(err).Error("Failed to get hosted zone name servers")
 		return reconcile.Result{}, err
 	}
 
-	isZoneSOAAvailable, err := r.soaLookup(dnsZone.Spec.Zone, r.logger)
+	isZoneSOAAvailable, err := r.soaLookup(dnsZone.Spec.Zone, logger)
 	if err != nil {
-		r.logger.WithError(err).Error("error looking up SOA record for zone")
+		logger.WithError(err).Error("error looking up SOA record for zone")
 	}
 
 	reconcileResult := reconcile.Result{}
 	if !isZoneSOAAvailable {
-		r.logger.Info("SOA record for DNS zone not available")
+		logger.Info("SOA record for DNS zone not available")
 		reconcileResult.RequeueAfter = domainAvailabilityCheckInterval
 	}
 
-	return reconcileResult, r.updateStatus(nameServers, isZoneSOAAvailable, dnsZone)
+	return reconcileResult, r.updateStatus(nameServers, isZoneSOAAvailable, dnsZone, logger)
 }
 
-func (r *ReconcileDNSZone) removeDNSZoneFinalizer(dnsZone *hivev1.DNSZone) error {
+func (r *ReconcileDNSZone) removeDNSZoneFinalizer(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
 	// Remove the finalizer from the DNSZone. It will be persisted when we persist status
-	r.logger.Info("Removing DNSZone finalizer")
+	logger.Info("Removing DNSZone finalizer")
 	controllerutils.DeleteFinalizer(dnsZone, hivev1.FinalizerDNSZone)
 	err := r.Client.Update(context.TODO(), dnsZone)
 	if err != nil {
-		r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to remove DNSZone finalizer")
 	}
 	return err
 }
@@ -442,9 +442,9 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 	return nil, errors.New("unable to determine which actuator to use")
 }
 
-func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable bool, dnsZone *hivev1.DNSZone) error {
+func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable bool, dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
 	orig := dnsZone.DeepCopy()
-	r.logger.Debug("Updating DNSZone status")
+	logger.Debug("Updating DNSZone status")
 
 	dnsZone.Status.NameServers = nameServers
 
@@ -475,7 +475,7 @@ func (r *ReconcileDNSZone) updateStatus(nameServers []string, isSOAAvailable boo
 	if !reflect.DeepEqual(orig.Status, dnsZone.Status) {
 		err := r.Client.Status().Update(context.TODO(), dnsZone)
 		if err != nil {
-			r.logger.WithError(err).Log(controllerutils.LogLevel(err), "Cannot update DNSZone status")
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "Cannot update DNSZone status")
 		}
 		return err
 	}

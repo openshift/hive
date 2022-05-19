@@ -470,12 +470,14 @@ func TestAWSActuator(t *testing.T) {
 			}(),
 			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
-				firstCall := mockDescribeSubnets(client, []string{"zone1", "zone2"},
-					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
-				// When an ExtraWorkerSecurityGroup annotation is configured we query the subnets for the first subnet
-				// in the list configured for a MachinePool to discover the VPC ID of the subnet.
-				mockDescribeSubnets(client, []string{"zone1"},
-					[]string{"subnet-zone1"}, []string{}, "vpc-1").After(firstCall)
+				gomock.InOrder(
+					mockDescribeSubnets(client, []string{"zone1", "zone2"},
+						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1"),
+					// When an ExtraWorkerSecurityGroup annotation is configured we query the subnets for the first subnet
+					// in the list configured for a MachinePool to discover the VPC ID of the subnet.
+					mockDescribeSubnets(client, []string{"zone1"},
+						[]string{"subnet-zone1"}, []string{}, "vpc-1"),
+				)
 				mockDescribeRouteTables(client,
 					map[string]bool{
 						"subnet-zone1":    false,

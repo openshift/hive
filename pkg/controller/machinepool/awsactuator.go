@@ -597,7 +597,7 @@ func GetVPCIDForMachinePool(awsClient awsclient.Client, pool *hivev1.MachinePool
 	}
 	vpcID := *subnetsOutput.Subnets[0].VpcId
 	if vpcID == "" {
-		return "", errors.Errorf("DescribeSubnets unexpectedly returned a subnet without a VPC ID %s", subnetID)
+		return "", errors.Errorf("DescribeSubnets unexpectedly returned subnet %s without a VPC ID", subnetID)
 	}
 	return vpcID, nil
 }

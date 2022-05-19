@@ -39,6 +39,7 @@ const (
 	testDeploymentName   = "test-deployment"
 	testProvisionName    = "test-provision"
 	testNamespace        = "test-namespace"
+	testVPCID            = "testvpc123"
 	pullSecretSecretName = "pull-secret"
 
 	installerBinary     = "openshift-install"
@@ -830,7 +831,7 @@ spec:
 				},
 			}
 			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
-			modifiedBytes, err := patchWorkerMachineSetManifest([]byte(tc.manifestYAML), pool, logger)
+			modifiedBytes, err := patchWorkerMachineSetManifest([]byte(tc.manifestYAML), pool, testVPCID, logger)
 			if tc.expectModified {
 				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
 			} else {
@@ -854,7 +855,9 @@ spec:
 				assert.NoError(t, err, "expected to be able to decode AWSMachineProviderConfig")
 				awsMachineTemplate, _ := awsMachineTemplateObj.(*awsproviderv1beta1.AWSMachineProviderConfig)
 
-				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within AWSMachineProviderConfig")
+				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within Security Group Filters in AWSMachineProviderConfig")
+				assert.Equal(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Name, "vpc-id", "expected an vpc-id named filter to be configured within Security Group Filters in AWSMachineProviderConfig")
+				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Values, "testvpc123", "expected testvpc123 to be configured within Security Group Filters in AWSMachineProviderConfig")
 			}
 		})
 	}

@@ -61,7 +61,9 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/machinepool"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/hive/pkg/resource"
@@ -800,6 +802,19 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 	// ExtraWorkerSecurityGroupAnnotation has been set in annotations for the worker MachinePool.
 	// For details, see HIVE-1802.
 	if workerMachinePool != nil && metav1.HasAnnotation(workerMachinePool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) {
+		if cd.Spec.Platform.AWS == nil {
+			return errors.New("ExtraWorkerSecurityGroup annotation cannot be configured for non-AWS MachinePool")
+		}
+		m.log.Info("retrieving VPC ID of configured worker machinepool subnets")
+		awsClient, err := awsclient.NewClientFromSecret(nil, cd.Spec.Platform.AWS.Region)
+		if err != nil {
+			return err
+		}
+		vpcID, err := machinepool.GetVPCIDForMachinePool(awsClient, workerMachinePool)
+		if err != nil {
+			return err
+		}
+
 		m.log.Info("modifying worker machineset manifests")
 
 		err = filepath.WalkDir(filepath.Join(m.WorkDir, "openshift"), func(path string, d fs.DirEntry, err error) error {
@@ -813,7 +828,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 				return err
 			}
 
-			modifiedManifestBytes, err := patchWorkerMachineSetManifest(manifestBytes, workerMachinePool, m.log)
+			modifiedManifestBytes, err := patchWorkerMachineSetManifest(manifestBytes, workerMachinePool, vpcID, m.log)
 			if err != nil {
 				m.log.WithError(err).Error("error patching worker machineset manifest")
 				return err
@@ -868,7 +883,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 // The first return value points to the modified manifest. It is `nil` if the manifest was not modified.
 // The second return value indicates an error from which we should not proceed.
 // Of note, it is not an error if `manifestBytes` represents valid yaml that is not a worker MachineSet.
-func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, logger log.FieldLogger) (*[]byte, error) {
+func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, vpcID string, logger log.FieldLogger) (*[]byte, error) {
 	c, err := yamlutils.Decode(manifestBytes)
 	// Decoding the yaml here shouldn't produce an error. An error indicates that the
 	// installer produced yaml that could not be decoded.
@@ -886,12 +901,27 @@ func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePoo
 		return nil, nil
 	}
 
-	securityGroupFilter := interface{}(pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
+	securityGroupFilterValue := interface{}(pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
+	var vpcIDFilterValue map[string]interface{} = map[string]interface{}{
+		"name":   "vpc-id",
+		"values": []string{vpcID},
+	}
+	vpcIDFilterValueInterface := interface{}(vpcIDFilterValue)
 	ops := yamlpatch.Patch{
+		// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
+		// annotation found on the MachinePool to the existing tag:Name filter in the worker
+		// MachineSet manifest
 		yamlpatch.Operation{
 			Op:    "add",
 			Path:  yamlpatch.OpPath("/spec/template/spec/providerSpec/value/securityGroups/0/filters/0/values/-"),
-			Value: yamlpatch.NewNode(&securityGroupFilter),
+			Value: yamlpatch.NewNode(&securityGroupFilterValue),
+		},
+		// Add a filter for the vpcID since the names of security groups may be the same within a
+		// given AWS account. HIVE-1874
+		yamlpatch.Operation{
+			Op:    "add",
+			Path:  yamlpatch.OpPath("/spec/template/spec/providerSpec/value/securityGroups/0/filters/-"),
+			Value: yamlpatch.NewNode(&vpcIDFilterValueInterface),
 		},
 	}
 

@@ -83,6 +83,15 @@ spec:
                   - type
                   type: object
                 type: array
+              controlledByReplica:
+                description: ControlledByReplica indicates which replica of the hive-clustersync
+                  StatefulSet is responsible for (the CD related to) this clustersync.
+                  Note that this value indicates the replica that most recently handled
+                  the ClusterSync. If the hive-clustersync statefulset is scaled up
+                  or down, the controlling replica can change, potentially causing
+                  logs to be spread across multiple pods.
+                format: int64
+                type: integer
               firstSuccessTime:
                 description: FirstSuccessTime is the time we first successfully applied
                   all (selector)syncsets to a cluster.

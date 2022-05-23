@@ -309,7 +309,7 @@ func (r *ReconcileClusterSync) getAndCheckClusterSyncStatefulSet(logger log.Fiel
 }
 
 // isSyncAssignedToMe determines if this instance of the controller is assigned to the resource being sync'd
-func (r *ReconcileClusterSync) isSyncAssignedToMe(sts *appsv1.StatefulSet, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (bool, error) {
+func (r *ReconcileClusterSync) isSyncAssignedToMe(sts *appsv1.StatefulSet, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (bool, int64, error) {
 	logger.Debug("Getting uid for hashing")
 	var uidAsBigInt big.Int
 
@@ -337,7 +337,7 @@ func (r *ReconcileClusterSync) isSyncAssignedToMe(sts *appsv1.StatefulSet, cd *h
 		"assignedToMe":        assignedToMe,
 	}).Debug("computed values")
 
-	return assignedToMe, nil
+	return assignedToMe, ordinalIDOfAssignee, nil
 }
 
 // Reconcile reads the state of the ClusterDeployment and applies any SyncSets or SelectorSyncSets that need to be
@@ -368,7 +368,8 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	if me, err := r.isSyncAssignedToMe(sts, cd, logger); !me || err != nil {
+	me, ordinal, err := r.isSyncAssignedToMe(sts, cd, logger)
+	if !me || err != nil {
 		if err != nil {
 			logger.WithError(err).Error("failed determining which instance is assigned to sync this cluster")
 			return reconcile.Result{}, err
@@ -426,6 +427,8 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return reconcile.Result{}, err
 	}
+
+	clusterSync.Status.ControlledByReplica = &ordinal
 
 	needToCreateLease := false
 	lease := &hiveintv1alpha1.ClusterSyncLease{}

@@ -36,7 +36,6 @@ import (
 	resourcemock "github.com/openshift/hive/pkg/resource/mock"
 	hiveassert "github.com/openshift/hive/pkg/test/assert"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
-	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcs "github.com/openshift/hive/pkg/test/clustersync"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testsecret "github.com/openshift/hive/pkg/test/secret"
@@ -81,7 +80,7 @@ func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
 
-	c := &clientWrapper{fake.NewFakeClientWithScheme(scheme, existing...)}
+	c := &clientWrapper{fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(existing...).Build()}
 
 	mockResourceHelper := resourcemock.NewMockHelper(mockCtrl)
 	mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -444,12 +443,12 @@ func TestIsSyncAssignedToMe(t *testing.T) {
 	scheme := newScheme()
 
 	cases := []struct {
-		name                 string
-		ordinalID            int64
-		statefulSet          *appsv1.StatefulSet
-		clusterDeployment    *hivev1.ClusterDeployment
-		expectedAssignedToMe bool
-		expectedErr          bool
+		name              string
+		ordinalID         int64
+		expectedOrdinalID int64
+		statefulSet       *appsv1.StatefulSet
+		clusterDeployment *hivev1.ClusterDeployment
+		expectedErr       bool
 	}{
 		{
 			name:      "assigned to me - ordinal 0",
@@ -458,71 +457,74 @@ func TestIsSyncAssignedToMe(t *testing.T) {
 				teststatefulset.WithCurrentReplicas(3),
 				teststatefulset.WithReplicas(3),
 			),
-			clusterDeployment: testclusterdeployment.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testclusterdeployment.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800195")),
+			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
+				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800195")),
 			),
-			expectedAssignedToMe: true,
-			expectedErr:          false,
+			expectedOrdinalID: 0,
+			expectedErr:       false,
 		},
 		{
-			name:      "not assigned to me - ordinal 0",
-			ordinalID: 0,
+			name:              "not assigned to me - ordinal 0",
+			ordinalID:         0,
+			expectedOrdinalID: 1,
 			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
 				teststatefulset.WithCurrentReplicas(3),
 				teststatefulset.WithReplicas(3),
 			),
-			clusterDeployment: testclusterdeployment.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testclusterdeployment.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800196")),
+			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
+				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800196")),
 			),
 			expectedErr: false,
 		},
 		{
-			name:      "assigned to me - ordinal 1",
-			ordinalID: 1,
+			name:              "assigned to me - ordinal 1",
+			ordinalID:         1,
+			expectedOrdinalID: 1,
 			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
 				teststatefulset.WithCurrentReplicas(3),
 				teststatefulset.WithReplicas(3),
 			),
-			clusterDeployment: testclusterdeployment.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testclusterdeployment.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800196")),
-			),
-			expectedAssignedToMe: true,
-			expectedErr:          false,
-		},
-		{
-			name:      "not assigned to me - ordinal 1",
-			ordinalID: 1,
-			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(3),
-				teststatefulset.WithReplicas(3),
-			),
-			clusterDeployment: testclusterdeployment.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testclusterdeployment.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800197")),
+			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
+				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800196")),
 			),
 			expectedErr: false,
 		},
 		{
-			name:      "assigned to me - ordinal 2",
-			ordinalID: 2,
+			name:              "not assigned to me - ordinal 1",
+			ordinalID:         1,
+			expectedOrdinalID: 2,
 			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
 				teststatefulset.WithCurrentReplicas(3),
 				teststatefulset.WithReplicas(3),
 			),
-			clusterDeployment: testclusterdeployment.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testclusterdeployment.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800197")),
+			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
+				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800197")),
 			),
-			expectedAssignedToMe: true,
-			expectedErr:          false,
+			expectedErr: false,
 		},
 		{
-			name:      "not assigned to me - ordinal 2",
-			ordinalID: 2,
+			name:              "assigned to me - ordinal 2",
+			ordinalID:         2,
+			expectedOrdinalID: 2,
 			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
 				teststatefulset.WithCurrentReplicas(3),
 				teststatefulset.WithReplicas(3),
 			),
-			clusterDeployment: testclusterdeployment.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testclusterdeployment.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800198")),
+			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
+				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800197")),
+			),
+			expectedErr: false,
+		},
+		{
+			name:              "not assigned to me - ordinal 2",
+			ordinalID:         2,
+			expectedOrdinalID: 0,
+			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+				teststatefulset.WithCurrentReplicas(3),
+				teststatefulset.WithReplicas(3),
+			),
+			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
+				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800198")),
 			),
 			expectedErr: false,
 		},
@@ -536,10 +538,11 @@ func TestIsSyncAssignedToMe(t *testing.T) {
 			rt.r.ordinalID = tc.ordinalID
 
 			// Act
-			actualAssignedToMe, actualErr := rt.r.isSyncAssignedToMe(tc.statefulSet, tc.clusterDeployment, rt.logger)
+			actualAssignedToMe, actualOrdinalID, actualErr := rt.r.isSyncAssignedToMe(tc.statefulSet, tc.clusterDeployment, rt.logger)
 
 			// Assert
-			assert.Equal(t, tc.expectedAssignedToMe, actualAssignedToMe)
+			assert.Equal(t, tc.ordinalID == tc.expectedOrdinalID, actualAssignedToMe, "Unexpected assigned-to-me")
+			assert.Equal(t, tc.expectedOrdinalID, actualOrdinalID)
 			if tc.expectedErr {
 				assert.Error(t, actualErr, "Didn't error when was expected to.")
 			} else {

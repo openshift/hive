@@ -52,14 +52,22 @@ ORIG_NS=$HIVE_NS
 export HIVE_NS=hive-e2e-two
 # 2) Patch the hiveconfig
 oc patch hiveconfig hive -n $HIVE_OPERATOR_NS --type=merge -p '{"spec":{"targetNamespace": "'$HIVE_NS'"}}'
-# 3) If USE_MANAGED_DNS=true, "Move" the managed DNS creds secret to the new namespace. (In real life the user would be
-#    responsible for making sure the secret referenced by hiveconfig exists in the new target
-#    namespace -- either by moving the secret or creating a new one and updating hiveconfig.)
-#    TODO: Or should  we try to do that for the user?
+# 3) If USE_MANAGED_DNS=true, "Move" the managed DNS creds secret to the new namespace. (In real
+#    life the user would be responsible for making sure the secret referenced by hiveconfig exists
+#    in the new target namespace -- either by moving the secret or creating a new one and updating
+#    hiveconfig.)
+#    TODO: Or should we try to do that for the user?
 if $USE_MANAGED_DNS; then
-  oc get secret -l hive.openshift.io/managed-dns-credentials=true -n $ORIG_NS -o json \
-    | jq '.items[0].metadata.namespace = "'$HIVE_NS'"' \
-    | oc apply -f -
+  J=$(oc get secret -l hive.openshift.io/managed-dns-credentials=true -n $ORIG_NS -o json)
+  num_secrets=$(jq -r '.items[] | length' <<<"$J")
+  # Our retry loop for `hiveutil adm manage-dns enable` isn't idempotent, so there may be multiple
+  # suitable secrets present.
+  if [[ $num_secrets -lt 1 ]]; then
+    echo "Expected to find at least one secret with the managed-dns-credentials label, but found $num_secrets!"
+    exit 1
+  fi
+  # They should all be the same, so just pick the first one to copy over.
+  jq '.items[0].metadata.namespace = "'$HIVE_NS'"' <<<"$J" | oc apply -f -
 fi
 # 4) Rerun postdeploy tests, which wait for everything to come up
 echo "Running post-deploy tests in new namespace $HIVE_NS"

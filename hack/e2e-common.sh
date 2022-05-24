@@ -42,25 +42,16 @@ while [ $i -le ${max_tries} ]; do
 
   i=$((i + 1))
 done
-
-ORIGINAL_NAMESPACE=$(oc config view -o json | jq -er 'select(.contexts[].name == ."current-context") | .contexts[]?.context.namespace // ""')
-echo Original default namespace is ${ORIGINAL_NAMESPACE}
-echo Setting default namespace to ${CLUSTER_NAMESPACE}
-if ! oc config set-context --current --namespace=${CLUSTER_NAMESPACE}; then
-	echo "Failed to set the default namespace"
-	exit 1
-fi
-
-function restore_default_namespace() {
-	echo Restoring default namespace to ${ORIGINAL_NAMESPACE}
-	oc config set-context --current --namespace=${ORIGINAL_NAMESPACE}
-}
-trap 'restore_default_namespace' EXIT
-
 if [ $i -ge ${max_tries} ] ; then
   # Failed the maximum amount of times.
   echo "exiting"
   exit 10
+fi
+
+echo Setting default namespace to ${CLUSTER_NAMESPACE}
+if ! oc config set-context --current --namespace=${CLUSTER_NAMESPACE}; then
+	echo "Failed to set the default namespace"
+	exit 1
 fi
 
 CLUSTER_PROFILE_DIR="${CLUSTER_PROFILE_DIR:-/tmp/cluster}"
@@ -88,9 +79,6 @@ PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLUSTER_PROFILE_DIR}/pull-secret}"
 export HIVE_NS="hive-e2e"
 export HIVE_OPERATOR_NS="hive-operator"
 
-# Install Hive
-IMG="${HIVE_IMAGE}" make deploy
-
 function save_hive_logs() {
   tmpf=$(mktemp)
   for x in "hive-controllers ${HIVE_NS}" "hiveadmission ${HIVE_NS}" "hive-operator ${HIVE_OPERATOR_NS}"; do
@@ -101,6 +89,27 @@ function save_hive_logs() {
     fi
   done
 }
+# The consumer of this lib can set up its own exit trap, but this basic one will at least help
+# debug e.g. problems from `make deploy` and managed DNS setup.
+trap save_hive_logs EXIT
+
+# Install Hive
+IMG="${HIVE_IMAGE}" make deploy
+
+# Wait for $HIVE_NS to appear, as subsequent test steps rely on it
+echo -n "Waiting for namespace $HIVE_NS to appear"
+i=0
+while [[ $i -lt 30 ]]; do
+  oc get namespace $HIVE_NS >/dev/null 2>&1 && break
+  i=$((i+1))
+  echo -n .
+  sleep 1
+done
+if ! oc get namespace $HIVE_NS >/dev/null 2>&1; then
+  echo " Timed out!"
+  exit 1
+fi
+echo
 
 SRC_ROOT=$(git rev-parse --show-toplevel)
 
@@ -148,6 +157,10 @@ if $USE_MANAGED_DNS; then
 	for i in 1 2 3; do
 	  go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN} \
 	    --creds-file="${CREDS_FILE}" --cloud="${CLOUD}" && break
+	  if [[ $i -eq 3 ]]; then
+	    echo "Failed after $i attempts!"
+	    exit 1
+	  fi
 	  echo "Retrying..."
 	done
 	MANAGED_DNS_ARG=" --manage-dns"

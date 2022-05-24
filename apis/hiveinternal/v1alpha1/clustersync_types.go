@@ -42,6 +42,12 @@ type ClusterSyncStatus struct {
 	// FirstSuccessTime is the time we first successfully applied all (selector)syncsets to a cluster.
 	// +optional
 	FirstSuccessTime *metav1.Time `json:"firstSuccessTime,omitempty"`
+
+	// ControlledByReplica indicates which replica of the hive-clustersync StatefulSet is responsible
+	// for (the CD related to) this clustersync. Note that this value indicates the replica that most
+	// recently handled the ClusterSync. If the hive-clustersync statefulset is scaled up or down, the
+	// controlling replica can change, potentially causing logs to be spread across multiple pods.
+	ControlledByReplica *int64 `json:"controlledByReplica,omitempty"`
 }
 
 // SyncStatus is the status of applying a specific SyncSet or SelectorSyncSet to the cluster.

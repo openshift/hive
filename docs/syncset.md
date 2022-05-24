@@ -141,8 +141,6 @@ spec:
 
 ## Diagnosing SyncSet Failures
 
-The failure logs for syncset is present in Hive controller POD logs.
-
 To find the status of the syncset, check the cluster deployment's `ClusterSync` object in the cluster deployment namespace. Every cluster deployment has an associated `ClusterSync` object that records status within `ClusterSync.Status.SyncSets`.
 
 ```sh
@@ -154,6 +152,23 @@ To see details, run as below.
 ```sh
 oc get clustersync <clusterdeployment name> -o yaml
 ```
+
+All (Selector)SyncSets for a given ClusterDeployment are handled by a single replica of the hive-clustersync StatefulSet.
+The replica pods are named `hive-clustersync-N` where `N` is an integer such that `0 <= N < #replicas`.
+`ClusterSync.Status.ControlledByReplica` indicates which replica is responsible for (the CD associated with) the ClusterSync.
+Use this to determine which replica's pod logs to examine when debugging syncset operations.
+For example:
+
+```sh
+$ REPLICA=`oc get clustersync -n <namespace> <clusterdeployment name> -o json | jq -r .status.controlledByReplica`
+$ oc logs -n hive hive-clustersync-$REPLICA | grep <clusterdeployment name>
+```
+
+**Note:** This value is only set/updated when the cluster is installed, reachable, and not deleted.
+
+**Note:** This value indicates the replica that *most recently* handled the ClusterSync.
+If the hive-clustersync statefulset is scaled up or down, the controlling replica can change,
+potentially causing logs to be spread across multiple pods.
 
 ## Changing ResourceApplyMode
 

@@ -465,6 +465,20 @@ spec:
                               items:
                                 type: string
                               type: array
+                              x-kubernetes-list-type: atomic
+                            groups:
+                              description: groups is the list of claims value of which
+                                should be used to synchronize groups from the OIDC
+                                provider to OpenShift for the user. If multiple claims
+                                are specified, the first one with a non-empty value
+                                is used.
+                              items:
+                                description: OpenIDClaim represents a claim retrieved
+                                  from an OpenID provider's tokens or userInfo responses
+                                minLength: 1
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
                             name:
                               description: name is the list of claims whose values
                                 should be used as the display name. Optional. If unspecified,
@@ -472,6 +486,7 @@ spec:
                               items:
                                 type: string
                               type: array
+                              x-kubernetes-list-type: atomic
                             preferredUsername:
                               description: preferredUsername is the list of claims
                                 whose values should be used as the preferred username.
@@ -480,6 +495,7 @@ spec:
                               items:
                                 type: string
                               type: array
+                              x-kubernetes-list-type: atomic
                           type: object
                         clientID:
                           description: clientID is the oauth client ID

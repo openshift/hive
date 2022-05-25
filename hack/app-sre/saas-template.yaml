@@ -1092,13 +1092,15 @@ objects:
                             type: string
                           value:
                             description: 'Variable references $(VAR_NAME) are expanded
-                              using the previous defined environment variables in
+                              using the previously defined environment variables in
                               the container and any service environment variables.
                               If a variable cannot be resolved, the reference in the
-                              input string will be unchanged. The $(VAR_NAME) syntax
-                              can be escaped with a double $$, ie: $$(VAR_NAME). Escaped
-                              references will never be expanded, regardless of whether
-                              the variable exists or not. Defaults to "".'
+                              input string will be unchanged. Double $$ are reduced
+                              to a single $, which allows for escaping the $(VAR_NAME)
+                              syntax: i.e. "$$(VAR_NAME)" will produce the string
+                              literal "$(VAR_NAME)". Escaped references will never
+                              be expanded, regardless of whether the variable exists
+                              or not. Defaults to "".'
                             type: string
                           valueFrom:
                             description: Source for the environment variable's value.
@@ -5495,6 +5497,20 @@ objects:
                                 items:
                                   type: string
                                 type: array
+                                x-kubernetes-list-type: atomic
+                              groups:
+                                description: groups is the list of claims value of
+                                  which should be used to synchronize groups from
+                                  the OIDC provider to OpenShift for the user. If
+                                  multiple claims are specified, the first one with
+                                  a non-empty value is used.
+                                items:
+                                  description: OpenIDClaim represents a claim retrieved
+                                    from an OpenID provider's tokens or userInfo responses
+                                  minLength: 1
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
                               name:
                                 description: name is the list of claims whose values
                                   should be used as the display name. Optional. If
@@ -5502,6 +5518,7 @@ objects:
                                 items:
                                   type: string
                                 type: array
+                                x-kubernetes-list-type: atomic
                               preferredUsername:
                                 description: preferredUsername is the list of claims
                                   whose values should be used as the preferred username.
@@ -5510,6 +5527,7 @@ objects:
                                 items:
                                   type: string
                                 type: array
+                                x-kubernetes-list-type: atomic
                             type: object
                           clientID:
                             description: clientID is the oauth client ID
@@ -6325,6 +6343,20 @@ objects:
                                 items:
                                   type: string
                                 type: array
+                                x-kubernetes-list-type: atomic
+                              groups:
+                                description: groups is the list of claims value of
+                                  which should be used to synchronize groups from
+                                  the OIDC provider to OpenShift for the user. If
+                                  multiple claims are specified, the first one with
+                                  a non-empty value is used.
+                                items:
+                                  description: OpenIDClaim represents a claim retrieved
+                                    from an OpenID provider's tokens or userInfo responses
+                                  minLength: 1
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
                               name:
                                 description: name is the list of claims whose values
                                   should be used as the display name. Optional. If
@@ -6332,6 +6364,7 @@ objects:
                                 items:
                                   type: string
                                 type: array
+                                x-kubernetes-list-type: atomic
                               preferredUsername:
                                 description: preferredUsername is the list of claims
                                   whose values should be used as the preferred username.
@@ -6340,6 +6373,7 @@ objects:
                                 items:
                                   type: string
                                 type: array
+                                x-kubernetes-list-type: atomic
                             type: object
                           clientID:
                             description: clientID is the oauth client ID

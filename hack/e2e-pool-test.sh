@@ -24,7 +24,9 @@ EOF
 }
 
 function count_cds() {
-  oc get cd -A -o json | jq -r '.items | length'
+  J=$(oc get cd -A -o json)
+  [[ -z "$J" ]] && return
+  jq -r '.items | length' <<<"$J"
 }
 
 function wait_for_hibernation_state() {

@@ -35,6 +35,7 @@ require (
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v0.9.0-master.0.20220118155007-ad535d3fdbf4
 	github.com/openshift/library-go v0.0.0-20210811133500-5e31383de2a7
+	github.com/openshift/machine-api-operator v0.2.1-0.20211111133920-c8bba3e64310
 	github.com/openshift/machine-api-provider-gcp v0.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0

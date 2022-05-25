@@ -635,6 +635,13 @@ github.com/openshift/build-machinery-go/make/targets/golang
 github.com/openshift/build-machinery-go/make/targets/openshift
 github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
+# github.com/openshift/client-go v0.0.0-20211025111749-96ca2abfc56c
+github.com/openshift/client-go/machine/clientset/versioned
+github.com/openshift/client-go/machine/clientset/versioned/scheme
+github.com/openshift/client-go/machine/clientset/versioned/typed/machine/v1beta1
+github.com/openshift/client-go/machine/informers/externalversions/internalinterfaces
+github.com/openshift/client-go/machine/informers/externalversions/machine/v1beta1
+github.com/openshift/client-go/machine/listers/machine/v1beta1
 # github.com/openshift/cloud-credential-operator v0.0.0-20200316201045-d10080b52c9e
 github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
 github.com/openshift/cloud-credential-operator/pkg/aws
@@ -725,6 +732,14 @@ github.com/openshift/library-go/pkg/verify/store/parallel
 github.com/openshift/library-go/pkg/verify/store/serial
 github.com/openshift/library-go/pkg/verify/store/sigstore
 github.com/openshift/library-go/pkg/verify/util
+# github.com/openshift/machine-api-operator v0.2.1-0.20211111133920-c8bba3e64310
+## explicit
+github.com/openshift/machine-api-operator/pkg/controller/machine
+github.com/openshift/machine-api-operator/pkg/controller/vsphere
+github.com/openshift/machine-api-operator/pkg/controller/vsphere/session
+github.com/openshift/machine-api-operator/pkg/metrics
+github.com/openshift/machine-api-operator/pkg/util
+github.com/openshift/machine-api-operator/pkg/util/conditions
 # github.com/openshift/machine-api-provider-gcp v0.0.0
 ## explicit
 github.com/openshift/machine-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
@@ -850,6 +865,9 @@ github.com/uudashr/gocognit
 # github.com/vmware/govmomi v0.24.0
 ## explicit
 github.com/vmware/govmomi
+github.com/vmware/govmomi/find
+github.com/vmware/govmomi/internal
+github.com/vmware/govmomi/list
 github.com/vmware/govmomi/nfc
 github.com/vmware/govmomi/object
 github.com/vmware/govmomi/pbm
@@ -1275,6 +1293,11 @@ google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/fieldmaskpb
 google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/wrapperspb
+# gopkg.in/gcfg.v1 v1.2.3
+gopkg.in/gcfg.v1
+gopkg.in/gcfg.v1/scanner
+gopkg.in/gcfg.v1/token
+gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
 # gopkg.in/ini.v1 v1.62.0
@@ -1284,6 +1307,8 @@ gopkg.in/ini.v1
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 gopkg.in/tomb.v1
+# gopkg.in/warnings.v0 v0.1.2
+gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit
 gopkg.in/yaml.v2
@@ -1951,6 +1976,7 @@ k8s.io/kubectl/pkg/cmd/util/editor/crlf
 k8s.io/kubectl/pkg/cmd/util/podcmd
 k8s.io/kubectl/pkg/cmd/wait
 k8s.io/kubectl/pkg/describe
+k8s.io/kubectl/pkg/drain
 k8s.io/kubectl/pkg/polymorphichelpers
 k8s.io/kubectl/pkg/rawhttp
 k8s.io/kubectl/pkg/scheme

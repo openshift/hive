@@ -4,10 +4,8 @@ WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN make build
 
-FROM quay.io/centos/centos:8
+FROM quay.io/centos/centos:stream
 
-# CentOS images do not get updates as they are meant to mirror ISO content, and thus this update
-# is strongly recommended for security updates.
 RUN dnf -y update && dnf clean all
 
 # ssh-agent required for gathering logs in some situations:

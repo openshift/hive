@@ -484,7 +484,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 	)
 	clusterSync.Status.SelectorSyncSets = syncStatusesForSelectorSyncSets
 
-	setFailedCondition(clusterSync)
+	failing := setFailedCondition(clusterSync)
 
 	// Set clusterSync.Status.FirstSyncSetsSuccessTime
 	syncStatuses := append(syncStatusesForSyncSets, syncStatusesForSelectorSyncSets...)
@@ -499,6 +499,10 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterSync")
 			return reconcile.Result{}, err
 		}
+	}
+	// Clear the cluster sync failing metric
+	if !failing {
+		ClearClusterSyncFailingSecondsMetric(clusterSync, logger)
 	}
 
 	if needToDoFullReapply {
@@ -1015,7 +1019,8 @@ func doesSelectorSyncSetApplyToClusterDeployment(selectorSyncSet *hivev1.Selecto
 	return labelSelector.Matches(labels.Set(cd.Labels))
 }
 
-func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync) {
+// setFailedCondition returns true if failed condition is set to true
+func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync) (failing bool) {
 	status := corev1.ConditionFalse
 	reason := "Success"
 	message := "All SyncSets and SelectorSyncSets have been applied to the cluster"
@@ -1036,6 +1041,7 @@ func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync) {
 			verb = "are"
 		}
 		message = fmt.Sprintf("%s %s failing", strings.Join(failureNames, " and "), verb)
+		failing = true
 	}
 	if len(clusterSync.Status.Conditions) > 0 {
 		cond := clusterSync.Status.Conditions[0]
@@ -1053,6 +1059,7 @@ func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync) {
 		LastProbeTime:      metav1.Now(),
 		LastTransitionTime: metav1.Now(),
 	}}
+	return failing
 }
 
 func getFailingSyncSets(syncStatuses []hiveintv1alpha1.SyncStatus) []string {
@@ -1138,4 +1145,13 @@ func (r *ReconcileClusterSync) timeUntilFullReapply(lease *hiveintv1alpha1.Clust
 		return 0
 	}
 	return timeUntilNext
+}
+
+func ClearClusterSyncFailingSecondsMetric(cs *hiveintv1alpha1.ClusterSync, csLog log.FieldLogger) {
+	cleared := hivemetrics.MetricClusterSyncFailingSeconds.Delete(map[string]string{
+		"namespaced_name": hivemetrics.GetNameSpacedName(cs.Namespace, cs.Name),
+	})
+	if cleared {
+		csLog.Debug("cleared metric: %v", hivemetrics.MetricClusterSyncFailingSeconds)
+	}
 }

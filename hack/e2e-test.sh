@@ -7,6 +7,7 @@ source ${0%/*}/e2e-common.sh
 
 
 function teardown() {
+  echo "!EXIT TRAP!"
   capture_manifests
   # Let's save the logs now in case any of the following never finish
   echo "Saving hive logs before cleanup"

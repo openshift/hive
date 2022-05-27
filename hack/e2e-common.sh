@@ -1,3 +1,16 @@
+###
+# TEMPORARY workaround for https://issues.redhat.com/browse/DPTP-2871
+# The job timeout after 2h isn't signaling the test script like it should, so
+# our exit trap isn't being activated, so we're not cleaning up spoke clusters,
+# so we're leaking cloud resources. Inject a "manual" timeout that actually
+# does signal us.
+###
+# This is necessary so our child process can signal us.
+set -o monitor
+# Background an almost-2h sleep followed by sending SIGINT to our PID.
+/usr/bin/bash -c "sleep $((118*60)); echo 'Timed out!'; kill -n 2 $$" &
+###
+
 max_tries=120
 sleep_between_tries=10
 # Set timeout for the cluster deployment to install

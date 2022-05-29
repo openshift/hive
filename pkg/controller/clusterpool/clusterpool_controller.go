@@ -186,7 +186,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 
 func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
 	return func(o client.Object) []reconcile.Request {
-		_, ok := o.(*hivev1.ClusterDeploymentCustomization)
+		cdc, ok := o.(*hivev1.ClusterDeploymentCustomization)
 		if !ok {
 			return nil
 		}
@@ -199,12 +199,19 @@ func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.Ma
 
 		var requests []reconcile.Request
 		for _, cpl := range cpList.Items {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Namespace: cpl.Namespace,
-					Name:      cpl.Name,
-				},
-			})
+			if cpl.Spec.Inventory != nil {
+				for _, entry := range cpl.Spec.Inventory {
+					if entry.Name == cdc.Name {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Namespace: cpl.Namespace,
+								Name:      cpl.Name,
+							},
+						})
+						break
+					}
+				}
+			}
 		}
 
 		return requests
@@ -412,6 +419,9 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// If too few, create new InstallConfig and ClusterDeployment.
 	case drift < 0 && availableCapacity > 0:
 		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
+		if clp.Spec.Inventory != nil {
+			toAdd = minIntVarible(toAdd, len(cdcs.Unassigned()))
+		}
 		if err := r.addClusters(clp, poolVersion, cds, toAdd, cdcs, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
@@ -710,12 +720,6 @@ func (r *ReconcileClusterPool) createCluster(
 	cdcs *cdcCollection,
 	logger log.FieldLogger,
 ) (*hivev1.ClusterDeployment, error) {
-	if clp.Spec.Inventory != nil {
-		if len(cdcs.unassigned) == 0 {
-			return nil, errors.New("no customization available")
-		}
-	}
-
 	var err error
 
 	ns, err := r.createRandomNamespace(clp)

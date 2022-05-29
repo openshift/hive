@@ -23,6 +23,24 @@ spec:
 EOF
 }
 
+function create_customization() {
+  local is_name=$1
+  local ns=$2
+  echo "Creating ClusterDeploymentCustomization $is_name"
+  oc apply -f -<<EOF
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeploymentCustomization
+metadata:
+  name: $is_name
+  name: $ns
+spec:
+  installConfigPatches:
+    - op: replace
+      path: /metadata/name
+      value: cdc-test 
+EOF
+}
+
 function count_cds() {
   J=$(oc get cd -A -o json)
   [[ -z "$J" ]] && return
@@ -148,6 +166,31 @@ function verify_pool_cd_imagesets() {
   return $rc
 }
 
+function verify_cluster_name() {
+  local poolname=$1
+  local cdcname=$2
+  local expected_name=$3
+  local rc=0
+ echo "Validating customization $cdcname succefully changed cluster name to $expected_name"
+  cd_cdc=$(oc get cd -A -o json \
+      | jq -r '.items[]
+        | select(.metadata.deletionTimestamp==null)
+        | select(.spec.clusterPoolRef.poolName=="'$poolname'")
+        | [.metadata.name, .metadata.namespace, .spec.clusterPoolRef.customizationRef.name, .spec.provisioning.installConfigSecretRef.name]
+        | @tsv')
+  while read cd ns cdc iref; do
+    if [[ $cdc == $cdcname ]]; then
+      name="$(oc -n  $ns extract secret/$iref --to=- | yq .metadata.name -r)"
+      if [[ $name != $expected_name ]]; then
+        echo "FAIL: ClusterDeployment $cd has ClusterDeploymentCustomization $cdcname but cluster $name is not $expected_name"
+        rc=1
+      fi
+    fi
+  done <<< "$cd_cis"
+  return $rc
+
+}
+
 function set_power_state() {
   local cd=$1
   local power_state=$2
@@ -267,5 +310,12 @@ echo "Re-resuming"
 set_power_state $CLUSTER_NAME Running
 
 wait_for_hibernation_state $CLUSTER_NAME Running
+
+# Test customization
+create_customization "cdc-test" "${CLUSTER_NAMESPACE}"
+oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": "[{"name": "cdc-test"}]"}}'
+oc delete clusterclaim --all
+wait_for_pool_to_be_ready $REAL_POOL_NAME
+verify_cluster_name $REAL_POOL_NAME "cdc-test" "cdc-test"
 
 # Let the cleanup trap do the cleanup.

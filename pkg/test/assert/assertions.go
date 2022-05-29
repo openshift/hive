@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
@@ -55,6 +56,15 @@ func findClusterDeploymentCondition(conditions []hivev1.ClusterDeploymentConditi
 	return nil
 }
 
+func findCDCCondition(conditions []conditionsv1.Condition, conditionType conditionsv1.ConditionType) *conditionsv1.Condition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
 // AssertConditionStatus asserts if a condition is present on the cluster deployment and has the expected status
 func AssertConditionStatus(t *testing.T, cd *hivev1.ClusterDeployment, condType hivev1.ClusterDeploymentConditionType, status corev1.ConditionStatus) {
 	condition := findClusterDeploymentCondition(cd.Status.Conditions, condType)
@@ -69,6 +79,23 @@ func AssertConditions(t *testing.T, cd *hivev1.ClusterDeployment, expectedCondit
 	testifyassert.LessOrEqual(t, len(expectedConditions), len(cd.Status.Conditions), "some conditions are not present")
 	for _, expectedCond := range expectedConditions {
 		condition := findClusterDeploymentCondition(cd.Status.Conditions, expectedCond.Type)
+		if testifyassert.NotNilf(t, condition, "did not find expected condition type: %v", expectedCond.Type) {
+			testifyassert.Equal(t, expectedCond.Status, condition.Status, "condition found with unexpected status")
+			testifyassert.Equal(t, expectedCond.Reason, condition.Reason, "condition found with unexpected reason")
+			// Optionally validate the message
+			if expectedCond.Message != "" {
+				testifyassert.Equal(t, expectedCond.Message, condition.Message, "condition found with unexpected message")
+			}
+		}
+	}
+}
+
+// AssertConditions asserts if the expected conditions are present on the cluster deployment.
+// It also asserts if those conditions have the expected status, reason, and (optionally) message.
+func AssertCDCConditions(t *testing.T, cdc *hivev1.ClusterDeploymentCustomization, expectedConditions []conditionsv1.Condition) {
+	testifyassert.LessOrEqual(t, len(expectedConditions), len(cdc.Status.Conditions), "some conditions are not present")
+	for _, expectedCond := range expectedConditions {
+		condition := findCDCCondition(cdc.Status.Conditions, expectedCond.Type)
 		if testifyassert.NotNilf(t, condition, "did not find expected condition type: %v", expectedCond.Type) {
 			testifyassert.Equal(t, expectedCond.Status, condition.Status, "condition found with unexpected status")
 			testifyassert.Equal(t, expectedCond.Reason, condition.Reason, "condition found with unexpected reason")

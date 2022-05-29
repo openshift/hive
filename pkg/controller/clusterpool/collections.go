@@ -232,7 +232,7 @@ func isBroken(cd *hivev1.ClusterDeployment, pool *hivev1.ClusterPool, logger log
 		return true
 	}
 
-	// Check if CD's customization exists in CP invnetory
+	// Check if CD's customization exists in CP inventory
 	if cd.Spec.ClusterPoolRef != nil && cd.Spec.ClusterPoolRef.CustomizationRef != nil {
 		customizationExists := false
 		cdcName := cd.Spec.ClusterPoolRef.CustomizationRef.Name
@@ -659,8 +659,7 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 	}
 
 	for i, cdc := range cdcList.Items {
-		ref := &cdcList.Items[i]
-		cdcCol.namespace[cdc.Name] = ref
+		cdcCol.namespace[cdc.Name] = &cdcList.Items[i]
 	}
 
 	for _, item := range pool.Spec.Inventory {
@@ -740,6 +739,10 @@ func (cdcs *cdcCollection) Sort() {
 }
 
 func (cdcs *cdcCollection) Reserve(c client.Client, cdc *hivev1.ClusterDeploymentCustomization, cdName, poolName string) error {
+	if cdc.Status.ClusterDeploymentRef != nil || cdc.Status.ClusterPoolRef != nil {
+		return errors.New("ClusterDeploymentCustomization already reserved")
+	}
+
 	cdc.Status.ClusterDeploymentRef = &corev1.LocalObjectReference{Name: cdName}
 	cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: poolName}
 
@@ -791,9 +794,7 @@ func (cdcs *cdcCollection) Unassign(c client.Client, cdc *hivev1.ClusterDeployme
 		}
 	}
 
-	if _, ok := cdcs.reserved[cdc.Name]; ok {
-		delete(cdcs.reserved, cdc.Name)
-	}
+	delete(cdcs.reserved, cdc.Name)
 
 	cdcs.unassigned = append(cdcs.unassigned, cdc)
 	cdcs.Sort()
@@ -874,6 +875,10 @@ func (cdcs *cdcCollection) InstallationPending(c client.Client, cdc *hivev1.Clus
 	delete(cdcs.syntax, cdc.Name)
 	delete(cdcs.cloud, cdc.Name)
 	return nil
+}
+
+func (c *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
+	return c.unassigned
 }
 
 // SyncClusterDeploymentCustomizations updates CDCs and related CR status:
@@ -966,6 +971,9 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 				}
 			}
 			// Fix CDC availability
+			if err := cdcs.Unassign(c, cdc); err != nil {
+				return err
+			}
 			if err := cdcs.Reserve(c, cdc, cd.Name, pool.Name); err != nil {
 				return err
 			}

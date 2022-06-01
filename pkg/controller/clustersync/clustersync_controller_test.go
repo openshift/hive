@@ -3,7 +3,6 @@ package clustersync
 import (
 	"context"
 	"fmt"
-	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -157,11 +156,9 @@ func (rt *reconcileTest) run(t *testing.T) {
 			minRequeueAfter = (defaultReapplyInterval - endTime.Sub(startTime)).Seconds()
 			maxRequeueAfter = defaultReapplyInterval.Seconds() * (1 + reapplyIntervalJitter)
 		}
-		// Due to the vagaries of floating point math, we've seen flakes where these numbers are "right" to
-		// within 0.01s, but still fail. Truncating to 2dp gets around this.
-		floor2 := func(f float64) float64 { return math.Floor(f*100) / 100 }
-		assert.GreaterOrEqual(t, floor2(result.RequeueAfter.Seconds()), floor2(minRequeueAfter), "requeue after too small")
-		assert.LessOrEqual(t, floor2(result.RequeueAfter.Seconds()), floor2(maxRequeueAfter), "requeue after too large")
+		// Due to the vagaries of floating point math, these numbers are still "right" when within 0.01s.
+		assert.InDelta(t, result.RequeueAfter.Seconds(), minRequeueAfter, 0.01*float64(time.Second), "Minimum RequeueAfter out of range")
+		assert.InDelta(t, result.RequeueAfter.Seconds(), maxRequeueAfter, 0.01*float64(time.Second), "Maximum RequeueAfter out of range")
 	}
 
 	lease := &hiveintv1alpha1.ClusterSyncLease{}

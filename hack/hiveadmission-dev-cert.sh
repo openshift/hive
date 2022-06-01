@@ -11,7 +11,12 @@ cat <<EOF | cfssl genkey - | cfssljson -bare server
     "hiveadmission.${HIVE_NS}.svc",
     "hiveadmission.${HIVE_NS}.svc.cluster.local"
   ],
-  "CN": "hiveadmission.${HIVE_NS}.svc",
+  "CN": "system:node:hiveadmission.${HIVE_NS}.svc",
+  "names": [
+    {
+      "O": "system:nodes"
+    }
+  ],
   "key": {
     "algo": "ecdsa",
     "size": 256
@@ -20,12 +25,13 @@ cat <<EOF | cfssl genkey - | cfssljson -bare server
 EOF
 
 cat <<EOF | kubectl apply -f -
-apiVersion: certificates.k8s.io/v1beta1
+apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
 metadata:
   name: hiveadmission.${HIVE_NS}
 spec:
   request: $(cat server.csr | base64 | tr -d '\n')
+  signerName: kubernetes.io/kubelet-serving
   usages:
   - digital signature
   - key encipherment

@@ -544,7 +544,8 @@ func (r *ReconcileClusterSync) applySyncSets(
 		return syncSets[i].AsMetaObject().GetName() < syncSets[j].AsMetaObject().GetName()
 	})
 
-	deletionList := syncStatuses
+	deletionList := make([]hiveintv1alpha1.SyncStatus, len(syncStatuses))
+	copy(deletionList, syncStatuses)
 
 	for _, syncSet := range syncSets {
 		_, indexOfOldStatus := getOldSyncStatus(syncSet, deletionList)

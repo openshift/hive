@@ -975,13 +975,24 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourceToApply := testConfigMap("dest-namespace", "retained-resource")
+			resourceToApply2 := testConfigMap("another-namespace", "another-resource")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
 				testsyncset.WithGeneration(2),
 				testsyncset.WithResources(resourceToApply),
 				testsyncset.WithApplyMode(tc.resourceApplyMode),
 			)
+			syncSet2 := testsyncset.FullBuilder(testNamespace, "test-syncset2", scheme).Build(
+				testsyncset.ForClusterDeployments(testCDName),
+				testsyncset.WithGeneration(2),
+				testsyncset.WithResources(resourceToApply2),
+				testsyncset.WithApplyMode(tc.resourceApplyMode),
+			)
 			existingSyncStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
+				withTransitionInThePast(),
+				withFirstSuccessTimeInThePast(),
+			)
+			existingSyncStatusBuilder2 := newSyncStatusBuilder("test-syncset2").Options(
 				withTransitionInThePast(),
 				withFirstSuccessTimeInThePast(),
 			)
@@ -990,8 +1001,14 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 					testConfigMapRef("dest-namespace", "deleted-resource"),
 					testConfigMapRef("dest-namespace", "retained-resource"),
 				))
+				existingSyncStatusBuilder2 = existingSyncStatusBuilder2.Options(withResourcesToDelete(
+					testConfigMapRef("another-namespace", "another-resource"),
+				))
 			}
-			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatusBuilder.Build()))
+			clusterSync := clusterSyncBuilder(scheme).Build(
+				testcs.WithSyncSetStatus(existingSyncStatusBuilder.Build()),
+				testcs.WithSyncSetStatus(existingSyncStatusBuilder2.Build()),
+			)
 			lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
 			rt := newReconcileTest(t, mockCtrl, scheme,
 				cdBuilder(scheme).Build(),
@@ -1000,9 +1017,11 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 					teststatefulset.WithReplicas(3),
 				),
 				syncSet,
+				syncSet2,
 				clusterSync,
 				lease)
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
+			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply2)).Return(resource.CreatedApplyResult, nil)
 			if tc.expectDelete {
 				rt.mockResourceHelper.EXPECT().
 					Delete("v1", "ConfigMap", "dest-namespace", "deleted-resource").
@@ -1012,12 +1031,22 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 				withObservedGeneration(2),
 				withFirstSuccessTimeInThePast(),
 			)
+			expectedSyncStatusBuilder2 := newSyncStatusBuilder("test-syncset2").Options(
+				withObservedGeneration(2),
+				withFirstSuccessTimeInThePast(),
+			)
 			if tc.includeResourcesToDelete {
 				expectedSyncStatusBuilder = expectedSyncStatusBuilder.Options(withResourcesToDelete(
 					testConfigMapRef("dest-namespace", "retained-resource"),
 				))
+				expectedSyncStatusBuilder2 = expectedSyncStatusBuilder2.Options(withResourcesToDelete(
+					testConfigMapRef("another-namespace", "another-resource"),
+				))
 			}
-			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
+				expectedSyncStatusBuilder.Build(),
+				expectedSyncStatusBuilder2.Build(),
+			}
 			rt.expectUnchangedLeaseRenewTime = true
 			rt.run(t)
 		})

@@ -95,7 +95,7 @@ function cleanup() {
   echo "Saving hive logs after cleanup"
   save_hive_logs
 }
-trap cleanup EXIT
+trap 'kill %1; cleanup' EXIT
 
 function wait_for_pool_to_be_ready() {
   local poolname=$1

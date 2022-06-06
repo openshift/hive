@@ -8,6 +8,8 @@
 # This is necessary so our child process can signal us.
 set -o monitor
 # Background an almost-2h sleep followed by sending SIGINT to our PID.
+# Exit traps need to kill this, or it'll hold the test env until the timeout is
+# reached :(
 /usr/bin/bash -c "sleep $((118*60)); echo 'Timed out!'; kill -n 2 $$" &
 ###
 
@@ -110,7 +112,7 @@ function save_hive_logs() {
 }
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.
-trap save_hive_logs EXIT
+trap 'kill %1; save_hive_logs' EXIT
 
 # Install Hive
 IMG="${HIVE_IMAGE}" make deploy

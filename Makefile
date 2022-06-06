@@ -1,6 +1,13 @@
 .PHONY: all
 all: vendor update test build
 
+# In openshift ci (Prow), we need to set $HOME to a writable directory else tests will fail
+# because they don't have permissions to create /.local or /.cache directories
+# as $HOME is set to "/" by default.
+ifeq ($(HOME),/)
+export HOME=/tmp/home
+endif
+
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
@@ -59,7 +66,7 @@ endif
 # v{major}.{minor}.{commitcount}-{sha}
 # Note that building against a local commit may result in {major}.{minor} being rendered as
 # `UnknownBranch`. However, the {commitcount} and {sha} should still be accurate.
-SOURCE_GIT_TAG := v$(shell python3 -mpip install --user gitpython >&2; hack/version.py)
+SOURCE_GIT_TAG := v$(shell export HOME=$(HOME); python3 -mpip install --user gitpython >&2; hack/version.py)
 
 BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/... ./config/monitoring/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)

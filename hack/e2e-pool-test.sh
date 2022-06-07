@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 TEST_NAME=e2e-pool
 source ${0%/*}/e2e-common.sh

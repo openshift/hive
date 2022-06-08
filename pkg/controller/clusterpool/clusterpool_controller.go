@@ -775,7 +775,7 @@ func (r *ReconcileClusterPool) createCluster(
 			poolRef := poolReference(clp)
 			cd.Spec.ClusterPoolRef = &poolRef
 			if clp.Spec.Inventory != nil {
-				cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcs.unassigned[0].Name}
+				cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcs.next}
 			}
 		} else if secretTmp := isInstallConfigSecret(obj); secretTmp != nil {
 			secret = secretTmp

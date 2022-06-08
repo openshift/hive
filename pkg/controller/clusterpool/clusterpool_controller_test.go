@@ -362,6 +362,31 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedAssignedCDCs:             map[string]string{"test-cdc-successful-old": ""},
 		},
 		{
+			name: "cp with inventory - correct prioritization - mix and multiple deployments",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(2),
+					testcp.WithInventory([]string{"test-cdc-successful-old", "test-cdc-unused-new", "test-cdc-broken-old"}),
+				),
+				testcdc.FullBuilder(testNamespace, "test-cdc-successful-old", scheme).Build(
+					testcdc.WithApplySucceeded(hivev1.CustomizationApplyReasonSucceeded, nowish.Add(-time.Hour)),
+				),
+				testcdc.FullBuilder(testNamespace, "test-cdc-broken-old", scheme).Build(
+					testcdc.WithApplySucceeded(hivev1.CustomizationApplyReasonBrokenCloud, nowish.Add(-time.Hour)),
+				),
+				testcdc.FullBuilder(testNamespace, "test-cdc-unused-new", scheme).Build(),
+			},
+			expectedTotalClusters:            2,
+			expectedInventoryValidStatus:     corev1.ConditionFalse,
+			expectInventory:                  true,
+			expectedInventoryAssignmentOrder: []string{"test-cdc-successful-old", "test-cdc-unused-new"},
+			expectedAssignedCDCs: map[string]string{
+				"test-cdc-successful-old": "",
+				"test-cdc-unused-new":     "",
+			},
+		},
+
+		{
 			name: "cp with inventory - correct prioritization - successful vs broken",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(
@@ -1873,7 +1898,7 @@ func TestReconcileClusterPool(t *testing.T) {
 					if condition == nil || condition.Status == corev1.ConditionUnknown || condition.Status == corev1.ConditionTrue {
 						assert.Failf(t, "expected CDC %s to be assigned", cdcName)
 					}
-					assert.True(t, lastTime.Before(&condition.LastTransitionTime), "expected %s to be before %s", lastTime, condition.LastTransitionTime)
+					assert.True(t, lastTime.Before(&condition.LastTransitionTime) || lastTime.Equal(&condition.LastTransitionTime), "expected %s to be before %s", lastTime, condition.LastTransitionTime)
 					lastTime = condition.LastTransitionTime
 				}
 			}
@@ -2636,8 +2661,6 @@ func TestReconcileRBAC(t *testing.T) {
 func Test_isBroken(t *testing.T) {
 	logger := log.New()
 
-	basicPool := hivev1.ClusterPool{}
-
 	poolNoHibernationConfig := hivev1.ClusterPool{
 		Spec: hivev1.ClusterPoolSpec{},
 	}
@@ -2829,20 +2852,6 @@ func Test_isBroken(t *testing.T) {
 				testcd.WithStatusPowerState(hivev1.ClusterPowerStateWaitingForClusterOperators),
 			).Build(),
 			pool: &poolWithTimeout,
-			want: true,
-		},
-		{
-			name: "ClusterDeploymentCustomization was removed",
-			cd: testcd.BasicBuilder().Options(
-				testcd.WithCondition(
-					hivev1.ClusterDeploymentCondition{
-						Type:   hivev1.ProvisionStoppedCondition,
-						Status: corev1.ConditionFalse,
-					}),
-				testcd.WithClusterPoolReference(testNamespace, "cp", ""),
-				testcd.WithCustomization("test-cdc-1"),
-			).Build(),
-			pool: &basicPool,
 			want: true,
 		},
 	}

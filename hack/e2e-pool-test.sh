@@ -313,7 +313,7 @@ wait_for_hibernation_state $CLUSTER_NAME Running
 
 # Test customization
 create_customization "cdc-test" "${CLUSTER_NAMESPACE}"
-oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": "[{"name": "cdc-test"}]"}}'
+oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
 oc delete clusterclaim --all
 wait_for_pool_to_be_ready $REAL_POOL_NAME
 verify_cluster_name $REAL_POOL_NAME "cdc-test" "cdc-test"

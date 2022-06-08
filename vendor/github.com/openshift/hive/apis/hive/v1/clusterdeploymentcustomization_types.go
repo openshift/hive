@@ -12,10 +12,10 @@ const (
 	CustomizationApplyReasonSucceeded = "Succeeded"
 	// CustomizationApplyReasonBrokenSyntax indicates that Hive failed to apply
 	// customization patches on install-config. More details would be found in
-	// Valid condition message.
+	// ApplySucceded condition message.
 	CustomizationApplyReasonBrokenSyntax = "BrokenBySyntax"
 	// CustomizationApplyReasonBrokenCloud indicates that cluster deployment provision has failed
-	// when using this customization. More details would be found in the Valid condition message.
+	// when using this customization. More details would be found in the ApplySucceeded condition message.
 	CustomizationApplyReasonBrokenCloud = "BrokenByCloud"
 	// CustomizationApplyReasonInstallationPending indicates that the customization patches have
 	// been successfully applied but provisioning is not completed yet.

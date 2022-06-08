@@ -213,6 +213,8 @@ function capture_manifests() {
     oc get clusterstate -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterstate.yaml" || true
     oc get dnszone -A -o yaml &> "${ARTIFACT_DIR}/hive_dnszones.yaml" || true
     oc get machinepool -A -o yaml &> "${ARTIFACT_DIR}/hive_machinepools.yaml" || true
+    oc get clusterdeploymentcustomization -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterdeploymentcustomization.yaml" || true
+    oc get clusterpool -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterppol.yaml" || true
     # Don't get the contents of the secrets, since they're sensitive; hopefully just listing them will be helpful.
     oc get secrets -A &> "${ARTIFACT_DIR}/secret_list.txt" || true
 }

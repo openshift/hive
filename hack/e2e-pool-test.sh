@@ -32,12 +32,12 @@ apiVersion: hive.openshift.io/v1
 kind: ClusterDeploymentCustomization
 metadata:
   name: $is_name
-  name: $ns
+  namespace: $ns
 spec:
   installConfigPatches:
     - op: replace
       path: /metadata/name
-      value: cdc-test 
+      value: cdc-test
 EOF
 }
 

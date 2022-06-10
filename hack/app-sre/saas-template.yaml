@@ -6748,7 +6748,13 @@ objects:
     - namespaces
     - persistentvolumeclaims
     verbs:
-    - '*'
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
   - apiGroups:
     - apiregistration.k8s.io
     resources:

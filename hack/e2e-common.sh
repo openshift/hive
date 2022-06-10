@@ -1,16 +1,23 @@
 ###
 # TEMPORARY workaround for https://issues.redhat.com/browse/DPTP-2871
-# The job timeout after 2h isn't signaling the test script like it should, so
-# our exit trap isn't being activated, so we're not cleaning up spoke clusters,
-# so we're leaking cloud resources. Inject a "manual" timeout that actually
-# does signal us.
+# The configured job timeout after isn't signaling the test script like it
+# should, so our exit trap isn't being activated, so we're not cleaning up
+# spoke clusters, so we're leaking cloud resources. Inject a "manual" timeout
+# that actually does signal us.
 ###
 # This is necessary so our child process can signal us.
 set -o monitor
-# Background an almost-2h sleep followed by sending SIGINT to our PID.
+# Background a sleep followed by sending SIGINT to our PID.
 # Exit traps need to kill this, or it'll hold the test env until the timeout is
 # reached :(
-/usr/bin/bash -c "sleep $((118*60)); echo 'Timed out!'; kill -n 2 $$" &
+# Compute the timeout as 2m less than what's configured for the job in prow --
+# keep these up to date with the job config!
+if [[ $0 == */e2e-pool-test.sh ]]; then
+  timeout_minutes=148
+else
+  timeout_minutes=118
+fi
+/usr/bin/bash -c "sleep $(($timeout_minutes*60)) && echo 'Timed out!' && kill -n 2 $$" &
 ###
 
 max_tries=120

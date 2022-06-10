@@ -130,6 +130,10 @@ const (
 	// SyncsetPauseAnnotation is a annotation used by clusterDeployment, if it's true, then we will disable syncing to a specific cluster
 	SyncsetPauseAnnotation = "hive.openshift.io/syncset-pause"
 
+	// PowerStatePauseAnnotation is an annotation used by ClusterDeployment. If "true", the hibernation controller will ignore
+	// the cluster, causing its machines to remain in their current state (unless acted on externally) regardless of CD.Spec.PowerState.
+	PowerStatePauseAnnotation = "hive.openshift.io/powerstate-pause"
+
 	// HiveManagedLabel is a label added to any resources we sync to the remote cluster to help identify that they are
 	// managed by Hive, and any manual changes may be undone the next time the resource is reconciled.
 	HiveManagedLabel = "hive.openshift.io/managed"

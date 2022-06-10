@@ -195,6 +195,26 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
+	// Secret toggle allowing consumers to e.g. perform manual maintenance on machines without the
+	// controller attempting to reconcile desired CD.Spec.PowerState.
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.PowerStatePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile of PowerState as the powerstate-pause annotation is set")
+		changed := false
+		if cd.Status.PowerState != hivev1.ClusterPowerStateUnknown {
+			changed = true
+			cd.Status.PowerState = hivev1.ClusterPowerStateUnknown
+		}
+		msg := "the powerstate-pause annotation is set"
+		changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonPowerStatePaused, msg, corev1.ConditionUnknown, cdLog) ||
+			changed
+		changed = r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonPowerStatePaused, msg, corev1.ConditionUnknown, cdLog) ||
+			changed
+		if changed {
+			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
+		}
+		return reconcile.Result{}, nil
+	}
+
 	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 	readyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 
@@ -572,7 +592,7 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		// Make sure we wait long enough for operators to start/settle:
 		if readyCondition.Reason == hivev1.ReadyReasonPausingForClusterOperatorsToSettle &&
 			time.Since(readyCondition.LastProbeTime.Time) < constants.ClusterOperatorSettlePause {
-			remainingPause := constants.ClusterOperatorSettlePause - time.Now().Sub(readyCondition.LastProbeTime.Time)
+			remainingPause := constants.ClusterOperatorSettlePause - time.Since(readyCondition.LastProbeTime.Time)
 			logger.WithField("timeRemaining", remainingPause).Info("still waiting for ClusterOperators to settle")
 			return reconcile.Result{RequeueAfter: remainingPause}, nil
 		}

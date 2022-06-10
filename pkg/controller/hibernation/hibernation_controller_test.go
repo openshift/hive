@@ -148,6 +148,127 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "powerstate-paused annotation won't hibernate",
+			cd:   cdBuilder.Options(o.shouldHibernate, testcd.WithAnnotation(constants.PowerStatePauseAnnotation, "true")).Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, hivev1.ClusterPowerStateUnknown, string(cd.Status.PowerState), "unexpected Status.PowerState")
+				hc, rc := getHibernatingAndRunningConditions(cd)
+				for _, cond := range []*hivev1.ClusterDeploymentCondition{hc, rc} {
+					assert.Equal(t, corev1.ConditionUnknown, cond.Status, "unexpected status for the %s condition", cond.Type)
+					assert.Equal(t, "PowerStatePaused", cond.Reason, "unexpected reason for the %s condition", cond.Type)
+					assert.Equal(t, "the powerstate-pause annotation is set", cond.Message, "unexpected message for the %s condition", cond.Type)
+				}
+			},
+		},
+		{
+			name: "powerstate-paused annotation won't run",
+			cd:   cdBuilder.Options(o.shouldRun, testcd.WithAnnotation(constants.PowerStatePauseAnnotation, "true")).Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, hivev1.ClusterPowerStateUnknown, string(cd.Status.PowerState), "unexpected Status.PowerState")
+				hc, rc := getHibernatingAndRunningConditions(cd)
+				for _, cond := range []*hivev1.ClusterDeploymentCondition{hc, rc} {
+					assert.Equal(t, corev1.ConditionUnknown, cond.Status, "unexpected status for the %s condition", cond.Type)
+					assert.Equal(t, "PowerStatePaused", cond.Reason, "unexpected reason for the %s condition", cond.Type)
+					assert.Equal(t, "the powerstate-pause annotation is set", cond.Message, "unexpected message for the %s condition", cond.Type)
+				}
+			},
+		},
+		{
+			name: "powerstate-paused takes precedence over unsupported",
+			cd: cdBuilder.Options(
+				o.shouldRun,
+				testcd.WithAnnotation(constants.PowerStatePauseAnnotation, "true"),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:    hivev1.ClusterHibernatingCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.HibernatingReasonUnsupported,
+					Message: "Unsupported version, need version 4.4.8 or greater",
+				}),
+				testcd.WithClusterVersion("4.3.11")).Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, hivev1.ClusterPowerStateUnknown, string(cd.Status.PowerState), "unexpected Status.PowerState")
+				hc, rc := getHibernatingAndRunningConditions(cd)
+				for _, cond := range []*hivev1.ClusterDeploymentCondition{hc, rc} {
+					assert.Equal(t, corev1.ConditionUnknown, cond.Status, "unexpected status for the %s condition", cond.Type)
+					assert.Equal(t, "PowerStatePaused", cond.Reason, "unexpected reason for the %s condition", cond.Type)
+					assert.Equal(t, "the powerstate-pause annotation is set", cond.Message, "unexpected message for the %s condition", cond.Type)
+				}
+			},
+		},
+		{
+			name: "unpause start hibernating",
+			cd: cdBuilder.Options(
+				o.shouldHibernate,
+				// Simulate a previous reconcile having set the status for powerstate-paused,
+				// but now the annotation is non-true-ish.
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateUnknown),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:    hivev1.ClusterHibernatingCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.HibernatingReasonPowerStatePaused,
+					Message: "the powerstate-pause annotation is set",
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:    hivev1.ClusterReadyCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.ReadyReasonPowerStatePaused,
+					Message: "the powerstate-pause annotation is set",
+				}),
+				testcd.WithAnnotation(constants.PowerStatePauseAnnotation, "false"),
+			).Build(),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().StopMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.HibernatingReasonStopping, cond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStopping, cd.Status.PowerState)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.ReadyReasonStoppingOrHibernating, runCond.Reason)
+			},
+		},
+		{
+			name: "unpause start resuming",
+			cd: cdBuilder.Options(
+				o.hibernating,
+				o.shouldRun,
+				// Simulate a previous reconcile having set the status for powerstate-paused,
+				// but now the annotation is non-true-ish.
+				testcd.WithStatusPowerState(hivev1.ClusterPowerStateUnknown),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:    hivev1.ClusterHibernatingCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.HibernatingReasonPowerStatePaused,
+					Message: "the powerstate-pause annotation is set",
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:    hivev1.ClusterReadyCondition,
+					Status:  corev1.ConditionUnknown,
+					Reason:  hivev1.ReadyReasonPowerStatePaused,
+					Message: "the powerstate-pause annotation is set",
+				}),
+				testcd.WithAnnotation(constants.PowerStatePauseAnnotation, "false"),
+			).Build(),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().StartMachines(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				require.NotNil(t, cond)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status)
+				assert.Equal(t, hivev1.HibernatingReasonResumingOrRunning, cond.Reason)
+				require.NotNil(t, runCond)
+				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
+				assert.Equal(t, hivev1.ReadyReasonStartingMachines, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateStartingMachines, cd.Status.PowerState)
+			},
+		},
+		{
 			name:        "clustersync not yet created",
 			cd:          cdBuilder.Options(o.shouldHibernate).Build(),
 			expectError: true,

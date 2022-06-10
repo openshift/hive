@@ -100,6 +100,9 @@ const (
 	// ClusterPowerStateWaitingForClusterOperators is used when waiting for ClusterOperators to
 	// get to a good state. (Available=True, Processing=False, Degraded=False)
 	ClusterPowerStateWaitingForClusterOperators ClusterPowerState = "WaitingForClusterOperators"
+
+	// ClusterPowerStateUnknown indicates that we can't/won't discover the state of the cluster's cloud machines.
+	ClusterPowerStateUnknown = "Unknown"
 )
 
 // ClusterDeploymentSpec defines the desired state of ClusterDeployment
@@ -496,6 +499,9 @@ const (
 	// (It does not necessarily mean they are currently copacetic -- check ClusterSync status
 	// for that.)
 	HibernatingReasonSyncSetsApplied = "SyncSetsApplied"
+	// HibernatingReasonPowerStatePaused indicates that we can't/won't discover the state of the
+	// cluster's cloud machines because the powerstate-paused annotation is set.
+	HibernatingReasonPowerStatePaused = "PowerStatePaused"
 
 	// ReadyReasonStoppingOrHibernating is used as the reason for the Ready condition when the cluster
 	// is stopping or hibernating. Precise details are available in the Hibernating condition.
@@ -516,6 +522,9 @@ const (
 	ReadyReasonWaitingForClusterOperators = string(ClusterPowerStateWaitingForClusterOperators)
 	// ReadyReasonRunning is used on the Ready condition as the reason when the cluster is running and ready
 	ReadyReasonRunning = string(ClusterPowerStateRunning)
+	// ReadyReasonPowerStatePaused indicates that we can't/won't discover the state of the
+	// cluster's cloud machines because the powerstate-paused annotation is set.
+	ReadyReasonPowerStatePaused = "PowerStatePaused"
 )
 
 // Provisioned status condition reasons

@@ -195,6 +195,26 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
+	// Secret toggle allowing consumers to e.g. perform manual maintenance on machines without the
+	// controller attempting to reconcile desired CD.Spec.PowerState.
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.PowerStatePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile of PowerState as the powerstate-pause annotation is set")
+		changed := false
+		if cd.Status.PowerState != hivev1.ClusterPowerStateUnknown {
+			changed = true
+			cd.Status.PowerState = hivev1.ClusterPowerStateUnknown
+		}
+		msg := "the powerstate-pause annotation is set"
+		changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonPowerStatePaused, msg, corev1.ConditionUnknown, cdLog) ||
+			changed
+		changed = r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonPowerStatePaused, msg, corev1.ConditionUnknown, cdLog) ||
+			changed
+		if changed {
+			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
+		}
+		return reconcile.Result{}, nil
+	}
+
 	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 	readyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 
@@ -220,10 +240,11 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		// Fail and requeue to wait for it to exist.
 		return reconcile.Result{}, fmt.Errorf("could not get ClusterSync: %v", err)
 	}
+	syncSetsApplied := clusterSync.Status.FirstSuccessTime != nil
 
 	// Check on the SyncSetsNotApplied condition. Usually this is happening on a freshly installed cluster that's
 	// running; checkClusterRunning will discover that state and flip the condition appropriately.
-	if hibernatingCondition.Reason == hivev1.HibernatingReasonSyncSetsNotApplied && clusterSync.Status.FirstSuccessTime != nil {
+	if hibernatingCondition.Reason == hivev1.HibernatingReasonSyncSetsNotApplied && syncSetsApplied {
 		r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonSyncSetsApplied,
 			"SyncSets have been applied", corev1.ConditionFalse, cdLog)
 		return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
@@ -308,10 +329,10 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 
 	if shouldHibernate || readyToHibernate {
 		// Signal a problem if we should be hibernating and the SyncSets have not yet been applied.
-		if clusterSync.Status.FirstSuccessTime == nil {
+		if !syncSetsApplied {
 			// Allow hibernation (do not set condition) if hibernateAfterSyncSetsNotApplied duration has passed since cluster
 			// installed and syncsets still not applied
-			if cd.Status.InstalledTimestamp != nil && time.Now().Sub(cd.Status.InstalledTimestamp.Time) < hibernateAfterSyncSetsNotApplied {
+			if cd.Status.InstalledTimestamp != nil && time.Since(cd.Status.InstalledTimestamp.Time) < hibernateAfterSyncSetsNotApplied {
 				changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonSyncSetsNotApplied,
 					"Cluster SyncSets have not been applied", corev1.ConditionFalse, cdLog)
 				if changed {
@@ -367,7 +388,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if shouldStartMachines(cd, hibernatingCondition, readyCondition) {
 		return r.startMachines(cd, cdLog)
 	}
-	return r.checkClusterRunning(cd, cdLog, readyCondition, hibernatingCondition)
+	return r.checkClusterRunning(cd, syncSetsApplied, cdLog, readyCondition, hibernatingCondition)
 }
 
 func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
@@ -481,7 +502,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 	return reconcile.Result{}, nil
 }
 
-func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment, logger log.FieldLogger,
+func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment, syncSetsApplied bool, logger log.FieldLogger,
 	readyCondition *hivev1.ClusterDeploymentCondition, hibernatingCondition *hivev1.ClusterDeploymentCondition) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
@@ -517,6 +538,17 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 	remoteClient, err := r.remoteClientBuilder(cd).Build()
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to connect to target cluster")
+		// Special case: it's possible to get here when we're in StartingMachines state. But MachinesRunning
+		// returned true, so really we're waiting for nodes. So make sure that state is set.
+		if cd.Status.PowerState == hivev1.ClusterPowerStateStartingMachines {
+			r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonWaitingForNodes,
+				"Waiting for Nodes to be ready (step 2/4)", corev1.ConditionFalse, logger)
+			cd.Status.PowerState = hivev1.ClusterPowerStateWaitingForNodes
+			if lerr := r.updateClusterDeploymentStatus(cd, logger); lerr != nil {
+				return reconcile.Result{}, lerr
+			}
+		}
+		// Regardless, return the error from remoteClientBuilder
 		return reconcile.Result{}, err
 	}
 
@@ -534,7 +566,7 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		}
 	}
 
-	nodesReady, err := r.nodesReady(cd, remoteClient, logger)
+	nodesReady, err := r.nodesReady(cd, syncSetsApplied, remoteClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether nodes are ready")
 		return reconcile.Result{}, err
@@ -572,7 +604,7 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		// Make sure we wait long enough for operators to start/settle:
 		if readyCondition.Reason == hivev1.ReadyReasonPausingForClusterOperatorsToSettle &&
 			time.Since(readyCondition.LastProbeTime.Time) < constants.ClusterOperatorSettlePause {
-			remainingPause := constants.ClusterOperatorSettlePause - time.Now().Sub(readyCondition.LastProbeTime.Time)
+			remainingPause := constants.ClusterOperatorSettlePause - time.Since(readyCondition.LastProbeTime.Time)
 			logger.WithField("timeRemaining", remainingPause).Info("still waiting for ClusterOperators to settle")
 			return reconcile.Result{RequeueAfter: remainingPause}, nil
 		}
@@ -727,14 +759,14 @@ func (r *hibernationReconciler) hibernationSupported(cd *hivev1.ClusterDeploymen
 	return true, "Hibernation capable"
 }
 
-func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (bool, error) {
+func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, syncSetsApplied bool, remoteClient client.Client, logger log.FieldLogger) (bool, error) {
 
 	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 	if hibernatingCondition == nil {
 		return false, errors.New("cannot find hibernating condition")
 	}
-	// Don't delay nodeCheckWaitTime if we just discovered SyncSets have been applied
-	if hibernatingCondition.Reason != hivev1.HibernatingReasonSyncSetsApplied && time.Since(hibernatingCondition.LastProbeTime.Time) < nodeCheckWaitTime {
+	// Don't delay nodeCheckWaitTime if SyncSets have been applied
+	if !syncSetsApplied && time.Since(hibernatingCondition.LastProbeTime.Time) < nodeCheckWaitTime {
 		return false, nil
 	}
 	nodeList := &corev1.NodeList{}

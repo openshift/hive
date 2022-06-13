@@ -223,10 +223,31 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 		// by cloud controller manager. In that case some machines would never get
 		// deleted without a manual intervention.
 		if _, exists := m.ObjectMeta.Annotations[ExcludeNodeDrainingAnnotation]; !exists && m.Status.NodeRef != nil {
+			// pre-drain.delete lifecycle hook
+			// Return early without error, will requeue if/when the hook owner removes the annotation.
+			if len(m.Spec.LifecycleHooks.PreDrain) > 0 {
+				klog.Infof("%v: not draining machine: lifecycle blocked by pre-drain hook", machineName)
+				return reconcile.Result{}, nil
+			}
+
 			if err := r.drainNode(ctx, m); err != nil {
 				klog.Errorf("%v: failed to drain node for machine: %v", machineName, err)
+				conditions.Set(m, conditions.FalseCondition(
+					machinev1.MachineDrained,
+					machinev1.MachineDrainError,
+					machinev1.ConditionSeverityWarning,
+					"could not drain machine: %v", err,
+				))
 				return delayIfRequeueAfterError(err)
 			}
+			conditions.Set(m, conditions.TrueCondition(machinev1.MachineDrained))
+		}
+
+		// pre-term.delete lifecycle hook
+		// Return early without error, will requeue if/when the hook owner removes the annotation.
+		if len(m.Spec.LifecycleHooks.PreTerminate) > 0 {
+			klog.Infof("%v: not deleting machine: lifecycle blocked by pre-terminate hook", machineName)
+			return reconcile.Result{}, nil
 		}
 
 		if err := r.actuator.Delete(ctx, m); err != nil {
@@ -359,7 +380,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 		if err := r.updateStatus(ctx, m, phaseProvisioning, nil, originalConditions); err != nil {
 			return reconcile.Result{}, err
 		}
-		return reconcile.Result{RequeueAfter: requeueAfter}, nil
+		return reconcile.Result{}, nil
 	}
 
 	klog.Infof("%v: reconciling machine triggers idempotent create", machineName)
@@ -482,6 +503,9 @@ func (r *ReconcileMachine) updateStatus(ctx context.Context, machine *machinev1.
 	if stringPointerDeref(machine.Status.Phase) != phase {
 		klog.V(3).Infof("%v: going into phase %q", machine.GetName(), phase)
 	}
+
+	// Ensure the lifecycle hook conditions are accurate whenever the status is updated
+	setLifecycleHookConditions(machine)
 
 	// Conditions need to be deep copied as they are set outside of this function.
 	// They will be restored after any updates to the base (done by patching annotations).
@@ -618,6 +642,30 @@ func validateMachine(m *machinev1.Machine) field.ErrorList {
 	}
 
 	return errors
+}
+
+func setLifecycleHookConditions(m *machinev1.Machine) {
+	if len(m.Spec.LifecycleHooks.PreDrain) > 0 {
+		conditions.Set(m, conditions.FalseCondition(
+			machinev1.MachineDrainable,
+			machinev1.MachineHookPresent,
+			machinev1.ConditionSeverityWarning,
+			"Drain operation currently blocked by: %+v", m.Spec.LifecycleHooks.PreDrain,
+		))
+	} else {
+		conditions.MarkTrue(m, machinev1.MachineDrainable)
+	}
+
+	if len(m.Spec.LifecycleHooks.PreTerminate) > 0 {
+		conditions.Set(m, conditions.FalseCondition(
+			machinev1.MachineTerminable,
+			machinev1.MachineHookPresent,
+			machinev1.ConditionSeverityWarning,
+			"Terminate operation currently blocked by: %+v", m.Spec.LifecycleHooks.PreTerminate,
+		))
+	} else {
+		conditions.MarkTrue(m, machinev1.MachineTerminable)
+	}
 }
 
 // now is used to get the current time. If the reconciler nowFunc is no nil this will be used instead of time.Now().

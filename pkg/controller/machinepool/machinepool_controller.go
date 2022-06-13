@@ -981,7 +981,7 @@ func (r *ReconcileMachinePool) createActuator(
 		); err != nil {
 			return nil, err
 		}
-		return NewAlibabaCloudActuator(creds, cd.Spec.Platform.AlibabaCloud.Region, logger)
+		return NewAlibabaCloudActuator(creds, cd.Spec.Platform.AlibabaCloud.Region, masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.AWS != nil:
 		creds := awsclient.CredentialsSource{
 			Secret: &awsclient.SecretCredentialsSource{

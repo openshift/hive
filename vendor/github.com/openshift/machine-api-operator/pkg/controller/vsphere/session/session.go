@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -40,6 +41,7 @@ var sessionMU sync.Mutex
 
 const (
 	managedObjectTypeTask = "Task"
+	clientTimeout         = 15 * time.Second
 )
 
 // Session is a vSphere session with a configured Finder.
@@ -50,6 +52,18 @@ type Session struct {
 
 	username string
 	password string
+}
+
+func newClientWithTimeout(ctx context.Context, u *url.URL, insecure bool, timeout time.Duration) (*govmomi.Client, error) {
+	clientCreateCtx, clientCreateCtxCancel := context.WithTimeout(ctx, timeout)
+	defer clientCreateCtxCancel()
+	// It makes call to vcenter during new client creation, so pass context with timeout there.
+	client, err := govmomi.NewClient(clientCreateCtx, u, insecure)
+	if err != nil {
+		return nil, err
+	}
+	client.Timeout = timeout
+	return client, nil
 }
 
 // GetOrCreate gets a cached session or creates a new one if one does not
@@ -84,11 +98,10 @@ func GetOrCreate(
 	// Set user to nil there for prevent login during client creation.
 	// See https://github.com/vmware/govmomi/blob/master/client.go#L91
 	soapURL.User = nil
-	client, err := govmomi.NewClient(ctx, soapURL, insecure)
+	client, err := newClientWithTimeout(ctx, soapURL, insecure, clientTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up new vSphere SOAP client: %w", err)
 	}
-
 	// Set up user agent before login for being able to track mapi component in vcenter sessions list
 	client.UserAgent = "machineAPIvSphereProvider"
 	if err := client.Login(ctx, url.UserPassword(username, password)); err != nil {

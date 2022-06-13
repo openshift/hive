@@ -5,16 +5,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	apimachineryutilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/google/uuid"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
-	machineapierros "github.com/openshift/machine-api-operator/pkg/controller/machine"
-	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
-	"github.com/openshift/machine-api-operator/pkg/controller/vsphere/session"
-	"github.com/openshift/machine-api-operator/pkg/metrics"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
@@ -25,8 +22,14 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+
+	machineapierros "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"github.com/openshift/machine-api-operator/pkg/controller/vsphere/session"
+	"github.com/openshift/machine-api-operator/pkg/metrics"
 )
 
 const (
@@ -36,6 +39,7 @@ const (
 	providerIDPrefix      = "vsphere://"
 	regionKey             = "region"
 	zoneKey               = "zone"
+	minimumHWVersion      = 15
 )
 
 // These are the guestinfo variables used by Ignition.
@@ -48,7 +52,9 @@ const (
 
 // vSphere tasks description IDs, for determinate task types (clone, delete, etc)
 const (
-	cloneVmTaskDescriptionId = "VirtualMachine.clone"
+	cloneVmTaskDescriptionId    = "VirtualMachine.clone"
+	destroyVmTaskDescriptionId  = "VirtualMachine.destroy"
+	powerOffVmTaskDescriptionId = "VirtualMachine.powerOff"
 )
 
 // Reconciler runs the logic to reconciles a machine resource towards its desired state
@@ -126,7 +132,7 @@ func (r *Reconciler) create() error {
 			return fmt.Errorf("Failed to check task status: %w", err)
 		}
 	} else if !taskIsFinished {
-		return fmt.Errorf("task %v has not finished", moTask.Reference().Value)
+		return fmt.Errorf("%v task %v has not finished", moTask.Info.DescriptionId, moTask.Reference().Value)
 	}
 	// If taskIsFinished then next reconcile should result in update.
 	return nil
@@ -157,9 +163,9 @@ func (r *Reconciler) update() error {
 					Namespace: r.machine.Namespace,
 					Reason:    "Task finished with error",
 				})
-				return err
+				return fmt.Errorf("%v task %v finished with error: %w", moTask.Info.DescriptionId, moTask.Reference().Value, err)
 			} else if !taskIsFinished {
-				return fmt.Errorf("task %v has not finished", moTask.Reference().Value)
+				return fmt.Errorf("%v task %v has not finished", moTask.Info.DescriptionId, moTask.Reference().Value)
 			}
 		}
 	}
@@ -241,15 +247,14 @@ func (r *Reconciler) delete() error {
 						Reason:    "Task finished with error",
 					})
 					klog.Errorf("Delete task finished with error: %w", err)
-					return err
+					return fmt.Errorf("%v task %v finished with error: %w", moTask.Info.DescriptionId, moTask.Reference().Value, err)
 				} else {
 					klog.Warningf(
 						"TaskRef points to clone task which finished with error: %w. Proceeding with machine deletion", err,
 					)
-					return err
 				}
 			} else if !taskIsFinished {
-				return fmt.Errorf("task %v has not finished", moTask.Reference().Value)
+				return fmt.Errorf("%v task %v has not finished", moTask.Info.DescriptionId, moTask.Reference().Value)
 			}
 		}
 	}
@@ -296,12 +301,21 @@ func (r *Reconciler) delete() error {
 		}
 	}
 
-	if _, err := vm.powerOffVM(); err != nil {
-		return err
+	powerState, err := vm.getPowerState()
+	if err != nil {
+		return fmt.Errorf("can not determine %v vm power state: %w", r.machine.GetName(), err)
+	}
+	if powerState != types.VirtualMachinePowerStatePoweredOff {
+		powerOffTaskRef, err := vm.powerOffVM()
+		if err != nil {
+			return fmt.Errorf("%v: failed to power off vm: %w", r.machine.GetName(), err)
+		}
+		if err := setProviderStatus(powerOffTaskRef, conditionSuccess(), r.machineScope, vm); err != nil {
+			return fmt.Errorf("failed to set provider status: %w", err)
+		}
+		return fmt.Errorf("powering off vm is in progress, requeuing")
 	}
 
-	// Will this error if VM not all the way powered off yet?  Don't want to
-	// emit an event for a transient condition.
 	task, err := vm.Obj.Destroy(r.Context)
 	if err != nil {
 		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
@@ -317,7 +331,7 @@ func (r *Reconciler) delete() error {
 	}
 
 	// TODO: consider returning an error to specify retry time here
-	return fmt.Errorf("destroying vm in progress, reconciling")
+	return fmt.Errorf("destroying vm in progress, requeuing")
 }
 
 // nodeHasVolumesAttached returns true if node status still have volumes attached
@@ -534,6 +548,21 @@ func isRetrieveMONotFound(taskRef string, err error) bool {
 	return err.Error() == fmt.Sprintf("ServerFaultCode: The object 'vim.Task:%v' has already been deleted or has not been completely created", taskRef)
 }
 
+func getHwVersion(ctx context.Context, vm *object.VirtualMachine) (int, error) {
+	var _vm mo.VirtualMachine
+	if err := vm.Properties(ctx, vm.Reference(), []string{"config.version"}, &_vm); err != nil {
+		return 0, fmt.Errorf("error getting hw version information for vm %s: %w", vm.Name(), err)
+	}
+
+	versionString := _vm.Config.Version
+	version := strings.TrimPrefix(versionString, "vmx-")
+	parsedVersion, err := strconv.Atoi(version)
+	if err != nil {
+		return 0, fmt.Errorf("can not extract hardware version from version string: %s, format unknown", versionString)
+	}
+	return parsedVersion, nil
+}
+
 func clone(s *machineScope) (string, error) {
 	userData, err := s.GetUserData()
 	if err != nil {
@@ -548,12 +577,35 @@ func clone(s *machineScope) (string, error) {
 		return "", handleVSphereError(multipleFoundMsg, notFoundMsg, defaultError, err)
 	}
 
+	hwVersion, err := getHwVersion(s.Context, vmTemplate)
+	if err != nil {
+		return "", machineapierros.InvalidMachineConfiguration(
+			"Unable to detect machine template HW version for machine '%s': %v", s.machine.GetName(), err,
+		)
+	}
+	if hwVersion < minimumHWVersion {
+		return "", machineapierros.InvalidMachineConfiguration(
+			fmt.Sprintf(
+				"Hardware lower than %d is not supported, clone stopped. "+
+					"Detected machine template version is %d. "+
+					"Please update machine template: https://access.redhat.com/articles/6090681",
+				minimumHWVersion, hwVersion,
+			),
+		)
+	}
+
+	// Default clone type is FullClone, having snapshot on clonee template will cause incorrect disk sizing.
+	diskMoveType := fullCloneDiskMoveType
 	var snapshotRef *types.ManagedObjectReference
 
 	// If a linked clone is requested then a MoRef for a snapshot must be
 	// found with which to perform the linked clone.
-	// Empty clone mode is linked clone
-	if s.providerSpec.CloneMode == "" || s.providerSpec.CloneMode == machinev1.LinkedClone {
+	// Empty clone mode is a full clone,
+	// because otherwise disk size from provider spec will not be respected.
+	if s.providerSpec.CloneMode == machinev1.LinkedClone {
+		if s.providerSpec.DiskGiB > 0 {
+			klog.Warningf("LinkedClone mode is set. Disk size parameter from ProviderSpec will be ignored")
+		}
 		if s.providerSpec.Snapshot == "" {
 			klog.V(3).Infof("%v: no snapshot name provided, getting snapshot using template", s.machine.GetName())
 			var vm mo.VirtualMachine
@@ -569,17 +621,14 @@ func clone(s *machineScope) (string, error) {
 			var err error
 			snapshotRef, err = vmTemplate.FindSnapshot(s.Context, s.providerSpec.Snapshot)
 			if err != nil {
-				klog.V(3).Infof("%v: failed to find snapshot %s", s.machine.GetName(), s.providerSpec.Snapshot)
+				// Maybe return an error there?
+				klog.V(3).Infof("%v: failed to find snapshot %s, fallback to FullClone", s.machine.GetName(), s.providerSpec.Snapshot)
 			}
 		}
-	}
 
-	// The type of clone operation depends on whether or not there is a snapshot
-	// from which to do a linked clone.
-	diskMoveType := fullCloneDiskMoveType
-	if snapshotRef != nil {
-		// TODO: write clone mode to status
-		diskMoveType = linkCloneDiskMoveType
+		if snapshotRef != nil {
+			diskMoveType = linkCloneDiskMoveType
+		}
 	}
 
 	var folderPath, datastorePath, resourcepoolPath string
@@ -638,7 +687,7 @@ func clone(s *machineScope) (string, error) {
 	}
 
 	klog.V(3).Infof("Getting network devices")
-	networkDevices, err := getNetworkDevices(s, devices)
+	networkDevices, err := getNetworkDevices(s, resourcepool, devices)
 	if err != nil {
 		return "", fmt.Errorf("error getting network specs: %v", err)
 	}
@@ -707,8 +756,9 @@ func getDiskSpec(s *machineScope, devices object.VirtualDeviceList) (types.BaseV
 	}, nil
 }
 
-func getNetworkDevices(s *machineScope, devices object.VirtualDeviceList) ([]types.BaseVirtualDeviceConfigSpec, error) {
+func getNetworkDevices(s *machineScope, resourcepool *object.ResourcePool, devices object.VirtualDeviceList) ([]types.BaseVirtualDeviceConfigSpec, error) {
 	var networkDevices []types.BaseVirtualDeviceConfigSpec
+	var backing types.BaseVirtualDeviceBackingInfo
 	// Remove any existing NICs
 	for _, dev := range devices.SelectByType((*types.VirtualEthernetCard)(nil)) {
 		networkDevices = append(networkDevices, &types.VirtualDeviceConfigSpec{
@@ -719,20 +769,47 @@ func getNetworkDevices(s *machineScope, devices object.VirtualDeviceList) ([]typ
 
 	// Add new NICs based on the machine config.
 	for i := range s.providerSpec.Network.Devices {
+		var ccrMo mo.ClusterComputeResource
+
 		netSpec := &s.providerSpec.Network.Devices[i]
 		klog.V(3).Infof("Adding device: %v", netSpec.NetworkName)
 
-		ref, err := s.GetSession().Finder.Network(s.Context, netSpec.NetworkName)
+		clusterRef, err := resourcepool.Owner(s.Context)
 		if err != nil {
-			const multipleFoundMsg = "multiple networks found, specify one in config"
-			const notFoundMsg = "network not found, specify valid value"
-			defaultError := fmt.Errorf("unable to get network for %q: %w", netSpec.NetworkName, err)
-			return nil, handleVSphereError(multipleFoundMsg, notFoundMsg, defaultError, err)
+			return nil, fmt.Errorf("unable to find cluster resource: %w", err)
 		}
 
-		backing, err := ref.EthernetCardBackingInfo(s.Context)
+		clusterRes := object.NewClusterComputeResource(s.GetSession().Client.Client, clusterRef.Reference())
+		err = clusterRes.Properties(s.Context, clusterRef.Reference(), []string{"network"}, &ccrMo)
 		if err != nil {
-			return nil, fmt.Errorf("unable to create new ethernet card backing info for network %q: %w", netSpec.NetworkName, err)
+			return nil, fmt.Errorf("unable to get list of networks in cluster: %w", err)
+		}
+
+		for _, netRef := range ccrMo.Network {
+			// Use generic network object to get name
+			genericNetwork := object.NewNetwork(s.GetSession().Client.Client, netRef)
+			networkName, err := genericNetwork.ObjectName(s.Context)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get network name: %w", err)
+			}
+			if netSpec.NetworkName == networkName {
+				// Use more specific network reference to get Ethernet info
+				ref := object.NewReference(s.GetSession().Client.Client, netRef)
+				networkObject, ok := ref.(object.NetworkReference)
+				if !ok {
+					return nil, fmt.Errorf("unable to create new ethernet card backing info for network %q: network type failure: %s", netSpec.NetworkName, ref.Reference().Type)
+				}
+
+				backing, err = networkObject.EthernetCardBackingInfo(s.Context)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create new ethernet card backing info for network %q: %w", netSpec.NetworkName, err)
+				}
+				break
+			}
+		}
+
+		if backing == nil {
+			return nil, fmt.Errorf("unable to get network for %q", netSpec.NetworkName)
 		}
 
 		dev, err := object.EthernetCardTypes().CreateEthernetCard(ethCardType, backing)
@@ -787,7 +864,7 @@ func taskIsFinished(task *mo.Task) (bool, error) {
 	}
 }
 
-func setProviderStatus(taskRef string, condition machinev1.VSphereMachineProviderCondition, scope *machineScope, vm *virtualMachine) error {
+func setProviderStatus(taskRef string, condition metav1.Condition, scope *machineScope, vm *virtualMachine) error {
 	klog.Infof("%s: Updating provider status", scope.machine.Name)
 
 	if vm != nil {
@@ -808,7 +885,7 @@ func setProviderStatus(taskRef string, condition machinev1.VSphereMachineProvide
 		scope.providerStatus.TaskRef = taskRef
 	}
 
-	scope.providerStatus.Conditions = setVSphereMachineProviderConditions(condition, scope.providerStatus.Conditions)
+	scope.providerStatus.Conditions = setConditions(condition, scope.providerStatus.Conditions)
 
 	return nil
 }

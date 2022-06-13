@@ -59,7 +59,6 @@ type Helper struct {
 	GracePeriodSeconds int
 
 	IgnoreAllDaemonSets bool
-	IgnoreErrors        bool
 	Timeout             time.Duration
 	DeleteEmptyDirData  bool
 	Selector            string
@@ -84,7 +83,7 @@ type Helper struct {
 	ErrOut io.Writer
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunVerifier *resource.QueryParamVerifier
 
 	// OnPodDeletedOrEvicted is called when a pod is evicted/deleted; for printing progress output
 	OnPodDeletedOrEvicted func(pod *corev1.Pod, usingEviction bool)
@@ -144,7 +143,7 @@ func (d *Helper) DeletePod(pod corev1.Pod) error {
 	return d.Client.CoreV1().Pods(pod.Namespace).Delete(d.getContext(), pod.Name, d.makeDeleteOptions())
 }
 
-// EvictPod will evict the give pod, or return an error if it couldn't
+// EvictPod will evict the given pod, or return an error if it couldn't
 func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersion) error {
 	if d.DryRunStrategy == cmdutil.DryRunServer {
 		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {

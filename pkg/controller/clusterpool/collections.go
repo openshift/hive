@@ -321,6 +321,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			for _, entry := range pool.Spec.Inventory {
 				if cdcName == entry.Name {
 					customizationExists = true
+					break
 				}
 			}
 		}
@@ -615,7 +616,7 @@ func (cds *cdCollection) Delete(c client.Client, cdName string) error {
 
 type cdcCollection struct {
 	// Unclaimed by any cluster pool CD and are not broken
-	unassigned map[string]*hivev1.ClusterDeploymentCustomization
+	unassigned []*hivev1.ClusterDeploymentCustomization
 	// Missing CDC means listed in pool inventory but the custom resource doesn't exist in the pool namespace
 	missing []string
 	// Used by some cluster deployment
@@ -628,8 +629,6 @@ type cdcCollection struct {
 	byCDCName map[string]*hivev1.ClusterDeploymentCustomization
 	// Namespace are all the CDC in the namespace mapped by name
 	namespace map[string]*hivev1.ClusterDeploymentCustomization
-	// Next CDC to assign
-	next string
 }
 
 // getAllCustomizationsForPool is the constructor for a cdcCollection for all of the
@@ -647,7 +646,7 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 	}
 
 	cdcCol := cdcCollection{
-		unassigned: make(map[string]*hivev1.ClusterDeploymentCustomization),
+		unassigned: make([]*hivev1.ClusterDeploymentCustomization, 0),
 		missing:    make([]string, 0),
 		reserved:   make(map[string]*hivev1.ClusterDeploymentCustomization),
 		cloud:      make(map[string]*hivev1.ClusterDeploymentCustomization),
@@ -664,7 +663,7 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 		if cdc, ok := cdcCol.namespace[item.Name]; ok {
 			cdcCol.byCDCName[item.Name] = cdc
 			if cdRef := cdc.Status.ClusterDeploymentRef; cdRef == nil {
-				cdcCol.unassigned[item.Name] = cdc
+				cdcCol.unassigned = append(cdcCol.unassigned, cdc)
 			} else {
 				cdcCol.reserved[item.Name] = cdc
 			}
@@ -700,19 +699,14 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 // customization.  When customizations have the same last apply status, the
 // oldest used customization will be prioritized.
 func (cdcs *cdcCollection) Sort() {
-	var unassigned []*hivev1.ClusterDeploymentCustomization
-	for _, cdc := range cdcs.unassigned {
-		unassigned = append(unassigned, cdc)
-	}
-
 	sort.Slice(
-		unassigned,
+		cdcs.unassigned,
 		func(i, j int) bool {
 			now := metav1.NewTime(time.Now())
-			iStatus := conditionsv1.FindStatusCondition(unassigned[i].Status.Conditions, hivev1.ApplySucceededCondition)
-			jStatus := conditionsv1.FindStatusCondition(unassigned[j].Status.Conditions, hivev1.ApplySucceededCondition)
-			iName := unassigned[i].Name
-			jName := unassigned[j].Name
+			iStatus := conditionsv1.FindStatusCondition(cdcs.unassigned[i].Status.Conditions, hivev1.ApplySucceededCondition)
+			jStatus := conditionsv1.FindStatusCondition(cdcs.unassigned[j].Status.Conditions, hivev1.ApplySucceededCondition)
+			iName := cdcs.unassigned[i].Name
+			jName := cdcs.unassigned[j].Name
 			if iStatus == nil || iStatus.Status == corev1.ConditionUnknown {
 				iStatus = &conditionsv1.Condition{Reason: hivev1.CustomizationApplyReasonSucceeded}
 				iStatus.LastTransitionTime = now
@@ -739,9 +733,6 @@ func (cdcs *cdcCollection) Sort() {
 			return iName < jName
 		},
 	)
-	if len(unassigned) > 0 {
-		cdcs.next = unassigned[0].Name
-	}
 }
 
 func (cdcs *cdcCollection) Reserve(c client.Client, cdc *hivev1.ClusterDeploymentCustomization, cdName, poolName string) error {
@@ -768,7 +759,13 @@ func (cdcs *cdcCollection) Reserve(c client.Client, cdc *hivev1.ClusterDeploymen
 	cdcs.reserved[cdc.Name] = cdc
 	cdcs.byCDCName[cdc.Name] = cdc
 
-	delete(cdcs.unassigned, cdc.Name)
+	for i, cdci := range cdcs.unassigned {
+		if cdci.Name == cdc.Name {
+			copy(cdcs.unassigned[i:], cdcs.unassigned[i+1:])
+			cdcs.unassigned = cdcs.unassigned[:len(cdcs.unassigned)-1]
+			break
+		}
+	}
 
 	cdcs.Sort()
 	return nil
@@ -796,7 +793,7 @@ func (cdcs *cdcCollection) Unassign(c client.Client, cdc *hivev1.ClusterDeployme
 
 	delete(cdcs.reserved, cdc.Name)
 
-	cdcs.unassigned[cdc.Name] = cdc
+	cdcs.unassigned = append(cdcs.unassigned, cdc)
 	cdcs.Sort()
 	return nil
 }
@@ -877,7 +874,7 @@ func (cdcs *cdcCollection) InstallationPending(c client.Client, cdc *hivev1.Clus
 	return nil
 }
 
-func (c *cdcCollection) Unassigned() map[string]*hivev1.ClusterDeploymentCustomization {
+func (c *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
 	return c.unassigned
 }
 
@@ -943,7 +940,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 		// CDC exists
 		cdc, ok := cdcs.namespace[cpRef.CustomizationRef.Name]
 		if !ok {
-			logger.Warning("CD has reference to a CDC that doesn't exist, it was forceully removed or this is a bug")
+			logger.Warning("CD has reference to a CDC that doesn't exist, it was forcefully removed or this is a bug")
 			continue
 		}
 
@@ -1003,7 +1000,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 				"clusterdeployment":              cd.Name,
 				"clusterdeploymentcustomization": cdcRef.Name,
 				"namespace":                      cd.Spec.ClusterPoolRef.Namespace,
-			}).Warning("CD has reference to a CDC that doesn't exist, it was forceully removed or this is a bug")
+			}).Warning("CD has reference to a CDC that doesn't exist, it was forcefully removed or this is a bug")
 		}
 	}
 
@@ -1022,7 +1019,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 				"clusterdeployment":              cd.Name,
 				"clusterdeploymentcustomization": cdcRef.Name,
 				"namespace":                      cd.Spec.ClusterPoolRef.Namespace,
-			}).Warning("CD has reference to a CDC that doesn't exist, it was forceully removed or this is a bug")
+			}).Warning("CD has reference to a CDC that doesn't exist, it was forcefully removed or this is a bug")
 		}
 	}
 

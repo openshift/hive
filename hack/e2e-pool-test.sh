@@ -214,6 +214,10 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   --size "${POOL_SIZE}" \
   ${REAL_POOL_NAME}
 
+# Add customization
+create_customization "cdc-test" "${CLUSTER_NAMESPACE}"
+oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
+
 ### INTERLUDE: FAKE POOL
 # The real cluster pool is going to take a while to become ready. While that
 # happens, create a fake pool and do some more testing. We'll use the real
@@ -286,6 +290,9 @@ wait_for_pool_to_be_ready $FAKE_POOL_NAME
 # Wait for the real cluster pool to become ready (if it isn't yet)
 wait_for_pool_to_be_ready $REAL_POOL_NAME
 
+# Test customization
+verify_cluster_name $REAL_POOL_NAME "cdc-test" "cdc-test"
+
 # Get the CD name & namespace (which should be the same)
 # TODO: Set this up for variable POOL_SIZE -- as written this would put
 #       multiple results in CLUSTER_NAME; for >1 pool size we would not only
@@ -310,12 +317,5 @@ echo "Re-resuming"
 set_power_state $CLUSTER_NAME Running
 
 wait_for_hibernation_state $CLUSTER_NAME Running
-
-# Test customization
-create_customization "cdc-test" "${CLUSTER_NAMESPACE}"
-oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
-oc delete clusterclaim --all
-wait_for_pool_to_be_ready $REAL_POOL_NAME
-verify_cluster_name $REAL_POOL_NAME "cdc-test" "cdc-test"
 
 # Let the cleanup trap do the cleanup.

@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/openshift/installer/pkg/ipnet"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/validate"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -405,6 +407,27 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Remove metadataService field from machinepool platform within installconfig.
+	// TODO: Remove this once https://bugzilla.redhat.com/show_bug.cgi?id=2098299 has been addressed.
+	if installConfig.Platform.AWS != nil {
+		ops := yamlpatch.Patch{
+			yamlpatch.Operation{
+				Op:   "remove",
+				Path: yamlpatch.OpPath("/compute/0/platform/aws/metadataService"),
+			},
+			yamlpatch.Operation{
+				Op:   "remove",
+				Path: yamlpatch.OpPath("/controlPlane/platform/aws/metadataService"),
+			},
+		}
+		modifiedBytes, err := ops.Apply(d)
+		if err != nil {
+			return nil, errors.Wrap(err, "error patching install-config.yaml to remove metadataService")
+		}
+		d = modifiedBytes
+	}
+
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",

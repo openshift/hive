@@ -60,6 +60,18 @@ func ValidateMachinePool(p *ovirt.MachinePool, fldPath *field.Path) field.ErrorL
 		}
 	}
 
+	switch p.Format {
+	case "":
+	case "raw":
+	case "cow":
+	default:
+		allErrs = append(allErrs, field.NotSupported(
+			fldPath.Child("format"),
+			p.Format,
+			[]string{"", "raw", "cow"},
+		))
+	}
+
 	return allErrs
 }
 

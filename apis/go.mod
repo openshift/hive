@@ -3,7 +3,7 @@ module github.com/openshift/hive/apis
 go 1.17
 
 require (
-	github.com/openshift/api v0.0.0-20220222102030-354aa98a475c
+	github.com/openshift/api v0.0.0-20220427141643-6e7069f2fba2
 	k8s.io/api v0.23.0
 	k8s.io/apimachinery v0.23.0
 )

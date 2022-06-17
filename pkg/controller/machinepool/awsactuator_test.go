@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
@@ -50,8 +49,8 @@ func TestAWSActuator(t *testing.T) {
 		expectedErr                  bool
 		expectedCondition            *hivev1.MachinePoolCondition
 		expectedKMSKey               string
-		expectedAMI                  *awsprovider.AWSResourceReference
-		expectedSGFilters            []awsprovider.Filter
+		expectedAMI                  *machineapi.AWSResourceReference
+		expectedSGFilters            []machineapi.Filter
 	}{
 		{
 			name:              "generate single machineset for single zone",
@@ -64,7 +63,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -81,7 +80,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 				generateAWSMachineSetName("zone3"): 1,
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -99,7 +98,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 				generateAWSMachineSetName("zone3"): 1,
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -133,7 +132,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone3"): 1,
 			},
 			expectedSubnetIDInMachineSet: true,
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -146,7 +145,7 @@ func TestAWSActuator(t *testing.T) {
 				mockDescribeAvailabilityZones(client, nil)
 			},
 			expectedErr: true,
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -169,7 +168,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "SubnetsNotFound",
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -198,7 +197,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "MoreThanOneSubnetForZone",
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -226,7 +225,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "NoSubnetForAvailabilityZone",
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -255,7 +254,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "InsufficientPublicSubnets",
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -289,7 +288,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedSubnetIDInMachineSet: true,
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -323,7 +322,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedSubnetIDInMachineSet: true,
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -338,7 +337,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -352,7 +351,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "UnsupportedSpotMarketOptions",
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -368,7 +367,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone1"): 3,
 			},
 			expectedKMSKey: fakeKMSKeyARN,
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -395,7 +394,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionFalse,
 				Reason: "ConfigurationSupported",
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -409,7 +408,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "UnsupportedSpotMarketOptions",
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
 		},
@@ -420,8 +419,8 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine: func() *machineapi.Machine {
 				m := testMachine("master0", "master")
 				awsMachineProviderConfig := testAWSProviderSpec()
-				awsMachineProviderConfig.AMI = awsprovider.AWSResourceReference{
-					Filters: []awsprovider.Filter{
+				awsMachineProviderConfig.AMI = machineapi.AWSResourceReference{
+					Filters: []machineapi.Filter{
 						{
 							Name: "tag:Name",
 							Values: []string{
@@ -443,8 +442,8 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 				generateAWSMachineSetName("zone3"): 1,
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
-				Filters: []awsprovider.Filter{
+			expectedAMI: &machineapi.AWSResourceReference{
+				Filters: []machineapi.Filter{
 					{
 						Name: "tag:Name",
 						Values: []string{
@@ -491,10 +490,10 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone1"): 2,
 				generateAWSMachineSetName("zone2"): 1,
 			},
-			expectedAMI: &awsprovider.AWSResourceReference{
+			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},
-			expectedSGFilters: []awsprovider.Filter{
+			expectedSGFilters: []machineapi.Filter{
 				{
 					Name:   "tag:Name",
 					Values: []string{"foo-12345-worker-sg", "extra-security-group"},
@@ -542,7 +541,6 @@ func TestAWSActuator(t *testing.T) {
 
 	for _, test := range tests {
 		apis.AddToScheme(scheme.Scheme)
-		awsprovider.SchemeBuilder.AddToScheme(scheme.Scheme)
 		machineapi.AddToScheme(scheme.Scheme)
 
 		t.Run(test.name, func(t *testing.T) {
@@ -610,7 +608,6 @@ func TestGetAWSAMIID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
 			machineapi.AddToScheme(scheme)
-			awsprovider.SchemeBuilder.AddToScheme(scheme)
 			actualAMIID, actualErr := getAWSAMIID(tc.masterMachine, scheme, log.StandardLogger())
 			if tc.expectError {
 				assert.Error(t, actualErr, "expected an error")
@@ -623,7 +620,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 }
 
-func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *awsprovider.AWSResourceReference, expectedSGFilters []awsprovider.Filter) {
+func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *machineapi.AWSResourceReference, expectedSGFilters []machineapi.Filter) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -632,7 +629,7 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch", ms.Name)
 		}
 
-		awsProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
+		awsProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
 		assert.True(t, ok, "failed to convert to AWSMachineProviderConfig")
 
 		assert.Equal(t, testInstanceType, awsProvider.InstanceType, "unexpected instance type")
@@ -649,7 +646,7 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 		assert.Equal(t, expectedKMSKey, *awsProvider.BlockDevices[0].EBS.KMSKey.ARN)
 
 		if expectedSubnetID {
-			providerConfig := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsprovider.AWSMachineProviderConfig)
+			providerConfig := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
 			assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID")
 			assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
 		}
@@ -783,7 +780,7 @@ func generateAWSMachineSetName(zone string) string {
 	return fmt.Sprintf("%s-%s-%s", testInfraID, testPoolName, zone)
 }
 
-func encodeAWSMachineProviderSpec(awsProviderSpec *awsprovider.AWSMachineProviderConfig, scheme *runtime.Scheme) (*runtime.RawExtension, error) {
+func encodeAWSMachineProviderSpec(awsProviderSpec *machineapi.AWSMachineProviderConfig, scheme *runtime.Scheme) (*runtime.RawExtension, error) {
 	serializer := jsonserializer.NewSerializer(jsonserializer.DefaultMetaFactory, scheme, scheme, false)
 	var buffer bytes.Buffer
 	err := serializer.Encode(awsProviderSpec, &buffer)

@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,8 +10,11 @@ import (
 	aznetwork "github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/network/mgmt/network"
 	azres "github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/resources/mgmt/resources"
 	azsubs "github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/resources/mgmt/subscriptions"
+	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
+	azmarketplace "github.com/Azure/azure-sdk-for-go/profiles/latest/marketplaceordering/mgmt/marketplaceordering"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 //go:generate mockgen -source=./client.go -destination=mock/azureclient_generated.go -package=mock
@@ -27,6 +31,10 @@ type API interface {
 	GetGroup(ctx context.Context, groupName string) (*azres.Group, error)
 	ListResourceIDsByGroup(ctx context.Context, groupName string) ([]string, error)
 	GetStorageEndpointSuffix(ctx context.Context) (string, error)
+	GetDiskEncryptionSet(ctx context.Context, subscriptionID, groupName string, diskEncryptionSetName string) (*azenc.DiskEncryptionSet, error)
+	GetHyperVGenerationVersion(ctx context.Context, instanceType string, diskType string, region string) (string, error)
+	GetMarketplaceImage(ctx context.Context, region, publisher, offer, sku, version string) (azsku.VirtualMachineImage, error)
+	AreMarketplaceImageTermsAccepted(ctx context.Context, publisher, offer, sku string) (bool, error)
 }
 
 // Client makes calls to the Azure API.
@@ -249,4 +257,74 @@ func (c *Client) GetVirtualMachineSku(ctx context.Context, name, region string) 
 		}
 	}
 	return nil, nil
+}
+
+// GetDiskEncryptionSet retrieves the specified disk encryption set.
+func (c *Client) GetDiskEncryptionSet(ctx context.Context, subscriptionID, groupName, diskEncryptionSetName string) (*azenc.DiskEncryptionSet, error) {
+	client := azenc.NewDiskEncryptionSetsClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, subscriptionID)
+	client.Authorizer = c.ssn.Authorizer
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	diskEncryptionSet, err := client.Get(ctx, groupName, diskEncryptionSetName)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get disk encryption set")
+	}
+
+	return &diskEncryptionSet, nil
+}
+
+// GetHyperVGenerationVersion gets the HyperVGeneration version for the given disk instance type. Defaults to V2 if either V1 or V2
+// available.
+func (c *Client) GetHyperVGenerationVersion(ctx context.Context, instanceType string, diskType string, region string) (version string, err error) {
+	typeMeta, err := c.GetVirtualMachineSku(ctx, instanceType, region)
+	if err != nil {
+		return "", fmt.Errorf("error onnecting to Azure client: %s", err.Error())
+	}
+
+	for _, capability := range *typeMeta.Capabilities {
+		if strings.EqualFold(*capability.Name, "HyperVGenerations") {
+			generations := sets.NewString()
+			for _, g := range strings.Split(to.String(capability.Value), ",") {
+				g = strings.TrimSpace(g)
+				g = strings.ToUpper(g)
+				generations.Insert(g)
+			}
+			if generations.Has("V2") {
+				return "V2", nil
+			}
+			return "V1", nil
+		}
+	}
+	return "", fmt.Errorf("failed to fetch HyperVGeneration version for given instance type")
+}
+
+// GetMarketplaceImage get the specified marketplace VM image.
+func (c *Client) GetMarketplaceImage(ctx context.Context, region, publisher, offer, sku, version string) (azsku.VirtualMachineImage, error) {
+	client := azsku.NewVirtualMachineImagesClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
+	client.Authorizer = c.ssn.Authorizer
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	image, err := client.Get(ctx, region, publisher, offer, sku, version)
+	return image, errors.Wrap(err, "could not get marketplace image")
+}
+
+// AreMarketplaceImageTermsAccepted tests whether the terms have been accepted for the specified marketplace VM image.
+func (c *Client) AreMarketplaceImageTermsAccepted(ctx context.Context, publisher, offer, sku string) (bool, error) {
+	client := azmarketplace.NewMarketplaceAgreementsClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
+	client.Authorizer = c.ssn.Authorizer
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	terms, err := client.Get(ctx, publisher, offer, sku)
+	if err != nil {
+		return false, err
+	}
+
+	if terms.AgreementProperties == nil {
+		return false, errors.New("no agreement properties for image")
+	}
+
+	return terms.AgreementProperties.Accepted != nil && *terms.AgreementProperties.Accepted, nil
 }

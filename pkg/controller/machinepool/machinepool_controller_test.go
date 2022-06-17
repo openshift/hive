@@ -21,8 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
-	awsproviderapis "sigs.k8s.io/cluster-api-provider-aws/pkg/apis"
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -59,7 +57,6 @@ func init() {
 func TestRemoteMachineSetReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	machineapi.AddToScheme(scheme.Scheme)
-	awsproviderapis.AddToScheme(scheme.Scheme)
 
 	getPool := func(c client.Client, poolName string) *hivev1.MachinePool {
 		pool := &hivev1.MachinePool{}
@@ -745,13 +742,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 								t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
 							}
 
-							rAWSProviderSpec, _ := decodeAWSMachineProviderSpec(
-								rMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
+							rAWSProviderSpec, _ := decodeAWSMachineProviderSpec(rMS.Spec.Template.Spec.ProviderSpec.Value, logger)
 							log.Debugf("remote AWS: %v", printAWSMachineProviderConfig(rAWSProviderSpec))
 							assert.NotNil(t, rAWSProviderSpec)
 
-							eAWSProviderSpec, _ := decodeAWSMachineProviderSpec(
-								eMS.Spec.Template.Spec.ProviderSpec.Value, scheme.Scheme)
+							eAWSProviderSpec, _ := decodeAWSMachineProviderSpec(eMS.Spec.Template.Spec.ProviderSpec.Value, logger)
 							log.Debugf("expected AWS: %v", printAWSMachineProviderConfig(eAWSProviderSpec))
 							assert.NotNil(t, eAWSProviderSpec)
 							assert.Equal(t, eAWSProviderSpec.AMI, rAWSProviderSpec.AMI, "%s AMI does not match", eMS.Name)
@@ -940,13 +935,13 @@ func testAutoscalingMachinePool(min, max int) *hivev1.MachinePool {
 	return p
 }
 
-func testAWSProviderSpec() *awsprovider.AWSMachineProviderConfig {
-	return &awsprovider.AWSMachineProviderConfig{
+func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
+	return &machineapi.AWSMachineProviderConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "AWSMachineProviderConfig",
-			APIVersion: awsprovider.SchemeGroupVersion.String(),
+			APIVersion: machineapi.SchemeGroupVersion.String(),
 		},
-		AMI: awsprovider.AWSResourceReference{
+		AMI: machineapi.AWSResourceReference{
 			ID: aws.String(testAMI),
 		},
 	}
@@ -1120,7 +1115,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	}
 }
 
-func printAWSMachineProviderConfig(cfg *awsprovider.AWSMachineProviderConfig) string {
+func printAWSMachineProviderConfig(cfg *machineapi.AWSMachineProviderConfig) string {
 	b, err := json.Marshal(cfg)
 	if err != nil {
 		panic(err.Error())

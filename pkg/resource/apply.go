@@ -11,10 +11,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	kresource "k8s.io/cli-runtime/pkg/resource"
 	kcmdapply "k8s.io/kubectl/pkg/cmd/apply"
+	"k8s.io/kubectl/pkg/cmd/delete"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -206,13 +208,22 @@ func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 
 func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
 	r.logger.Debug("setting up apply command")
-	o := kcmdapply.NewApplyOptions(ioStreams)
+	flags := kcmdapply.NewApplyFlags(f, ioStreams)
+	o := &kcmdapply.ApplyOptions{
+		IOStreams:         ioStreams,
+		VisitedUids:       sets.NewString(),
+		VisitedNamespaces: sets.NewString(),
+		Recorder:          genericclioptions.NoopRecorder{},
+		PrintFlags:        flags.PrintFlags,
+		Overwrite:         true,
+		OpenAPIPatch:      true,
+	}
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain dynamic client from factory")
 		return nil, nil, err
 	}
-	o.DeleteOptions, err = o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
+	o.DeleteOptions, err = delete.NewDeleteFlags("").ToOptions(dynamicClient, ioStreams)
 	if err != nil {
 		r.logger.WithError(err).Error("cannot create delete options")
 		return nil, nil, err

@@ -4602,13 +4602,64 @@ objects:
                         osDisk:
                           description: OSDisk defines the storage for instance.
                           properties:
+                            diskEncryptionSet:
+                              description: DiskEncryptionSet defines a disk encryption
+                                set.
+                              properties:
+                                name:
+                                  description: Name is the name of the disk encryption
+                                    set.
+                                  type: string
+                                resourceGroup:
+                                  description: ResourceGroup defines the Azure resource
+                                    group used by the disk encryption set.
+                                  type: string
+                                subscriptionId:
+                                  description: SubscriptionID defines the Azure subscription
+                                    the disk encryption set is in.
+                                  type: string
+                              required:
+                              - name
+                              - resourceGroup
+                              type: object
                             diskSizeGB:
                               description: DiskSizeGB defines the size of disk in
                                 GB.
                               format: int32
+                              minimum: 0
                               type: integer
+                            diskType:
+                              description: DiskType defines the type of disk. For
+                                control plane nodes, the valid values are Premium_LRS
+                                and StandardSSD_LRS. Default is Premium_LRS.
+                              enum:
+                              - Standard_LRS
+                              - Premium_LRS
+                              - StandardSSD_LRS
+                              type: string
                           required:
                           - diskSizeGB
+                          type: object
+                        osImage:
+                          description: OSImage defines the image to use for the OS.
+                          properties:
+                            offer:
+                              description: Offer is the offer of the image.
+                              type: string
+                            publisher:
+                              description: Publisher is the publisher of the image.
+                              type: string
+                            sku:
+                              description: SKU is the SKU of the image.
+                              type: string
+                            version:
+                              description: Version is the version of the image.
+                              type: string
+                          required:
+                          - offer
+                          - publisher
+                          - sku
+                          - version
                           type: object
                         type:
                           description: InstanceType defines the azure instance type.

@@ -3,7 +3,10 @@ package azureclient
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
@@ -13,6 +16,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/openshift/hive/pkg/constants"
 )
@@ -37,6 +41,13 @@ type Client interface {
 	ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute.VirtualMachineListResultPage, error)
 	DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesDeallocateFuture, error)
 	StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error)
+
+	// SKU & HyperVGen
+	GetHyperVGenerationVersion(ctx context.Context, instanceType string, diskType string, region string) (version string, err error)
+	GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error)
+
+	// Images
+	ListImagesByResourceGroup(ctx context.Context, resourgeGroupName string) (ImageListResultPage, error)
 }
 
 // ResourceSKUsPage is a page of results from listing resource SKUs.
@@ -53,11 +64,18 @@ type RecordSetPage interface {
 	Values() []dns.RecordSet
 }
 
+type ImageListResultPage interface {
+	NextWithContext(ctx context.Context) error
+	NotDone() bool
+	Values() []compute.Image
+}
+
 type azureClient struct {
 	resourceSKUsClient    *compute.ResourceSkusClient
 	recordSetsClient      *dns.RecordSetsClient
 	zonesClient           *dns.ZonesClient
 	virtualMachinesClient *compute.VirtualMachinesClient
+	imagesClient          *compute.ImagesClient
 }
 
 func (c *azureClient) ListResourceSKUs(ctx context.Context, filter string) (ResourceSKUsPage, error) {
@@ -111,6 +129,65 @@ func (c *azureClient) DeallocateVirtualMachine(ctx context.Context, resourceGrou
 
 func (c *azureClient) StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error) {
 	return c.virtualMachinesClient.Start(ctx, resourceGroup, name)
+}
+
+// GetHyperVGenerationVersion gets the HyperVGeneration version for the given disk instance type. Defaults to V2 if either V1 or V2
+// available.
+func (c *azureClient) GetHyperVGenerationVersion(ctx context.Context, instanceType string, diskType string, region string) (version string, err error) {
+	typeMeta, err := c.GetVirtualMachineSku(ctx, instanceType, region)
+	if err != nil {
+		return "", fmt.Errorf("error onnecting to Azure client: %s", err.Error())
+	}
+
+	for _, capability := range *typeMeta.Capabilities {
+		if strings.EqualFold(*capability.Name, "HyperVGenerations") {
+			generations := sets.NewString()
+			for _, g := range strings.Split(to.String(capability.Value), ",") {
+				g = strings.TrimSpace(g)
+				g = strings.ToUpper(g)
+				generations.Insert(g)
+			}
+			if generations.Has("V2") {
+				return "V2", nil
+			}
+			return "V1", nil
+		}
+	}
+	return "", fmt.Errorf("failed to fetch HyperVGeneration version for given instance type")
+}
+
+// GetVirtualMachineSku retrieves the resource SKU of a specified virtual machine SKU in the specified region.
+func (c *azureClient) GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	for page, err := c.resourceSKUsClient.List(ctx, ""); page.NotDone(); err = page.NextWithContext(ctx) {
+		if err != nil {
+			return nil, errors.Wrap(err, "error fetching SKU pages")
+		}
+		for _, sku := range page.Values() {
+			// Filter out resources that are not virtualMachines
+			if !strings.EqualFold("virtualMachines", *sku.ResourceType) {
+				continue
+			}
+			// Filter out resources that do not match the provided name
+			if !strings.EqualFold(name, *sku.Name) {
+				continue
+			}
+			// Return the resource from the provided region
+			for _, location := range to.StringSlice(sku.Locations) {
+				if strings.EqualFold(location, region) {
+					return &sku, nil
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+func (c *azureClient) ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (ImageListResultPage, error) {
+	page, err := c.imagesClient.ListByResourceGroup(ctx, resourceGroupName)
+	return &page, err
 }
 
 // NewClientFromSecret creates our client wrapper object for interacting with Azure. The Azure creds are read from the
@@ -182,11 +259,15 @@ func newClient(authJSONSource func() ([]byte, error), environmentName string) (*
 	virtualMachinesClient := compute.NewVirtualMachinesClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
 	virtualMachinesClient.Authorizer = authorizer
 
+	imagesClient := compute.NewImagesClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
+	imagesClient.Authorizer = authorizer
+
 	return &azureClient{
 		resourceSKUsClient:    &resourceSKUsClient,
 		recordSetsClient:      &recordSetsClient,
 		zonesClient:           &zonesClient,
 		virtualMachinesClient: &virtualMachinesClient,
+		imagesClient:          &imagesClient,
 	}, nil
 }
 

@@ -110,6 +110,36 @@ func (mr *MockClientMockRecorder) DeleteZone(ctx, resourceGroupName, zone interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteZone", reflect.TypeOf((*MockClient)(nil).DeleteZone), ctx, resourceGroupName, zone)
 }
 
+// GetHyperVGenerationVersion mocks base method.
+func (m *MockClient) GetHyperVGenerationVersion(ctx context.Context, instanceType, diskType, region string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetHyperVGenerationVersion", ctx, instanceType, diskType, region)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetHyperVGenerationVersion indicates an expected call of GetHyperVGenerationVersion.
+func (mr *MockClientMockRecorder) GetHyperVGenerationVersion(ctx, instanceType, diskType, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHyperVGenerationVersion", reflect.TypeOf((*MockClient)(nil).GetHyperVGenerationVersion), ctx, instanceType, diskType, region)
+}
+
+// GetVirtualMachineSku mocks base method.
+func (m *MockClient) GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVirtualMachineSku", ctx, name, region)
+	ret0, _ := ret[0].(*compute.ResourceSku)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetVirtualMachineSku indicates an expected call of GetVirtualMachineSku.
+func (mr *MockClientMockRecorder) GetVirtualMachineSku(ctx, name, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVirtualMachineSku", reflect.TypeOf((*MockClient)(nil).GetVirtualMachineSku), ctx, name, region)
+}
+
 // GetZone mocks base method.
 func (m *MockClient) GetZone(ctx context.Context, resourceGroupName, zone string) (dns.Zone, error) {
 	m.ctrl.T.Helper()
@@ -138,6 +168,21 @@ func (m *MockClient) ListAllVirtualMachines(ctx context.Context, statusOnly stri
 func (mr *MockClientMockRecorder) ListAllVirtualMachines(ctx, statusOnly interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllVirtualMachines", reflect.TypeOf((*MockClient)(nil).ListAllVirtualMachines), ctx, statusOnly)
+}
+
+// ListImagesByResourceGroup mocks base method.
+func (m *MockClient) ListImagesByResourceGroup(ctx context.Context, resourgeGroupName string) (azureclient.ImageListResultPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListImagesByResourceGroup", ctx, resourgeGroupName)
+	ret0, _ := ret[0].(azureclient.ImageListResultPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListImagesByResourceGroup indicates an expected call of ListImagesByResourceGroup.
+func (mr *MockClientMockRecorder) ListImagesByResourceGroup(ctx, resourgeGroupName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImagesByResourceGroup", reflect.TypeOf((*MockClient)(nil).ListImagesByResourceGroup), ctx, resourgeGroupName)
 }
 
 // ListRecordSetsByZone mocks base method.
@@ -313,4 +358,69 @@ func (m *MockRecordSetPage) Values() []dns.RecordSet {
 func (mr *MockRecordSetPageMockRecorder) Values() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Values", reflect.TypeOf((*MockRecordSetPage)(nil).Values))
+}
+
+// MockImageListResultPage is a mock of ImageListResultPage interface.
+type MockImageListResultPage struct {
+	ctrl     *gomock.Controller
+	recorder *MockImageListResultPageMockRecorder
+}
+
+// MockImageListResultPageMockRecorder is the mock recorder for MockImageListResultPage.
+type MockImageListResultPageMockRecorder struct {
+	mock *MockImageListResultPage
+}
+
+// NewMockImageListResultPage creates a new mock instance.
+func NewMockImageListResultPage(ctrl *gomock.Controller) *MockImageListResultPage {
+	mock := &MockImageListResultPage{ctrl: ctrl}
+	mock.recorder = &MockImageListResultPageMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockImageListResultPage) EXPECT() *MockImageListResultPageMockRecorder {
+	return m.recorder
+}
+
+// NextWithContext mocks base method.
+func (m *MockImageListResultPage) NextWithContext(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NextWithContext", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// NextWithContext indicates an expected call of NextWithContext.
+func (mr *MockImageListResultPageMockRecorder) NextWithContext(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NextWithContext", reflect.TypeOf((*MockImageListResultPage)(nil).NextWithContext), ctx)
+}
+
+// NotDone mocks base method.
+func (m *MockImageListResultPage) NotDone() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NotDone")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// NotDone indicates an expected call of NotDone.
+func (mr *MockImageListResultPageMockRecorder) NotDone() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotDone", reflect.TypeOf((*MockImageListResultPage)(nil).NotDone))
+}
+
+// Values mocks base method.
+func (m *MockImageListResultPage) Values() []compute.Image {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Values")
+	ret0, _ := ret[0].([]compute.Image)
+	return ret0
+}
+
+// Values indicates an expected call of Values.
+func (mr *MockImageListResultPageMockRecorder) Values() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Values", reflect.TypeOf((*MockImageListResultPage)(nil).Values))
 }

@@ -2,6 +2,7 @@ package machinepool
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -15,10 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
-	awsprovider "sigs.k8s.io/cluster-api-provider-aws/pkg/apis"
-	awsproviderv1beta1 "sigs.k8s.io/cluster-api-provider-aws/pkg/apis/awsprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
@@ -49,10 +47,6 @@ var (
 
 	versionsSupportingSpotInstances = semver.MustParseRange(">=4.5.0")
 )
-
-func addAWSProviderToScheme(scheme *runtime.Scheme) error {
-	return awsprovider.AddToScheme(scheme)
-}
 
 // NewAWSActuator is the constructor for building a AWSActuator
 func NewAWSActuator(
@@ -245,7 +239,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 // Get the AMI ID from an existing master machine.
 func getAWSAMIID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
-	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, logger)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode AWSMachineProviderConfig from master machine")
 		return "", errors.Wrap(err, "cannot decode AWSMachineProviderConfig from master machine")
@@ -261,7 +255,7 @@ func getAWSAMIID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logg
 
 // Return true if the provided master machine references AMI by tag
 func masterAMIRefByTag(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (bool, error) {
-	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
+	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, logger)
 	if err != nil {
 		return false, errors.Wrap(err, "cannot decode AWSMachineProviderConfig from master machine")
 	}
@@ -288,20 +282,17 @@ func (a *AWSActuator) fetchAvailabilityZones() ([]string, error) {
 	return zones, nil
 }
 
-func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*awsproviderv1beta1.AWSMachineProviderConfig, error) {
-	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(awsproviderv1beta1.SchemeGroupVersion)
-	if rawExt == nil {
-		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
+func decodeAWSMachineProviderSpec(rawExtension *runtime.RawExtension, logger log.FieldLogger) (*machineapi.AWSMachineProviderConfig, error) {
+	if rawExtension == nil {
+		return &machineapi.AWSMachineProviderConfig{}, nil
 	}
-	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode AWS ProviderConfig: %v", err)
+
+	spec := new(machineapi.AWSMachineProviderConfig)
+	if err := json.Unmarshal(rawExtension.Raw, &spec); err != nil {
+		return nil, fmt.Errorf("error unmarshalling providerSpec: %v", err)
 	}
-	spec, ok := obj.(*awsproviderv1beta1.AWSMachineProviderConfig)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
-	}
+
+	logger.Infof("Got provider spec from raw extension: %+v", spec)
 	return spec, nil
 }
 
@@ -309,24 +300,24 @@ func decodeAWSMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.
 // Currently we modify the AWSMachineProviderConfig IAMInstanceProfile, Subnet and SecurityGroups such that
 // the values match the worker pool originally created by the installer.
 func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, infraID string, pool *hivev1.MachinePool, vpcID string) {
-	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*awsproviderv1beta1.AWSMachineProviderConfig)
+	providerConfig := machineSet.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
 
 	// TODO: assumptions about pre-existing objects by name here is quite dangerous, it's already
 	// broken on us once via renames in the installer. We need to start querying for what exists
 	// here.
-	providerConfig.IAMInstanceProfile = &awsproviderv1beta1.AWSResourceReference{ID: aws.String(fmt.Sprintf("%s-worker-profile", infraID))}
+	providerConfig.IAMInstanceProfile = &machineapi.AWSResourceReference{ID: aws.String(fmt.Sprintf("%s-worker-profile", infraID))}
 	// Update the subnet filter only if subnet id is absent
 	if providerConfig.Subnet.ID == nil {
-		providerConfig.Subnet = awsproviderv1beta1.AWSResourceReference{
-			Filters: []awsproviderv1beta1.Filter{{
+		providerConfig.Subnet = machineapi.AWSResourceReference{
+			Filters: []machineapi.Filter{{
 				Name:   "tag:Name",
 				Values: []string{fmt.Sprintf("%s-private-%s", infraID, providerConfig.Placement.AvailabilityZone)},
 			}},
 		}
 	}
 
-	providerConfig.SecurityGroups = []awsproviderv1beta1.AWSResourceReference{{
-		Filters: []awsproviderv1beta1.Filter{{
+	providerConfig.SecurityGroups = []machineapi.AWSResourceReference{{
+		Filters: []machineapi.Filter{{
 			Name:   "tag:Name",
 			Values: []string{fmt.Sprintf("%s-worker-sg", infraID)},
 		}},
@@ -344,11 +335,11 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 		providerConfig.SecurityGroups[0].Filters[0].Values = append(providerConfig.SecurityGroups[0].Filters[0].Values, pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
 		// Add a filter for the vpcID since the names of security groups may be the same within a
 		// given AWS account. HIVE-1874
-		providerConfig.SecurityGroups[0].Filters = append(providerConfig.SecurityGroups[0].Filters, awsproviderv1beta1.Filter{Name: "vpc-id", Values: []string{vpcID}})
+		providerConfig.SecurityGroups[0].Filters = append(providerConfig.SecurityGroups[0].Filters, machineapi.Filter{Name: "vpc-id", Values: []string{vpcID}})
 	}
 
 	if pool.Spec.Platform.AWS.SpotMarketOptions != nil {
-		providerConfig.SpotMarketOptions = &awsproviderv1beta1.SpotMarketOptions{
+		providerConfig.SpotMarketOptions = &machineapi.SpotMarketOptions{
 			MaxPrice: pool.Spec.Platform.AWS.SpotMarketOptions.MaxPrice,
 		}
 	}

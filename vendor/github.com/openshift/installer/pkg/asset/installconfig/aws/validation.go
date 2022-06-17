@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"sort"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/pkg/errors"
-	"golang.org/x/net/proxy"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -321,20 +321,12 @@ func validateEndpointAccessibility(endpointURL string) error {
 	if endpointURL == "e2e.local" {
 		return nil
 	}
-	URL, err := url.Parse(endpointURL)
+	_, err := url.Parse(endpointURL)
 	if err != nil {
 		return err
 	}
-	port := URL.Port()
-	if port == "" {
-		port = "https"
-	}
-	conn, err := proxy.Dial(context.Background(), "tcp", net.JoinHostPort(URL.Hostname(), port))
-	if err != nil {
-		return err
-	}
-	conn.Close()
-	return nil
+	_, err = http.Head(endpointURL)
+	return err
 }
 
 var requiredServices = []string{
@@ -349,7 +341,7 @@ var requiredServices = []string{
 
 // ValidateForProvisioning validates if the install config is valid for provisioning the cluster.
 func ValidateForProvisioning(session *session.Session, ic *types.InstallConfig, metadata *Metadata) error {
-	if ic.Publish == types.InternalPublishingStrategy {
+	if ic.Publish == types.InternalPublishingStrategy && ic.AWS.HostedZone == "" {
 		return nil
 	}
 
@@ -362,11 +354,13 @@ func ValidateForProvisioning(session *session.Session, ic *types.InstallConfig, 
 	client := route53.New(session)
 
 	if ic.AWS.HostedZone != "" {
-		zoneName := ic.AWS.HostedZone
-		zonePath := field.NewPath("aws", "hostedZone")
+		zoneName = ic.AWS.HostedZone
+		zonePath = field.NewPath("aws", "hostedZone")
 		zoneOutput, errors := getHostedZone(client, zonePath, zoneName)
 		if len(errors) > 0 {
-			allErrs = append(allErrs, errors...)
+			return field.ErrorList{
+				field.Invalid(zonePath, zoneName, "cannot find hosted zone"),
+			}.ToAggregate()
 		}
 
 		if errors = validateHostedZone(zoneOutput, zonePath, zoneName, metadata); len(errors) > 0 {
@@ -375,11 +369,13 @@ func ValidateForProvisioning(session *session.Session, ic *types.InstallConfig, 
 
 		zone = zoneOutput.HostedZone
 	} else {
-		zoneName := ic.BaseDomain
-		zonePath := field.NewPath("baseDomain")
+		zoneName = ic.BaseDomain
+		zonePath = field.NewPath("baseDomain")
 		zone, errors = getBaseDomain(session, zonePath, zoneName)
 		if len(errors) > 0 {
-			allErrs = append(allErrs, errors...)
+			return field.ErrorList{
+				field.Invalid(zonePath, zoneName, "cannot find base domain"),
+			}.ToAggregate()
 		}
 	}
 
@@ -464,7 +460,7 @@ func getSubDomainDNSRecords(client *route53.Route53, hostedZone *route53.HostedZ
 				name := aws.StringValue(recordSet.Name)
 				// skip record sets that are not sub-domains of the cluster domain. Such record sets may exist for
 				// hosted zones that are used for other clusters or other purposes.
-				if !strings.HasSuffix(name, dottedClusterDomain) {
+				if !strings.HasSuffix(name, "."+dottedClusterDomain) {
 					continue
 				}
 				// skip record sets that are the cluster domain. Record sets for the cluster domain are fine. If the

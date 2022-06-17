@@ -18,15 +18,15 @@ const (
 	// ErrCodeAccessPointLimitExceeded for service response error code
 	// "AccessPointLimitExceeded".
 	//
-	// Returned if the AWS account has already created the maximum number of access
-	// points allowed per file system.
+	// Returned if the Amazon Web Services account has already created the maximum
+	// number of access points allowed per file system.
 	ErrCodeAccessPointLimitExceeded = "AccessPointLimitExceeded"
 
 	// ErrCodeAccessPointNotFound for service response error code
 	// "AccessPointNotFound".
 	//
 	// Returned if the specified AccessPointId value doesn't exist in the requester's
-	// AWS account.
+	// Amazon Web Services account.
 	ErrCodeAccessPointNotFound = "AccessPointNotFound"
 
 	// ErrCodeAvailabilityZonesMismatch for service response error code
@@ -68,15 +68,15 @@ const (
 	// ErrCodeFileSystemLimitExceeded for service response error code
 	// "FileSystemLimitExceeded".
 	//
-	// Returned if the AWS account has already created the maximum number of file
-	// systems allowed per account.
+	// Returned if the Amazon Web Services account has already created the maximum
+	// number of file systems allowed per account.
 	ErrCodeFileSystemLimitExceeded = "FileSystemLimitExceeded"
 
 	// ErrCodeFileSystemNotFound for service response error code
 	// "FileSystemNotFound".
 	//
 	// Returned if the specified FileSystemId value doesn't exist in the requester's
-	// AWS account.
+	// Amazon Web Services account.
 	ErrCodeFileSystemNotFound = "FileSystemNotFound"
 
 	// ErrCodeIncorrectFileSystemLifeCycleState for service response error code
@@ -133,16 +133,16 @@ const (
 	// "MountTargetNotFound".
 	//
 	// Returned if there is no mount target with the specified ID found in the caller's
-	// account.
+	// Amazon Web Services account.
 	ErrCodeMountTargetNotFound = "MountTargetNotFound"
 
 	// ErrCodeNetworkInterfaceLimitExceeded for service response error code
 	// "NetworkInterfaceLimitExceeded".
 	//
 	// The calling account has reached the limit for elastic network interfaces
-	// for the specific AWS Region. The client should try to delete some elastic
-	// network interfaces or get the account limit raised. For more information,
-	// see Amazon VPC Limits (https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_Appendix_Limits.html)
+	// for the specific Amazon Web Services Region. The client should try to delete
+	// some elastic network interfaces or get the account limit raised. For more
+	// information, see Amazon VPC Limits (https://docs.aws.amazon.com/AmazonVPC/latest/UserGuide/VPC_Appendix_Limits.html)
 	// in the Amazon VPC User Guide (see the Network interfaces per VPC entry in
 	// the table).
 	ErrCodeNetworkInterfaceLimitExceeded = "NetworkInterfaceLimitExceeded"
@@ -160,6 +160,12 @@ const (
 	// Returned if the default file system policy is in effect for the EFS file
 	// system specified.
 	ErrCodePolicyNotFound = "PolicyNotFound"
+
+	// ErrCodeReplicationNotFound for service response error code
+	// "ReplicationNotFound".
+	//
+	// Returned if the specified file system did not have a replication configuration.
+	ErrCodeReplicationNotFound = "ReplicationNotFound"
 
 	// ErrCodeSecurityGroupLimitExceeded for service response error code
 	// "SecurityGroupLimitExceeded".
@@ -205,8 +211,8 @@ const (
 	// ErrCodeValidationException for service response error code
 	// "ValidationException".
 	//
-	// Returned if the AWS Backup service is not available in the Region in which
-	// the request was made.
+	// Returned if the Backup service is not available in the Amazon Web Services
+	// Region in which the request was made.
 	ErrCodeValidationException = "ValidationException"
 )
 
@@ -232,6 +238,7 @@ var exceptionFromCode = map[string]func(protocol.ResponseMetadata) error{
 	"NetworkInterfaceLimitExceeded":     newErrorNetworkInterfaceLimitExceeded,
 	"NoFreeAddressesInSubnet":           newErrorNoFreeAddressesInSubnet,
 	"PolicyNotFound":                    newErrorPolicyNotFound,
+	"ReplicationNotFound":               newErrorReplicationNotFound,
 	"SecurityGroupLimitExceeded":        newErrorSecurityGroupLimitExceeded,
 	"SecurityGroupNotFound":             newErrorSecurityGroupNotFound,
 	"SubnetNotFound":                    newErrorSubnetNotFound,

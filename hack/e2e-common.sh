@@ -124,10 +124,13 @@ trap 'kill %1; save_hive_logs' EXIT
 # Install Hive
 IMG="${HIVE_IMAGE}" make deploy
 
-# Wait for $HIVE_NS to appear, as subsequent test steps rely on it
+# Wait for $HIVE_NS to appear, as subsequent test steps rely on it.
+# Timeout needs to account for Deployment=>ReplicaSet=>Pod=>Container as well
+# as the operator starting up and reconciling HiveConfig to create the
+# targetNamespace.
 echo -n "Waiting for namespace $HIVE_NS to appear"
 i=0
-while [[ $i -lt 30 ]]; do
+while [[ $i -lt 180 ]]; do
   oc get namespace $HIVE_NS >/dev/null 2>&1 && break
   i=$((i+1))
   echo -n .

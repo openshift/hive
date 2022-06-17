@@ -276,6 +276,11 @@ data:
       - "Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane"
       installFailingReason: KubeAPIWaitFailed
       installFailingMessage: Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane
+    - name: SCACertPullFailed
+      searchRegexStrings:
+      - "Failed to pull SCA certs from"
+      installFailingReason: SCACertPullFailed
+      installFailingMessage: Failed to pull SCA certs
 
     # Keep these at the bottom so that they're only hit if nothing above matches.
     # We don't want to show these to users unless it's a last resort. It's barely better than "unknown error".

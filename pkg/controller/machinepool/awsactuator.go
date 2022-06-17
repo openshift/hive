@@ -292,7 +292,6 @@ func decodeAWSMachineProviderSpec(rawExtension *runtime.RawExtension, logger log
 		return nil, fmt.Errorf("error unmarshalling providerSpec: %v", err)
 	}
 
-	logger.Infof("Got provider spec from raw extension: %+v", spec)
 	return spec, nil
 }
 

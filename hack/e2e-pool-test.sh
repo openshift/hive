@@ -214,10 +214,6 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   --size "${POOL_SIZE}" \
   ${REAL_POOL_NAME}
 
-# Add customization
-create_customization "cdc-test" "${CLUSTER_NAMESPACE}"
-oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
-
 ### INTERLUDE: FAKE POOL
 # The real cluster pool is going to take a while to become ready. While that
 # happens, create a fake pool and do some more testing. We'll use the real
@@ -227,6 +223,11 @@ FAKE_POOL_NAME=fake-pool
 oc get clusterpool ${REAL_POOL_NAME} -o json \
   | jq '.spec.annotations["hive.openshift.io/fake-cluster"] = "true" | .metadata.name = "'${FAKE_POOL_NAME}'" | .spec.size = 4' \
   | oc apply -f -
+
+# Add customization to REAL POOL
+create_customization "cdc-test" "${CLUSTER_NAMESPACE}"
+oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
+
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
 
 ## Test stale cluster replacement (HIVE-1058)

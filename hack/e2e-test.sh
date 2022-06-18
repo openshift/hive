@@ -160,6 +160,15 @@ while [ $i -le ${max_cluster_deployment_status_checks} ]; do
   PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionFailed")' <<<"${CD_JSON}")
   if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
     INSTALL_RESULT="failure"
+    FAILURE_TYPE=ProvisionFailed
+    FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
+    FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
+    break
+  fi
+  PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionStopped")' <<<"${CD_JSON}")
+  if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
+    INSTALL_RESULT="failure"
+    FAILURE_TYPE=ProvisionStopped
     FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
     FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
     break
@@ -187,6 +196,7 @@ case "${INSTALL_RESULT}" in
         ;;
     failure)
         echo "ClusterDeployment ${CLUSTER_NAME} provision failed" >&2
+        echo "Type: $FAILURE_TYPE" >&2
         echo "Reason: $FAILURE_REASON" >&2
         echo "Message: $FAILURE_MESSAGE" >&2
         ;;

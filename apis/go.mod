@@ -1,6 +1,6 @@
 module github.com/openshift/hive/apis
 
-go 1.17
+go 1.18
 
 require (
 	github.com/openshift/api v0.0.0-20220427141643-6e7069f2fba2

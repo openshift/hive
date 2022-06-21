@@ -16,7 +16,7 @@ type MachinePool struct {
 
 	// OSImage defines the image to use for the OS.
 	// +optional
-	OSImage OSImage `json:"osImage,omitempty"`
+	OSImage *OSImage `json:"osImage,omitempty"`
 }
 
 // OSImage is the image to use for the OS of a machine.

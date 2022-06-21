@@ -30,7 +30,11 @@ func (in *MachinePool) DeepCopyInto(out *MachinePool) {
 		copy(*out, *in)
 	}
 	in.OSDisk.DeepCopyInto(&out.OSDisk)
-	out.OSImage = in.OSImage
+	if in.OSImage != nil {
+		in, out := &in.OSImage, &out.OSImage
+		*out = new(OSImage)
+		**out = **in
+	}
 	return
 }
 

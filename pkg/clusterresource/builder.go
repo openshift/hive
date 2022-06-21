@@ -423,7 +423,26 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 		}
 		modifiedBytes, err := ops.Apply(d)
 		if err != nil {
-			return nil, errors.Wrap(err, "error patching install-config.yaml to remove metadataService")
+			return nil, errors.Wrap(err, "error patching install-config.yaml to remove metadataService field")
+		}
+		d = modifiedBytes
+	}
+
+	// Remove osImage field from machinepool platform within installconfig.
+	if installConfig.Platform.Azure != nil {
+		ops := yamlpatch.Patch{
+			yamlpatch.Operation{
+				Op:   "remove",
+				Path: yamlpatch.OpPath("/compute/0/platform/azure/osImage"),
+			},
+			yamlpatch.Operation{
+				Op:   "remove",
+				Path: yamlpatch.OpPath("/controlPlane/platform/azure/osImage"),
+			},
+		}
+		modifiedBytes, err := ops.Apply(d)
+		if err != nil {
+			return nil, errors.Wrap(err, "error patching install-config.yaml to remove osImage field")
 		}
 		d = modifiedBytes
 	}

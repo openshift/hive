@@ -35,6 +35,7 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1"})
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
 					testAzureImage(compute.HyperVGenerationTypesV1),
 				})
@@ -49,6 +50,7 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
 					testAzureImage(compute.HyperVGenerationTypesV1),
 				})
@@ -68,6 +70,7 @@ func TestAzureActuator(t *testing.T) {
 				return pool
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
 					testAzureImage(compute.HyperVGenerationTypesV1),
 				})
@@ -88,6 +91,7 @@ func TestAzureActuator(t *testing.T) {
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
 					testAzureImage(compute.HyperVGenerationTypesV1),
 				})
@@ -104,6 +108,7 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3", "zone4", "zone5"})
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
 					testAzureImage(compute.HyperVGenerationTypesV1),
 				})
@@ -122,6 +127,7 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{})
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
 					testAzureImage(compute.HyperVGenerationTypesV1),
 				})
@@ -134,6 +140,7 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
 					testAzureImage(compute.HyperVGenerationTypesV1),
 				})
@@ -153,8 +160,9 @@ func TestAzureActuator(t *testing.T) {
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
-				mockGetHyperVGeneration(mockCtrl, client, "V2")
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
 					testAzureImage(compute.HyperVGenerationTypesV2),
 				})
 			},
@@ -181,6 +189,7 @@ func TestAzureActuator(t *testing.T) {
 				return mp
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
 				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
 			},
 			expectedMachineSetReplicas: map[string]int64{
@@ -219,6 +228,7 @@ func TestAzureActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
+				assert.NoError(t, err, "unexpected error for test case")
 				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage)
 			}
 		})
@@ -263,8 +273,11 @@ func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockCli
 	)
 }
 
-func mockGetHyperVGeneration(mockCtrl *gomock.Controller, client *mockazure.MockClient, hyperVGen string) {
-	client.EXPECT().GetHyperVGenerationVersion(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(hyperVGen, nil)
+func mockGetVMCapabilities(mockCtrl *gomock.Controller, client *mockazure.MockClient, hyperVGenerations string) {
+	capabilities := map[string]string{
+		"HyperVGenerations": hyperVGenerations,
+	}
+	client.EXPECT().GetVMCapabilities(gomock.Any(), gomock.Any(), gomock.Any()).Return(capabilities, nil)
 }
 
 func mockListImagesByResourceGroup(mockCtrl *gomock.Controller, client *mockazure.MockClient, images []compute.Image) {

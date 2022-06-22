@@ -16,7 +16,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/openshift/hive/pkg/constants"
 )
@@ -41,9 +40,9 @@ type Client interface {
 	ListAllVirtualMachines(ctx context.Context, statusOnly string) (compute.VirtualMachineListResultPage, error)
 	DeallocateVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesDeallocateFuture, error)
 	StartVirtualMachine(ctx context.Context, resourceGroup, name string) (compute.VirtualMachinesStartFuture, error)
+	GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error)
 
-	// SKU & HyperVGen
-	GetHyperVGenerationVersion(ctx context.Context, instanceType string, diskType string, region string) (version string, err error)
+	// SKU
 	GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error)
 
 	// Images
@@ -131,29 +130,22 @@ func (c *azureClient) StartVirtualMachine(ctx context.Context, resourceGroup, na
 	return c.virtualMachinesClient.Start(ctx, resourceGroup, name)
 }
 
-// GetHyperVGenerationVersion gets the HyperVGeneration version for the given disk instance type. Defaults to V2 if either V1 or V2
-// available.
-func (c *azureClient) GetHyperVGenerationVersion(ctx context.Context, instanceType string, diskType string, region string) (version string, err error) {
+// GetVMCapabilities retrieves the capabilities of an instance type in a specific region. Returns these values
+// in a map with the capability name as the key and the corresponding value.
+func (c *azureClient) GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error) {
 	typeMeta, err := c.GetVirtualMachineSku(ctx, instanceType, region)
 	if err != nil {
-		return "", fmt.Errorf("error onnecting to Azure client: %s", err.Error())
+		return nil, fmt.Errorf("error connecting to Azure client: %v", err)
+	}
+	if typeMeta == nil {
+		return nil, fmt.Errorf("not found in region %s", region)
 	}
 
+	capabilities := make(map[string]string)
 	for _, capability := range *typeMeta.Capabilities {
-		if strings.EqualFold(*capability.Name, "HyperVGenerations") {
-			generations := sets.NewString()
-			for _, g := range strings.Split(to.String(capability.Value), ",") {
-				g = strings.TrimSpace(g)
-				g = strings.ToUpper(g)
-				generations.Insert(g)
-			}
-			if generations.Has("V2") {
-				return "V2", nil
-			}
-			return "V1", nil
-		}
+		capabilities[to.String(capability.Name)] = to.String(capability.Value)
 	}
-	return "", fmt.Errorf("failed to fetch HyperVGeneration version for given instance type")
+	return capabilities, nil
 }
 
 // GetVirtualMachineSku retrieves the resource SKU of a specified virtual machine SKU in the specified region.

@@ -110,19 +110,19 @@ func (mr *MockClientMockRecorder) DeleteZone(ctx, resourceGroupName, zone interf
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteZone", reflect.TypeOf((*MockClient)(nil).DeleteZone), ctx, resourceGroupName, zone)
 }
 
-// GetHyperVGenerationVersion mocks base method.
-func (m *MockClient) GetHyperVGenerationVersion(ctx context.Context, instanceType, diskType, region string) (string, error) {
+// GetVMCapabilities mocks base method.
+func (m *MockClient) GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHyperVGenerationVersion", ctx, instanceType, diskType, region)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "GetVMCapabilities", ctx, instanceType, region)
+	ret0, _ := ret[0].(map[string]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetHyperVGenerationVersion indicates an expected call of GetHyperVGenerationVersion.
-func (mr *MockClientMockRecorder) GetHyperVGenerationVersion(ctx, instanceType, diskType, region interface{}) *gomock.Call {
+// GetVMCapabilities indicates an expected call of GetVMCapabilities.
+func (mr *MockClientMockRecorder) GetVMCapabilities(ctx, instanceType, region interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHyperVGenerationVersion", reflect.TypeOf((*MockClient)(nil).GetHyperVGenerationVersion), ctx, instanceType, diskType, region)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVMCapabilities", reflect.TypeOf((*MockClient)(nil).GetVMCapabilities), ctx, instanceType, region)
 }
 
 // GetVirtualMachineSku mocks base method.

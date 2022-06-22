@@ -19,7 +19,7 @@ const (
 	awsInstanceType = "m4.xlarge"
 	volumeIOPS      = 100
 	volumeSize      = 22
-	volumeType      = "gp2"
+	volumeType      = "gp3"
 )
 
 var _ CloudBuilder = (*AWSCloudBuilder)(nil)

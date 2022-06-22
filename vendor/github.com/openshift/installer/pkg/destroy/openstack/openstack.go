@@ -103,7 +103,7 @@ func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 		"deleteServerGroups":    deleteServerGroups,
 		"deleteTrunks":          deleteTrunks,
 		"deleteLoadBalancers":   deleteLoadBalancers,
-		"deletePorts":           deletePorts,
+		"deletePorts":           deletePortsByFilter,
 		"deleteSecurityGroups":  deleteSecurityGroups,
 		"clearRouterInterfaces": clearRouterInterfaces,
 		"deleteSubnets":         deleteSubnets,
@@ -112,6 +112,7 @@ func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 		"deleteContainers":      deleteContainers,
 		"deleteVolumes":         deleteVolumes,
 		"deleteShares":          deleteShares,
+		"deleteVolumeSnapshots": deleteVolumeSnapshots,
 		"deleteFloatingIPs":     deleteFloatingIPs,
 		"deleteImages":          deleteImages,
 	}
@@ -320,7 +321,36 @@ func deleteServerGroups(opts *clientconfig.ClientOpts, filter Filter, logger log
 	return numberDeleted == numberToDelete, nil
 }
 
-func deletePorts(opts *clientconfig.ClientOpts, filter Filter, logger logrus.FieldLogger) (bool, error) {
+func deletePortsByNetwork(opts *clientconfig.ClientOpts, networkID string, logger logrus.FieldLogger) (bool, error) {
+
+	listOpts := ports.ListOpts{
+		NetworkID: networkID,
+	}
+
+	result, err := deletePorts(opts, listOpts, logger)
+	if err != nil {
+		logger.Error(err)
+		return false, nil
+	}
+	return result, err
+}
+
+func deletePortsByFilter(opts *clientconfig.ClientOpts, filter Filter, logger logrus.FieldLogger) (bool, error) {
+
+	tags := filterTags(filter)
+	listOpts := ports.ListOpts{
+		TagsAny: strings.Join(tags, ","),
+	}
+
+	result, err := deletePorts(opts, listOpts, logger)
+	if err != nil {
+		logger.Error(err)
+		return false, nil
+	}
+	return result, err
+}
+
+func deletePorts(opts *clientconfig.ClientOpts, listOpts ports.ListOpts, logger logrus.FieldLogger) (bool, error) {
 	logger.Debug("Deleting openstack ports")
 	defer logger.Debugf("Exiting deleting openstack ports")
 
@@ -328,10 +358,6 @@ func deletePorts(opts *clientconfig.ClientOpts, filter Filter, logger logrus.Fie
 	if err != nil {
 		logger.Error(err)
 		return false, nil
-	}
-	tags := filterTags(filter)
-	listOpts := ports.ListOpts{
-		TagsAny: strings.Join(tags, ","),
 	}
 
 	allPages, err := ports.List(conn, listOpts).AllPages()
@@ -820,17 +846,17 @@ func getRouterByPort(client *gophercloud.ServiceClient, allPorts []ports.Port) (
 	return empty, nil
 }
 
-func deleteLeftoverLoadBalancers(opts *clientconfig.ClientOpts, logger logrus.FieldLogger, networkID string) {
+func deleteLeftoverLoadBalancers(opts *clientconfig.ClientOpts, logger logrus.FieldLogger, networkID string) error {
 	conn, err := clientconfig.NewServiceClient("load-balancer", opts)
 	if err != nil {
 		// Ignore the error if Octavia is not available for the cloud
 		var gerr *gophercloud.ErrEndpointNotFound
 		if errors.As(err, &gerr) {
 			logger.Debug("Skip load balancer deletion because Octavia endpoint is not found")
-			return
+			return nil
 		}
 		logger.Error(err)
-		return
+		return err
 	}
 
 	listOpts := loadbalancers.ListOpts{
@@ -839,17 +865,18 @@ func deleteLeftoverLoadBalancers(opts *clientconfig.ClientOpts, logger logrus.Fi
 	allPages, err := loadbalancers.List(conn, listOpts).AllPages()
 	if err != nil {
 		logger.Error(err)
-		return
+		return err
 	}
 
 	allLoadBalancers, err := loadbalancers.ExtractLoadBalancers(allPages)
 	if err != nil {
 		logger.Error(err)
-		return
+		return err
 	}
 	deleteOpts := loadbalancers.DeleteOpts{
 		Cascade: true,
 	}
+	deleted := 0
 	for _, loadbalancer := range allLoadBalancers {
 		if !strings.HasPrefix(loadbalancer.Description, "Kubernetes external service") {
 			logger.Debugf("Not deleting LoadBalancer %q with description %q", loadbalancer.ID, loadbalancer.Description)
@@ -876,8 +903,13 @@ func deleteLeftoverLoadBalancers(opts *clientconfig.ClientOpts, logger logrus.Fi
 			}
 			logger.Debugf("Cannot find load balancer %q. It's probably already been deleted.", loadbalancer.ID)
 		}
+		deleted++
 	}
-	return
+
+	if deleted != len(allLoadBalancers) {
+		return errors.Errorf("Only deleted %d of %d load balancers", deleted, len(allLoadBalancers))
+	}
+	return nil
 }
 
 func isClusterSubnet(subnets []subnets.Subnet, subnetID string) bool {
@@ -970,11 +1002,24 @@ func deleteNetworks(opts *clientconfig.ClientOpts, filter Filter, logger logrus.
 			// Ignore the error if the network cannot be found
 			var gerr gophercloud.ErrDefault404
 			if !errors.As(err, &gerr) {
-				// This can fail when network is still in use
-				// Just log the error and move on to the next port
+				// This can fail when network is still in use. Let's log an error and try to fix this.
 				logger.Debugf("Deleting Network %q failed: %v", network.ID, err)
-				// Try to delete eventual leftover load balancers
-				deleteLeftoverLoadBalancers(opts, logger, network.ID)
+
+				// First try to delete eventual leftover load balancers
+				// *This has to be done before attempt to remove ports or we'll delete LB ports!*
+				err := deleteLeftoverLoadBalancers(opts, logger, network.ID)
+				if err != nil {
+					logger.Error(err)
+					// Do not attempt to delete ports on LB removal problem or we'll lose FIP associations!
+					continue
+				}
+
+				// Only then try to remove all the ports it may still contain (untagged as well).
+				// *We cannot delete ports before LBs because we'll lose FIP associations!*
+				_, err = deletePortsByNetwork(opts, network.ID, logger)
+				if err != nil {
+					logger.Error(err)
+				}
 				continue
 			}
 			logger.Debugf("Cannot find network %q. It's probably already been deleted.", network.ID)
@@ -1385,12 +1430,6 @@ func deleteVolumes(opts *clientconfig.ClientOpts, filter Filter, logger logrus.F
 	numberToDelete := len(volumeIDs)
 	numberDeleted := 0
 	for _, volumeID := range volumeIDs {
-		deleted, err := deleteSnapshots(conn, volumeID, logger)
-		if !deleted || err != nil {
-			// Move on to the next volume
-			continue
-		}
-
 		logger.Debugf("Deleting volume %q", volumeID)
 		err = volumes.Delete(conn, volumeID, deleteOpts).ExtractErr()
 		if err != nil {
@@ -1409,13 +1448,25 @@ func deleteVolumes(opts *clientconfig.ClientOpts, filter Filter, logger logrus.F
 	return numberDeleted == numberToDelete, nil
 }
 
-func deleteSnapshots(conn *gophercloud.ServiceClient, volumeID string, logger logrus.FieldLogger) (bool, error) {
-	logger.Debugf("Deleting OpenStack snapshots for volume %v", volumeID)
-	defer logger.Debugf("Exiting deleting OpenStack snapshots for volume %v", volumeID)
+func deleteVolumeSnapshots(opts *clientconfig.ClientOpts, filter Filter, logger logrus.FieldLogger) (bool, error) {
+	logger.Debug("Deleting OpenStack volume snapshots")
+	defer logger.Debugf("Exiting deleting OpenStack volume snapshots")
 
-	listOpts := snapshots.ListOpts{
-		VolumeID: volumeID,
+	var clusterID string
+	for k, v := range filter {
+		if strings.ToLower(k) == "openshiftclusterid" {
+			clusterID = v
+			break
+		}
 	}
+
+	conn, err := clientconfig.NewServiceClient("volume", opts)
+	if err != nil {
+		logger.Error(err)
+		return false, nil
+	}
+
+	listOpts := snapshots.ListOpts{}
 
 	allPages, err := snapshots.List(conn, listOpts).AllPages()
 	if err != nil {
@@ -1432,17 +1483,20 @@ func deleteSnapshots(conn *gophercloud.ServiceClient, volumeID string, logger lo
 	numberToDelete := len(allSnapshots)
 	numberDeleted := 0
 	for _, snapshot := range allSnapshots {
-		logger.Debugf("Deleting volume snapshot %q", snapshot.ID)
-		err = snapshots.Delete(conn, snapshot.ID).ExtractErr()
-		if err != nil {
-			// Ignore the error if the volume snapshot cannot be found
-			var gerr gophercloud.ErrDefault404
-			if !errors.As(err, &gerr) {
-				// Just log the error and move on to the next volume snapshot
-				logger.Debugf("Deleting volume snapshot %q failed: %v", snapshot.ID, err)
-				continue
+		// Delete only those snapshots that contain cluster ID in the metadata
+		if val, ok := snapshot.Metadata[cinderCSIClusterIDKey]; ok && val == clusterID {
+			logger.Debugf("Deleting volume snapshot %q", snapshot.ID)
+			err = snapshots.Delete(conn, snapshot.ID).ExtractErr()
+			if err != nil {
+				// Ignore the error if the server cannot be found
+				var gerr gophercloud.ErrDefault404
+				if !errors.As(err, &gerr) {
+					// Just log the error and move on to the next volume snapshot
+					logger.Debugf("Deleting volume snapshot %q failed: %v", snapshot.ID, err)
+					continue
+				}
+				logger.Debugf("Cannot find volume snapshot %q. It's probably already been deleted.", snapshot.ID)
 			}
-			logger.Debugf("Cannot find volume snapshot %q. It's probably already been deleted.", snapshot.ID)
 		}
 		numberDeleted++
 	}

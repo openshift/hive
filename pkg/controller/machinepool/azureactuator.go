@@ -87,7 +87,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	}
 
 	var hyperVGen string
-	if osImage := pool.Spec.Platform.Azure.OSImage; osImage.Publisher != "" {
+	if osImage := pool.Spec.Platform.Azure.OSImage; osImage != nil && osImage.Publisher != "" {
 		computePool.Platform.Azure.OSImage = installertypesazure.OSImage{
 			Publisher: osImage.Publisher,
 			Offer:     osImage.Offer,

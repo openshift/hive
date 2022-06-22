@@ -172,7 +172,7 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool: func() *hivev1.MachinePool {
 				mp := testAzurePool()
-				mp.Spec.Platform.Azure.OSImage = hivev1azure.OSImage{
+				mp.Spec.Platform.Azure.OSImage = &hivev1azure.OSImage{
 					Publisher: "testpublisher",
 					Offer:     "testoffer",
 					SKU:       "testsku",

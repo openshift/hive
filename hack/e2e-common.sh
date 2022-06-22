@@ -13,7 +13,9 @@ set -o monitor
 # Compute the timeout as 2m less than what's configured for the job in prow --
 # keep these up to date with the job config!
 if [[ $0 == */e2e-pool-test.sh ]]; then
-  timeout_minutes=148
+  # TODO: set this back to 148 when we figure out how to make the *test script*
+  # timeout something other than 2h.
+  timeout_minutes=118
 else
   timeout_minutes=118
 fi

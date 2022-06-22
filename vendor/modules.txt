@@ -22,7 +22,6 @@ github.com/Azure/azure-sdk-for-go/profiles/2018-03-01/resources/mgmt/subscriptio
 github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute
 github.com/Azure/azure-sdk-for-go/profiles/latest/marketplaceordering/mgmt/marketplaceordering
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-03-30/compute
-github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-12-01/compute
 github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2016-04-01/dns
@@ -848,7 +847,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20220427141643-6e7069f2fba2
+# github.com/openshift/api v0.0.0-20220504105152-6f735e7109c8
 ## explicit; go 1.16
 github.com/openshift/api/apps/v1
 github.com/openshift/api/authorization/v1
@@ -923,7 +922,7 @@ github.com/openshift/hive/apis/hive/v1/vsphere
 github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
 github.com/openshift/hive/apis/scheme
-# github.com/openshift/installer v0.9.0-master.0.20220507013207-bdbb3b12afd3
+# github.com/openshift/installer v0.9.0-master.0.20220617092223-f912534f1249
 ## explicit; go 1.17
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset/installconfig/alibabacloud

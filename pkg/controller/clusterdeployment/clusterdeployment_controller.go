@@ -512,11 +512,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			// removed the finalizer.
 			clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
 			// Clear ClusterSyncFailing metric
-			clusterSync := &hiveintv1alpha1.ClusterSync{}
-			err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync)
-			if err != nil {
-				clustersync.ClearClusterSyncFailingSecondsMetric(clusterSync, cdLog)
-			}
+			clustersync.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 			return reconcile.Result{}, nil
 		}
@@ -1414,11 +1410,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 
 	clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
 	// Clear ClusterSyncFailing metric
-	clusterSync := &hiveintv1alpha1.ClusterSync{}
-	err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync)
-	if err != nil {
-		clustersync.ClearClusterSyncFailingSecondsMetric(clusterSync, cdLog)
-	}
+	clustersync.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 	// Increment the clusters deleted counter:
 	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
@@ -2085,7 +2077,7 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 			message = "ClusterSync has not yet been created"
 		}
 		// In case the clusterSync has been deleted at this point, clear the clusterSyncFailing metric
-		clustersync.ClearClusterSyncFailingSecondsMetric(clusterSync, cdLog)
+		clustersync.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 	case err != nil:
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return err

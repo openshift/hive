@@ -502,7 +502,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 	}
 	// Clear the cluster sync failing metric
 	if !failing {
-		ClearClusterSyncFailingSecondsMetric(clusterSync, logger)
+		ClearClusterSyncFailingSecondsMetric(clusterSync.Namespace, clusterSync.Name, logger)
 	}
 
 	if needToDoFullReapply {
@@ -1147,11 +1147,11 @@ func (r *ReconcileClusterSync) timeUntilFullReapply(lease *hiveintv1alpha1.Clust
 	return timeUntilNext
 }
 
-func ClearClusterSyncFailingSecondsMetric(cs *hiveintv1alpha1.ClusterSync, csLog log.FieldLogger) {
+func ClearClusterSyncFailingSecondsMetric(namespace string, name string, log log.FieldLogger) {
 	cleared := hivemetrics.MetricClusterSyncFailingSeconds.Delete(map[string]string{
-		"namespaced_name": hivemetrics.GetNameSpacedName(cs.Namespace, cs.Name),
+		"namespaced_name": hivemetrics.GetNameSpacedName(namespace, name),
 	})
 	if cleared {
-		csLog.Debug("cleared metric: %v", hivemetrics.MetricClusterSyncFailingSeconds)
+		log.Debug("cleared metric: %v", hivemetrics.MetricClusterSyncFailingSeconds)
 	}
 }

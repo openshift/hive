@@ -665,7 +665,7 @@ func deleteTransitionMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterD
 
 // logCumulativeMetric should be used to log cumulative metrics
 func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment, time float64) {
-	if !hivemetrics.ShouldLogDurationMetric(metric, time) {
+	if !hivemetrics.ShouldLogHistogramDurationMetric(metric, time) {
 		return
 	}
 	poolNS, poolName := "<none>", "<none>"

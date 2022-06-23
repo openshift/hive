@@ -29,6 +29,8 @@ const (
 	CurrentResuming DurationMetricType = "currentResuming"
 	// CurrentWaitingForCO corresponds to hive_cluster_deployments_waiting_for_cluster_operators_seconds
 	CurrentWaitingForCO DurationMetricType = "currentWaitingForCO"
+	// CurrentClusterSyncFailing corresponds to hive_clustersync_failing_seconds
+	CurrentClusterSyncFailing DurationMetricType = "currentClusterSyncFailing"
 
 	// These metrics will not be cleared and can potentially blow up the cardinality
 

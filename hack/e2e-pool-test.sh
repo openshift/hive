@@ -26,6 +26,7 @@ EOF
 function create_customization() {
   local is_name=$1
   local ns=$2
+  local cname=$3
   echo "Creating ClusterDeploymentCustomization $is_name"
   oc apply -f -<<EOF
 apiVersion: hive.openshift.io/v1
@@ -37,7 +38,7 @@ spec:
   installConfigPatches:
     - op: replace
       path: /metadata/name
-      value: cdc-test
+      value: $cname
 EOF
 }
 
@@ -225,7 +226,8 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
   | oc apply -f -
 
 # Add customization to REAL POOL
-create_customization "cdc-test" "${CLUSTER_NAMESPACE}"
+NEW_CLUSTER_NAME="cdc-$(cat /dev/urandom | tr -dc 'a-z' | fold -w 8 | head -n 1)"
+create_customization "cdc-test" "${CLUSTER_NAMESPACE}" "${NEW_CLUSTER_NAME}"
 oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
 
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
@@ -292,7 +294,7 @@ wait_for_pool_to_be_ready $FAKE_POOL_NAME
 wait_for_pool_to_be_ready $REAL_POOL_NAME
 
 # Test customization
-verify_cluster_name $REAL_POOL_NAME "cdc-test" "cdc-test"
+verify_cluster_name $REAL_POOL_NAME "cdc-test" $NEW_CLUSTER_NAME
 
 # Get the CD name & namespace (which should be the same)
 # TODO: Set this up for variable POOL_SIZE -- as written this would put

@@ -2,36 +2,35 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Developing Hive](#developing-hive)
-  - [Prerequisites](#prerequisites)
-    - [External tools](#external-tools)
-  - [Build and run tests](#build-and-run-tests)
-  - [Setting up the development environment](#setting-up-the-development-environment)
-    - [Cloning the repository](#cloning-the-repository)
-  - [Obtaining a Cluster](#obtaining-a-cluster)
-    - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
-  - [Deploying from Source](#deploying-from-source)
-    - [Full Container Build](#full-container-build)
-    - [Fedora Development Container Build](#fedora-development-container-build)
-    - [Running Code Locally](#running-code-locally)
-      - [hive-operator](#hive-operator)
-    - [hive-controllers](#hive-controllers)
-  - [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
-  - [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
-  - [Using Serving Certificates](#using-serving-certificates)
-    - [Generating a Certificate](#generating-a-certificate)
-    - [Using Generated Certificate](#using-generated-certificate)
-  - [Code editors and multi-module repositories](#code-editors-and-multi-module-repositories)
-  - [Updating Hive APIs](#updating-hive-apis)
-  - [Importing Hive APIs](#importing-hive-apis)
-  - [Dependency management](#dependency-management)
-    - [Updating Dependencies](#updating-dependencies)
-    - [Re-creating vendor Directory](#re-creating-vendor-directory)
-    - [Updating the Kubernetes dependencies](#updating-the-kubernetes-dependencies)
-    - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
-  - [Running the e2e test locally](#running-the-e2e-test-locally)
-  - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
-  - [Hive Controllers CPU Profiling](#hive-controllers-cpu-profiling)
+- [Prerequisites](#prerequisites)
+  - [External tools](#external-tools)
+- [Build and run tests](#build-and-run-tests)
+- [Setting up the development environment](#setting-up-the-development-environment)
+  - [Cloning the repository](#cloning-the-repository)
+- [Obtaining a Cluster](#obtaining-a-cluster)
+  - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
+- [Deploying from Source](#deploying-from-source)
+  - [Full Container Build](#full-container-build)
+  - [Fedora Development Container Build](#fedora-development-container-build)
+  - [Running Code Locally](#running-code-locally)
+    - [hive-operator](#hive-operator)
+  - [hive-controllers](#hive-controllers)
+- [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
+- [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
+- [Using Serving Certificates](#using-serving-certificates)
+  - [Generating a Certificate](#generating-a-certificate)
+  - [Using Generated Certificate](#using-generated-certificate)
+- [Code editors and multi-module repositories](#code-editors-and-multi-module-repositories)
+- [Updating Hive APIs](#updating-hive-apis)
+- [Importing Hive APIs](#importing-hive-apis)
+- [Dependency management](#dependency-management)
+  - [Updating Dependencies](#updating-dependencies)
+  - [Re-creating vendor Directory](#re-creating-vendor-directory)
+  - [Updating the Kubernetes dependencies](#updating-the-kubernetes-dependencies)
+  - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
+- [Running the e2e test locally](#running-the-e2e-test-locally)
+- [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
+- [Hive Controllers CPU Profiling](#hive-controllers-cpu-profiling)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -275,21 +274,21 @@ the `github.com/openshift/hive/apis` go submodule.
 A separate `github.com/openshift/hive/apis` submodule allows other repositories to easily import the Hive APIs without
 having to deal with the complex vendoring introduced by dependencies of Hive controllers like the OpenShift Installer.
 
-Since Hive module `github.com/openshift/hive` or `root` module uses vendor directory for all it's dependencies, **ANY**
-change in `github.com/openshift/hive/apis` module requires updating the dependency in the `root` module for change to
+Since Hive's `github.com/openshift/hive` and `root` modules both use vendor directories for all their dependencies, **ANY**
+change in the `github.com/openshift/hive/apis` module requires updating the corresponding dependency in the `root` module for the change to
 take effect.
 
-Therefore, these steps must be followed when updating the Hive APIs,
+Therefore, these steps must be followed when updating the Hive APIs:
 
 1. Make necessary modifications to `github.com/openshift/hive/apis`.
 
-2. Follow the steps defined in [Updating Dependencies](#Updating-Dependencies) to update the dependecies of `root` module
+2. Follow the steps defined in [Updating Dependencies](#Updating-Dependencies) to update the dependecies of the `root` module
 
 3. Now you can use various `make` targets or `go test` for testing your changes.
 
 **IMPORTANT**: go versions => 1.15 default to `-mod=vendor` for all the subcommands and therefore will
-only use the copy of modules in the `vendor/` directory. Anytime you make changes to apis submodule and
-not update the dependencies of the root module, all the builds, tests will continue to use old version of the
+only use the copy of the modules in the `vendor/` directory. Any time you make changes to the `apis` submodule and do
+not update the dependencies of the root module, all the builds and tests will continue to use the old version of the
 submodule.
 
 ## Importing Hive APIs
@@ -311,25 +310,23 @@ go get -u github.com/openshift/hive/apis@master
 
 ### Updating Dependencies
 
-If your work requires a change to the dependencies, you need to update the modules.
+If your work requires a change to dependencies, you need to update the vendored modules.
 
 * If you are upgrading an existing dependency, run `go get [module]`. If you are adding a dependency, then you should
-not need to do anything explicit for this step. The go tooling should pick up the dependency from the include directives
+not need to do anything explicit for this step. The go tooling should pick up the dependency from the `import` directives
 that you added in code.
 
 * Run `make vendor` to fetch changed dependencies.
 
 * Test that everything still compiles with changed files in place by running `make`.
 
-**Refer Go modules documents for more information.**
+**Refer to Go modules documents for more information.**
 
 * [go modules wiki](https://github.com/golang/go/wiki/Modules)
 
 ### Re-creating vendor Directory
 
-If you delete *_vendor_* directory which contain the needed {project} dependencies.
-
-To recreate *_vendor_* directory, you can run the following command:
+If you delete the `vendor` directory which contains the necessary project dependencies, you can recreate it via the following command:
 
 ```
 make vendor
@@ -337,21 +334,38 @@ make vendor
 
 ### Updating the Kubernetes dependencies
 
-Hive is a [multi-module repository](https://github.com/golang/go/wiki/Modules#faqs--multi-module-repositories) with
-the various submodules like,
+Hive is a [multi-module repository](https://github.com/golang/go/wiki/Modules#faqs--multi-module-repositories) with a `github.com/openshift/hive/apis` submodule.
 
-- `github.com/openshift/hive/apis`
-
-These submodules define their own dependencies, most commonly from the Kubernetes ecosystem. All build artifacts are
+This submodule defines its own dependencies, most commonly from the Kubernetes ecosystem. All build artifacts are
 generated from the `root` module and therefore the version of all dependencies used is defined by the `go.mod` in the
-root module, but making sure the dependecies of the all the submodules match the root modules help reduce divergence
-and dependencies pain.
+root module, but making sure the dependecies of the submodule match those of the root module helps reduce divergence
+and dependency pain for consumers.
 
 So whenever the root module updates the Kubernetes ecosystem dependencies,
 
 1. Update the submodules to use the desired version of the Kubernetes ecosystem.
 
-2. Update the root mosdule dependencies to the desired version of the Kubernetes ecosystem.
+2. Update the root module dependencies to the desired version of the Kubernetes ecosystem.
+
+You can validate that the root and submodule dependencies match by running
+
+```
+make modcheck
+```
+
+This will exit nonzero if any discrepancies are found, and the output will denote which dependencies
+are mismatched. For example:
+```
+$ make modcheck
+go run ./hack/modcheck.go
+XX require github.com/go-logr/logr: root(v1.2.2) apis(v1.2.0)
+XX require github.com/google/gofuzz: root(v1.2.0) apis(v1.1.0)
+exit status 1
+make: *** [Makefile:325: modcheck] Error 1
+```
+In this example, address the first error by updating the version of the `require github.com/go-logr/logr` dependency in `apis/go.mod` from `v1.2.0` to `v1.2.2`.
+Repeat for the other errors until the output is clean.
+Don't forget to `make vendor` when you're done to sync the vendor directories with your go.mod changes.
 
 ### Vendoring the OpenShift Installer
 

@@ -320,6 +320,11 @@ lint: install-tools
 # Remove the golangci-lint from the verify until a fix is in place for permisions for writing to the /.cache directory.
 #verify: lint
 
+.PHONY: modcheck
+modcheck:
+	go run ./hack/modcheck.go
+verify: modcheck
+
 .PHONY: install-tools
 install-tools:
 	go install $(GO_MOD_FLAGS) github.com/golang/mock/mockgen

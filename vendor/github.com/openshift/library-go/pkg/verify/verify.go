@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/openpgp"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/verify/store"
@@ -41,6 +42,19 @@ type Interface interface {
 
 	// AddStore adds additional stores for signature verification.
 	AddStore(additionalStore store.Store)
+}
+
+type wrapError struct {
+	msg string
+	err error
+}
+
+func (e *wrapError) Error() string {
+	return e.msg
+}
+
+func (e *wrapError) Unwrap() error {
+	return e.err
 }
 
 type rejectVerifier struct{}
@@ -171,19 +185,23 @@ func (v *releaseVerifier) Verify(ctx context.Context, releaseDigest string) erro
 	}
 
 	var signedWith [][]byte
+	var errs []error
 	err := v.store.Signatures(ctx, "", releaseDigest, func(ctx context.Context, signature []byte, errIn error) (done bool, err error) {
 		if errIn != nil {
 			klog.V(4).Infof("error retrieving signature for %s: %v", releaseDigest, errIn)
+			errs = append(errs, fmt.Errorf("%s: %w", time.Now().Format(time.RFC3339), errIn))
 			return false, nil
 		}
 		for k, keyring := range remaining {
 			content, _, err := verifySignatureWithKeyring(bytes.NewReader(signature), keyring)
 			if err != nil {
 				klog.V(4).Infof("keyring %q could not verify signature for %s: %v", k, releaseDigest, err)
+				errs = append(errs, fmt.Errorf("%s: %w", time.Now().Format(time.RFC3339), err))
 				continue
 			}
 			if err := verifyAtomicContainerSignature(content, releaseDigest); err != nil {
 				klog.V(4).Infof("signature for %s is not valid: %v", releaseDigest, err)
+				errs = append(errs, fmt.Errorf("%s: %w", time.Now().Format(time.RFC3339), err))
 				continue
 			}
 			delete(remaining, k)
@@ -192,17 +210,21 @@ func (v *releaseVerifier) Verify(ctx context.Context, releaseDigest string) erro
 		return len(remaining) == 0, nil
 	})
 	if err != nil {
-		klog.V(4).Infof("Failed to retrieve signatures for %s (should never happen)", releaseDigest)
-		return err
+		klog.V(4).Infof("Failed to retrieve signatures for %s: %v", releaseDigest, err)
+		errs = append(errs, fmt.Errorf("%s: %w", time.Now().Format(time.RFC3339), err))
 	}
 
 	if len(remaining) > 0 {
-		if klog.V(4).Enabled() {
-			for k := range remaining {
-				klog.Infof("Unable to verify %s against keyring %s", releaseDigest, k)
-			}
+		remainingKeyRings := make([]string, 0, len(remaining))
+		for k := range remaining {
+			remainingKeyRings = append(remainingKeyRings, k)
 		}
-		return fmt.Errorf("unable to locate a valid signature for one or more sources")
+		err := &wrapError{
+			msg: fmt.Sprintf("unable to verify %s against keyrings: %s", releaseDigest, strings.Join(remainingKeyRings, ", ")),
+			err: errors.NewAggregate(errs),
+		}
+		klog.V(4).Info(err.Error())
+		return err
 	}
 
 	v.cacheVerification(releaseDigest, signedWith)

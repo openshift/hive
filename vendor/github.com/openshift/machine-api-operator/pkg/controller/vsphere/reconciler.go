@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	apimachineryutilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -38,6 +39,7 @@ const (
 	providerIDPrefix      = "vsphere://"
 	regionKey             = "region"
 	zoneKey               = "zone"
+	minimumHWVersion      = 15
 )
 
 // These are the guestinfo variables used by Ignition.
@@ -546,6 +548,21 @@ func isRetrieveMONotFound(taskRef string, err error) bool {
 	return err.Error() == fmt.Sprintf("ServerFaultCode: The object 'vim.Task:%v' has already been deleted or has not been completely created", taskRef)
 }
 
+func getHwVersion(ctx context.Context, vm *object.VirtualMachine) (int, error) {
+	var _vm mo.VirtualMachine
+	if err := vm.Properties(ctx, vm.Reference(), []string{"config.version"}, &_vm); err != nil {
+		return 0, fmt.Errorf("error getting hw version information for vm %s: %w", vm.Name(), err)
+	}
+
+	versionString := _vm.Config.Version
+	version := strings.TrimPrefix(versionString, "vmx-")
+	parsedVersion, err := strconv.Atoi(version)
+	if err != nil {
+		return 0, fmt.Errorf("can not extract hardware version from version string: %s, format unknown", versionString)
+	}
+	return parsedVersion, nil
+}
+
 func clone(s *machineScope) (string, error) {
 	userData, err := s.GetUserData()
 	if err != nil {
@@ -558,6 +575,23 @@ func clone(s *machineScope) (string, error) {
 		const notFoundMsg = "template not found, specify valid value"
 		defaultError := fmt.Errorf("unable to get template %q: %w", s.providerSpec.Template, err)
 		return "", handleVSphereError(multipleFoundMsg, notFoundMsg, defaultError, err)
+	}
+
+	hwVersion, err := getHwVersion(s.Context, vmTemplate)
+	if err != nil {
+		return "", machineapierros.InvalidMachineConfiguration(
+			"Unable to detect machine template HW version for machine '%s': %v", s.machine.GetName(), err,
+		)
+	}
+	if hwVersion < minimumHWVersion {
+		return "", machineapierros.InvalidMachineConfiguration(
+			fmt.Sprintf(
+				"Hardware lower than %d is not supported, clone stopped. "+
+					"Detected machine template version is %d. "+
+					"Please update machine template: https://access.redhat.com/articles/6090681",
+				minimumHWVersion, hwVersion,
+			),
+		)
 	}
 
 	// Default clone type is FullClone, having snapshot on clonee template will cause incorrect disk sizing.

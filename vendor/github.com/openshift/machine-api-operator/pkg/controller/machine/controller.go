@@ -380,7 +380,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 		if err := r.updateStatus(ctx, m, phaseProvisioning, nil, originalConditions); err != nil {
 			return reconcile.Result{}, err
 		}
-		return reconcile.Result{Requeue: true}, nil
+		return reconcile.Result{}, nil
 	}
 
 	klog.Infof("%v: reconciling machine triggers idempotent create", machineName)

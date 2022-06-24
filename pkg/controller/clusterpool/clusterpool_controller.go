@@ -199,18 +199,20 @@ func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.Ma
 
 		var requests []reconcile.Request
 		for _, cpl := range cpList.Items {
-			if cpl.Spec.Inventory != nil {
-				for _, entry := range cpl.Spec.Inventory {
-					if entry.Name == cdc.Name {
-						requests = append(requests, reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Namespace: cpl.Namespace,
-								Name:      cpl.Name,
-							},
-						})
-						break
-					}
+			if cpl.Spec.Inventory == nil {
+				continue
+			}
+			for _, entry := range cpl.Spec.Inventory {
+				if entry.Name != cdc.Name {
+					continue
 				}
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: cpl.Namespace,
+						Name:      cpl.Name,
+					},
+				})
+				break
 			}
 		}
 

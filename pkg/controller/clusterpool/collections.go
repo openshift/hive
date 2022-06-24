@@ -740,9 +740,6 @@ func (cdcs *cdcCollection) Reserve(c client.Client, cdc *hivev1.ClusterDeploymen
 		return errors.New("ClusterDeploymentCustomization already reserved")
 	}
 
-	cdc.Status.ClusterDeploymentRef = &corev1.LocalObjectReference{Name: cdName}
-	cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: poolName}
-
 	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
 		Type:    conditionsv1.ConditionAvailable,
 		Status:  corev1.ConditionFalse,
@@ -754,7 +751,12 @@ func (cdcs *cdcCollection) Reserve(c client.Client, cdc *hivev1.ClusterDeploymen
 		if err := c.Status().Update(context.Background(), cdc); err != nil {
 			return err
 		}
+	} else {
+		return errors.New("ClusterDeploymentCustomization already reserved")
 	}
+
+	cdc.Status.ClusterDeploymentRef = &corev1.LocalObjectReference{Name: cdName}
+	cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: poolName}
 
 	cdcs.reserved[cdc.Name] = cdc
 	cdcs.byCDCName[cdc.Name] = cdc

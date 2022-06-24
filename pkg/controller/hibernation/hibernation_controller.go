@@ -368,7 +368,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		if shouldStopMachines(cd, hibernatingCondition) {
 			return r.stopMachines(cd, cdLog)
 		}
-		return r.checkClusterStopped(cd, readyCondition, false, cdLog)
+		return r.checkClusterStopped(cd, false, cdLog)
 	}
 	// If we get here, we're not supposed to be hibernating
 	if isFakeCluster {
@@ -388,7 +388,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if shouldStartMachines(cd, hibernatingCondition, readyCondition) {
 		return r.startMachines(cd, cdLog)
 	}
-	return r.checkClusterRunning(cd, syncSetsApplied, cdLog, readyCondition, hibernatingCondition)
+	return r.checkClusterRunning(cd, syncSetsApplied, cdLog, readyCondition)
 }
 
 func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
@@ -451,8 +451,7 @@ func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logge
 	return reconcile.Result{}, err
 }
 
-func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, readyCondition *hivev1.ClusterDeploymentCondition,
-	expectRunning bool, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, expectRunning bool, logger log.FieldLogger) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to check machine status")
@@ -493,8 +492,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 			return reconcile.Result{}, err
 		}
 		// logging with time since ready condition was set to StoppingOrHibernating state
-		logCumulativeMetric(hivemetrics.MetricClusterHibernationTransitionSeconds, cd,
-			time.Since(readyCondition.LastTransitionTime.Time).Seconds())
+		logCumulativeMetric(hivemetrics.MetricClusterHibernationTransitionSeconds, cd, hivev1.ClusterReadyCondition, logger)
 		// Clear entry from currently stopping and waiting for cluster operators clusters if exists
 		deleteTransitionMetric(hivemetrics.MetricStoppingClustersSeconds, cd)
 		deleteTransitionMetric(hivemetrics.MetricWaitingForCOClustersSeconds, cd)
@@ -503,7 +501,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 }
 
 func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment, syncSetsApplied bool, logger log.FieldLogger,
-	readyCondition *hivev1.ClusterDeploymentCondition, hibernatingCondition *hivev1.ClusterDeploymentCondition) (reconcile.Result, error) {
+	readyCondition *hivev1.ClusterDeploymentCondition) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to check machine status")
@@ -639,8 +637,7 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 			return reconcile.Result{}, err
 		}
 		// logging with time since hibernating condition was set to ResumingOrRunning state
-		logCumulativeMetric(hivemetrics.MetricClusterReadyTransitionSeconds, cd,
-			time.Since(hibernatingCondition.LastTransitionTime.Time).Seconds())
+		logCumulativeMetric(hivemetrics.MetricClusterReadyTransitionSeconds, cd, hivev1.ClusterHibernatingCondition, logger)
 		// Clear entry from currently resuming clusters if exists
 		deleteTransitionMetric(hivemetrics.MetricResumingClustersSeconds, cd)
 	}
@@ -664,7 +661,16 @@ func deleteTransitionMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterD
 }
 
 // logCumulativeMetric should be used to log cumulative metrics
-func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment, time float64) {
+// Time to log is calculated as the time lapsed since the last transition time of condition mentioned
+func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment,
+	conditionType hivev1.ClusterDeploymentConditionType, logger log.FieldLogger) {
+	condition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, conditionType)
+	// This shouldn't happen if conditions have been properly initialized
+	if condition == nil {
+		logger.Warningf("cannot find %s condition, logging of metric skipped", conditionType)
+		return
+	}
+	time := time.Since(condition.LastTransitionTime.Time).Seconds()
 	if !hivemetrics.ShouldLogHistogramDurationMetric(metric, time) {
 		return
 	}

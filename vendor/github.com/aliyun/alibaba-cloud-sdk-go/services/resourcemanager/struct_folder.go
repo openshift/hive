@@ -17,8 +17,9 @@ package resourcemanager
 
 // Folder is a nested struct in resourcemanager response
 type Folder struct {
-	CreateTime     string `json:"CreateTime" xml:"CreateTime"`
-	FolderName     string `json:"FolderName" xml:"FolderName"`
-	ParentFolderId string `json:"ParentFolderId" xml:"ParentFolderId"`
-	FolderId       string `json:"FolderId" xml:"FolderId"`
+	ResourceDirectoryPath string `json:"ResourceDirectoryPath" xml:"ResourceDirectoryPath"`
+	CreateTime            string `json:"CreateTime" xml:"CreateTime"`
+	FolderName            string `json:"FolderName" xml:"FolderName"`
+	ParentFolderId        string `json:"ParentFolderId" xml:"ParentFolderId"`
+	FolderId              string `json:"FolderId" xml:"FolderId"`
 }

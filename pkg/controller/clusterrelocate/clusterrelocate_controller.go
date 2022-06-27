@@ -721,7 +721,6 @@ func clearInstanceSpecificMeta(to metav1.Object) {
 	to.SetGeneration(0)
 	to.SetCreationTimestamp(metav1.Time{})
 	to.SetOwnerReferences(nil)
-	to.SetClusterName("")
 	to.SetManagedFields(nil)
 }
 

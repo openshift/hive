@@ -18,6 +18,6 @@ package tag
 // Tag is a nested struct in tag response
 type Tag struct {
 	Key      string `json:"Key" xml:"Key"`
-	Value    string `json:"Value" xml:"Value"`
 	Category string `json:"Category" xml:"Category"`
+	Value    string `json:"Value" xml:"Value"`
 }

@@ -84,8 +84,8 @@ func (s *Store) mostRecentConfigMaps() []corev1.ConfigMap {
 	return s.last
 }
 
-// Signatures returns a list of signatures that match the request
-// digest out of config maps labelled with ReleaseLabelConfigMap in the
+// Signatures fetches signatures for the provided digest
+// out of config maps labelled with ReleaseLabelConfigMap in the
 // NamespaceLabelConfigMap namespace.
 func (s *Store) Signatures(ctx context.Context, name string, digest string, fn store.Callback) error {
 	// avoid repeatedly reloading config maps
@@ -121,6 +121,12 @@ func (s *Store) Signatures(ctx context.Context, name string, digest string, fn s
 					return err
 				}
 			}
+		}
+		if done, err := fn(ctx, nil, fmt.Errorf("prefix %s in config map %s: %w", prefix, cm.ObjectMeta.Name, store.ErrNotFound)); err != nil || done {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 	}
 	return nil

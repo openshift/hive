@@ -32,8 +32,6 @@ import (
 // an attacker was able to take ownership of the store to perform DoS on clusters).
 const maxSignatureSearch = 10
 
-var errNotFound = errors.New("no more signatures to check")
-
 // Store provides access to signatures stored in memory.
 type Store struct {
 	// URI is the base from which signature URIs are constructed.
@@ -85,7 +83,7 @@ func checkHTTPSignatures(ctx context.Context, client *http.Client, u url.URL, ma
 
 		req, err := http.NewRequest("GET", sigURL.String(), nil)
 		if err != nil {
-			_, err = fn(ctx, nil, fmt.Errorf("could not build request to check signature: %v", err))
+			_, err = fn(ctx, nil, fmt.Errorf("could not build request to check signature: %w", err))
 			return err // even if the callback ate the error, no sense in checking later indexes which will fail the same way
 		}
 		req = req.WithContext(ctx)
@@ -110,25 +108,22 @@ func checkHTTPSignatures(ctx context.Context, client *http.Client, u url.URL, ma
 			}()
 
 			if resp.StatusCode == http.StatusNotFound {
-				return nil, errNotFound
+				return nil, store.ErrNotFound
 			}
 			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				if i == 1 {
-					klog.V(4).Infof("Could not find signature at store location %v", sigURL)
-				}
-				return nil, fmt.Errorf("unable to retrieve signature from %v: %d", sigURL, resp.StatusCode)
+				return nil, fmt.Errorf("response status %d", resp.StatusCode)
 			}
 
 			return ioutil.ReadAll(resp.Body)
 		}()
-		if err == errNotFound {
-			break
-		}
 		if err != nil {
-			klog.V(4).Info(err)
-			done, err := fn(ctx, nil, err)
-			if done || err != nil {
-				return err
+			err := fmt.Errorf("unable to retrieve signature from %s: %w", sigURL.String(), err)
+			done, err2 := fn(ctx, nil, err)
+			if done || err2 != nil {
+				return err2
+			}
+			if errors.Is(err, store.ErrNotFound) {
+				break
 			}
 			continue
 		}

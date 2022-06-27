@@ -230,7 +230,7 @@ func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams gene
 	}
 	// Re-use the openAPISchema that should have been initialized in the constructor.
 	o.OpenAPISchema = r.openAPISchema
-	o.Validator, err = f.Validator(false)
+	o.Validator, err = f.Validator(metav1.FieldValidationIgnore, nil)
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain schema to validate objects from factory")
 		return nil, nil, err

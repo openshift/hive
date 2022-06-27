@@ -35,7 +35,11 @@ func (s *Store) Signatures(ctx context.Context, name string, digest string, fn s
 			errorChannel <- wrappedStore.Signatures(ctx, name, digest, func(ctx context.Context, signature []byte, errIn error) (done bool, err error) {
 				select {
 				case <-ctx.Done():
-					return true, nil
+					select {
+					case responses <- signatureResponse{signature: signature, errIn: errIn}:
+					default:
+					}
+					return false, ctx.Err()
 				case responses <- signatureResponse{signature: signature, errIn: errIn}:
 				}
 				return false, nil
@@ -74,7 +78,13 @@ func (s *Store) Signatures(ctx context.Context, name string, digest string, fn s
 	if loopError != nil {
 		return loopError
 	}
-	return ctx.Err() // because we discard context errors from the wrapped stores
+
+	if err := ctx.Err(); err != nil {
+		return err // because we discard context errors from the wrapped stores
+	}
+
+	_, err := fn(ctx, nil, fmt.Errorf("%s: %w", s.String(), store.ErrNotFound))
+	return err
 }
 
 // String returns a description of where this store finds

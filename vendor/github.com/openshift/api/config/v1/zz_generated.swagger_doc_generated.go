@@ -1573,23 +1573,6 @@ func (NodeSpec) SwaggerDoc() map[string]string {
 	return map_NodeSpec
 }
 
-var map_NodeStatus = map[string]string{
-	"workerLatencyProfileStatus": "WorkerLatencyProfileStatus provides the current status of WorkerLatencyProfile",
-}
-
-func (NodeStatus) SwaggerDoc() map[string]string {
-	return map_NodeStatus
-}
-
-var map_WorkerLatencyProfileStatus = map[string]string{
-	"":           "WorkerLatencyProfileStatus provides status information about the WorkerLatencyProfile rollout",
-	"conditions": "conditions describes the state of the WorkerLatencyProfile and related components (Kubelet or Controller Manager or Kube API Server) whether progressing, degraded or complete",
-}
-
-func (WorkerLatencyProfileStatus) SwaggerDoc() map[string]string {
-	return map_WorkerLatencyProfileStatus
-}
-
 var map_BasicAuthIdentityProvider = map[string]string{
 	"": "BasicAuthPasswordIdentityProvider provides identities for users authenticating using HTTP basic auth credentials",
 }

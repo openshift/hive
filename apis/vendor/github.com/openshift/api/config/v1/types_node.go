@@ -41,11 +41,7 @@ type NodeSpec struct {
 	WorkerLatencyProfile WorkerLatencyProfileType `json:"workerLatencyProfile,omitempty"`
 }
 
-type NodeStatus struct {
-	// WorkerLatencyProfileStatus provides the current status of WorkerLatencyProfile
-	// +optional
-	WorkerLatencyProfileStatus WorkerLatencyProfileStatus `json:"workerLatencyProfileStatus,omitempty"`
-}
+type NodeStatus struct{}
 
 // +kubebuilder:validation:Enum=v1;v2;""
 type CgroupMode string
@@ -98,43 +94,6 @@ const (
 	LowNotReadyTolerationSeconds = 60
 	// LowUnreachableTolerationSeconds refers to the "--default-unreachable-toleration-seconds" of the Kube API Server in case of LowUpdateSlowReaction WorkerLatencyProfile type
 	LowUnreachableTolerationSeconds = 60
-)
-
-// WorkerLatencyProfileStatus provides status information about the WorkerLatencyProfile rollout
-type WorkerLatencyProfileStatus struct {
-	// conditions describes the state of the WorkerLatencyProfile and related components
-	// (Kubelet or Controller Manager or Kube API Server) whether progressing, degraded or complete
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
-}
-
-// Different condition types to be used by KubeletOperator, Kube Controller
-// Manager Operator and Kube API Server Operator
-const (
-	// Progressing indicates that the updates to component (Kubelet or Controller
-	// Manager or Kube API Server) is actively rolling out, propagating changes to the
-	// respective arguments.
-	KubeletProgressing               = "KubeletProgressing"
-	KubeControllerManagerProgressing = "KubeControllerManagerProgressing"
-	KubeAPIServerProgressing         = "KubeAPIServerProgressing"
-
-	// Complete indicates whether the component (Kubelet or Controller Manager or Kube API Server)
-	// is successfully updated the respective arguments.
-	KubeletComplete               = "KubeletComplete"
-	KubeControllerManagerComplete = "KubeControllerManagerComplete"
-	KubeAPIServerComplete         = "KubeAPIServerComplete"
-
-	// Degraded indicates that the component (Kubelet or Controller Manager or Kube API Server)
-	// does not reach the state 'Complete' over a period of time
-	// resulting in either a lower quality or absence of service.
-	// If the component enters in this state, "Default" WorkerLatencyProfileType
-	// rollout will be initiated to restore the respective default arguments of all
-	// components.
-	KubeletDegraded               = "KubeletDegraded"
-	KubeControllerManagerDegraded = "KubeControllerManagerDegraded"
-	KubeAPIServerDegraded         = "KubeAPIServerDegraded"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

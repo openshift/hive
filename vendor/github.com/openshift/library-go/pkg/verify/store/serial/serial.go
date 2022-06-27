@@ -38,7 +38,8 @@ func (s *Store) Signatures(ctx context.Context, name string, digest string, fn s
 		}
 	}
 
-	return nil
+	_, err := fn(ctx, nil, fmt.Errorf("%s: %w", s.String(), store.ErrNotFound))
+	return err
 }
 
 // String returns a description of where this store finds

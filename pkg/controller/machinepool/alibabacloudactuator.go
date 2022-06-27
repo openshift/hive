@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
+	alibabacloudprovider "github.com/openshift/cluster-api-provider-alibaba/pkg/apis/alibabacloudprovider/v1"
 	installalibabacloud "github.com/openshift/installer/pkg/asset/machines/alibabacloud"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesalibabacloud "github.com/openshift/installer/pkg/types/alibabacloud"
@@ -23,6 +24,7 @@ import (
 type AlibabaCloudActuator struct {
 	logger        log.FieldLogger
 	alibabaClient alibabaclient.API
+	imageID       string
 }
 
 var _ Actuator = &AlibabaCloudActuator{}
@@ -32,15 +34,21 @@ func addAlibabaCloudProviderToScheme(scheme *runtime.Scheme) error {
 }
 
 // NewAlibabaCloudActuator is the constructor for building an AlibabaCloudActuator
-func NewAlibabaCloudActuator(alibabaCreds *corev1.Secret, region string, logger log.FieldLogger) (*AlibabaCloudActuator, error) {
+func NewAlibabaCloudActuator(alibabaCreds *corev1.Secret, region string, masterMachine *machineapi.Machine, logger log.FieldLogger) (*AlibabaCloudActuator, error) {
 	alibabaClient, err := alibabaclient.NewClientFromSecret(alibabaCreds, region)
 	if err != nil {
 		logger.WithError(err).Warn("failed to create Alibaba cloud client with creds in clusterDeployment's secret")
 		return nil, err
 	}
+	imageID, err := getAlibabaCloudImageID(masterMachine, logger)
+	if err != nil {
+		logger.WithError(err).Error("error getting image ID from master machine")
+		return nil, err
+	}
 	actuator := &AlibabaCloudActuator{
 		logger:        logger,
 		alibabaClient: alibabaClient,
+		imageID:       imageID,
 	}
 	return actuator, nil
 }
@@ -60,6 +68,7 @@ func (a *AlibabaCloudActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment,
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.AlibabaCloud = &installertypesalibabacloud.MachinePool{
+		ImageID:      a.imageID,
 		InstanceType: pool.Spec.Platform.AlibabaCloud.InstanceType,
 		Zones:        pool.Spec.Platform.AlibabaCloud.Zones,
 	}
@@ -122,4 +131,20 @@ func (a *AlibabaCloudActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment,
 	}
 
 	return installerMachineSets, true, nil
+}
+
+// Get the image ID from an existing master machine.
+func getAlibabaCloudImageID(masterMachine *machineapi.Machine, logger log.FieldLogger) (string, error) {
+	providerSpec, err := alibabacloudprovider.ProviderSpecFromRawExtension(masterMachine.Spec.ProviderSpec.Value)
+	if err != nil {
+		logger.WithError(err).Warn("cannot decode AlibabaCloudMachineProviderSpec from master machine")
+		return "", errors.Wrap(err, "cannot decode AlibabaCloudMachineProviderSpec from master machine")
+	}
+	if providerSpec.ImageID == "" {
+		logger.Warn("master machine does not have image ID set")
+		return "", errors.New("master machine does not have image ID set")
+	}
+	imageID := providerSpec.ImageID
+	logger.WithField("image", imageID).Debug("resolved image to use for new machinesets")
+	return imageID, nil
 }

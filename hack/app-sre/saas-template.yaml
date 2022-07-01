@@ -4197,6 +4197,7 @@ objects:
                             - currentStopping
                             - currentResuming
                             - currentWaitingForCO
+                            - currentClusterSyncFailing
                             - cumulativeHibernated
                             - cumulativeResumed
                             type: string

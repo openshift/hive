@@ -6,7 +6,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // The purpose of these metrics should be to track outliers - ensure their duration is not set too low.
 type MetricsWithDuration struct {
 	// Name of the metric. It will correspond to an optional relevant metric in hive
-	// +kubebuilder:validation:Enum=currentStopping;currentResuming;currentWaitingForCO;cumulativeHibernated;cumulativeResumed
+	// +kubebuilder:validation:Enum=currentStopping;currentResuming;currentWaitingForCO;currentClusterSyncFailing;cumulativeHibernated;cumulativeResumed
 	Name DurationMetricType `json:"name"`
 	// Duration is the minimum time taken - the relevant metric will be logged only if the value reported by that metric
 	// is more than the time mentioned here. For example, if a user opts-in for current clusters stopping and mentions

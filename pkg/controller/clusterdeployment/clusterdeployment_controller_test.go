@@ -1034,6 +1034,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZone(),
 			},
+			expectExplicitRequeue: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
@@ -1072,6 +1073,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZoneWithInvalidCredentialsCondition(),
 			},
+			expectExplicitRequeue: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
@@ -1095,6 +1097,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZoneWithAPIOptInRequiredCondition(),
 			},
+			expectExplicitRequeue: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
@@ -1118,6 +1121,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZoneWithAuthenticationFailureCondition(),
 			},
+			expectExplicitRequeue: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
@@ -1141,6 +1145,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testDNSZoneWithDNSErrorCondition(),
 			},
+			expectExplicitRequeue: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
@@ -1172,6 +1177,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testAvailableDNSZone(),
 			},
+			expectExplicitRequeue: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditionStatus(t, cd, hivev1.DNSNotReadyCondition, corev1.ConditionFalse)
@@ -1242,9 +1248,18 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
+					cd := testClusterDeploymentWithDefaultConditions(
+						testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Spec.ManageDNS = true
 					cd.Annotations = map[string]string{dnsReadyAnnotation: "NOW"}
+					controllerutils.SetClusterDeploymentCondition(
+						cd.Status.Conditions,
+						hivev1.DNSNotReadyCondition,
+						corev1.ConditionFalse,
+						dnsReadyReason,
+						"DNS Zone available",
+						controllerutils.UpdateConditionAlways,
+					)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1275,6 +1290,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testAvailableDNSZone(),
 			},
+			expectExplicitRequeue: true,
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				assert.NotNil(t, cd.Annotations, "annotations should be set on clusterdeployment")
@@ -3421,8 +3437,10 @@ func testAvailableDNSZone() *hivev1.DNSZone {
 	zone := testDNSZoneWithFinalizer()
 	zone.Status.Conditions = []hivev1.DNSZoneCondition{
 		{
-			Type:   hivev1.ZoneAvailableDNSZoneCondition,
-			Status: corev1.ConditionTrue,
+			Type:    hivev1.ZoneAvailableDNSZoneCondition,
+			Status:  corev1.ConditionTrue,
+			Reason:  dnsReadyReason,
+			Message: "DNS Zone available",
 			LastTransitionTime: metav1.Time{
 				Time: time.Now(),
 			},
@@ -3856,11 +3874,24 @@ func TestCopyInstallLogSecret(t *testing.T) {
 func TestEnsureManagedDNSZone(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
+	goodDNSZone := func() *hivev1.DNSZone {
+		return testdnszone.Build(
+			dnsZoneBase(),
+			testdnszone.WithControllerOwnerReference(testclusterdeployment.Build(
+				clusterDeploymentBase(),
+			)),
+			testdnszone.WithCondition(hivev1.DNSZoneCondition{
+				Type: hivev1.ZoneAvailableDNSZoneCondition,
+			}),
+		)
+	}
 	tests := []struct {
 		name                         string
 		existingObjs                 []runtime.Object
 		existingEnvVars              []corev1.EnvVar
 		clusterDeployment            *hivev1.ClusterDeployment
+		expectedUpdated              bool
+		expectedResult               reconcile.Result
 		expectedErr                  bool
 		expectedDNSZone              *hivev1.DNSZone
 		expectedDNSNotReadyCondition *hivev1.ClusterDeploymentCondition
@@ -3883,16 +3914,13 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 			clusterDeployment: testclusterdeployment.Build(
 				clusterDeploymentBase(),
 			),
+			expectedUpdated: true,
+			expectedDNSZone: goodDNSZone(),
 		},
 		{
 			name: "zone already exists and is owned by clusterdeployment",
 			existingObjs: []runtime.Object{
-				testdnszone.Build(
-					dnsZoneBase(),
-					testdnszone.WithControllerOwnerReference(testclusterdeployment.Build(
-						clusterDeploymentBase(),
-					)),
-				),
+				goodDNSZone(),
 			},
 			clusterDeployment: testclusterdeployment.Build(
 				clusterDeploymentBase(),
@@ -3901,7 +3929,8 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 					Status: corev1.ConditionUnknown,
 				}),
 			),
-			expectedErr: true,
+			expectedUpdated: true,
+			expectedResult:  reconcile.Result{Requeue: true, RequeueAfter: defaultDNSNotReadyTimeout},
 			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
 				Type:   hivev1.DNSNotReadyCondition,
 				Status: corev1.ConditionTrue,
@@ -3918,7 +3947,8 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 			clusterDeployment: testclusterdeployment.Build(
 				clusterDeploymentBase(),
 			),
-			expectedErr: true,
+			expectedUpdated: true,
+			expectedErr:     true,
 			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
 				Type:   hivev1.DNSNotReadyCondition,
 				Status: corev1.ConditionTrue,
@@ -3928,12 +3958,7 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 		{
 			name: "zone already exists and is owned by clusterdeployment, but has timed out",
 			existingObjs: []runtime.Object{
-				testdnszone.Build(
-					dnsZoneBase(),
-					testdnszone.WithControllerOwnerReference(testclusterdeployment.Build(
-						clusterDeploymentBase(),
-					)),
-				),
+				goodDNSZone(),
 			},
 			clusterDeployment: testclusterdeployment.Build(
 				clusterDeploymentBase(),
@@ -3945,7 +3970,27 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
 				}),
 			),
-			expectedErr: true,
+			expectedUpdated: true,
+			expectedResult:  reconcile.Result{Requeue: true},
+			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.DNSNotReadyCondition,
+				Status: corev1.ConditionTrue,
+				Reason: dnsNotReadyTimedoutReason,
+			},
+		},
+		{
+			name: "no-op if already timed out",
+			existingObjs: []runtime.Object{
+				goodDNSZone(),
+			},
+			clusterDeployment: testclusterdeployment.Build(
+				clusterDeploymentBase(),
+				testclusterdeployment.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.DNSNotReadyCondition,
+					Status: corev1.ConditionTrue,
+					Reason: dnsNotReadyTimedoutReason,
+				}),
+			),
 			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{
 				Type:   hivev1.DNSNotReadyCondition,
 				Status: corev1.ConditionTrue,
@@ -3957,7 +4002,8 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
+			existingObjs := append(test.existingObjs, test.clusterDeployment)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -3969,17 +4015,34 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 			}
 
 			// act
-			actualDNSZone, err := rcd.ensureManagedDNSZone(test.clusterDeployment, rcd.logger)
+			updated, result, err := rcd.ensureManagedDNSZone(test.clusterDeployment, rcd.logger)
 			actualDNSNotReadyCondition := controllerutils.FindClusterDeploymentCondition(test.clusterDeployment.Status.Conditions, hivev1.DNSNotReadyCondition)
 
 			// assert
+			assert.Equal(t, test.expectedUpdated, updated, "Unexpected 'updated' return")
+			assert.Equal(t, test.expectedResult, result, "Unexpected 'result' return")
 			if test.expectedErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, test.expectedDNSZone, actualDNSZone, "Expected DNSZone doesn't match returned zone")
+			// Tests that start off with an existing DNSZone may not want to bother checking that it still exists
+			if test.expectedDNSZone != nil {
+				actualDNSZone := &hivev1.DNSZone{}
+				fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: controllerutils.DNSZoneName(testName)}, actualDNSZone)
+				// Just assert the fields we care about. Otherwise we have to muck with e.g. typemeta
+				assert.Equal(t, test.expectedDNSZone.Namespace, actualDNSZone.Namespace, "Unexpected DNSZone namespace")
+				assert.Equal(t, test.expectedDNSZone.Name, actualDNSZone.Name, "Unexpected DNSZone name")
+				// TODO: Add assertions for (which will require setting up the CD and goodDNSZone more thoroughly):
+				// - ControllerReference
+				// - Labels
+				// - Zone
+				// - LinkToParentDomain
+				// - AWS CredentialsSecretRef, CredentialsAssumeRole, AdditionalTags, Region
+			}
+
+			// TODO: Test setDNSDelayMetric paths
 
 			if actualDNSNotReadyCondition != nil {
 				actualDNSNotReadyCondition.LastProbeTime = metav1.Time{}      // zero out so it won't be checked.

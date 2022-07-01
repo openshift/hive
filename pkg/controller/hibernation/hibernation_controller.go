@@ -591,20 +591,21 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		// Delicate state transitions ahead. If we've now cleared the nodes phase, transition to a pause state
 		// so we can give ClusterOperators time to get their pods running, before we check their status. This is
 		// to avoid prematurely checking and getting good status, but from before hibernation.
-		if readyCondition.Reason == hivev1.ReadyReasonWaitingForNodes {
+		switch readyCondition.Reason {
+		case hivev1.ReadyReasonStartingMachines, hivev1.ReadyReasonWaitingForMachines, hivev1.ReadyReasonWaitingForNodes:
+			// Assume that if we encounter any of the previous possible states, we are ready to proceed.
 			r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonPausingForClusterOperatorsToSettle,
 				fmt.Sprintf("Pausing %s for ClusterOperators to settle (step 3/4)", constants.ClusterOperatorSettlePause), corev1.ConditionFalse, logger)
 			cd.Status.PowerState = hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle
 			err := r.updateClusterDeploymentStatus(cd, logger)
 			return reconcile.Result{RequeueAfter: constants.ClusterOperatorSettlePause}, err
-		}
-
-		// Make sure we wait long enough for operators to start/settle:
-		if readyCondition.Reason == hivev1.ReadyReasonPausingForClusterOperatorsToSettle &&
-			time.Since(readyCondition.LastProbeTime.Time) < constants.ClusterOperatorSettlePause {
-			remainingPause := constants.ClusterOperatorSettlePause - time.Since(readyCondition.LastProbeTime.Time)
-			logger.WithField("timeRemaining", remainingPause).Info("still waiting for ClusterOperators to settle")
-			return reconcile.Result{RequeueAfter: remainingPause}, nil
+		case hivev1.ReadyReasonPausingForClusterOperatorsToSettle:
+			// Make sure we wait long enough for operators to start/settle:
+			if time.Since(readyCondition.LastProbeTime.Time) < constants.ClusterOperatorSettlePause {
+				remainingPause := constants.ClusterOperatorSettlePause - time.Since(readyCondition.LastProbeTime.Time)
+				logger.WithField("timeRemaining", remainingPause).Info("still waiting for ClusterOperators to settle")
+				return reconcile.Result{RequeueAfter: remainingPause}, nil
+			}
 		}
 
 		operatorsReady, err := r.operatorsReady(remoteClient, logger)

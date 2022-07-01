@@ -304,7 +304,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ClusterPowerStateSyncSetsNotApplied, cd.Status.PowerState)
 			},
 			expectError:        false,
-			expectRequeueAfter: time.Duration(time.Minute * 10),
+			expectRequeueAfter: time.Minute * 10,
 		},
 		{
 			name: "clear SyncSetsNotApplied",
@@ -350,8 +350,75 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
 			},
+			expectRequeueAfter: time.Minute * 2,
+		},
+		{
+			name: "proceed to pausing for cluster operators from starting machines",
+			cd: cdBuilder.Options(o.shouldRun).Build(
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
+					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse,
+					hivev1.ReadyReasonStartingMachines, 1*time.Hour))),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				objs := []runtime.Object{}
+				objs = append(objs, readyNodes()...)
+				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				builder.EXPECT().Build().Times(1).Return(c, nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
+			},
+			expectRequeueAfter: time.Minute * 2,
+		},
+		{
+			name: "proceed to pausing for cluster operators from waiting for machines",
+			cd: cdBuilder.Options(o.shouldRun).Build(
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
+					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse,
+					hivev1.ReadyReasonWaitingForMachines, 1*time.Hour))),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				objs := []runtime.Object{}
+				objs = append(objs, readyNodes()...)
+				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				builder.EXPECT().Build().Times(1).Return(c, nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
+			},
+			expectRequeueAfter: time.Minute * 2,
+		},
+		{
+			name: "proceed to pausing for cluster operators from waiting for nodes",
+			cd: cdBuilder.Options(o.shouldRun).Build(
+				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
+					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
+				testcd.WithCondition(readyCondition(corev1.ConditionFalse,
+					hivev1.ReadyReasonWaitingForNodes, 1*time.Hour))),
+			cs: csBuilder.Build(),
+			setupActuator: func(actuator *mock.MockHibernationActuator) {
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				objs := []runtime.Object{}
+				objs = append(objs, readyNodes()...)
+				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				builder.EXPECT().Build().Times(1).Return(c, nil)
+			},
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
+			},
+			expectRequeueAfter: time.Minute * 2,
 		},
 		{
 			name: "start hibernating, syncsets not applied but 10 minutes have passed since cd install",
@@ -448,7 +515,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, "Stopping cluster machines. Some machines have not yet stopped: pending-1,running-1,stopping-1", cond.Message)
 				assert.Equal(t, hivev1.ClusterPowerStateWaitingForMachinesToStop, cd.Status.PowerState)
 			},
-			expectRequeueAfter: time.Duration(time.Minute * 1),
+			expectRequeueAfter: time.Minute * 1,
 		},
 		{
 			name: "stopping after MachinesFailedToStart",
@@ -558,7 +625,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, "Waiting for cluster machines to start. Some machines are not yet running: pending-1,stopped-1 (step 1/4)", runCond.Message)
 				assert.Equal(t, hivev1.ClusterPowerStateWaitingForMachines, cd.Status.PowerState)
 			},
-			expectRequeueAfter: time.Duration(time.Minute * 1),
+			expectRequeueAfter: time.Minute * 1,
 		},
 		{
 			name: "resuming unready node",
@@ -585,7 +652,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ReadyReasonWaitingForNodes, runCond.Reason)
 				assert.Equal(t, hivev1.ClusterPowerStateWaitingForNodes, cd.Status.PowerState)
 			},
-			expectRequeueAfter: time.Duration(time.Second * 30),
+			expectRequeueAfter: time.Second * 30,
 		},
 		{
 			name: "resuming pending csrs",
@@ -618,7 +685,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
 				assert.Equal(t, hivev1.ReadyReasonWaitingForNodes, runCond.Reason)
 			},
-			expectRequeueAfter: time.Duration(time.Second * 30),
+			expectRequeueAfter: time.Second * 30,
 		},
 		{
 			name: "resuming nodes ready pause for clusteroperators to start and settle",
@@ -659,7 +726,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, hivev1.ReadyReasonPausingForClusterOperatorsToSettle, runCond.Reason)
 				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
 			},
-			expectRequeueAfter: time.Duration(time.Minute * 2),
+			expectRequeueAfter: time.Minute * 2,
 		},
 		{
 			name: "resuming continue to pause for clusteroperators to start and settle",
@@ -699,7 +766,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
 				assert.Equal(t, hivev1.ReadyReasonWaitingForClusterOperators, runCond.Reason)
 			},
-			expectRequeueAfter: time.Duration(time.Second * 30),
+			expectRequeueAfter: time.Second * 30,
 		},
 		{
 			name: "resuming clusteroperators not ready",
@@ -739,7 +806,7 @@ func TestReconcile(t *testing.T) {
 				assert.Equal(t, corev1.ConditionFalse, runCond.Status)
 				assert.Equal(t, hivev1.ReadyReasonWaitingForClusterOperators, runCond.Reason)
 			},
-			expectRequeueAfter: time.Duration(time.Second * 30),
+			expectRequeueAfter: time.Second * 30,
 		},
 		{
 			name: "resume skips cluster operators",
@@ -1059,7 +1126,7 @@ func TestHibernateAfter(t *testing.T) {
 			).Build(),
 			expectError:        false,
 			expectedPowerState: "",
-			expectRequeueAfter: time.Duration(time.Minute * 2),
+			expectRequeueAfter: time.Minute * 2,
 		},
 		{
 			name: "cluster due for hibernate, syncsets not applied but 10 minutes have passed since cd install",
@@ -1095,7 +1162,7 @@ func TestHibernateAfter(t *testing.T) {
 			).Build(),
 			expectError:        false,
 			expectedPowerState: "",
-			expectRequeueAfter: time.Duration(time.Minute * 2),
+			expectRequeueAfter: time.Minute * 2,
 		},
 		{
 			name: "fake cluster due for hibernate, syncsets successfully applied",

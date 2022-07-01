@@ -234,8 +234,9 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 			if err := r.Status().Update(context.Background(), desiredState); err != nil {
 				dnsLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update dnszone status")
 			}
+			return reconcile.Result{}, err
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, actErr
 	}
 
 	// Actually reconcile desired state with current state

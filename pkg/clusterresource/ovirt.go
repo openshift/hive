@@ -38,6 +38,13 @@ type OvirtCloudBuilder struct {
 	CACert []byte
 }
 
+func NewOvirtCloudBuilderFromSecret(credsSecret *corev1.Secret) *OvirtCloudBuilder {
+	ovirtConfigYamlContent := credsSecret.Data[constants.OvirtCredentialsName]
+	return &OvirtCloudBuilder{
+		OvirtConfig: ovirtConfigYamlContent,
+	}
+}
+
 func (p *OvirtCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

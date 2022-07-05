@@ -54,6 +54,15 @@ type VSphereCloudBuilder struct {
 	CACert []byte
 }
 
+func NewVSphereCloudBuilderFromSecret(credsSecret *corev1.Secret) *VSphereCloudBuilder {
+	username := credsSecret.Data[constants.UsernameSecretKey]
+	password := credsSecret.Data[constants.PasswordSecretKey]
+	return &VSphereCloudBuilder{
+		Username: string(username),
+		Password: string(password),
+	}
+}
+
 func (p *VSphereCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

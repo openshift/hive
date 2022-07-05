@@ -1160,7 +1160,51 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder := clusterresource.NewOpenStackCloudBuilderFromSecret(credsSecret)
 		cloudBuilder.Cloud = platform.OpenStack.Cloud
 		return cloudBuilder, nil
-	// TODO: VMware, and Ovirt.
+	case platform.VSphere != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.VSphere.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		certsSecret, err := r.getCredentialsSecret(pool, platform.VSphere.CertificatesSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := certsSecret.Data[".cacert"]; !ok {
+			return nil, err
+		}
+
+		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret)
+		cloudBuilder.Datacenter = platform.VSphere.Datacenter
+		cloudBuilder.DefaultDatastore = platform.VSphere.DefaultDatastore
+		cloudBuilder.VCenter = platform.VSphere.VCenter
+		cloudBuilder.Cluster = platform.VSphere.Cluster
+		cloudBuilder.Folder = platform.VSphere.Folder
+		cloudBuilder.Network = platform.VSphere.Network
+
+		return cloudBuilder, nil
+	case platform.Ovirt != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.Ovirt.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		certsSecret, err := r.getCredentialsSecret(pool, platform.Ovirt.CertificatesSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := certsSecret.Data[".cacert"]; !ok {
+			return nil, err
+		}
+
+		cloudBuilder := clusterresource.NewOvirtCloudBuilderFromSecret(credsSecret)
+		cloudBuilder.StorageDomainID = platform.Ovirt.StorageDomainID
+		cloudBuilder.ClusterID = platform.Ovirt.ClusterID
+		cloudBuilder.NetworkName = platform.Ovirt.NetworkName
+
+		return cloudBuilder, nil
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

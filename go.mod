@@ -381,3 +381,11 @@ replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0
 // needed for fixing CVE-2020-26160
 // taken from https://github.com/openshift/installer/blob/21cd5218bb58288cd7b03018b9a2513aca3a13a5/terraform/providers/ibm/go.mod
 replace github.com/dgrijalva/jwt-go v3.2.0+incompatible => github.com/golang-jwt/jwt v3.2.1+incompatible
+
+// needed for fixing CVE-2018-1099
+exclude (
+	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
+	go.etcd.io/etcd v0.0.0-20200513171258-e048e166ab9c
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20200819165624-17cef6e3e9d5
+	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
+)

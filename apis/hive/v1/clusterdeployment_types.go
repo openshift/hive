@@ -668,6 +668,12 @@ type ControlPlaneConfigSpec struct {
 	// active, Hive will use the override URL for further communications with the API server of the remote cluster.
 	// +optional
 	APIURLOverride string `json:"apiURLOverride,omitempty"`
+
+	// APIServerIPOverride is the optional override of the API server IP address.
+	// Hive will use this IP address for creating TCP connections.
+	// Port from the original API server URL will be used.
+	// +optional
+	APIServerIPOverride string `json:"apiServerIPOverride,omitempty"`
 }
 
 // ControlPlaneServingCertificateSpec specifies serving certificate settings for

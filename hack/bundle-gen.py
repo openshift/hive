@@ -90,7 +90,17 @@ def get_params():
     parser.add_argument(
         "--hive-repo",
         default=HIVE_REPO_DEFAULT,
-        help="The hive git repository to clone. E.g. save time by using a local directory (but make sure it's up to date!)"
+        help="The hive git repository to clone. E.g. save time by using a local directory (but make sure it's up to date!)",
+    )
+    parser.add_argument(
+        "--dummy-bundle",
+        metavar="COMMIT-ISH",
+        help="""Only generate bundle files. They will be placed in a subdirectory of your PWD named
+                                hive-operator-bundle-$version, where $version is computed as '0.0.$count-$sha';
+                                $count is the number of commits leading up to the requested COMMIT-ISH; and
+                                $sha is the first seven digits of the commit SHA corresponding to COMMIT-ISH.
+                                No image will be built. No package file will be generated. The CSV will not
+                                have any graph directives (`replaces`, `skipRange`, etc.)""",
     )
     args = parser.parse_args()
 
@@ -123,7 +133,7 @@ def build_and_push_image(registry_auth_file, hive_version, dry_run, build_engine
     container_name = "{}:v{}".format(OPERATORHUB_HIVE_IMAGE_DEFAULT, hive_version)
 
     if dry_run:
-        print("Skipping build of container {} due to dry-run".format(container_name))
+        print("Skipping build of container {}".format(container_name))
         return
 
     if build_engine == "buildah":
@@ -189,7 +199,7 @@ def get_previous_version(channel_name):
 
 # generate_csv_base generates a hive bundle from the current working directory
 # and deposits all artifacts in the specified bundle_dir.
-# If prev_version is not None, the CSV will include it as `replaces`.
+# If prev_version is not None/empty, the CSV will include it as `replaces`.
 def generate_csv_base(bundle_dir, version, prev_version):
     print("Writing bundle files to directory: %s" % bundle_dir)
     print("Generating CSV for version: %s" % version)
@@ -256,7 +266,7 @@ def generate_csv_base(bundle_dir, version, prev_version):
     # Update the versions to include git hash:
     csv["metadata"]["name"] = "hive-operator.v%s" % version
     csv["spec"]["version"] = version
-    if prev_version is not None:
+    if prev_version:
         csv["spec"]["replaces"] = "hive-operator.v%s" % prev_version
 
     # Update the deployment to use the defined image:
@@ -277,6 +287,8 @@ def generate_csv_base(bundle_dir, version, prev_version):
         yaml.dump(csv, outfile, default_flow_style=False)
     print("Wrote ClusterServiceVersion: %s" % csv_file)
 
+    return version_dir
+
 
 def generate_package(package_file, channel, version):
     document_template = """
@@ -296,6 +308,12 @@ def generate_package(package_file, channel, version):
             default_flow_style=False,
         )
     print("Wrote package: %s" % package_file)
+
+
+def copy_bundle(orig_wd, bundle_source_dir, bundle_version):
+    bundle_dest_dir = os.path.join(orig_wd, "hive-operator-bundle-{}".format(bundle_version))
+    shutil.copytree(bundle_source_dir, bundle_dest_dir)
+    print("Wrote bundle to {}".format(bundle_dest_dir))
 
 
 def open_pr(
@@ -472,18 +490,24 @@ if __name__ == "__main__":
 
     hive_repo = git.Repo(hive_repo_dir.name)
 
-    hive_commit, hive_version_prefix, update_channels = version.process_branch(
-        hive_repo, args.branch
-    )
+    if args.dummy_bundle:
+        # This will raise an exception if there's no such commit-ish
+        hive_commit = hive_repo.rev_parse(args.dummy_bundle).hexsha
+        hive_version_prefix = "0.0"
+    else:
+        hive_commit, hive_version_prefix, update_channels = version.process_branch(
+            hive_repo, args.branch
+        )
 
-    # The channel we use when looking for stuff in the package.yaml file
-    channel = (
-        CHANNEL_DEFAULT if CHANNEL_DEFAULT in update_channels else update_channels[0]
-    )
+        # The channel we use when looking for stuff in the package.yaml file
+        channel = (
+            CHANNEL_DEFAULT if CHANNEL_DEFAULT in update_channels else update_channels[0]
+        )
 
     bundle_dir = tempfile.TemporaryDirectory(prefix="hive-operator-bundle-")
     work_dir = tempfile.TemporaryDirectory(prefix="operatorhub-push-")
 
+    orig_wd = os.getcwd()
     print("Working in {}".format(hive_repo_dir.name))
     os.chdir(hive_repo_dir.name)
 
@@ -495,40 +519,47 @@ if __name__ == "__main__":
         raise
 
     hive_version = version.gen_hive_version(hive_repo, hive_commit, hive_version_prefix)
-    prev_version = get_previous_version(channel)
-    if hive_version == prev_version:
-        raise ValueError("Version {} already exists upstream".format(hive_version))
+    if args.dummy_bundle:
+        # Omit version graph stuff
+        prev_version = None
+    else:
+        prev_version = get_previous_version(channel)
+        if hive_version == prev_version:
+            raise ValueError("Version {} already exists upstream".format(hive_version))
 
-    build_and_push_image(args.registry_auth_file, hive_version, args.dry_run, args.build_engine)
-    generate_csv_base(bundle_dir.name, hive_version, prev_version)
-    generate_package(os.path.join(bundle_dir.name, "hive.package.yaml"), channel, hive_version)
+    build_and_push_image(args.registry_auth_file, hive_version, args.dry_run or args.dummy_bundle, args.build_engine)
+    version_dir = generate_csv_base(bundle_dir.name, hive_version, prev_version)
 
-    # redhat-openshift-ecosystem/community-operators-prod
-    open_pr(
-        work_dir.name,
-        "git@github.com:%s/community-operators-prod.git" % args.github_user,
-        "git@github.com:redhat-openshift-ecosystem/community-operators-prod.git",
-        args.github_user,
-        bundle_dir.name,
-        hive_version,
-        prev_version,
-        update_channels,
-        args.hold,
-        args.dry_run,
-    )
-    # k8s-operatorhub/community-operators
-    open_pr(
-        work_dir.name,
-        "git@github.com:%s/community-operators.git" % args.github_user,
-        "git@github.com:k8s-operatorhub/community-operators.git",
-        args.github_user,
-        bundle_dir.name,
-        hive_version,
-        prev_version,
-        update_channels,
-        args.hold,
-        args.dry_run,
-    )
+    if args.dummy_bundle:
+        copy_bundle(orig_wd, version_dir, hive_version)
+    else:
+        generate_package(os.path.join(bundle_dir.name, "hive.package.yaml"), channel, hive_version)
+        # redhat-openshift-ecosystem/community-operators-prod
+        open_pr(
+            work_dir.name,
+            "git@github.com:%s/community-operators-prod.git" % args.github_user,
+            "git@github.com:redhat-openshift-ecosystem/community-operators-prod.git",
+            args.github_user,
+            bundle_dir.name,
+            hive_version,
+            prev_version,
+            update_channels,
+            args.hold,
+            args.dry_run,
+        )
+        # k8s-operatorhub/community-operators
+        open_pr(
+            work_dir.name,
+            "git@github.com:%s/community-operators.git" % args.github_user,
+            "git@github.com:k8s-operatorhub/community-operators.git",
+            args.github_user,
+            bundle_dir.name,
+            hive_version,
+            prev_version,
+            update_channels,
+            args.hold,
+            args.dry_run,
+        )
 
     hive_repo_dir.cleanup()
     bundle_dir.cleanup()

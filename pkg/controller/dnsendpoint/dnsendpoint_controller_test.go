@@ -472,7 +472,7 @@ func assertRootDomainsMapEqual(t *testing.T, expected rootDomainsMap, actual roo
 
 func validateConditions(t *testing.T, dnsZone *hivev1.DNSZone, conditions []conditionExpectations) {
 	for _, expectedCondition := range conditions {
-		cond := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, expectedCondition.conditionType)
+		cond := controllerutils.FindCondition(dnsZone.Status.Conditions, expectedCondition.conditionType)
 		if expectedCondition.status == corev1.ConditionFalse {
 			assert.True(t, cond == nil || cond.Status == corev1.ConditionFalse, "expected condition %v to be missing or not be true", expectedCondition.conditionType)
 		} else {

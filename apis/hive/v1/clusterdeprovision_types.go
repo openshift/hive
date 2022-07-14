@@ -187,6 +187,16 @@ type ClusterDeprovisionCondition struct {
 // ClusterDeprovisionConditionType is a valid value for ClusterDeprovisionCondition.Type
 type ClusterDeprovisionConditionType string
 
+// ConditionType satisfies the conditions.Condition interface
+func (c ClusterDeprovisionCondition) ConditionType() ConditionType {
+	return c.Type
+}
+
+// String satisfies the conditions.ConditionType interface
+func (t ClusterDeprovisionConditionType) String() string {
+	return string(t)
+}
+
 const (
 	// AuthenticationFailureClusterDeprovisionCondition is true when credentials cannot be used because of authentication failure
 	AuthenticationFailureClusterDeprovisionCondition ClusterDeprovisionConditionType = "AuthenticationFailure"

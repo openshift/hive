@@ -123,7 +123,7 @@ func IsClusterDeploymentErrorUpdateEvent(evt event.UpdateEvent) bool {
 			continue
 		}
 
-		oldcond := FindClusterDeploymentCondition(old.Status.Conditions, cond.Type)
+		oldcond := FindCondition(old.Status.Conditions, cond.Type)
 		if oldcond == nil {
 			return true // newly added condition in failed state
 		}

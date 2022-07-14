@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -131,6 +132,16 @@ type ClusterSyncCondition struct {
 
 // ClusterSyncConditionType is a valid value for ClusterSyncCondition.Type
 type ClusterSyncConditionType string
+
+// ConditionType satisfies the generics.Condition interface
+func (c ClusterSyncCondition) ConditionType() hivev1.ConditionType {
+	return c.Type
+}
+
+// String satisfies the generics.ConditionType interface
+func (t ClusterSyncConditionType) String() string {
+	return string(t)
+}
 
 const (
 	// ClusterSyncFailed is the type of condition used to indicate whether there are SyncSets or SelectorSyncSets which

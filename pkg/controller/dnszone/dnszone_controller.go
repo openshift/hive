@@ -375,7 +375,7 @@ func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
 	}
 
 	if desiredState.Spec.LinkToParentDomain {
-		availableCondition := controllerutils.FindDNSZoneCondition(desiredState.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+		availableCondition := controllerutils.FindCondition(desiredState.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 		if availableCondition == nil || availableCondition.Status == corev1.ConditionFalse {
 			return true, 0
 		} // If waiting to link to parent, sync now to check domain
@@ -557,9 +557,9 @@ func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 	}
 
 	for _, cond := range errorConds {
-		cn := controllerutils.FindDNSZoneCondition(new.Status.Conditions, cond)
+		cn := controllerutils.FindCondition(new.Status.Conditions, cond)
 		if cn != nil && cn.Status == corev1.ConditionTrue {
-			co := controllerutils.FindDNSZoneCondition(old.Status.Conditions, cond)
+			co := controllerutils.FindCondition(old.Status.Conditions, cond)
 			if co == nil {
 				return true // newly added failure condition
 			}

@@ -72,14 +72,14 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	conditions := cd.Status.Conditions
 
 	// copy the required conditions
-	requiredConditions := []string{
+	requiredConditions := []hivev1.ClusterInstallConditionType{
 		hivev1.ClusterInstallFailed,
 		hivev1.ClusterInstallCompleted,
 		hivev1.ClusterInstallStopped,
 		hivev1.ClusterInstallRequirementsMet,
 	}
 	for _, req := range requiredConditions {
-		cond := controllerutils.FindClusterInstallCondition(ci.Status.Conditions, req)
+		cond := controllerutils.FindCondition(ci.Status.Conditions, req)
 		if cond == nil {
 			continue
 		}
@@ -97,7 +97,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		}
 	}
 	// additionally copy failed to provision failed condition
-	failed := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallFailedClusterDeploymentCondition)
+	failed := controllerutils.FindCondition(conditions, hivev1.ClusterInstallFailedClusterDeploymentCondition)
 	updated := false
 	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 		hivev1.ProvisionFailedCondition, // this transformation is part of the contract
@@ -116,7 +116,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	// update installed = true when completed
 	// update the installed timestamp when complete
 
-	requirementsMet := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition)
+	requirementsMet := controllerutils.FindCondition(conditions, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition)
 	if requirementsMet.Status == corev1.ConditionTrue {
 		if !reflect.DeepEqual(cd.Status.InstallStartedTimestamp, &requirementsMet.LastTransitionTime) {
 			cd.Status.InstallStartedTimestamp = &requirementsMet.LastTransitionTime
@@ -128,8 +128,8 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		}
 	}
 
-	completed := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
-	stopped := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallStoppedClusterDeploymentCondition)
+	completed := controllerutils.FindCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
+	stopped := controllerutils.FindCondition(conditions, hivev1.ClusterInstallStoppedClusterDeploymentCondition)
 
 	reason := stopped.Reason
 	msg := stopped.Message
@@ -163,7 +163,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		)
 	}
 
-	completed = controllerutils.FindClusterDeploymentCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
+	completed = controllerutils.FindCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
 	if completed.Status == corev1.ConditionTrue { // the cluster install is complete
 		cd.Spec.Installed = true
 		cd.Status.InstalledTimestamp = &completed.LastTransitionTime

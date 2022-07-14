@@ -1460,7 +1460,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				if expectedCDCurrentStatus == "" {
 					expectedCDCurrentStatus = corev1.ConditionTrue
 				}
-				cdCurrentCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolAllClustersCurrentCondition)
+				cdCurrentCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolAllClustersCurrentCondition)
 				if assert.NotNil(t, cdCurrentCondition, "did not find ClusterDeploymentsCurrent condition") {
 					assert.Equal(t, expectedCDCurrentStatus, cdCurrentCondition.Status,
 						"unexpected ClusterDeploymentsCurrent condition")
@@ -1468,7 +1468,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 
 			if test.expectedMissingDependenciesStatus != "" {
-				missingDependenciesCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolMissingDependenciesCondition)
+				missingDependenciesCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolMissingDependenciesCondition)
 				if assert.NotNil(t, missingDependenciesCondition, "did not find MissingDependencies condition") {
 					assert.Equal(t, test.expectedMissingDependenciesStatus, missingDependenciesCondition.Status,
 						"unexpected MissingDependencies conditon status")
@@ -1479,7 +1479,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				}
 			}
 			if test.expectedCapacityStatus != "" {
-				capacityAvailableCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolCapacityAvailableCondition)
+				capacityAvailableCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolCapacityAvailableCondition)
 				if assert.NotNil(t, capacityAvailableCondition, "did not find CapacityAvailable condition") {
 					assert.Equal(t, test.expectedCapacityStatus, capacityAvailableCondition.Status,
 						"unexpected CapacityAvailable conditon status")
@@ -1544,7 +1544,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			for _, claim := range claims.Items {
 				if test.expectedClaimPendingReasons != nil {
 					if reason, ok := test.expectedClaimPendingReasons[claim.Name]; ok {
-						actualCond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
+						actualCond := controllerutils.FindCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
 						if assert.NotNil(t, actualCond, "did not find Pending condition on claim %s", claim.Name) {
 							assert.Equal(t, reason, actualCond.Reason, "wrong reason on Pending condition for claim %s", claim.Name)
 						}

@@ -96,6 +96,16 @@ type ClusterProvisionCondition struct {
 // ClusterProvisionConditionType is a valid value for ClusterProvisionCondition.Type
 type ClusterProvisionConditionType string
 
+// ConditionType satisfies the conditions.Condition interface
+func (c ClusterProvisionCondition) ConditionType() ConditionType {
+	return c.Type
+}
+
+// String satisfies the conditions.ConditionType interface
+func (t ClusterProvisionConditionType) String() string {
+	return string(t)
+}
+
 const (
 	// ClusterProvisionInitializedCondition is set when a cluster provision has finished initialization.
 	ClusterProvisionInitializedCondition ClusterProvisionConditionType = "ClusterProvisionInitialized"

@@ -167,7 +167,7 @@ func validateSuccessfulExecution(expectedInstallerImage, expectedReason string) 
 		if assert.NotNil(t, clusterDeployment.Status.InstallerImage, "did not get an installer image in status") {
 			assert.Equal(t, expectedInstallerImage, *clusterDeployment.Status.InstallerImage, "did not get expected installer image in status")
 		}
-		condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
+		condition := controllerutils.FindCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
 		if assert.NotNil(t, condition, "could not find InstallerImageResolutionFailed condition") {
 			assert.Equal(t, corev1.ConditionFalse, condition.Status, "unexpected condition status")
 			if expectedReason != "" {
@@ -178,7 +178,7 @@ func validateSuccessfulExecution(expectedInstallerImage, expectedReason string) 
 }
 
 func validateFailureExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
-	condition := controllerutils.FindClusterDeploymentCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
+	condition := controllerutils.FindCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
 	if assert.NotNil(t, condition, "no failure condition found") {
 		assert.Equal(t, corev1.ConditionTrue, condition.Status, "unexpected condition status")
 		assert.Contains(t, condition.Message, "could not get cli image", "condition message does not contain expected error message")

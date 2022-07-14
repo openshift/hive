@@ -316,12 +316,12 @@ func shouldSync(desired *hivev1.ClusterDeployment) (bool, time.Duration) {
 		return true, 0 // We're in a deleting state, sync now.
 	}
 
-	failedCondition := controllerutils.FindClusterDeploymentCondition(desired.Status.Conditions, hivev1.AWSPrivateLinkFailedClusterDeploymentCondition)
+	failedCondition := controllerutils.FindCondition(desired.Status.Conditions, hivev1.AWSPrivateLinkFailedClusterDeploymentCondition)
 	if failedCondition != nil && failedCondition.Status == corev1.ConditionTrue {
 		return true, 0 // we have failed to reconcile and therefore should continue to retry for quick recovery
 	}
 
-	readyCondition := controllerutils.FindClusterDeploymentCondition(desired.Status.Conditions, hivev1.AWSPrivateLinkReadyClusterDeploymentCondition)
+	readyCondition := controllerutils.FindCondition(desired.Status.Conditions, hivev1.AWSPrivateLinkReadyClusterDeploymentCondition)
 	if readyCondition == nil || readyCondition.Status != corev1.ConditionTrue {
 		return true, 0 // we have not reached Ready level
 	}
@@ -403,7 +403,7 @@ func (r *ReconcileAWSPrivateLink) setReadyCondition(cd *hivev1.ClusterDeployment
 	}
 
 	var readyChanged bool
-	ready := controllerutils.FindClusterDeploymentCondition(conditions, hivev1.AWSPrivateLinkReadyClusterDeploymentCondition)
+	ready := controllerutils.FindCondition(conditions, hivev1.AWSPrivateLinkReadyClusterDeploymentCondition)
 	if ready == nil || ready.Status != corev1.ConditionTrue {
 		// we want to allow Ready condition to reach Ready level
 		conditions, readyChanged = controllerutils.SetClusterDeploymentConditionWithChangeCheck(

@@ -215,8 +215,8 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
-	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-	readyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
+	hibernatingCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	readyCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 
 	if supported, msg := r.hibernationSupported(cd); !supported {
 		// set hibernating condition to false for unsupported clouds
@@ -665,7 +665,7 @@ func deleteTransitionMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterD
 // Time to log is calculated as the time lapsed since the last transition time of condition mentioned
 func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment,
 	conditionType hivev1.ClusterDeploymentConditionType, logger log.FieldLogger) {
-	condition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, conditionType)
+	condition := controllerutils.FindCondition(cd.Status.Conditions, conditionType)
 	// This shouldn't happen if conditions have been properly initialized
 	if condition == nil {
 		logger.Warningf("cannot find %s condition, logging of metric skipped", conditionType)
@@ -768,7 +768,7 @@ func (r *hibernationReconciler) hibernationSupported(cd *hivev1.ClusterDeploymen
 
 func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, syncSetsApplied bool, remoteClient client.Client, logger log.FieldLogger) (bool, error) {
 
-	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	hibernatingCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 	if hibernatingCondition == nil {
 		return false, errors.New("cannot find hibernating condition")
 	}

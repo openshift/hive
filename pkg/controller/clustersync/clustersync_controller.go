@@ -669,7 +669,7 @@ func (r *ReconcileClusterSync) applySyncSets(
 			if cd.Status.InstalledTimestamp != nil && startTime.Before(cd.Status.InstalledTimestamp.Time) {
 				startTime = cd.Status.InstalledTimestamp.Time
 			}
-			if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition); cond != nil && startTime.Before(cond.LastTransitionTime.Time) {
+			if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.UnreachableCondition); cond != nil && startTime.Before(cond.LastTransitionTime.Time) {
 				startTime = cond.LastTransitionTime.Time
 			}
 			applyTime := now.Sub(startTime).Seconds()

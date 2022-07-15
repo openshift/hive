@@ -1,4 +1,4 @@
-package hibernation
+package powerstate
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -32,6 +33,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/hibernation"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -39,7 +41,7 @@ import (
 
 const (
 	// ControllerName is the name of this controller
-	ControllerName = hivev1.HibernationControllerName
+	ControllerName = hivev1.PowerStateControllerName
 
 	// stateCheckInterval is the time interval for polling
 	// whether a cluster's machines are stopped or are running
@@ -73,9 +75,13 @@ const (
 )
 
 var (
+	// minimumClusterVersion is the minimum supported version for
+	// hibernation
+	minimumClusterVersion = semver.MustParse("4.4.8")
+
 	// actuators is a list of available actuators for this controller
 	// It is populated via the RegisterActuator function
-	actuators []HibernationActuator
+	actuators []hibernation.HibernationActuator
 
 	// clusterDeploymentHibernationConditions are the cluster deployment conditions controlled by
 	// hibernation controller
@@ -99,26 +105,26 @@ func Add(mgr manager.Manager) error {
 // RegisterActuator register an actuator with this controller. The actuator
 // determines whether it can handle a particular cluster deployment via the CanHandle
 // function.
-func RegisterActuator(a HibernationActuator) {
+func RegisterActuator(a hibernation.HibernationActuator) {
 	actuators = append(actuators, a)
 }
 
-// hibernationReconciler is the reconciler type for this controller
-type hibernationReconciler struct {
+// powerStateReconciler is the reconciler type for this controller
+type powerStateReconciler struct {
 	client.Client
 	logger  log.FieldLogger
-	csrUtil CSRHelper
+	csrUtil hibernation.CSRHelper
 
 	remoteClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 }
 
 // NewReconciler returns a new Reconciler
-func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *hibernationReconciler {
+func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *powerStateReconciler {
 	logger := log.WithField("controller", ControllerName)
-	r := &hibernationReconciler{
+	r := &powerStateReconciler{
 		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		logger:  logger,
-		csrUtil: &CSRUtility{},
+		csrUtil: &hibernation.CSRUtility{},
 	}
 	r.remoteClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
@@ -127,9 +133,9 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *hi
 }
 
 // AddToManager adds a new Controller to the controller manager
-func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
-	c, err := controller.New("hibernation-controller", mgr, controller.Options{
-		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
+func AddToManager(mgr manager.Manager, r *powerStateReconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+	c, err := controller.New("powerstate-controller", mgr, controller.Options{
+		Reconciler:              r,
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})
@@ -149,7 +155,7 @@ func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentRecon
 }
 
 // Reconcile syncs a single ClusterDeployment
-func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
+func (r *powerStateReconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
@@ -168,12 +174,6 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		// Error reading the object - requeue the request.
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error getting cluster deployment")
 		return reconcile.Result{}, err
-	}
-	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
-
-	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
-		cdLog.Info("skipping reconcile due to ClusterDeployment pause annotation")
-		return reconcile.Result{}, nil
 	}
 
 	// If cluster is already deleted, skip any processing
@@ -216,19 +216,14 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
-	hibernatingCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-	readyCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
+	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	readyCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 
 	if supported, msg := r.hibernationSupported(cd); !supported {
-		// Set hibernating condition to false for unsupported clouds.
-		// Set Ready condition and Status.PowerState to indicate "Running" for consistent UX.
+		// set hibernating condition to false for unsupported clouds
 		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported, msg,
 			corev1.ConditionFalse, cdLog)
-		changed2 := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonRunning,
-			"No power state actuator -- assuming running", corev1.ConditionTrue, cdLog)
-		changed3 := cd.Status.PowerState != hivev1.ClusterPowerStateRunning
-		if changed || changed2 || changed3 {
-			cd.Status.PowerState = hivev1.ClusterPowerStateRunning
+		if changed {
 			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
 		}
 	} else if hibernatingCondition.Reason == hivev1.HibernatingReasonUnsupported {
@@ -397,7 +392,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	return r.checkClusterRunning(cd, syncSetsApplied, cdLog, readyCondition)
 }
 
-func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *powerStateReconciler) startMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to start cluster machines")
@@ -427,7 +422,7 @@ func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logg
 	return reconcile.Result{}, err
 }
 
-func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *powerStateReconciler) stopMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to start cluster machines")
@@ -457,7 +452,7 @@ func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logge
 	return reconcile.Result{}, err
 }
 
-func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, expectRunning bool, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *powerStateReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, expectRunning bool, logger log.FieldLogger) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to check machine status")
@@ -506,7 +501,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 	return reconcile.Result{}, nil
 }
 
-func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment, syncSetsApplied bool, logger log.FieldLogger,
+func (r *powerStateReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment, syncSetsApplied bool, logger log.FieldLogger,
 	readyCondition *hivev1.ClusterDeploymentCondition) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
@@ -556,7 +551,7 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		return reconcile.Result{}, err
 	}
 
-	preemptibleActuator, ok := actuator.(HibernationPreemptibleMachines)
+	preemptibleActuator, ok := actuator.(hibernation.HibernationPreemptibleMachines)
 	if ok {
 		replaced, err := preemptibleActuator.ReplaceMachines(cd, remoteClient, logger)
 		if err != nil {
@@ -597,21 +592,20 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		// Delicate state transitions ahead. If we've now cleared the nodes phase, transition to a pause state
 		// so we can give ClusterOperators time to get their pods running, before we check their status. This is
 		// to avoid prematurely checking and getting good status, but from before hibernation.
-		switch readyCondition.Reason {
-		case hivev1.ReadyReasonStartingMachines, hivev1.ReadyReasonWaitingForMachines, hivev1.ReadyReasonWaitingForNodes:
-			// Assume that if we encounter any of the previous possible states, we are ready to proceed.
+		if readyCondition.Reason == hivev1.ReadyReasonWaitingForNodes {
 			r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonPausingForClusterOperatorsToSettle,
 				fmt.Sprintf("Pausing %s for ClusterOperators to settle (step 3/4)", constants.ClusterOperatorSettlePause), corev1.ConditionFalse, logger)
 			cd.Status.PowerState = hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle
 			err := r.updateClusterDeploymentStatus(cd, logger)
 			return reconcile.Result{RequeueAfter: constants.ClusterOperatorSettlePause}, err
-		case hivev1.ReadyReasonPausingForClusterOperatorsToSettle:
-			// Make sure we wait long enough for operators to start/settle:
-			if time.Since(readyCondition.LastProbeTime.Time) < constants.ClusterOperatorSettlePause {
-				remainingPause := constants.ClusterOperatorSettlePause - time.Since(readyCondition.LastProbeTime.Time)
-				logger.WithField("timeRemaining", remainingPause).Info("still waiting for ClusterOperators to settle")
-				return reconcile.Result{RequeueAfter: remainingPause}, nil
-			}
+		}
+
+		// Make sure we wait long enough for operators to start/settle:
+		if readyCondition.Reason == hivev1.ReadyReasonPausingForClusterOperatorsToSettle &&
+			time.Since(readyCondition.LastProbeTime.Time) < constants.ClusterOperatorSettlePause {
+			remainingPause := constants.ClusterOperatorSettlePause - time.Since(readyCondition.LastProbeTime.Time)
+			logger.WithField("timeRemaining", remainingPause).Info("still waiting for ClusterOperators to settle")
+			return reconcile.Result{RequeueAfter: remainingPause}, nil
 		}
 
 		operatorsReady, err := r.operatorsReady(remoteClient, logger)
@@ -671,7 +665,7 @@ func deleteTransitionMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterD
 // Time to log is calculated as the time lapsed since the last transition time of condition mentioned
 func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDeployment,
 	conditionType hivev1.ClusterDeploymentConditionType, logger log.FieldLogger) {
-	condition := controllerutils.FindCondition(cd.Status.Conditions, conditionType)
+	condition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, conditionType)
 	// This shouldn't happen if conditions have been properly initialized
 	if condition == nil {
 		logger.Warningf("cannot find %s condition, logging of metric skipped", conditionType)
@@ -692,7 +686,34 @@ func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDepl
 		poolName).Observe(time)
 }
 
-func (r *hibernationReconciler) setCDCondition(cd *hivev1.ClusterDeployment, cond hivev1.ClusterDeploymentConditionType,
+// timeBeforeClusterSyncCheck returns a duration for requeue use when we find that (Selector)SyncSets
+// haven't yet been applied. The idea is to use increasing delays, starting short to account for
+// cases of few/no syncsets, but to a maximum total delay of `hibernateAfterSyncSetsNotApplied` from
+// the installation time of the CD, because after that point we want to hibernate anyway.
+func timeBeforeClusterSyncCheck(cd *hivev1.ClusterDeployment) time.Duration {
+	if cd.Status.InstalledTimestamp == nil {
+		// This should never happen... but future proof.
+		return 2 * time.Minute
+	}
+	expiry := cd.Status.InstalledTimestamp.Time.Add(hibernateAfterSyncSetsNotApplied)
+	maxDelay := time.Until(expiry)
+	if maxDelay <= 0 {
+		return 0
+	}
+	elapsed := hibernateAfterSyncSetsNotApplied - maxDelay
+	if elapsed < 30*time.Second {
+		return 10 * time.Second
+	}
+	if elapsed < 3*time.Minute {
+		return time.Minute
+	}
+	if maxDelay > 3*time.Minute {
+		return 3 * time.Minute
+	}
+	return maxDelay
+}
+
+func (r *powerStateReconciler) setCDCondition(cd *hivev1.ClusterDeployment, cond hivev1.ClusterDeploymentConditionType,
 	reason, message string, status corev1.ConditionStatus, logger log.FieldLogger) bool {
 	changed := false
 	cd.Status.Conditions, changed = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
@@ -709,7 +730,7 @@ func (r *hibernationReconciler) setCDCondition(cd *hivev1.ClusterDeployment, con
 	return changed
 }
 
-func (r *hibernationReconciler) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+func (r *powerStateReconciler) updateClusterDeploymentStatus(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
 	err := r.Status().Update(context.TODO(), cd)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update clusterdeployment")
@@ -718,7 +739,7 @@ func (r *hibernationReconciler) updateClusterDeploymentStatus(cd *hivev1.Cluster
 	return nil
 }
 
-func (r *hibernationReconciler) getActuator(cd *hivev1.ClusterDeployment) HibernationActuator {
+func (r *powerStateReconciler) getActuator(cd *hivev1.ClusterDeployment) hibernation.HibernationActuator {
 	for _, a := range actuators {
 		if a.CanHandle(cd) {
 			return a
@@ -727,16 +748,27 @@ func (r *hibernationReconciler) getActuator(cd *hivev1.ClusterDeployment) Hibern
 	return nil
 }
 
-func (r *hibernationReconciler) hibernationSupported(cd *hivev1.ClusterDeployment) (bool, string) {
+func (r *powerStateReconciler) hibernationSupported(cd *hivev1.ClusterDeployment) (bool, string) {
 	if r.getActuator(cd) == nil {
 		return false, "Unsupported platform: no actuator to handle it"
+	}
+	versionString, versionPresent := cd.Labels[constants.VersionMajorMinorPatchLabel]
+	if !versionPresent {
+		return false, "No cluster version is available yet"
+	}
+	version, err := semver.Parse(versionString)
+	if err != nil {
+		return false, fmt.Sprintf("Cannot parse cluster version: %v", err)
+	}
+	if version.LT(minimumClusterVersion) {
+		return false, fmt.Sprintf("Unsupported version, need version %s or greater", minimumClusterVersion.String())
 	}
 	return true, "Hibernation capable"
 }
 
-func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, syncSetsApplied bool, remoteClient client.Client, logger log.FieldLogger) (bool, error) {
+func (r *powerStateReconciler) nodesReady(cd *hivev1.ClusterDeployment, syncSetsApplied bool, remoteClient client.Client, logger log.FieldLogger) (bool, error) {
 
-	hibernatingCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 	if hibernatingCondition == nil {
 		return false, errors.New("cannot find hibernating condition")
 	}
@@ -765,7 +797,7 @@ func (r *hibernationReconciler) nodesReady(cd *hivev1.ClusterDeployment, syncSet
 	return true, nil
 }
 
-func (r *hibernationReconciler) operatorsReady(remoteClient client.Client, logger log.FieldLogger) (bool, error) {
+func (r *powerStateReconciler) operatorsReady(remoteClient client.Client, logger log.FieldLogger) (bool, error) {
 	logger.Debug("Checking if ClusterOperators are ready")
 	coList := &configv1.ClusterOperatorList{}
 	err := remoteClient.List(context.TODO(), coList)
@@ -798,7 +830,7 @@ func (r *hibernationReconciler) operatorsReady(remoteClient client.Client, logge
 	return success, nil
 }
 
-func (r *hibernationReconciler) checkCSRs(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *powerStateReconciler) checkCSRs(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (reconcile.Result, error) {
 	kubeClient, err := r.remoteClientBuilder(cd).BuildKubeClient()
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to get kube client to target cluster")

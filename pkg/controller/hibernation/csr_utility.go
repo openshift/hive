@@ -52,10 +52,10 @@ var kubeletServerUsages = []certificatesv1.KeyUsage{
 	certificatesv1.UsageServerAuth,
 }
 
-// csrUtility implements the csrHelper interface for use in the hibernation controller
-type csrUtility struct{}
+// CSRUtility implements the csrHelper interface for use in the hibernation controller
+type CSRUtility struct{}
 
-func (u *csrUtility) IsApproved(csr *certificatesv1.CertificateSigningRequest) bool {
+func (u *CSRUtility) IsApproved(csr *certificatesv1.CertificateSigningRequest) bool {
 	for _, condition := range csr.Status.Conditions {
 		if condition.Type == certificatesv1.CertificateApproved {
 			return true
@@ -65,7 +65,7 @@ func (u *csrUtility) IsApproved(csr *certificatesv1.CertificateSigningRequest) b
 }
 
 // parseCSR extracts the CSR from the API object and decodes it.
-func (u *csrUtility) Parse(obj *certificatesv1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
+func (u *CSRUtility) Parse(obj *certificatesv1.CertificateSigningRequest) (*x509.CertificateRequest, error) {
 	// extract PEM from request object
 	block, _ := pem.Decode(obj.Spec.Request)
 	if block == nil || block.Type != "CERTIFICATE REQUEST" {
@@ -74,7 +74,7 @@ func (u *csrUtility) Parse(obj *certificatesv1.CertificateSigningRequest) (*x509
 	return x509.ParseCertificateRequest(block.Bytes)
 }
 
-func (u *csrUtility) Approve(client kubeclient.Interface, csr *certificatesv1.CertificateSigningRequest) error {
+func (u *CSRUtility) Approve(client kubeclient.Interface, csr *certificatesv1.CertificateSigningRequest) error {
 	if u.IsApproved(csr) {
 		return nil
 	}
@@ -103,7 +103,7 @@ func (u *csrUtility) Approve(client kubeclient.Interface, csr *certificatesv1.Ce
 //
 // For server certificates:
 // Names contained in the CSR are checked against addresses in the corresponding node's machine status.
-func (*csrUtility) Authorize(
+func (*CSRUtility) Authorize(
 	machines []v1beta1.Machine,
 	client kubeclient.Interface,
 	req *certificatesv1.CertificateSigningRequest,

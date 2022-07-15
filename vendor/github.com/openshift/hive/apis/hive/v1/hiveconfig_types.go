@@ -561,6 +561,7 @@ const (
 	DNSZoneControllerName              ControllerName = "dnszone"
 	FakeClusterInstallControllerName   ControllerName = "fakeclusterinstall"
 	HibernationControllerName          ControllerName = "hibernation"
+	PowerStateControllerName           ControllerName = "powerstate"
 	RemoteIngressControllerName        ControllerName = "remoteingress"
 	SyncIdentityProviderControllerName ControllerName = "syncidentityprovider"
 	UnreachableControllerName          ControllerName = "unreachable"

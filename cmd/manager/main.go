@@ -191,6 +191,10 @@ func newRootCommand() *cobra.Command {
 				}
 
 				disabledControllersSet := sets.NewString(opts.DisabledControllers...)
+				// By default, use the old hibernation controller.
+				if !disabledControllersSet.Has(hivev1.HibernationControllerName.String()) {
+					disabledControllersSet.Insert(hivev1.PowerStateControllerName.String())
+				}
 				// Setup all Controllers
 				for _, name := range opts.Controllers {
 					fn, ok := controllerFuncs[hivev1.ControllerName(name)]

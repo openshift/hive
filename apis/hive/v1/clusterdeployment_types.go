@@ -72,6 +72,10 @@ const (
 	// for the cluster based on ClusterSync.Status.FirstSucessTime
 	ClusterPowerStateSyncSetsNotApplied ClusterPowerState = "SyncSetsNotApplied"
 
+	// ClusterPowerStateSyncSetsApplied indicates SyncSets have been applied
+	// for the cluster based on ClusterSync.Status.FirstSucessTime
+	ClusterPowerStateSyncSetsApplied ClusterPowerState = "SyncSetsNotApplied"
+
 	// ClusterPowerStateStartingMachines is used to reflect attempt to list and start cloud VMs
 	ClusterPowerStateStartingMachines ClusterPowerState = "StartingMachines"
 

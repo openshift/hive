@@ -76,19 +76,50 @@ func TestDNSEndpointReconcile(t *testing.T) {
 		expectedConditions       []conditionExpectations
 	}{
 		{
+			name:    "not yet scraped: deleted zone",
+			dnsZone: testDeletedDNSZone(),
+			nameServers: rootDomainsMap{
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
+			},
+			// Reconcile seeds the cache; doesn't delete the entry because we haven't scraped yet
+			expectedNameServers: rootDomainsMap{
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString(),
+						},
+					},
+				},
+			},
+		},
+		{
 			name:    "new name server",
 			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("test-value-1", "test-value-2"),
+						},
+					},
+				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
 				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.NewString("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{
-					dnsName: endpointState{
-						dnsZone:  testDNSZone(),
-						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						},
 					},
 				},
 			},
@@ -104,18 +135,24 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			name:    "up-to-date name server",
 			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{
-					dnsName: endpointState{
-						dnsZone:  testDNSZone(),
-						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						},
 					},
 				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{
-					dnsName: endpointState{
-						dnsZone:  testDNSZone(),
-						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						},
 					},
 				},
 			},
@@ -131,10 +168,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			name:    "out-of-date name server",
 			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{
-					dnsName: endpointState{
-						dnsZone:  testDNSZone(),
-						nsValues: sets.NewString("old-value"),
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("old-value"),
+						},
 					},
 				},
 			},
@@ -142,10 +182,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.NewString("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{
-					dnsName: endpointState{
-						dnsZone:  testDNSZone(),
-						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						},
 					},
 				},
 			},
@@ -158,13 +201,16 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:    "delete name server",
+			name:    "delete name servers for deleted zone",
 			dnsZone: testDeletedDNSZone(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{
-					dnsName: endpointState{
-						dnsZone:  testDNSZone(),
-						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						},
 					},
 				},
 			},
@@ -172,21 +218,10 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.NewString("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
-			},
-			expectDNSZoneDeleted: true,
-		},
-		{
-			name:    "delete untracked name server",
-			dnsZone: testDeletedDNSZone(),
-			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
-			},
-			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().Delete(rootDomain, dnsName, nil).Return(nil)
-			},
-			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					scraped:              true,
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 			expectDNSZoneDeleted: true,
 		},
@@ -194,7 +229,15 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			name:    "create error",
 			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("old-value"),
+						},
+					},
+				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
 				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.NewString("test-value-1", "test-value-2", "test-value-3")).
@@ -202,7 +245,15 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			},
 			expectErr: true,
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("old-value"),
+						},
+					},
+				},
 			},
 			expectedConditions: []conditionExpectations{
 				{
@@ -215,32 +266,49 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			name:    "delete error",
 			dnsZone: testDeletedDNSZone(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("old-value"),
+						},
+					},
+				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().Delete(rootDomain, dnsName, nil).
+				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.NewString("old-value")).
 					Return(errors.New("delete error"))
 			},
 			expectErr: true,
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("old-value"),
+						},
+					},
+				},
 			},
 		},
 		{
-			name:    "name servers not yet scraped",
+			name:    "not yet scraped: empty map",
 			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
-				rootDomain: nil,
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
-			expectErr:    true,
-			requeueAfter: 15 * time.Second,
 			expectedNameServers: rootDomainsMap{
-				rootDomain: nil,
-			},
-			expectedConditions: []conditionExpectations{
-				{
-					conditionType: hivev1.ParentLinkCreatedCondition,
-					status:        corev1.ConditionFalse,
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString(),
+						},
+					},
 				},
 			},
 		},
@@ -252,10 +320,14 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				return z
 			}(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 			expectedConditions: []conditionExpectations{
 				{
@@ -272,10 +344,14 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				return z
 			}(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 		},
 		{
@@ -290,10 +366,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				return z
 			}(),
 			nameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{
-					dnsName: endpointState{
-						dnsZone:  testDNSZone(),
-						nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+				rootDomain: &rootDomainsInfo{
+					scraped: true,
+					endpointsBySubdomain: endpointsBySubdomain{
+						dnsName: endpointState{
+							dnsZone:  testDNSZone(),
+							nsValues: sets.NewString("test-value-1", "test-value-2", "test-value-3"),
+						},
 					},
 				},
 			},
@@ -301,17 +380,24 @@ func TestDNSEndpointReconcile(t *testing.T) {
 				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.NewString("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
-				rootDomain: endpointsBySubdomain{},
+				rootDomain: &rootDomainsInfo{
+					scraped:              true,
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 		},
 		{
 			name:    "missing domain client condition",
 			dnsZone: testDNSZone(),
 			nameServers: rootDomainsMap{
-				"notdomain.com": endpointsBySubdomain{},
+				"notdomain.com": &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 			expectedNameServers: rootDomainsMap{
-				"notdomain.com": endpointsBySubdomain{},
+				"notdomain.com": &rootDomainsInfo{
+					endpointsBySubdomain: endpointsBySubdomain{},
+				},
 			},
 			expectedConditions: []conditionExpectations{
 				{
@@ -374,10 +460,11 @@ func assertRootDomainsMapEqual(t *testing.T, expected rootDomainsMap, actual roo
 	for rootDomainKey, expectedDomainMap := range expected {
 		require.Contains(t, actual, rootDomainKey)
 		actualDomainMap := actual[rootDomainKey]
-		require.Equal(t, len(expectedDomainMap), len(actualDomainMap), "unexpected number of domain map keys")
-		for domainKey, expectedEndpointState := range expectedDomainMap {
-			require.Contains(t, actualDomainMap, domainKey)
-			actualEndpointState := actualDomainMap[domainKey]
+		require.Equal(t, len(expectedDomainMap.endpointsBySubdomain), len(actualDomainMap.endpointsBySubdomain), "unexpected number of domain map keys")
+		require.Equal(t, expectedDomainMap.scraped, actualDomainMap.scraped, "unexpected 'scraped' status")
+		for domainKey, expectedEndpointState := range expectedDomainMap.endpointsBySubdomain {
+			require.Contains(t, actualDomainMap.endpointsBySubdomain, domainKey)
+			actualEndpointState := actualDomainMap.endpointsBySubdomain[domainKey]
 			assert.Equal(t, expectedEndpointState.nsValues.List(), actualEndpointState.nsValues.List())
 		}
 	}

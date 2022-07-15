@@ -2,6 +2,7 @@ package dnsendpoint
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -29,22 +30,49 @@ type endpointState struct {
 // A map, keyed by subdomain name, of endpointState objects
 type endpointsBySubdomain map[string]endpointState
 
-// A map, keyed by root domain name, of maps of subdomain names to their endpointStates, e.g.
+type rootDomainsInfo struct {
+	scraped              bool
+	endpointsBySubdomain endpointsBySubdomain
+}
+
+// A map, keyed by root domain name, of information about root domains.
+// The information about a root domain is:
+// - A bool indicating whether the scraper has scraped that root domain yet.
+// - A map, keyed by subdomain name, of information about each subdomain.
+// The subdomain information is:
+// - A pointer to a DNSZone. This is populated by the dnsendpoint controller iff it has ever
+//   reconciled that DNSZone (and the DNSZone hasn't been deleted).
+// - A set of strings representing the name servers the scraper has discovered for the subdomain
+//   in the root domain's hosted zone. This is populated by the scraper; and updated by the
+//   dnsendpoint controller iff it decides the name servers for the subdomain need to be synced
+//   after inspecting the corresponding DNSZone.
 // {
-// 		"p1.openshiftapps.com": {
-// 			"abcd.p1.openshiftapps.com": {
-// 				dnsZone: $dnsZone,
-// 				nsValues: {
-//  				"ns-124.awsdns-15.com.",
-//  				...
-// 				}
-// 			}
-//  		"wxyz.p1.openshiftapps.com": { ... }
-// 		}
-//  	"p2.openshiftapps.com": { ... }
+//    "p1.openshiftapps.com": {
+//       scraped: true
+//       endpoinsBySubdomain: {
+//          "abcd.p1.openshiftapps.com": {
+//             dnsZone: $dnsZone,
+//             nsValues: {
+//                "ns-124.awsdns-15.com.",
+//                ...
+//             }
+//          }
+//          "wxyz.p1.openshiftapps.com": { ... }
+//       }
+//    }
+//    "p2.openshiftapps.com": { ... }
 // }
 // This is used as a cache with the intent of reducing the number of queries to the cloud provider.
-type rootDomainsMap map[string]endpointsBySubdomain
+//
+// On startup, if the dnsendpoint controller reconciles a DNSZone before its corresponding root
+// domain has been scraped, it seeds the cache with the DNSZone and an empty nsValues set, then
+// returns without requeueing.
+// - If the scraper encounters entries for that subdomain, it updates the cache and enqueues that
+//   DNSZone to the dnsendpoint controller.
+// - If the scraper does not see the subdomain at all, this indicates that the dnsendpoint
+//   controller has not yet configured the root hosted zone for this subdomain, so it enqueues the
+//   DNSZone for that case as well.
+type rootDomainsMap map[string]*rootDomainsInfo
 
 // Every `defaultScrapePeriod` the scraper queries the cloud provider for the definitive list of
 // name servers configured in the root domain's hosted zone for each subdomain. It updates the
@@ -78,7 +106,10 @@ func newNameServerScraper(logger log.FieldLogger, nameServerQuery nameserver.Que
 	rootDomainsMap := make(rootDomainsMap, len(rootDomains))
 	for _, rootDomain := range rootDomains {
 		queue.Add(rootDomain)
-		rootDomainsMap[rootDomain] = nil
+		rootDomainsMap[rootDomain] = &rootDomainsInfo{
+			scraped:              false,
+			endpointsBySubdomain: endpointsBySubdomain{},
+		}
 	}
 	return &nameServerScraper{
 		logger:       logger.WithField("scraper", "nameServer"),
@@ -96,7 +127,39 @@ func (s *nameServerScraper) GetEndpoint(subdomain string) (rootDomain string, na
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	rootDomain, nsMap := s.rootDomainNameServers(subdomain)
-	return rootDomain, nsMap[subdomain].nsValues
+	nameServers = sets.NewString()
+	if nsMap != nil {
+		if endpoint, ok := nsMap[subdomain]; ok {
+			nameServers = endpoint.nsValues
+		}
+	}
+	return rootDomain, nameServers
+}
+
+// CheckSeedScrapeStatus
+// - Ensures the cache has been seeded with this dnsZone. This enables the scraper to enqueue the
+//   DNSZone to the dnsendpoint controller if necessary.
+// - Returns whether the scraper has run yet (ever, since this controller started).
+func (s *nameServerScraper) CheckSeedScrapeStatus(dnsZone *hivev1.DNSZone, rootDomain string) bool {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	subdomain := dnsZone.Spec.Zone
+	rdInfo, ok := s.rootDomainsMap[rootDomain]
+	// NOTE: This should be impossible, since (at the time of this writing) the caller has already
+	// ensured that the rootDomain is tracked. This is defending against future bug injection.
+	if !ok || rdInfo == nil {
+		s.logger.WithField("rootDomain", rootDomain).Error("no root domain info found -- this is a bug!")
+		// This will cause the caller to return with no requeue
+		return false
+	}
+	// Since eps is a struct (not a pointer),
+	// - this is a copyout
+	// - eps gets an empty struct if the key doesn't exist in the map
+	// so we can use it to initialize if necessary, but we need to copy it back in when done
+	eps := rdInfo.endpointsBySubdomain[subdomain]
+	eps.dnsZone = dnsZone
+	rdInfo.endpointsBySubdomain[subdomain] = eps
+	return rdInfo.scraped
 }
 
 // SyncEndpoint adds or updates the subdomain's endpointState in the scraper's cache
@@ -121,13 +184,6 @@ func (s *nameServerScraper) RemoveEndpoint(subdomain string) {
 	delete(nsMap, subdomain)
 }
 
-func (s *nameServerScraper) HasBeenScraped(subdomain string) bool {
-	s.mux.Lock()
-	defer s.mux.Unlock()
-	_, nsMap := s.rootDomainNameServers(subdomain)
-	return nsMap != nil
-}
-
 // Start starts the name server scraper.
 func (s *nameServerScraper) Start(ctx context.Context) error {
 	defer s.queue.ShutDown()
@@ -135,6 +191,7 @@ func (s *nameServerScraper) Start(ctx context.Context) error {
 		for {
 			obj, shutdown := s.queue.Get()
 			if shutdown {
+				s.logger.Info("scraper queue shutting down")
 				return
 			}
 			func() {
@@ -146,7 +203,7 @@ func (s *nameServerScraper) Start(ctx context.Context) error {
 					return
 				}
 				if err := s.scrape(rootDomain); err == nil {
-					s.logger.WithField("domain", rootDomain).Info("scrape name servers for root domain")
+					s.logger.WithField("domain", rootDomain).Info("successfully scraped name servers for root domain")
 					s.queue.Forget(obj)
 					s.queue.AddAfter(rootDomain, s.scrapePeriod)
 				} else {
@@ -161,6 +218,8 @@ func (s *nameServerScraper) Start(ctx context.Context) error {
 }
 
 func (s *nameServerScraper) scrape(rootDomain string) error {
+	logger := s.logger.WithField("rootDomain", rootDomain)
+	logger.Debug("scrape root domain")
 	currentNameServerMap, err := s.nameServerQuery.Get(rootDomain)
 	if err != nil {
 		return errors.Wrap(err, "error querying name servers")
@@ -169,37 +228,59 @@ func (s *nameServerScraper) scrape(rootDomain string) error {
 	func() {
 		s.mux.Lock()
 		defer s.mux.Unlock()
-		oldNSMap, ok := s.rootDomainsMap[rootDomain]
+		oldRDInfo, ok := s.rootDomainsMap[rootDomain]
 		if !ok {
-			s.logger.WithField("domain", rootDomain).Error("domain is not a root domain")
+			logger.Error("domain is not a managed root domain")
 			return
 		}
-		if oldNSMap == nil {
-			oldNSMap = endpointsBySubdomain{}
-			s.rootDomainsMap[rootDomain] = oldNSMap
-		}
-		// Sync our cache with NS entries for each subdomain that has already been seeded. If
-		// anything has changed, update the cache based on what came from the cloud provider
-		// and (set up to) requeue any affected DNSZone objects to the dnsendpoint controller.
-		for subdomain, oldEndpoints := range oldNSMap {
-			currentNameServers, ok := currentNameServerMap[subdomain]
-			if !ok || !currentNameServers.Equal(oldEndpoints.nsValues) {
+		oldNSMap := oldRDInfo.endpointsBySubdomain
+		// Keep track of subdomains for which we have name servers. We'll use this to find out if
+		// there are DNSZones that have a) already been reconciled, and b) not been set up yet in
+		// the root hosted zone. Those need to be enqueued explicitly to the dnsendpoint controller.
+		seenSubdomains := sets.String{}
+		// Sync our cache with NS entries for each subdomain.
+		// NOTE: We are caching *all* the subdomains, not just the ones for DNSZones managed by
+		// this controller. This is to mitigate timing issues on controller restart: so the
+		// dnsendpoint controller can skip redundant calls to the cloud provider to sync name
+		// servers it already has.
+		for subdomain, nameServers := range currentNameServerMap {
+			seenSubdomains.Insert(subdomain)
+			oldEndpoints, ok := oldNSMap[subdomain]
+			// If the subdomain existed in the cache and its name servers have changed, set up to
+			// enqueue any affected DNSZone objects to the dnsendpoint controller.
+			if ok && oldEndpoints.dnsZone != nil && !nameServers.Equal(oldEndpoints.nsValues) {
 				changedDNSZones = append(changedDNSZones, oldEndpoints.dnsZone)
-				oldEndpoints.nsValues = currentNameServers
-				oldNSMap[subdomain] = oldEndpoints
+			}
+			// Populate the cache for this subdomain.
+			if !ok {
+				oldEndpoints = endpointState{}
+			}
+			oldEndpoints.nsValues = nameServers
+			oldNSMap[subdomain] = oldEndpoints
+		}
+		// Now go through the cache looking for entries that were seeded by the dnsendpoint
+		// controller, but for which no entries were found in the root hosted zone. Those need to
+		// be sent explicitly to the dnsendpoint controller, which would otherwise not reconcile
+		// them again.
+		for subdomain, endpointInfo := range oldNSMap {
+			if !seenSubdomains.Has(subdomain) && endpointInfo.dnsZone != nil {
+				changedDNSZones = append(changedDNSZones, endpointInfo.dnsZone)
 			}
 		}
+		oldRDInfo.scraped = true
 	}()
 	for _, changedDNSZone := range changedDNSZones {
+		logger.WithField("dnsZone", fmt.Sprintf("%s/%s", changedDNSZone.GetNamespace(), changedDNSZone.GetName())).
+			Debug("notify dnsendpoint controller")
 		s.notifyChange(changedDNSZone)
 	}
 	return nil
 }
 
 func (s *nameServerScraper) rootDomainNameServers(domain string) (string, endpointsBySubdomain) {
-	for root, nsMap := range s.rootDomainsMap {
+	for root, rdInfo := range s.rootDomainsMap {
 		if strings.HasSuffix(domain, root) {
-			return root, nsMap
+			return root, rdInfo.endpointsBySubdomain
 		}
 	}
 	return "", nil

@@ -106,11 +106,16 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 			return nil, false, err
 		}
 		if !gen2ImageExists {
-			// Modify capabilities to ensure that a V1 image is chosen by installazure.MachineSets
-			// because a gen2 image does not exist.
+			// Modify capabilities to ensure that a V1 image is chosen by installazure.MachineSets()
+			// because a V2 image does not exist.
 			// The HyperVGeneration is germane to the instance/disk type and affects the image used
-			// for the instance. "-gen-2" will be appended to the image name when HyperVGenerations
-			// capability includes "V2".
+			// for the instance. "-gen-2" will be appended to the image name by installazure.MachineSets()
+			// when the HyperVGenerations capability (comma separated list of HyperVGenerations) includes "V2".
+			//
+			// capabilities := map[string]string{
+			//   "HyperVGenerations": "V1,V2",
+			// }
+			//
 			if _, ok := capabilities["HyperVGenerations"]; ok {
 				capabilities["HyperVGenerations"] = "V1"
 			}

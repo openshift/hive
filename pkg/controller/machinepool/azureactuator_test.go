@@ -135,7 +135,7 @@ func TestAzureActuator(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:              "V2 image does not exist, don't check if instance can support V2",
+			name:              "default V1 image exists and instance supports V1 images",
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -150,12 +150,35 @@ func TestAzureActuator(t *testing.T) {
 				generateAzureMachineSetName("zone2"): 1,
 				generateAzureMachineSetName("zone3"): 1,
 			},
+			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
 				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345",
 			},
 		},
 		{
-			name:              "default V2 image exists and instance supports V2 images",
+			name:              "default V1 and V2 images exist but instance only supports V1 images",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetVMCapabilities(mockCtrl, client, "V1")
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+					testAzureImage(compute.HyperVGenerationTypesV2),
+				})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+			// V1 image is chosen for machinepool
+			expectedImage: &machineapi.Image{
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345",
+			},
+		},
+		{
+			name:              "default V1 and V2 images exist and instance supports V1 and V2 images",
 			clusterDeployment: testAzureClusterDeployment(),
 			pool:              testAzurePool(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -171,6 +194,29 @@ func TestAzureActuator(t *testing.T) {
 				generateAzureMachineSetName("zone2"): 1,
 				generateAzureMachineSetName("zone3"): 1,
 			},
+			// V2 ("-gen2") image is chosen for machinepool
+			expectedImage: &machineapi.Image{
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345-gen2",
+			},
+		},
+		{
+			name:              "default V1 and V2 images exist but instance only supports V2 images",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetVMCapabilities(mockCtrl, client, "V2")
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+					testAzureImage(compute.HyperVGenerationTypesV2),
+				})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
 				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345-gen2",
 			},

@@ -207,7 +207,8 @@ spec:
                     description: APIServerIPOverride is the optional override of the
                       API server IP address. Hive will use this IP address for creating
                       TCP connections. Port from the original API server URL will
-                      be used.
+                      be used. This field can be used when repointing the APIServer's
+                      DNS is not viable option.
                     type: string
                   apiURLOverride:
                     description: APIURLOverride is the optional URL override to which

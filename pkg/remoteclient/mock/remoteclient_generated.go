@@ -5,6 +5,8 @@
 package mock
 
 import (
+	context "context"
+	net "net"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -124,4 +126,42 @@ func (m *MockBuilder) UseSecondaryAPIURL() remoteclient.Builder {
 func (mr *MockBuilderMockRecorder) UseSecondaryAPIURL() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UseSecondaryAPIURL", reflect.TypeOf((*MockBuilder)(nil).UseSecondaryAPIURL))
+}
+
+// Mockdialer is a mock of dialer interface.
+type Mockdialer struct {
+	ctrl     *gomock.Controller
+	recorder *MockdialerMockRecorder
+}
+
+// MockdialerMockRecorder is the mock recorder for Mockdialer.
+type MockdialerMockRecorder struct {
+	mock *Mockdialer
+}
+
+// NewMockdialer creates a new mock instance.
+func NewMockdialer(ctrl *gomock.Controller) *Mockdialer {
+	mock := &Mockdialer{ctrl: ctrl}
+	mock.recorder = &MockdialerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *Mockdialer) EXPECT() *MockdialerMockRecorder {
+	return m.recorder
+}
+
+// DialContext mocks base method.
+func (m *Mockdialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DialContext", ctx, network, address)
+	ret0, _ := ret[0].(net.Conn)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DialContext indicates an expected call of DialContext.
+func (mr *MockdialerMockRecorder) DialContext(ctx, network, address interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DialContext", reflect.TypeOf((*Mockdialer)(nil).DialContext), ctx, network, address)
 }

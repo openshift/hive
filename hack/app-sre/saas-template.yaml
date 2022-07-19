@@ -458,6 +458,12 @@ objects:
                   description: ControlPlaneConfig contains additional configuration
                     for the target cluster's control plane
                   properties:
+                    apiServerIPOverride:
+                      description: APIServerIPOverride is the optional override of
+                        the API server IP address. Hive will use this IP address for
+                        creating TCP connections. Port from the original API server
+                        URL will be used.
+                      type: string
                     apiURLOverride:
                       description: APIURLOverride is the optional URL override to
                         which Hive will transition for communication with the API

@@ -3,6 +3,7 @@ package remoteclient
 import (
 	"context"
 	"io/ioutil"
+	"net"
 	"path/filepath"
 	"testing"
 	"time"
@@ -53,12 +54,13 @@ func Test_InitialURL(t *testing.T) {
 
 func Test_builder_RESTConfig(t *testing.T) {
 	cases := []struct {
-		name           string
-		overrideURL    string
-		overrideActive bool
-		usePrimary     bool
-		useSecondary   bool
-		expectedHost   string
+		name                string
+		overrideURL         string
+		overrideActive      bool
+		usePrimary          bool
+		useSecondary        bool
+		expectedHost        string
+		apiServerIPOverride string
 	}{
 		{
 			name:         "no override",
@@ -111,6 +113,11 @@ func Test_builder_RESTConfig(t *testing.T) {
 			useSecondary:   true,
 			expectedHost:   apiURL,
 		},
+		{
+			name:                "apiServerIPOverride is set",
+			expectedHost:        apiURL,
+			apiServerIPOverride: "10.0.4.6",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -118,6 +125,9 @@ func Test_builder_RESTConfig(t *testing.T) {
 			setAPIURLOverride(cd, tc.overrideURL)
 			if tc.overrideActive {
 				setOverrideActive(cd)
+			}
+			if tc.apiServerIPOverride != "" {
+				cd.Spec.ControlPlaneConfig.APIServerIPOverride = tc.apiServerIPOverride
 			}
 			kubeconfigSecret := testKubeconfigSecret(t)
 			c := fakeClient(cd, kubeconfigSecret)
@@ -131,6 +141,12 @@ func Test_builder_RESTConfig(t *testing.T) {
 			cfg, err := builder.RESTConfig()
 			assert.NoError(t, err, "unexpected error getting REST config")
 			assert.Equal(t, tc.expectedHost, cfg.Host, "unexpected host")
+
+			if tc.apiServerIPOverride != "" {
+				assert.NotEmpty(t, cfg.Dial, "unexpected absence of a custom dial")
+			} else {
+				assert.Empty(t, cfg.Dial, "unexpected custom dial")
+			}
 		})
 	}
 }
@@ -282,5 +298,65 @@ func testKubeconfigSecret(t *testing.T) *corev1.Secret {
 			Name:      testKubeconfigSecretName,
 		},
 		Data: map[string][]byte{constants.KubeconfigSecretKey: kubeconfig},
+	}
+}
+
+type dialerMock func(ctx context.Context, network, address string)
+
+func (d dialerMock) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	var c net.Conn
+	d(ctx, network, address)
+	return c, nil
+}
+
+func Test_createDialContext(t *testing.T) {
+	for _, tc := range []struct {
+		name                string
+		apiServerIPOverride string
+		dialNetwork         string
+		dialAddress         string
+		expectedAddress     string
+		expectedErr         string
+	}{
+		{
+			name:                "replace host ip",
+			apiServerIPOverride: "10.0.4.6",
+			dialAddress:         "1.1.1.1:6443",
+			dialNetwork:         "tcp",
+			expectedAddress:     "10.0.4.6:6443",
+		},
+		{
+			name:                "invalid address",
+			apiServerIPOverride: "10.0.4.6",
+			dialAddress:         "1.1.1.1",
+			dialNetwork:         "tcp",
+			expectedErr:         "address 1.1.1.1: missing port in address",
+		},
+		{
+			name:                "unsupported network",
+			apiServerIPOverride: "10.0.4.6",
+			dialAddress:         "1.1.1.1:6443",
+			dialNetwork:         "udp",
+			expectedErr:         "unimplemented network \"udp\"",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testCtx := context.WithValue(context.Background(), struct{ nonEmptyCtx string }{}, 1)
+
+			mockDialer := dialerMock(func(ctx context.Context, network, address string) {
+				assert.Equal(t, testCtx, ctx, "unexpected context")
+				assert.Equal(t, tc.dialNetwork, network, "network")
+				assert.Equal(t, tc.expectedAddress, address, "unexpected address")
+			})
+
+			dial := createDialContext(mockDialer, tc.apiServerIPOverride)
+
+			_, err := dial(testCtx, tc.dialNetwork, tc.dialAddress)
+			if tc.expectedErr != "" && assert.Error(t, err, "expected error dialing") {
+				assert.Equal(t, tc.expectedErr, err.Error(), "unexpected dial error")
+			} else {
+				assert.NoError(t, err, "")
+			}
+		})
 	}
 }

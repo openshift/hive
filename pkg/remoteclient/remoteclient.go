@@ -4,6 +4,8 @@ package remoteclient
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"time"
 
 	"github.com/pkg/errors"
@@ -49,6 +51,10 @@ type Builder interface {
 	// UseSecondaryAPIURL will use the secondary API URL. If there is an API URL override, then the initial API URL
 	// is the secondary.
 	UseSecondaryAPIURL() Builder
+}
+
+type dialer interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 // NewBuilder creates a new Builder for creating a client to connect to the remote cluster associated with the specified
@@ -289,6 +295,14 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 		}
 	}
 
+	if override := b.cd.Spec.ControlPlaneConfig.APIServerIPOverride; override != "" {
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		cfg.Dial = createDialContext(dialer, override)
+	}
+
 	return cfg, nil
 }
 
@@ -315,4 +329,19 @@ func restConfigFromSecret(kubeconfigSecret *corev1.Secret) (*rest.Config, error)
 	}
 	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
 	return kubeConfig.ClientConfig()
+}
+
+func createDialContext(d dialer, apiServerIPOverride string) func(ctx context.Context, network, address string) (net.Conn, error) {
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		if network != "tcp" {
+			return nil, fmt.Errorf("unimplemented network %q", network)
+		}
+
+		_, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+
+		return d.DialContext(ctx, network, apiServerIPOverride+":"+port)
+	}
 }

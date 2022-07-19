@@ -672,6 +672,7 @@ type ControlPlaneConfigSpec struct {
 	// APIServerIPOverride is the optional override of the API server IP address.
 	// Hive will use this IP address for creating TCP connections.
 	// Port from the original API server URL will be used.
+	// This field can be used when repointing the APIServer's DNS is not viable option.
 	// +optional
 	APIServerIPOverride string `json:"apiServerIPOverride,omitempty"`
 }

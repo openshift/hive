@@ -236,7 +236,7 @@ func (m *InstallManager) Complete(args []string) error {
 	}
 
 	// Swap some function implementations if this is flagged to be a fake install:
-	fakeInstall, err := strconv.ParseBool(os.Getenv(constants.FakeClusterInstallEnvVar))
+	fakeInstall, _ := strconv.ParseBool(os.Getenv(constants.FakeClusterInstallEnvVar))
 	if fakeInstall {
 		m.log.Warnf("%s set to true, swapping function implementations to fake an installation",
 			constants.FakeClusterInstallEnvVar)
@@ -683,11 +683,11 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 	case cd.Spec.Platform.VSphere != nil:
 		vSphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
 		if vSphereUsername == "" {
-			return fmt.Errorf("No %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
 		}
 		vSpherePassword := os.Getenv(constants.VSpherePasswordEnvVar)
 		if vSpherePassword == "" {
-			return fmt.Errorf("No %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
 		}
 		metadata := &installertypes.ClusterMetadata{
 			InfraID: infraID,
@@ -723,7 +723,7 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		// Create IBMCloud Client
 		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
 		if ibmCloudAPIKey == "" {
-			return fmt.Errorf("No %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
 		}
 		ibmClient, err := ibmclient.NewClient(ibmCloudAPIKey)
 		if err != nil {
@@ -816,7 +816,8 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 
 		m.log.Info("modifying worker machineset manifests")
 
-		err = filepath.WalkDir(filepath.Join(m.WorkDir, "openshift"), func(path string, d fs.DirEntry, err error) error {
+		// TODO: Handle error arg to WalkDirFunc
+		err = filepath.WalkDir(filepath.Join(m.WorkDir, "openshift"), func(path string, d fs.DirEntry, _ error) error {
 			if d.IsDir() || (filepath.Ext(path) != ".yaml" && filepath.Ext(path) != ".yml") {
 				return nil
 			}
@@ -996,16 +997,15 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 	m.waitForFiles([]string{logfileName})
 
 	logfile, err := os.Open(logfileName)
-	defer logfile.Close()
 	if err != nil {
 		// FIXME what is a better response to being unable to open the file
 		m.log.WithError(err).Fatalf("unable to open installer log file to display to stdout")
 		panic("unable to open log file")
 	}
+	defer logfile.Close()
 
 	r := bufio.NewReader(logfile)
 	fullLine := ""
-	fiveMS := time.Millisecond * 5
 
 	// this loop will store up a full line worth of text into fullLine before
 	// passing through regex and then out to stdout
@@ -1020,7 +1020,7 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 		}
 		// pause for EOF and any other error
 		if err != nil {
-			time.Sleep(fiveMS)
+			time.Sleep(time.Millisecond * 5)
 			continue
 		}
 

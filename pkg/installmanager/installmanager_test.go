@@ -199,7 +199,7 @@ func TestInstallManager(t *testing.T) {
 			}
 			im.Complete([]string{})
 
-			im.waitForProvisioningStage = func(*hivev1.ClusterProvision, *InstallManager) error { return nil }
+			im.waitForProvisioningStage = func(*InstallManager) error { return nil }
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),
 				fmt.Sprintf(fakeInstallerBinary, tempDir))) {
@@ -212,38 +212,38 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			if test.failedMetadataRead {
-				im.readClusterMetadata = func(*hivev1.ClusterProvision, *InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
+				im.readClusterMetadata = func(*InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
 					return nil, nil, fmt.Errorf("failed to save metadata")
 				}
 			}
 
 			if test.failedKubeconfigSave {
-				im.uploadAdminKubeconfig = func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error) {
+				im.uploadAdminKubeconfig = func(*InstallManager) (*corev1.Secret, error) {
 					return nil, fmt.Errorf("failed to save admin kubeconfig")
 				}
 			}
 
 			if test.failedAdminPasswordSave {
-				im.uploadAdminPassword = func(*hivev1.ClusterProvision, *InstallManager) (*corev1.Secret, error) {
+				im.uploadAdminPassword = func(*InstallManager) (*corev1.Secret, error) {
 					return nil, fmt.Errorf("failed to save admin password")
 				}
 			}
 
 			if test.failedInstallerLogRead {
-				im.readInstallerLog = func(*hivev1.ClusterProvision, *InstallManager, bool) (string, error) {
+				im.readInstallerLog = func(*InstallManager, bool) (string, error) {
 					return "", fmt.Errorf("failed to save install log")
 				}
 			}
 
 			if test.failedProvisionUpdate != nil {
 				calls := int32(0)
-				im.updateClusterProvision = func(provision *hivev1.ClusterProvision, im *InstallManager, mutation provisionMutation) error {
+				im.updateClusterProvision = func(im *InstallManager, mutation provisionMutation) error {
 					callNumber := calls
 					calls = calls + 1
 					if callNumber == *test.failedProvisionUpdate {
 						return fmt.Errorf("failed to update provision")
 					}
-					return updateClusterProvisionWithRetries(provision, im, mutation)
+					return updateClusterProvisionWithRetries(im, mutation)
 				}
 			}
 

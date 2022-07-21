@@ -426,6 +426,11 @@ const (
 	// actually checking if ClusterOperators are in a good state. This is to allow them time to start
 	// their pods and report accurate status so we avoid reading good state from before hibernation.
 	ClusterOperatorSettlePause = 2 * time.Minute
+
+	// AdditionalLogFieldsAnnotation keys an annotation containing a JSON-encoded map of key/value pairs. If specified,
+	// nonempty, and parseable into such a map, the key/value pairs are blindly included in log lines for any controller
+	// dealing with the annotated object.
+	AdditionalLogFieldsAnnotation = "hive.openshift.io/additional-log-fields"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

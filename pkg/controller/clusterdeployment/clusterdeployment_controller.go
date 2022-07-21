@@ -46,6 +46,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/clustersync"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -299,6 +300,7 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 		cdLog.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
+	cdLog = utils.AddLogFields(cd, cdLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, r.logger)
@@ -498,7 +500,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.Spec.ManageDNS {
-		changed, err := r.ensureDNSZonePreserveOnDelete(cd, cdLog)
+		changed, err := r.ensureDNSZonePreserveOnDeleteAndLogAnnotations(cd, cdLog)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -1505,10 +1507,10 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 	return true, nil
 }
 
-// ensureDNSZonePreserveOnDelete makes sure the DNSZone, if one exists, has a
-// matching PreserveOnDelete setting with its ClusterDeployment. Returns true
-// if a change was made.
-func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDelete(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
+// ensureDNSZonePreserveOnDeleteAndLogAnnotations makes sure the DNSZone, if one exists, has a
+// matching PreserveOnDelete setting and additional log annotations with its ClusterDeployment.
+// Returns true if a change was made.
+func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDeleteAndLogAnnotations(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
 	dnsZone := &hivev1.DNSZone{}
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
 	logger := cdLog.WithField("zone", dnsZoneNamespacedName.String())
@@ -1521,17 +1523,23 @@ func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDelete(cd *hivev1.Cl
 		return false, nil
 	}
 
+	changed := controllerutils.CopyLogAnnotation(cd, dnsZone)
+
 	if dnsZone.Spec.PreserveOnDelete != cd.Spec.PreserveOnDelete {
+		changed = true
 		logger.WithField("preserveOnDelete", cd.Spec.PreserveOnDelete).Info("setting DNSZone PreserveOnDelete to match ClusterDeployment PreserveOnDelete")
 		dnsZone.Spec.PreserveOnDelete = cd.Spec.PreserveOnDelete
+	}
+
+	if changed {
 		err := r.Update(context.TODO(), dnsZone)
 		if err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating DNSZone")
 			return false, err
 		}
-		return true, nil
 	}
-	return false, nil
+
+	return changed, nil
 }
 
 // ensureManagedDNSZone
@@ -1657,6 +1665,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 			LinkToParentDomain: true,
 		},
 	}
+	controllerutils.CopyLogAnnotation(cd, dnsZone)
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:
@@ -1790,6 +1799,7 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			ClusterName: cd.Spec.ClusterName,
 		},
 	}
+	utils.CopyLogAnnotation(cd, req)
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:

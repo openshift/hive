@@ -39,6 +39,7 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 	"github.com/openshift/hive/pkg/resource"
@@ -361,6 +362,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		log.WithError(err).Error("failed to get ClusterDeployment")
 		return reconcile.Result{}, err
 	}
+	logger = utils.AddLogFields(cd, logger)
 
 	sts, err := r.getAndCheckClusterSyncStatefulSet(logger)
 	if err != nil {

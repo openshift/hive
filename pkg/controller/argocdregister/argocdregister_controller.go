@@ -52,6 +52,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -152,6 +153,7 @@ func (r *ArgoCDRegisterController) Reconcile(ctx context.Context, request reconc
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
+	cdLog = utils.AddLogFields(cd, cdLog)
 
 	if !cd.Spec.Installed {
 		cdLog.Info("cluster installation is not complete")

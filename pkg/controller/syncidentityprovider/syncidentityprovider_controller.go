@@ -32,6 +32,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
@@ -192,6 +193,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(ctx context.Context, request 
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
+	contextLogger = utils.AddLogFields(cd, contextLogger)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, contextLogger)

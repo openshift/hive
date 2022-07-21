@@ -34,6 +34,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -156,6 +157,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
+	cdLog = utils.AddLogFields(cd, cdLog)
 	rContext.clusterDeployment = cd
 
 	// Initialize cluster deployment conditions if not present

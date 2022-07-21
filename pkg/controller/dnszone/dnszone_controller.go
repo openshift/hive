@@ -18,6 +18,7 @@ import (
 	"github.com/openshift/hive/pkg/azureclient"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 	corev1 "k8s.io/api/core/v1"
@@ -154,6 +155,7 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
+	dnsLog = utils.AddLogFields(desiredState, dnsLog)
 
 	// NOTE: Can race with call to same in dnsendpoint controller
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {

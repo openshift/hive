@@ -41,6 +41,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 )
@@ -136,6 +137,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
+	cdLog = utils.AddLogFields(cd, cdLog)
 
 	// Initialize cluster deployment conditions if not present
 	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentUnreachableConditions)

@@ -31,6 +31,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -168,6 +169,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		rLog.WithError(err).Error("cannot get clusterdeprovision")
 		return reconcile.Result{}, err
 	}
+	rLog = utils.AddLogFields(instance, rLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, rLog)

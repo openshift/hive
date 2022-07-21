@@ -221,7 +221,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				assert.Equal(t, constants.SyncSetTypeControlPlaneCerts, labels[constants.SyncSetTypeLabel], "incorrect syncset type label")
 			}
 
-			notFoundCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ControlPlaneCertificateNotFoundCondition)
+			notFoundCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ControlPlaneCertificateNotFoundCondition)
 			if test.expectedNotFoundStatus != "" {
 				assert.NotNil(t, notFoundCondition, "expected a NotFound condition")
 				assert.Equal(t, test.expectedNotFoundStatus, notFoundCondition.Status, "unexpected NotFound status")

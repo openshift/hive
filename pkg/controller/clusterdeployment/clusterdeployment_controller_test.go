@@ -990,7 +990,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
 					// Pretend DNSNotReady happened 4m ago
-					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
 					cond.Status = corev1.ConditionTrue
 					cond.Reason = dnsNotReadyReason
 					cond.Message = "DNS Zone not yet available"
@@ -1023,7 +1023,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
 					// Pretend DNSNotReady happened >10m ago
-					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
 					cond.Status = corev1.ConditionTrue
 					cond.Reason = dnsNotReadyReason
 					cond.Message = "DNS Zone not yet available"
@@ -1203,7 +1203,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
 					if assert.NotNil(t, cond, "expected to find condition") {
 						assert.Equal(t, corev1.ConditionTrue, cond.Status, "unexpected condition status")
 						assert.Equal(t, "Existing DNS zone not owned by cluster deployment", cond.Message, "unexpected condition message")
@@ -1233,7 +1233,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+					cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
 					if assert.NotNil(t, cond, "expected to find condition") {
 						assert.Equal(t, corev1.ConditionTrue, cond.Status, "unexpected condition status")
 						assert.Equal(t, "Existing DNS zone not owned by cluster deployment", cond.Message, "unexpected condition message")
@@ -1560,7 +1560,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if assert.NotNil(t, cd, "missing clusterdeployment") {
-					cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.SyncSetFailedCondition)
+					cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.SyncSetFailedCondition)
 					if assert.NotNil(t, cond, "missing SyncSetFailedCondition status condition") {
 						assert.Equal(t, corev1.ConditionTrue, cond.Status, "did not get expected state for SyncSetFailedCondition condition")
 					}
@@ -1598,7 +1598,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.SyncSetFailedCondition)
+				cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.SyncSetFailedCondition)
 				if assert.NotNil(t, cond, "missing SyncSetFailedCondition status condition") {
 					assert.Equal(t, corev1.ConditionFalse, cond.Status, "did not get expected state for SyncSetFailedCondition condition")
 				}
@@ -1620,7 +1620,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.SyncSetFailedCondition)
+				cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.SyncSetFailedCondition)
 				if assert.NotNil(t, cond, "missing SyncSetFailedCondition status condition") {
 					assert.Equal(t, corev1.ConditionTrue, cond.Status, "did not get expected state for SyncSetFailedCondition condition")
 					assert.Equal(t, "SyncSetPaused", cond.Reason, "did not get expected reason for SyncSetFailedCondition condition")
@@ -1805,7 +1805,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				lc := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, "ClusterImageSetNotFound")
+				// This is a hack to get Go to accept this arbitrary string as the proper type
+				dummy := hivev1.ClusterDeploymentCondition{Type: "ClusterImageSetNotFound"}
+				lc := controllerutils.FindCondition(cd.Status.Conditions, dummy.Type)
 				assert.Nil(t, lc, "legacy condition was not cleared")
 			},
 		},
@@ -2654,10 +2656,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
 						assert.Equal(t, corev1.ConditionFalse, cond.Status, "expected ProvisionStopped to be False")
 					}
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
 						assert.Equal(t, hivev1.ProvisionedReasonProvisioning, cond.Reason, "expected Provisioned to be Provisioning")
 					}
 				}
@@ -2681,11 +2683,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			retryReasons: &[]string{"foo", "aReason", "bar"},
 			validate: func(c client.Client, t *testing.T) {
 				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
 						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
 						assert.Equal(t, "InstallAttemptsLimitReached", cond.Reason, "expected ProvisionStopped Reason to be InstallAttemptsLimitReached")
 					}
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
 						assert.Equal(t, hivev1.ProvisionedReasonProvisionStopped, cond.Reason, "expected Provisioned to be ProvisionStopped")
 					}
 				}
@@ -2707,10 +2709,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
 						assert.Equal(t, corev1.ConditionFalse, cond.Status, "expected ProvisionStopped to be False")
 					}
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
 						assert.Equal(t, hivev1.ProvisionedReasonProvisioning, cond.Reason, "expected Provisioned to be Provisioning")
 					}
 				}
@@ -2731,11 +2733,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			retryReasons: &[]string{"foo", "bReason", "bar"},
 			validate: func(c client.Client, t *testing.T) {
 				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
 						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
 						assert.Equal(t, "FailureReasonNotRetryable", cond.Reason, "expected ProvisionStopped Reason to be FailureReasonNotRetryable")
 					}
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
 						assert.Equal(t, hivev1.ProvisionedReasonProvisionStopped, cond.Reason, "expected Provisioned to be ProvisionStopped")
 					}
 				}
@@ -2754,11 +2756,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			retryReasons: &[]string{"foo", "bReason", "bar"},
 			validate: func(c client.Client, t *testing.T) {
 				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
 						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
 						assert.Equal(t, "FailureReasonNotRetryable", cond.Reason, "expected ProvisionStopped Reason to be FailureReasonNotRetryable")
 					}
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
 						assert.Equal(t, hivev1.ProvisionedReasonProvisionStopped, cond.Reason, "expected Provisioned to be ProvisionStopped")
 					}
 				}
@@ -2777,10 +2779,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
 				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
 						assert.Equal(t, corev1.ConditionFalse, cond.Status, "expected ProvisionStopped to be False")
 					}
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
 						assert.Equal(t, hivev1.ProvisionedReasonProvisioning, cond.Reason, "expected Provisioned to be Provisioning")
 					}
 				}
@@ -2800,11 +2802,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			retryReasons: &[]string{},
 			validate: func(c client.Client, t *testing.T) {
 				if cd := getCD(c); assert.NotNil(t, cd, "no clusterdeployment found") {
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); assert.NotNil(t, cond, "no ProvisionStopped condition") {
 						assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected ProvisionStopped to be True")
 						assert.Equal(t, "FailureReasonNotRetryable", cond.Reason, "expected ProvisionStopped Reason to be FailureReasonNotRetryable")
 					}
-					if cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
+					if cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionedCondition); assert.NotNil(t, cond, "no Provisioned condition") {
 						assert.Equal(t, hivev1.ProvisionedReasonProvisionStopped, cond.Reason, "expected Provisioned to be ProvisionStopped")
 					}
 				}
@@ -3309,7 +3311,7 @@ func testFakeClusterInstallWithConditions(name string, conditions []hivev1.Clust
 	value := []interface{}{}
 	for _, c := range conditions {
 		value = append(value, map[string]interface{}{
-			"type":    c.Type,
+			"type":    string(c.Type),
 			"status":  string(c.Status),
 			"reason":  c.Reason,
 			"message": c.Message,
@@ -4016,7 +4018,7 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 
 			// act
 			updated, result, err := rcd.ensureManagedDNSZone(test.clusterDeployment, rcd.logger)
-			actualDNSNotReadyCondition := controllerutils.FindClusterDeploymentCondition(test.clusterDeployment.Status.Conditions, hivev1.DNSNotReadyCondition)
+			actualDNSNotReadyCondition := controllerutils.FindCondition(test.clusterDeployment.Status.Conditions, hivev1.DNSNotReadyCondition)
 
 			// assert
 			assert.Equal(t, test.expectedUpdated, updated, "Unexpected 'updated' return")

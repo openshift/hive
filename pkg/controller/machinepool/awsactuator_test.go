@@ -574,7 +574,7 @@ func TestAWSActuator(t *testing.T) {
 				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey, test.expectedAMI, test.expectedSGFilters)
 			}
 			if test.expectedCondition != nil {
-				cond := controllerutils.FindMachinePoolCondition(pool.Status.Conditions, test.expectedCondition.Type)
+				cond := controllerutils.FindCondition(pool.Status.Conditions, test.expectedCondition.Type)
 				if assert.NotNilf(t, cond, "did not find expected condition type: %v", test.expectedCondition.Type) {
 					assert.Equal(t, test.expectedCondition.Status, cond.Status, "condition found with unexpected status")
 					assert.Equal(t, test.expectedCondition.Reason, cond.Reason, "condition found with unexpected reason")

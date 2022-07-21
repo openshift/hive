@@ -7,7 +7,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 )
 
 // UpdateConditionCheck tests whether a condition should be updated from the
@@ -53,7 +52,7 @@ func InitializeClusterDeploymentConditions(existingConditions []hivev1.ClusterDe
 	now := metav1.Now()
 	changed := false
 	for _, conditionType := range conditionsToBeAdded {
-		if FindClusterDeploymentCondition(existingConditions, conditionType) == nil {
+		if FindCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
 				existingConditions,
 				hivev1.ClusterDeploymentCondition{
@@ -103,7 +102,7 @@ func SetClusterDeploymentConditionWithChangeCheck(
 ) ([]hivev1.ClusterDeploymentCondition, bool) {
 	changed := false
 	now := metav1.Now()
-	existingCondition := FindClusterDeploymentCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		conditions = append(
 			conditions,
@@ -171,7 +170,7 @@ func InitializeClusterClaimConditions(existingConditions []hivev1.ClusterClaimCo
 	now := metav1.Now()
 	changed := false
 	for _, conditionType := range conditionsToBeAdded {
-		if FindClusterClaimCondition(existingConditions, conditionType) == nil {
+		if FindCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
 				existingConditions,
 				hivev1.ClusterClaimCondition{
@@ -221,7 +220,7 @@ func SetClusterClaimConditionWithChangeCheck(
 ) ([]hivev1.ClusterClaimCondition, bool) {
 	changed := false
 	now := metav1.Now()
-	existingCondition := FindClusterClaimCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		conditions = append(
 			conditions,
@@ -264,7 +263,7 @@ func InitializeClusterPoolConditions(existingConditions []hivev1.ClusterPoolCond
 	now := metav1.Now()
 	changed := false
 	for _, conditionType := range conditionsToBeAdded {
-		if FindClusterPoolCondition(existingConditions, conditionType) == nil {
+		if FindCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
 				existingConditions,
 				hivev1.ClusterPoolCondition{
@@ -314,7 +313,7 @@ func SetClusterPoolConditionWithChangeCheck(
 ) ([]hivev1.ClusterPoolCondition, bool) {
 	changed := false
 	now := metav1.Now()
-	existingCondition := FindClusterPoolCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		conditions = append(
 			conditions,
@@ -357,7 +356,7 @@ func SetClusterProvisionCondition(
 	updateConditionCheck UpdateConditionCheck,
 ) []hivev1.ClusterProvisionCondition {
 	now := metav1.Now()
-	existingCondition := FindClusterProvisionCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		if status == corev1.ConditionTrue {
 			conditions = append(
@@ -400,7 +399,7 @@ func SetSyncCondition(
 	updateConditionCheck UpdateConditionCheck,
 ) []hivev1.SyncCondition {
 	now := metav1.Now()
-	existingCondition := FindSyncCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		if status == corev1.ConditionTrue {
 			conditions = append(
@@ -466,7 +465,7 @@ func SetDNSZoneConditionWithChangeCheck(
 ) ([]hivev1.DNSZoneCondition, bool) {
 	changed := false
 	now := metav1.Now()
-	existingCondition := FindDNSZoneCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		if status == corev1.ConditionTrue {
 			conditions = append(
@@ -506,7 +505,7 @@ func InitializeMachinePoolConditions(existingConditions []hivev1.MachinePoolCond
 	now := metav1.Now()
 	changed := false
 	for _, conditionType := range conditionsToBeAdded {
-		if FindMachinePoolCondition(existingConditions, conditionType) == nil {
+		if FindCondition(existingConditions, conditionType) == nil {
 			existingConditions = append(
 				existingConditions,
 				hivev1.MachinePoolCondition{
@@ -556,7 +555,7 @@ func SetMachinePoolConditionWithChangeCheck(
 ) ([]hivev1.MachinePoolCondition, bool) {
 	changed := false
 	now := metav1.Now()
-	existingCondition := FindMachinePoolCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		conditions = append(
 			conditions,
@@ -622,7 +621,7 @@ func SetClusterDeprovisionConditionWithChangeCheck(
 ) ([]hivev1.ClusterDeprovisionCondition, bool) {
 	changed := false
 	now := metav1.Now()
-	existingCondition := FindClusterDeprovisionCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		if status == corev1.ConditionTrue {
 			conditions = append(
@@ -663,7 +662,7 @@ func SetClusterDeprovisionConditionWithChangeCheck(
 // to the conditions.
 func SetClusterInstallConditionWithChangeCheck(
 	conditions []hivev1.ClusterInstallCondition,
-	conditionType string,
+	conditionType hivev1.ClusterInstallConditionType,
 	status corev1.ConditionStatus,
 	reason string,
 	message string,
@@ -672,7 +671,7 @@ func SetClusterInstallConditionWithChangeCheck(
 
 	changed := false
 	now := metav1.Now()
-	existingCondition := FindClusterInstallCondition(conditions, conditionType)
+	existingCondition := FindCondition(conditions, conditionType)
 	if existingCondition == nil {
 		conditions = append(
 			conditions,
@@ -705,110 +704,9 @@ func SetClusterInstallConditionWithChangeCheck(
 	return conditions, changed
 }
 
-// FindClusterDeploymentCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindClusterDeploymentCondition(conditions []hivev1.ClusterDeploymentCondition, conditionType hivev1.ClusterDeploymentConditionType) *hivev1.ClusterDeploymentCondition {
+func FindCondition[C hivev1.Condition, T hivev1.ConditionType](conditions []C, conditionType T) *C {
 	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindClusterClaimCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindClusterClaimCondition(conditions []hivev1.ClusterClaimCondition, conditionType hivev1.ClusterClaimConditionType) *hivev1.ClusterClaimCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindClusterPoolCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindClusterPoolCondition(conditions []hivev1.ClusterPoolCondition, conditionType hivev1.ClusterPoolConditionType) *hivev1.ClusterPoolCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindClusterProvisionCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindClusterProvisionCondition(conditions []hivev1.ClusterProvisionCondition, conditionType hivev1.ClusterProvisionConditionType) *hivev1.ClusterProvisionCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindSyncCondition finds in the condition that has the specified condition type
-// in the given list. If none exists, then returns nil.
-func FindSyncCondition(conditions []hivev1.SyncCondition, conditionType hivev1.SyncConditionType) *hivev1.SyncCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindDNSZoneCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindDNSZoneCondition(conditions []hivev1.DNSZoneCondition, conditionType hivev1.DNSZoneConditionType) *hivev1.DNSZoneCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindMachinePoolCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindMachinePoolCondition(conditions []hivev1.MachinePoolCondition, conditionType hivev1.MachinePoolConditionType) *hivev1.MachinePoolCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindClusterDeprovisionCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindClusterDeprovisionCondition(conditions []hivev1.ClusterDeprovisionCondition, conditionType hivev1.ClusterDeprovisionConditionType) *hivev1.ClusterDeprovisionCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindClusterInstallCondition finds in the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindClusterInstallCondition(conditions []hivev1.ClusterInstallCondition, conditionType string) *hivev1.ClusterInstallCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
-}
-
-// FindClusterSyncCondition finds the condition that has the
-// specified condition type in the given list. If none exists, then returns nil.
-func FindClusterSyncCondition(conditions []v1alpha1.ClusterSyncCondition, conditionType v1alpha1.ClusterSyncConditionType) *v1alpha1.ClusterSyncCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
+		if condition.ConditionType().String() == conditionType.String() {
 			return &conditions[i]
 		}
 	}

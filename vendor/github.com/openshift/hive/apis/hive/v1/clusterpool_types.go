@@ -177,6 +177,16 @@ type ClusterPoolCondition struct {
 // ClusterPoolConditionType is a valid value for ClusterPoolCondition.Type
 type ClusterPoolConditionType string
 
+// ConditionType satisfies the conditions.Condition interface
+func (c ClusterPoolCondition) ConditionType() ConditionType {
+	return c.Type
+}
+
+// String satisfies the conditions.ConditionType interface
+func (t ClusterPoolConditionType) String() string {
+	return string(t)
+}
+
 const (
 	// ClusterPoolMissingDependenciesCondition is set when a cluster pool is missing dependencies required to create a
 	// cluster. Dependencies include resources such as the ClusterImageSet and the credentials Secret.

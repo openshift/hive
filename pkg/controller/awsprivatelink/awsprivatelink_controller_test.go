@@ -1786,7 +1786,7 @@ users:
 			}
 
 			for _, cond := range clusterDeploymentAWSPrivateLinkConditions {
-				if present := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+				if present := controllerutils.FindCondition(cd.Status.Conditions,
 					cond); present == nil {
 					test.expectedConditions = append(test.expectedConditions, hivev1.ClusterDeploymentCondition{
 						Status:  corev1.ConditionUnknown,

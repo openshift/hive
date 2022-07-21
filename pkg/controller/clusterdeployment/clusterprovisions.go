@@ -258,7 +258,7 @@ func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev
 		return true, nil
 	}
 	// Does our failed provision's reason match?
-	cond := controllerutils.FindClusterProvisionCondition(
+	cond := controllerutils.FindCondition(
 		prov.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
 	if cond == nil {
 		return false, errors.New("failed to find ClusterProvisionFailed Condition -- this should never happen!")
@@ -356,7 +356,7 @@ func (r *ReconcileClusterDeployment) stopProvisioning(cd *hivev1.ClusterDeployme
 func (r *ReconcileClusterDeployment) reconcileInitializingProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
 	cdLog.Debug("still initializing provision")
 	// Set condition on ClusterDeployment when install pod is stuck in pending phase
-	installPodStuckCondition := controllerutils.FindClusterProvisionCondition(provision.Status.Conditions, hivev1.InstallPodStuckCondition)
+	installPodStuckCondition := controllerutils.FindCondition(provision.Status.Conditions, hivev1.InstallPodStuckCondition)
 	if installPodStuckCondition != nil && installPodStuckCondition.Status == corev1.ConditionTrue {
 		if err := r.updateCondition(cd, hivev1.InstallLaunchErrorCondition, corev1.ConditionTrue, installPodStuckCondition.Reason, installPodStuckCondition.Message, cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update InstallLaunchErrorCondition")
@@ -401,7 +401,7 @@ func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.Cluster
 	reason := "MissingCondition"
 	message := fmt.Sprintf("Provision %s failed. Next provision will begin soon.", provision.Name)
 
-	failedCond := controllerutils.FindClusterProvisionCondition(provision.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
+	failedCond := controllerutils.FindCondition(provision.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
 	if failedCond != nil && failedCond.Status == corev1.ConditionTrue {
 		nextProvisionTime = calculateNextProvisionTime(failedCond.LastTransitionTime.Time, cd.Status.InstallRestarts, cdLog)
 		reason = failedCond.Reason

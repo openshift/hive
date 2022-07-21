@@ -262,7 +262,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 	job := &batchv1.Job{}
 	switch err := r.Get(context.TODO(), types.NamespacedName{Name: instance.Status.JobRef.Name, Namespace: instance.Namespace}, job); {
 	case apierrors.IsNotFound(err):
-		if cond := controllerutils.FindClusterProvisionCondition(instance.Status.Conditions, hivev1.ClusterProvisionFailedCondition); cond == nil {
+		if cond := controllerutils.FindCondition(instance.Status.Conditions, hivev1.ClusterProvisionFailedCondition); cond == nil {
 			pLog.Error("install job lost")
 			if err := r.setCondition(instance, hivev1.ClusterProvisionFailedCondition, corev1.ConditionTrue, "JobNotFound", "install job not found", controllerutils.UpdateConditionAlways, pLog); err != nil {
 				return reconcile.Result{}, err
@@ -311,7 +311,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 			// install manager will set the InfraID on the ClusterProvision or the pod will fail.
 			return reconcile.Result{}, nil
 		}
-		if cond := controllerutils.FindClusterProvisionCondition(instance.Status.Conditions, hivev1.InstallPodStuckCondition); cond != nil && cond.Status == corev1.ConditionTrue {
+		if cond := controllerutils.FindCondition(instance.Status.Conditions, hivev1.InstallPodStuckCondition); cond != nil && cond.Status == corev1.ConditionTrue {
 			if err := r.setCondition(instance, hivev1.InstallPodStuckCondition, corev1.ConditionFalse, "PodInRunningPhase", "pod is in running phase", controllerutils.UpdateConditionNever, pLog); err != nil {
 				return reconcile.Result{}, err
 			}

@@ -1175,7 +1175,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 				}
 			}
 
-			cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.RelocationFailedCondition)
+			cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.RelocationFailedCondition)
 			if tc.expectedRelocationFailedCondition != nil {
 				if assert.NotNil(t, cond, "missing relocating condition") {
 					assert.Equal(t, tc.expectedRelocationFailedCondition.Status, cond.Status, "unexpected condition status")

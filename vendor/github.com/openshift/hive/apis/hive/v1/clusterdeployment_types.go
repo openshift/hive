@@ -374,6 +374,16 @@ type ClusterDeploymentCondition struct {
 // ClusterDeploymentConditionType is a valid value for ClusterDeploymentCondition.Type
 type ClusterDeploymentConditionType string
 
+// ConditionType satisfies the conditions.Condition interface
+func (c ClusterDeploymentCondition) ConditionType() ConditionType {
+	return c.Type
+}
+
+// String satisfies the conditions.ConditionType interface
+func (t ClusterDeploymentConditionType) String() string {
+	return string(t)
+}
+
 const (
 	// InstallerImageResolutionFailedCondition is a condition that indicates whether the job
 	// to determine the installer image based on a release image was successful.

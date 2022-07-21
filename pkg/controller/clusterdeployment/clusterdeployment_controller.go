@@ -661,7 +661,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	// If the platform credentials are no good, return error and go into backoff
-	authCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.AuthenticationFailureClusterDeploymentCondition)
+	authCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.AuthenticationFailureClusterDeploymentCondition)
 	if authCondition.Status == corev1.ConditionTrue {
 		authError := errors.New(authCondition.Message)
 		cdLog.WithError(authError).Error("cannot proceed with provision while platform credentials authentication is failing.")
@@ -840,7 +840,7 @@ func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev
 }
 
 func dnsZoneNotReadyMaybeTimedOut(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (string, string, time.Duration) {
-	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
+	cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.DNSNotReadyCondition)
 	if cond == nil || (cond.Reason != dnsNotReadyReason && cond.Reason != dnsNotReadyTimedoutReason) {
 		// First time we're setting the condition to "not ready".
 		// If the DNSZone becomes ready, it'll pop this controller right away.
@@ -1116,7 +1116,7 @@ func (r *ReconcileClusterDeployment) setReqsMetConditionImageSetNotFound(cd *hiv
 			controllerutils.UpdateConditionIfReasonOrMessageChange)
 	} else {
 		// Set the RequirementsMet condition status back to unknown if True and it's current reason matches
-		reqsCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+		reqsCond := controllerutils.FindCondition(cd.Status.Conditions,
 			hivev1.RequirementsMetCondition)
 		if reqsCond.Status == corev1.ConditionFalse && reqsCond.Reason == clusterImageSetNotFoundReason {
 			conds, changed = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
@@ -1132,7 +1132,7 @@ func (r *ReconcileClusterDeployment) setReqsMetConditionImageSetNotFound(cd *hiv
 		return nil
 	}
 	cd.Status.Conditions = conds
-	reqsCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+	reqsCond := controllerutils.FindCondition(cd.Status.Conditions,
 		hivev1.RequirementsMetCondition)
 	cdLog.Infof("updating RequirementsMetCondition: status=%s reason=%s", reqsCond.Status, reqsCond.Reason)
 	err := r.Status().Update(context.TODO(), cd)
@@ -1288,7 +1288,7 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 		return false, err
 	}
 
-	authenticationFailureCondition := controllerutils.FindClusterDeprovisionCondition(existingRequest.Status.Conditions, hivev1.AuthenticationFailureClusterDeprovisionCondition)
+	authenticationFailureCondition := controllerutils.FindCondition(existingRequest.Status.Conditions, hivev1.AuthenticationFailureClusterDeprovisionCondition)
 	if authenticationFailureCondition != nil {
 		var conds []hivev1.ClusterDeploymentCondition
 		var changed1, changed2, authFailure bool
@@ -1433,7 +1433,7 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 		return false, nil
 	}
 
-	readyCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+	readyCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 
 	if readyCondition == nil || readyCondition.Status != corev1.ConditionTrue {
 		msg := "did not find timestamp for when dnszone became ready"
@@ -1530,11 +1530,11 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		return true, reconcile.Result{}, errors.New("Existing unowned DNS zone")
 	}
 
-	availableCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
-	insufficientCredentialsCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.InsufficientCredentialsCondition)
-	authenticationFailureCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.AuthenticationFailureCondition)
-	apiOptInRequiredCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.APIOptInRequiredCondition)
-	dnsErrorCondition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, hivev1.GenericDNSErrorsCondition)
+	availableCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+	insufficientCredentialsCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.InsufficientCredentialsCondition)
+	authenticationFailureCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.AuthenticationFailureCondition)
+	apiOptInRequiredCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.APIOptInRequiredCondition)
+	dnsErrorCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.GenericDNSErrorsCondition)
 	var (
 		status              corev1.ConditionStatus
 		reason, message     string
@@ -2034,7 +2034,7 @@ func (r *ReconcileClusterDeployment) validatePlatformCreds(cd *hivev1.ClusterDep
 
 // checkForFailedSync returns true if it finds that the ClusterSync has the Failed condition set
 func checkForFailedSync(clusterSync *hiveintv1alpha1.ClusterSync) bool {
-	cond := controllerutils.FindClusterSyncCondition(clusterSync.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
+	cond := controllerutils.FindCondition(clusterSync.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
 	if cond != nil {
 		return cond.Status == corev1.ConditionTrue
 	}

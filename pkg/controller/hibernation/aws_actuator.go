@@ -170,7 +170,7 @@ func (a *awsActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient c
 
 // ReplaceMachines implements HibernationPreemptibleMachines interface.
 func (a *awsActuator) ReplaceMachines(cd *hivev1.ClusterDeployment, remoteClient client.Client, logger log.FieldLogger) (bool, error) {
-	hibernatingCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions,
+	hibernatingCondition := controllerutils.FindCondition(cd.Status.Conditions,
 		hivev1.ClusterHibernatingCondition)
 	if hibernatingCondition == nil {
 		return false, errors.New("cannot find hibernating condition")

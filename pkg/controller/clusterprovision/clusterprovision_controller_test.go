@@ -303,7 +303,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			provision := getProvision(fakeClient)
 			if assert.NotNil(t, provision, "provision lost") {
 				assert.Equal(t, string(test.expectedStage), string(provision.Spec.Stage), "unexpected provision stage")
-				failedCond := controllerutils.FindClusterProvisionCondition(provision.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
+				failedCond := controllerutils.FindCondition(provision.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
 				if test.expectedFailReason != "" {
 					if assert.NotNil(t, failedCond, "expected to find a Failed condition") {
 						assert.Equal(t, test.expectedFailReason, failedCond.Reason, "unexpected fail reason")

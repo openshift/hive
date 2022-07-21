@@ -229,7 +229,7 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 	// Delete ClusterClaim after its lifetime elapses
 	if lifetime != nil {
 		logger.WithField("lifetime", lifetime).Debug("checking whether lifetime of ClusterClaim has elapsed")
-		pendingCond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
+		pendingCond := controllerutils.FindCondition(claim.Status.Conditions, hivev1.ClusterClaimPendingCondition)
 		if pendingCond.Status == corev1.ConditionFalse {
 			if timeSinceAssigned := time.Since(pendingCond.LastTransitionTime.Time); timeSinceAssigned >= lifetime.Duration {
 				logger.WithField("timeSinceAssigned", timeSinceAssigned).

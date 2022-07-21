@@ -584,7 +584,7 @@ func TestObtainLeaseChar(t *testing.T) {
 			require.Contains(t, test.expectedCharIn, string(leaseChar))
 
 			if test.expectCondition != nil {
-				cond := controllerutils.FindMachinePoolCondition(pool.Status.Conditions, test.expectCondition.Type)
+				cond := controllerutils.FindCondition(pool.Status.Conditions, test.expectCondition.Type)
 				if assert.NotNilf(t, cond, "did not find expected condition type: %v", test.expectCondition.Type) {
 					assert.Equal(t, test.expectCondition.Status, cond.Status, "condition found with unexpected status")
 				}

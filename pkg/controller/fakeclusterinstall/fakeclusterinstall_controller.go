@@ -113,7 +113,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 	}
 
 	// Ensure our conditions are present, default state should be Unknown per Kube guidelines:
-	conditionTypes := []string{
+	conditionTypes := []hivev1.ClusterInstallConditionType{
 		// These conditions are required by Hive:
 		hivev1.ClusterInstallCompleted,
 		hivev1.ClusterInstallFailed,
@@ -123,7 +123,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 
 	var anyChanged bool
 	for _, condType := range conditionTypes {
-		c := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, condType)
+		c := controllerutils.FindCondition(fci.Status.Conditions, condType)
 		if c == nil {
 			logger.WithField("condition", condType).Info("initializing condition with Unknown status")
 			newConditions, changed := controllerutils.SetClusterInstallConditionWithChangeCheck(
@@ -175,7 +175,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 	}
 
 	// Check if we're Completed and can exit reconcile early.
-	completedCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallCompleted)
+	completedCond := controllerutils.FindCondition(fci.Status.Conditions, hivev1.ClusterInstallCompleted)
 	if completedCond.Status == corev1.ConditionTrue {
 		// Ensure Stopped=True
 		newConditions, changedStopped := controllerutils.SetClusterInstallConditionWithChangeCheck(
@@ -220,7 +220,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 	}
 
 	// Simulate 30 second wait for RequirementsMet condition to go True:
-	reqsCond := controllerutils.FindClusterInstallCondition(fci.Status.Conditions, hivev1.ClusterInstallRequirementsMet)
+	reqsCond := controllerutils.FindCondition(fci.Status.Conditions, hivev1.ClusterInstallRequirementsMet)
 	switch reqsCond.Status {
 	case corev1.ConditionUnknown:
 		logger.Info("setting RequirementsMet condition to False")

@@ -688,7 +688,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			}
 
 			for _, expectedCond := range test.expectedConditions {
-				cond := controllerutils.FindClusterClaimCondition(claim.Status.Conditions, expectedCond.Type)
+				cond := controllerutils.FindCondition(claim.Status.Conditions, expectedCond.Type)
 				if assert.NotNilf(t, cond, "did not find expected condition type: %v", expectedCond.Type) {
 					assert.Equal(t, expectedCond.Status, cond.Status, "condition found with unexpected status")
 					if expectedCond.Reason != "" {

@@ -140,7 +140,7 @@ func InitialURL(c client.Client, cd *hivev1.ClusterDeployment) (string, error) {
 // Note that this function will not attempt to reach the remote cluster. It only checks the current conditions on
 // the ClusterDeployment to determine if the remote cluster is reachable.
 func Unreachable(cd *hivev1.ClusterDeployment) (unreachable bool, lastCheck time.Time) {
-	cond := utils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
+	cond := utils.FindCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
 	if cond == nil || cond.Status == corev1.ConditionUnknown {
 		unreachable = true
 		return
@@ -153,7 +153,7 @@ func IsPrimaryURLActive(cd *hivev1.ClusterDeployment) bool {
 	if cd.Spec.ControlPlaneConfig.APIURLOverride == "" {
 		return true
 	}
-	cond := utils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ActiveAPIURLOverrideCondition)
+	cond := utils.FindCondition(cd.Status.Conditions, hivev1.ActiveAPIURLOverrideCondition)
 	return cond != nil && cond.Status == corev1.ConditionTrue
 }
 

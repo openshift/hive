@@ -224,7 +224,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			name: "Skip create missing machine set when cluster is unreachable",
 			clusterDeployment: func() *hivev1.ClusterDeployment {
 				cd := testClusterDeployment()
-				cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
+				cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.UnreachableCondition)
 				cond.Status = corev1.ConditionTrue
 				return cd
 			}(),

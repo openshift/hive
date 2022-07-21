@@ -305,8 +305,8 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				}
 
 				// Check if cluster is currently transitioning and set the appropriate metrics
-				hibernatingCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-				readyCond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
+				hibernatingCond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+				readyCond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 				// Ensure it is not too early in the cluster provisioning state and the conditions have been set at this point
 				if readyCond != nil && hibernatingCond != nil {
 					if readyCond.Reason == hivev1.ReadyReasonStoppingOrHibernating &&
@@ -480,7 +480,7 @@ func (mc *Calculator) calculateSyncSetMetrics(mcLog log.FieldLogger) {
 	ssInstancesUnappliedTotal := 0
 	for _, cs := range clusterSyncList.Items {
 		// Failing cluster syncs
-		cond := controllerutils.FindClusterSyncCondition(cs.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
+		cond := controllerutils.FindCondition(cs.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
 		if cond != nil && cond.Status == corev1.ConditionTrue {
 			seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
 			if ShouldLogGaugeDurationMetric(MetricClusterSyncFailingSeconds, seconds) {

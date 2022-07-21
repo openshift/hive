@@ -156,6 +156,16 @@ type MachinePoolCondition struct {
 // MachinePoolConditionType is a valid value for MachinePoolCondition.Type
 type MachinePoolConditionType string
 
+// ConditionType satisfies the conditions.Condition interface
+func (c MachinePoolCondition) ConditionType() ConditionType {
+	return c.Type
+}
+
+// String satisfies the conditions.ConditionType interface
+func (t MachinePoolConditionType) String() string {
+	return string(t)
+}
+
 const (
 	// NotEnoughReplicasMachinePoolCondition is true when the minReplicas field
 	// is set too low for the number of machinesets for the machine pool.

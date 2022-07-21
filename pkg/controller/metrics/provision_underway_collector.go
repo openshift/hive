@@ -216,7 +216,7 @@ func newProvisioningUnderwayInstallRestartsCollector(client client.Client, minim
 func getConditionAndReason(conditions []hivev1.ClusterDeploymentCondition) (condition, reason string, skip bool) {
 	condition, reason = "Unknown", "Unknown"
 	for _, delayCondition := range provisioningDelayCondition {
-		if cdCondition := controllerutils.FindClusterDeploymentCondition(conditions,
+		if cdCondition := controllerutils.FindCondition(conditions,
 			delayCondition); cdCondition != nil {
 			if cdCondition.Status != corev1.ConditionUnknown &&
 				!controllerutils.IsConditionInDesiredState(*cdCondition) {

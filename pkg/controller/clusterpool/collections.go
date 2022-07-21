@@ -218,7 +218,7 @@ func isBroken(cd *hivev1.ClusterDeployment, pool *hivev1.ClusterPool, logger log
 	////
 	// Check for ProvisionStopped
 	////
-	cond := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition)
+	cond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition)
 	if cond == nil {
 		// Since we should be initializing conditions, this probably means the CD is super fresh.
 		// Don't declare it broken yet -- give it a chance to come to life.
@@ -249,7 +249,7 @@ func isBroken(cd *hivev1.ClusterDeployment, pool *hivev1.ClusterPool, logger log
 		// completed resuming, skip.
 		return false
 	}
-	cond = controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
+	cond = controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
 	if cond == nil {
 		// Since we should be initializing conditions, this probably means the CD is super fresh.
 		// Don't declare it broken yet -- give it a chance to come to life.

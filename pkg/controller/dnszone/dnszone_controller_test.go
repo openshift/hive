@@ -167,7 +167,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+				condition := controllerutils.FindCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 				assert.NotNil(t, condition, "zone available condition should be set on dnszone")
 			},
 		},
@@ -319,7 +319,7 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 				mockGCPZoneExists(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+				condition := controllerutils.FindCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 				assert.NotNil(t, condition, "zone available condition should be set on dnszone")
 			},
 		},
@@ -454,7 +454,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 				mockAzureZoneExists(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				condition := controllerutils.FindDNSZoneCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
+				condition := controllerutils.FindCondition(zone.Status.Conditions, hivev1.ZoneAvailableDNSZoneCondition)
 				assert.NotNil(t, condition, "zone available condition should be set on dnszone")
 			},
 		},
@@ -620,7 +620,7 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 
 			// Validate
 			if tc.expectDnsCondition {
-				cond := controllerutils.FindDNSZoneCondition(zr.dnsZone.Status.Conditions, tc.dnsCondition.Type)
+				cond := controllerutils.FindCondition(zr.dnsZone.Status.Conditions, tc.dnsCondition.Type)
 				if assert.NotNil(t, cond, "expected condition not found") {
 					assert.Equal(t, tc.dnsCondition.Status, cond.Status, "condition in unexpected status")
 					assert.Equal(t, tc.dnsCondition.Reason, cond.Reason, "condition with unexpected reason")
@@ -1086,7 +1086,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 func assertDNSZoneConditions(t *testing.T, dnsZone *hivev1.DNSZone, expectedConditions []hivev1.DNSZoneCondition) {
 	assert.LessOrEqual(t, len(expectedConditions), len(dnsZone.Status.Conditions), "some conditions are not present")
 	for _, expectedCond := range expectedConditions {
-		condition := controllerutils.FindDNSZoneCondition(dnsZone.Status.Conditions, expectedCond.Type)
+		condition := controllerutils.FindCondition(dnsZone.Status.Conditions, expectedCond.Type)
 		if assert.NotNilf(t, condition, "did not find expected condition type: %v", expectedCond.Type) {
 			assert.Equal(t, expectedCond.Status, condition.Status, "condition found with unexpected status")
 			assert.Equal(t, expectedCond.Reason, condition.Reason, "condition found with unexpected reason")

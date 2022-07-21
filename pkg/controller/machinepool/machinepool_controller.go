@@ -1219,9 +1219,9 @@ func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 	}
 
 	for _, cond := range errorConds {
-		cn := controllerutils.FindMachinePoolCondition(new.Status.Conditions, cond)
+		cn := controllerutils.FindCondition(new.Status.Conditions, cond)
 		if cn != nil && cn.Status == corev1.ConditionTrue {
-			co := controllerutils.FindMachinePoolCondition(old.Status.Conditions, cond)
+			co := controllerutils.FindCondition(old.Status.Conditions, cond)
 			if co == nil {
 				return true // newly added failure condition
 			}

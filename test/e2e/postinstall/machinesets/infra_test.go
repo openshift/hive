@@ -135,7 +135,7 @@ func TestNewMachinePool(t *testing.T) {
 	case p.Azure != nil:
 		infraMachinePool.Spec.Platform = hivev1.MachinePoolPlatform{
 			Azure: &hivev1azure.MachinePool{
-				InstanceType: "Standard_D2s_v3",
+				InstanceType: "Standard_D4s_v3",
 				OSDisk: hivev1azure.OSDisk{
 					DiskSizeGB: 128,
 				},

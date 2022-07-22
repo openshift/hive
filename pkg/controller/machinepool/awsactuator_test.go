@@ -365,7 +365,9 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			// MachineSets will have an explicit subnet ID.
-			expectedSubnetIDInMachineSet: true,
+			// TODO: HIVE-1805: Uncomment the line below when HIVE-1805 has been addressed,
+			// allowing public subnets to be configured for machinepools when privatelink is enabled.
+			//expectedSubnetIDInMachineSet: true,
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.StringPtr(testAMI),
 			},

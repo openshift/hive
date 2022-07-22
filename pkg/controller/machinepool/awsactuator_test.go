@@ -647,8 +647,9 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 
 		if expectedSubnetID {
 			providerConfig := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
-			assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID")
-			assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
+			if assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID") {
+				assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
+			}
 		}
 		if expectedSGFilters != nil {
 			assert.Equal(t, awsProvider.SecurityGroups[0].Filters, expectedSGFilters, "unexpected security group filters")

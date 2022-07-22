@@ -9,22 +9,33 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func AddLogFields(obj metav1.Object, logger *log.Entry) *log.Entry {
+func ExtractLogFields(obj metav1.Object) (map[string]interface{}, error) {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
-		return logger
+		return nil, nil
 	}
 
-	if addl_log_fields, exists := annotations[constants.AdditionalLogFieldsAnnotation]; exists {
-		kvmap := log.Fields{}
-		if err := json.Unmarshal([]byte(addl_log_fields), &kvmap); err != nil {
-			logger.WithError(err).Warning("failed to unmarshal additional log fields -- ignoring")
-		} else {
-			kvmap["component"] = "hive"
-			logger = logger.WithFields(kvmap)
-		}
+	addl_log_fields, exists := annotations[constants.AdditionalLogFieldsAnnotation]
+	if !exists {
+		return nil, nil
 	}
 
+	kvmap := map[string]interface{}{}
+	if err := json.Unmarshal([]byte(addl_log_fields), &kvmap); err != nil {
+		return nil, err
+	}
+	// If the annotation is being used, we assume it is for log aggregation. Add our component name.
+	kvmap["component"] = "hive"
+	return kvmap, nil
+}
+
+func AddLogFields(obj metav1.Object, logger *log.Entry) *log.Entry {
+	switch kvmap, err := ExtractLogFields(obj); {
+	case err != nil:
+		logger.WithError(err).Warning("failed to extract additional log fields -- ignoring")
+	case kvmap != nil:
+		logger = logger.WithFields(log.Fields(kvmap))
+	}
 	return logger
 }
 

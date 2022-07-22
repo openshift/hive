@@ -64,6 +64,7 @@ import (
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool"
+	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/hive/pkg/resource"
@@ -1007,6 +1008,19 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 	r := bufio.NewReader(logfile)
 	fullLine := ""
 
+	// Set up additional log fields
+	suffix := ""
+	if fields, err := utils.ExtractLogFields(m.ClusterProvision); err != nil {
+		m.log.WithError(err).Warning("failed to extract additional log fields -- ignoring")
+	} else {
+		// We should get this with component=hive; override to indicate that the component
+		// being tagged now is the installer
+		fields["component"] = "installer"
+		for k, v := range fields {
+			suffix = suffix + fmt.Sprintf(" %s=%v", k, v)
+		}
+	}
+
 	// this loop will store up a full line worth of text into fullLine before
 	// passing through regex and then out to stdout
 	//
@@ -1033,9 +1047,9 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 
 		if scrubInstallLog {
 			cleanLine := cleanupLogOutput(fullLine)
-			fmt.Println(cleanLine)
+			fmt.Println(cleanLine + suffix)
 		} else {
-			fmt.Println(fullLine)
+			fmt.Println(fullLine + suffix)
 		}
 		// clear out the line buffer so we can start again
 		fullLine = ""
@@ -1077,6 +1091,7 @@ func (m *InstallManager) loadClusterProvision() error {
 		m.log.WithError(err).Error("error getting cluster provision")
 		return err
 	}
+	m.log = utils.AddLogFields(m.ClusterProvision, (m.log).(*log.Entry))
 	return nil
 }
 

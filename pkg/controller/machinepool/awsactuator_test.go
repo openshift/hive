@@ -327,6 +327,50 @@ func TestAWSActuator(t *testing.T) {
 			},
 		},
 		{
+			// Public subnets may be used exclusively when privatelink is enabled for ClusterDeployment.
+			name: "only public subnets (tagged as public 'kubernetes.io/role/elb' in AWS, no internet gateway), privateLink enabled",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				// Privatelink is enabled for the ClusterDeployment.
+				cd.Spec.Platform.AWS.PrivateLink = &awshivev1.PrivateLinkAccess{
+					Enabled: true,
+				}
+				return cd
+			}(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				// MachinePool has only public subnets.
+				pool.Spec.Platform.AWS.Subnets = []string{"pubSubnet-zone1", "pubSubnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				// AWS API returns the configured public subnets. Each public subnet returned will be tagged 'kubernetes.io/role/elb'.
+				mockDescribeSubnets(client, []string{"zone1", "zone2"},
+					[]string{}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"pubSubnet-zone1": false,
+					"pubSubnet-zone2": false,
+				}, "vpc-1")
+			},
+			// We expect this to be a valid configuration.
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
+				Status: corev1.ConditionFalse,
+				Reason: "ValidSubnets",
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 2,
+				generateAWSMachineSetName("zone2"): 1,
+			},
+			// MachineSets will have an explicit subnet ID.
+			expectedSubnetIDInMachineSet: true,
+			expectedAMI: &machineapi.AWSResourceReference{
+				ID: pointer.StringPtr(testAMI),
+			},
+		},
+		{
 			name:              "supported spot market options",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
 			machinePool:       withSpotMarketOptions(testMachinePool()),

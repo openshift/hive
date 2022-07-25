@@ -1792,7 +1792,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					cd.Status.Conditions = append(cd.Status.Conditions,
 						hivev1.ClusterDeploymentCondition{
-							Type:    "ClusterImageSetNotFound",
+							Type:    hivev1.ClusterImageSetNotFoundCondition,
 							Status:  corev1.ConditionFalse,
 							Reason:  clusterImageSetFoundReason,
 							Message: "test-message",
@@ -1805,9 +1805,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
-				// This is a hack to get Go to accept this arbitrary string as the proper type
-				dummy := hivev1.ClusterDeploymentCondition{Type: "ClusterImageSetNotFound"}
-				lc := controllerutils.FindCondition(cd.Status.Conditions, dummy.Type)
+				lc := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterImageSetNotFoundCondition)
 				assert.Nil(t, lc, "legacy condition was not cleared")
 			},
 		},

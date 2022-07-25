@@ -222,10 +222,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		// set hibernating condition to false for unsupported clouds
 		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported, msg,
 			corev1.ConditionFalse, cdLog)
-		rChanged := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonRunning, clusterRunningMsg,
-			corev1.ConditionTrue, cdLog)
-		if changed || rChanged {
-			cd.Status.PowerState = hivev1.ClusterPowerStateRunning
+		if changed {
 			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
 		}
 	} else if hibernatingCondition.Reason == hivev1.HibernatingReasonUnsupported {
@@ -910,9 +907,6 @@ func shouldStopMachines(cd *hivev1.ClusterDeployment, hibernatingCondition *hive
 // shouldStartMachines decides if machines should be started
 func shouldStartMachines(cd *hivev1.ClusterDeployment, hibernatingCondition *hivev1.ClusterDeploymentCondition,
 	readyCondition *hivev1.ClusterDeploymentCondition) bool {
-	if hibernatingCondition.Reason == hivev1.HibernatingReasonUnsupported {
-		return true
-	}
 	if cd.Spec.PowerState == hivev1.ClusterPowerStateHibernating {
 		return false
 	}

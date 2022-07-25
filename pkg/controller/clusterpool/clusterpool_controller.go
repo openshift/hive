@@ -299,6 +299,10 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
+	if p := clp.Spec.Platform; clp.Spec.RunningCount != clp.Spec.Size && (p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil) {
+		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt, unless runningCount==size")
+	}
+
 	// Initialize cluster pool conditions if not set
 	newConditions, changed := controllerutils.InitializeClusterPoolConditions(clp.Status.Conditions, clusterPoolConditions)
 	if changed {
@@ -973,6 +977,12 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 			return errors.Wrap(err, "could not delete ClusterDeployment")
 		}
 	}
+	cdcs, err := getAllCustomizationsForPool(r.Client, pool, logger)
+	if err != nil {
+		return err
+	}
+	// If CDC is shared by other clusterpool then the deletion should trigger other clusterpools to resolve any return the finalizer
+	cdcs.Release(pool)
 	// TODO: Wait to remove finalizer until all (unclaimed??) clusters are gone.
 	controllerutils.DeleteFinalizer(pool, finalizer)
 	if err := r.Update(context.Background(), pool); err != nil {
@@ -1175,7 +1185,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 			return nil, err
 		}
 
-		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret)
+		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret)
 		cloudBuilder.Datacenter = platform.VSphere.Datacenter
 		cloudBuilder.DefaultDatastore = platform.VSphere.DefaultDatastore
 		cloudBuilder.VCenter = platform.VSphere.VCenter

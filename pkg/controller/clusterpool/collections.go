@@ -662,10 +662,11 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 	for _, item := range pool.Spec.Inventory {
 		if cdc, ok := cdcCol.namespace[item.Name]; ok {
 			cdcCol.byCDCName[item.Name] = cdc
-			if cdRef := cdc.Status.ClusterDeploymentRef; cdRef == nil {
-				cdcCol.unassigned = append(cdcCol.unassigned, cdc)
-			} else {
+			availability := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+			if availability != nil && availability.Status == corev1.ConditionFalse {
 				cdcCol.reserved[item.Name] = cdc
+			} else {
+				cdcCol.unassigned = append(cdcCol.unassigned, cdc)
 			}
 			applyStatus := conditionsv1.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
 			if applyStatus == nil {
@@ -880,6 +881,14 @@ func (c *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
 	return c.unassigned
 }
 
+func (c *cdcCollection) Release(pool *hivev1.ClusterPool) {
+	for _, item := range pool.Spec.Inventory {
+		if cdc, ok := c.namespace[item.Name]; ok {
+			controllerutils.DeleteFinalizer(cdc, finalizer)
+		}
+	}
+}
+
 // SyncClusterDeploymentCustomizations updates CDCs and related CR status:
 // - Handle deletion of CDC in the namespace
 // - If there is no CD, but CDC is reserved, then we release the CDC
@@ -918,7 +927,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 
 	// If there is no CD, but CDC is reserved, then we release the CDC
 	for _, cdc := range cdcs.reserved {
-		if cds.ByName(cdc.Status.ClusterDeploymentRef.Name) == nil {
+		if ref := cdc.Status.ClusterDeploymentRef; ref == nil || cds.ByName(ref.Name) == nil {
 			if err := cdcs.Unassign(c, cdc); err != nil {
 				return err
 			}

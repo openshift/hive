@@ -118,7 +118,14 @@ func TestReconcile(t *testing.T) {
 					Message: "Unsupported version, need version 4.4.8 or greater"})).Build(),
 			cs: csBuilder.Build(),
 			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(false)
+				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
+			},
+			setupRemote: func(builder *remoteclientmock.MockBuilder) {
+				objs := []runtime.Object{}
+				objs = append(objs, readyNodes()...)
+				objs = append(objs, readyClusterOperators()...)
+				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
@@ -936,10 +943,10 @@ func TestReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockActuator := mock.NewMockHibernationActuator(ctrl)
+			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(true)
 			if test.setupActuator != nil {
 				test.setupActuator(mockActuator)
 			}
-			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(true)
 			mockBuilder := remoteclientmock.NewMockBuilder(ctrl)
 			if test.setupRemote != nil {
 				test.setupRemote(mockBuilder)

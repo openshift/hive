@@ -54,12 +54,14 @@ type VSphereCloudBuilder struct {
 	CACert []byte
 }
 
-func NewVSphereCloudBuilderFromSecret(credsSecret *corev1.Secret) *VSphereCloudBuilder {
+func NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret *corev1.Secret) *VSphereCloudBuilder {
 	username := credsSecret.Data[constants.UsernameSecretKey]
 	password := credsSecret.Data[constants.PasswordSecretKey]
+	cacert := certsSecret.Data[".cacert"]
 	return &VSphereCloudBuilder{
 		Username: string(username),
 		Password: string(password),
+		CACert:   cacert,
 	}
 }
 

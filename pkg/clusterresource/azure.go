@@ -17,7 +17,7 @@ import (
 
 const (
 	azureCredFile     = "osServicePrincipal.json"
-	azureInstanceType = "Standard_D2s_v3"
+	azureInstanceType = "Standard_D4s_v3"
 )
 
 var _ CloudBuilder = (*AzureCloudBuilder)(nil)

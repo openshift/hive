@@ -178,6 +178,12 @@ func (c *InstallConfig) IsOKD() bool {
 	return OKD
 }
 
+// IsSingleNodeOpenShift returns true if the install-config has been configured for
+// bootstrapInPlace
+func (c *InstallConfig) IsSingleNodeOpenShift() bool {
+	return c.BootstrapInPlace != nil
+}
+
 // Platform is the configuration for the specific platform upon which to perform
 // the installation. Only one of the platform configuration should be set.
 type Platform struct {
@@ -274,17 +280,18 @@ func (p *Platform) Name() string {
 
 // Networking defines the pod network provider in the cluster.
 type Networking struct {
-	// NetworkType is the type of network to install. The default is OpenShiftSDN
-	//
-	// +kubebuilder:default=OpenShiftSDN
+	// NetworkType is the type of network to install.
+	// The default value is OVNKubernetes for Single Node OpenShift
+	// and OpenShiftSDN for all other platforms.
 	// +optional
 	NetworkType string `json:"networkType,omitempty"`
 
 	// MachineNetwork is the list of IP address pools for machines.
 	// This field replaces MachineCIDR, and if set MachineCIDR must
 	// be empty or match the first entry in the list.
-	// Default is 10.0.0.0/16 for all platforms other than libvirt.
+	// Default is 10.0.0.0/16 for all platforms other than libvirt and Power VS.
 	// For libvirt, the default is 192.168.126.0/24.
+	// For Power VS, the default is 192.168.0.0/16.
 	//
 	// +optional
 	MachineNetwork []MachineNetworkEntry `json:"machineNetwork,omitempty"`

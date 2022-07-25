@@ -86,7 +86,11 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		}
 	}
 
-	var hyperVGen string
+	capabilities, err := a.client.GetVMCapabilities(context.TODO(), computePool.Platform.Azure.InstanceType, ic.Platform.Azure.Region)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "error retrieving VM capabilities")
+	}
+
 	if osImage := pool.Spec.Platform.Azure.OSImage; osImage != nil && osImage.Publisher != "" {
 		computePool.Platform.Azure.OSImage = installertypesazure.OSImage{
 			Publisher: osImage.Publisher,
@@ -101,17 +105,19 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		if err != nil {
 			return nil, false, err
 		}
-		if gen2ImageExists {
-			// Get HyperV Generation to provide to installer machineset generation. The HyperV Generation is germane to the instance/disk
-			// type and affects the image used for the instance. "-gen-2" will be appended to the image name when the
-			// hyperVGen == "V2".
-			hyperVGen, err = a.client.GetHyperVGenerationVersion(context.TODO(),
-				computePool.Platform.Azure.InstanceType,
-				computePool.Platform.Azure.OSDisk.DiskType,
-				cd.Spec.Platform.Azure.Region,
-			)
-			if err != nil {
-				return nil, false, err
+		if !gen2ImageExists {
+			// Modify capabilities to ensure that a V1 image is chosen by installazure.MachineSets()
+			// because a V2 image does not exist.
+			// The HyperVGeneration is germane to the instance/disk type and affects the image used
+			// for the instance. "-gen-2" will be appended to the image name by installazure.MachineSets()
+			// when the HyperVGenerations capability (comma separated list of HyperVGenerations) includes "V2".
+			//
+			// capabilities := map[string]string{
+			//   "HyperVGenerations": "V1,V2",
+			// }
+			//
+			if _, ok := capabilities["HyperVGenerations"]; ok {
+				capabilities["HyperVGenerations"] = "V1"
 			}
 		}
 	}
@@ -126,7 +132,6 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		}
 		computePool.Platform.Azure.Zones = zones
 	}
-
 	// The imageID parameter is not used. The image is determined by the infraID.
 	const imageID = ""
 
@@ -137,7 +142,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		imageID,
 		workerRole,
 		workerUserDataName,
-		hyperVGen,
+		capabilities,
 	)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/installer/pkg/types"
 	typesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 
+	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -75,21 +76,10 @@ func (o *vSphereOptions) Validate(cmd *cobra.Command) error {
 
 // Run executes the command
 func (o *vSphereOptions) Run() error {
-	// Set log level
-	level, err := log.ParseLevel(o.logLevel)
+	logger, err := utils.NewLogger(o.logLevel)
 	if err != nil {
-		log.WithError(err).Error("cannot parse log level")
 		return err
 	}
-
-	logger := log.NewEntry(&log.Logger{
-		Out: os.Stdout,
-		Formatter: &log.TextFormatter{
-			FullTimestamp: true,
-		},
-		Hooks: make(log.LevelHooks),
-		Level: level,
-	})
 
 	metadata := &types.ClusterMetadata{
 		InfraID: o.infraID,

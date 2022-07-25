@@ -71,3 +71,24 @@ func GetPullSecret(logger log.FieldLogger, pullSecret string, pullSecretFile str
 	}
 	return "", nil
 }
+
+func NewLogger(logLevel string) (*log.Entry, error) {
+
+	// Set log level
+	level, err := log.ParseLevel(logLevel)
+	if err != nil {
+		log.WithError(err).Error("cannot parse log level")
+		return nil, err
+	}
+
+	logger := log.NewEntry(&log.Logger{
+		Out: os.Stdout,
+		Formatter: &log.TextFormatter{
+			FullTimestamp: true,
+		},
+		Hooks: make(log.LevelHooks),
+		Level: level,
+	})
+
+	return logger, nil
+}

@@ -2,12 +2,12 @@ package deprovision
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/installer/pkg/destroy/aws"
 )
 
@@ -55,21 +55,10 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []s
 		o.Filters = append(o.Filters, filter)
 	}
 
-	// Set log level
-	level, err := log.ParseLevel(logLevel)
-	if err != nil {
-		log.WithError(err).Error("cannot parse log level")
+	var err error
+	if o.Logger, err = utils.NewLogger(logLevel); err != nil {
 		return err
 	}
-
-	o.Logger = log.NewEntry(&log.Logger{
-		Out: os.Stdout,
-		Formatter: &log.TextFormatter{
-			FullTimestamp: true,
-		},
-		Hooks: make(log.LevelHooks),
-		Level: level,
-	})
 
 	return nil
 }

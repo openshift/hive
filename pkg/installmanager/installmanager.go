@@ -208,21 +208,12 @@ func (m *InstallManager) Complete(args []string) error {
 	m.provisionCluster = provisionCluster
 	m.waitForProvisioningStage = waitForProvisioningStage
 
-	// Set log level
-	level, err := log.ParseLevel(m.LogLevel)
+	var err error
+	m.log, err = contributils.NewLogger(m.LogLevel)
 	if err != nil {
-		log.WithError(err).Error("cannot parse log level")
 		return err
 	}
 
-	m.log = log.NewEntry(&log.Logger{
-		Out: os.Stdout,
-		Formatter: &log.TextFormatter{
-			FullTimestamp: true,
-		},
-		Hooks: make(log.LevelHooks),
-		Level: level,
-	})
 	// Add an installID logger field with a randomly generated string to help with debugging across multiple
 	// install attempts in the namespace.
 	m.log = m.log.WithField("installID", utilrand.String(8))

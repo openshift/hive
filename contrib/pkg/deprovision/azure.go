@@ -1,8 +1,6 @@
 package deprovision
 
 import (
-	"os"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -12,6 +10,7 @@ import (
 	"github.com/openshift/installer/pkg/types"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 
+	"github.com/openshift/hive/contrib/pkg/utils"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 )
 
@@ -61,21 +60,10 @@ func validate() error {
 
 func completeAzureUninstaller(logLevel, cloudName string, args []string) (providers.Destroyer, error) {
 
-	// Set log level
-	level, err := log.ParseLevel(logLevel)
+	logger, err := utils.NewLogger(logLevel)
 	if err != nil {
-		log.WithError(err).Error("cannot parse log level")
 		return nil, err
 	}
-
-	logger := log.NewEntry(&log.Logger{
-		Out: os.Stdout,
-		Formatter: &log.TextFormatter{
-			FullTimestamp: true,
-		},
-		Hooks: make(log.LevelHooks),
-		Level: level,
-	})
 
 	metadata := &types.ClusterMetadata{
 		InfraID: args[0],

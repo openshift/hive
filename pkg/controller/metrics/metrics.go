@@ -323,7 +323,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 					// after nodes are ready, before we could query status of cluster operators
 					if readyCond.Reason == hivev1.ReadyReasonWaitingForClusterOperators {
 						logHistogramDurationMetric(MetricWaitingForCOClustersSeconds, &cd,
-							(time.Since(readyCond.LastTransitionTime.Time).Seconds())+
+							(time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())+
 								constants.ClusterOperatorSettlePause.Seconds())
 					}
 				}

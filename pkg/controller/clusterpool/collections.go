@@ -877,18 +877,24 @@ func (cdcs *cdcCollection) InstallationPending(c client.Client, cdc *hivev1.Clus
 	return nil
 }
 
-func (c *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
-	return c.unassigned
+func (cdcs *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
+	return cdcs.unassigned
 }
 
-func (c *cdcCollection) RemoveFinalizer(pool *hivev1.ClusterPool) {
+func (cdcs *cdcCollection) RemoveFinalizer(c client.Client, pool *hivev1.ClusterPool) error {
 	poolFinalizer := fmt.Sprintf("hive.openshift.io/%s", pool.Name)
 
 	for _, item := range pool.Spec.Inventory {
-		if cdc, ok := c.byCDCName[item.Name]; ok {
+		if cdc, ok := cdcs.namespace[item.Name]; ok {
 			controllerutils.DeleteFinalizer(cdc, poolFinalizer)
+			if err := c.Update(context.Background(), cdc); err != nil {
+				return err
+			}
+			cdcs.namespace[item.Name] = cdc
 		}
 	}
+
+	return nil
 }
 
 // SyncClusterDeploymentCustomizations updates CDCs and related CR status:

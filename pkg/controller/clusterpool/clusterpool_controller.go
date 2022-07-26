@@ -961,6 +961,16 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if !controllerutils.HasFinalizer(pool, finalizer) {
 		return nil
 	}
+
+	cdcs, err := getAllCustomizationsForPool(r.Client, pool, logger)
+	if err != nil {
+		return err
+	}
+
+	if err := cdcs.RemoveFinalizer(r.Client, pool); err != nil {
+		return err
+	}
+
 	// Don't care about the poolVersion here since we're deleting everything.
 	cds, err := getAllClusterDeploymentsForPool(r.Client, pool, "", logger)
 	if err != nil {
@@ -975,13 +985,6 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 			return errors.Wrap(err, "could not delete ClusterDeployment")
 		}
 	}
-
-	cdcs, err := getAllCustomizationsForPool(r.Client, pool, logger)
-	if err != nil {
-		return err
-	}
-
-	cdcs.RemoveFinalizer(pool)
 
 	// TODO: Wait to remove finalizer until all (unclaimed??) clusters are gone.
 	controllerutils.DeleteFinalizer(pool, finalizer)

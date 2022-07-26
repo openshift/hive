@@ -881,10 +881,12 @@ func (c *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
 	return c.unassigned
 }
 
-func (c *cdcCollection) Release(pool *hivev1.ClusterPool) {
+func (c *cdcCollection) RemoveFinalizer(pool *hivev1.ClusterPool) {
+	poolFinalizer := fmt.Sprintf("hive.openshift.io/clusterpools/%s", pool.Name)
+
 	for _, item := range pool.Spec.Inventory {
-		if cdc, ok := c.namespace[item.Name]; ok {
-			controllerutils.DeleteFinalizer(cdc, finalizer)
+		if cdc, ok := c.byCDCName[item.Name]; ok {
+			controllerutils.DeleteFinalizer(cdc, poolFinalizer)
 		}
 	}
 }
@@ -901,15 +903,17 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 		return nil
 	}
 
+	poolFinalizer := fmt.Sprintf("hive.openshift.io/clusterpools/%s", pool.Name)
+
 	// Handle deletion of CDC in the namespace
 	for _, cdc := range cdcs.namespace {
 		isDeleted := cdc.DeletionTimestamp != nil
-		hasFinalizer := controllerutils.HasFinalizer(cdc, finalizer)
+		hasFinalizer := controllerutils.HasFinalizer(cdc, poolFinalizer)
 		isAvailable := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
 		if isDeleted && (isAvailable == nil || isAvailable.Status != corev1.ConditionFalse) {
 			// We can delete the finalizer for a deleted CDC only if it is not reserved
 			if hasFinalizer {
-				controllerutils.DeleteFinalizer(cdc, finalizer)
+				controllerutils.DeleteFinalizer(cdc, poolFinalizer)
 				if err := c.Update(context.Background(), cdc); err != nil {
 					return err
 				}
@@ -917,7 +921,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 		} else {
 			// Ensure the finalizer is present if the CDC is not deleted, OR if it is reserved
 			if !hasFinalizer {
-				controllerutils.AddFinalizer(cdc, finalizer)
+				controllerutils.AddFinalizer(cdc, poolFinalizer)
 				if err := c.Update(context.Background(), cdc); err != nil {
 					return err
 				}

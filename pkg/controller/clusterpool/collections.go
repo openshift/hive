@@ -882,7 +882,7 @@ func (c *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
 }
 
 func (c *cdcCollection) RemoveFinalizer(pool *hivev1.ClusterPool) {
-	poolFinalizer := fmt.Sprintf("hive.openshift.io/clusterpools/%s", pool.Name)
+	poolFinalizer := fmt.Sprintf("hive.openshift.io/%s", pool.Name)
 
 	for _, item := range pool.Spec.Inventory {
 		if cdc, ok := c.byCDCName[item.Name]; ok {
@@ -903,7 +903,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 		return nil
 	}
 
-	poolFinalizer := fmt.Sprintf("hive.openshift.io/clusterpools/%s", pool.Name)
+	poolFinalizer := fmt.Sprintf("hive.openshift.io/%s", pool.Name)
 
 	// Handle deletion of CDC in the namespace
 	for _, cdc := range cdcs.namespace {

@@ -176,7 +176,7 @@ func (r *ReconcileClusterClaim) Reconcile(ctx context.Context, request reconcile
 		log.WithError(err).Error("error getting ClusterClaim")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(claim, logger)
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: claim}, logger)
 
 	// Initialize cluster claim conditions if not set
 	newConditions, changed := controllerutils.InitializeClusterClaimConditions(claim.Status.Conditions, clusterClaimConditions)

@@ -169,7 +169,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		rLog.WithError(err).Error("cannot get clusterdeprovision")
 		return reconcile.Result{}, err
 	}
-	rLog = utils.AddLogFields(instance, rLog)
+	rLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: instance}, rLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, rLog)

@@ -161,7 +161,7 @@ func (r *ReconcileClusterProvision) Reconcile(ctx context.Context, request recon
 		pLog.WithError(err).Error("cannot get ClusterProvision")
 		return reconcile.Result{}, err
 	}
-	pLog = utils.AddLogFields(instance, pLog)
+	pLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: instance}, pLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, pLog)

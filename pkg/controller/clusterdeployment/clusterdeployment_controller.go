@@ -300,7 +300,7 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 		cdLog.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(cd, cdLog)
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, r.logger)

@@ -157,7 +157,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(cd, cdLog)
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 	rContext.clusterDeployment = cd
 
 	// Initialize cluster deployment conditions if not present

@@ -137,7 +137,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(cd, cdLog)
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	// Initialize cluster deployment conditions if not present
 	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentUnreachableConditions)

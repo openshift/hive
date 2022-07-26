@@ -362,7 +362,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		log.WithError(err).Error("failed to get ClusterDeployment")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(cd, logger)
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, logger)
 
 	sts, err := r.getAndCheckClusterSyncStatefulSet(logger)
 	if err != nil {

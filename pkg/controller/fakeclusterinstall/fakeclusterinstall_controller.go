@@ -107,7 +107,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		logger.WithError(err).Error("Error getting FakeClusterInstall")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(fci, logger)
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: fci}, logger)
 
 	if !fci.DeletionTimestamp.IsZero() {
 		logger.Info("FakeClusterInstall resource has been deleted")

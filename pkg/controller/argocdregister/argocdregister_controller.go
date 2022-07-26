@@ -153,7 +153,7 @@ func (r *ArgoCDRegisterController) Reconcile(ctx context.Context, request reconc
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(cd, cdLog)
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	if !cd.Spec.Installed {
 		cdLog.Info("cluster installation is not complete")

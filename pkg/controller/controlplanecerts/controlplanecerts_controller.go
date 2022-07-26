@@ -143,7 +143,7 @@ func (r *ReconcileControlPlaneCerts) Reconcile(ctx context.Context, request reco
 		}
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(cd, cdLog)
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	// Initialize cluster deployment conditions if not present
 	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentControlPlaneCertsConditions)

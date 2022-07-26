@@ -155,7 +155,7 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
-	dnsLog = utils.AddLogFields(desiredState, dnsLog)
+	dnsLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: desiredState}, dnsLog)
 
 	// NOTE: Can race with call to same in dnsendpoint controller
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {

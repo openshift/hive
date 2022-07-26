@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -89,6 +91,9 @@ func NewLogger(logLevel string) (*log.Entry, error) {
 		Hooks: make(log.LevelHooks),
 		Level: level,
 	})
+
+	// Decorate with additional log fields, if requested
+	logger = utils.AddLogFields(utils.StringLogTagger{S: os.Getenv(constants.AdditionalLogFieldsEnvVar)}, logger)
 
 	return logger, nil
 }

@@ -1001,7 +1001,7 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 
 	// Set up additional log fields
 	suffix := ""
-	if fields, err := utils.ExtractLogFields(m.ClusterProvision); err != nil {
+	if fields, err := utils.ExtractLogFields(utils.MetaObjectLogTagger{Object: m.ClusterProvision}); err != nil {
 		m.log.WithError(err).Warning("failed to extract additional log fields -- ignoring")
 	} else {
 		// We should get this with component=hive; override to indicate that the component
@@ -1082,7 +1082,7 @@ func (m *InstallManager) loadClusterProvision() error {
 		m.log.WithError(err).Error("error getting cluster provision")
 		return err
 	}
-	m.log = utils.AddLogFields(m.ClusterProvision, (m.log).(*log.Entry))
+	m.log = utils.AddLogFields(utils.MetaObjectLogTagger{Object: m.ClusterProvision}, (m.log).(*log.Entry))
 	return nil
 }
 

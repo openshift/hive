@@ -175,7 +175,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
-	dnsLog = utils.AddLogFields(instance, dnsLog)
+	dnsLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: instance}, dnsLog)
 
 	if !instance.Spec.LinkToParentDomain {
 		return reconcile.Result{}, nil

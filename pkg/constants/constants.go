@@ -431,6 +431,11 @@ const (
 	// nonempty, and parseable into such a map, the key/value pairs are blindly included in log lines for any controller
 	// dealing with the annotated object.
 	AdditionalLogFieldsAnnotation = "hive.openshift.io/additional-log-fields"
+
+	// AdditionalLogFieldsEnvVar, if present, contains a string comprising a JSON-encoded map of key/value pairs. If specified,
+	// nonempty, and parseable into such a map, the key/value pairs are blindly included in log lines from hive binaries
+	// (currently only hiveutil).
+	AdditionalLogFieldsEnvVar = "HIVE_ADDITIONAL_LOG_FIELDS"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

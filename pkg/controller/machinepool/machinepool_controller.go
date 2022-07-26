@@ -222,7 +222,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 	// NOTE: This may be sparse if we haven't yet synced from the ClusterDeployment (below)
-	logger = utils.AddLogFields(pool, logger)
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: pool}, logger)
 
 	// Initialize machine pool conditions if not present
 	newConditions, changed := controllerutils.InitializeMachinePoolConditions(pool.Status.Conditions, machinePoolConditions)

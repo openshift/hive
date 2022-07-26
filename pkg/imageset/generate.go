@@ -3,6 +3,7 @@ package imageset
 import (
 	"time"
 
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 
@@ -121,6 +122,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 			},
 		},
 	}
+	utils.AddLogFieldsEnvVar(cd, job)
 
 	return job
 }

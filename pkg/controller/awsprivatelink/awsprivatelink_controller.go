@@ -172,7 +172,7 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 		logger.WithError(err).Error("error getting ClusterDeployment")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(cd, logger)
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, logger)
 
 	// Initialize cluster deployment conditions if not present
 	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentAWSPrivateLinkConditions)

@@ -175,7 +175,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(cd, cdLog)
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	// If cluster is already deleted, skip any processing
 	if !cd.DeletionTimestamp.IsZero() {

@@ -193,7 +193,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(ctx context.Context, request 
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-	contextLogger = utils.AddLogFields(cd, contextLogger)
+	contextLogger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, contextLogger)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, contextLogger)

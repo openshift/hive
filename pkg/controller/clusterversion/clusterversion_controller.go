@@ -111,7 +111,7 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(cd, cdLog)
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
 		return reconcile.Result{}, nil

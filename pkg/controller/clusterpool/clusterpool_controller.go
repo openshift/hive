@@ -299,7 +299,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		log.WithError(err).Error("error reading cluster pool")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(clp, logger)
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: clp}, logger)
 
 	if p := clp.Spec.Platform; clp.Spec.RunningCount != clp.Spec.Size && (p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil) {
 		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt, unless runningCount==size")

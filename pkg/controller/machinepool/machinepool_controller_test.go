@@ -498,6 +498,115 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Update cluster autoscaler when BalanceSimilarNodeGroups was unset",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testAutoscalingMachinePool(3, 5),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				func() runtime.Object {
+					a := testClusterAutoscaler("1")
+					a.Spec.BalanceSimilarNodeGroups = nil
+					return a
+				}(),
+				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
+				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			expectedRemoteClusterAutoscalers: []autoscalingv1.ClusterAutoscaler{
+				*testClusterAutoscaler("2"),
+			},
+		},
+		{
+			name:              "Don't update cluster autoscaler when BalanceSimilarNodeGroups was explicitly disabled",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testAutoscalingMachinePool(3, 5),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				func() runtime.Object {
+					a := testClusterAutoscaler("1")
+					a.Spec.BalanceSimilarNodeGroups = pointer.BoolPtr(false)
+					return a
+				}(),
+				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
+				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			expectedRemoteClusterAutoscalers: func() []autoscalingv1.ClusterAutoscaler {
+				a := testClusterAutoscaler("1")
+				a.Spec.BalanceSimilarNodeGroups = pointer.BoolPtr(false)
+				return []autoscalingv1.ClusterAutoscaler{*a}
+			}(),
+		},
+		{
+			name:              "Don't update cluster autoscaler when BalanceSimilarNodeGroups was already enabled",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testAutoscalingMachinePool(3, 5),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testClusterAutoscaler("1"),
+				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
+				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			expectedRemoteClusterAutoscalers: []autoscalingv1.ClusterAutoscaler{
+				*testClusterAutoscaler("1"),
+			},
+		},
+		{
 			name:              "Create machine autoscalers",
 			clusterDeployment: testClusterDeployment(),
 			machinePool:       testAutoscalingMachinePool(3, 5),
@@ -1070,6 +1179,7 @@ func testClusterAutoscaler(resourceVersion string) *autoscalingv1.ClusterAutosca
 			ScaleDown: &autoscalingv1.ScaleDownConfig{
 				Enabled: true,
 			},
+			BalanceSimilarNodeGroups: pointer.BoolPtr(true),
 		},
 	}
 }

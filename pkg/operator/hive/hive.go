@@ -553,6 +553,7 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 // reconcileMonitoring switches metrics exporting on or off, according to HiveConfig.Spec.ExportMetrics
 func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) error {
 	patchFmt := `{"metadata": {"labels": {"openshift.io/cluster-monitoring": %s}}}`
+	enable := instance.Spec.ExportMetrics
 
 	// Clean up previous target namespaces
 	for _, ns := range namespacesToClean {
@@ -568,12 +569,18 @@ func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resour
 		hLog.Infof("Disabling metrics reporting for old target namespace %s", ns)
 		if err := h.Patch(types.NamespacedName{Name: ns}, "Namespace", "v1", []byte(fmt.Sprintf(patchFmt, "null")), ""); err != nil {
 			hLog.WithError(err).Errorf("error disabling metrics reporting for old target namespace %s", ns)
-			return err
+			// The servicemonitor is a coreos kind, and thus only available in OpenShift deployments. If monitoring
+			// is enabled, we need it; so let any error ride. However, if monitoring is disabled and the error is
+			// "no such CRD", we can ignore it -- there's nothing to delete, and we don't need the asset anyway.
+			if !enable && util.IsNoSuchCRD(err) {
+				hLog.Debug("Ignoring 'no such CRD' error for non-OpenShift deployment with monitoring disabled.")
+			} else {
+				return err
+			}
 		}
 	}
 
 	hiveNSName := getHiveNamespace(instance)
-	enable := instance.Spec.ExportMetrics
 
 	var labelVal, metricsAction, resourceVerbing, resourceVerbed string
 	var kubeFunc func(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error
@@ -605,7 +612,14 @@ func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resour
 	for _, assetPath := range monitoringNamespacedAssets {
 		if err := kubeFunc(h, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Errorf("error %s object with namespace override", resourceVerbing)
-			return err
+			// The servicemonitor is a coreos kind, and thus only available in OpenShift deployments. If monitoring
+			// is enabled, we need it; so let any error ride. However, if monitoring is disabled and the error is
+			// "no such CRD", we can ignore it -- there's nothing to delete, and we don't need the asset anyway.
+			if !enable && util.IsNoSuchCRD(err) {
+				hLog.Debug("Ignoring 'no such CRD' error for non-OpenShift deployment with monitoring disabled.")
+			} else {
+				return err
+			}
 		}
 		hLog.WithField("asset", assetPath).Infof("%s asset with namespace override", resourceVerbed)
 	}

@@ -1,6 +1,8 @@
 package util
 
 import (
+	"strings"
+
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -133,4 +135,15 @@ func readRuntimeObject(assetPath string) (runtime.Object, error) {
 	obj, _, err := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().
 		Decode(assets.MustAsset(assetPath), nil, nil)
 	return obj, err
+}
+
+// IsNoSuchCRD inspects an error and determines whether it is similar to this:
+// "could not get mapping: no matches for kind \"ServiceMonitor\" in version \"monitoring.coreos.com/v1\""
+// In certain circumstances -- e.g. deploying hive on non-openshift with monitoring disabled -- these
+// errors may be spurious and ignorable.
+func IsNoSuchCRD(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "no matches for kind")
 }

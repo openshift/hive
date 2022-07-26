@@ -11,18 +11,23 @@ type Op string
 
 // Ops
 const (
-	opAdd     Op = "add"
-	opRemove  Op = "remove"
-	opReplace Op = "replace"
-	opMove    Op = "move"
-	opCopy    Op = "copy"
-	opTest    Op = "test"
+	OpAdd     Op = "add"
+	OpRemove  Op = "remove"
+	OpReplace Op = "replace"
+	OpMove    Op = "move"
+	OpCopy    Op = "copy"
+	OpTest    Op = "test"
+)
+
+const (
+	rootPath = "/"
 )
 
 // OpPath is an RFC6902 'pointer'
 type OpPath string
 
 // Decompose returns the pointer's components:
+// "/" => [], ""
 // "/foo" => [], "foo"
 // "/foo/1" => ["foo"], "1"
 // "/foo/1/bar" => ["foo", "1"], "bar"
@@ -64,17 +69,17 @@ func (o *Operation) Perform(c Container) error {
 	var err error
 
 	switch o.Op {
-	case opAdd:
+	case OpAdd:
 		err = tryAdd(c, o)
-	case opRemove:
+	case OpRemove:
 		err = tryRemove(c, o)
-	case opReplace:
+	case OpReplace:
 		err = tryReplace(c, o)
-	case opMove:
+	case OpMove:
 		err = tryMove(c, o)
-	case opCopy:
+	case OpCopy:
 		err = tryCopy(c, o)
-	case opTest:
+	case OpTest:
 		err = tryTest(c, o)
 	default:
 		err = fmt.Errorf("Unexpected op: %s", o.Op)
@@ -84,6 +89,10 @@ func (o *Operation) Perform(c Container) error {
 }
 
 func tryAdd(doc Container, op *Operation) error {
+	if op.Path == rootPath {
+		return doc.Add("", op.Value)
+	}
+
 	con, key, err := findContainer(doc, &op.Path)
 	if err != nil {
 		return fmt.Errorf("yamlpatch add operation does not apply: doc is missing path: %s", op.Path)
@@ -169,7 +178,7 @@ func tryTest(doc Container, op *Operation) error {
 		return err
 	}
 
-	if op.Value.Empty() && val == nil {
+	if op.Value == nil && val.Empty() {
 		return nil
 	}
 

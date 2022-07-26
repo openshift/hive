@@ -507,10 +507,8 @@ func (r *ReconcileClusterPool) reconcileRunningClusters(
 	)
 	for i := 0; i < len(cdList); i++ {
 		cd := cdList[i]
-		hibernateCondition := controllerutils.FindClusterDeploymentCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
-		hibernateUnsupported := hibernateCondition != nil && hibernateCondition.Reason == hivev1.HibernatingReasonUnsupported
 		var desiredPowerState hivev1.ClusterPowerState
-		if i < runningCount || hibernateUnsupported {
+		if i < runningCount {
 			desiredPowerState = hivev1.ClusterPowerStateRunning
 		} else {
 			desiredPowerState = hivev1.ClusterPowerStateHibernating

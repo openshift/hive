@@ -681,7 +681,7 @@ github.com/kisielk/gotool
 github.com/kisielk/gotool/internal/load
 # github.com/kr/pty v1.1.8
 ## explicit; go 1.12
-# github.com/krishicks/yaml-patch v0.0.10
+# github.com/krishicks/yaml-patch v0.0.11-0.20201210192933-7cea92d7f43e
 ## explicit
 github.com/krishicks/yaml-patch
 # github.com/kulti/thelper v0.4.0

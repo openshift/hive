@@ -148,6 +148,12 @@ NOTE: If you are running on Kubernetes or kind, (not OpenShift), you will also n
 ./hack/hiveadmission-dev-cert.sh
 ```
 
+NOTE: If you are running on Kubernetes or kind >= version 1.24, (not OpenShift), you will also need to create secrets for serviceaccounts after running make deploy for the first time:
+
+```bash
+./hack/create-service-account-secrets.sh
+```
+
 ### Fedora Development Container Build
 
 This approach is much faster than a full container build as it uses a base OS image, and binaries compiled on your host OS and then added to the container. *At present this is best suited for Fedora 33+.*

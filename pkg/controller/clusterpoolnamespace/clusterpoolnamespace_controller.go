@@ -59,7 +59,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		fmt.Sprintf("%s-controller", ControllerName),
 		mgr,
 		controller.Options{
-			Reconciler:              r,
+			Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
 			MaxConcurrentReconciles: concurrentReconciles,
 			RateLimiter:             rateLimiter,
 		},

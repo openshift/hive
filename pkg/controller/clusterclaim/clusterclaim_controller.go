@@ -65,7 +65,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *Re
 func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
 	c, err := controller.New("clusterclaim-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, r.logger),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})

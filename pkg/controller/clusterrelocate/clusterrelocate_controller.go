@@ -87,7 +87,7 @@ func Add(mgr manager.Manager) error {
 	}
 
 	c, err := controller.New("clusterrelocate-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, r.logger),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             queueRateLimiter,
 	})

@@ -134,7 +134,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *hi
 // AddToManager adds a new Controller to the controller manager
 func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	c, err := controller.New("hibernation-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})

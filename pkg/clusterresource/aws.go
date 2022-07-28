@@ -17,9 +17,8 @@ import (
 
 const (
 	awsInstanceType = "m4.xlarge"
-	volumeIOPS      = 100
 	volumeSize      = 22
-	volumeType      = "gp3"
+	volumeType      = "gp2"
 )
 
 var _ CloudBuilder = (*AWSCloudBuilder)(nil)
@@ -99,7 +98,6 @@ func (p *AWSCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachineP
 	mp.Spec.Platform.AWS = &hivev1aws.MachinePoolPlatform{
 		InstanceType: awsInstanceType,
 		EC2RootVolume: hivev1aws.EC2RootVolume{
-			IOPS: volumeIOPS,
 			Size: volumeSize,
 			Type: volumeType,
 		},
@@ -119,7 +117,6 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 	mpp := &awsinstallertypes.MachinePool{
 		InstanceType: awsInstanceType,
 		EC2RootVolume: awsinstallertypes.EC2RootVolume{
-			IOPS: volumeIOPS,
 			Size: volumeSize,
 			Type: volumeType,
 		},

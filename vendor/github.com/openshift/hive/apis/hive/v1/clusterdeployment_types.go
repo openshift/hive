@@ -465,6 +465,10 @@ const (
 	ClusterInstallCompletedClusterDeploymentCondition       ClusterDeploymentConditionType = "ClusterInstallCompleted"
 	ClusterInstallStoppedClusterDeploymentCondition         ClusterDeploymentConditionType = "ClusterInstallStopped"
 	ClusterInstallRequirementsMetClusterDeploymentCondition ClusterDeploymentConditionType = "ClusterInstallRequirementsMet"
+
+	// ClusterImageSetNotFoundCondition is a legacy condition type that is not intended to be used
+	// in production.  This type is never used by hive.
+	ClusterImageSetNotFoundCondition ClusterDeploymentConditionType = "ClusterImageSetNotFound"
 )
 
 // PositivePolarityClusterDeploymentConditions is a slice containing all condition types with positive polarity

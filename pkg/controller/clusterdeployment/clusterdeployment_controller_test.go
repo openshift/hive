@@ -2130,6 +2130,32 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "ProvisionStopped already",
+			existing: []runtime.Object{
+				testInstallConfigSecret(),
+				func() runtime.Object {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+					})
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+					},
+				})
+			},
+		},
+		{
 			name: "install attempts is equal to the limit",
 			existing: []runtime.Object{
 				testInstallConfigSecret(),

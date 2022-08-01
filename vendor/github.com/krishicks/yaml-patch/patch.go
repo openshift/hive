@@ -1,7 +1,9 @@
 package yamlpatch
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -23,38 +25,59 @@ func DecodePatch(bs []byte) (Patch, error) {
 
 // Apply returns a YAML document that has been mutated per the patch
 func (p Patch) Apply(doc []byte) ([]byte, error) {
-	var iface interface{}
-	err := yaml.Unmarshal(doc, &iface)
-	if err != nil {
-		return nil, fmt.Errorf("failed unmarshaling doc: %s\n\n%s", string(doc), err)
-	}
+	decoder := yaml.NewDecoder(bytes.NewReader(doc))
+	buf := bytes.NewBuffer([]byte{})
+	encoder := yaml.NewEncoder(buf)
 
-	var c Container
-	c = NewNode(&iface).Container()
-
-	for _, op := range p {
-		pathfinder := NewPathFinder(c)
-		if op.Path.ContainsExtendedSyntax() {
-			paths := pathfinder.Find(string(op.Path))
-			if paths == nil {
-				return nil, fmt.Errorf("could not expand pointer: %s", op.Path)
+	for {
+		var iface interface{}
+		err := decoder.Decode(&iface)
+		if err != nil {
+			if err == io.EOF {
+				break
 			}
 
-			for _, path := range paths {
-				newOp := op
-				newOp.Path = OpPath(path)
-				err = newOp.Perform(c)
+			return nil, fmt.Errorf("failed to decode doc: %s\n\n%s", string(doc), err)
+		}
+
+		var c Container
+		c = NewNode(&iface).Container()
+
+		for _, op := range p {
+			pathfinder := NewPathFinder(c)
+			if op.Path.ContainsExtendedSyntax() {
+				paths := pathfinder.Find(string(op.Path))
+				if paths == nil {
+					return nil, fmt.Errorf("could not expand pointer: %s", op.Path)
+				}
+
+				for i := len(paths) - 1; i >= 0; i-- {
+					path := paths[i]
+					newOp := op
+					newOp.Path = OpPath(path)
+					err := newOp.Perform(c)
+					if err != nil {
+						return nil, err
+					}
+				}
+			} else {
+				err := op.Perform(c)
 				if err != nil {
 					return nil, err
 				}
 			}
-		} else {
-			err = op.Perform(c)
-			if err != nil {
-				return nil, err
-			}
+		}
+
+		err = encoder.Encode(c)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode container: %s", err)
 		}
 	}
 
-	return yaml.Marshal(c)
+	err := encoder.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }

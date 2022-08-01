@@ -26,6 +26,14 @@ type ClusterDeploymentListerExpansion interface{}
 // ClusterDeploymentNamespaceLister.
 type ClusterDeploymentNamespaceListerExpansion interface{}
 
+// ClusterDeploymentCustomizationListerExpansion allows custom methods to be added to
+// ClusterDeploymentCustomizationLister.
+type ClusterDeploymentCustomizationListerExpansion interface{}
+
+// ClusterDeploymentCustomizationNamespaceListerExpansion allows custom methods to be added to
+// ClusterDeploymentCustomizationNamespaceLister.
+type ClusterDeploymentCustomizationNamespaceListerExpansion interface{}
+
 // ClusterDeprovisionListerExpansion allows custom methods to be added to
 // ClusterDeprovisionLister.
 type ClusterDeprovisionListerExpansion interface{}

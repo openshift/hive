@@ -92,6 +92,11 @@ type ClusterPoolSpec struct {
 	// HibernationConfig configures the hibernation/resume behavior of ClusterDeployments owned by the ClusterPool.
 	// +optional
 	HibernationConfig *HibernationConfig `json:"hibernationConfig"`
+
+	// Inventory maintains a list of entries consumed by the ClusterPool
+	// to customize the default ClusterDeployment.
+	// +optional
+	Inventory []InventoryEntry `json:"inventory,omitempty"`
 }
 
 type HibernationConfig struct {
@@ -108,6 +113,22 @@ type HibernationConfig struct {
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	ResumeTimeout metav1.Duration `json:"resumeTimeout"`
+}
+
+// InventoryEntryKind is the Kind of the inventory entry.
+// +kubebuilder:validation:Enum="";ClusterDeploymentCustomization
+type InventoryEntryKind string
+
+const ClusterDeploymentCustomizationInventoryEntry InventoryEntryKind = "ClusterDeploymentCustomization"
+
+// InventoryEntry maintains a reference to a custom resource consumed by a clusterpool to customize the cluster deployment.
+type InventoryEntry struct {
+	// Kind denotes the kind of the referenced resource. The default is ClusterDeploymentCustomization, which is also currently the only supported value.
+	// +kubebuilder:default=ClusterDeploymentCustomization
+	Kind InventoryEntryKind `json:"kind,omitempty"`
+	// Name is the name of the referenced resource.
+	// +required
+	Name string `json:"name,omitempty"`
 }
 
 // ClusterPoolClaimLifetime defines the lifetimes for claims for the cluster pool.
@@ -197,6 +218,17 @@ const (
 	// ClusterPoolAllClustersCurrentCondition indicates whether all unassigned (installing or ready)
 	// ClusterDeployments in the pool match the current configuration of the ClusterPool.
 	ClusterPoolAllClustersCurrentCondition ClusterPoolConditionType = "AllClustersCurrent"
+	// ClusterPoolInventoryValidCondition is set to provide information on whether the cluster pool inventory is valid
+	ClusterPoolInventoryValidCondition ClusterPoolConditionType = "InventoryValid"
+)
+
+const (
+	// InventoryReasonValid is used when all ClusterDeploymentCustomization are
+	// available and when used the ClusterDeployments are successfully installed.
+	InventoryReasonValid = "Valid"
+	// InventoryReasonInvalid is used when there is something wrong with ClusterDeploymentCustomization, for example
+	// patching issue, provisioning failure, missing, etc.
+	InventoryReasonInvalid = "Invalid"
 )
 
 // +genclient

@@ -8,6 +8,8 @@ type ClusterClaimExpansion interface{}
 
 type ClusterDeploymentExpansion interface{}
 
+type ClusterDeploymentCustomizationExpansion interface{}
+
 type ClusterDeprovisionExpansion interface{}
 
 type ClusterImageSetExpansion interface{}

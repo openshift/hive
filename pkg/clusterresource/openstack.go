@@ -43,6 +43,13 @@ type OpenStackCloudBuilder struct {
 	MasterFlavor string
 }
 
+func NewOpenStackCloudBuilderFromSecret(credsSecret *corev1.Secret) *OpenStackCloudBuilder {
+	cloudsYamlContent := credsSecret.Data[constants.OpenStackCredentialsName]
+	return &OpenStackCloudBuilder{
+		CloudsYAMLContent: cloudsYamlContent,
+	}
+}
+
 func (p *OpenStackCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

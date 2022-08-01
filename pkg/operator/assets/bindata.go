@@ -1125,6 +1125,7 @@ rules:
   - syncsets
   - syncsetinstances
   - clusterdeprovisions
+  - clusterdeploymentcustomizations
   # TODO: remove once v1alpha1 compat removed
   - clusterdeprovisionrequests
   - clusterstates
@@ -1139,6 +1140,7 @@ rules:
   - hiveconfigs
   - selectorsyncsets
   - selectorsyncidentityproviders
+  - clusterdeploymentcustomizations
   verbs:
   - get
   - list
@@ -1508,6 +1510,7 @@ rules:
   - syncsets
   - syncsetinstances
   - clusterdeprovisions
+  - clusterdeploymentcustomizations
   # TODO: remove once v1alpha1 compat removed
   - clusterdeprovisionrequests
   - clusterstates

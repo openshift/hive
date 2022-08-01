@@ -187,6 +187,16 @@ spec:
                       belonging to ClusterPools.
                     format: date-time
                     type: string
+                  clusterDeploymentCustomization:
+                    description: CustomizationRef is the ClusterPool Inventory claimed
+                      customization for this ClusterDeployment. The Customization
+                      exists in the ClusterPool namespace.
+                    properties:
+                      name:
+                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        type: string
+                    type: object
                   namespace:
                     description: Namespace is the namespace where the ClusterPool
                       resides.

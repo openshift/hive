@@ -1,0 +1,135 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.0
+  creationTimestamp: null
+  name: clusterdeploymentcustomizations.hive.openshift.io
+spec:
+  group: hive.openshift.io
+  names:
+    kind: ClusterDeploymentCustomization
+    listKind: ClusterDeploymentCustomizationList
+    plural: clusterdeploymentcustomizations
+    singular: clusterdeploymentcustomization
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ClusterDeploymentCustomization is the Schema for clusterdeploymentcustomizations
+          API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ClusterDeploymentCustomizationSpec defines the desired state
+              of ClusterDeploymentCustomization.
+            properties:
+              installConfigPatches:
+                description: InstallConfigPatches is a list of patches to be applied
+                  to the install-config.
+                items:
+                  description: PatchEntity represent a json patch (RFC 6902) to be
+                    applied to the install-config
+                  properties:
+                    from:
+                      description: From is the json path to copy or move the value
+                        from
+                      type: string
+                    op:
+                      description: 'Op is the operation to perform: add, remove, replace,
+                        move, copy, test'
+                      type: string
+                    path:
+                      description: Path is the json path to the value to be modified
+                      type: string
+                    value:
+                      description: Value is the value to be used in the operation
+                      type: string
+                  required:
+                  - op
+                  - path
+                  - value
+                  type: object
+                type: array
+            type: object
+          status:
+            description: ClusterDeploymentCustomizationStatus defines the observed
+              state of ClusterDeploymentCustomization.
+            properties:
+              clusterDeploymentRef:
+                description: ClusterDeploymentRef is a reference to the cluster deployment
+                  that this customization is applied on.
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
+              clusterPoolRef:
+                description: ClusterPoolRef is the name of the current cluster pool
+                  the CDC used at.
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
+              conditions:
+                description: Conditions describes the state of the operator's reconciliation
+                  functionality.
+                items:
+                  description: Condition represents the state of the operator's reconciliation
+                    functionality.
+                  properties:
+                    lastHeartbeatTime:
+                      format: date-time
+                      type: string
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      description: ConditionType is the state of the operator's reconciliation
+                        functionality.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastAppliedConfiguration:
+                description: LastAppliedConfiguration contains the last applied patches
+                  to the install-config. The information will retain for reference
+                  in case the customization is updated.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

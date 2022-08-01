@@ -1,2 +1,3 @@
 GitPython
 PyYAML>=6.0
+yq>=4.0

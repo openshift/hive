@@ -184,3 +184,17 @@ func WithRunningCount(size int) Option {
 		clusterPool.Spec.RunningCount = int32(size)
 	}
 }
+
+func WithInventory(cdcs []string) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		if len(cdcs) == 0 {
+			clusterPool.Spec.Inventory = nil
+		} else {
+			inventory := []hivev1.InventoryEntry{}
+			for _, cdc := range cdcs {
+				inventory = append(inventory, hivev1.InventoryEntry{Name: cdc})
+			}
+			clusterPool.Spec.Inventory = inventory
+		}
+	}
+}

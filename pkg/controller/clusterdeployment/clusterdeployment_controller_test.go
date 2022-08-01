@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/openpgp"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 
@@ -115,6 +116,15 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, cd)
 		if err == nil {
 			return cd
+		}
+		return nil
+	}
+
+	getCDC := func(c client.Client) *hivev1.ClusterDeploymentCustomization {
+		cdc := &hivev1.ClusterDeploymentCustomization{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: testName, Namespace: testNamespace}, cdc)
+		if err == nil {
+			return cdc
 		}
 		return nil
 	}
@@ -1875,6 +1885,36 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "release customization on deprovision",
+			existing: []runtime.Object{
+				testClusterDeploymentCustomization(testName),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.Installed = true
+					cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+						Namespace:        testNamespace,
+						CustomizationRef: &corev1.LocalObjectReference{Name: testName},
+					}
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testclusterdeprovision.Build(
+					testclusterdeprovision.WithNamespace(testNamespace),
+					testclusterdeprovision.WithName(testName),
+					testclusterdeprovision.Completed(),
+				),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				testassert.AssertCDCConditions(t, getCDC(c), []conditionsv1.Condition{{
+					Type:    conditionsv1.ConditionAvailable,
+					Status:  corev1.ConditionTrue,
+					Reason:  "Available",
+					Message: "available",
+				}})
+			},
+		},
+		{
 			name: "deprovision finished",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -3209,6 +3249,13 @@ func testClusterDeploymentWithInitializedConditions(cd *hivev1.ClusterDeployment
 		})
 	}
 	return cd
+}
+
+func testClusterDeploymentCustomization(name string) *hivev1.ClusterDeploymentCustomization {
+	cdc := &hivev1.ClusterDeploymentCustomization{}
+	cdc.Name = name
+	cdc.Namespace = testNamespace
+	return cdc
 }
 
 func testInstalledClusterDeployment(installedAt time.Time) *hivev1.ClusterDeployment {

@@ -152,6 +152,27 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+              inventory:
+                description: Inventory maintains a list of entries consumed by the
+                  ClusterPool to customize the default ClusterDeployment.
+                items:
+                  description: InventoryEntry maintains a reference to a custom resource
+                    consumed by a clusterpool to customize the cluster deployment.
+                  properties:
+                    kind:
+                      default: ClusterDeploymentCustomization
+                      description: Kind denotes the kind of the referenced resource.
+                        The default is ClusterDeploymentCustomization, which is also
+                        currently the only supported value.
+                      enum:
+                      - ""
+                      - ClusterDeploymentCustomization
+                      type: string
+                    name:
+                      description: Name is the name of the referenced resource.
+                      type: string
+                  type: object
+                type: array
               labels:
                 additionalProperties:
                   type: string

@@ -30,6 +30,7 @@ func main() {
 		hivevalidatingwebhooks.NewMachinePoolValidatingAdmissionHook(decoder),
 		hivevalidatingwebhooks.NewSyncSetValidatingAdmissionHook(decoder),
 		hivevalidatingwebhooks.NewSelectorSyncSetValidatingAdmissionHook(decoder),
+		hivevalidatingwebhooks.NewClusterDeploymentCustomizationValidatingAdmissionHook(decoder),
 	)
 }
 

@@ -14,6 +14,8 @@ type Interface interface {
 	ClusterClaims() ClusterClaimInformer
 	// ClusterDeployments returns a ClusterDeploymentInformer.
 	ClusterDeployments() ClusterDeploymentInformer
+	// ClusterDeploymentCustomizations returns a ClusterDeploymentCustomizationInformer.
+	ClusterDeploymentCustomizations() ClusterDeploymentCustomizationInformer
 	// ClusterDeprovisions returns a ClusterDeprovisionInformer.
 	ClusterDeprovisions() ClusterDeprovisionInformer
 	// ClusterImageSets returns a ClusterImageSetInformer.
@@ -68,6 +70,11 @@ func (v *version) ClusterClaims() ClusterClaimInformer {
 // ClusterDeployments returns a ClusterDeploymentInformer.
 func (v *version) ClusterDeployments() ClusterDeploymentInformer {
 	return &clusterDeploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ClusterDeploymentCustomizations returns a ClusterDeploymentCustomizationInformer.
+func (v *version) ClusterDeploymentCustomizations() ClusterDeploymentCustomizationInformer {
+	return &clusterDeploymentCustomizationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ClusterDeprovisions returns a ClusterDeprovisionInformer.

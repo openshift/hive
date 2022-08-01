@@ -681,7 +681,7 @@ github.com/kisielk/gotool
 github.com/kisielk/gotool/internal/load
 # github.com/kr/pty v1.1.8
 ## explicit; go 1.12
-# github.com/krishicks/yaml-patch v0.0.10
+# github.com/krishicks/yaml-patch v0.0.11-0.20201210192933-7cea92d7f43e
 ## explicit
 github.com/krishicks/yaml-patch
 # github.com/kulti/thelper v0.4.0
@@ -917,6 +917,9 @@ github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1
 ## explicit; go 1.16
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1
+# github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
+## explicit; go 1.12
+github.com/openshift/custom-resource-status/conditions/v1
 # github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
 ## explicit; go 1.13
 github.com/openshift/generic-admission-server/pkg/apiserver

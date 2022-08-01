@@ -28,7 +28,7 @@ require (
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/json-iterator/go v1.1.12
-	github.com/krishicks/yaml-patch v0.0.10
+	github.com/krishicks/yaml-patch v0.0.11-0.20201210192933-7cea92d7f43e
 	github.com/miekg/dns v1.1.35
 	github.com/modern-go/reflect2 v1.0.2
 	github.com/onsi/ginkgo v1.16.5
@@ -38,6 +38,7 @@ require (
 	github.com/openshift/cluster-api-provider-ibmcloud v0.0.1-0.20220201105455-8014e5e894b0
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551
+	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v0.9.0-master.0.20220711145509-cdb9627de7ef

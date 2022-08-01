@@ -2,11 +2,13 @@ package clusterpool
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
 	"sort"
 
+	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -54,6 +56,7 @@ var (
 		hivev1.ClusterPoolMissingDependenciesCondition,
 		hivev1.ClusterPoolCapacityAvailableCondition,
 		hivev1.ClusterPoolAllClustersCurrentCondition,
+		hivev1.ClusterPoolInventoryValidCondition,
 	}
 )
 
@@ -169,7 +172,52 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 		return err
 	}
 
+	// Watch for changes to ClusterDeploymentCustomizations
+	if err := c.Watch(
+		&source.Kind{Type: &hivev1.ClusterDeploymentCustomization{}},
+		handler.EnqueueRequestsFromMapFunc(
+			requestsForCDCResources(r.Client, r.logger)),
+	); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
+	return func(o client.Object) []reconcile.Request {
+		cdc, ok := o.(*hivev1.ClusterDeploymentCustomization)
+		if !ok {
+			return nil
+		}
+
+		cpList := &hivev1.ClusterPoolList{}
+		if err := c.List(context.Background(), cpList, client.InNamespace(o.GetNamespace())); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to list cluster pools for CDC resource")
+			return nil
+		}
+
+		var requests []reconcile.Request
+		for _, cpl := range cpList.Items {
+			if cpl.Spec.Inventory == nil {
+				continue
+			}
+			for _, entry := range cpl.Spec.Inventory {
+				if entry.Name != cdc.Name {
+					continue
+				}
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: cpl.Namespace,
+						Name:      cpl.Name,
+					},
+				})
+				break
+			}
+		}
+
+		return requests
+	}
 }
 
 func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
@@ -251,6 +299,10 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
+	if p := clp.Spec.Platform; clp.Spec.RunningCount != clp.Spec.Size && (p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil) {
+		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt, unless runningCount==size")
+	}
+
 	// Initialize cluster pool conditions if not set
 	newConditions, changed := controllerutils.InitializeClusterPoolConditions(clp.Status.Conditions, clusterPoolConditions)
 	if changed {
@@ -295,8 +347,16 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
+	cdcs, err := getAllCustomizationsForPool(r.Client, clp, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	claims.SyncClusterDeploymentAssignments(r.Client, cds, logger)
 	cds.SyncClaimAssignments(r.Client, claims, logger)
+	if err := cdcs.SyncClusterDeploymentCustomizationAssignments(r.Client, clp, cds, logger); err != nil {
+		return reconcile.Result{}, err
+	}
 
 	origStatus := clp.Status.DeepCopy()
 	clp.Status.Size = int32(len(cds.Unassigned(true)))
@@ -365,7 +425,10 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// If too few, create new InstallConfig and ClusterDeployment.
 	case drift < 0 && availableCapacity > 0:
 		toAdd := minIntVarible(-drift, availableCapacity, availableCurrent)
-		if err := r.addClusters(clp, poolVersion, cds, toAdd, logger); err != nil {
+		if clp.Spec.Inventory != nil {
+			toAdd = minIntVarible(toAdd, len(cdcs.Unassigned()))
+		}
+		if err := r.addClusters(clp, poolVersion, cds, toAdd, cdcs, logger); err != nil {
 			log.WithError(err).Error("error adding clusters")
 			return reconcile.Result{}, err
 		}
@@ -480,6 +543,12 @@ func calculatePoolVersion(clp *hivev1.ClusterPool) string {
 	ba = append(ba, deephash.Hash(clp.Spec.BaseDomain)...)
 	ba = append(ba, deephash.Hash(clp.Spec.ImageSetRef)...)
 	ba = append(ba, deephash.Hash(clp.Spec.InstallConfigSecretTemplateRef)...)
+	// Inventory changes the behavior of cluster pool, thus it needs to be in the pool version.
+	// But to avoid redployment of clusters if inventory changes, a fixed string is added to pool version.
+	// https://github.com/openshift/hive/blob/master/docs/enhancements/clusterpool-inventory.md#pool-version
+	if clp.Spec.Inventory != nil {
+		ba = append(ba, []byte("hasInventory")...)
+	}
 	// Hash of hashes to ensure fixed length
 	return fmt.Sprintf("%x", deephash.Hash(ba))
 }
@@ -597,6 +666,7 @@ func (r *ReconcileClusterPool) addClusters(
 	poolVersion string,
 	cds *cdCollection,
 	newClusterCount int,
+	cdcs *cdcCollection,
 	logger log.FieldLogger,
 ) error {
 	logger.WithField("count", newClusterCount).Info("Adding new clusters")
@@ -635,7 +705,7 @@ func (r *ReconcileClusterPool) addClusters(
 	}
 
 	for i := 0; i < newClusterCount; i++ {
-		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, logger)
+		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, cdcs, logger)
 		if err != nil {
 			return err
 		}
@@ -651,8 +721,11 @@ func (r *ReconcileClusterPool) createCluster(
 	pullSecret string,
 	installConfigTemplate string,
 	poolVersion string,
+	cdcs *cdcCollection,
 	logger log.FieldLogger,
 ) (*hivev1.ClusterDeployment, error) {
+	var err error
+
 	ns, err := r.createRandomNamespace(clp)
 	if err != nil {
 		logger.WithError(err).Error("error obtaining random namespace")
@@ -696,18 +769,30 @@ func (r *ReconcileClusterPool) createCluster(
 	poolKey := types.NamespacedName{Namespace: clp.Namespace, Name: clp.Name}.String()
 	r.expectations.ExpectCreations(poolKey, 1)
 	var cd *hivev1.ClusterDeployment
+	var secret *corev1.Secret
+	var cdPos int
 	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
 	for i, obj := range objs {
-		var ok bool
-		cd, ok = obj.(*hivev1.ClusterDeployment)
-		if !ok {
-			continue
+		if cdTmp, ok := obj.(*hivev1.ClusterDeployment); ok {
+			cd = cdTmp
+			cdPos = i
+			poolRef := poolReference(clp)
+			cd.Spec.ClusterPoolRef = &poolRef
+			if clp.Spec.Inventory != nil {
+				cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcs.unassigned[0].Name}
+			}
+		} else if secretTmp := isInstallConfigSecret(obj); secretTmp != nil {
+			secret = secretTmp
 		}
-		poolRef := poolReference(clp)
-		cd.Spec.ClusterPoolRef = &poolRef
-		lastIndex := len(objs) - 1
-		objs[i], objs[lastIndex] = objs[lastIndex], objs[i]
 	}
+
+	if err := r.patchInstallConfig(clp, cd, secret, cdcs, logger); err != nil {
+		return nil, err
+	}
+
+	// Move the ClusterDeployment to the end of the slice
+	lastIndex := len(objs) - 1
+	objs[cdPos], objs[lastIndex] = objs[lastIndex], objs[cdPos]
 	// Create the resources.
 	for _, obj := range objs {
 		if err := r.Client.Create(context.Background(), obj.(client.Object)); err != nil {
@@ -717,6 +802,69 @@ func (r *ReconcileClusterPool) createCluster(
 	}
 
 	return cd, nil
+}
+
+func isInstallConfigSecret(obj interface{}) *corev1.Secret {
+	if secret, ok := obj.(*corev1.Secret); ok {
+		_, ok := secret.StringData["install-config.yaml"]
+		if ok {
+			return secret
+		}
+	}
+	return nil
+}
+
+// patchInstallConfig responsible for applying ClusterDeploymentCustomization and its reservation
+func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *hivev1.ClusterDeployment, secret *corev1.Secret, cdcs *cdcCollection, logger log.FieldLogger) error {
+	if clp.Spec.Inventory == nil {
+		return nil
+	}
+	if cd.Spec.ClusterPoolRef.CustomizationRef == nil {
+		return errors.New("missing customization")
+	}
+
+	cdc := &hivev1.ClusterDeploymentCustomization{}
+	if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: clp.Namespace, Name: cd.Spec.ClusterPoolRef.CustomizationRef.Name}, cdc); err != nil {
+		if apierrors.IsNotFound(err) {
+			return errors.New("missing customization")
+		}
+		return err
+	}
+
+	newPatch := yamlpatch.Patch{}
+	for _, patch := range cdc.Spec.InstallConfigPatches {
+		var value interface{}
+		value = patch.Value
+		newPatch = append(newPatch, yamlpatch.Operation{
+			Op:    yamlpatch.Op(patch.Op),
+			Path:  yamlpatch.OpPath(patch.Path),
+			From:  yamlpatch.OpPath(patch.From),
+			Value: yamlpatch.NewNode(&value),
+		})
+	}
+
+	installConfig, err := newPatch.Apply([]byte(secret.StringData["install-config.yaml"]))
+	if err != nil {
+		cdcs.BrokenBySyntax(r, cdc, fmt.Sprint(err))
+		cdcs.UpdateInventoryValidCondition(r, clp)
+		return err
+	}
+
+	configJson, err := json.Marshal(cdc.Spec)
+	if err != nil {
+		return err
+	}
+
+	if err := cdcs.Reserve(r, cdc, cd.Name, clp.Name); err != nil {
+		return err
+	}
+	if err := cdcs.InstallationPending(r, cdc); err != nil {
+		return err
+	}
+
+	cdc.Status.LastAppliedConfiguration = string(configJson)
+	secret.StringData["install-config.yaml"] = string(installConfig)
+	return nil
 }
 
 func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool) (*corev1.Namespace, error) {
@@ -813,6 +961,16 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if !controllerutils.HasFinalizer(pool, finalizer) {
 		return nil
 	}
+
+	cdcs, err := getAllCustomizationsForPool(r.Client, pool, logger)
+	if err != nil {
+		return err
+	}
+
+	if err := cdcs.RemoveFinalizer(r.Client, pool); err != nil {
+		return err
+	}
+
 	// Don't care about the poolVersion here since we're deleting everything.
 	cds, err := getAllClusterDeploymentsForPool(r.Client, pool, "", logger)
 	if err != nil {
@@ -827,6 +985,7 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 			return errors.Wrap(err, "could not delete ClusterDeployment")
 		}
 	}
+
 	// TODO: Wait to remove finalizer until all (unclaimed??) clusters are gone.
 	controllerutils.DeleteFinalizer(pool, finalizer)
 	if err := r.Update(context.Background(), pool); err != nil {
@@ -1006,7 +1165,59 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.Region = platform.Azure.Region
 		cloudBuilder.CloudName = platform.Azure.CloudName
 		return cloudBuilder, nil
-	// TODO: OpenStack, VMware, and Ovirt.
+	case platform.OpenStack != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.OpenStack.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+		cloudBuilder := clusterresource.NewOpenStackCloudBuilderFromSecret(credsSecret)
+		cloudBuilder.Cloud = platform.OpenStack.Cloud
+		return cloudBuilder, nil
+	case platform.VSphere != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.VSphere.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		certsSecret, err := r.getCredentialsSecret(pool, platform.VSphere.CertificatesSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := certsSecret.Data[".cacert"]; !ok {
+			return nil, err
+		}
+
+		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret)
+		cloudBuilder.Datacenter = platform.VSphere.Datacenter
+		cloudBuilder.DefaultDatastore = platform.VSphere.DefaultDatastore
+		cloudBuilder.VCenter = platform.VSphere.VCenter
+		cloudBuilder.Cluster = platform.VSphere.Cluster
+		cloudBuilder.Folder = platform.VSphere.Folder
+		cloudBuilder.Network = platform.VSphere.Network
+
+		return cloudBuilder, nil
+	case platform.Ovirt != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.Ovirt.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		certsSecret, err := r.getCredentialsSecret(pool, platform.Ovirt.CertificatesSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := certsSecret.Data[".cacert"]; !ok {
+			return nil, err
+		}
+
+		cloudBuilder := clusterresource.NewOvirtCloudBuilderFromSecret(credsSecret)
+		cloudBuilder.StorageDomainID = platform.Ovirt.StorageDomainID
+		cloudBuilder.ClusterID = platform.Ovirt.ClusterID
+		cloudBuilder.NetworkName = platform.Ovirt.NetworkName
+
+		return cloudBuilder, nil
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

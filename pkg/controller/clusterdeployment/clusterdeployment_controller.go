@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 	"github.com/openshift/library-go/pkg/manifest"
 	"github.com/openshift/library-go/pkg/verify"
@@ -1383,13 +1384,20 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, err
 	}
 
+	if deprovisioned {
+		if err := r.releaseCustomization(cd, cdLog); err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error releasing inventory customization")
+			return reconcile.Result{}, err
+		}
+	}
+
 	switch {
 	case !deprovisioned:
 		return reconcile.Result{}, nil
 	case !dnsZoneGone:
 		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	default:
-		cdLog.Infof("DNSZone gone and deprovision request completed, removing finalizer")
+		cdLog.Infof("DNSZone gone, customization gone and deprovision request completed, removing deprovision finalizer")
 		if err := r.removeClusterDeploymentFinalizer(cd, cdLog); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 			return reconcile.Result{}, err
@@ -1418,6 +1426,49 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 
 	// Increment the clusters deleted counter:
 	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+
+	return nil
+}
+
+func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	cpRef := cd.Spec.ClusterPoolRef
+	if cpRef == nil || cpRef.CustomizationRef == nil {
+		return nil
+	}
+
+	cdc := &hivev1.ClusterDeploymentCustomization{}
+	cdcNamespace := cpRef.Namespace
+	cdcName := cpRef.CustomizationRef.Name
+	cdcLog := cdLog.WithField("customization", cdcName).WithField("namespace", cdcNamespace)
+	err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: cdcNamespace, Name: cdcName}, cdc)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			cdcLog.Info("customization not found, nothing to release")
+			return nil
+		}
+		cdcLog.WithError(err).Error("error reading customization")
+		return err
+	}
+
+	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    conditionsv1.ConditionAvailable,
+		Status:  corev1.ConditionTrue,
+		Reason:  "Available",
+		Message: "available",
+	})
+
+	if cdc.Status.ClusterPoolRef != nil || cdc.Status.ClusterDeploymentRef != nil {
+		cdc.Status.ClusterPoolRef = nil
+		cdc.Status.ClusterDeploymentRef = nil
+		changed = true
+	}
+
+	if changed {
+		if err := r.Status().Update(context.Background(), cdc); err != nil {
+			cdcLog.WithError(err).Error("failed to update ClusterDeploymentCustomizationAvailable condition")
+			return err
+		}
+	}
 
 	return nil
 }

@@ -2,6 +2,7 @@ package clusterpool
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -15,9 +16,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 type claimCollection struct {
@@ -207,6 +210,8 @@ type cdCollection struct {
 	unknownPoolVersion []*hivev1.ClusterDeployment
 	// Clusters whose pool version annotation doesn't match the pool's
 	mismatchedPoolVersion []*hivev1.ClusterDeployment
+	// Cluster whose customization reference was removed from pool's inventory
+	customizationMissing []*hivev1.ClusterDeployment
 	// All CDs in this pool
 	byCDName map[string]*hivev1.ClusterDeployment
 	// This contains only claimed CDs
@@ -309,6 +314,17 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			}).Error("unepectedly got a ClusterDeployment not belonging to this pool")
 			continue
 		}
+		customizationExists := true
+		if cd.Spec.ClusterPoolRef.CustomizationRef != nil {
+			customizationExists = false
+			cdcName := cd.Spec.ClusterPoolRef.CustomizationRef.Name
+			for _, entry := range pool.Spec.Inventory {
+				if cdcName == entry.Name {
+					customizationExists = true
+					break
+				}
+			}
+		}
 		ref := &cdList.Items[i]
 		cdCol.byCDName[cd.Name] = ref
 		claimName := poolRef.ClaimName
@@ -329,7 +345,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			} else {
 				cdCol.installing = append(cdCol.installing, ref)
 			}
-			// Count stale CDs (poolVersion either unknown or mismatched)
+			// Count stale CDs (poolVersion either unknown or mismatched, or customizaiton was removed)
 			if cdPoolVersion, ok := cd.Annotations[constants.ClusterDeploymentPoolSpecHashAnnotation]; !ok || cdPoolVersion == "" {
 				// Annotation is either missing or empty. This could be due to upgrade (this CD was
 				// created before this code was installed) or manual intervention (outside agent mucked
@@ -337,8 +353,9 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 				cdCol.unknownPoolVersion = append(cdCol.unknownPoolVersion, ref)
 			} else if cdPoolVersion != poolVersion {
 				cdCol.mismatchedPoolVersion = append(cdCol.mismatchedPoolVersion, ref)
+			} else if cdcRef := cd.Spec.ClusterPoolRef.CustomizationRef; cdcRef != nil && !customizationExists {
+				cdCol.customizationMissing = append(cdCol.customizationMissing, ref)
 			}
-
 		}
 		// Register all claimed CDs, even if they're deleting/marked
 		if claimName != "" {
@@ -463,6 +480,17 @@ func (cds *cdCollection) Unassigned(includeBroken bool) []*hivev1.ClusterDeploym
 	return ret
 }
 
+// Installed returns the list of ClusterDeployments which are Installed
+func (cds *cdCollection) Installed() []*hivev1.ClusterDeployment {
+	ret := []*hivev1.ClusterDeployment{}
+	ret = append(ret, cds.assignable...)
+	ret = append(ret, cds.standby...)
+	for _, cd := range cds.byClaimName {
+		ret = append(ret, cd)
+	}
+	return ret
+}
+
 // UnknownPoolVersion returns the list of ClusterDeployments whose pool version annotation is
 // missing or empty.
 func (cds *cdCollection) UnknownPoolVersion() []*hivev1.ClusterDeployment {
@@ -478,7 +506,9 @@ func (cds *cdCollection) MismatchedPoolVersion() []*hivev1.ClusterDeployment {
 // Stale returns the list of ClusterDeployments whose pool version annotation doesn't match the
 // version of the pool. Put "unknown" first becuase they're annoying.
 func (cds *cdCollection) Stale() []*hivev1.ClusterDeployment {
-	return append(cds.unknownPoolVersion, cds.mismatchedPoolVersion...)
+	stale := append(cds.unknownPoolVersion, cds.mismatchedPoolVersion...)
+	stale = append(stale, cds.customizationMissing...)
+	return stale
 }
 
 // RegisterNewCluster adds a freshly-created cluster to the cdCollection, assuming it is installing.
@@ -582,6 +612,510 @@ func (cds *cdCollection) Delete(c client.Client, cdName string) error {
 	removeCDsFromSlice(&cds.mismatchedPoolVersion, cdName)
 	removeCDsFromSlice(&cds.markedForDeletion, cdName)
 	return nil
+}
+
+type cdcCollection struct {
+	// Unclaimed by any cluster pool CD and are not broken
+	unassigned []*hivev1.ClusterDeploymentCustomization
+	// Missing CDC means listed in pool inventory but the custom resource doesn't exist in the pool namespace
+	missing []string
+	// Used by some cluster deployment
+	reserved map[string]*hivev1.ClusterDeploymentCustomization
+	// Last Cluster Deployment failed on provision
+	cloud map[string]*hivev1.ClusterDeploymentCustomization
+	// Failed to apply patches for this cluster pool
+	syntax map[string]*hivev1.ClusterDeploymentCustomization
+	// ByCDCName are all the CDCs listed in the pool inventory, the CR exists and are mapped by name
+	byCDCName map[string]*hivev1.ClusterDeploymentCustomization
+	// Namespace are all the CDC in the namespace mapped by name
+	namespace map[string]*hivev1.ClusterDeploymentCustomization
+}
+
+// getAllCustomizationsForPool is the constructor for a cdcCollection for all of the
+// ClusterDeploymentCustomizations that are related to specified pool.
+func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logger log.FieldLogger) (*cdcCollection, error) {
+	if pool.Spec.Inventory == nil {
+		return &cdcCollection{}, nil
+	}
+	cdcList := &hivev1.ClusterDeploymentCustomizationList{}
+	if err := c.List(
+		context.Background(), cdcList,
+		client.InNamespace(pool.Namespace)); err != nil {
+		logger.WithField("namespace", pool.Namespace).WithError(err).Error("error listing ClusterDeploymentCustomizations")
+		return &cdcCollection{}, err
+	}
+
+	cdcCol := cdcCollection{
+		unassigned: make([]*hivev1.ClusterDeploymentCustomization, 0),
+		missing:    make([]string, 0),
+		reserved:   make(map[string]*hivev1.ClusterDeploymentCustomization),
+		cloud:      make(map[string]*hivev1.ClusterDeploymentCustomization),
+		syntax:     make(map[string]*hivev1.ClusterDeploymentCustomization),
+		byCDCName:  make(map[string]*hivev1.ClusterDeploymentCustomization),
+		namespace:  make(map[string]*hivev1.ClusterDeploymentCustomization),
+	}
+
+	for i, cdc := range cdcList.Items {
+		cdcCol.namespace[cdc.Name] = &cdcList.Items[i]
+	}
+
+	for _, item := range pool.Spec.Inventory {
+		if cdc, ok := cdcCol.namespace[item.Name]; ok {
+			cdcCol.byCDCName[item.Name] = cdc
+			availability := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+			if availability != nil && availability.Status == corev1.ConditionFalse {
+				cdcCol.reserved[item.Name] = cdc
+			} else {
+				cdcCol.unassigned = append(cdcCol.unassigned, cdc)
+			}
+			applyStatus := conditionsv1.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
+			if applyStatus == nil {
+				continue
+			}
+			if applyStatus.Reason == hivev1.CustomizationApplyReasonBrokenCloud {
+				cdcCol.cloud[item.Name] = cdc
+			}
+			if applyStatus.Reason == hivev1.CustomizationApplyReasonBrokenSyntax {
+				cdcCol.syntax[item.Name] = cdc
+			}
+		} else {
+			cdcCol.missing = append(cdcCol.missing, item.Name)
+		}
+	}
+
+	cdcCol.Sort()
+
+	logger.WithFields(log.Fields{
+		"unassignedCount":     len(cdcCol.unassigned),
+		"missingCount":        len(cdcCol.missing),
+		"reservedCount":       len(cdcCol.reserved),
+		"brokenByCloudCount":  len(cdcCol.cloud),
+		"brokenBySyntaxCount": len(cdcCol.syntax),
+	}).Debug("found ClusterDeploymentCustomizations for ClusterPool")
+
+	return &cdcCol, nil
+}
+
+// Sort unassigned oldest successful customizations to avoid using the same broken
+// customization.  When customizations have the same last apply status, the
+// oldest used customization will be prioritized.
+func (cdcs *cdcCollection) Sort() {
+	sort.Slice(
+		cdcs.unassigned,
+		func(i, j int) bool {
+			now := metav1.NewTime(time.Now())
+			iStatus := conditionsv1.FindStatusCondition(cdcs.unassigned[i].Status.Conditions, hivev1.ApplySucceededCondition)
+			jStatus := conditionsv1.FindStatusCondition(cdcs.unassigned[j].Status.Conditions, hivev1.ApplySucceededCondition)
+			iName := cdcs.unassigned[i].Name
+			jName := cdcs.unassigned[j].Name
+			if iStatus == nil || iStatus.Status == corev1.ConditionUnknown {
+				iStatus = &conditionsv1.Condition{Reason: hivev1.CustomizationApplyReasonSucceeded}
+				iStatus.LastTransitionTime = now
+			}
+			if jStatus == nil || jStatus.Status == corev1.ConditionUnknown {
+				jStatus = &conditionsv1.Condition{Reason: hivev1.CustomizationApplyReasonSucceeded}
+				jStatus.LastTransitionTime = now
+			}
+			iTime := iStatus.LastTransitionTime
+			jTime := jStatus.LastTransitionTime
+			if iStatus.Reason == jStatus.Reason {
+				if iTime.Equal(&jTime) {
+					// Sort by name to make this deterministic
+					return iName < jName
+				}
+				return iTime.Before(&jTime)
+			}
+			if iStatus.Reason == hivev1.CustomizationApplyReasonSucceeded {
+				return true
+			}
+			if jStatus.Reason == hivev1.CustomizationApplyReasonSucceeded {
+				return false
+			}
+			return iName < jName
+		},
+	)
+}
+
+func (cdcs *cdcCollection) Reserve(c client.Client, cdc *hivev1.ClusterDeploymentCustomization, cdName, poolName string) error {
+	if cdc.Status.ClusterDeploymentRef != nil || cdc.Status.ClusterPoolRef != nil {
+		return errors.New("ClusterDeploymentCustomization already reserved")
+	}
+
+	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    conditionsv1.ConditionAvailable,
+		Status:  corev1.ConditionFalse,
+		Reason:  "Reserved",
+		Message: "reserved",
+	})
+
+	if changed {
+		if err := c.Status().Update(context.Background(), cdc); err != nil {
+			return err
+		}
+	} else {
+		return errors.New("ClusterDeploymentCustomization already reserved")
+	}
+
+	cdc.Status.ClusterDeploymentRef = &corev1.LocalObjectReference{Name: cdName}
+	cdc.Status.ClusterPoolRef = &corev1.LocalObjectReference{Name: poolName}
+
+	cdcs.reserved[cdc.Name] = cdc
+	cdcs.byCDCName[cdc.Name] = cdc
+
+	for i, cdci := range cdcs.unassigned {
+		if cdci.Name == cdc.Name {
+			copy(cdcs.unassigned[i:], cdcs.unassigned[i+1:])
+			cdcs.unassigned = cdcs.unassigned[:len(cdcs.unassigned)-1]
+			break
+		}
+	}
+
+	cdcs.Sort()
+	return nil
+}
+
+func (cdcs *cdcCollection) Unassign(c client.Client, cdc *hivev1.ClusterDeploymentCustomization) error {
+	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    conditionsv1.ConditionAvailable,
+		Status:  corev1.ConditionTrue,
+		Reason:  "Available",
+		Message: "available",
+	})
+
+	if cdc.Status.ClusterDeploymentRef != nil || cdc.Status.ClusterPoolRef != nil {
+		cdc.Status.ClusterDeploymentRef = nil
+		cdc.Status.ClusterPoolRef = nil
+		changed = true
+	}
+
+	if changed {
+		if err := c.Status().Update(context.Background(), cdc); err != nil {
+			return err
+		}
+	}
+
+	delete(cdcs.reserved, cdc.Name)
+
+	cdcs.unassigned = append(cdcs.unassigned, cdc)
+	cdcs.Sort()
+	return nil
+}
+
+func (cdcs *cdcCollection) BrokenBySyntax(c client.Client, cdc *hivev1.ClusterDeploymentCustomization, msg string) error {
+	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    hivev1.ApplySucceededCondition,
+		Status:  corev1.ConditionFalse,
+		Reason:  hivev1.CustomizationApplyReasonBrokenSyntax,
+		Message: msg,
+	})
+
+	if changed {
+		if err := c.Status().Update(context.Background(), cdc); err != nil {
+			return err
+		}
+	}
+
+	cdcs.syntax[cdc.Name] = cdc
+	delete(cdcs.cloud, cdc.Name)
+	return nil
+}
+
+func (cdcs *cdcCollection) BrokenByCloud(c client.Client, cdc *hivev1.ClusterDeploymentCustomization) error {
+	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    hivev1.ApplySucceededCondition,
+		Status:  corev1.ConditionFalse,
+		Reason:  hivev1.CustomizationApplyReasonBrokenCloud,
+		Message: "Cluster installation failed. This may or may not be the fault of patches. Check the installation logs.",
+	})
+
+	if changed {
+		if err := c.Status().Update(context.Background(), cdc); err != nil {
+			return err
+		}
+	}
+
+	cdcs.cloud[cdc.Name] = cdc
+	delete(cdcs.syntax, cdc.Name)
+	return nil
+}
+
+func (cdcs *cdcCollection) Succeeded(c client.Client, cdc *hivev1.ClusterDeploymentCustomization) error {
+	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    hivev1.ApplySucceededCondition,
+		Status:  corev1.ConditionTrue,
+		Reason:  hivev1.CustomizationApplyReasonSucceeded,
+		Message: "Patches applied and cluster installed successfully",
+	})
+
+	if changed {
+		if err := c.Status().Update(context.Background(), cdc); err != nil {
+			return err
+		}
+	}
+
+	delete(cdcs.syntax, cdc.Name)
+	delete(cdcs.cloud, cdc.Name)
+	return nil
+}
+
+func (cdcs *cdcCollection) InstallationPending(c client.Client, cdc *hivev1.ClusterDeploymentCustomization) error {
+	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
+		Type:    hivev1.ApplySucceededCondition,
+		Status:  corev1.ConditionFalse,
+		Reason:  hivev1.CustomizationApplyReasonInstallationPending,
+		Message: "Patches applied; cluster is installing",
+	})
+
+	if changed {
+		if err := c.Status().Update(context.Background(), cdc); err != nil {
+			return err
+		}
+	}
+
+	delete(cdcs.syntax, cdc.Name)
+	delete(cdcs.cloud, cdc.Name)
+	return nil
+}
+
+func (cdcs *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization {
+	return cdcs.unassigned
+}
+
+func (cdcs *cdcCollection) RemoveFinalizer(c client.Client, pool *hivev1.ClusterPool) error {
+	poolFinalizer := fmt.Sprintf("hive.openshift.io/%s", pool.Name)
+
+	for _, item := range pool.Spec.Inventory {
+		if cdc, ok := cdcs.namespace[item.Name]; ok {
+			controllerutils.DeleteFinalizer(cdc, poolFinalizer)
+			if err := c.Update(context.Background(), cdc); err != nil {
+				return err
+			}
+			cdcs.namespace[item.Name] = cdc
+		}
+	}
+
+	return nil
+}
+
+// SyncClusterDeploymentCustomizations updates CDCs and related CR status:
+// - Handle deletion of CDC in the namespace
+// - If there is no CD, but CDC is reserved, then we release the CDC
+// - Make sure that CD <=> CDC links are legit; repair them if not.
+// - Notice a Broken CD => update the CDC's ApplySucceeded condition to BrokenByCloud;
+// - Notice a CD has finished installing => update the CDC's ApplySucceeded condition to Success;
+// - Update ClusterPool InventoryValid condition
+func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c client.Client, pool *hivev1.ClusterPool, cds *cdCollection, logger log.FieldLogger) error {
+	if pool.Spec.Inventory == nil {
+		return nil
+	}
+
+	poolFinalizer := fmt.Sprintf("hive.openshift.io/%s", pool.Name)
+
+	// Handle deletion of CDC in the namespace
+	for _, cdc := range cdcs.namespace {
+		isDeleted := cdc.DeletionTimestamp != nil
+		hasFinalizer := controllerutils.HasFinalizer(cdc, poolFinalizer)
+		isAvailable := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+		if isDeleted && (isAvailable == nil || isAvailable.Status != corev1.ConditionFalse) {
+			// We can delete the finalizer for a deleted CDC only if it is not reserved
+			if hasFinalizer {
+				controllerutils.DeleteFinalizer(cdc, poolFinalizer)
+				if err := c.Update(context.Background(), cdc); err != nil {
+					return err
+				}
+			}
+		} else {
+			// Ensure the finalizer is present if the CDC is not deleted, OR if it is reserved
+			if !hasFinalizer {
+				controllerutils.AddFinalizer(cdc, poolFinalizer)
+				if err := c.Update(context.Background(), cdc); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// If there is no CD, but CDC is reserved, then we release the CDC
+	for _, cdc := range cdcs.reserved {
+		if ref := cdc.Status.ClusterDeploymentRef; ref == nil || cds.ByName(ref.Name) == nil {
+			if err := cdcs.Unassign(c, cdc); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Make sure CD <=> CDC links are legit; repair them if not.
+	for _, cd := range cds.byCDName {
+		// CD has CDC
+		cpRef := cd.Spec.ClusterPoolRef
+		if cpRef.CustomizationRef == nil {
+			continue
+		}
+
+		logger = logger.WithFields(log.Fields{
+			"clusterdeployment":              cd.Name,
+			"clusterdeploymentcustomization": cpRef.CustomizationRef.Name,
+			"namespace":                      cpRef.Namespace,
+		})
+
+		// CDC exists
+		cdc, ok := cdcs.namespace[cpRef.CustomizationRef.Name]
+		if !ok {
+			logger.Warning("CD has reference to a CDC that doesn't exist, it was forcefully removed or this is a bug")
+			continue
+		}
+
+		// CDC is not reserved
+		available := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
+		if available == nil || available.Status == corev1.ConditionUnknown || available.Status == corev1.ConditionTrue {
+			// CDC is used by other CD
+			if cdRef := cdc.Status.ClusterDeploymentRef; cdRef != nil && cdRef.Name != cd.Name {
+				cdOther := &hivev1.ClusterDeployment{}
+				if err := c.Get(
+					context.Background(),
+					client.ObjectKey{Name: cdRef.Name, Namespace: cdRef.Name},
+					cdOther,
+				); err != nil {
+					if !apierrors.IsNotFound(err) {
+						return err
+					}
+				} else {
+					// Fixing reservation should be done by the appropriate cluster pool
+					logger.WithFields(log.Fields{
+						"parallelclusterdeployment": cdOther.Name,
+						"namespace":                 cdc.Namespace,
+					}).Warning("Another CD exists and has this CDC reserved")
+					continue
+				}
+			}
+			// Fix CDC availability
+			if err := cdcs.Unassign(c, cdc); err != nil {
+				return err
+			}
+			if err := cdcs.Reserve(c, cdc, cd.Name, pool.Name); err != nil {
+				return err
+			}
+
+			if cd.Spec.Installed {
+				cdcs.Succeeded(c, cdc)
+			} else if isBroken(cd, pool, logger) {
+				cdcs.BrokenByCloud(c, cdc)
+			} else {
+				cdcs.InstallationPending(c, cdc)
+			}
+		}
+	}
+
+	// Notice a Broken CD => update the CDC's ApplySucceeded condition to BrokenByCloud;
+	for _, cd := range cds.Broken() {
+		cdcRef := cd.Spec.ClusterPoolRef.CustomizationRef
+		if cdcRef == nil {
+			continue
+		}
+		if cdc, ok := cdcs.byCDCName[cdcRef.Name]; ok {
+			if err := cdcs.BrokenByCloud(c, cdc); err != nil {
+				return err
+			}
+		} else {
+			logger.WithFields(log.Fields{
+				"clusterdeployment":              cd.Name,
+				"clusterdeploymentcustomization": cdcRef.Name,
+				"namespace":                      cd.Spec.ClusterPoolRef.Namespace,
+			}).Warning("CD has reference to a CDC that doesn't exist, it was forcefully removed or this is a bug")
+		}
+	}
+
+	// Notice a CD has finished installing => update the CDC's ApplySucceeded condition to Success;
+	for _, cd := range cds.Installed() {
+		cdcRef := cd.Spec.ClusterPoolRef.CustomizationRef
+		if cdcRef == nil {
+			continue
+		}
+		if cdc, ok := cdcs.byCDCName[cdcRef.Name]; ok {
+			if err := cdcs.Succeeded(c, cdc); err != nil {
+				return err
+			}
+		} else {
+			logger.WithFields(log.Fields{
+				"clusterdeployment":              cd.Name,
+				"clusterdeploymentcustomization": cdcRef.Name,
+				"namespace":                      cd.Spec.ClusterPoolRef.Namespace,
+			}).Warning("CD has reference to a CDC that doesn't exist, it was forcefully removed or this is a bug")
+		}
+	}
+
+	cdcs.Sort()
+
+	// Update ClusterPool InventoryValid condition
+	if err := cdcs.UpdateInventoryValidCondition(c, pool); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cdcs *cdcCollection) UpdateInventoryValidCondition(c client.Client, pool *hivev1.ClusterPool) error {
+	message := ""
+	status := corev1.ConditionTrue
+	reason := hivev1.InventoryReasonValid
+	if (len(cdcs.syntax) + len(cdcs.cloud) + len(cdcs.missing)) > 0 {
+		// Send the cdcCollection to our custom marshaller that extracts and marshals just the invalid CDCs.
+		var b invalidCDCCollection = invalidCDCCollection(*cdcs)
+		messageByte, err := json.Marshal(&b)
+		if err != nil {
+			return err
+		}
+		message = string(messageByte)
+		status = corev1.ConditionFalse
+		reason = hivev1.InventoryReasonInvalid
+	}
+
+	conditions, changed := controllerutils.SetClusterPoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.ClusterPoolInventoryValidCondition,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
+	if changed {
+		pool.Status.Conditions = conditions
+		if err := c.Status().Update(context.TODO(), pool); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type invalidCDCCollection cdcCollection
+
+var _ json.Marshaler = &invalidCDCCollection{}
+
+// MarshalJSON cdcs implements the InventoryValid condition message
+func (cdcs *invalidCDCCollection) MarshalJSON() ([]byte, error) {
+	cloud := []string{}
+	for _, cdc := range cdcs.cloud {
+		cloud = append(cloud, cdc.Name)
+	}
+	syntax := []string{}
+	for _, cdc := range cdcs.syntax {
+		syntax = append(syntax, cdc.Name)
+	}
+	sort.Strings(cloud)
+	sort.Strings(syntax)
+	sort.Strings(cdcs.missing)
+
+	return json.Marshal(&struct {
+		BrokenByCloud  []string
+		BrokenBySyntax []string
+		Missing        []string
+	}{
+		BrokenByCloud:  cloud,
+		BrokenBySyntax: syntax,
+		Missing:        cdcs.missing,
+	})
 }
 
 // setCDsCurrentCondition idempotently sets the ClusterDeploymentsCurrent condition on the

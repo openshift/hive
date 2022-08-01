@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/openshift/api v0.0.0-20220531073726-6c4f186339a7
-	github.com/openshift/custom-resource-status v1.1.2
+	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 	k8s.io/api v0.24.1
 	k8s.io/apimachinery v0.24.1
 )

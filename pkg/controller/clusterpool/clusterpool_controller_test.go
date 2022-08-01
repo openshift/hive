@@ -3,6 +3,7 @@ package clusterpool
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"sort"
 	"testing"
@@ -230,7 +231,7 @@ func TestReconcileClusterPool(t *testing.T) {
 					testNamespace, "test-cdc-1", scheme,
 				).GenericOptions(
 					testgeneric.Deleted(),
-					testgeneric.WithFinalizer(finalizer),
+					testgeneric.WithFinalizer(fmt.Sprintf("hive.openshift.io/%s", testLeasePoolName)),
 				).Build(),
 			},
 			expectedTotalClusters:   0,
@@ -1770,7 +1771,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 
 			if test.expectedInventoryValidStatus != "" {
-				inventoryValidCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolInventoryValidCondition)
+				inventoryValidCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolInventoryValidCondition)
 				if assert.NotNil(t, inventoryValidCondition, "did not find InventoryValid condition") {
 					assert.Equal(t, test.expectedInventoryValidStatus, inventoryValidCondition.Status,
 						"unexpcted InventoryValid condition status %s", inventoryValidCondition.Message)
@@ -1778,7 +1779,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 
 			if test.expectedInventoryMessage != nil {
-				inventoryValidCondition := controllerutils.FindClusterPoolCondition(pool.Status.Conditions, hivev1.ClusterPoolInventoryValidCondition)
+				inventoryValidCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolInventoryValidCondition)
 				if assert.NotNil(t, inventoryValidCondition, "did not find InventoryValid condition") {
 					expectedInventoryMessage := map[string][]string{}
 					err := json.Unmarshal([]byte(inventoryValidCondition.Message), &expectedInventoryMessage)

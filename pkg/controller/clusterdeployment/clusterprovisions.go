@@ -41,6 +41,12 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	releaseImage string,
 	logger log.FieldLogger,
 ) (result reconcile.Result, returnedErr error) {
+	// Preflight; If we've reached ProvisionStopped for any reason, bail
+	if pfcond := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition); pfcond != nil && pfcond.Status == corev1.ConditionTrue {
+		logger.Debug("ProvisionStopped is True; not creating a new provision")
+		return reconcile.Result{}, nil
+	}
+
 	existingProvisions, err := r.existingProvisions(cd, logger)
 	if err != nil {
 		return reconcile.Result{}, err

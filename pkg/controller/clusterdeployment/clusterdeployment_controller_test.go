@@ -2414,9 +2414,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testassert.AssertConditionStatus(t, cd, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition, corev1.ConditionTrue)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
 					Type:    hivev1.ProvisionedCondition,
-					Status:  corev1.ConditionUnknown,
-					Reason:  hivev1.InitializedConditionReason,
-					Message: "Condition Initialized",
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.ProvisionedReasonProvisioning,
+					Message: "Provisioning in progress",
 				}})
 			},
 		},
@@ -2473,7 +2473,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "clusterinstallref exists, stopped, completed not set",
+			name: "clusterinstallref exists, stopped, completed false, failed true",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterInstallRefClusterDeployment("test-fake")))
@@ -2487,6 +2487,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}, {
 					Type:   hivev1.ClusterInstallCompleted,
 					Status: corev1.ConditionFalse,
+				}, {
+					Type:   hivev1.ClusterInstallFailed,
+					Status: corev1.ConditionTrue,
 				}}),
 				testClusterImageSet(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -2498,9 +2501,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testassert.AssertConditionStatus(t, cd, hivev1.ClusterInstallStoppedClusterDeploymentCondition, corev1.ConditionTrue)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
 					{
-						Type:   hivev1.ProvisionStoppedCondition,
-						Status: corev1.ConditionTrue,
-						Reason: "InstallAttemptsLimitReached",
+						Type:    hivev1.ProvisionStoppedCondition,
+						Status:  corev1.ConditionTrue,
+						Reason:  "InstallAttemptsLimitReached",
+						Message: "Install attempts limit reached",
 					},
 					{
 						Type:    hivev1.ProvisionedCondition,
@@ -2512,7 +2516,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "clusterinstallref exists, stopped, completed false",
+			name: "clusterinstallref exists, stopped, completed false, failed not set",
 			existing: []runtime.Object{
 				testClusterDeploymentWithInitializedConditions(testClusterInstallRefClusterDeployment("test-fake")),
 				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
@@ -2534,13 +2538,12 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					{
 						Type:   hivev1.ProvisionStoppedCondition,
 						Status: corev1.ConditionTrue,
-						Reason: "InstallAttemptsLimitReached",
 					},
 					{
 						Type:    hivev1.ProvisionedCondition,
-						Status:  corev1.ConditionFalse,
-						Reason:  hivev1.ProvisionedReasonProvisionStopped,
-						Message: "Provisioning failed terminally (see the ProvisionStopped condition for details)",
+						Status:  corev1.ConditionUnknown,
+						Reason:  "Error",
+						Message: "Invalid ClusterInstall conditions. Please report this bug.",
 					},
 				})
 			},
@@ -2652,7 +2655,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "clusterinstallref exists, completed",
+			name: "clusterinstallref exists, completed but not stopped",
 			existing: []runtime.Object{
 				testClusterDeploymentWithInitializedConditions(testClusterInstallRefClusterDeployment("test-fake")),
 				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
@@ -2667,13 +2670,11 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				cd := getCD(c)
 				require.NotNil(t, cd, "could not get ClusterDeployment")
 				testassert.AssertConditionStatus(t, cd, hivev1.ClusterInstallCompletedClusterDeploymentCondition, corev1.ConditionTrue)
-				assert.Equal(t, true, cd.Spec.Installed)
-				assert.NotNil(t, cd.Status.InstalledTimestamp)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{{
 					Type:    hivev1.ProvisionedCondition,
-					Status:  corev1.ConditionTrue,
-					Reason:  hivev1.ProvisionedReasonProvisioned,
-					Message: "Cluster is provisioned",
+					Status:  corev1.ConditionUnknown,
+					Reason:  "Error",
+					Message: "Invalid ClusterInstall conditions. Please report this bug.",
 				}})
 			},
 		},

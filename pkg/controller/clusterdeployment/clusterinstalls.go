@@ -97,13 +97,14 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		}
 	}
 	// additionally copy failed to provision failed condition
-	failed := controllerutils.FindCondition(conditions, hivev1.ClusterInstallFailedClusterDeploymentCondition)
+	// dereference the condition so that the reference isn't clobbered by other updates to the conditions array
+	clusterInstallFailed := *controllerutils.FindCondition(conditions, hivev1.ClusterInstallFailedClusterDeploymentCondition)
 	updated := false
 	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 		hivev1.ProvisionFailedCondition, // this transformation is part of the contract
-		failed.Status,
-		failed.Reason,
-		failed.Message,
+		clusterInstallFailed.Status,
+		clusterInstallFailed.Reason,
+		clusterInstallFailed.Message,
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 	if updated {
@@ -116,10 +117,10 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	// update installed = true when completed
 	// update the installed timestamp when complete
 
-	requirementsMet := controllerutils.FindCondition(conditions, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition)
-	if requirementsMet.Status == corev1.ConditionTrue {
-		if !reflect.DeepEqual(cd.Status.InstallStartedTimestamp, &requirementsMet.LastTransitionTime) {
-			cd.Status.InstallStartedTimestamp = &requirementsMet.LastTransitionTime
+	clusterInstallRequirementsMet := controllerutils.FindCondition(conditions, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition)
+	if clusterInstallRequirementsMet.Status == corev1.ConditionTrue {
+		if !reflect.DeepEqual(cd.Status.InstallStartedTimestamp, &clusterInstallRequirementsMet.LastTransitionTime) {
+			cd.Status.InstallStartedTimestamp = &clusterInstallRequirementsMet.LastTransitionTime
 			statusModified = true
 
 			kickstartDuration := time.Since(ci.CreationTimestamp.Time)
@@ -128,80 +129,134 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		}
 	}
 
-	completed := controllerutils.FindCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
-	stopped := controllerutils.FindCondition(conditions, hivev1.ClusterInstallStoppedClusterDeploymentCondition)
+	// dereference the conditions so that the references aren't clobbered by other updates to the conditions array
+	clusterInstallStopped := *controllerutils.FindCondition(conditions, hivev1.ClusterInstallStoppedClusterDeploymentCondition)
+	clusterInstallCompleted := *controllerutils.FindCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
 
-	reason := stopped.Reason
-	msg := stopped.Message
-	if stopped.Status == corev1.ConditionTrue && completed.Status == corev1.ConditionFalse {
+	reason := clusterInstallStopped.Reason
+	msg := clusterInstallStopped.Message
+	if clusterInstallStopped.Status == corev1.ConditionTrue && clusterInstallCompleted.Status == corev1.ConditionFalse && clusterInstallFailed.Status == corev1.ConditionTrue {
 		// we must have reached the limit for retrying and therefore
 		// gave up with not completed
 		reason = installAttemptsLimitReachedReason
 		msg = "Install attempts limit reached"
 	}
 
-	updated = false
+	changedClusterDeploymentStoppedCondition := false
 	// Fun extra variable to keep track of whether we should increment metricProvisionFailedTerminal
 	// later; because we only want to do that if (we change that status and) the status update succeeds.
 	provisionFailedTerminal := false
-	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
+	conditions, changedClusterDeploymentStoppedCondition = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 		hivev1.ProvisionStoppedCondition,
-		stopped.Status,
+		clusterInstallStopped.Status,
 		reason,
 		msg,
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
-	if updated {
-		statusModified = true
-		provisionFailedTerminal = true
-		conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+
+	if clusterInstallStopped.Status == corev1.ConditionTrue && !changedClusterDeploymentStoppedCondition {
+		// they are stopped, we are already stopped, exit early
+		return reconcile.Result{}, nil
+	}
+
+	// if we are still provisioning...
+	if clusterInstallStopped.Status != corev1.ConditionTrue && clusterInstallCompleted.Status != corev1.ConditionTrue && clusterInstallFailed.Status != corev1.ConditionTrue {
+		// let the end user know
+		conditions, statusModified = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionFalse,
-			hivev1.ProvisionedReasonProvisionStopped,
-			"Provisioning failed terminally (see the ProvisionStopped condition for details)",
+			hivev1.ProvisionedReasonProvisioning,
+			"Provisioning in progress",
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
 	}
 
-	completed = controllerutils.FindCondition(conditions, hivev1.ClusterInstallCompletedClusterDeploymentCondition)
-	if completed.Status == corev1.ConditionTrue { // the cluster install is complete
-		cd.Spec.Installed = true
-		cd.Status.InstalledTimestamp = &completed.LastTransitionTime
-		cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
-			cd.Status.Conditions,
-			hivev1.ProvisionedCondition,
-			corev1.ConditionTrue,
-			hivev1.ProvisionedReasonProvisioned,
-			"Cluster is provisioned",
-			controllerutils.UpdateConditionAlways,
-		)
-		specModified = true
-		statusModified = true
+	// if the cluster install has very recently become stopped...
+	if clusterInstallStopped.Status == corev1.ConditionTrue && changedClusterDeploymentStoppedCondition {
 
-		installStartTime := ci.CreationTimestamp
-		if cd.Status.InstallStartedTimestamp != nil {
-			installStartTime = *cd.Status.InstallStartedTimestamp // we expect that the install started when requirements met
+		// ...and is also failed...
+		if clusterInstallFailed.Status == corev1.ConditionTrue {
+			// terminal state, we are not retrying anymore
+			statusModified = true
+			provisionFailedTerminal = true
+			conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionFalse,
+				hivev1.ProvisionedReasonProvisionStopped,
+				"Provisioning failed terminally (see the ProvisionStopped condition for details)",
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
 		}
-		installDuration := cd.Status.InstalledTimestamp.Sub(installStartTime.Time)
-		logger.WithField("duration", installDuration.Seconds()).Debug("install job completed")
-		metricInstallJobDuration.Observe(float64(installDuration.Seconds()))
 
-		metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
-			Observe(float64(cd.Status.InstallRestarts))
+		// ...and is complete...
+		if clusterInstallCompleted.Status == corev1.ConditionTrue {
+			// we are done provisioning
+			cd.Spec.Installed = true
+			cd.Status.InstalledTimestamp = &clusterInstallCompleted.LastTransitionTime
+			cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+				cd.Status.Conditions,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionTrue,
+				hivev1.ProvisionedReasonProvisioned,
+				"Cluster is provisioned",
+				controllerutils.UpdateConditionAlways,
+			)
+			specModified = true
+			statusModified = true
 
-		metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+			installStartTime := ci.CreationTimestamp
+			if cd.Status.InstallStartedTimestamp != nil {
+				installStartTime = *cd.Status.InstallStartedTimestamp // we expect that the install started when requirements met
+			}
+			installDuration := cd.Status.InstalledTimestamp.Sub(installStartTime.Time)
+			logger.WithField("duration", installDuration.Seconds()).Debug("install job completed")
+			metricInstallJobDuration.Observe(float64(installDuration.Seconds()))
 
-		if r.protectedDelete {
-			// Set protected delete on for the ClusterDeployment.
-			// If the ClusterDeployment already has the ProtectedDelete annotation, do not overwrite it. This allows the
-			// user an opportunity to explicitly exclude a ClusterDeployment from delete protection at the time of
-			// creation of the ClusterDeployment.
-			if _, annotationPresent := cd.Annotations[constants.ProtectedDeleteAnnotation]; !annotationPresent {
-				initializeAnnotations(cd)
-				cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
-				specModified = true
+			metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
+				Observe(float64(cd.Status.InstallRestarts))
+
+			metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+
+			if r.protectedDelete {
+				// Set protected delete on for the ClusterDeployment.
+				// If the ClusterDeployment already has the ProtectedDelete annotation, do not overwrite it. This allows the
+				// user an opportunity to explicitly exclude a ClusterDeployment from delete protection at the time of
+				// creation of the ClusterDeployment.
+				if _, annotationPresent := cd.Annotations[constants.ProtectedDeleteAnnotation]; !annotationPresent {
+					initializeAnnotations(cd)
+					cd.Annotations[constants.ProtectedDeleteAnnotation] = "true"
+					specModified = true
+				}
 			}
 		}
+
+		// ...and is not failed or completed...
+		if clusterInstallFailed.Status != corev1.ConditionTrue && clusterInstallCompleted.Status != corev1.ConditionTrue {
+			// terminal state, cluster install contract has been violated
+			statusModified = true
+			provisionFailedTerminal = true
+			conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+				hivev1.ProvisionedCondition,
+				corev1.ConditionUnknown,
+				"Error",
+				"Invalid ClusterInstall conditions. Please report this bug.",
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
+			)
+		}
+	}
+
+	// if the cluster install is completed without being stopped...
+	if clusterInstallStopped.Status != corev1.ConditionTrue && clusterInstallCompleted.Status == corev1.ConditionTrue {
+		// terminal state, cluster install contract has been violated
+		statusModified = true
+		provisionFailedTerminal = true
+		conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionUnknown,
+			"Error",
+			"Invalid ClusterInstall conditions. Please report this bug.",
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
 	}
 
 	if specModified {

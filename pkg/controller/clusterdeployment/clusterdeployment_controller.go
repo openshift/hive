@@ -44,7 +44,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/clustersync"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
@@ -513,7 +512,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			// removed the finalizer.
 			clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
 			// Clear ClusterSyncFailing metric
-			clustersync.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
+			hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 			return reconcile.Result{}, nil
 		}
@@ -1422,7 +1421,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 
 	clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
 	// Clear ClusterSyncFailing metric
-	clustersync.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
+	hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 	// Increment the clusters deleted counter:
 	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
@@ -2113,7 +2112,7 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 			message = "ClusterSync has not yet been created"
 		}
 		// In case the clusterSync has been deleted at this point, clear the clusterSyncFailing metric
-		clustersync.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
+		hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 	case err != nil:
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return err

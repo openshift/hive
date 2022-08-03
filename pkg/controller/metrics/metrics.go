@@ -464,6 +464,15 @@ func ShouldLogGaugeDurationMetric(metricToLog *prometheus.GaugeVec, timeToLog fl
 	return ok && duration.Seconds() <= timeToLog
 }
 
+func ClearClusterSyncFailingSecondsMetric(namespace string, name string, log log.FieldLogger) {
+	cleared := MetricClusterSyncFailingSeconds.Delete(map[string]string{
+		"namespaced_name": GetNameSpacedName(namespace, name),
+	})
+	if cleared {
+		log.Debug("cleared metric: %v", MetricClusterSyncFailingSeconds)
+	}
+}
+
 func (mc *Calculator) calculateSyncSetMetrics(mcLog log.FieldLogger) {
 	mcLog.Debug("calculating metrics across all ClusterSyncs")
 	clusterSyncList := &hiveintv1alpha1.ClusterSyncList{}
@@ -486,6 +495,8 @@ func (mc *Calculator) calculateSyncSetMetrics(mcLog log.FieldLogger) {
 			if ShouldLogGaugeDurationMetric(MetricClusterSyncFailingSeconds, seconds) {
 				MetricClusterSyncFailingSeconds.WithLabelValues(GetNameSpacedName(cs.Namespace, cs.Name)).Set(seconds)
 			}
+		} else {
+			ClearClusterSyncFailingSecondsMetric(cs.Namespace, cs.Name, mcLog)
 		}
 		for _, sss := range cs.Status.SelectorSyncSets {
 			sssInstancesTotal[sss.Name]++

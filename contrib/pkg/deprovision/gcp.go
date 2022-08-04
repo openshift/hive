@@ -2,7 +2,6 @@ package deprovision
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -12,6 +11,7 @@ import (
 	"github.com/openshift/installer/pkg/types"
 	typesgcp "github.com/openshift/installer/pkg/types/gcp"
 
+	"github.com/openshift/hive/contrib/pkg/utils"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/gcpclient"
 )
@@ -77,21 +77,10 @@ func (o *gcpOptions) Validate(cmd *cobra.Command) error {
 
 // Run executes the command
 func (o *gcpOptions) Run() error {
-	// Set log level
-	level, err := log.ParseLevel(o.logLevel)
+	logger, err := utils.NewLogger(o.logLevel)
 	if err != nil {
-		log.WithError(err).Error("cannot parse log level")
 		return err
 	}
-
-	logger := log.NewEntry(&log.Logger{
-		Out: os.Stdout,
-		Formatter: &log.TextFormatter{
-			FullTimestamp: true,
-		},
-		Hooks: make(log.LevelHooks),
-		Level: level,
-	})
 
 	metadata := &types.ClusterMetadata{
 		InfraID: o.infraID,

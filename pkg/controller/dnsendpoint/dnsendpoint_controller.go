@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/manageddns"
 )
@@ -174,6 +175,7 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
+	dnsLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: instance}, dnsLog)
 
 	if !instance.Spec.LinkToParentDomain {
 		return reconcile.Result{}, nil

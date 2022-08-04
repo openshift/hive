@@ -24,6 +24,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 )
@@ -110,6 +111,7 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
+	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
 		return reconcile.Result{}, nil

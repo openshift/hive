@@ -634,6 +634,7 @@ func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, err
 			},
 		},
 	}
+	utils.AddLogFieldsEnvVar(provision, job)
 
 	return job, nil
 }
@@ -711,6 +712,7 @@ func GenerateUninstallerJobForDeprovision(
 		job.Spec.Template.Spec.Containers[idx].Env = append(job.Spec.Template.Spec.Containers[idx].Env, extraEnvVars...)
 	}
 	controllerutils.SetProxyEnvVars(&job.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
+	utils.AddLogFieldsEnvVar(req, job)
 
 	return job, nil
 }

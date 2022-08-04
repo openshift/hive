@@ -30,6 +30,7 @@ func cleanupDNSZone(dynClient client.Client, cd *hivev1.ClusterDeployment, logge
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
 	if err := dynClient.Get(context.TODO(), dnsZoneNamespacedName, dnsZone); err != nil {
 		logger.WithError(err).Error("error looking up managed dnszone")
+		// TODO: Return the err?!?
 	}
 
 	switch {

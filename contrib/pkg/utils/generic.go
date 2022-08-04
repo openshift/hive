@@ -11,6 +11,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -70,4 +72,28 @@ func GetPullSecret(logger log.FieldLogger, pullSecret string, pullSecretFile str
 		return pullSecret, nil
 	}
 	return "", nil
+}
+
+func NewLogger(logLevel string) (*log.Entry, error) {
+
+	// Set log level
+	level, err := log.ParseLevel(logLevel)
+	if err != nil {
+		log.WithError(err).Error("cannot parse log level")
+		return nil, err
+	}
+
+	logger := log.NewEntry(&log.Logger{
+		Out: os.Stdout,
+		Formatter: &log.TextFormatter{
+			FullTimestamp: true,
+		},
+		Hooks: make(log.LevelHooks),
+		Level: level,
+	})
+
+	// Decorate with additional log fields, if requested
+	logger = utils.AddLogFields(utils.StringLogTagger{S: os.Getenv(constants.AdditionalLogFieldsEnvVar)}, logger)
+
+	return logger, nil
 }

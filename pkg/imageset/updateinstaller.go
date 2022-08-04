@@ -26,6 +26,7 @@ import (
 
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/contrib/pkg/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -82,21 +83,11 @@ func NewUpdateInstallerImageCommand() *cobra.Command {
 
 // Complete sets remaining fields on the UpdateInstallerImageOptions based on command options and arguments.
 func (o *UpdateInstallerImageOptions) Complete() error {
-	// Set log level
-	level, err := log.ParseLevel(o.LogLevel)
+	var err error
+	o.log, err = utils.NewLogger(o.LogLevel)
 	if err != nil {
-		log.WithError(err).Error("cannot parse log level")
 		return err
 	}
-
-	o.log = log.NewEntry(&log.Logger{
-		Out: os.Stdout,
-		Formatter: &log.TextFormatter{
-			FullTimestamp: true,
-		},
-		Hooks: make(log.LevelHooks),
-		Level: level,
-	})
 
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})

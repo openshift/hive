@@ -29,6 +29,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 )
@@ -120,6 +121,7 @@ func (r *ReconcileClusterState) Reconcile(ctx context.Context, request reconcile
 		logger.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, logger)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, logger)

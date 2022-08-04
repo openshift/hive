@@ -26,6 +26,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveint "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -106,6 +107,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		logger.WithError(err).Error("Error getting FakeClusterInstall")
 		return reconcile.Result{}, err
 	}
+	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: fci}, logger)
 
 	if !fci.DeletionTimestamp.IsZero() {
 		logger.Info("FakeClusterInstall resource has been deleted")

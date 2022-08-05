@@ -5,10 +5,12 @@ set -e
 TEST_NAME=e2e-pool
 source ${0%/*}/e2e-common.sh
 
-# TODO: Use something better here.
-# `make test-e2e-postdeploy` could work, but does more than we need.
-echo "Waiting for the deployment to settle"
-sleep 120
+echo "Waiting for the operator deployment to settle"
+oc wait --for=condition=Available --timeout=2m deploy/hive-operator -n $HIVE_OPERATOR_NS
+echo "Waiting for the controllers and admission deployments to settle"
+for deployment in hive-controllers hiveadmission; do
+  oc wait --for=condition=Available --timeout=2m deploy/$deployment -n $HIVE_NS
+done
 
 function create_imageset() {
   local is_name=$1

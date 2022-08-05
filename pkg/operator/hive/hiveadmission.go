@@ -50,7 +50,7 @@ var webhookAssets = []string{
 	"config/hiveadmission/selectorsyncset-webhook.yaml",
 }
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, additionalHashes ...string) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveNSName string, namespacesToClean []string, additionalHashes ...string) error {
 	deploymentAsset := "config/hiveadmission/deployment.yaml"
 	namespacedAssets := []string{
 		"config/hiveadmission/service.yaml",
@@ -67,8 +67,6 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 			}
 		}
 	}
-
-	hiveNSName := getHiveNamespace(instance)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
@@ -87,18 +85,6 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		if err := util.ApplyAssetWithGC(h, a, instance, hLog); err != nil {
 			return err
 		}
-	}
-
-	// Apply global ClusterRoleBindings which may need Subject namespace overrides for their ServiceAccounts.
-	clusterRoleBindingAssets := []string{
-		"config/hiveadmission/hiveadmission_rbac_role_binding.yaml",
-	}
-	for _, crbAsset := range clusterRoleBindingAssets {
-		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, instance); err != nil {
-			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
-			return err
-		}
-		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
 	}
 
 	asset := assets.MustAsset(deploymentAsset)
@@ -165,7 +151,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	}
 
 	// Set the serving cert CA secret hash as an annotation on the pod template to force a rollout in the event it changes:
-	servingCertSecret, err := r.hiveSecretLister.Secrets(hiveNSName).Get(hiveAdmissionServingCertSecretName)
+	servingCertSecret, err := r.hiveSecretListers[hiveNSName].Get(hiveAdmissionServingCertSecretName)
 	if err != nil {
 		hLog.WithError(err).WithField("secretName", hiveAdmissionServingCertSecretName).Log(
 			controllerutils.LogLevel(err), "error getting serving cert secret")
@@ -213,7 +199,7 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debugf("listing secrets in %s namespace", hiveNSName)
-	secrets, err := r.hiveSecretLister.Secrets(hiveNSName).List(labels.Everything())
+	secrets, err := r.hiveSecretListers[hiveNSName].List(labels.Everything())
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
 		return nil, nil, err

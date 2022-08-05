@@ -59,7 +59,7 @@ var (
 	}
 )
 
-func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, configHashes ...string) error {
+func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveNSName string, namespacesToClean []string, configHashes ...string) error {
 	deploymentAsset := "config/controllers/deployment.yaml"
 	namespacedAssets := []string{
 		"config/controllers/service.yaml",
@@ -159,8 +159,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		})
 	}
 
-	hiveNSName := getHiveNamespace(instance)
-
 	if awssp := instance.Spec.ServiceProviderCredentialsConfig.AWS; awssp != nil && awssp.CredentialsSecretRef.Name != "" {
 		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
 			Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
@@ -249,7 +247,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		})
 	}
 
-	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment, hiveContainer, namespacesToClean); err != nil {
+	if err := r.includeAdditionalCAs(hLog, h, instance, hiveDeployment, hiveContainer, hiveNSName, namespacesToClean); err != nil {
 		return err
 	}
 
@@ -288,20 +286,6 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 			hLog.WithField("asset", a).WithError(err).Error("error applying asset")
 			return err
 		}
-	}
-
-	// Apply global ClusterRoleBindings which may need Subject namespace overrides for their ServiceAccounts.
-	clusterRoleBindingAssets := []string{
-		"config/rbac/hive_frontend_role_binding.yaml",
-		"config/controllers/hive_controllers_role_binding.yaml",
-	}
-	for _, crbAsset := range clusterRoleBindingAssets {
-
-		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, instance); err != nil {
-			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
-			return err
-		}
-		hLog.WithField("asset", crbAsset).Info("applied ClusterRoleRoleBinding asset with namespace override")
 	}
 
 	// In very rare cases we use OpenShift specific types which will not apply if running on
@@ -347,7 +331,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	return nil
 }
 
-func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment, hiveContainer *corev1.Container, namespacesToClean []string) error {
+func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveDeployment *appsv1.Deployment, hiveContainer *corev1.Container, hiveNS string, namespacesToClean []string) error {
 	// Delete any additional CA secrets from previous target namespaces
 	for _, ns := range namespacesToClean {
 		hLog.Infof("Deleting secret/%s from old target namespace %s", hiveAdditionalCASecret, ns)
@@ -358,10 +342,9 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 		}
 	}
 
-	hiveNS := getHiveNamespace(instance)
 	additionalCA := &bytes.Buffer{}
 	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
-		caSecret, err := r.hiveSecretLister.Secrets(hiveNS).Get(clientCARef.Name)
+		caSecret, err := r.hiveSecretListers[hiveNS].Get(clientCARef.Name)
 		if err != nil {
 			hLog.WithError(err).WithField("secret", clientCARef.Name).Errorf("Cannot read client CA secret")
 			continue
@@ -374,7 +357,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 	}
 
 	if additionalCA.Len() == 0 {
-		caSecret, err := r.hiveSecretLister.Secrets(hiveNS).Get(hiveAdditionalCASecret)
+		caSecret, err := r.hiveSecretListers[hiveNS].Get(hiveAdditionalCASecret)
 		if err == nil {
 			err = h.Delete(caSecret.APIVersion, caSecret.Kind, caSecret.Namespace, caSecret.Name)
 			if err != nil {
@@ -388,7 +371,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 
 	caSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: getHiveNamespace(instance),
+			Namespace: hiveNS,
 			Name:      hiveAdditionalCASecret,
 		},
 		Data: map[string][]byte{
@@ -551,7 +534,7 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 }
 
 // reconcileMonitoring switches metrics exporting on or off, according to HiveConfig.Spec.ExportMetrics
-func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string) error {
+func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveNSName string, namespacesToClean []string) error {
 	patchFmt := `{"metadata": {"labels": {"openshift.io/cluster-monitoring": %s}}}`
 	enable := instance.Spec.ExportMetrics
 
@@ -579,8 +562,6 @@ func (r *ReconcileHiveConfig) reconcileMonitoring(hLog log.FieldLogger, h resour
 			}
 		}
 	}
-
-	hiveNSName := getHiveNamespace(instance)
 
 	var labelVal, metricsAction, resourceVerbing, resourceVerbed string
 	var kubeFunc func(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error

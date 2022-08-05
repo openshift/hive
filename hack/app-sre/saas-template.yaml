@@ -4436,6 +4436,16 @@ objects:
                   - name
                   - namespace
                   type: object
+                scaleMode:
+                  description: ScaleMode causes hive-operator to deploy controllers
+                    into multiple namespaces, which must be labeled with `hive.openshift.io/data-plane=true`,
+                    and must contain a secret named `data-plane-kubeconfig`. Each
+                    such deployment will use that secret to talk to a kube API server
+                    that will host its "data plane". That data plane will house all
+                    etcd objects needed by hive *except* those related to running
+                    containers (e.g. Pod, Job, Deployment, StatefulSet, ReplicaSet)
+                    which will run on the local "control plane" per usual.
+                  type: boolean
                 serviceProviderCredentialsConfig:
                   description: ServiceProviderCredentialsConfig is used to configure
                     credentials related to being a service provider on various cloud
@@ -4527,6 +4537,44 @@ objects:
                     HiveConfig object's generation.
                   format: int64
                   type: integer
+                targetNamespaces:
+                  description: TargetNamespaces contains a list of statuses of each
+                    namespace to which the hive controller stack is deployed.
+                  items:
+                    description: TargetNamespaceStatus defines the state of a single
+                      deployment of hive controllers to a target namespace.
+                    properties:
+                      lastTransitionTime:
+                        description: LastTransitionTime is the time when this status
+                          last changed.
+                        format: date-time
+                        type: string
+                      message:
+                        description: Message provides details on the status of the
+                          target namespace deployment in human-readable form.
+                        type: string
+                      name:
+                        description: Name is the name of the target namespace.
+                        type: string
+                      reason:
+                        description: Reason provides a machine-readable indicator
+                          of the cause of the result of the target namespace deployment.
+                        type: string
+                      result:
+                        description: Result is the result of the last attempt to deploy
+                          to the target namespace.
+                        enum:
+                        - Success
+                        - Failure
+                        type: string
+                    required:
+                    - lastTransitionTime
+                    - message
+                    - name
+                    - reason
+                    - result
+                    type: object
+                  type: array
               type: object
           type: object
       served: true

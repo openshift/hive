@@ -3,7 +3,6 @@ package util
 import (
 	"strings"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/utils/pointer"
@@ -92,23 +91,6 @@ func DeleteAssetWithNSOverride(h resource.Helper, assetPath, namespaceOverride s
 	objT, _ := meta.TypeAccessor(requiredObj)
 	if err := h.Delete(objT.GetAPIVersion(), objT.GetKind(), namespaceOverride, objA.GetName()); err != nil {
 		return errors.Wrapf(err, "unable to delete asset: %s", assetPath)
-	}
-	return nil
-}
-
-// ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC loads the given asset, overrides the namespace on the subject,
-// adds an owner reference to HiveConfig for uninstall, and applies it to the cluster.
-func ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h resource.Helper, roleBindingAssetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
-
-	rb := resourceread.ReadClusterRoleBindingV1OrDie(assets.MustAsset(roleBindingAssetPath))
-	for i := range rb.Subjects {
-		if rb.Subjects[i].Kind == "ServiceAccount" || rb.Subjects[i].Namespace != "" {
-			rb.Subjects[i].Namespace = namespaceOverride
-		}
-	}
-	_, err := ApplyRuntimeObjectWithGC(h, rb, hiveConfig)
-	if err != nil {
-		return errors.Wrapf(err, "unable to apply asset: %s", roleBindingAssetPath)
 	}
 	return nil
 }

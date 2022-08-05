@@ -149,6 +149,14 @@ type HiveConfigSpec struct {
 	// MetricsConfig encapsulates metrics specific configurations, like opting in for certain metrics.
 	// +optional
 	MetricsConfig *metricsconfig.MetricsConfig `json:"metricsConfig,omitempty"`
+
+	// ScaleMode causes hive-operator to deploy controllers into multiple namespaces, which must be labeled
+	// with `hive.openshift.io/data-plane=true`, and must contain a secret named `data-plane-kubeconfig`.
+	// Each such deployment will use that secret to talk to a kube API server that will host its "data plane".
+	// That data plane will house all etcd objects needed by hive *except* those related to running containers
+	// (e.g. Pod, Job, Deployment, StatefulSet, ReplicaSet) which will run on the local "control plane" per usual.
+	// +optional
+	ScaleMode bool `json:"scaleMode"`
 }
 
 // ReleaseImageVerificationConfigMapReference is a reference to the ConfigMap that
@@ -318,6 +326,11 @@ type HiveConfigStatus struct {
 	// Conditions includes more detailed status for the HiveConfig
 	// +optional
 	Conditions []HiveConfigCondition `json:"conditions,omitempty"`
+
+	// TargetNamespaces contains a list of statuses of each namespace to which the hive controller stack
+	// is deployed.
+	// +optional
+	TargetNamespaces []TargetNamespaceStatus `json:"targetNamespaces,omitempty"`
 }
 
 // HiveConfigCondition contains details for the current condition of a HiveConfig
@@ -347,6 +360,42 @@ const (
 	// HiveReadyCondition is set when hive is deployed successfully and ready to provision clusters
 	HiveReadyCondition HiveConfigConditionType = "Ready"
 )
+
+// TargetNamespaceStatus defines the state of a single deployment of hive controllers to a target namespace.
+type TargetNamespaceStatus struct {
+	// Name is the name of the target namespace.
+	Name string `json:"name"`
+
+	// Result is the result of the last attempt to deploy to the target namespace.
+	Result TargetNamespaceDeploymentResult `json:"result"`
+
+	// Reason provides a machine-readable indicator of the cause of the result of the target namespace deployment.
+	Reason TargetNamespaceDeploymentReason `json:"reason"`
+
+	// Message provides details on the status of the target namespace deployment in human-readable form.
+	Message string `json:"message"`
+
+	// LastTransitionTime is the time when this status last changed.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+}
+
+// TargetNamespaceDeploymentResult is the result of an attempt to deploy to a target namespace
+// +kubebuilder:validation:Enum=Success;Failure
+type TargetNamespaceDeploymentResult string
+
+const (
+	// SuccessTargetNamespaceDeploymentResult is the result deploying to a target namespace succeeded.
+	SuccessTargetNamespaceDeploymentResult TargetNamespaceDeploymentResult = "Success"
+
+	// FailureTargetNamespaceDeploymentResult is the result when something went wrong attempting to
+	// deploy to a target namespace.
+	FailureTargetNamespaceDeploymentResult TargetNamespaceDeploymentResult = "Failure"
+)
+
+// TargetNamespaceDeploymentReason is a machine-readable indicator of the cause of the result of the
+// target namespace deployment.
+// TODO: kubebuilder enum and consts from hive_controller.go.
+type TargetNamespaceDeploymentReason string
 
 // ArgoCDConfig contains settings for integration with ArgoCD.
 type ArgoCDConfig struct {

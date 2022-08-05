@@ -479,6 +479,15 @@ const (
 	// generating installer manifests. This will be effective in-cluster credentials mode. The valid values for
 	// credentials mode are "Manual", "Mint" and "Passthrough"
 	OverrideInClusterCredentialsModeAnnotation = "hive.openshift.io/override-in-cluster-credentials-mode"
+
+	// DataPlaneNamespaceLabel should be set to `true` on a namespace in which hive should run a deployment when
+	// HiveConfig.Spec.ScaleMode is true.
+	DataPlaneNamespaceLabel = "hive.openshift.io/data-plane"
+
+	// DataPlaneKubeconfigSecretName is the name of a Secret in a namespace designated as a data plane in scale mode.
+	// The secret must contain a kubeconfig key from which a client with appropriate access and permissions can be
+	// built to talk to the data plane.
+	DataPlaneKubeconfigSecretName = "data-plane-kubeconfig"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

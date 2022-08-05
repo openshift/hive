@@ -14,18 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
-
-func getHiveNamespace(config *hivev1.HiveConfig) string {
-	if config.Spec.TargetNamespace == "" {
-		return constants.DefaultHiveNamespace
-	}
-
-	return config.Spec.TargetNamespace
-}
 
 func dynamicDelete(dynamicClient dynamic.Interface, gvrnsn gvrNSName, hLog log.FieldLogger) error {
 	rLog := hLog.WithField("resource", gvrnsn)

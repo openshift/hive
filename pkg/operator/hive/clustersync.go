@@ -24,7 +24,7 @@ const (
 	defaultClustersyncReplicas = 1
 )
 
-func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource.Helper, hiveconfig *hivev1.HiveConfig, hiveControllersConfigHash string, namespacesToClean []string) error {
+func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource.Helper, hiveconfig *hivev1.HiveConfig, hiveControllersConfigHash, hiveNSName string, namespacesToClean []string) error {
 	ssAsset := "config/clustersync/statefulset.yaml"
 	namespacedAssets := []string{
 		"config/clustersync/service.yaml",
@@ -84,8 +84,6 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
-
-	hiveNSName := getHiveNamespace(hiveconfig)
 
 	if newClusterSyncStatefulSet.Spec.Template.Annotations == nil {
 		newClusterSyncStatefulSet.Spec.Template.Annotations = make(map[string]string, 1)

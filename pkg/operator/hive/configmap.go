@@ -253,7 +253,7 @@ var featureGatesConfigMapInfo = configMapInfo{
 //
 // namespacesToClean is a list of strings indicating former target namespaces from which this configmap
 // is to be deleted.
-func (r *ReconcileHiveConfig) deployConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, cmInfo configMapInfo, namespacesToClean []string) (string, error) {
+func (r *ReconcileHiveConfig) deployConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, cmInfo configMapInfo, hiveNSName string, namespacesToClean []string) (string, error) {
 	cmLog := hLog.WithField("configMap.name", cmInfo.name)
 
 	// Delete the configmap from previous target namespaces
@@ -268,7 +268,7 @@ func (r *ReconcileHiveConfig) deployConfigMap(hLog log.FieldLogger, h resource.H
 
 	cm := &corev1.ConfigMap{}
 	cm.Name = cmInfo.name
-	cm.Namespace = getHiveNamespace(instance)
+	cm.Namespace = hiveNSName
 	cm.Data = make(map[string]string)
 
 	if cmInfo.setData != nil {

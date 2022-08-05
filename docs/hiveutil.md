@@ -45,8 +45,10 @@ Credentials will be read from either `~/.azure/osServicePrincipal.json`, the con
 ```
 
 ```bash
-bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup mycluster
+bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=azure --azure-base-domain-resource-group-name=myresourcegroup --azure-cloud-name=AzurePublicCloud mycluster
 ```
+
+NOTE: `--azure-cloud-name=AzurePublicCloud` specifies the Azure Cloud in which the cluster will be created e.g. `AzurePublicCloud` or `AzureUSGovernmentCloud`.
 
 NOTE: For deprovisioning a cluster `hiveutil` will use creds from `~/.azure/osServiceAccount.json` or the `AZURE_AUTH_LOCATION` environment variable (with the environment variable prefered).
 

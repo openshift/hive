@@ -407,9 +407,11 @@ and replace the contents of `platform` with:
 
 ```yaml
   azure:
+    cloudName: AzurePublicCloud
     baseDomainResourceGroupName: my-bdrgn
     region: centralus
 ```
+Note: `cloudName` specifies the Azure Cloud in which to create the cluster e.g. `AzurePublicCloud` or `AzureUSGovernmentCloud`.
 
 For GCP, replace the contents of `compute.platform` and `controlPlane.platform` with:
 ```yaml
@@ -565,8 +567,11 @@ azure:
   baseDomainResourceGroupName: my-bdrgn
   credentialsSecretRef:
     name: mycluster-azure-creds
+  cloudName: AzurePublicCloud
   region: centralus
 ```
+Note: `cloudName` specifies the Azure Cloud in which to create the cluster e.g. `AzurePublicCloud` or `AzureUSGovernmentCloud`.
+
 
 For GCP, replace the contents of `spec.platform` with:
 

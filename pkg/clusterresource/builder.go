@@ -250,7 +250,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	allObjects = append(allObjects, additionalCloudObjects...)
 
 	if o.InstallerManifests != nil {
-		allObjects = append(allObjects, o.generateInstallerManifestsConfigMap())
+		allObjects = append(allObjects, o.generateInstallerManifestsSecret())
 	}
 
 	if o.Adopt {
@@ -339,8 +339,8 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	}
 
 	if o.InstallerManifests != nil {
-		cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{
-			Name: o.getManifestsConfigMapName(),
+		cd.Spec.Provisioning.ManifestsSecretRef = &corev1.LocalObjectReference{
+			Name: o.getManifestsSecretName(),
 		}
 	}
 
@@ -595,17 +595,17 @@ func (o *Builder) generateAdminKubeconfigSecret() *corev1.Secret {
 	}
 }
 
-func (o *Builder) generateInstallerManifestsConfigMap() *corev1.ConfigMap {
-	return &corev1.ConfigMap{
+func (o *Builder) generateInstallerManifestsSecret() *corev1.Secret {
+	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
+			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      o.getManifestsConfigMapName(),
+			Name:      o.getManifestsSecretName(),
 			Namespace: o.Namespace,
 		},
-		BinaryData: o.InstallerManifests,
+		Data: o.InstallerManifests,
 	}
 }
 
@@ -630,7 +630,7 @@ func (o *Builder) generateAdoptedAdminPasswordSecret() *corev1.Secret {
 	return adminPasswordSecret
 }
 
-func (o *Builder) getManifestsConfigMapName() string {
+func (o *Builder) getManifestsSecretName() string {
 	return fmt.Sprintf("%s-manifests", o.Name)
 }
 func (o *Builder) getAdoptAdminPasswordSecretName() string {

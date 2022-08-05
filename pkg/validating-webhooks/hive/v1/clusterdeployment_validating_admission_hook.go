@@ -300,11 +300,14 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		if cd.Spec.Provisioning.SSHPrivateKeySecretRef != nil && cd.Spec.Provisioning.SSHPrivateKeySecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "sshPrivateKeySecretRef", "name"), "must specify a name for the ssh private key secret if the ssh private key secret is specified"))
 		}
-		if cd.Spec.Platform.IBMCloud != nil && cd.Spec.Provisioning.ManifestsConfigMapRef == nil {
-			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "manifestsConfigMapRef"), "must specify manifestsConfigMapRef when platform is IBM Cloud"))
+		if cd.Spec.Platform.IBMCloud != nil && cd.Spec.Provisioning.ManifestsConfigMapRef == nil && cd.Spec.Provisioning.ManifestsSecretRef == nil {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "must specify manifestsConfigMapRef or manifestsSecretRef when platform is IBM Cloud"))
 		}
-		if cd.Spec.Platform.AlibabaCloud != nil && cd.Spec.Provisioning.ManifestsConfigMapRef == nil {
-			allErrs = append(allErrs, field.Required(specPath.Child("provisioning", "manifestsConfigMapRef"), "must specify manifestsConfigMapRef when platform is Alibaba Cloud"))
+		if cd.Spec.Platform.AlibabaCloud != nil && cd.Spec.Provisioning.ManifestsConfigMapRef == nil && cd.Spec.Provisioning.ManifestsSecretRef == nil {
+			allErrs = append(allErrs, field.Required(specPath.Child("provisioning"), "must specify manifestsConfigMapRef or manifestsSecretRef when platform is Alibaba Cloud"))
+		}
+		if cd.Spec.Provisioning.ManifestsConfigMapRef != nil && cd.Spec.Provisioning.ManifestsSecretRef != nil {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("provisioning", "manifestsConfigMapRef"), cd.Spec.Provisioning.ManifestsConfigMapRef.Name, "manifestsConfigMapRef and manifestsSecretRef are mutually exclusive"))
 		}
 	}
 

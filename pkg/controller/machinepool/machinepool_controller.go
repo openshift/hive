@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -820,12 +821,23 @@ func (r *ReconcileMachinePool) syncClusterAutoscaler(
 		}
 	}
 	if defaultClusterAutoscaler != nil {
-		if spec := &defaultClusterAutoscaler.Spec; spec.ScaleDown == nil || !spec.ScaleDown.Enabled {
-			logger.Info("updaing cluster autoscaler")
-			if spec.ScaleDown == nil {
-				spec.ScaleDown = &autoscalingv1.ScaleDownConfig{}
-			}
+		spec := &defaultClusterAutoscaler.Spec
+		changed := false
+		if spec.ScaleDown == nil {
+			spec.ScaleDown = &autoscalingv1.ScaleDownConfig{}
+		}
+		// Ensure spec.ScaleDown.Enabled = true
+		if !spec.ScaleDown.Enabled {
 			spec.ScaleDown.Enabled = true
+			changed = true
+		}
+		// Default spec.BalanceSimilarNodeGroups to true if unset.
+		if spec.BalanceSimilarNodeGroups == nil {
+			spec.BalanceSimilarNodeGroups = pointer.BoolPtr(true)
+			changed = true
+		}
+		if changed {
+			logger.Info("updaing cluster autoscaler")
 			if err := remoteClusterAPIClient.Update(context.Background(), defaultClusterAutoscaler); err != nil {
 				logger.WithError(err).Error("could not update cluster autoscaler")
 				return err
@@ -841,6 +853,7 @@ func (r *ReconcileMachinePool) syncClusterAutoscaler(
 				ScaleDown: &autoscalingv1.ScaleDownConfig{
 					Enabled: true,
 				},
+				BalanceSimilarNodeGroups: pointer.BoolPtr(true),
 			},
 		}
 		if err := remoteClusterAPIClient.Create(context.Background(), defaultClusterAutoscaler); err != nil {

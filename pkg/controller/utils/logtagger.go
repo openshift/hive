@@ -2,7 +2,6 @@ package utils
 
 import (
 	"encoding/json"
-	"errors"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -60,10 +59,15 @@ func parseLogFields(jsonMap string) (map[string]interface{}, error) {
 
 }
 
+// ExtractLogFields knows where to look in an AdditionalLogFieldHavinThing for additional log
+// fields. It attempts to extract them and parse them as a JSON string representing a map. If
+// no such fields are found, both returns are nil -- this is not considered an error. If
+// parsing succeeds, the first return is the unmarshaled map and the second return is nil. If
+// parsing fails, the map is nil and the error is bubbled up.
 func ExtractLogFields[O AdditionalLogFieldHavinThing](obj O) (map[string]interface{}, error) {
 	addl_log_fields := obj.GetAdditionalLogFieldsJSON()
 	if addl_log_fields == nil {
-		return nil, errors.New("no additional log fields found")
+		return nil, nil
 	}
 
 	return parseLogFields(*addl_log_fields)
@@ -73,6 +77,8 @@ func AddLogFields[O AdditionalLogFieldHavinThing](obj O, logger *log.Entry) *log
 	switch kvmap, err := ExtractLogFields(obj); {
 	case err != nil:
 		logger.WithError(err).Warning("failed to extract additional log fields -- ignoring")
+	case kvmap == nil:
+		logger.Debug("no additional log fields found")
 	case kvmap != nil:
 		logger = logger.WithFields(log.Fields(kvmap))
 	}

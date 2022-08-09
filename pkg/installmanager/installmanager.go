@@ -1001,9 +1001,12 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 
 	// Set up additional log fields
 	suffix := ""
-	if fields, err := utils.ExtractLogFields(utils.MetaObjectLogTagger{Object: m.ClusterProvision}); err != nil {
+	switch fields, err := utils.ExtractLogFields(utils.MetaObjectLogTagger{Object: m.ClusterProvision}); {
+	case err != nil:
 		m.log.WithError(err).Warning("failed to extract additional log fields -- ignoring")
-	} else {
+	case fields == nil:
+		m.log.Debug("no additional log fields found")
+	default:
 		// We should get this with component=hive; override to indicate that the component
 		// being tagged now is the installer
 		fields["component"] = "installer"

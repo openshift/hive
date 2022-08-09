@@ -49,7 +49,7 @@ type: Opaque
 
 ### Create Authentication Manifest
 
-In the same directory as your Secret manifets, add another file named `cluster-authentication-02-config.yaml` to configure the OpenShift Authentication operator to use the S3 OIDC provider created by `ccoctl create identity-provider`.
+In the same directory as your Secret manifests, add another file named `cluster-authentication-02-config.yaml` to configure the OpenShift Authentication operator to use the S3 OIDC provider created by `ccoctl create identity-provider`.
 
 ```yaml
 apiVersion: config.openshift.io/v1
@@ -67,7 +67,7 @@ May also soon be automated by ccoctl.
 Create a ClusterDeployment normally with the following changes:
 
   1. Create a Secret for your private service account signing key created with ccoctl key-pair above: `kubectl create secret generic bound-service-account-signing-key --from-file=bound-service-account-signing-key.key=serviceaccount-signer.private`
-  1. Create a ConfigMap for your installer manifets (credential role Secrets, Authentication config): `kubectl create configmap cluster-manifests --from-file=manifests/`
+  1. Create a Secret for your installer manifests (credential role Secrets, Authentication config): `kubectl create secret generic cluster-manifests --from-file=manifests/`
   1. In your InstallConfig set `credentialsMode: Manual`
   1. In your ClusterDeployment set `spec.boundServiceAccountSigningKeySecretRef.name` to point to the Secret created above. (bound-service-account-signing-key)
   1. In your ClusterDeployment set `spec.provisioning.manifestsConfigMapRef` to point to the ConfigMap created above. (cluster-manifests)

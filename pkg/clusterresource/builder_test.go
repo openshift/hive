@@ -343,9 +343,9 @@ metadata:
 			nc := int64(workerNodeCount)
 			assert.Equal(t, &nc, workerPool.Spec.Replicas)
 
-			manifestsConfigMap := findConfigMap(allObjects, fmt.Sprintf("%s-%s", clusterName, "manifests"))
-			require.NotNil(t, manifestsConfigMap)
-			assert.Equal(t, manifestsConfigMap.Name, cd.Spec.Provisioning.ManifestsConfigMapRef.Name)
+			manifestsSecret := findSecret(allObjects, fmt.Sprintf("%s-%s", clusterName, "manifests"))
+			require.NotNil(t, manifestsSecret)
+			assert.Equal(t, manifestsSecret.Name, cd.Spec.Provisioning.ManifestsSecretRef.Name)
 
 			test.validate(t, allObjects)
 		})
@@ -382,19 +382,6 @@ func findClusterDeployment(allObjects []runtime.Object, name string) *hivev1.Clu
 func findMachinePool(allObjects []runtime.Object, name string) *hivev1.MachinePool {
 	for _, ro := range allObjects {
 		obj, ok := ro.(*hivev1.MachinePool)
-		if !ok {
-			continue
-		}
-		if obj.Name == name {
-			return obj
-		}
-	}
-	return nil
-}
-
-func findConfigMap(allObjects []runtime.Object, name string) *corev1.ConfigMap {
-	for _, ro := range allObjects {
-		obj, ok := ro.(*corev1.ConfigMap)
 		if !ok {
 			continue
 		}

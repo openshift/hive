@@ -422,18 +422,30 @@ func InstallerPodSpec(
 		)
 	}
 
-	if cd.Spec.Provisioning.ManifestsConfigMapRef != nil {
+	// Mount additional manifests if supplied via configmap or secret
+	if cmr, sr := cd.Spec.Provisioning.ManifestsConfigMapRef, cd.Spec.Provisioning.ManifestsSecretRef; cmr != nil || sr != nil {
+		var vs corev1.VolumeSource
+		// Webhooks should prevent both of these getting set; but if somehow they do, the secret gets precedence
+		if sr != nil {
+			vs = corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: sr.Name,
+				},
+			}
+		} else {
+			vs = corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cmr.Name,
+					},
+				},
+			}
+		}
 		volumes = append(
 			volumes,
 			corev1.Volume{
-				Name: "manifests",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: cd.Spec.Provisioning.ManifestsConfigMapRef.Name,
-						},
-					},
-				},
+				Name:         "manifests",
+				VolumeSource: vs,
 			},
 		)
 		volumeMounts = append(

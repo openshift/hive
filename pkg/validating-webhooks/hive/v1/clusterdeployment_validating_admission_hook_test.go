@@ -161,7 +161,7 @@ func validIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
 		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
 		Region:               "us-east",
 	}
-	cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{Name: "fake-manifests-configmap"}
+	cd.Spec.Provisioning.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "fake-manifests-secret"}
 	return cd
 }
 
@@ -1010,10 +1010,58 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name: "IBMCloud create missing manifests",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validIBMCloudClusterDeployment()
+				cd.Spec.Provisioning.ManifestsConfigMapRef = nil
+				cd.Spec.Provisioning.ManifestsSecretRef = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
 			name:            "Alibaba Cloud create valid",
 			newObject:       validAlibabaCloudClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
+		},
+		{
+			name: "Alibaba Cloud create missing manifests",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAlibabaCloudClusterDeployment()
+				cd.Spec.Provisioning.ManifestsConfigMapRef = nil
+				cd.Spec.Provisioning.ManifestsSecretRef = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "manifestsConfigMapRef and manifestsSecretRef mutually exclusive (create)",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{
+					Name: "foo",
+				}
+				cd.Spec.Provisioning.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "bar"}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			// This gets caught by the "Spec is immutable except [... not Provisioning ...]" check
+			name:      "manifestsConfigMapRef and manifestsSecretRef mutually exclusive (update)",
+			oldObject: validAlibabaCloudClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAlibabaCloudClusterDeployment()
+				// Already has ManifestsConfigMapRef
+				cd.Spec.Provisioning.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "bar"}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
 		},
 		{
 			name: "private link set, but disabled, no config",

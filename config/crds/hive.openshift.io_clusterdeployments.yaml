@@ -951,7 +951,19 @@ spec:
                   manifestsConfigMapRef:
                     description: ManifestsConfigMapRef is a reference to user-provided
                       manifests to add to or replace manifests that are generated
-                      by the installer.
+                      by the installer. It serves the same purpose as, and is mutually
+                      exclusive with, ManifestsSecretRef.
+                    properties:
+                      name:
+                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          TODO: Add other useful fields. apiVersion, kind, uid?'
+                        type: string
+                    type: object
+                  manifestsSecretRef:
+                    description: ManifestsSecretRef is a reference to user-provided
+                      manifests to add to or replace manifests that are generated
+                      by the installer. It serves the same purpose as, and is mutually
+                      exclusive with, ManifestsConfigMapRef.
                     properties:
                       name:
                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names

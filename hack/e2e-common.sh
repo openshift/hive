@@ -118,6 +118,13 @@ function save_hive_logs() {
       fi
     done
   done
+  # Let's try to save any prov/deprov pod logs
+  oc get po -A -l hive.openshift.io/install=true -o custom-columns=:.metadata.namespace,:.metadata.name --no-headers | while read ns po; do
+    oc logs -n $ns $po -c hive > ${ARTIFACT_DIR}/${ns}-${po}.log
+  done
+  oc get po -A -l hive.openshift.io/uninstall=true -o custom-columns=:.metadata.namespace,:.metadata.name --no-headers | while read ns po; do
+    oc logs -n $ns $po > ${ARTIFACT_DIR}/${ns}-${po}.log
+  done
 }
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.

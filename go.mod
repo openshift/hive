@@ -24,7 +24,7 @@ require (
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/json-iterator/go v1.1.11
 	github.com/miekg/dns v1.1.35
-	github.com/modern-go/reflect2 v1.0.1
+	github.com/modern-go/reflect2 v1.0.2
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0
 	github.com/openshift/api v0.0.0-20211119153416-313e51eab8c8

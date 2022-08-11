@@ -100,7 +100,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*R
 func AddToManager(mgr manager.Manager, r *ReconcileAWSPrivateLink, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
 	c, err := controller.New("awsprivatelink-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})

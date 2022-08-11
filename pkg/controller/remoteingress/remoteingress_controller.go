@@ -100,7 +100,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) rec
 func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
 	c, err := controller.New("remoteingress-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})

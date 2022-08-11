@@ -107,7 +107,7 @@ func Add(mgr manager.Manager) error {
 
 	// Create a new controller
 	c, err := controller.New("machinepool-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             queueRateLimiter,
 	})

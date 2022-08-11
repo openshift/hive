@@ -197,7 +197,7 @@ func resourceHelperBuilderFunc(
 func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
 	c, err := controller.New("clusterSync-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, r.logger),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})

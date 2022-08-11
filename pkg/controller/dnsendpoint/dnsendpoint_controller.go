@@ -58,7 +58,7 @@ func Add(mgr manager.Manager) error {
 		ControllerName.String(),
 		mgr,
 		controller.Options{
-			Reconciler:              reconciler,
+			Reconciler:              controllerutils.NewDelayingReconciler(reconciler, logger),
 			MaxConcurrentReconciles: concurrentReconciles,
 			RateLimiter:             queueRateLimiter,
 		},

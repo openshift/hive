@@ -162,7 +162,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 	logger := log.WithField("controller", ControllerName)
 	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(r, logger),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})

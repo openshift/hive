@@ -103,7 +103,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, 
 
 	// Create a new controller
 	c, err := controller.New("clusterprovision-controller", mgr, controller.Options{
-		Reconciler:              r,
+		Reconciler:              controllerutils.NewDelayingReconciler(provisionReconciler, provisionReconciler.logger),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})

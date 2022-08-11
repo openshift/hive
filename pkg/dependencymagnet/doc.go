@@ -1,3 +1,4 @@
+//go:build tools
 // +build tools
 
 // Package dependencymagnet is a package for setting dependencies used by extra-build tooling.

@@ -278,7 +278,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.HibernateAfter, "hibernate-after", "", "Automatically hibernate the cluster whenever it has been running for the given duration")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
 	flags.StringVar(&opt.BoundServiceAccountSigningKeyFile, "bound-service-account-signing-key-file", "", "Private service account signing key (often created with ccoutil create key-pair)")
-	flags.BoolVar(&opt.CredentialsModeManual, "credentials-mode-manual", false, "Configure the Cloud Credential Operator in the target cluster to Manual mode. Implies the use of --manifests-dir to inject custom Secrets for all CredentialsRequests in the cluster.")
+	flags.BoolVar(&opt.CredentialsModeManual, "credentials-mode-manual", false, "Configure the Cloud Credential Operator in the target cluster to Manual mode. Implies the use of --manifests to inject custom Secrets for all CredentialsRequests in the cluster.")
 
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
@@ -440,7 +440,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 	if o.CredentialsModeManual {
 		if o.ManifestsDir == "" {
-			return fmt.Errorf("--credentials-mode-manual requires --manifests-dir containing custom Secrets with manually provisioned credentials")
+			return fmt.Errorf("--credentials-mode-manual requires --manifests containing custom Secrets with manually provisioned credentials")
 		}
 	}
 

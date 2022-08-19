@@ -161,6 +161,11 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	newClusterSyncStatefulSet.Spec.Template.Spec.Tolerations = r.tolerations
 
 	newClusterSyncStatefulSet.Namespace = hiveNSName
+
+	if hiveconfig.Spec.ScaleMode {
+		controllerutils.AddDataPlaneKubeConfigVolume(&newClusterSyncStatefulSet.Spec.Template.Spec, hiveContainer)
+	}
+
 	result, err := util.ApplyRuntimeObjectWithGC(h, newClusterSyncStatefulSet, hiveconfig)
 	if err != nil {
 		hLog.WithError(err).Error("error applying statefulset")

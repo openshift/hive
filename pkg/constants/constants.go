@@ -488,6 +488,10 @@ const (
 	// The secret must contain a kubeconfig key from which a client with appropriate access and permissions can be
 	// built to talk to the data plane.
 	DataPlaneKubeconfigSecretName = "data-plane-kubeconfig"
+
+	// DataPlaneKubeconfigEnvVar is the name of an environment variable whose value is the path to the mounted kubeconfig
+	// secret for the data plane in a given target namespace.
+	DataPlaneKubeconfigEnvVar = "DATA_PLANE_KUBECONFIG"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

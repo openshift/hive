@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -391,4 +392,36 @@ func SetProxyEnvVars(podSpec *corev1.PodSpec, httpProxy, httpsProxy, noProxy str
 func SafeDelete(cl client.Client, ctx context.Context, obj client.Object) error {
 	rv := obj.GetResourceVersion()
 	return cl.Delete(ctx, obj, client.Preconditions{ResourceVersion: &rv})
+}
+
+func AddDataPlaneKubeConfigVolume(podSpec *corev1.PodSpec, container *corev1.Container) {
+	volname := "data-plane-kubeconfig"
+	filename := "kubeconfig"
+	mountpath := "/data/data-plane-kubeconfig"
+	volume := corev1.Volume{
+		Name: volname,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: constants.DataPlaneKubeconfigSecretName,
+				Items: []corev1.KeyToPath{
+					{
+						Key:  filename,
+						Path: filename,
+						Mode: pointer.Int32Ptr(0400),
+					},
+				},
+			},
+		},
+	}
+	volumeMount := corev1.VolumeMount{
+		Name:      volname,
+		MountPath: mountpath,
+	}
+	envVar := corev1.EnvVar{
+		Name:  constants.DataPlaneKubeconfigEnvVar,
+		Value: fmt.Sprintf("%s/%s", mountpath, filename),
+	}
+	podSpec.Volumes = append(podSpec.Volumes, volume)
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+	container.Env = append(container.Env, envVar)
 }

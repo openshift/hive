@@ -641,6 +641,23 @@ func (r *ReconcileHiveConfig) deployToNamespace(instance *hivev1.HiveConfig, h r
 		hLog.Info("target namespace created")
 	}
 
+	// Preflight check: in scale mode, the data plane kubeconfig secret must exist or we will refuse to deploy.
+	if instance.Spec.ScaleMode {
+		dpkcs := &corev1.Secret{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNSName, Name: constants.DataPlaneKubeconfigSecretName}, dpkcs); err != nil {
+			var reason hivev1.TargetNamespaceDeploymentReason = "ErrorFindingDataPlaneKubeConfigSecret"
+			// Give 404 a special reason code
+			if apierrors.IsNotFound(err) {
+				reason = "MissingDataPlaneKubeConfigSecret"
+			}
+			return targetNamespaceStatus(hiveNSName, err, reason, hLog)
+		}
+		// We're counting on the kubeconfig living in an element called `kubeconfig`
+		if _, exists := dpkcs.Data["kubeconfig"]; !exists {
+			return targetNamespaceStatus(hiveNSName, errors.New("data plane kubeconfig secret does not contain a 'kubeconfig' key"), "InvalidDataPlaneKubeConfigSecret", hLog)
+		}
+	}
+
 	// We used to name the managed domains configmap dynamically and look it up by label. We
 	// stopped doing that, but for upgrade purposes we should continue to look for and delete
 	// any such old configmaps for "a while".

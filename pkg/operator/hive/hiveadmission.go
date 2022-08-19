@@ -120,6 +120,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(), hiveAdmContainer)
 	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 
+	if instance.Spec.ScaleMode {
+		controllerutils.AddDataPlaneKubeConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, hiveAdmContainer)
+	}
+
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
 		asset = assets.MustAsset(yaml)

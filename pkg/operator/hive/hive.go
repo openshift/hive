@@ -148,6 +148,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, failedProvisionConfigMapInfo, hiveContainer)
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, metricsConfigConfigMapInfo, hiveContainer)
 
+	if instance.Spec.ScaleMode {
+		utils.AddDataPlaneKubeConfigVolume(&hiveDeployment.Spec.Template.Spec, hiveContainer)
+	}
+
 	// This triggers the clusterdeployment controller to copy the secret into the CD's namespace.
 	// It would be neat if it did that purely based on the FailedProvisionConfig ConfigMap, to
 	// which it does have access, but that code path is shared by other things that need the

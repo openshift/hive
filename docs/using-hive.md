@@ -293,6 +293,62 @@ metadata:
   namespace: mynamespace
 type: Opaque
 ```
+
+Create a `secret` containing your vSphere CA certificate.
+
+1. From the vCenter home page, download the vCenter’s root CA certificates. Click **Download trusted root CA certificates** in the vSphere Web Services SDK section. Download, wget or curl the <vCenter>/certs/download.zip file.
+```
+wget https://<vCenter>/certs/download.zip
+```
+2. Extract the compressed file that contains the vCenter root CA certificates. The contents of the compressed file resemble the following file structure:
+```
+certs
+├── lin
+│   ├── 108f4d17.0
+│   ├── 108f4d17.r1
+│   ├── 7e757f6a.0
+│   ├── 8e4f8471.0
+│   └── 8e4f8471.r0
+├── mac
+│   ├── 108f4d17.0
+│   ├── 108f4d17.r1
+│   ├── 7e757f6a.0
+│   ├── 8e4f8471.0
+│   └── 8e4f8471.r0
+└── win
+    ├── 108f4d17.0.crt
+    ├── 108f4d17.r1.crl
+    ├── 7e757f6a.0.crt
+    ├── 8e4f8471.0.crt
+    └── 8e4f8471.r0.crl
+
+3 directories, 15 files
+```
+3. Create a single file by concatenating all the files in certs/lin. Save the file somewhere permanent -- you'll need it for each vSphere cluster you want to create.
+```
+cat certs/lin/* > /home/me/vsphere/ca.cert
+```
+
+Create a secret containing the combined CA bundle data within a `.cacert` key:
+
+```
+oc create secret generic mycluster-vsphere-certs --from-file=.cacert=/home/me/vsphere/ca.cert
+```
+
+```yaml
+apiVersion: v1
+stringData:
+  .cacert: |
+    -----BEGIN CERTIFICATE-----
+    CA BUNDLE DATA HERE
+    -----END CERTIFICATE-----
+kind: Secret
+metadata:
+  name: mycluster-vsphere-certs
+  namespace: mynamespace
+type: Opaque
+```
+
 #### OpenStack
 
 Create a `secret` containing your OpenStack clouds.yaml file:

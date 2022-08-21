@@ -336,9 +336,8 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 		} else if claimName == "" {
 			if isBroken(&cd, pool, logger) {
 				cdCol.broken = append(cdCol.broken, ref)
-			} else if p := pool.Spec.Platform; cd.Spec.Installed {
-				alwaysRunning := p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil
-				if cd.Status.PowerState == hivev1.ClusterPowerStateRunning || alwaysRunning {
+			} else if cd.Spec.Installed {
+				if cd.Status.PowerState == hivev1.ClusterPowerStateRunning || poolAlwaysRunning(pool) {
 					cdCol.assignable = append(cdCol.assignable, ref)
 				} else {
 					cdCol.standby = append(cdCol.standby, ref)
@@ -797,6 +796,13 @@ func (cdcs *cdcCollection) Unassign(c client.Client, cdc *hivev1.ClusterDeployme
 
 	delete(cdcs.reserved, cdc.Name)
 
+	// remove duplicates
+	for i, cdci := range cdcs.unassigned {
+		if cdci.Name == cdc.Name {
+			copy(cdcs.unassigned[i:], cdcs.unassigned[i+1:])
+			cdcs.unassigned = cdcs.unassigned[:len(cdcs.unassigned)-1]
+		}
+	}
 	cdcs.unassigned = append(cdcs.unassigned, cdc)
 	cdcs.Sort()
 	return nil

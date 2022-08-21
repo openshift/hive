@@ -10,6 +10,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/pkg/test/generic"
 )
 
@@ -82,6 +83,15 @@ func ForAWS(credsSecretName, region string) Option {
 		clusterPool.Spec.Platform.AWS = &hivev1aws.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecretName},
 			Region:               "region",
+		}
+	}
+}
+
+func ForOpenstack(credsSecretName string) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.Platform.AWS = nil
+		clusterPool.Spec.Platform.OpenStack = &hivev1openstack.Platform{
+			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecretName},
 		}
 	}
 }

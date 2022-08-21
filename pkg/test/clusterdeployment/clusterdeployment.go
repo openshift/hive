@@ -137,10 +137,12 @@ func WithClusterPoolReference(namespace, poolName, claimName string) Option {
 		clusterDeployment.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
 			Namespace: namespace,
 			PoolName:  poolName,
-			ClaimName: claimName,
 		}
-		now := metav1.Now()
-		clusterDeployment.Spec.ClusterPoolRef.ClaimedTimestamp = &now
+		if claimName != "" {
+			clusterDeployment.Spec.ClusterPoolRef.ClaimName = claimName
+			now := metav1.Now()
+			clusterDeployment.Spec.ClusterPoolRef.ClaimedTimestamp = &now
+		}
 	}
 }
 

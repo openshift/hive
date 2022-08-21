@@ -115,6 +115,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		noClusterImageSet                  bool
 		noCredsSecret                      bool
 		expectError                        bool
+		expectedPools                      []string
 		expectedTotalClusters              int
 		expectedObservedSize               int32
 		expectedObservedReady              int32
@@ -125,6 +126,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedCDCurrentStatus            corev1.ConditionStatus
 		expectedInventoryValidStatus       corev1.ConditionStatus
 		expectedInventoryMessage           map[string][]string
+		expectedCDCFinalizers              map[string][]string
 		expectedCDCReason                  map[string]string
 		expectedPoolVersion                string
 		expectedMissingDependenciesMessage string
@@ -273,6 +275,54 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedAssignedCDs:      1,
 			expectedUnassignedClaims: 0,
 			expectedAssignedCDCs:     map[string]string{"test-cdc-1": "c1"},
+		},
+		{
+			name: "finalizer will be added to cdc if missing",
+			existing: []runtime.Object{
+				inventoryPoolBuilder().Build(testcp.WithSize(1)),
+				testcp.FullBuilder(testNamespace, "test-cp-2", scheme).
+					GenericOptions(
+						testgeneric.WithFinalizer(finalizer),
+					).
+					Options(
+						testcp.ForAWS(credsSecretName, "us-east-1"),
+						testcp.WithBaseDomain("test-domain"),
+						testcp.WithImageSet(imageSetName),
+					).
+					Build(
+						testcp.WithCondition(hivev1.ClusterPoolCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.ClusterPoolMissingDependenciesCondition,
+						}),
+						testcp.WithCondition(hivev1.ClusterPoolCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.ClusterPoolCapacityAvailableCondition,
+						}),
+						testcp.WithCondition(hivev1.ClusterPoolCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.ClusterPoolAllClustersCurrentCondition,
+						}),
+						testcp.WithCondition(hivev1.ClusterPoolCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.ClusterPoolInventoryValidCondition,
+						}),
+						testcp.WithInventory([]string{"test-cdc-2"}),
+						testcp.WithCondition(hivev1.ClusterPoolCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.ClusterPoolInventoryValidCondition,
+						}),
+					),
+				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(),
+				testcdc.FullBuilder(testNamespace, "test-cdc-2", scheme).Build(),
+			},
+			expectedPools: []string{testLeasePoolName, "test-cp-2"},
+			expectedCDCFinalizers: map[string][]string{
+				"test-cdc-1": {fmt.Sprintf("hive.openshift.io/%s", testLeasePoolName)},
+				"test-cdc-2": {"hive.openshift.io/test-cp-2"},
+			},
+			expectedTotalClusters: 1,
+			expectedPoolVersion:   inventoryPoolVersion,
+			expectError:           false,
 		},
 		{
 			name: "cp with inventory and cdc doesn't exist is not valid - missing",
@@ -1790,27 +1840,35 @@ func TestReconcileClusterPool(t *testing.T) {
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			controllerExpectations := controllerutils.NewExpectations(logger)
-			rcp := &ReconcileClusterPool{
-				Client:       fakeClient,
-				logger:       logger,
-				expectations: controllerExpectations,
+
+			expectedPools := []string{testLeasePoolName}
+			if test.expectedPools != nil {
+				expectedPools = test.expectedPools
+			}
+			for _, poolName := range expectedPools {
+				rcp := &ReconcileClusterPool{
+					Client:       fakeClient,
+					logger:       logger,
+					expectations: controllerExpectations,
+				}
+
+				reconcileRequest := reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      poolName,
+						Namespace: testNamespace,
+					},
+				}
+
+				_, err := rcp.Reconcile(context.TODO(), reconcileRequest)
+				if test.expectError {
+					assert.Error(t, err, "expected error from reconcile")
+				} else {
+					assert.NoError(t, err, "expected no error from reconcile")
+				}
 			}
 
-			reconcileRequest := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testLeasePoolName,
-					Namespace: testNamespace,
-				},
-			}
-
-			_, err := rcp.Reconcile(context.TODO(), reconcileRequest)
-			if test.expectError {
-				assert.Error(t, err, "expected error from reconcile")
-			} else {
-				assert.NoError(t, err, "expected no error from reconcile")
-			}
 			pool := &hivev1.ClusterPool{}
-			err = fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)
+			err := fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)
 
 			if test.expectFinalizerRemoved {
 				assert.True(t, apierrors.IsNotFound(err), "expected pool to be deleted")
@@ -1971,6 +2029,14 @@ func TestReconcileClusterPool(t *testing.T) {
 				if test.expectedAssignedCDCs != nil {
 					if cdName, ok := test.expectedAssignedCDCs[cdc.Name]; ok {
 						assert.Regexp(t, regexp.MustCompile(cdName), cdc.Status.ClusterDeploymentRef.Name, "expected CDC assignment to CD match")
+					}
+				}
+
+				if test.expectedCDCFinalizers != nil {
+					if finalizers, ok := test.expectedCDCFinalizers[cdc.Name]; ok {
+						for _, finalizer := range finalizers {
+							assert.Contains(t, cdc.Finalizers, finalizer, "expected CDC finalizer to match")
+						}
 					}
 				}
 			}

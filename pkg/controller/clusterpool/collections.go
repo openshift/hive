@@ -925,8 +925,8 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 				}
 			}
 		} else {
-			// Ensure the finalizer is present if the CDC is not deleted, OR if it is reserved
-			if !hasFinalizer {
+			// Ensure the finalizer is present if the CDC is in this pool inventory
+			if _, ok := cdcs.byCDCName[cdc.Name]; !hasFinalizer && ok {
 				controllerutils.AddFinalizer(cdc, poolFinalizer)
 				if err := c.Update(context.Background(), cdc); err != nil {
 					return err

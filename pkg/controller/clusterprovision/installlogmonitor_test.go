@@ -59,9 +59,10 @@ const (
 	// NOTE: This embedded newline matters: our regex must be able to match the two chunks of the message on separate lines.
 	noWorkerNodesFmt = `time="2021-12-09T10:51:06Z" level=debug msg="Symlinking plugin terraform-provider-%s src: \"/usr/bin/openshift-install\" dst: \"/tmp/openshift-install-cluster-723469510/plugins/terraform-provider-%s\""
 time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 master nodes blah"`
-	targetGroupNotFound = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:0123445698:targetgroup/aaaabbbbcccc/dddd): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd' not found"
-	errorCreatingNLB    = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
-	noMatchLog          = "an example of something that doesn't match the log regexes"
+	targetGroupNotFound   = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:0123445698:targetgroup/aaaabbbbcccc/dddd): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd' not found"
+	errorCreatingNLB      = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
+	terraformFailedDelete = "level=fatal msg=terraform destroy: failed to destroy using Terraform"
+	noMatchLog            = "an example of something that doesn't match the log regexes"
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -393,6 +394,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "ErrorCreatingNetworkLoadBalancer",
 			log:            pointer.StringPtr(errorCreatingNLB),
 			expectedReason: "ErrorCreatingNetworkLoadBalancer",
+		},
+		{
+			name:           "ErrorDestroyingBootstrapResources",
+			log:            pointer.StringPtr(terraformFailedDelete),
+			expectedReason: "InstallerFailedToDestroyResources",
 		},
 	}
 

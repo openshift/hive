@@ -1770,6 +1770,11 @@ data:
       - "Error creating network Load Balancer: InternalFailure: "
       installFailingReason: ErrorCreatingNetworkLoadBalancer
       installFailingMessage: AWS network load balancer creation encountered an error during cluster installation
+    - name: TerraformFailedToDeleteResources
+      searchRegexStrings:
+        - "terraform destroy: failed to destroy using Terraform"
+      installFailingReason: InstallerFailedToDestroyResources
+      installFailingMessage: The installer failed to destroy installation resources
 
 
     # GCP Specific

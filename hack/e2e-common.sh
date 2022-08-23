@@ -125,6 +125,10 @@ function save_hive_logs() {
   oc get po -A -l hive.openshift.io/uninstall=true -o custom-columns=:.metadata.namespace,:.metadata.name --no-headers | while read ns po; do
     oc logs -n $ns $po > ${ARTIFACT_DIR}/${ns}-${po}.log
   done
+  # Grab the HiveConfig. We may be running this after cleanup, so make sure it exists first.
+  if oc get hiveconfig hive -o yaml > $tmpf; then
+    mv $tmpf "${ARTIFACT_DIR}/hiveconfig-hive.yaml"
+  fi
 }
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.

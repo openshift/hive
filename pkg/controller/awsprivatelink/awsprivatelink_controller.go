@@ -733,7 +733,7 @@ func (r *ReconcileAWSPrivateLink) ensureVPCEndpointService(awsClient awsclient.C
 		serviceConfig, err = createVPCEndpointService(awsClient, cd, metadata, clusterNLB, logger)
 		if err != nil {
 			logger.WithError(err).Error("failed to create VPC Endpoint Service for cluster")
-			return modified, nil, errors.Wrap(err, "failed to create VPC Enpoint Service for cluster")
+			return modified, nil, errors.Wrap(err, "failed to create VPC Endpoint Service for cluster")
 		}
 	} else {
 		serviceConfig = resp.ServiceConfigurations[0]

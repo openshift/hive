@@ -92,11 +92,11 @@ func Add(mgr manager.Manager) error {
 	}
 
 	r := &ReconcileMachinePool{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
+	r.Client, r.controlPlaneClient, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter)
 	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
 		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, logger)
 	}
@@ -178,7 +178,8 @@ var _ reconcile.Reconciler = &ReconcileMachinePool{}
 // ReconcileMachinePool reconciles the MachineSets generated from a MachinePool object
 type ReconcileMachinePool struct {
 	client.Client
-	scheme *runtime.Scheme
+	controlPlaneClient client.Client
+	scheme             *runtime.Scheme
 
 	logger log.FieldLogger
 
@@ -1012,7 +1013,7 @@ func (r *ReconcileMachinePool) createActuator(
 				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
 			},
 		}
-		return NewAWSActuator(r.Client, creds, cd.Spec.Platform.AWS.Region, pool, masterMachine, r.scheme, logger)
+		return NewAWSActuator(r.Client, r.controlPlaneClient, creds, cd.Spec.Platform.AWS.Region, pool, masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.GCP != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(

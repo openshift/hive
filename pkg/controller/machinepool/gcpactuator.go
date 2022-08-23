@@ -61,7 +61,8 @@ type GCPActuator struct {
 
 var _ Actuator = &GCPActuator{}
 
-// NewGCPActuator is the constructor for building a GCPActuator
+// NewGCPActuator is the constructor for building a GCPActuator.
+// The client is used for MachinePool and MachinePoolLease objects in the CD namespace, so use the data plane client.
 func NewGCPActuator(
 	client client.Client,
 	gcpCreds *corev1.Secret,

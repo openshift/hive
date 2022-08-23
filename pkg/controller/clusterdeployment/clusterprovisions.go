@@ -134,6 +134,21 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
 		return reconcile.Result{}, err
 	}
+	if r.scaleMode {
+		// In scale mode:
+		// We need the service account and secret reader permissions in the namespace on the control plane
+		// TODO: Split the role -- the control plane should only need secret reader
+		if err := controllerutils.SetupClusterInstallServiceAccount(r.controlPlaneClient, cd.Namespace, logger); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role in control plane")
+			return reconcile.Result{}, err
+		}
+		// Copy the data plane kubeconfig secret into the CD namespace
+		controllerutils.CopySecret(
+			r.controlPlaneClient, r.controlPlaneClient,
+			types.NamespacedName{Name: constants.DataPlaneKubeconfigSecretName, Namespace: controllerutils.GetHiveNamespace()},
+			types.NamespacedName{Name: constants.DataPlaneKubeconfigSecretName, Namespace: cd.Namespace},
+			nil, nil)
+	}
 
 	provisionName := apihelpers.GetResourceName(cd.Name, fmt.Sprintf("%d-%s", cd.Status.InstallRestarts, utilrand.String(5)))
 
@@ -205,7 +220,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		}
 	}
 
-	if err := install.CopyAWSServiceProviderSecret(r.Client, provision.Namespace, extraEnvVars, cd, r.scheme); err != nil {
+	if err := install.CopyAWSServiceProviderSecret(r.controlPlaneClient, r.Client, provision.Namespace, extraEnvVars, cd, r.scheme); err != nil {
 		logger.WithError(err).Error("could not copy AWS service provider secret")
 		return reconcile.Result{}, err
 	}
@@ -564,7 +579,7 @@ func (r *ReconcileClusterDeployment) copyInstallLogSecret(destNamespace string, 
 
 	src := types.NamespacedName{Name: srcSecretName, Namespace: hiveNS}
 	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(r, src, dest, nil, nil)
+	return controllerutils.CopySecret(r.controlPlaneClient, r.Client, src, dest, nil, nil)
 }
 
 // NOTE: Ugly-but-simple way to mock ioutil.ReadFile for test purposes.

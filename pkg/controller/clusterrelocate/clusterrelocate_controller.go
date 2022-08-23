@@ -79,9 +79,9 @@ func Add(mgr manager.Manager) error {
 	}
 
 	r := &ReconcileClusterRelocate{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
 		logger: logger,
 	}
+	r.Client, _, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter)
 	r.remoteClusterAPIClientBuilder = func(secret *corev1.Secret) remoteclient.Builder {
 		return remoteclient.NewBuilderFromKubeconfig(r.Client, secret)
 	}

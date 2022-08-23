@@ -55,6 +55,7 @@ type Builder interface {
 // NewBuilder creates a new Builder for creating a client to connect to the remote cluster associated with the specified
 // ClusterDeployment.
 // The controllerName is needed for metrics.
+// The client should be the data plane client.
 // If the ClusterDeployment carries the fake cluster annotation, a fake client will be returned populated with
 // runtime.Objects we need to query for in all our controllers.
 func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) Builder {
@@ -74,6 +75,7 @@ func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hi
 // ConnectToRemoteCluster connects to a remote cluster using the specified builder.
 // If the ClusterDeployment is marked as unreachable, then no connection will be made.
 // If there are problems connecting, then the specified clusterdeployment will be marked as unreachable.
+// The localClient is used to update the CD's status, so the data plane client should be used.
 func ConnectToRemoteCluster(
 	cd *hivev1.ClusterDeployment,
 	remoteClientBuilder Builder,
@@ -301,6 +303,8 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 	return cfg, nil
 }
 
+// The client is used to look up the admin kubeconfig secret in the CD namespace; so it
+// should be the data plane client.
 func unadulteratedRESTConfig(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, error) {
 	kubeconfigSecret := &corev1.Secret{}
 	if err := c.Get(

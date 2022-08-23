@@ -30,9 +30,9 @@ func (a *ibmCloudActuator) CanHandle(cd *hivev1.ClusterDeployment) bool {
 }
 
 // StopMachines will stop machines belonging to the given ClusterDeployment
-func (a *ibmCloudActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *ibmCloudActuator) StopMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "ibmcloud")
-	ibmCloudClient, err := a.ibmCloudClientFn(cd, hiveClient, logger)
+	ibmCloudClient, err := a.ibmCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -55,9 +55,9 @@ func (a *ibmCloudActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient
 }
 
 // StartMachines will start machines belonging to the given ClusterDeployment
-func (a *ibmCloudActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *ibmCloudActuator) StartMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "ibmcloud")
-	ibmCloudClient, err := a.ibmCloudClientFn(cd, hiveClient, logger)
+	ibmCloudClient, err := a.ibmCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -90,10 +90,10 @@ func ibmCloudInstanceNames(instances []vpcv1.Instance) []string {
 // MachinesRunning will return true if the machines associated with the given
 // ClusterDeployment are in a running state. It also returns a list of machines that
 // are not running.
-func (a *ibmCloudActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *ibmCloudActuator) MachinesRunning(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "ibmcloud")
 	logger.Infof("checking whether machines are running")
-	ibmCloudClient, err := a.ibmCloudClientFn(cd, hiveClient, logger)
+	ibmCloudClient, err := a.ibmCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}
@@ -107,10 +107,10 @@ func (a *ibmCloudActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveCli
 // MachinesStopped will return true if the machines associated with the given
 // ClusterDeployment are in a stopped state. It also returns a list of machines
 // that have not stopped.
-func (a *ibmCloudActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *ibmCloudActuator) MachinesStopped(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "ibmcloud")
 	logger.Infof("checking whether machines are stopped")
-	ibmCloudClient, err := a.ibmCloudClientFn(cd, hiveClient, logger)
+	ibmCloudClient, err := a.ibmCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}

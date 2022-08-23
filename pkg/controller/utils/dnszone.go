@@ -40,6 +40,7 @@ func EnqueueDNSZonesOwnedByClusterDeployment(c client.Client, logger log.FieldLo
 
 // ReconcileDNSZoneForRelocation performs reconciliation on a DNSZone that is in the midst of a relocation to a new
 // Hive instance.
+// The client operatons on the DNSZone object, so it should be the data plane client.
 // If the DNSZone is undergoing relocation, then the source Hive instance should not act on the DNSZone.
 // If the DNSZone is undergoing relocation, then the destination Hive instance should not act on the DNSZone except to
 // allow for a delete.

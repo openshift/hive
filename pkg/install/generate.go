@@ -46,7 +46,7 @@ func AWSAssumeRoleSecretName(secretPrefix string) string {
 // CopyAWSServiceProviderSecret copies the AWS service provider secret to the dest namespace
 // when HiveAWSServiceProviderCredentialsSecretRefEnvVar is set in envVars. The secret
 // name in the dest namespace will be the value set in HiveAWSServiceProviderCredentialsSecretRefEnvVar.
-func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, envVars []corev1.EnvVar, owner metav1.Object, scheme *runtime.Scheme) error {
+func CopyAWSServiceProviderSecret(srcClient, destClient client.Client, destNamespace string, envVars []corev1.EnvVar, owner metav1.Object, scheme *runtime.Scheme) error {
 	hiveNS := controllerutils.GetHiveNamespace()
 
 	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
@@ -70,7 +70,7 @@ func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, en
 
 	src := types.NamespacedName{Name: spSecretName, Namespace: hiveNS}
 	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(client, src, dest, owner, scheme)
+	return controllerutils.CopySecret(srcClient, destClient, src, dest, owner, scheme)
 }
 
 // AWSAssumeRoleCLIConfig creates a secret that can assume the role using the hiveutil
@@ -361,6 +361,12 @@ func InstallerPodSpec(
 		ServiceAccountName: serviceAccountName,
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
 	}
+
+	// If we're in scale mode, mount the data plane kubeconfig secret on the `hive` pod
+	if os.Getenv(constants.DataPlaneKubeconfigEnvVar) != "" {
+		controllerutils.AddDataPlaneKubeConfigVolume(podSpec, &podSpec.Containers[2])
+	}
+
 	controllerutils.SetProxyEnvVars(podSpec, httpProxy, httpsProxy, noProxy)
 	return podSpec, nil
 }
@@ -472,6 +478,12 @@ func GenerateUninstallerJobForDeprovision(
 		completeIBMCloudDeprovisionJob(req, job)
 	default:
 		return nil, errors.New("deprovision requests currently not supported for platform")
+	}
+
+	if os.Getenv(constants.DataPlaneKubeconfigEnvVar) != "" {
+		// If we're in scale mode, mount the data plane kubeconfig secret. This will trigger the command to load
+		// creds/certs from the secret(s) in the data plane.
+		controllerutils.AddDataPlaneKubeConfigVolume(&job.Spec.Template.Spec, &job.Spec.Template.Spec.Containers[0])
 	}
 
 	for idx := range job.Spec.Template.Spec.Containers {

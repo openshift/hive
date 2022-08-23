@@ -208,8 +208,9 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.resources...).Build()
 
 			reconciler := &ReconcileClusterPoolNamespace{
-				Client: c,
-				logger: logger,
+				Client:             c,
+				controlPlaneClient: c,
+				logger:             logger,
 			}
 			namespaceKey := client.ObjectKey{Name: namespaceName}
 			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: namespaceKey})
@@ -343,8 +344,9 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.resources...).Build()
 			reconciler := &ReconcileClusterPoolNamespace{
-				Client: c,
-				logger: logger,
+				Client:             c,
+				controlPlaneClient: c,
+				logger:             logger,
 			}
 			cds := &hivev1.ClusterDeploymentList{}
 			err := c.List(context.Background(), cds)

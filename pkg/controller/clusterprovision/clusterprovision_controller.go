@@ -88,12 +88,13 @@ func Add(mgr manager.Manager) error {
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	logger := log.WithField("controller", ControllerName)
-	return &ReconcileClusterProvision{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+	r := &ReconcileClusterProvision{
 		scheme:       mgr.GetScheme(),
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
+	r.Client, r.controlPlaneClient, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	return r
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -136,8 +137,9 @@ var _ reconcile.Reconciler = &ReconcileClusterProvision{}
 // ReconcileClusterProvision reconciles a ClusterProvision object
 type ReconcileClusterProvision struct {
 	client.Client
-	scheme *runtime.Scheme
-	logger log.FieldLogger
+	controlPlaneClient client.Client
+	scheme             *runtime.Scheme
+	logger             log.FieldLogger
 	// A TTLCache of job creates each clusterprovision expects to see
 	expectations controllerutils.ExpectationsInterface
 }
@@ -245,7 +247,7 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 
 	pLog.Infof("creating install job")
 	r.expectations.ExpectCreations(types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}.String(), 1)
-	if err := r.Create(context.TODO(), job); err != nil {
+	if err := r.controlPlaneClient.Create(context.TODO(), job); err != nil {
 		pLog.WithError(err).Error("error creating job")
 		r.expectations.CreationObserved(types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}.String())
 		return reconcile.Result{}, err
@@ -264,7 +266,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 	pLog.Debug("reconciling running job")
 
 	job := &batchv1.Job{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: instance.Status.JobRef.Name, Namespace: instance.Namespace}, job); {
+	switch err := r.controlPlaneClient.Get(context.TODO(), types.NamespacedName{Name: instance.Status.JobRef.Name, Namespace: instance.Namespace}, job); {
 	case apierrors.IsNotFound(err):
 		if cond := controllerutils.FindCondition(instance.Status.Conditions, hivev1.ClusterProvisionFailedCondition); cond == nil {
 			pLog.Error("install job lost")
@@ -353,7 +355,7 @@ func (r *ReconcileClusterProvision) getInstallPod(job *batchv1.Job, pLog log.Fie
 		pLog.WithError(err).Error("could not create pod selector from job")
 		return nil, fmt.Errorf("could not create pod selector from job")
 	}
-	if err := r.List(
+	if err := r.controlPlaneClient.List(
 		context.TODO(),
 		podList,
 		client.MatchingLabelsSelector{Selector: podLabelSelector},
@@ -413,7 +415,7 @@ func (r *ReconcileClusterProvision) abortProvision(instance *hivev1.ClusterProvi
 		return reconcile.Result{}, err
 	}
 	job := &batchv1.Job{}
-	switch err := r.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Status.JobRef.Name}, job); {
+	switch err := r.controlPlaneClient.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Status.JobRef.Name}, job); {
 	case apierrors.IsNotFound(err):
 		pLog.Warn("install job for aborted provision already gone before it was deleted")
 		return reconcile.Result{}, nil
@@ -421,7 +423,7 @@ func (r *ReconcileClusterProvision) abortProvision(instance *hivev1.ClusterProvi
 		pLog.WithError(err).Error("could not get install job")
 		return reconcile.Result{}, err
 	}
-	if err := r.Delete(context.TODO(), job, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+	if err := r.controlPlaneClient.Delete(context.TODO(), job, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
 		pLog.WithError(err).Log(controllerutils.LogLevel(err), "could not delete install job")
 		return reconcile.Result{}, err
 	}
@@ -496,7 +498,7 @@ func (r *ReconcileClusterProvision) setStage(instance *hivev1.ClusterProvision, 
 
 func (r *ReconcileClusterProvision) existingJobs(provision *hivev1.ClusterProvision, pLog log.FieldLogger) ([]*batchv1.Job, error) {
 	jobList := &batchv1.JobList{}
-	if err := r.List(
+	if err := r.controlPlaneClient.List(
 		context.TODO(),
 		jobList,
 		client.InNamespace(provision.Namespace),
@@ -567,7 +569,7 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 func (r *ReconcileClusterProvision) deleteInstallJob(provision *hivev1.ClusterProvision, pLog log.FieldLogger) (reconcile.Result, error) {
 	pLog.Info("deleting successful install job")
 	job := &batchv1.Job{}
-	switch err := r.Get(context.TODO(), types.NamespacedName{Name: provision.Status.JobRef.Name, Namespace: provision.Namespace}, job); {
+	switch err := r.controlPlaneClient.Get(context.TODO(), types.NamespacedName{Name: provision.Status.JobRef.Name, Namespace: provision.Namespace}, job); {
 	case apierrors.IsNotFound(err):
 		pLog.Info("install job has already been deleted")
 	case err != nil:
@@ -575,7 +577,7 @@ func (r *ReconcileClusterProvision) deleteInstallJob(provision *hivev1.ClusterPr
 		return reconcile.Result{}, err
 	default:
 		// deleting install job with background propagation policy to cascade delete install pod
-		if err := r.Delete(context.TODO(), job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+		if err := r.controlPlaneClient.Delete(context.TODO(), job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
 			pLog.WithField("job", job.Name).WithError(err).Log(controllerutils.LogLevel(err), "error deleting successful install job")
 			return reconcile.Result{}, err
 		}

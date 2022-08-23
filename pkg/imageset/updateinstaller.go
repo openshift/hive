@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -92,13 +91,13 @@ func (o *UpdateInstallerImageOptions) Complete() error {
 		return err
 	}
 
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
-	cfg, err := kubeconfig.ClientConfig()
+	// In scale mode, load the data plane REST config from the mounted kubeconfig
+	cfg, err := utils.GetDataPlaneClientConfig()
 	if err != nil {
 		log.WithError(err).Error("Cannot obtain client config")
 		return err
 	}
+
 	o.client, err = getClient(cfg)
 	if err != nil {
 		log.WithError(err).Error("Cannot obtain API client")
@@ -263,6 +262,7 @@ func (o *UpdateInstallerImageOptions) setImageResolutionErrorCondition(cd *hivev
 	}
 }
 
+// TODO: Can this be folded into contrib.pkg.utils.GetClient somehow?
 func getClient(kubeConfig *rest.Config) (client.Client, error) {
 	clientScheme := scheme.Scheme
 	apis.AddToScheme(clientScheme)

@@ -49,7 +49,7 @@ func TestNewAWSActuator(t *testing.T) {
 			// Act
 			zr, err := NewAWSActuator(
 				expectedAWSActuator.logger,
-				nil, awsclient.CredentialsSource{},
+				nil, nil, awsclient.CredentialsSource{},
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
 			)

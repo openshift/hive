@@ -2992,6 +2992,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			}
 			rcd := &ReconcileClusterDeployment{
 				Client:                                  fakeClient,
+				controlPlaneClient:                      fakeClient,
 				scheme:                                  scheme.Scheme,
 				logger:                                  logger,
 				expectations:                            controllerExpectations,
@@ -3075,6 +3076,7 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
+				controlPlaneClient:            fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        logger,
 				expectations:                  controllerExpectations,
@@ -3197,8 +3199,9 @@ func TestDeleteStaleProvisions(t *testing.T) {
 			}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:             fakeClient,
+				controlPlaneClient: fakeClient,
+				scheme:             scheme.Scheme,
 			}
 			rcd.deleteStaleProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteStaleProvisions"))
 			actualAttempts := []int{}
@@ -3249,8 +3252,9 @@ func TestDeleteOldFailedProvisions(t *testing.T) {
 			}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:             fakeClient,
+				controlPlaneClient: fakeClient,
+				scheme:             scheme.Scheme,
 			}
 			rcd.deleteOldFailedProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteOldFailedProvisions"))
 			assert.Len(t, getProvisions(fakeClient), tc.expectedNumberOfProvisionsAfterDeletion, "unexpected provisions kept")
@@ -3766,6 +3770,7 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
+				controlPlaneClient:            fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
@@ -3930,6 +3935,7 @@ func TestMergePullSecrets(t *testing.T) {
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
+				controlPlaneClient:            fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
@@ -3997,6 +4003,7 @@ func TestCopyInstallLogSecret(t *testing.T) {
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
+				controlPlaneClient:            fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
@@ -4168,6 +4175,7 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
+				controlPlaneClient:            fakeClient,
 				scheme:                        scheme.Scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },

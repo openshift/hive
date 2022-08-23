@@ -159,14 +159,15 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*R
 		}
 	}
 	log.WithField("reapplyInterval", reapplyInterval).Info("Reapply interval set")
-	c := controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	dpClient, cpClient, _ := controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	return &ReconcileClusterSync{
-		Client:                c,
+		Client:                dpClient,
+		controlPlaneClient:    cpClient,
 		logger:                logger,
 		reapplyInterval:       reapplyInterval,
 		resourceHelperBuilder: resourceHelperBuilderFunc,
 		remoteClusterAPIClientBuilder: func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
-			return remoteclient.NewBuilder(c, cd, ControllerName)
+			return remoteclient.NewBuilder(dpClient, cd, ControllerName)
 		},
 	}, nil
 }
@@ -284,8 +285,9 @@ var _ reconcile.Reconciler = &ReconcileClusterSync{}
 // ReconcileClusterSync reconciles a ClusterDeployment object to apply its SyncSets and SelectorSyncSets
 type ReconcileClusterSync struct {
 	client.Client
-	logger          log.FieldLogger
-	reapplyInterval time.Duration
+	controlPlaneClient client.Client
+	logger             log.FieldLogger
+	reapplyInterval    time.Duration
 
 	resourceHelperBuilder func(*hivev1.ClusterDeployment, func(cd *hivev1.ClusterDeployment) remoteclient.Builder, log.FieldLogger) (resource.Helper, error)
 
@@ -301,7 +303,7 @@ func (r *ReconcileClusterSync) getAndCheckClusterSyncStatefulSet(logger log.Fiel
 
 	logger.Debug("Getting statefulset")
 	sts := &appsv1.StatefulSet{}
-	err := r.Get(context.Background(), types.NamespacedName{Namespace: hiveNS, Name: stsName}, sts)
+	err := r.controlPlaneClient.Get(context.Background(), types.NamespacedName{Namespace: hiveNS, Name: stsName}, sts)
 	if err != nil {
 		logger.WithError(err).WithField("hiveNS", hiveNS).Error("error getting statefulset.")
 		return nil, err

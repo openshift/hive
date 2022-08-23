@@ -73,10 +73,10 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileRemoteMachineSet{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme: mgr.GetScheme(),
 		logger: log.WithField("controller", ControllerName),
 	}
+	r.Client, _, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}

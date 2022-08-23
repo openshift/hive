@@ -439,8 +439,9 @@ func TestParseInstallLog(t *testing.T) {
 			}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
 			r := &ReconcileClusterProvision{
-				Client: fakeClient,
-				scheme: scheme.Scheme,
+				Client:             fakeClient,
+				controlPlaneClient: fakeClient,
+				scheme:             scheme.Scheme,
 			}
 			reason, message := r.parseInstallLog(test.log, log.WithFields(log.Fields{}))
 			assert.Equal(t, test.expectedReason, reason, "unexpected reason")

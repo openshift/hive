@@ -87,12 +87,13 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) rec
 		// Hard exit if we can't create this controller
 		logger.WithError(err).Fatal("unable to create resource helper")
 	}
-	return &ReconcileRemoteClusterIngress{
-		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+	r := &ReconcileRemoteClusterIngress{
 		scheme:  mgr.GetScheme(),
 		logger:  log.WithField("controller", ControllerName),
 		kubeCLI: helper,
 	}
+	r.Client, _, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	return r
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler

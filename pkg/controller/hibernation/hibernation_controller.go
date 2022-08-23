@@ -106,8 +106,9 @@ func RegisterActuator(a HibernationActuator) {
 // hibernationReconciler is the reconciler type for this controller
 type hibernationReconciler struct {
 	client.Client
-	logger  log.FieldLogger
-	csrUtil csrHelper
+	controlPlaneClient client.Client
+	logger             log.FieldLogger
+	csrUtil            csrHelper
 
 	remoteClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
 }
@@ -116,11 +117,12 @@ type hibernationReconciler struct {
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *hibernationReconciler {
 	logger := log.WithField("controller", ControllerName)
 	r := &hibernationReconciler{
-		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		logger:  logger,
 		csrUtil: &csrUtility{},
 	}
+	r.Client, r.controlPlaneClient, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	r.remoteClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
+		// This client is used to look up the admin kubeconfig in the CD namespace.
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 	return r
@@ -406,7 +408,7 @@ func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logg
 	if rChanged {
 		cd.Status.PowerState = hivev1.ClusterPowerStateStartingMachines
 	}
-	err := actuator.StartMachines(cd, r.Client, logger)
+	err := actuator.StartMachines(cd, r.Client, r.controlPlaneClient, logger)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to start machines: %v", err)
 		r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonFailedToStartMachines, msg,
@@ -436,7 +438,7 @@ func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logge
 	if changed {
 		cd.Status.PowerState = hivev1.ClusterPowerStateStopping
 	}
-	err := actuator.StopMachines(cd, r.Client, logger)
+	err := actuator.StopMachines(cd, r.Client, r.controlPlaneClient, logger)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to stop machines: %v", err)
 		changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonFailedToStop, msg,
@@ -459,14 +461,14 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 		return reconcile.Result{}, nil
 	}
 
-	stopped, remaining, err := actuator.MachinesStopped(cd, r.Client, logger)
+	stopped, remaining, err := actuator.MachinesStopped(cd, r.Client, r.controlPlaneClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether machines are stopped.")
 		return reconcile.Result{}, err
 	}
 	if !stopped {
 		// Ensure all machines have been stopped. Should have been handled already but we've seen VMs left in running state.
-		if err := actuator.StopMachines(cd, r.Client, logger); err != nil {
+		if err := actuator.StopMachines(cd, r.Client, r.controlPlaneClient, logger); err != nil {
 			logger.WithError(err).Error("error stopping machines")
 			return reconcile.Result{}, err
 		}
@@ -509,14 +511,14 @@ func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment
 		return reconcile.Result{}, nil
 	}
 
-	running, remaining, err := actuator.MachinesRunning(cd, r.Client, logger)
+	running, remaining, err := actuator.MachinesRunning(cd, r.Client, r.controlPlaneClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "Failed to check whether machines are running.")
 		return reconcile.Result{}, err
 	}
 	if !running {
 		// Ensure all machines have been started. Should have been handled already but we've seen VMs left in stopped state.
-		if err := actuator.StartMachines(cd, r.Client, logger); err != nil {
+		if err := actuator.StartMachines(cd, r.Client, r.controlPlaneClient, logger); err != nil {
 			logger.WithError(err).Error("error starting machines")
 			return reconcile.Result{}, err
 		}

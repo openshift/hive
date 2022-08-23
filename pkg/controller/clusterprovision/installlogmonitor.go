@@ -31,6 +31,12 @@ func (r *ReconcileClusterProvision) parseInstallLog(log *string, pLog log.FieldL
 	}
 
 	// Load the regex configmap, if we don't have one, there's not much point proceeding here.
+	// TODO: Should we expect the configmap in
+	// - the control plane
+	//   - with the deployment -- that's where we expect it today
+	//   - with the operator -- it would be singular then, like the hiveconfig that uses it; but we would be changing the behavior
+	// - the data plane -- but then the consumer would have to make sure to mirror the targetNamespace. This is what we're going
+	//   with for now, as it fits with the principle of "data goes on the data plane". But I don't like it.
 	regexCM := &corev1.ConfigMap{}
 	if err := r.Get(context.TODO(), types.NamespacedName{Name: regexConfigMapName, Namespace: controllerutils.GetHiveNamespace()}, regexCM); err != nil {
 		pLog.WithError(err).Errorf("error loading %s configmap", regexConfigMapName)

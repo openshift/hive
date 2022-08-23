@@ -611,8 +611,9 @@ func TestReconcileClusterClaim(t *testing.T) {
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			rcp := &ReconcileClusterClaim{
-				Client: c,
-				logger: logger,
+				Client:             c,
+				controlPlaneClient: c,
+				logger:             logger,
 			}
 
 			reconcileRequest := reconcile.Request{

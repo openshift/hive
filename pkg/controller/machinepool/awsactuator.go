@@ -32,6 +32,7 @@ import (
 // AWSActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
 type AWSActuator struct {
+	// This client is used on the machinepool, so it should be the data plane client.
 	client    client.Client
 	awsClient awsclient.Client
 	logger    log.FieldLogger
@@ -50,7 +51,7 @@ var (
 
 // NewAWSActuator is the constructor for building a AWSActuator
 func NewAWSActuator(
-	client client.Client,
+	dpClient, cpClient client.Client,
 	credentials awsclient.CredentialsSource,
 	region string,
 	pool *hivev1.MachinePool,
@@ -58,7 +59,7 @@ func NewAWSActuator(
 	scheme *runtime.Scheme,
 	logger log.FieldLogger,
 ) (*AWSActuator, error) {
-	awsClient, err := awsclient.New(client, awsclient.Options{Region: region, CredentialsSource: credentials})
+	awsClient, err := awsclient.New(dpClient, cpClient, awsclient.Options{Region: region, CredentialsSource: credentials})
 	if err != nil {
 		logger.WithError(err).Warn("failed to create AWS client")
 		return nil, err
@@ -84,7 +85,7 @@ func NewAWSActuator(
 		}
 	}
 	actuator := &AWSActuator{
-		client:    client,
+		client:    dpClient,
 		awsClient: awsClient,
 		logger:    logger,
 		region:    region,

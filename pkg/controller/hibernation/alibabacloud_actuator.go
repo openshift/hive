@@ -44,9 +44,9 @@ func (a *alibabaCloudActuator) CanHandle(cd *hivev1.ClusterDeployment) bool {
 }
 
 // StopMachines will stop machines belonging to the given ClusterDeployment
-func (a *alibabaCloudActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *alibabaCloudActuator) StopMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "alibabacloud")
-	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, hiveClient, logger)
+	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -77,9 +77,9 @@ func (a *alibabaCloudActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveCl
 }
 
 // StartMachines will start machines belonging to the given ClusterDeployment
-func (a *alibabaCloudActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *alibabaCloudActuator) StartMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "alibabacloud")
-	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, hiveClient, logger)
+	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -116,10 +116,10 @@ func getAlibabaInstanceIDs(instances []ecs.Instance) []string {
 // MachinesRunning will return true if the machines associated with the given
 // ClusterDeployment are in a running state. It also returns a list of machines that
 // are not running.
-func (a *alibabaCloudActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *alibabaCloudActuator) MachinesRunning(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "alibabacloud")
 	logger.Infof("checking whether machines are running")
-	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, hiveClient, logger)
+	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}
@@ -133,10 +133,10 @@ func (a *alibabaCloudActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiv
 // MachinesStopped will return true if the machines associated with the given
 // ClusterDeployment are in a stopped state. It also returns a list of machines
 // that have not stopped.
-func (a *alibabaCloudActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *alibabaCloudActuator) MachinesStopped(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "alibabacloud")
 	logger.Infof("checking whether machines are stopped")
-	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, hiveClient, logger)
+	alibabaCloudClient, err := a.alibabaCloudClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}
@@ -148,6 +148,7 @@ func (a *alibabaCloudActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiv
 }
 
 // getAlibabaCloudClient builds Alibaba Cloud client from given ClusterDeployment
+// The client is getting the secret from the data plane.
 func getAlibabaCloudClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (alibabaclient.API, error) {
 	secret := &corev1.Secret{}
 	err := c.Get(context.TODO(), client.ObjectKey{Name: cd.Spec.Platform.AlibabaCloud.CredentialsSecretRef.Name, Namespace: cd.Namespace}, secret)

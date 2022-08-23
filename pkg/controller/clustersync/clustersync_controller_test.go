@@ -85,10 +85,11 @@ func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime
 	mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 
 	r := &ReconcileClusterSync{
-		ordinalID:       0,
-		Client:          c,
-		logger:          logger,
-		reapplyInterval: defaultReapplyInterval,
+		ordinalID:          0,
+		Client:             c,
+		controlPlaneClient: c,
+		logger:             logger,
+		reapplyInterval:    defaultReapplyInterval,
 		resourceHelperBuilder: func(
 			cd *hivev1.ClusterDeployment,
 			remoteClusterAPIClientBuilderFunc func(cd *hivev1.ClusterDeployment) remoteclient.Builder,

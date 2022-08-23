@@ -395,13 +395,13 @@ type AssumeRoleCredentialsSource struct {
 //	    },
 //	}
 //	client, err := New(kubeClient, options)
-func New(kubeClient client.Client, options Options) (Client, error) {
+func New(dpClient, cpClient client.Client, options Options) (Client, error) {
 	source := options.CredentialsSource
 	switch {
 	case source.Secret != nil && source.Secret.Ref != nil && source.Secret.Ref.Name != "":
-		return NewClient(kubeClient, source.Secret.Ref.Name, source.Secret.Namespace, options.Region)
+		return NewClient(dpClient, source.Secret.Ref.Name, source.Secret.Namespace, options.Region)
 	case source.AssumeRole != nil && source.AssumeRole.Role != nil && source.AssumeRole.Role.RoleARN != "":
-		return newClientAssumeRole(kubeClient,
+		return newClientAssumeRole(cpClient,
 			source.AssumeRole.SecretRef.Name, source.AssumeRole.SecretRef.Namespace,
 			source.AssumeRole.Role,
 			options.Region,
@@ -452,7 +452,7 @@ func newClientAssumeRole(kubeClient client.Client,
 // otherwise the IAM profile of the master where the actuator will run. (target clusters)
 //
 // Pass a nil client, and empty secret name and namespace to load credentials from the standard
-// AWS environment variables.
+// AWS environment variables. Otherwise the data plane client should be used.
 func NewClient(kubeClient client.Client, secretName, namespace, region string) (Client, error) {
 
 	// Special case to not use a secret to gather credentials.

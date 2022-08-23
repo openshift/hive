@@ -46,9 +46,9 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterPoolNamespace{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		logger: log.WithField("controller", ControllerName),
 	}
+	r.Client, r.controlPlaneClient, r.scaleMode = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	return r
 }
 
@@ -67,6 +67,8 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	if err != nil {
 		return err
 	}
+
+	// TODO: In scale mode, we're only watching the data plane!
 
 	// Watch for changes to Namespaces
 	if err := c.Watch(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}); err != nil {
@@ -95,7 +97,9 @@ var _ reconcile.Reconciler = &ReconcileClusterPoolNamespace{}
 // ClusterPool clusters after the clusters have been deleted.
 type ReconcileClusterPoolNamespace struct {
 	client.Client
-	logger log.FieldLogger
+	controlPlaneClient client.Client
+	scaleMode          bool
+	logger             log.FieldLogger
 }
 
 // Reconcile deletes a Namespace if it no longer contains any ClusterDeployments.
@@ -136,10 +140,22 @@ func (r *ReconcileClusterPoolNamespace) Reconcile(ctx context.Context, request r
 	}
 
 	if len(cdList.Items) == 0 {
-		logger.Info("deleting namespace since it contains no ClusterDeployments")
-		if err := r.Delete(context.Background(), namespace); err != nil {
-			logger.WithError(err).Log(controllerutils.LogLevel(err), "error deleting namespace")
+		deleteNS := func(c client.Client, logger log.FieldLogger) error {
+			logger.Info("deleting namespace since it contains no ClusterDeployments")
+			if err := c.Delete(context.Background(), namespace); err != nil {
+				logger.WithError(err).Log(controllerutils.LogLevel(err), "error deleting namespace")
+				return err
+			}
+			return nil
+		}
+		if err := deleteNS(r.Client, logger.WithField("plane", "data")); err != nil {
 			return reconcile.Result{}, err
+		}
+		// In scale mode, we need to delete the namespace from the control plane as well
+		if r.scaleMode {
+			if err := deleteNS(r.controlPlaneClient, logger.WithField("plane", "control")); err != nil {
+				return reconcile.Result{}, err
+			}
 		}
 		return reconcile.Result{}, nil
 	}

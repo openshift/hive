@@ -138,9 +138,9 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			var err error
 			switch test.testFunc {
 			case "StopMachines":
-				err = actuator.StopMachines(testIBMCloudClusterDeployment(), nil, log.New())
+				err = actuator.StopMachines(testIBMCloudClusterDeployment(), nil, nil, log.New())
 			case "StartMachines":
-				err = actuator.StartMachines(testIBMCloudClusterDeployment(), nil, log.New())
+				err = actuator.StartMachines(testIBMCloudClusterDeployment(), nil, nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}
@@ -221,9 +221,9 @@ func TestIBMCloudMachinesStoppedAndRunning(t *testing.T) {
 			var remaining []string
 			switch test.testFunc {
 			case "MachinesStopped":
-				result, remaining, err = actuator.MachinesStopped(testIBMCloudClusterDeployment(), nil, log.New())
+				result, remaining, err = actuator.MachinesStopped(testIBMCloudClusterDeployment(), nil, nil, log.New())
 			case "MachinesRunning":
-				result, remaining, err = actuator.MachinesRunning(testIBMCloudClusterDeployment(), nil, log.New())
+				result, remaining, err = actuator.MachinesRunning(testIBMCloudClusterDeployment(), nil, nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}

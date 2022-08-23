@@ -180,6 +180,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			zr, _ := NewAWSActuator(
 				log.WithField("controller", ControllerName),
 				mocks.fakeKubeClient,
+				mocks.fakeKubeClient,
 				awsclient.CredentialsSource{},
 				tc.dnsZone,
 				fakeAWSClientBuilder(mocks.mockAWSClient),
@@ -581,6 +582,7 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 
 			zr, _ := NewAWSActuator(
 				log.WithField("controller", ControllerName),
+				mocks.fakeKubeClient,
 				mocks.fakeKubeClient,
 				awsclient.CredentialsSource{},
 				tc.dnsZone,
@@ -1055,6 +1057,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 
 			zr, _ := NewAWSActuator(
 				log.WithField("controller", ControllerName),
+				mocks.fakeKubeClient,
 				mocks.fakeKubeClient,
 				awsclient.CredentialsSource{},
 				tc.dnsZone,

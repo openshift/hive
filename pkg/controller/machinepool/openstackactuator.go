@@ -43,6 +43,7 @@ func addOpenStackProviderToScheme(scheme *runtime.Scheme) error {
 }
 
 // NewOpenStackActuator is the constructor for building a OpenStackActuator
+// The client is used to retrieve secrets from the CD namespace, so the data plane client should be used.
 func NewOpenStackActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, kubeClient client.Client, logger log.FieldLogger) (*OpenStackActuator, error) {
 	osImage, err := getOpenStackOSImage(masterMachine, scheme, logger)
 	if err != nil {

@@ -81,9 +81,8 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new ReconcileClusterClaim
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*ReconcileAWSPrivateLink, error) {
 	logger := log.WithField("controller", ControllerName)
-	reconciler := &ReconcileAWSPrivateLink{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
-	}
+	reconciler := &ReconcileAWSPrivateLink{}
+	reconciler.Client, reconciler.controlPlaneClient, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 
 	config, err := ReadAWSPrivateLinkControllerConfigFile()
 	if err != nil {
@@ -143,6 +142,7 @@ var _ reconcile.Reconciler = &ReconcileAWSPrivateLink{}
 // ReconcileAWSPrivateLink reconciles a PrivateLink for clusterdeployment object
 type ReconcileAWSPrivateLink struct {
 	client.Client
+	controlPlaneClient client.Client
 
 	controllerconfig *hivev1.AWSPrivateLinkConfig
 
@@ -150,7 +150,7 @@ type ReconcileAWSPrivateLink struct {
 	awsClientFn awsClientFn
 }
 
-type awsClientFn func(client.Client, awsclient.Options) (awsclient.Client, error)
+type awsClientFn func(client.Client, client.Client, awsclient.Options) (awsclient.Client, error)
 
 // Reconcile reconciles PrivateLink for ClusterDeployment.
 func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
@@ -1106,7 +1106,7 @@ func (r *ReconcileAWSPrivateLink) reconcileHostedZoneAssociations(awsClient *aws
 				return modified, err
 			}
 
-			awsAssociationClient, err = r.awsClientFn(r.Client, awsclient.Options{
+			awsAssociationClient, err = r.awsClientFn(r.Client, r.controlPlaneClient, awsclient.Options{
 				Region: info.Region,
 				CredentialsSource: awsclient.CredentialsSource{
 					Secret: &awsclient.SecretCredentialsSource{
@@ -1202,7 +1202,7 @@ type awsClient struct {
 }
 
 func newAWSClient(r *ReconcileAWSPrivateLink, cd *hivev1.ClusterDeployment) (*awsClient, error) {
-	uClient, err := r.awsClientFn(r.Client, awsclient.Options{
+	uClient, err := r.awsClientFn(r.Client, r.controlPlaneClient, awsclient.Options{
 		Region: cd.Spec.Platform.AWS.Region,
 		CredentialsSource: awsclient.CredentialsSource{
 			Secret: &awsclient.SecretCredentialsSource{
@@ -1221,7 +1221,7 @@ func newAWSClient(r *ReconcileAWSPrivateLink, cd *hivev1.ClusterDeployment) (*aw
 	if err != nil {
 		return nil, err
 	}
-	hClient, err := r.awsClientFn(r.Client, awsclient.Options{
+	hClient, err := r.awsClientFn(r.Client, r.controlPlaneClient, awsclient.Options{
 		Region: cd.Spec.Platform.AWS.Region,
 		CredentialsSource: awsclient.CredentialsSource{
 			Secret: &awsclient.SecretCredentialsSource{

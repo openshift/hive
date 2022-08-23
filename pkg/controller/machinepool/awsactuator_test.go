@@ -557,7 +557,7 @@ func TestAWSActuator(t *testing.T) {
 			}
 
 			logger := log.WithFields(log.Fields{"machinePool": test.machinePool.Name})
-			actuator, err := NewAWSActuator(fakeClient, awsclient.CredentialsSource{}, test.clusterDeployment.Spec.Platform.AWS.Region, test.machinePool, test.masterMachine, scheme.Scheme, logger)
+			actuator, err := NewAWSActuator(fakeClient, fakeClient, awsclient.CredentialsSource{}, test.clusterDeployment.Spec.Platform.AWS.Region, test.machinePool, test.masterMachine, scheme.Scheme, logger)
 			require.NoError(t, err)
 			actuator.awsClient = awsClient
 

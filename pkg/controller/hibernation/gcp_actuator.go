@@ -47,9 +47,9 @@ func (a *gcpActuator) CanHandle(cd *hivev1.ClusterDeployment) bool {
 }
 
 // StopMachines will start machines belonging to the given ClusterDeployment
-func (a *gcpActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *gcpActuator) StopMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "GCP")
-	gcpClient, err := a.getGCPClientFn(cd, hiveClient, logger)
+	gcpClient, err := a.getGCPClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -69,9 +69,9 @@ func (a *gcpActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient clie
 }
 
 // StartMachines will select machines belonging to the given ClusterDeployment
-func (a *gcpActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *gcpActuator) StartMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "GCP")
-	gcpClient, err := a.getGCPClientFn(cd, hiveClient, logger)
+	gcpClient, err := a.getGCPClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -97,9 +97,9 @@ func (a *gcpActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient cli
 // MachinesRunning will return true if the machines associated with the given
 // ClusterDeployment are in a running state. It also returns a list of machines that
 // are not running.
-func (a *gcpActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *gcpActuator) MachinesRunning(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "GCP")
-	gcpClient, err := a.getGCPClientFn(cd, hiveClient, logger)
+	gcpClient, err := a.getGCPClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}
@@ -113,9 +113,9 @@ func (a *gcpActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient c
 // MachinesStopped will return true if the machines associated with the given
 // ClusterDeployment are in a stopped state. It also returns a list of machines
 // that have not stopped.
-func (a *gcpActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *gcpActuator) MachinesStopped(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "GCP")
-	gcpClient, err := a.getGCPClientFn(cd, hiveClient, logger)
+	gcpClient, err := a.getGCPClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}

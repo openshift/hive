@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// LoadSecretData loads a given secret key and returns it's data as a string.
+// LoadSecretData loads a given secret key and returns its data as a string.
 func LoadSecretData(c client.Client, secretName, namespace, dataKey string) (string, error) {
 	s := &corev1.Secret{}
 	err := c.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)

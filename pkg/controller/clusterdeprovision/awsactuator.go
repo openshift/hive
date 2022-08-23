@@ -25,7 +25,7 @@ var _ Actuator = &awsActuator{}
 // AWSActuator manages getting the desired state, getting the current state and reconciling the two.
 type awsActuator struct {
 	// awsClientFn is the function to build an AWS client, here for testing
-	awsClientFn func(*hivev1.ClusterDeprovision, client.Client, log.FieldLogger) (awsclient.Client, error)
+	awsClientFn func(*hivev1.ClusterDeprovision, client.Client, client.Client, log.FieldLogger) (awsclient.Client, error)
 }
 
 // CanHandle returns true if the actuator can handle a particular ClusterDeprovision
@@ -34,8 +34,8 @@ func (a *awsActuator) CanHandle(clusterDeprovision *hivev1.ClusterDeprovision) b
 }
 
 // TestCredentials ensures that the the aws credentials are usable.
-func (a *awsActuator) TestCredentials(clusterDeprovision *hivev1.ClusterDeprovision, c client.Client, logger log.FieldLogger) error {
-	awsClient, err := a.awsClientFn(clusterDeprovision, c, logger)
+func (a *awsActuator) TestCredentials(clusterDeprovision *hivev1.ClusterDeprovision, dpClient, cpClient client.Client, logger log.FieldLogger) error {
+	awsClient, err := a.awsClientFn(clusterDeprovision, dpClient, cpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (a *awsActuator) TestCredentials(clusterDeprovision *hivev1.ClusterDeprovis
 	return nil
 }
 
-func getAWSClient(cd *hivev1.ClusterDeprovision, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {
+func getAWSClient(cd *hivev1.ClusterDeprovision, dpClient, cpClient client.Client, logger log.FieldLogger) (awsclient.Client, error) {
 	options := awsclient.Options{
 		Region: cd.Spec.Platform.AWS.Region,
 		CredentialsSource: awsclient.CredentialsSource{
@@ -69,5 +69,5 @@ func getAWSClient(cd *hivev1.ClusterDeprovision, c client.Client, logger log.Fie
 		},
 	}
 
-	return awsclient.New(c, options)
+	return awsclient.New(dpClient, cpClient, options)
 }

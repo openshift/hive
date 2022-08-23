@@ -1847,9 +1847,10 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 			for _, poolName := range expectedPools {
 				rcp := &ReconcileClusterPool{
-					Client:       fakeClient,
-					logger:       logger,
-					expectations: controllerExpectations,
+					Client:             fakeClient,
+					controlPlaneClient: fakeClient,
+					logger:             logger,
+					expectations:       controllerExpectations,
 				}
 
 				reconcileRequest := reconcile.Request{
@@ -2776,9 +2777,10 @@ func TestReconcileRBAC(t *testing.T) {
 			logger.SetLevel(log.DebugLevel)
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcp := &ReconcileClusterPool{
-				Client:       fakeClient,
-				logger:       logger,
-				expectations: controllerExpectations,
+				Client:             fakeClient,
+				controlPlaneClient: fakeClient,
+				logger:             logger,
+				expectations:       controllerExpectations,
 			}
 
 			err := rcp.reconcileRBAC(&hivev1.ClusterPool{

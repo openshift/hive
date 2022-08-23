@@ -51,9 +51,9 @@ func (mr *MockHibernationActuatorMockRecorder) CanHandle(cd interface{}) *gomock
 }
 
 // MachinesRunning mocks base method.
-func (m *MockHibernationActuator) MachinesRunning(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) (bool, []string, error) {
+func (m *MockHibernationActuator) MachinesRunning(cd *v1.ClusterDeployment, dpClient, cpClient client.Client, logger logrus.FieldLogger) (bool, []string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MachinesRunning", cd, hiveClient, logger)
+	ret := m.ctrl.Call(m, "MachinesRunning", cd, dpClient, cpClient, logger)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].([]string)
 	ret2, _ := ret[2].(error)
@@ -61,15 +61,15 @@ func (m *MockHibernationActuator) MachinesRunning(cd *v1.ClusterDeployment, hive
 }
 
 // MachinesRunning indicates an expected call of MachinesRunning.
-func (mr *MockHibernationActuatorMockRecorder) MachinesRunning(cd, hiveClient, logger interface{}) *gomock.Call {
+func (mr *MockHibernationActuatorMockRecorder) MachinesRunning(cd, dpClient, cpClient, logger interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MachinesRunning", reflect.TypeOf((*MockHibernationActuator)(nil).MachinesRunning), cd, hiveClient, logger)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MachinesRunning", reflect.TypeOf((*MockHibernationActuator)(nil).MachinesRunning), cd, dpClient, cpClient, logger)
 }
 
 // MachinesStopped mocks base method.
-func (m *MockHibernationActuator) MachinesStopped(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) (bool, []string, error) {
+func (m *MockHibernationActuator) MachinesStopped(cd *v1.ClusterDeployment, dpClient, cpClient client.Client, logger logrus.FieldLogger) (bool, []string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MachinesStopped", cd, hiveClient, logger)
+	ret := m.ctrl.Call(m, "MachinesStopped", cd, dpClient, cpClient, logger)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].([]string)
 	ret2, _ := ret[2].(error)
@@ -77,37 +77,37 @@ func (m *MockHibernationActuator) MachinesStopped(cd *v1.ClusterDeployment, hive
 }
 
 // MachinesStopped indicates an expected call of MachinesStopped.
-func (mr *MockHibernationActuatorMockRecorder) MachinesStopped(cd, hiveClient, logger interface{}) *gomock.Call {
+func (mr *MockHibernationActuatorMockRecorder) MachinesStopped(cd, dpClient, cpClient, logger interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MachinesStopped", reflect.TypeOf((*MockHibernationActuator)(nil).MachinesStopped), cd, hiveClient, logger)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MachinesStopped", reflect.TypeOf((*MockHibernationActuator)(nil).MachinesStopped), cd, dpClient, cpClient, logger)
 }
 
 // StartMachines mocks base method.
-func (m *MockHibernationActuator) StartMachines(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) error {
+func (m *MockHibernationActuator) StartMachines(cd *v1.ClusterDeployment, dpClient, cpClient client.Client, logger logrus.FieldLogger) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartMachines", cd, hiveClient, logger)
+	ret := m.ctrl.Call(m, "StartMachines", cd, dpClient, cpClient, logger)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StartMachines indicates an expected call of StartMachines.
-func (mr *MockHibernationActuatorMockRecorder) StartMachines(cd, hiveClient, logger interface{}) *gomock.Call {
+func (mr *MockHibernationActuatorMockRecorder) StartMachines(cd, dpClient, cpClient, logger interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartMachines", reflect.TypeOf((*MockHibernationActuator)(nil).StartMachines), cd, hiveClient, logger)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartMachines", reflect.TypeOf((*MockHibernationActuator)(nil).StartMachines), cd, dpClient, cpClient, logger)
 }
 
 // StopMachines mocks base method.
-func (m *MockHibernationActuator) StopMachines(cd *v1.ClusterDeployment, hiveClient client.Client, logger logrus.FieldLogger) error {
+func (m *MockHibernationActuator) StopMachines(cd *v1.ClusterDeployment, dpClient, cpClient client.Client, logger logrus.FieldLogger) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StopMachines", cd, hiveClient, logger)
+	ret := m.ctrl.Call(m, "StopMachines", cd, dpClient, cpClient, logger)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StopMachines indicates an expected call of StopMachines.
-func (mr *MockHibernationActuatorMockRecorder) StopMachines(cd, hiveClient, logger interface{}) *gomock.Call {
+func (mr *MockHibernationActuatorMockRecorder) StopMachines(cd, dpClient, cpClient, logger interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopMachines", reflect.TypeOf((*MockHibernationActuator)(nil).StopMachines), cd, hiveClient, logger)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopMachines", reflect.TypeOf((*MockHibernationActuator)(nil).StopMachines), cd, dpClient, cpClient, logger)
 }
 
 // MockHibernationPreemptibleMachines is a mock of HibernationPreemptibleMachines interface.

@@ -123,14 +123,16 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterDeployment{
-		Client:                                  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:                                  mgr.GetScheme(),
 		logger:                                  logger,
 		expectations:                            controllerutils.NewExpectations(logger),
 		watchingClusterInstall:                  map[string]struct{}{},
 		validateCredentialsForClusterDeployment: controllerutils.ValidateCredentialsForClusterDeployment,
 	}
+	r.Client, r.controlPlaneClient, r.scaleMode = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
+		// The remote client builder uses the client (first arg) to look up the admin kubeconfig secret
+		// associated with the CD, so it needs the data plane client.
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
 
@@ -140,7 +142,7 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flow
 		r.protectedDelete = true
 	}
 
-	verifier, err := LoadReleaseImageVerifier(mgr.GetConfig())
+	verifier, err := LoadReleaseImageVerifier(controllerutils.LoadDataPlaneKubeConfigOrDie())
 	if err == nil {
 		logger.Info("Release Image verification enabled")
 		r.releaseImageVerifier = verifier
@@ -244,8 +246,10 @@ var _ reconcile.Reconciler = &ReconcileClusterDeployment{}
 // ReconcileClusterDeployment reconciles a ClusterDeployment object
 type ReconcileClusterDeployment struct {
 	client.Client
-	scheme *runtime.Scheme
-	logger log.FieldLogger
+	controlPlaneClient client.Client
+	scaleMode          bool
+	scheme             *runtime.Scheme
+	logger             log.FieldLogger
 
 	// watcher allows the reconciler to add new watches
 	// at runtime.
@@ -959,7 +963,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	jobLog := cdLog.WithField("job", jobKey.Name)
 
 	existingJob := &batchv1.Job{}
-	switch err := r.Get(context.Background(), jobKey, existingJob); {
+	switch err := r.controlPlaneClient.Get(context.Background(), jobKey, existingJob); {
 	// The job does not exist. If the images have been resolved, continue reconciling. Otherwise, create the job.
 	case apierrors.IsNotFound(err):
 		if areImagesResolved {
@@ -985,8 +989,24 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
 			return nil, err
 		}
+		if r.scaleMode {
+			// In scale mode:
+			// We need the service account and secret reader permissions in the namespace on the control plane
+			// TODO: Split the role -- the control plane should only need secret reader
+			err = controllerutils.SetupClusterInstallServiceAccount(r.controlPlaneClient, cd.Namespace, cdLog)
+			if err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role in control plane")
+				return nil, err
+			}
+			// Copy the data plane kubeconfig secret into the CD namespace
+			controllerutils.CopySecret(
+				r.controlPlaneClient, r.controlPlaneClient,
+				types.NamespacedName{Name: constants.DataPlaneKubeconfigSecretName, Namespace: controllerutils.GetHiveNamespace()},
+				types.NamespacedName{Name: constants.DataPlaneKubeconfigSecretName, Namespace: cd.Namespace},
+				nil, nil)
+		}
 
-		if err := r.Create(context.TODO(), job); err != nil {
+		if err := r.controlPlaneClient.Create(context.TODO(), job); err != nil {
 			jobLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating job")
 			return nil, err
 		}
@@ -1014,7 +1034,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	case controllerutils.IsFinished(existingJob):
 		jobLog.WithField("successful", controllerutils.IsSuccessful(existingJob)).
 			Warning("Finished job found. Deleting.")
-		if err := r.Delete(
+		if err := r.controlPlaneClient.Delete(
 			context.Background(),
 			existingJob,
 			client.PropagationPolicy(metav1.DeletePropagationForeground),
@@ -1262,6 +1282,8 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating deprovision request")
 			// Check if namespace is terminated, if so we can give up, remove the finalizer, and let
 			// the cluster go away.
+			// NOTE: We're only checking the data plane, on the assumption that the control plane namespace
+			// will also be deleted at roughly the same time.
 			ns := &corev1.Namespace{}
 			err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, ns)
 			if err != nil {
@@ -1880,7 +1902,7 @@ func (r *ReconcileClusterDeployment) mergePullSecrets(cd *hivev1.ClusterDeployme
 	globalPullSecretName := os.Getenv(constants.GlobalPullSecret)
 	var globalPullSecret string
 	if len(globalPullSecretName) != 0 {
-		globalPullSecret, err = controllerutils.LoadSecretData(r.Client, globalPullSecretName, controllerutils.GetHiveNamespace(), corev1.DockerConfigJsonKey)
+		globalPullSecret, err = controllerutils.LoadSecretData(r.controlPlaneClient, globalPullSecretName, controllerutils.GetHiveNamespace(), corev1.DockerConfigJsonKey)
 		if err != nil {
 			return "", errors.Wrap(err, "global pull secret could not be retrieved")
 		}

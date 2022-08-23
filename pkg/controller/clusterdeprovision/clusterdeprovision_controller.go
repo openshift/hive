@@ -95,11 +95,12 @@ func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (re
 			return nil, err
 		}
 	}
-	return &ReconcileClusterDeprovision{
-		Client:               controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+	r := &ReconcileClusterDeprovision{
 		scheme:               mgr.GetScheme(),
 		deprovisionsDisabled: deprovisionsDisabled,
-	}, nil
+	}
+	r.Client, r.controlPlaneClient, r.scaleMode = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	return r, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -140,6 +141,8 @@ var _ reconcile.Reconciler = &ReconcileClusterDeprovision{}
 // ReconcileClusterDeprovision reconciles a ClusterDeprovision object
 type ReconcileClusterDeprovision struct {
 	client.Client
+	controlPlaneClient   client.Client
+	scaleMode            bool
 	scheme               *runtime.Scheme
 	deprovisionsDisabled bool
 }
@@ -225,7 +228,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		rLog.Debug("No actuator found for this provider")
 	} else {
 		// actuator found, ensure creds work.
-		err := actuator.TestCredentials(instance, r.Client, rLog)
+		err := actuator.TestCredentials(instance, r.Client, r.controlPlaneClient, rLog)
 		if err != nil {
 			rLog.WithError(err).Warn("Credential check failed")
 
@@ -268,7 +271,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 
 	extraEnvVars := getAWSServiceProviderEnvVars(instance, instance.Name)
 
-	if err := install.CopyAWSServiceProviderSecret(r.Client, instance.Namespace, extraEnvVars, instance, r.scheme); err != nil {
+	if err := install.CopyAWSServiceProviderSecret(r.controlPlaneClient, r.Client, instance.Namespace, extraEnvVars, instance, r.scheme); err != nil {
 		rLog.WithError(err).Error("could not copy AWS service provider secret")
 		return reconcile.Result{}, err
 	}
@@ -285,6 +288,21 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	if err := controllerutils.SetupClusterUninstallServiceAccount(r, cd.Namespace, rLog); err != nil {
 		rLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role")
 		return reconcile.Result{}, err
+	}
+	if r.scaleMode {
+		// In scale mode:
+		// We need the service account and secret reader permissions in the namespace on the control plane
+		// TODO: Split the role -- the control plane should only need secret reader
+		if err := controllerutils.SetupClusterUninstallServiceAccount(r.controlPlaneClient, cd.Namespace, rLog); err != nil {
+			rLog.WithError(err).Log(controllerutils.LogLevel(err), "error setting up service account and role in control plane")
+			return reconcile.Result{}, err
+		}
+		// Copy the data plane kubeconfig secret into the CD namespace
+		controllerutils.CopySecret(
+			r.controlPlaneClient, r.controlPlaneClient,
+			types.NamespacedName{Name: constants.DataPlaneKubeconfigSecretName, Namespace: controllerutils.GetHiveNamespace()},
+			types.NamespacedName{Name: constants.DataPlaneKubeconfigSecretName, Namespace: cd.Namespace},
+			nil, nil)
 	}
 
 	// Generate an uninstall job
@@ -322,10 +340,10 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 
 	// Check if uninstall job already exists:
 	existingJob := &batchv1.Job{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
+	err = r.controlPlaneClient.Get(context.TODO(), types.NamespacedName{Name: uninstallJob.Name, Namespace: uninstallJob.Namespace}, existingJob)
 	if err != nil && errors.IsNotFound(err) {
 		rLog.Debug("uninstall job does not exist, creating it")
-		err = r.Create(context.TODO(), uninstallJob)
+		err = r.controlPlaneClient.Create(context.TODO(), uninstallJob)
 		if err != nil {
 			rLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating uninstall job")
 			return reconcile.Result{}, err
@@ -398,7 +416,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	if newJobNeeded {
 		if existingJob.DeletionTimestamp == nil {
 			rLog.Info("deleting existing deprovision job due to updated/missing hash detected")
-			err := r.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
+			err := r.controlPlaneClient.Delete(context.TODO(), existingJob, client.PropagationPolicy(metav1.DeletePropagationForeground))
 			if err != nil {
 				rLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting outdated deprovision job")
 				return reconcile.Result{}, err
@@ -460,5 +478,4 @@ func (r *ReconcileClusterDeprovision) setupAWSCredentialForAssumeRole(cd *hivev1
 	}
 
 	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
-
 }

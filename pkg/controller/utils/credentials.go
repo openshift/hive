@@ -25,6 +25,7 @@ import (
 
 // ValidateCredentialsForClusterDeployment will attempt to verify that the platform/cloud credentials
 // for the given ClusterDeployment are valid.
+// The kubeClient is used to access secrets in the CD namespace, so it should be the data plane client.
 // Note: It simply checks that the username/password (or equivalent) can authenticate,
 // not that the credentials have any specific permissions.
 func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (bool, error) {

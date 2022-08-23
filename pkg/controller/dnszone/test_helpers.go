@@ -198,7 +198,7 @@ func setupDefaultMocks(t *testing.T) *mocks {
 }
 
 func fakeAWSClientBuilder(mockAWSClient *mockaws.MockClient) awsClientBuilderType {
-	return func(_ client.Client, _ awsclient.Options) (awsclient.Client, error) {
+	return func(_, _ client.Client, _ awsclient.Options) (awsclient.Client, error) {
 		return mockAWSClient, nil
 	}
 }

@@ -1758,7 +1758,7 @@ users:
 					DNSRecordType:        test.dnsRecordType,
 				},
 
-				awsClientFn: func(_ client.Client, _ awsclient.Options) (awsclient.Client, error) {
+				awsClientFn: func(_, _ client.Client, _ awsclient.Options) (awsclient.Client, error) {
 					return mockedAWSClient, nil
 				},
 			}

@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/pointer"
 
@@ -213,9 +212,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 
 			rcd := &ArgoCDRegisterController{
 				Client:     fakeClient,
-				scheme:     scheme.Scheme,
 				logger:     logger,
-				restConfig: &rest.Config{},
 				tlsClientConfigBuilder: func(kubeConfig clientcmd.ClientConfig, _ log.FieldLogger) (TLSClientConfig, error) {
 					return TLSClientConfig{}, nil
 				},

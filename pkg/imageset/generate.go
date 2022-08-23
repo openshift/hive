@@ -1,6 +1,7 @@
 package imageset
 
 import (
+	"os"
 	"time"
 
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -80,6 +81,11 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 		},
 		ServiceAccountName: serviceAccountName,
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
+	}
+
+	// If we're in scale mode, mount the data plane kubeconfig secret
+	if os.Getenv(constants.DataPlaneKubeconfigEnvVar) != "" {
+		controllerutils.AddDataPlaneKubeConfigVolume(&podSpec, &podSpec.Containers[0])
 	}
 
 	completions := int32(1)

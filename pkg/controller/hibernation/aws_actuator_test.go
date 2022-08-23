@@ -114,9 +114,9 @@ func TestStopAndStartMachines(t *testing.T) {
 			var err error
 			switch test.testFunc {
 			case "StopMachines":
-				err = actuator.StopMachines(testClusterDeployment(), nil, log.New())
+				err = actuator.StopMachines(testClusterDeployment(), nil, nil, log.New())
 			case "StartMachines":
-				err = actuator.StartMachines(testClusterDeployment(), nil, log.New())
+				err = actuator.StartMachines(testClusterDeployment(), nil, nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}
@@ -175,7 +175,7 @@ func TestStopPreemptibleMachines(t *testing.T) {
 				test.setupClient(t, awsClient)
 			}
 			actuator := testAWSActuator(awsClient)
-			err := actuator.StopMachines(testClusterDeployment(), nil, log.New())
+			err := actuator.StopMachines(testClusterDeployment(), nil, nil, log.New())
 			assert.NoError(t, err)
 		})
 	}
@@ -241,9 +241,9 @@ func TestMachinesStoppedAndRunning(t *testing.T) {
 			var result bool
 			switch test.testFunc {
 			case "MachinesStopped":
-				result, _, err = actuator.MachinesStopped(testClusterDeployment(), nil, log.New())
+				result, _, err = actuator.MachinesStopped(testClusterDeployment(), nil, nil, log.New())
 			case "MachinesRunning":
-				result, _, err = actuator.MachinesRunning(testClusterDeployment(), nil, log.New())
+				result, _, err = actuator.MachinesRunning(testClusterDeployment(), nil, nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}
@@ -384,7 +384,7 @@ func matchInstanceIDs(t *testing.T, actual []*string, states map[string]int) {
 
 func testAWSActuator(awsClient awsclient.Client) *awsActuator {
 	return &awsActuator{
-		awsClientFn: func(*hivev1.ClusterDeployment, client.Client, log.FieldLogger) (awsclient.Client, error) {
+		awsClientFn: func(*hivev1.ClusterDeployment, client.Client, client.Client, log.FieldLogger) (awsclient.Client, error) {
 			return awsClient, nil
 		},
 	}

@@ -294,13 +294,14 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 
 			r := &ReconcileClusterDeprovision{
 				Client:               mocks.fakeKubeClient,
+				controlPlaneClient:   mocks.fakeKubeClient,
 				scheme:               scheme.Scheme,
 				deprovisionsDisabled: test.deprovisionsDisabled,
 			}
 
 			// Save the list of actuators so that it can be restored at the end of this test
 			actuatorsSaved := actuators
-			actuators = []Actuator{&awsActuator{awsClientFn: func(clusterDeprovision *hivev1.ClusterDeprovision, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {
+			actuators = []Actuator{&awsActuator{awsClientFn: func(clusterDeprovision *hivev1.ClusterDeprovision, dpClient, cpClient client.Client, logger log.FieldLogger) (awsclient.Client, error) {
 				return mocks.mockAWSClient, nil
 			}}}
 

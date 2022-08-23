@@ -33,9 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
@@ -78,12 +76,10 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ArgoCDRegisterController{
-		Client:                 controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
-		scheme:                 mgr.GetScheme(),
-		restConfig:             mgr.GetConfig(),
 		logger:                 log.WithField("controller", ControllerName),
 		tlsClientConfigBuilder: tlsClientConfigBuilderFunc,
 	}
+	r.Client, _, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	return r
 }
 
@@ -115,8 +111,6 @@ var _ reconcile.Reconciler = &ArgoCDRegisterController{}
 // ArgoCDRegisterController reconciles ClusterDeployments and generates ArgoCD cluster secrets for ClusterDeployments
 type ArgoCDRegisterController struct {
 	client.Client
-	scheme                 *runtime.Scheme
-	restConfig             *rest.Config
 	logger                 log.FieldLogger
 	tlsClientConfigBuilder func(clientcmd.ClientConfig, log.FieldLogger) (TLSClientConfig, error)
 }

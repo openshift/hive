@@ -39,7 +39,7 @@ func init() {
 
 type awsActuator struct {
 	// awsClientFn is the function to build an AWS client, here for testing
-	awsClientFn func(*hivev1.ClusterDeployment, client.Client, log.FieldLogger) (awsclient.Client, error)
+	awsClientFn func(*hivev1.ClusterDeployment, client.Client, client.Client, log.FieldLogger) (awsclient.Client, error)
 }
 
 // CanHandle returns true if the actuator can handle a particular ClusterDeployment
@@ -48,9 +48,9 @@ func (a *awsActuator) CanHandle(cd *hivev1.ClusterDeployment) bool {
 }
 
 // StopMachines will stop machines belonging to the given ClusterDeployment
-func (a *awsActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *awsActuator) StopMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "aws")
-	awsClient, err := a.awsClientFn(cd, hiveClient, logger)
+	awsClient, err := a.awsClientFn(cd, dpClient, cpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -106,9 +106,9 @@ func (a *awsActuator) stopSpotInstances(awsClient awsclient.Client, instanceIDs 
 }
 
 // StartMachines will select machines belonging to the given ClusterDeployment
-func (a *awsActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
+func (a *awsActuator) StartMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "aws")
-	awsClient, err := a.awsClientFn(cd, hiveClient, logger)
+	awsClient, err := a.awsClientFn(cd, dpClient, cpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -137,10 +137,10 @@ func (a *awsActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient cli
 // MachinesRunning will return true if the machines associated with the given
 // ClusterDeployment are in a running state. It also returns a list of machines that
 // are not running.
-func (a *awsActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *awsActuator) MachinesRunning(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "aws")
 	logger.Infof("checking whether machines are running")
-	awsClient, err := a.awsClientFn(cd, hiveClient, logger)
+	awsClient, err := a.awsClientFn(cd, dpClient, cpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}
@@ -154,10 +154,10 @@ func (a *awsActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveClient c
 // MachinesStopped will return true if the machines associated with the given
 // ClusterDeployment are in a stopped state. It also returns a list of machines
 // that have not stopped.
-func (a *awsActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *awsActuator) MachinesStopped(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "aws")
 	logger.Infof("checking whether machines are stopped")
-	awsClient, err := a.awsClientFn(cd, hiveClient, logger)
+	awsClient, err := a.awsClientFn(cd, dpClient, cpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}
@@ -251,7 +251,7 @@ func machineNames(machines []machineapi.Machine) []string {
 	return result
 }
 
-func getAWSClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (awsclient.Client, error) {
+func getAWSClient(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (awsclient.Client, error) {
 	options := awsclient.Options{
 		Region: cd.Spec.Platform.AWS.Region,
 		CredentialsSource: awsclient.CredentialsSource{
@@ -269,7 +269,7 @@ func getAWSClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.Fiel
 		},
 	}
 
-	return awsclient.New(c, options)
+	return awsclient.New(dpClient, cpClient, options)
 }
 
 // filterOutSpotInstances removes the spot instances from the list and returns it. It

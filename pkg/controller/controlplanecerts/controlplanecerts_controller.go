@@ -87,10 +87,10 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) rec
 		logger.WithError(err).Fatal("unable to create resource helper")
 	}
 	r := &ReconcileControlPlaneCerts{
-		Client:  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:  mgr.GetScheme(),
 		applier: helper,
 	}
+	r.Client, _, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 
 	return r
 }

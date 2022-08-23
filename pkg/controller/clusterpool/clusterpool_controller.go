@@ -79,11 +79,12 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new ReconcileClusterPool
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *ReconcileClusterPool {
 	logger := log.WithField("controller", ControllerName)
-	return &ReconcileClusterPool{
-		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+	r := &ReconcileClusterPool{
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
+	r.Client, r.controlPlaneClient, r.scaleMode = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	return r
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -272,7 +273,9 @@ var _ reconcile.Reconciler = &ReconcileClusterPool{}
 // ReconcileClusterPool reconciles a ClusterPool object
 type ReconcileClusterPool struct {
 	client.Client
-	logger log.FieldLogger
+	controlPlaneClient client.Client
+	scaleMode          bool
+	logger             log.FieldLogger
 	// A TTLCache of ClusterDeployment creates each ClusterPool expects to see
 	expectations controllerutils.ExpectationsInterface
 }
@@ -589,50 +592,65 @@ func (r *ReconcileClusterPool) reconcileRBAC(
 		return nil
 	}
 
-	// get namespaces where role needs to be bound.
-	cdNSList := &corev1.NamespaceList{}
-	if err := r.Client.List(context.Background(), cdNSList,
-		client.MatchingLabels{constants.ClusterPoolNameLabel: clp.GetName()}); err != nil {
-		log.WithError(err).Error("error listing namespaces for cluster pool")
+	var errs []error
+
+	// If this returns an error, we'll bail right away. Otherwise it updates the errs slice.
+	applyToNamespaces := func(c client.Client, logger log.FieldLogger) error {
+		// get namespaces where role needs to be bound.
+		cdNSList := &corev1.NamespaceList{}
+		if err := c.List(context.Background(), cdNSList,
+			client.MatchingLabels{constants.ClusterPoolNameLabel: clp.GetName()}); err != nil {
+			logger.WithError(err).Error("error listing namespaces for cluster pool")
+			return err
+		}
+
+		// create role bindings.
+		for _, ns := range cdNSList.Items {
+			if ns.DeletionTimestamp != nil {
+				logger.WithField("namespace", ns.GetName()).
+					Debug("skipping syncing the rolebindings as the namespace is marked for deletion")
+				continue
+			}
+			rb := &rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns.GetName(),
+					Name:      clusterPoolAdminRoleBindingName,
+				},
+				Subjects: subs,
+				RoleRef:  roleRef,
+			}
+			orb := &rbacv1.RoleBinding{}
+			if err := applyRoleBinding(c, rb, orb, logger); err != nil {
+				errs = append(errs, errors.Wrapf(err, "failed to apply rolebinding in namespace %s", ns.GetNamespace()))
+				continue
+			}
+		}
+		return nil
+	}
+	if err := applyToNamespaces(r.Client, logger.WithField("plane", "data")); err != nil {
 		return err
 	}
-
-	// create role bindings.
-	var errs []error
-	for _, ns := range cdNSList.Items {
-		if ns.DeletionTimestamp != nil {
-			logger.WithField("namespace", ns.GetName()).
-				Debug("skipping syncing the rolebindings as the namespace is marked for deletion")
-			continue
-		}
-		rb := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.GetName(),
-				Name:      clusterPoolAdminRoleBindingName,
-			},
-			Subjects: subs,
-			RoleRef:  roleRef,
-		}
-		orb := &rbacv1.RoleBinding{}
-		if err := r.applyRoleBinding(rb, orb, logger); err != nil {
-			errs = append(errs, errors.Wrapf(err, "failed to apply rolebinding in namespace %s", ns.GetNamespace()))
-			continue
+	// In scale mode, we need to apply the RBAC to the namespaces in both planes
+	if r.scaleMode {
+		if err := applyToNamespaces(r.controlPlaneClient, logger.WithField("plane", "control")); err != nil {
+			return err
 		}
 	}
+
 	if err := utilerrors.NewAggregate(errs); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *ReconcileClusterPool) applyRoleBinding(desired, observed *rbacv1.RoleBinding, logger log.FieldLogger) error {
+func applyRoleBinding(c client.Client, desired, observed *rbacv1.RoleBinding, logger log.FieldLogger) error {
 	key := client.ObjectKey{Namespace: desired.GetNamespace(), Name: desired.GetName()}
 	logger = logger.WithField("rolebinding", key)
 
-	switch err := r.Client.Get(context.Background(), key, observed); {
+	switch err := c.Get(context.Background(), key, observed); {
 	case apierrors.IsNotFound(err):
 		logger.Info("creating rolebinding")
-		if err := r.Create(context.Background(), desired); err != nil {
+		if err := c.Create(context.Background(), desired); err != nil {
 			logger.WithError(err).Error("could not create rolebinding")
 			return err
 		}
@@ -654,7 +672,7 @@ func (r *ReconcileClusterPool) applyRoleBinding(desired, observed *rbacv1.RoleBi
 		"desiredSubjects":  desired.Subjects,
 		"desiredRoleRef":   desired.RoleRef,
 	}).Info("updating rolebinding")
-	if err := r.Update(context.Background(), observed); err != nil {
+	if err := c.Update(context.Background(), observed); err != nil {
 		logger.WithError(err).Error("could not update rolebinding")
 		return err
 	}
@@ -727,12 +745,11 @@ func (r *ReconcileClusterPool) createCluster(
 ) (*hivev1.ClusterDeployment, error) {
 	var err error
 
-	ns, err := r.createRandomNamespace(clp)
+	ns, err := r.createRandomNamespace(clp, logger)
 	if err != nil {
-		logger.WithError(err).Error("error obtaining random namespace")
 		return nil, err
 	}
-	logger.WithField("cluster", ns.Name).Info("Creating new cluster")
+	logger.WithField("cluster", ns).Info("Creating new cluster")
 
 	annotations := clp.Spec.Annotations
 	// Annotate the CD so we can distinguish "stale" CDs
@@ -743,8 +760,8 @@ func (r *ReconcileClusterPool) createCluster(
 
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
-		Name:                  ns.Name,
-		Namespace:             ns.Name,
+		Name:                  ns,
+		Namespace:             ns,
 		BaseDomain:            clp.Spec.BaseDomain,
 		ImageSet:              clp.Spec.ImageSetRef.Name,
 		WorkerNodesCount:      int64(3),
@@ -867,19 +884,34 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 	return nil
 }
 
-func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool) (*corev1.Namespace, error) {
+func (r *ReconcileClusterPool) createRandomNamespace(clp *hivev1.ClusterPool, logger log.FieldLogger) (string, error) {
 	namespaceName := apihelpers.GetResourceName(clp.Name, utilrand.String(5))
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-			Labels: map[string]string{
-				// Should never be removed.
-				constants.ClusterPoolNameLabel: clp.Name,
+	createNS := func(c client.Client, logger log.FieldLogger) error {
+		ns := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespaceName,
+				Labels: map[string]string{
+					// Should never be removed.
+					constants.ClusterPoolNameLabel: clp.Name,
+				},
 			},
-		},
+		}
+		err := c.Create(context.Background(), ns)
+		if err != nil {
+			logger.WithError(err).Error("error creating random namespace")
+		}
+		return err
 	}
-	err := r.Create(context.Background(), ns)
-	return ns, err
+	if err := createNS(r.Client, logger.WithField("plane", "data")); err != nil {
+		return namespaceName, err
+	}
+	// If we're in scale mode, we need to create the namespace in both planes
+	if r.scaleMode {
+		if err := createNS(r.controlPlaneClient, logger.WithField("plane", "control")); err != nil {
+			return namespaceName, err
+		}
+	}
+	return namespaceName, nil
 }
 
 // getClustersToDelete returns a list of length `deletionsNeeded` (to a max of the total number of

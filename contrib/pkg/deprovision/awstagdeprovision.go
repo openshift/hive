@@ -42,6 +42,12 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
+	// TODO: This isn't actually informing us where to get the creds. Its only effect is to terminate the command if
+	// whatever is in here changes -- whether or not it's actually what the command is using. It happens to match
+	// what we supply via the AWS_CONFIG_FILE env var when we generate the uninstaller job for deprovisioning. But
+	// a) that job is running in a pod where the creds file should never change, so it's not much good in that case; and
+	// b) it would not have the expected effect if used in a standalone invocation.
+	// So: can we just get rid of this arg and the terminateWhenFilesChange goroutine?
 	flags.StringVar(&credsDir, "creds-dir", "", "directory of the creds. Changes in the creds will cause the program to terminate")
 	return cmd
 }

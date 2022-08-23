@@ -58,11 +58,12 @@ func Add(mgr manager.Manager) error {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
-	return &ReconcileSyncIdentityProviders{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+	r := &ReconcileSyncIdentityProviders{
 		scheme: mgr.GetScheme(),
 		logger: log.WithField("controller", ControllerName),
 	}
+	r.Client, _, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	return r
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler

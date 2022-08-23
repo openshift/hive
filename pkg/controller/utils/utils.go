@@ -304,14 +304,14 @@ func EnsureRequeueAtLeastWithin(duration time.Duration, result reconcile.Result,
 }
 
 // CopySecret copies the secret defined by src to dest.
-func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Object, scheme *runtime.Scheme) error {
+func CopySecret(srcClient, destClient client.Client, src, dest types.NamespacedName, owner metav1.Object, scheme *runtime.Scheme) error {
 	srcSecret := &corev1.Secret{}
-	if err := c.Get(context.Background(), src, srcSecret); err != nil {
+	if err := srcClient.Get(context.Background(), src, srcSecret); err != nil {
 		return err
 	}
 
 	destSecret := &corev1.Secret{}
-	err := c.Get(context.Background(), dest, destSecret)
+	err := destClient.Get(context.Background(), dest, destSecret)
 	if apierrors.IsNotFound(err) {
 		destSecret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -328,7 +328,7 @@ func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Ob
 			}
 		}
 
-		return c.Create(context.Background(), destSecret)
+		return destClient.Create(context.Background(), destSecret)
 	}
 	if err != nil {
 		return err
@@ -340,7 +340,7 @@ func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Ob
 
 	destSecret.Data = srcSecret.DeepCopy().Data
 	destSecret.StringData = srcSecret.DeepCopy().StringData
-	return c.Update(context.Background(), destSecret)
+	return destClient.Update(context.Background(), destSecret)
 }
 
 // BuildControllerLogger returns a logger for controllers with consistent fields.

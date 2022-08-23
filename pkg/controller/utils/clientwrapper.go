@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 var (
@@ -49,13 +52,61 @@ func init() {
 	metrics.Registry.MustRegister(metricKubeClientRequestsCancelled)
 }
 
-// NewClientWithMetricsOrDie creates a new controller-runtime client with a wrapper which increments
+// NewClientsWithMetricsOrDie returns two clients:
+// - The data plane client. In scale mode, this points to the API service denoted by the data-plane-kubeconfig
+//   secret in the target namespace of this deployment. In normal mode, it is identical to...
+// - The control plane client, which points to the API service of the controller manager.
+// ...and a bool indicating whether we are in scale mode (true) or not (false).
+func NewClientsWithMetricsOrDie(mgr manager.Manager, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) (client.Client, client.Client, bool) {
+	// Control plane client.
+	// Copy the rest config as we want our round trippers to be controller specific.
+	cpClient := newClientWithMetricsOrDie(rest.CopyConfig(mgr.GetConfig()), mgr, ctrlrName, rateLimiter)
+
+	var dpClient client.Client
+
+	// In scale mode?
+	dpRestConfig := LoadDataPlaneKubeConfigOrDie()
+	if dpRestConfig == nil {
+		// Standard mode: the data plane and control plane are the same. NOTE: This is not a copy.
+		return cpClient, cpClient, false
+	}
+
+	// Scale mode: build the client from the data plane REST config
+	dpClient = newClientWithMetricsOrDie(dpRestConfig, mgr, ctrlrName, rateLimiter)
+
+	return dpClient, cpClient, true
+}
+
+func LoadDataPlaneKubeConfigOrDie() *rest.Config {
+	dpkcPath := os.Getenv(constants.DataPlaneKubeconfigEnvVar)
+	if dpkcPath == "" {
+		// Not in scale mode
+		return nil
+	}
+
+	// Scale mode: load the mounted kubeconfig indicated by the env var
+	kcData, err := os.ReadFile(dpkcPath)
+	if err != nil {
+		log.WithError(err).WithField("path", dpkcPath).Fatal("unable to read data plane kubeconfig file")
+	}
+	dpConfig, err := clientcmd.Load(kcData)
+	if err != nil {
+		log.WithError(err).Fatal("unable to load data plane kubeconfig")
+	}
+	dpRestConfig, err := clientcmd.NewDefaultClientConfig(*dpConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		log.WithError(err).Fatal("failed to parse data plane kubeconfig")
+	}
+
+	log.Info("Loaded data plane kubeconfig")
+	return dpRestConfig
+}
+
+// newClientWithMetricsOrDie creates a new controller-runtime client with a wrapper which increments
 // metrics for requests by controller name, HTTP method, URL path, and whether or not the request was
 // to a remote cluster.. The client will re-use the managers cache. This should be used in
 // all Hive controllers.
-func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) client.Client {
-	// Copy the rest config as we want our round trippers to be controller specific.
-	cfg := rest.CopyConfig(mgr.GetConfig())
+func newClientWithMetricsOrDie(cfg *rest.Config, mgr manager.Manager, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) client.Client {
 	if rateLimiter != nil {
 		cfg.RateLimiter = *rateLimiter
 	}

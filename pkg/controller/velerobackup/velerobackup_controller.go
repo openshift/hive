@@ -112,7 +112,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (re
 
 	var client client.Client
 	if scheme != nil {
-		client = controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+		client, _, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
 	}
 
 	return &ReconcileBackup{

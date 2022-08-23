@@ -81,12 +81,13 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *ReconcileDNSZone {
-	return &ReconcileDNSZone{
-		Client:    controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+	r := &ReconcileDNSZone{
 		scheme:    mgr.GetScheme(),
 		logger:    log.WithField("controller", ControllerName),
 		soaLookup: lookupSOARecord,
 	}
+	r.Client, r.controlPlaneClient, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	return r
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -125,7 +126,8 @@ var _ reconcile.Reconciler = &ReconcileDNSZone{}
 // ReconcileDNSZone reconciles a DNSZone object
 type ReconcileDNSZone struct {
 	client.Client
-	scheme *runtime.Scheme
+	controlPlaneClient client.Client
+	scheme             *runtime.Scheme
 
 	logger log.FieldLogger
 
@@ -408,7 +410,7 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 			},
 		}
 
-		return NewAWSActuator(dnsLog, r.Client, credentials, dnsZone, awsclient.New)
+		return NewAWSActuator(dnsLog, r.Client, r.controlPlaneClient, credentials, dnsZone, awsclient.New)
 	}
 
 	if dnsZone.Spec.GCP != nil {

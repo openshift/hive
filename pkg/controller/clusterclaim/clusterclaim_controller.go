@@ -55,10 +55,11 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new ReconcileClusterClaim
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *ReconcileClusterClaim {
 	logger := log.WithField("controller", ControllerName)
-	return &ReconcileClusterClaim{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
+	r := &ReconcileClusterClaim{
 		logger: logger,
 	}
+	r.Client, r.controlPlaneClient, r.scaleMode = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
+	return r
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -153,7 +154,9 @@ var _ reconcile.Reconciler = &ReconcileClusterClaim{}
 // ReconcileClusterClaim reconciles a CLusterClaim object
 type ReconcileClusterClaim struct {
 	client.Client
-	logger log.FieldLogger
+	controlPlaneClient client.Client
+	scaleMode          bool
+	logger             log.FieldLogger
 }
 
 // Reconcile reconciles a ClusterClaim.
@@ -521,16 +524,28 @@ func (r *ReconcileClusterClaim) createRBAC(claim *hivev1.ClusterClaim, cd *hivev
 	if cd.Spec.ClusterMetadata == nil {
 		return errors.New("ClusterDeployment does not have ClusterMetadata")
 	}
-	if err := r.applyHiveClaimOwnerRole(claim, cd, logger); err != nil {
+	applyClaimRBAC := func(c client.Client, logger log.FieldLogger) error {
+		if err := applyHiveClaimOwnerRole(c, claim, cd, logger); err != nil {
+			return err
+		}
+		if err := applyHiveClaimOwnerRoleBinding(c, claim, cd, logger); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := applyClaimRBAC(r.Client, logger.WithField("plane", "data")); err != nil {
 		return err
 	}
-	if err := r.applyHiveClaimOwnerRoleBinding(claim, cd, logger); err != nil {
-		return err
+	// In scale mode, we need to apply the RBAC in both planes
+	if r.scaleMode {
+		if err := applyClaimRBAC(r.controlPlaneClient, logger.WithField("plane", "control")); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+func applyHiveClaimOwnerRole(c client.Client, claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
 	desiredRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cd.Namespace,
@@ -563,13 +578,13 @@ func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(claim *hivev1.ClusterCla
 		observedRole.Rules = desiredRole.Rules
 		return true
 	}
-	if err := r.applyResource(desiredRole, observedRole, updateRole, logger); err != nil {
+	if err := applyResource(c, desiredRole, observedRole, updateRole, logger); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *ReconcileClusterClaim) applyHiveClaimOwnerRoleBinding(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+func applyHiveClaimOwnerRoleBinding(c client.Client, claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
 	desiredRoleBinding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cd.Namespace,
@@ -592,22 +607,22 @@ func (r *ReconcileClusterClaim) applyHiveClaimOwnerRoleBinding(claim *hivev1.Clu
 		observedRoleBinding.RoleRef = desiredRoleBinding.RoleRef
 		return true
 	}
-	if err := r.applyResource(desiredRoleBinding, observedRoleBinding, updateRole, logger); err != nil {
+	if err := applyResource(c, desiredRoleBinding, observedRoleBinding, updateRole, logger); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *ReconcileClusterClaim) applyResource(desired, observed hivev1.MetaRuntimeObject, update func() bool, logger log.FieldLogger) error {
+func applyResource(c client.Client, desired, observed hivev1.MetaRuntimeObject, update func() bool, logger log.FieldLogger) error {
 	key := client.ObjectKey{
 		Namespace: desired.GetNamespace(),
 		Name:      desired.GetName(),
 	}
 	logger = logger.WithField("resource", key)
-	switch err := r.Get(context.Background(), key, observed); {
+	switch err := c.Get(context.Background(), key, observed); {
 	case apierrors.IsNotFound(err):
 		logger.Info("creating resource")
-		if err := r.Create(context.Background(), desired); err != nil {
+		if err := c.Create(context.Background(), desired); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create resource")
 			return errors.Wrap(err, "could not create resource")
 		}
@@ -621,7 +636,7 @@ func (r *ReconcileClusterClaim) applyResource(desired, observed hivev1.MetaRunti
 		return nil
 	}
 	logger.Info("updating resource")
-	if err := r.Update(context.Background(), observed); err != nil {
+	if err := c.Update(context.Background(), observed); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update resource")
 		return errors.Wrap(err, "could not update resource")
 	}

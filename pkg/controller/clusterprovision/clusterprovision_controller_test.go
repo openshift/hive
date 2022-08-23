@@ -271,10 +271,11 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcp := &ReconcileClusterProvision{
-				Client:       fakeClient,
-				scheme:       scheme.Scheme,
-				logger:       logger,
-				expectations: controllerExpectations,
+				Client:             fakeClient,
+				controlPlaneClient: fakeClient,
+				scheme:             scheme.Scheme,
+				logger:             logger,
+				expectations:       controllerExpectations,
 			}
 
 			reconcileRequest := reconcile.Request{

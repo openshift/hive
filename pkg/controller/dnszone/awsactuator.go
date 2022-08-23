@@ -47,12 +47,12 @@ type AWSActuator struct {
 	dnsZone *hivev1.DNSZone
 }
 
-type awsClientBuilderType func(client.Client, awsclient.Options) (awsclient.Client, error)
+type awsClientBuilderType func(client.Client, client.Client, awsclient.Options) (awsclient.Client, error)
 
 // NewAWSActuator creates a new AWSActuator object. A new AWSActuator is expected to be created for each controller sync.
 func NewAWSActuator(
 	logger log.FieldLogger,
-	kubeClient client.Client,
+	dpClient, cpClient client.Client,
 	credentials awsclient.CredentialsSource,
 	dnsZone *hivev1.DNSZone,
 	awsClientBuilder awsClientBuilderType,
@@ -61,7 +61,7 @@ func NewAWSActuator(
 	if region == "" {
 		region = constants.AWSRoute53Region
 	}
-	awsClient, err := awsClientBuilder(kubeClient, awsclient.Options{
+	awsClient, err := awsClientBuilder(dpClient, cpClient, awsclient.Options{
 		Region:            region,
 		CredentialsSource: credentials,
 	})

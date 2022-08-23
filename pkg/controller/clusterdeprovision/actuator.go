@@ -12,5 +12,5 @@ type Actuator interface {
 	CanHandle(cd *hivev1.ClusterDeprovision) bool
 
 	// TestCredentials returns nil if the credential check succeeds. Otherwise returns the error.
-	TestCredentials(clusterDeprovision *hivev1.ClusterDeprovision, c client.Client, logger log.FieldLogger) error
+	TestCredentials(clusterDeprovision *hivev1.ClusterDeprovision, dpClient, cpClient client.Client, logger log.FieldLogger) error
 }

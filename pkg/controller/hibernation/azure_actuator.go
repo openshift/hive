@@ -52,9 +52,9 @@ func (a *azureActuator) CanHandle(cd *hivev1.ClusterDeployment) bool {
 }
 
 // StopMachines will stop machines belonging to the given ClusterDeployment
-func (a *azureActuator) StopMachines(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) error {
+func (a *azureActuator) StopMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "azure")
-	azureClient, err := a.azureClientFn(cd, c, logger)
+	azureClient, err := a.azureClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -79,9 +79,9 @@ func (a *azureActuator) StopMachines(cd *hivev1.ClusterDeployment, c client.Clie
 }
 
 // StartMachines will select machines belonging to the given ClusterDeployment
-func (a *azureActuator) StartMachines(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) error {
+func (a *azureActuator) StartMachines(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "azure")
-	azureClient, err := a.azureClientFn(cd, c, logger)
+	azureClient, err := a.azureClientFn(cd, dpClient, logger)
 	if err != nil {
 		return err
 	}
@@ -108,9 +108,9 @@ func (a *azureActuator) StartMachines(cd *hivev1.ClusterDeployment, c client.Cli
 // MachinesRunning will return true if the machines associated with the given
 // ClusterDeployment are in a running state. It also returns a list of machines that
 // are not running.
-func (a *azureActuator) MachinesRunning(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *azureActuator) MachinesRunning(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "azure")
-	azureClient, err := a.azureClientFn(cd, c, logger)
+	azureClient, err := a.azureClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}
@@ -124,9 +124,9 @@ func (a *azureActuator) MachinesRunning(cd *hivev1.ClusterDeployment, c client.C
 // MachinesStopped will return true if the machines associated with the given
 // ClusterDeployment are in a stopped state. It also returns a list of machines
 // that have not stopped.
-func (a *azureActuator) MachinesStopped(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (bool, []string, error) {
+func (a *azureActuator) MachinesStopped(cd *hivev1.ClusterDeployment, dpClient, cpClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "azure")
-	azureClient, err := a.azureClientFn(cd, c, logger)
+	azureClient, err := a.azureClientFn(cd, dpClient, logger)
 	if err != nil {
 		return false, nil, err
 	}

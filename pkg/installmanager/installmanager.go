@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
@@ -1620,7 +1619,8 @@ func waitForProvisioningStage(m *InstallManager) error {
 	waitContext, cancel := context.WithTimeout(context.Background(), provisioningTransitionTimeout)
 	defer cancel()
 
-	config, err := rest.InClusterConfig()
+	// TODO: Figure out how to reuse m.DynamicClient. Apparently it's not a cache.Getter.
+	config, err := contributils.GetDataPlaneClientConfig()
 	if err != nil {
 		return errors.Wrap(err, "could not get in-cluster REST config")
 	}

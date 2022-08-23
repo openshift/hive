@@ -384,7 +384,9 @@ func (o *Options) getResourceHelper() (resource.Helper, error) {
 
 func (o *Options) setupLocalClients() error {
 	log.Debug("creating cluster client config")
-	cfg, err := hiveutils.GetClientConfig()
+	// These clients are used for the HiveConfig and the admission Deployment, which are always
+	// in the control plane
+	cfg, err := hiveutils.GetControlPlaneClientConfig()
 	if err != nil {
 		log.WithError(err).Error("cannot obtain client config")
 		return err

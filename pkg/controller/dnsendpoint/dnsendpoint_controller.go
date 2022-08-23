@@ -42,7 +42,7 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	c := controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter)
+	c, _, _ := controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter)
 
 	reconciler, nameServerChangeNotifier, err := newReconciler(mgr, c)
 	if err != nil {

@@ -168,7 +168,7 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 					testsecret.WithDataKeyValue(constants.KubeconfigSecretKey, []byte(adminKubeconfig)),
 				),
 			)
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			mockController := gomock.NewController(t)
 			defer mockController.Finish()

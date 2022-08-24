@@ -68,7 +68,7 @@ func (r *helper) setupPatchCommand(name, kind, apiVersion, patchType string, f c
 	}
 	_, ok := patchTypes[patchType]
 	if !ok {
-		return nil, fmt.Errorf("Invalid patch type: %s. Valid patch types are 'strategic', 'merge' or 'json'", patchType)
+		return nil, fmt.Errorf("invalid patch type: %s. Valid patch types are 'strategic', 'merge' or 'json'", patchType)
 	}
 	o.PatchType = patchType
 	o.Patch = patch

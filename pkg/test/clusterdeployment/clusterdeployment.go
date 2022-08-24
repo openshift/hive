@@ -4,7 +4,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -124,7 +123,7 @@ func WithCondition(cond hivev1.ClusterDeploymentCondition) Option {
 func Broken() Option {
 	return WithCondition(hivev1.ClusterDeploymentCondition{
 		Type:   hivev1.ProvisionStoppedCondition,
-		Status: v1.ConditionTrue,
+		Status: corev1.ConditionTrue,
 	})
 }
 

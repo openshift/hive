@@ -170,7 +170,7 @@ func decodeOpenStackMachineProviderSpec(rawExt *runtime.RawExtension, scheme *ru
 	}
 	spec, ok := obj.(*openstackproviderv1alpha1.OpenstackProviderSpec)
 	if !ok {
-		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
+		return nil, fmt.Errorf("unexpected object: %#v", gvk)
 	}
 	return spec, nil
 }

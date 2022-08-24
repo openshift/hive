@@ -42,7 +42,6 @@ import (
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -172,7 +171,7 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 		logger.WithError(err).Error("error getting ClusterDeployment")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, logger)
+	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, logger)
 
 	// Initialize cluster deployment conditions if not present
 	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentAWSPrivateLinkConditions)

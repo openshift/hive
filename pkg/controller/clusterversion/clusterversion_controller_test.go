@@ -82,7 +82,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -193,7 +193,7 @@ func testRemoteClusterAPIClient() client.Client {
 	}
 	remoteClusterVersion.Status = *testRemoteClusterVersionStatus()
 
-	return fake.NewFakeClient(remoteClusterVersion)
+	return fake.NewClientBuilder().WithRuntimeObjects(remoteClusterVersion).Build()
 }
 
 func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {

@@ -29,7 +29,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -181,7 +180,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			Stage:   hivev1.ClusterProvisionStageInitializing,
 		},
 	}
-	utils.CopyLogAnnotation(cd, provision)
+	controllerutils.CopyLogAnnotation(cd, provision)
 
 	// Copy over the name, cluster ID and infra ID from previous provision so that a failed install can be removed.
 	if lastFailedProvision != nil {

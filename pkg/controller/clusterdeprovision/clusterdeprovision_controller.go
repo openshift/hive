@@ -12,7 +12,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +30,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -169,7 +167,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		rLog.WithError(err).Error("cannot get clusterdeprovision")
 		return reconcile.Result{}, err
 	}
-	rLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: instance}, rLog)
+	rLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: instance}, rLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, rLog)
@@ -276,7 +274,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	}
 
 	if err := r.setupAWSCredentialForAssumeRole(instance); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
+		if !errors.IsAlreadyExists(err) {
 			// Couldn't create the assume role credentials secret for a reason other than it already exists.
 			// If the secret already exists, then we should just use that secret.
 			rLog.WithError(err).Error("could not create assume role AWS secret")

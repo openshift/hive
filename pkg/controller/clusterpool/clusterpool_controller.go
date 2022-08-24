@@ -34,7 +34,6 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -299,7 +298,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		log.WithError(err).Error("error reading cluster pool")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: clp}, logger)
+	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: clp}, logger)
 
 	if p := clp.Spec.Platform; clp.Spec.RunningCount != clp.Spec.Size && (p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil) {
 		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt, unless runningCount==size")
@@ -835,8 +834,7 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 
 	newPatch := yamlpatch.Patch{}
 	for _, patch := range cdc.Spec.InstallConfigPatches {
-		var value interface{}
-		value = patch.Value
+		var value interface{} = patch.Value
 		newPatch = append(newPatch, yamlpatch.Operation{
 			Op:    yamlpatch.Op(patch.Op),
 			Path:  yamlpatch.OpPath(patch.Path),

@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
-	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,12 +42,12 @@ func (b *fakeBuilder) Build() (client.Client, error) {
 			},
 		},
 
-		&openshiftapiv1.ClusterVersion{
+		&configv1.ClusterVersion{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "version",
 			},
-			Status: openshiftapiv1.ClusterVersionStatus{
-				Desired: openshiftapiv1.Release{
+			Status: configv1.ClusterVersionStatus{
+				Desired: configv1.Release{
 					Version: "4.6.8",
 				},
 			},
@@ -97,7 +96,7 @@ func (b *fakeBuilder) Build() (client.Client, error) {
 		})
 	}
 
-	return fake.NewFakeClientWithScheme(scheme, fakeObjects...), nil
+	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(fakeObjects...).Build(), nil
 }
 
 func (b *fakeBuilder) BuildDynamic() (dynamic.Interface, error) {

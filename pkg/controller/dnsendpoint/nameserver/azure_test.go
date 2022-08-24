@@ -141,7 +141,6 @@ func (*azureTestFuncs) recordSet(name string, rType string, values ...string) dn
 		recordSetProperties = dns.RecordSetProperties{
 			NsRecords: &nsRecords,
 		}
-		break
 	case "A":
 		var aRecords []dns.ARecord
 		for _, value := range values {
@@ -152,7 +151,6 @@ func (*azureTestFuncs) recordSet(name string, rType string, values ...string) dn
 		recordSetProperties = dns.RecordSetProperties{
 			ARecords: &aRecords,
 		}
-		break
 	}
 
 	return dns.RecordSet{

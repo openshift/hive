@@ -65,11 +65,11 @@ func (o *vSphereOptions) Validate(cmd *cobra.Command) error {
 	}
 	o.username = os.Getenv(constants.VSphereUsernameEnvVar)
 	if o.username == "" {
-		return fmt.Errorf("No %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
+		return fmt.Errorf("no %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
 	}
 	o.password = os.Getenv(constants.VSpherePasswordEnvVar)
 	if o.password == "" {
-		return fmt.Errorf("No %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
+		return fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
 	}
 	return nil
 }

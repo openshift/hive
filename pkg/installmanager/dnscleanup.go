@@ -22,7 +22,7 @@ import (
 // cleanupDNSZone will handle any needed DNS cleanup for ClusterDeployments with
 // ManageDNS enabled (this helps to clean up any stray DNS records on install failures)
 func cleanupDNSZone(dynClient client.Client, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
-	if cd.Spec.ManageDNS == false {
+	if !cd.Spec.ManageDNS {
 		return nil
 	}
 

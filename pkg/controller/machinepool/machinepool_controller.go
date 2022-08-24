@@ -40,7 +40,6 @@ import (
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 )
@@ -223,7 +222,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 	// NOTE: This may be sparse if we haven't yet synced from the ClusterDeployment (below)
-	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: pool}, logger)
+	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: pool}, logger)
 
 	// Initialize machine pool conditions if not present
 	newConditions, changed := controllerutils.InitializeMachinePoolConditions(pool.Status.Conditions, machinePoolConditions)

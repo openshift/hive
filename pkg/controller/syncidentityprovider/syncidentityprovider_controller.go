@@ -32,7 +32,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
@@ -193,7 +192,7 @@ func (r *ReconcileSyncIdentityProviders) Reconcile(ctx context.Context, request 
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-	contextLogger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, contextLogger)
+	contextLogger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, contextLogger)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, contextLogger)
@@ -219,7 +218,7 @@ func (r *ReconcileSyncIdentityProviders) createSyncSetSpec(cd *hivev1.ClusterDep
 
 	patch, err := json.Marshal(idpPatch)
 	if err != nil {
-		return nil, fmt.Errorf("Failed marshaling identity provider list: %v", err)
+		return nil, fmt.Errorf("failed marshaling identity provider list: %v", err)
 	}
 
 	return &hivev1.SyncSetSpec{

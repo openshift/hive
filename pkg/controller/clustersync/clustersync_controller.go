@@ -39,7 +39,6 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 	"github.com/openshift/hive/pkg/resource"
@@ -362,7 +361,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		log.WithError(err).Error("failed to get ClusterDeployment")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, logger)
+	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, logger)
 
 	sts, err := r.getAndCheckClusterSyncStatefulSet(logger)
 	if err != nil {
@@ -960,7 +959,7 @@ func deleteFromTargetCluster(
 		logger.Info("deleting resource")
 		if err := resourceHelper.Delete(r.APIVersion, r.Kind, r.Namespace, r.Name); err != nil {
 			logger.WithError(err).Warn("could not delete resource")
-			allErrs = append(allErrs, fmt.Errorf("Failed to delete %s, Kind=%s %s/%s: %w", r.APIVersion, r.Kind, r.Namespace, r.Name, err))
+			allErrs = append(allErrs, fmt.Errorf("failed to delete %s, Kind=%s %s/%s: %w", r.APIVersion, r.Kind, r.Namespace, r.Name, err))
 			remainingResources = append(remainingResources, r)
 		}
 	}
@@ -1089,7 +1088,6 @@ func (r *ReconcileClusterSync) setFirstSuccessTime(syncStatuses []hiveintv1alpha
 	allSyncSetsAppliedDuration := lastSuccessTime.Time.Sub(cd.Status.InstalledTimestamp.Time)
 	logger.Infof("observed syncsets applied duration: %v seconds", allSyncSetsAppliedDuration.Seconds())
 	metricTimeToApplySyncSets.Observe(float64(allSyncSetsAppliedDuration.Seconds()))
-	return
 }
 
 func namesForFailureMessage(syncSetKind string, names []string) string {

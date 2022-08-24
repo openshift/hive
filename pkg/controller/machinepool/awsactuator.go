@@ -107,7 +107,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	}
 	clusterVersion, err := getClusterVersion(cd)
 	if err != nil {
-		return nil, false, fmt.Errorf("Unable to get cluster version: %v", err)
+		return nil, false, fmt.Errorf("unable to get cluster version: %v", err)
 	}
 
 	if isUsingUnsupportedSpotMarketOptions(pool, clusterVersion, logger) {
@@ -429,7 +429,7 @@ func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePo
 			hivev1.InvalidSubnetsMachinePoolCondition,
 			corev1.ConditionTrue,
 			"InsufficientPublicSubnets",
-			fmt.Sprintf("Public subnet does not exist for each zone with a private subnet"),
+			"Public subnet does not exist for each zone with a private subnet",
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
 		if changed {

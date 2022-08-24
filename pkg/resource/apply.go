@@ -39,8 +39,6 @@ const (
 	UnknownApplyResult ApplyResult = "unknown"
 )
 
-const fieldTooLong metav1.CauseType = "FieldValueTooLong"
-
 // Apply applies the given resource bytes to the target cluster specified by kubeconfig
 func (r *helper) Apply(obj []byte) (ApplyResult, error) {
 	factory, err := r.getFactory("")

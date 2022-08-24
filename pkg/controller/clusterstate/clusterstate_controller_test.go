@@ -159,12 +159,12 @@ func TestClusterStateReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			if !test.noRemoteCall {
-				mockRemoteClientBuilder.EXPECT().Build().Return(fake.NewFakeClient(test.remote...), nil)
+				mockRemoteClientBuilder.EXPECT().Build().Return(fake.NewClientBuilder().WithRuntimeObjects(test.remote...).Build(), nil)
 			}
 			updateCalled := false
 			rcd := &ReconcileClusterState{

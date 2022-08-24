@@ -26,7 +26,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveint "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -107,7 +106,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		logger.WithError(err).Error("Error getting FakeClusterInstall")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: fci}, logger)
+	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: fci}, logger)
 
 	if !fci.DeletionTimestamp.IsZero() {
 		logger.Info("FakeClusterInstall resource has been deleted")
@@ -240,7 +239,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		}
 	case corev1.ConditionFalse:
 		// Check if it's been 30 seconds since we set condition to False:
-		delta := time.Now().Sub(reqsCond.LastTransitionTime.Time)
+		delta := time.Since(reqsCond.LastTransitionTime.Time)
 		if delta < 30*time.Second {
 			// requeue for remainder of delta
 			return reconcile.Result{RequeueAfter: 30*time.Second - delta}, nil
@@ -292,7 +291,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		}
 
 		// Check if it's been 30 seconds since we set condition to False:
-		delta := time.Now().Sub(completedCond.LastTransitionTime.Time)
+		delta := time.Since(completedCond.LastTransitionTime.Time)
 		if delta < 30*time.Second {
 			// requeue for remainder of delta
 			return reconcile.Result{RequeueAfter: 30*time.Second - delta}, nil

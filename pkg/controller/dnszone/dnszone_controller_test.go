@@ -19,7 +19,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
-	"github.com/openshift/hive/pkg/awsclient/mock"
 	awsmock "github.com/openshift/hive/pkg/awsclient/mock"
 	azuremock "github.com/openshift/hive/pkg/azureclient/mock"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -73,7 +72,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 		{
 			name:    "Adopt existing zone, No ID Set",
 			dnsZone: validDNSZoneWithoutID(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneExists(expect, validDNSZoneWithoutID())
 				mockExistingAWSTags(expect)
 				mockAWSGetNSRecord(expect)
@@ -88,7 +87,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 		{
 			name:    "Adopt existing zone, No ID Set, No Tags Set",
 			dnsZone: validDNSZoneWithoutID(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneDoesntExist(expect, validDNSZoneWithoutID())
 				mockCreateAWSZoneDuplicateFailure(expect)
 				mockListAWSZonesByNameFound(expect, validDNSZoneWithoutID())
@@ -106,7 +105,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 		{
 			name:    "Existing zone, sync tags",
 			dnsZone: validDNSZoneWithAdditionalTags(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
 				mockExistingAWSTags(expect)
 				mockSyncAWSTags(expect)
@@ -119,7 +118,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 		{
 			name:    "Delete hosted zone",
 			dnsZone: validDNSZoneBeingDeleted(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
 				mockExistingAWSTags(expect)
 				mockDeleteAWSZone(expect)
@@ -129,7 +128,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 		{
 			name:    "Delete non-existent hosted zone",
 			dnsZone: validDNSZoneBeingDeleted(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneDoesntExist(expect, validDNSZoneBeingDeleted())
 			},
 			expectZoneDeleted: true,
@@ -138,7 +137,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			name:    "Delete zone with PreserveOnDelete",
 			dnsZone: validDNSZoneBeingDeletedWithPreserve(),
 			// No AWS calls expected in this case, our creds may be bad:
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 			},
 			expectZoneDeleted: true,
 		},
@@ -149,7 +148,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				dz.Status.AWS = nil
 				return dz
 			}(),
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockGetResourcePages(expect)
 				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
 				mockExistingAWSTags(expect)
@@ -161,7 +160,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			name:            "Existing zone, link to parent, reachable SOA",
 			dnsZone:         validDNSZoneWithLinkToParent(),
 			soaLookupResult: true,
-			setupAWSMock: func(expect *mock.MockClientMockRecorder) {
+			setupAWSMock: func(expect *awsmock.MockClientMockRecorder) {
 				mockAWSZoneExists(expect, validDNSZoneWithAdditionalTags())
 				mockExistingAWSTags(expect)
 				mockAWSGetNSRecord(expect)

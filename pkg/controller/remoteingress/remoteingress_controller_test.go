@@ -366,7 +366,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.localObjects...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.localObjects...).Build()
 
 			helper := &fakeKubeCLI{
 				t: t,
@@ -495,7 +495,7 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.localObjects...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.localObjects...).Build()
 
 			helper := &fakeKubeCLI{
 				t: t,
@@ -766,7 +766,6 @@ func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedS
 		}
 		assert.True(t, found, "didn't find expected ingressController: %v", ic.name)
 	}
-	return
 }
 
 func TestSecretHash(t *testing.T) {

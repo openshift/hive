@@ -200,7 +200,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "argocdregister")
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 

@@ -18,7 +18,6 @@ import (
 	"github.com/openshift/hive/pkg/azureclient"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 	corev1 "k8s.io/api/core/v1"
@@ -155,7 +154,7 @@ func (r *ReconcileDNSZone) Reconcile(ctx context.Context, request reconcile.Requ
 		dnsLog.WithError(err).Error("Error fetching dnszone object")
 		return reconcile.Result{}, err
 	}
-	dnsLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: desiredState}, dnsLog)
+	dnsLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: desiredState}, dnsLog)
 
 	// NOTE: Can race with call to same in dnsendpoint controller
 	if result, err := controllerutils.ReconcileDNSZoneForRelocation(r.Client, dnsLog, desiredState, hivev1.FinalizerDNSZone); err != nil {
@@ -383,7 +382,7 @@ func shouldSync(desiredState *hivev1.DNSZone) (bool, time.Duration) {
 		} // If waiting to link to parent, sync now to check domain
 	}
 
-	delta := time.Now().Sub(desiredState.Status.LastSyncTimestamp.Time)
+	delta := time.Since(desiredState.Status.LastSyncTimestamp.Time)
 	if delta >= zoneResyncDuration {
 		// We haven't sync'd in over zoneResyncDuration time, sync now.
 		return true, delta

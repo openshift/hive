@@ -92,7 +92,7 @@ func TestReconcileDNSZoneForRelocation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := log.WithField("", "")
-			client := fake.NewFakeClientWithScheme(scheme, tc.dnsZone)
+			client := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.dnsZone).Build()
 			result, err := ReconcileDNSZoneForRelocation(client, logger, tc.dnsZone, testFinalizer)
 			if tc.expectResult {
 				assert.NotNil(t, result, "expected result")

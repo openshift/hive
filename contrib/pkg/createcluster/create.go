@@ -704,12 +704,12 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	case cloudVSphere:
 		vsphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
 		if vsphereUsername == "" {
-			return nil, fmt.Errorf("No %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
 		}
 
 		vspherePassword := os.Getenv(constants.VSpherePasswordEnvVar)
 		if vspherePassword == "" {
-			return nil, fmt.Errorf("No %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.VSpherePasswordEnvVar)
 		}
 
 		vsphereCACerts := os.Getenv(constants.VSphereTLSCACertsEnvVar)

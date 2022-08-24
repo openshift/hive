@@ -192,7 +192,7 @@ func TestGCPActuator(t *testing.T) {
 			}
 
 			test.existing = append(test.existing, clusterDeployment)
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			// set up mock expectations
 			if test.mockGCPClient != nil {
@@ -333,7 +333,7 @@ func TestFindAvailableLeaseChars(t *testing.T) {
 		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			ga := &GCPActuator{
 				logger: log.WithField("actuator", "gcpactuator"),
 				client: fakeClient,
@@ -542,7 +542,7 @@ func TestObtainLeaseChar(t *testing.T) {
 		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			logger := log.WithField("actuator", "gcpactuator")
 			controllerExpectations := controllerutils.NewExpectations(logger)

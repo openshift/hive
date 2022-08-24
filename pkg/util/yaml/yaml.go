@@ -22,7 +22,7 @@ func Decode(ba []byte) (yamlpatch.Container, error) {
 func Test(c yamlpatch.Container, path, val string) (match bool, err error) {
 	defer func() {
 		if recover() != nil {
-			err = fmt.Errorf("No such path %s\n", path)
+			err = fmt.Errorf("no such path %s", path)
 			match = false
 		}
 		// Implicit return
@@ -34,7 +34,7 @@ func Test(c yamlpatch.Container, path, val string) (match bool, err error) {
 		Value: yamlpatch.NewNode(&valif),
 	}
 	if err := op.Perform(c); err != nil {
-		return false, fmt.Errorf("No match for value %s\n", val)
+		return false, fmt.Errorf("no match for value %s", val)
 	}
 	return true, nil
 }

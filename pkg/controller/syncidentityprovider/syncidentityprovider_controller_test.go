@@ -249,7 +249,7 @@ func TestSelectorSyncIdentityProviderWatchHandler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			r := &ReconcileSyncIdentityProviders{
-				Client: fake.NewFakeClient(test.existing...),
+				Client: fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build(),
 				scheme: scheme.Scheme,
 				logger: log.WithField("controller", "syncidentityprovider"),
 			}
@@ -454,7 +454,7 @@ func TestReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			r := &ReconcileSyncIdentityProviders{
-				Client: fake.NewFakeClient(test.existing...),
+				Client: fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build(),
 				scheme: scheme.Scheme,
 				logger: log.WithField("controller", "syncidentityprovider"),
 			}

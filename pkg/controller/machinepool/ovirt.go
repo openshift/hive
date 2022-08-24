@@ -136,7 +136,7 @@ func decodeOvirtMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtim
 	}
 	spec, ok := obj.(*ovirtproviderv1beta1.OvirtMachineProviderSpec)
 	if !ok {
-		return nil, fmt.Errorf("Unexpected object: %#v", gvk)
+		return nil, fmt.Errorf("unexpected object: %#v", gvk)
 	}
 	return spec, nil
 }

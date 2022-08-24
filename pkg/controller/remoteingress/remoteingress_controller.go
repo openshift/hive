@@ -34,7 +34,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 )
@@ -157,7 +156,7 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
+	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
 	rContext.clusterDeployment = cd
 
 	// Initialize cluster deployment conditions if not present
@@ -421,7 +420,7 @@ func (r *ReconcileRemoteClusterIngress) setIngressCertificateNotFoundCondition(r
 		reason = ingressCertificateNotFoundReason
 		updateCheck = controllerutils.UpdateConditionIfReasonOrMessageChange
 	} else {
-		msg = fmt.Sprintf("all secrets for ingress found")
+		msg = "all secrets for ingress found"
 		status = corev1.ConditionFalse
 		reason = ingressCertificateFoundReason
 		updateCheck = controllerutils.UpdateConditionNever

@@ -34,7 +34,6 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 )
@@ -175,7 +174,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
+	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	// If cluster is already deleted, skip any processing
 	if !cd.DeletionTimestamp.IsZero() {

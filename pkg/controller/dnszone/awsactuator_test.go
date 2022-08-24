@@ -97,7 +97,6 @@ func mockAWSZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DN
 func mockAWSZoneCreationError(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).
 		Return(nil, awserr.New(kinesis.ErrCodeKMSOptInRequired, "error creating hosted zone", fmt.Errorf("error creating hosted zone"))).Times(1)
-	return
 }
 
 func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {

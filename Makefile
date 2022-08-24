@@ -202,7 +202,7 @@ deploy: ensure-kustomize install
 	mkdir -p overlays/deploy
 	cp overlays/template/kustomization.yaml overlays/deploy
 	cd overlays/deploy && ../../$(KUSTOMIZE) edit set image registry.ci.openshift.org/openshift/hive-v4.0:hive=${IMG} && ../../$(KUSTOMIZE) edit set namespace ${HIVE_OPERATOR_NS}
-	$(KUSTOMIZE) build overlays/deploy | oc apply -f -
+	$(KUSTOMIZE) build overlays/deploy | sed 's/        - info/        - debug/' | oc apply -f -
 	rm -rf overlays/deploy
 	# Create a default basic HiveConfig so the operator will deploy Hive
 	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -f config/templates/hiveconfig.yaml | oc apply -f -

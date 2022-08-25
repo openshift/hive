@@ -166,6 +166,10 @@ test-e2e:
 test-e2e-pool:
 	hack/e2e-pool-test.sh
 
+.PHONY: test-e2e-assisted
+test-e2e-assisted:
+	hack/e2e-assisted-test.sh
+
 .PHONY: test-e2e-postdeploy
 test-e2e-postdeploy:
 	go test $(GO_MOD_FLAGS) -v -timeout 0 -count=1 ./test/e2e/postdeploy/...

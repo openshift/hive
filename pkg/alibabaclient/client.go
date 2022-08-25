@@ -1,13 +1,10 @@
 package alibabaclient
 
 import (
-	"fmt"
+	"strings"
+
 	"github.com/openshift/hive/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
-	"os"
-	"os/user"
-	"path/filepath"
-	"strings"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth"
@@ -18,19 +15,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
 	"github.com/pkg/errors"
 )
-
-const (
-	envCredentialFile = "ALIBABA_CLOUD_CREDENTIALS_FILE"
-)
-
-// Credential configuration file template.
-const configurationTemplate = `
-[default]              
-enable = true                    
-type = access_key                
-access_key_id = %s              
-access_key_secret = %s
-`
 
 //go:generate mockgen -source=./client.go -destination=./mock/client_generated.go -package=mock
 
@@ -161,34 +145,6 @@ func additionEndpoint(productName string, regionID string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func storeCredentials(accessKeyID string, accessKeySecret string) (err error) {
-	dirPath, ok := os.LookupEnv(envCredentialFile)
-	if !ok || dirPath == "" {
-		user, err := user.Current()
-		if err != nil {
-			return err
-		}
-		dirPath = user.HomeDir
-	}
-
-	dirPath = filepath.Join(dirPath, ".alibabacloud")
-	err = os.MkdirAll(dirPath, os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	filePath := filepath.Join(dirPath, "credentials")
-
-	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	file.WriteString(fmt.Sprintf(configurationTemplate, accessKeyID, accessKeySecret))
-
-	return nil
 }
 
 // DescribeInstances queries the details of one or more ECS instances

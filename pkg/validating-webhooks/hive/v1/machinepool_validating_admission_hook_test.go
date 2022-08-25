@@ -663,14 +663,6 @@ func testAzureMachinePool() *hivev1.MachinePool {
 	return pool
 }
 
-func testvSphereMachinePool() *hivev1.MachinePool {
-	pool := testMachinePool()
-	pool.Spec.Platform = hivev1.MachinePoolPlatform{
-		VSphere: validvSphereMachinePoolPlatform(),
-	}
-	return pool
-}
-
 func validAWSMachinePoolPlatform() *hivev1aws.MachinePoolPlatform {
 	return &hivev1aws.MachinePoolPlatform{
 		InstanceType: "test-instance-type",

@@ -825,23 +825,6 @@ func mockListComputeZones(gClient *mockgcp.MockClient, zones []string, region st
 	)
 }
 
-func mockListComputeImage(gClient *mockgcp.MockClient, images []string, infraID string) {
-	computeImages := &compute.ImageList{}
-	for _, image := range images {
-		computeImages.Items = append(computeImages.Items,
-			&compute.Image{
-				Name: image,
-			})
-	}
-
-	filter := gcpclient.ListComputeImagesOptions{
-		Filter: fmt.Sprintf("name eq \"%s-.*\"", infraID),
-	}
-	gClient.EXPECT().ListComputeImages(gomock.Eq(filter)).Return(
-		computeImages, nil,
-	)
-}
-
 func generateGCPMachineSetName(leaseChar, zone string) string {
 	return fmt.Sprintf("%s-%s-%s", testInfraID, leaseChar, zone)
 }

@@ -28,10 +28,6 @@ type IBMCloudActuator struct {
 
 var _ Actuator = &IBMCloudActuator{}
 
-func addIBMCloudProviderToScheme(scheme *runtime.Scheme) error {
-	return machineapi.AddToScheme(scheme)
-}
-
 // NewIBMCloudActuator is the constructor for building an IBMCloudActuator
 func NewIBMCloudActuator(ibmCreds *corev1.Secret, scheme *runtime.Scheme, logger log.FieldLogger) (*IBMCloudActuator, error) {
 	ibmClient, err := ibmclient.NewClientFromSecret(ibmCreds)

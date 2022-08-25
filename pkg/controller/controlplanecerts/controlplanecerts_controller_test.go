@@ -407,18 +407,6 @@ func fakeCertSecret(name string) *corev1.Secret {
 	return s
 }
 
-type additionalCertSpec struct {
-	domain string
-	secret string
-}
-
-func additionalCert(domain, secret string) additionalCertSpec {
-	return additionalCertSpec{
-		domain: domain,
-		secret: fakeName + "-" + secret,
-	}
-}
-
 func fakeSyncSet() *hivev1.SyncSet {
 	ss := &hivev1.SyncSet{}
 	ss.Namespace = fakeNamespace
@@ -433,15 +421,6 @@ func fakeSyncSet() *hivev1.SyncSet {
 		},
 	}
 	return ss
-}
-
-func findSecret(ss []hivev1.SecretMapping, name string) string {
-	for _, s := range ss {
-		if s.TargetRef.Name == name {
-			return name
-		}
-	}
-	return ""
 }
 
 func secretNames(ss []hivev1.SecretMapping) []string {

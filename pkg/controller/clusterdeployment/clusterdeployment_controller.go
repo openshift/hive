@@ -40,7 +40,6 @@ import (
 	"github.com/openshift/library-go/pkg/verify"
 	"github.com/openshift/library-go/pkg/verify/store/sigstore"
 
-	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
@@ -821,7 +820,6 @@ func (r *ReconcileClusterDeployment) reconcileInstalledClusterProvision(cd *hive
 	r.deleteOldFailedProvisions(existingProvisions, logger)
 
 	logger.Debug("cluster is already installed, no processing of provision needed")
-	r.cleanupInstallLogPVC(cd, logger)
 	return reconcile.Result{}, nil
 }
 
@@ -1732,58 +1730,6 @@ func selectorPodWatchHandler(a client.Object) []reconcile.Request {
 		Namespace: pod.Namespace,
 	}})
 	return retval
-}
-
-// GetInstallLogsPVCName returns the expected name of the persistent volume claim for cluster install failure logs.
-// TODO: Remove this function and all calls to it. It's being left here for compatibility until the install log PVs are removed from all the installs.
-func GetInstallLogsPVCName(cd *hivev1.ClusterDeployment) string {
-	return apihelpers.GetResourceName(cd.Name, "install-logs")
-}
-
-// cleanupInstallLogPVC will immediately delete the PVC (should it exist) if the cluster was installed successfully, without retries.
-// If there were retries, it will delete the PVC if it has been more than 7 days since the job was completed.
-// TODO: Remove this function and all calls to it. It's being left here for compatibility until the install log PVs are removed from all the installs.
-func (r *ReconcileClusterDeployment) cleanupInstallLogPVC(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
-	if !cd.Spec.Installed {
-		return nil
-	}
-
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: GetInstallLogsPVCName(cd), Namespace: cd.Namespace}, pvc)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		cdLog.WithError(err).Error("error looking up install logs PVC")
-		return err
-	}
-
-	// Also check if we've already deleted it, pvc won't be deleted until the install pod is, and that is retained
-	// for one day.
-	if pvc.DeletionTimestamp != nil {
-		return nil
-	}
-
-	pvcLog := cdLog.WithField("pvc", pvc.Name)
-
-	switch {
-	case cd.Status.InstallRestarts == 0:
-		pvcLog.Info("deleting logs PersistentVolumeClaim for installed cluster with no restarts")
-	case cd.Status.InstalledTimestamp == nil:
-		pvcLog.Warn("deleting logs PersistentVolumeClaim for cluster with errors but no installed timestamp")
-	// Otherwise, delete if more than 7 days have passed.
-	case time.Since(cd.Status.InstalledTimestamp.Time) > (7 * 24 * time.Hour):
-		pvcLog.Info("deleting logs PersistentVolumeClaim for cluster that was installed after restarts more than 7 days ago")
-	default:
-		cdLog.WithField("pvc", pvc.Name).Debug("preserving logs PersistentVolumeClaim for cluster with install restarts for 7 days")
-		return nil
-	}
-
-	if err := r.Delete(context.TODO(), pvc); err != nil {
-		pvcLog.WithError(err).Log(controllerutils.LogLevel(err), "error deleting install logs PVC")
-		return err
-	}
-	return nil
 }
 
 func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovision, error) {

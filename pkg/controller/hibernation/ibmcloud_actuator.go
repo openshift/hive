@@ -15,19 +15,6 @@ import (
 	ibmclient "github.com/openshift/hive/pkg/ibmclient"
 )
 
-var (
-	// States described in IBM Cloud API docs
-	// https://cloud.ibm.com/apidocs/vpc?code=go#get-instance
-	ibmRunningStates           = sets.NewString("running")
-	ibmStoppedStates           = sets.NewString("stopped")
-	ibmPendingStates           = sets.NewString("pending")
-	ibmStoppingStates          = sets.NewString("stopping")
-	ibmRunningOrPendingStates  = ibmRunningStates.Union(ibmPendingStates)
-	ibmStoppedOrStoppingStates = ibmStoppedStates.Union(ibmStoppingStates)
-	ibmNotRunningStates        = ibmStoppedOrStoppingStates.Union(ibmPendingStates)
-	ibmNotStoppedStates        = ibmRunningOrPendingStates.Union(ibmStoppingStates)
-)
-
 func init() {
 	RegisterActuator(&ibmCloudActuator{ibmCloudClientFn: getIBMCloudClient})
 }

@@ -343,7 +343,7 @@ func TestReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
-			fakeKubeClient := fake.NewFakeClientWithScheme(testscheme, test.existingObjects...)
+			fakeKubeClient := fake.NewClientBuilder().WithScheme(testscheme).WithRuntimeObjects(test.existingObjects...).Build()
 			logger := log.WithField("fake", "fake")
 
 			// Act

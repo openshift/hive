@@ -500,7 +500,7 @@ func TestSafeDelete(t *testing.T) {
 	hivev1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
 
-	fakeClient := fake.NewFakeClientWithScheme(scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
 
 	cp := &hivev1.ClusterPool{
 		ObjectMeta: v1.ObjectMeta{

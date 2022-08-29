@@ -162,7 +162,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			validateRequeueAfter: func(requeueAfter time.Duration, c client.Client, t *testing.T) {
 				testProvisionCreationTime := getProvision(c).CreationTimestamp.Time
 				assert.Less(t, requeueAfter.Nanoseconds(), 24*time.Hour.Nanoseconds(), "unexpected requeue after duration")
-				assert.Greater(t, requeueAfter.Nanoseconds(), testProvisionCreationTime.Add(24*time.Hour).Sub(time.Now()).Nanoseconds(),
+				assert.Greater(t, requeueAfter.Nanoseconds(), time.Until(testProvisionCreationTime.Add(24*time.Hour)).Nanoseconds(),
 					"unexpected requeue after duration")
 			},
 			expectedStage: hivev1.ClusterProvisionStageComplete,
@@ -268,7 +268,7 @@ func TestClusterProvisionReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterProvision")
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcp := &ReconcileClusterProvision{
 				Client:       fakeClient,

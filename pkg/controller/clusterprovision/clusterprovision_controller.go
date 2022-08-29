@@ -29,7 +29,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -161,7 +160,7 @@ func (r *ReconcileClusterProvision) Reconcile(ctx context.Context, request recon
 		pLog.WithError(err).Error("cannot get ClusterProvision")
 		return reconcile.Result{}, err
 	}
-	pLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: instance}, pLog)
+	pLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: instance}, pLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, pLog)
@@ -197,7 +196,7 @@ func (r *ReconcileClusterProvision) Reconcile(ctx context.Context, request recon
 			return r.deleteInstallJob(instance, pLog)
 		}
 		// installJobDeletionRecheckDelay will be duration between current time and expected install job deletion time (provision creation time + 24 hours)
-		installJobDeletionRecheckDelay := instance.CreationTimestamp.Time.Add(24 * time.Hour).Sub(time.Now())
+		installJobDeletionRecheckDelay := time.Until(instance.CreationTimestamp.Time.Add(24 * time.Hour))
 		return reconcile.Result{RequeueAfter: installJobDeletionRecheckDelay}, nil
 	case hivev1.ClusterProvisionStageFailed:
 		pLog.Debugf("ClusterProvision is %s. Nothing more to do", instance.Spec.Stage)

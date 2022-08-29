@@ -408,7 +408,7 @@ func TestParseInstallLog(t *testing.T) {
 			if existing == nil {
 				existing = []runtime.Object{buildRegexConfigMap()}
 			}
-			fakeClient := fake.NewFakeClient(existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
 			r := &ReconcileClusterProvision{
 				Client: fakeClient,
 				scheme: scheme.Scheme,

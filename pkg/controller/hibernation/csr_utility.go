@@ -110,7 +110,7 @@ func (*csrUtility) Authorize(
 	csr *x509.CertificateRequest,
 ) error {
 	if req == nil || csr == nil {
-		return fmt.Errorf("Invalid request")
+		return fmt.Errorf("invalid request")
 	}
 
 	if isNodeClientCert(req, csr) {
@@ -130,7 +130,7 @@ func (*csrUtility) Authorize(
 	// Check that we have a registered node with the request name
 	targetMachine, ok := findMatchingMachineFromNodeRef(nodeAsking, machines)
 	if !ok {
-		return fmt.Errorf("No target machine for node %q", nodeAsking)
+		return fmt.Errorf("no target machine for node %q", nodeAsking)
 	}
 
 	// SAN checks for both DNS and IPs, e.g.,
@@ -142,12 +142,13 @@ func (*csrUtility) Authorize(
 		}
 		var attemptedAddresses []string
 		var foundSan bool
+	addrs1:
 		for _, addr := range targetMachine.Status.Addresses {
 			switch addr.Type {
 			case corev1.NodeInternalDNS, corev1.NodeExternalDNS, corev1.NodeHostName:
 				if san == addr.Address {
 					foundSan = true
-					break
+					break addrs1
 				} else {
 					attemptedAddresses = append(attemptedAddresses, addr.Address)
 				}
@@ -166,12 +167,13 @@ func (*csrUtility) Authorize(
 		}
 		var attemptedAddresses []string
 		var foundSan bool
+	addrs2:
 		for _, addr := range targetMachine.Status.Addresses {
 			switch addr.Type {
 			case corev1.NodeInternalIP, corev1.NodeExternalIP:
 				if san.String() == addr.Address {
 					foundSan = true
-					break
+					break addrs2
 				} else {
 					attemptedAddresses = append(attemptedAddresses, addr.Address)
 				}
@@ -194,14 +196,14 @@ func validateCSRContents(req *certificatesv1.CertificateSigningRequest, csr *x50
 
 	nodeAsking := strings.TrimPrefix(req.Spec.Username, nodeUserPrefix)
 	if len(nodeAsking) == 0 {
-		return "", fmt.Errorf("Empty name")
+		return "", fmt.Errorf("empty name")
 	}
 
 	// Check groups, we need at least:
 	// - system:nodes
 	// - system:authenticated
 	if len(req.Spec.Groups) < 2 {
-		return "", fmt.Errorf("Too few groups")
+		return "", fmt.Errorf("too few groups")
 	}
 	groupSet := sets.NewString(req.Spec.Groups...)
 	if !groupSet.HasAll(nodeGroup, "system:authenticated") {
@@ -213,12 +215,12 @@ func validateCSRContents(req *certificatesv1.CertificateSigningRequest, csr *x50
 	// - key encipherment
 	// - server auth
 	if !hasExactUsages(req, kubeletServerUsages) {
-		return "", fmt.Errorf("Unexpected usages: %v", req.Spec.Usages)
+		return "", fmt.Errorf("unexpected usages: %v", req.Spec.Usages)
 	}
 
 	// Check subject: O = system:nodes, CN = system:node:ip-10-0-152-205.ec2.internal
 	if csr.Subject.CommonName != req.Spec.Username {
-		return "", fmt.Errorf("Mismatched CommonName %s != %s", csr.Subject.CommonName, req.Spec.Username)
+		return "", fmt.Errorf("mismatched CommonName %s != %s", csr.Subject.CommonName, req.Spec.Username)
 	}
 
 	var hasOrg bool
@@ -229,7 +231,7 @@ func validateCSRContents(req *certificatesv1.CertificateSigningRequest, csr *x50
 		}
 	}
 	if !hasOrg {
-		return "", fmt.Errorf("Organization %v doesn't include %s", csr.Subject.Organization, nodeGroup)
+		return "", fmt.Errorf("organization %v doesn't include %s", csr.Subject.Organization, nodeGroup)
 	}
 
 	return nodeAsking, nil

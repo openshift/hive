@@ -245,7 +245,7 @@ func fakeClient(objects ...runtime.Object) client.Client {
 	scheme := runtime.NewScheme()
 	hivev1.AddToScheme(scheme)
 	corev1.AddToScheme(scheme)
-	return fake.NewFakeClientWithScheme(scheme, objects...)
+	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).Build()
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

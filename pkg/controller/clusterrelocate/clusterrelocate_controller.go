@@ -28,7 +28,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 )
@@ -173,7 +172,7 @@ func (r *ReconcileClusterRelocate) Reconcile(ctx context.Context, request reconc
 		logger.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
-	logger = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, logger)
+	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, logger)
 
 	// Initialize cluster deployment conditions if not present
 	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions,

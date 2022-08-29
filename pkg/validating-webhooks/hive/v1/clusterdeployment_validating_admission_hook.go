@@ -654,7 +654,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	// Now catch the case where there was a previously defined list and now it's being emptied
 	hasClearedOutPreviouslyDefinedIngressList := hasClearedOutPreviouslyDefinedIngressList(&oldObject.Spec, &cd.Spec)
 	if hasClearedOutPreviouslyDefinedIngressList {
-		message := fmt.Sprintf("Previously defined a list of ingress objects, must provide a default ingress object")
+		message := "Previously defined a list of ingress objects, must provide a default ingress object"
 		contextLogger.Infof("Failed validation: %v", message)
 
 		return &admissionv1beta1.AdmissionResponse{
@@ -876,11 +876,7 @@ func validateIngressList(cd *hivev1.ClusterDeploymentSpec) bool {
 			defaultFound = true
 		}
 	}
-	if !defaultFound {
-		return false
-	}
-
-	return true
+	return defaultFound
 }
 
 func validateDomain(domain string, validDomains []string) bool {
@@ -904,7 +900,7 @@ func validateDomain(domain string, validDomains []string) bool {
 
 func validateIngress(cd *hivev1.ClusterDeployment, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
 	if !validateIngressList(&cd.Spec) {
-		message := fmt.Sprintf("Ingress list must include a default entry")
+		message := "Ingress list must include a default entry"
 		contextLogger.Infof("Failed validation: %v", message)
 
 		return &admissionv1beta1.AdmissionResponse{

@@ -58,7 +58,7 @@ func (o *openStackOptions) Validate(cmd *cobra.Command) error {
 		log.Info("No cloud param provided, using env var values from OS_CLOUD")
 		o.cloud = os.Getenv("OS_CLOUD")
 		if o.cloud == "" {
-			return fmt.Errorf("No OpenStack cloud setting to use, cannot proceed")
+			return fmt.Errorf("no OpenStack cloud setting to use, cannot proceed")
 		}
 	}
 

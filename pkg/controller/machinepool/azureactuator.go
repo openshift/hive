@@ -176,9 +176,7 @@ func (a *AzureActuator) getImagesByResourceGroup(resourceGroupName string) ([]co
 	var res azureclient.ImageListResultPage
 	var err error
 	for res, err = a.client.ListImagesByResourceGroup(ctx, resourceGroupName); err == nil && res.NotDone(); err = res.NextWithContext(ctx) {
-		for _, image := range res.Values() {
-			images = append(images, image)
-		}
+		images = append(images, res.Values()...)
 	}
 
 	return images, err

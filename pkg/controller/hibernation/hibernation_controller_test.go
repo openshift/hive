@@ -124,7 +124,7 @@ func TestReconcile(t *testing.T) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
 				objs = append(objs, readyClusterOperators()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -346,7 +346,7 @@ func TestReconcile(t *testing.T) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
 				objs = append(objs, readyClusterOperators()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -368,7 +368,7 @@ func TestReconcile(t *testing.T) {
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -390,7 +390,7 @@ func TestReconcile(t *testing.T) {
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -412,7 +412,7 @@ func TestReconcile(t *testing.T) {
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -637,7 +637,7 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
-				fakeClient := fake.NewFakeClientWithScheme(scheme, unreadyNode()...)
+				fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(unreadyNode()...).Build()
 				fakeKubeClient := fakekubeclient.NewSimpleClientset()
 				builder.EXPECT().Build().Times(1).Return(fakeClient, nil)
 				builder.EXPECT().BuildKubeClient().Times(1).Return(fakeKubeClient, nil)
@@ -664,7 +664,7 @@ func TestReconcile(t *testing.T) {
 				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
 			},
 			setupRemote: func(builder *remoteclientmock.MockBuilder) {
-				fakeClient := fake.NewFakeClientWithScheme(scheme, unreadyNode()...)
+				fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(unreadyNode()...).Build()
 				fakeKubeClient := fakekubeclient.NewSimpleClientset(csrs()...)
 				builder.EXPECT().Build().Times(1).Return(fakeClient, nil)
 				builder.EXPECT().BuildKubeClient().Times(1).Return(fakeKubeClient, nil)
@@ -713,7 +713,7 @@ func TestReconcile(t *testing.T) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
 				objs = append(objs, readyClusterOperators()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -754,7 +754,7 @@ func TestReconcile(t *testing.T) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
 				objs = append(objs, degradedClusterOperators()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -794,7 +794,7 @@ func TestReconcile(t *testing.T) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
 				objs = append(objs, degradedClusterOperators()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -875,7 +875,7 @@ func TestReconcile(t *testing.T) {
 				objs := []runtime.Object{}
 				objs = append(objs, readyNodes()...)
 				objs = append(objs, readyClusterOperators()...)
-				c := fake.NewFakeClientWithScheme(scheme, objs...)
+				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
@@ -958,9 +958,9 @@ func TestReconcile(t *testing.T) {
 			actuators = []HibernationActuator{mockActuator}
 			var c client.Client
 			if test.cs != nil {
-				c = fake.NewFakeClientWithScheme(scheme, test.cd, test.cs)
+				c = fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.cd, test.cs).Build()
 			} else {
-				c = fake.NewFakeClientWithScheme(scheme, test.cd)
+				c = fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.cd).Build()
 			}
 
 			reconciler := hibernationReconciler{
@@ -1201,9 +1201,9 @@ func TestHibernateAfter(t *testing.T) {
 			actuators = []HibernationActuator{mockActuator}
 			var c client.Client
 			if test.cs != nil {
-				c = fake.NewFakeClientWithScheme(scheme, test.cd, test.cs)
+				c = fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.cd, test.cs).Build()
 			} else {
-				c = fake.NewFakeClientWithScheme(scheme, test.cd)
+				c = fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.cd).Build()
 			}
 
 			reconciler := hibernationReconciler{
@@ -1401,60 +1401,4 @@ func csrs() []runtime.Object {
 		result[i] = csr
 	}
 	return result
-}
-
-func Test_timeBeforeClusterSyncCheck(t *testing.T) {
-	buildCD := func(installed time.Time) *hivev1.ClusterDeployment {
-		return testcd.BasicBuilder().Build(testcd.InstalledTimestamp(installed))
-	}
-	tests := []struct {
-		name string
-		cd   *hivev1.ClusterDeployment
-		want time.Duration
-	}{
-		{
-			// We should never hit this code path in real life, but make sure it behaves sanely anyway
-			name: "Not yet installed",
-			cd:   testcd.BasicBuilder().Build(),
-			want: 2 * time.Minute,
-		},
-		{
-			// This should also never happen, but is substantially the same as "waaay in the past"
-			name: "Installed at epoch",
-			cd:   buildCD(time.Time{}),
-			want: 0,
-		},
-		{
-			name: "Older than max wait time",
-			cd:   buildCD(time.Now().Add(-3 * hibernateAfterSyncSetsNotApplied)),
-			want: 0,
-		},
-		{
-			name: "Really new",
-			cd:   buildCD(time.Now().Add(-3 * time.Second)),
-			want: 10 * time.Second,
-		},
-		{
-			name: "Pretty new",
-			cd:   buildCD(time.Now().Add(-2 * time.Minute)),
-			want: time.Minute,
-		},
-		{
-			name: "Middlin",
-			cd:   buildCD(time.Now().Add(-5 * time.Minute)),
-			want: 3 * time.Minute,
-		},
-		{
-			name: "Almost expired",
-			cd:   buildCD(time.Now().Add((-9 * time.Minute) - (30 * time.Second))),
-			want: 30 * time.Second,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := timeBeforeClusterSyncCheck(tt.cd); got.Round(time.Second) != tt.want {
-				t.Errorf("timeBeforeClusterSyncCheck() = %v, want %v", got, tt.want)
-			}
-		})
-	}
 }

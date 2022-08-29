@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp" //lint:ignore SA1019 only used in unit test
 
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -562,6 +562,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					t.Errorf("did not find expected imageset job")
 				}
 				// Ensure that the release image from the imageset is used in the job
+				//lint:ignore SA5011 never nil due to test setup
 				envVars := job.Spec.Template.Spec.Containers[0].Env
 				for _, e := range envVars {
 					if e.Name == "RELEASE_IMAGE" {
@@ -574,7 +575,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 
 				// Ensure job type labels are set correctly
 				require.NotNil(t, job, "expected job")
+				//lint:ignore SA5011 never nil due to test setup
 				assert.Equal(t, testClusterDeployment().Name, job.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				//lint:ignore SA5011 never nil due to test setup
 				assert.Equal(t, constants.JobTypeImageSet, job.Labels[constants.JobTypeLabel], "incorrect job type label")
 			},
 		},
@@ -650,6 +653,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					t.Errorf("did not find expected imageset job")
 				}
 				// Ensure that the release image from the imageset is used in the job
+				//lint:ignore SA5011 never nil due to test setup
 				envVars := job.Spec.Template.Spec.Containers[0].Env
 				for _, e := range envVars {
 					if e.Name == "RELEASE_IMAGE" {
@@ -662,7 +666,9 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 
 				// Ensure job type labels are set correctly
 				require.NotNil(t, job, "expected job")
+				//lint:ignore SA5011 never nil due to test setup
 				assert.Equal(t, testClusterDeployment().Name, job.Labels[constants.ClusterDeploymentNameLabel], "incorrect cluster deployment name label")
+				//lint:ignore SA5011 never nil due to test setup
 				assert.Equal(t, constants.JobTypeImageSet, job.Labels[constants.JobTypeLabel], "incorrect job type label")
 			},
 		},
@@ -756,6 +762,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if job == nil {
 					t.Errorf("did not find expected imageset job")
 				}
+				//lint:ignore SA5011 never nil due to test setup
 				envVars := job.Spec.Template.Spec.Containers[0].Env
 				for _, e := range envVars {
 					if e.Name == "RELEASE_IMAGE" {

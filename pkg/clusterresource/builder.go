@@ -203,7 +203,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	if o.InstallConfigTemplate != "" {
 		installConfigSecret, err := o.mergeInstallConfigTemplate()
 		if err != nil {
-			return nil, fmt.Errorf("Encountered problems merging InstallConfigTemplate: %s", err.Error())
+			return nil, fmt.Errorf("encountered problems merging InstallConfigTemplate: %s", err.Error())
 		}
 		allObjects = append(allObjects, installConfigSecret)
 	} else {
@@ -467,7 +467,7 @@ func (o *Builder) mergeInstallConfigTemplate() (*corev1.Secret, error) {
 	ic := new(InstallConfigTemplate)
 	err := yaml.Unmarshal([]byte(o.InstallConfigTemplate), ic)
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing installconfigtemplate: %s", err.Error())
+		return nil, fmt.Errorf("error parsing installconfigtemplate: %s", err.Error())
 	}
 	ic.BaseDomain = o.BaseDomain
 	if ic.MetaData == nil {

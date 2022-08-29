@@ -408,12 +408,12 @@ func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*rout
 			}
 			if aws.StringValue(zone.Name) != domain {
 				logger.WithField("zone", aws.StringValue(zone.Name)).Debug("reached zone with different domain name, aborting search")
-				return nil, fmt.Errorf("Hosted zone not found")
+				return nil, fmt.Errorf("hosted zone not found")
 			}
 		}
 		if !aws.BoolValue(resp.IsTruncated) {
 			logger.Debug("reached end of results, did not find hosted zone")
-			return nil, fmt.Errorf("Hosted zone not found")
+			return nil, fmt.Errorf("hosted zone not found")
 		}
 		nextZoneID = resp.NextHostedZoneId
 		nextName = resp.NextDNSName

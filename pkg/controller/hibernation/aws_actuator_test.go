@@ -321,7 +321,7 @@ func TestReplacePreemptibleMachines(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actuator := testAWSActuator(nil)
-			c := fake.NewFakeClientWithScheme(scheme, test.existingMachines...)
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existingMachines...).Build()
 
 			replaced, err := actuator.ReplaceMachines(testcd, c, logger)
 			if test.expectedErr != "" {

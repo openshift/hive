@@ -186,7 +186,7 @@ type mocks struct {
 // setupDefaultMocks is an easy way to setup all of the default mocks
 func setupDefaultMocks(t *testing.T) *mocks {
 	mocks := &mocks{
-		fakeKubeClient: fakekubeclient.NewFakeClient(),
+		fakeKubeClient: fakekubeclient.NewClientBuilder().Build(),
 		mockCtrl:       gomock.NewController(t),
 	}
 

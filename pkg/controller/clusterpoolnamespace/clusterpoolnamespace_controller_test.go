@@ -205,7 +205,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 				}
 				tc.resources = append(tc.resources, builder.Build())
 			}
-			c := fake.NewFakeClientWithScheme(scheme, tc.resources...)
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.resources...).Build()
 
 			reconciler := &ReconcileClusterPoolNamespace{
 				Client: c,
@@ -341,7 +341,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			c := fake.NewFakeClientWithScheme(scheme, test.resources...)
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.resources...).Build()
 			reconciler := &ReconcileClusterPoolNamespace{
 				Client: c,
 				logger: logger,

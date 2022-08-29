@@ -1,8 +1,6 @@
 package resource
 
 import (
-	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -110,27 +108,4 @@ func getCacheDir(logger log.FieldLogger) string {
 		return envCacheDir
 	}
 	return defaultCacheDir
-}
-
-func (r *helper) createTempFile(prefix string, content []byte) (string, error) {
-	f, err := ioutil.TempFile(r.cacheDir, prefix)
-	if err != nil {
-		r.logger.WithError(err).WithField("prefix", prefix).Error("cannot create temporary file")
-		return "", fmt.Errorf("cannot create temporary file: %v", err)
-	}
-	defer f.Close()
-	if _, err = f.Write(content); err != nil {
-		r.logger.WithError(err).WithField("file", f.Name()).Error("cannot write to temporary file")
-		return "", fmt.Errorf("cannot write to temporary file: %v", err)
-	}
-	return f.Name(), nil
-}
-
-func (r *helper) deleteTempFile(name string) error {
-	err := os.Remove(name)
-	if err != nil {
-		r.logger.WithError(err).WithField("file", name).Error("cannot delete temp file")
-		return fmt.Errorf("cannot delete temporary file %s: %v", name, err)
-	}
-	return err
 }

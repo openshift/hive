@@ -26,7 +26,6 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -523,7 +522,7 @@ func InstallerPodSpec(
 	}
 
 	// Signal to fake an installation:
-	if utils.IsFakeCluster(cd) {
+	if controllerutils.IsFakeCluster(cd) {
 		env = append(env, corev1.EnvVar{
 			Name:  constants.FakeClusterInstallEnvVar,
 			Value: "true",
@@ -646,7 +645,7 @@ func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, err
 			},
 		},
 	}
-	utils.AddLogFieldsEnvVar(provision, job)
+	controllerutils.AddLogFieldsEnvVar(provision, job)
 
 	return job, nil
 }
@@ -724,7 +723,7 @@ func GenerateUninstallerJobForDeprovision(
 		job.Spec.Template.Spec.Containers[idx].Env = append(job.Spec.Template.Spec.Containers[idx].Env, extraEnvVars...)
 	}
 	controllerutils.SetProxyEnvVars(&job.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
-	utils.AddLogFieldsEnvVar(req, job)
+	controllerutils.AddLogFieldsEnvVar(req, job)
 
 	return job, nil
 }

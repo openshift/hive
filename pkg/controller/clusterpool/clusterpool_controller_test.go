@@ -1891,7 +1891,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				}
 			}
 
-			if order := test.expectedInventoryAssignmentOrder; order != nil && len(order) > 0 {
+			if order := test.expectedInventoryAssignmentOrder; len(order) > 0 {
 				lastTime := metav1.NewTime(nowish.Add(24 * -time.Hour))
 				for _, cdcName := range order {
 					cdc := cdcMap[cdcName]

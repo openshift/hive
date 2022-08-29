@@ -108,7 +108,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewFakeClient(test.existingClusterDeployment)
+			client := fake.NewClientBuilder().WithRuntimeObjects(test.existingClusterDeployment).Build()
 			workDir, err := ioutil.TempDir("", "test-update")
 			if err != nil {
 				t.Fatalf("error creating test directory: %v", err)

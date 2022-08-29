@@ -18,10 +18,6 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 )
 
-const (
-	awsSecretName = "awscreds"
-)
-
 func init() {
 	log.SetLevel(log.DebugLevel)
 }

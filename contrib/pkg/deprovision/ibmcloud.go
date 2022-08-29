@@ -26,8 +26,6 @@ type ibmCloudDeprovisionOptions struct {
 	infraID        string
 	logLevel       string
 	region         string
-	subnets        []string
-	vpc            string
 }
 
 // NewDeprovisionIBMCloudCommand is the entrypoint to create the IBM Cloud deprovision subcommand
@@ -68,7 +66,7 @@ func (o *ibmCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string)
 	// Create IBMCloud Client
 	ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
 	if ibmCloudAPIKey == "" {
-		return fmt.Errorf("No %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
+		return fmt.Errorf("no %s env var set, cannot proceed", constants.IBMCloudAPIKeyEnvVar)
 	}
 	ibmClient, err := ibmclient.NewClient(ibmCloudAPIKey)
 	if err != nil {
@@ -96,15 +94,15 @@ func (o *ibmCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string)
 func (o *ibmCloudDeprovisionOptions) Validate(cmd *cobra.Command) error {
 	if o.region == "" {
 		cmd.Usage()
-		return fmt.Errorf("No --region provided, cannot proceed")
+		return fmt.Errorf("no --region provided, cannot proceed")
 	}
 	if o.baseDomain == "" {
 		cmd.Usage()
-		return fmt.Errorf("No --base-domain provided, cannot proceed")
+		return fmt.Errorf("no --base-domain provided, cannot proceed")
 	}
 	if o.clusterName == "" {
 		cmd.Usage()
-		return fmt.Errorf("No --cluster-name provided, cannot proceed")
+		return fmt.Errorf("no --cluster-name provided, cannot proceed")
 	}
 	return nil
 }

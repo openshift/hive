@@ -34,7 +34,6 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 )
@@ -175,7 +174,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
+	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	// If cluster is already deleted, skip any processing
 	if !cd.DeletionTimestamp.IsZero() {
@@ -686,33 +685,6 @@ func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDepl
 		cd.Labels[hivev1.HiveClusterPlatformLabel],
 		poolNS,
 		poolName).Observe(time)
-}
-
-// timeBeforeClusterSyncCheck returns a duration for requeue use when we find that (Selector)SyncSets
-// haven't yet been applied. The idea is to use increasing delays, starting short to account for
-// cases of few/no syncsets, but to a maximum total delay of `hibernateAfterSyncSetsNotApplied` from
-// the installation time of the CD, because after that point we want to hibernate anyway.
-func timeBeforeClusterSyncCheck(cd *hivev1.ClusterDeployment) time.Duration {
-	if cd.Status.InstalledTimestamp == nil {
-		// This should never happen... but future proof.
-		return 2 * time.Minute
-	}
-	expiry := cd.Status.InstalledTimestamp.Time.Add(hibernateAfterSyncSetsNotApplied)
-	maxDelay := time.Until(expiry)
-	if maxDelay <= 0 {
-		return 0
-	}
-	elapsed := hibernateAfterSyncSetsNotApplied - maxDelay
-	if elapsed < 30*time.Second {
-		return 10 * time.Second
-	}
-	if elapsed < 3*time.Minute {
-		return time.Minute
-	}
-	if maxDelay > 3*time.Minute {
-		return 3 * time.Minute
-	}
-	return maxDelay
 }
 
 func (r *hibernationReconciler) setCDCondition(cd *hivev1.ClusterDeployment, cond hivev1.ClusterDeploymentConditionType,

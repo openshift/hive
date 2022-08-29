@@ -93,7 +93,7 @@ func TestSetupClusterInstallServiceAccount(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(tc.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(tc.existing...).Build()
 			err := SetupClusterInstallServiceAccount(fakeClient, testNamespace, log.StandardLogger())
 			if !assert.NoError(t, err, "unexpected error setting up service account") {
 				return

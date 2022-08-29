@@ -766,8 +766,8 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				testsecret.WithDataKeyValue("kubeconfig", []byte("some-kubeconfig-data")),
 			)
 			tc.srcResources = append(tc.srcResources, kubeconfigSecret)
-			srcClient := fake.NewFakeClientWithScheme(scheme, tc.srcResources...)
-			destClient := fake.NewFakeClientWithScheme(scheme, tc.destResources...)
+			srcClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.srcResources...).Build()
+			destClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.destResources...).Build()
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -1116,8 +1116,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			if !tc.missingKubeconfigSecret {
 				tc.srcResources = append(tc.srcResources, kubeconfigSecret)
 			}
-			srcClient := &deleteBlockingClientWrapper{fake.NewFakeClientWithScheme(scheme, tc.srcResources...)}
-			destClient := fake.NewFakeClientWithScheme(scheme, tc.destResources...)
+			srcClient := &deleteBlockingClientWrapper{fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.srcResources...).Build()}
+			destClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.destResources...).Build()
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()

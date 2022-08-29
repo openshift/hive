@@ -120,7 +120,7 @@ func clusterDeploymentBase() testclusterdeployment.Option {
 
 func fakeClientReconcileBackup(existingObjects []runtime.Object) *ReconcileBackup {
 	return &ReconcileBackup{
-		Client:                     fake.NewFakeClient(existingObjects...),
+		Client:                     fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build(),
 		scheme:                     scheme.Scheme,
 		reconcileRateLimitDuration: defaultReconcileRateLimitDuration,
 		logger:                     log.WithField("controller", ControllerName),

@@ -1488,7 +1488,7 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 				rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 				rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 					withObservedGeneration(2),
-					withFailureResult("[Failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-A: error deleting resource, Failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-B: error deleting resource, Failed to delete v1, Kind=ConfigMap namespace-B/resource-failing-to-delete-A: error deleting resource]"),
+					withFailureResult("[failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-A: error deleting resource, failed to delete v1, Kind=ConfigMap namespace-A/resource-failing-to-delete-B: error deleting resource, failed to delete v1, Kind=ConfigMap namespace-B/resource-failing-to-delete-A: error deleting resource]"),
 					withFirstSuccessTimeInThePast(),
 					withResourcesToDelete(
 						hiveintv1alpha1.SyncResourceReference{
@@ -1779,7 +1779,7 @@ func TestReconcileClusterSync_ErrorDeleting(t *testing.T) {
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 		withObservedGeneration(0),
-		withFailureResult("Failed to delete v1, Kind=ConfigMap dest-namespace/dest-name: error deleting resource"),
+		withFailureResult("failed to delete v1, Kind=ConfigMap dest-namespace/dest-name: error deleting resource"),
 		withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
 		withFirstSuccessTimeInThePast(),
 	)}
@@ -1843,7 +1843,7 @@ func TestReconcileClusterSync_DeleteErrorDoesNotBlockOtherDeletes(t *testing.T) 
 				Return(nil)
 			rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 			expectedSyncSetStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
-				withFailureResult("Failed to delete v1, Kind=ConfigMap dest-namespace/failing-resource: error deleting resource"),
+				withFailureResult("failed to delete v1, Kind=ConfigMap dest-namespace/failing-resource: error deleting resource"),
 				withResourcesToDelete(
 					testConfigMapRef("dest-namespace", "failing-resource"),
 				),

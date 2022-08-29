@@ -235,7 +235,7 @@ func TestReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			scheme := runtime.NewScheme()
 			hivev1.AddToScheme(scheme)
-			fakeClient := fake.NewFakeClientWithScheme(scheme, test.cd)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.cd).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)

@@ -31,7 +31,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
-	kapi "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,7 +51,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -153,7 +151,7 @@ func (r *ArgoCDRegisterController) Reconcile(ctx context.Context, request reconc
 		log.WithError(err).Error("error looking up cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
+	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	if !cd.Spec.Installed {
 		cdLog.Info("cluster installation is not complete")
@@ -372,7 +370,7 @@ func tlsClientConfigBuilderFunc(kubeConfig clientcmd.ClientConfig, cdLog log.Fie
 }
 
 func (r *ArgoCDRegisterController) loadSecretData(secretName, namespace, dataKey string) (string, error) {
-	s := &kapi.Secret{}
+	s := &corev1.Secret{}
 	err := r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
 	if err != nil {
 		return "", err

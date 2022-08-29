@@ -247,7 +247,7 @@ func TestProvisioningUnderwayCollector(t *testing.T) {
 	}}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			c := fake.NewFakeClientWithScheme(scheme, test.existing...)
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			collect := newProvisioningUnderwaySecondsCollector(c, test.min)
 
 			descCh := make(chan *prometheus.Desc)
@@ -540,7 +540,7 @@ func TestProvisioningUnderwayInstallRestartsCollector(t *testing.T) {
 	}}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			c := fake.NewFakeClientWithScheme(scheme, test.existing...)
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			collect := newProvisioningUnderwayInstallRestartsCollector(c, test.min)
 
 			descCh := make(chan *prometheus.Desc)

@@ -44,7 +44,6 @@ import (
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
-	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -298,7 +297,7 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 		cdLog.WithError(err).Error("Error getting cluster deployment")
 		return reconcile.Result{}, err
 	}
-	cdLog = utils.AddLogFields(utils.MetaObjectLogTagger{Object: cd}, cdLog)
+	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, r.logger)
@@ -1744,7 +1743,7 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			ClusterName: cd.Spec.ClusterName,
 		},
 	}
-	utils.CopyLogAnnotation(cd, req)
+	controllerutils.CopyLogAnnotation(cd, req)
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:
@@ -1901,7 +1900,7 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 	if pullSecretObjExists {
 		existingPullSecret, ok := existingPullSecretObj.Data[corev1.DockerConfigJsonKey]
 		if !ok {
-			return false, fmt.Errorf("Pull secret %s did not contain key %s", mergedSecretName, corev1.DockerConfigJsonKey)
+			return false, fmt.Errorf("pull secret %s did not contain key %s", mergedSecretName, corev1.DockerConfigJsonKey)
 		}
 		if string(existingPullSecret) == pullSecret {
 			cdLog.Debug("Existing and the new merged pull secret are same")

@@ -63,15 +63,16 @@ func TestReconcile(t *testing.T) {
 	)
 
 	tests := []struct {
-		name               string
-		cd                 *hivev1.ClusterDeployment
-		cs                 *hiveintv1alpha1.ClusterSync
-		setupActuator      func(actuator *mock.MockHibernationActuator)
-		setupCSRHelper     func(helper *mock.MockcsrHelper)
-		setupRemote        func(builder *remoteclientmock.MockBuilder)
-		validate           func(t *testing.T, cd *hivev1.ClusterDeployment)
-		expectError        bool
-		expectRequeueAfter time.Duration
+		name                   string
+		cd                     *hivev1.ClusterDeployment
+		cs                     *hiveintv1alpha1.ClusterSync
+		hibernationUnsupported bool
+		setupActuator          func(actuator *mock.MockHibernationActuator)
+		setupCSRHelper         func(helper *mock.MockcsrHelper)
+		setupRemote            func(builder *remoteclientmock.MockBuilder)
+		validate               func(t *testing.T, cd *hivev1.ClusterDeployment)
+		expectError            bool
+		expectRequeueAfter     time.Duration
 	}{
 		{
 			name: "cluster deleted",
@@ -98,9 +99,10 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "do not hibernate unsupported versions",
-			cd:   cdBuilder.Options(testcd.WithClusterVersion("4.3.11")).Build(),
-			cs:   csBuilder.Build(),
+			name:                   "do not hibernate unsupported clusters",
+			cd:                     cdBuilder.Build(),
+			hibernationUnsupported: true,
+			cs:                     csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
@@ -110,36 +112,33 @@ func TestReconcile(t *testing.T) {
 		},
 		{
 			name: "set powerstate for unsupported clusters",
-			cd: cdBuilder.Options(testcd.WithClusterVersion("4.3.11"),
+			cd: cdBuilder.Options(
 				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:    hivev1.ClusterHibernatingCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  hivev1.HibernatingReasonUnsupported,
-					Message: "Unsupported version, need version 4.4.8 or greater"})).Build(),
-			cs: csBuilder.Build(),
-			setupActuator: func(actuator *mock.MockHibernationActuator) {
-				actuator.EXPECT().MachinesRunning(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(true, nil, nil)
-			},
-			setupRemote: func(builder *remoteclientmock.MockBuilder) {
-				objs := []runtime.Object{}
-				objs = append(objs, readyNodes()...)
-				objs = append(objs, readyClusterOperators()...)
-				c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objs...).Build()
-				builder.EXPECT().Build().Times(1).Return(c, nil)
-			},
+					Message: "Unsupported platform: no actuator to handle it"})).Build(),
+			hibernationUnsupported: true,
+			cs:                     csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.HibernatingReasonUnsupported, cond.Reason)
 				require.NotNil(t, runCond)
-				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
-				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
+				// FIXME: https://issues.redhat.com/browse/HIVE-2016
+				//        CDs with hibernation unsupported should report Running as soon
+				//        as they're Installed.
+				// assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
+				// assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
+				assert.Equal(t, hivev1.InitializedConditionReason, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerState(""), cd.Status.PowerState)
 			},
 		},
 		{
-			name: "start hibernating, older version",
-			cd:   cdBuilder.Options(o.shouldHibernate, testcd.WithClusterVersion("4.3.11")).Build(),
-			cs:   csBuilder.Build(),
+			name:                   "start hibernating, unsupported cluster",
+			cd:                     cdBuilder.Options(o.shouldHibernate).Build(),
+			hibernationUnsupported: true,
+			cs:                     csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, _ := getHibernatingAndRunningConditions(cd)
 				require.NotNil(t, cond)
@@ -182,9 +181,9 @@ func TestReconcile(t *testing.T) {
 					Type:    hivev1.ClusterHibernatingCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  hivev1.HibernatingReasonUnsupported,
-					Message: "Unsupported version, need version 4.4.8 or greater",
-				}),
-				testcd.WithClusterVersion("4.3.11")).Build(),
+					Message: "Unsupported platform: no actuator to handle it",
+				})).Build(),
+			hibernationUnsupported: true,
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				assert.Equal(t, hivev1.ClusterPowerStateUnknown, string(cd.Status.PowerState), "unexpected Status.PowerState")
 				hc, rc := getHibernatingAndRunningConditions(cd)
@@ -943,7 +942,7 @@ func TestReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockActuator := mock.NewMockHibernationActuator(ctrl)
-			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(true)
+			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(!test.hibernationUnsupported)
 			if test.setupActuator != nil {
 				test.setupActuator(mockActuator)
 			}
@@ -1019,10 +1018,11 @@ func TestHibernateAfter(t *testing.T) {
 	)
 
 	tests := []struct {
-		name          string
-		setupActuator func(actuator *mock.MockHibernationActuator)
-		cd            *hivev1.ClusterDeployment
-		cs            *hiveintv1alpha1.ClusterSync
+		name                   string
+		setupActuator          func(actuator *mock.MockHibernationActuator)
+		cd                     *hivev1.ClusterDeployment
+		cs                     *hiveintv1alpha1.ClusterSync
+		hibernationUnsupported bool
 
 		expectError             bool
 		expectRequeueAfter      time.Duration
@@ -1038,10 +1038,11 @@ func TestHibernateAfter(t *testing.T) {
 			expectedPowerState: hivev1.ClusterPowerStateHibernating,
 		},
 		{
+			name: "cluster due for hibernate but unsupported",
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
-				testcd.WithClusterVersion("4.3.11"),
 				testcd.InstalledTimestamp(time.Now().Add(-10*time.Hour))),
+			hibernationUnsupported:  true,
 			cs:                      csBuilder.Build(),
 			expectedPowerState:      "",
 			expectedConditionReason: hivev1.HibernatingReasonUnsupported,
@@ -1050,8 +1051,8 @@ func TestHibernateAfter(t *testing.T) {
 			name: "cluster not yet due for hibernate older version", // cluster that has never been hibernated and thus has no running condition
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),
-				testcd.WithClusterVersion("4.3.11"),
 				testcd.InstalledTimestamp(time.Now().Add(-3*time.Hour))),
+			hibernationUnsupported: true,
 			cs: csBuilder.Options(
 				testcs.WithFirstSuccessTime(time.Now().Add(-3 * time.Hour)),
 			).Build(),
@@ -1192,7 +1193,7 @@ func TestHibernateAfter(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			mockActuator := mock.NewMockHibernationActuator(ctrl)
-			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(true)
+			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(!test.hibernationUnsupported)
 			if test.setupActuator != nil {
 				test.setupActuator(mockActuator)
 			}

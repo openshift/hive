@@ -509,8 +509,7 @@ const (
 	// Hibernating state.
 	HibernatingReasonHibernating = string(ClusterPowerStateHibernating)
 	// HibernatingReasonUnsupported is used as the reason when the cluster spec
-	// specifies that the cluster be moved to a Hibernating state, but either the cluster
-	// version is not compatible with hibernation (< 4.4.8) or the cloud provider of
+	// specifies that the cluster be moved to a Hibernating state, but the cloud provider of
 	// the cluster is not supported.
 	HibernatingReasonUnsupported = "Unsupported"
 	// HibernatingReasonFailedToStop is used when there was an error stopping machines

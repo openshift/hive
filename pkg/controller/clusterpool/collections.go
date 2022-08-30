@@ -796,13 +796,6 @@ func (cdcs *cdcCollection) Unassign(c client.Client, cdc *hivev1.ClusterDeployme
 
 	delete(cdcs.reserved, cdc.Name)
 
-	// remove duplicates
-	for i, cdci := range cdcs.unassigned {
-		if cdci.Name == cdc.Name {
-			copy(cdcs.unassigned[i:], cdcs.unassigned[i+1:])
-			cdcs.unassigned = cdcs.unassigned[:len(cdcs.unassigned)-1]
-		}
-	}
 	cdcs.unassigned = append(cdcs.unassigned, cdc)
 	cdcs.Sort()
 	return nil

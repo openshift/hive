@@ -339,6 +339,64 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectError:                  false,
 		},
 		{
+			name: "cp with inventory - fix cdc reservation",
+			existing: []runtime.Object{
+				inventoryPoolBuilder().Build(testcp.WithSize(2)),
+				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(
+					testcdc.WithCD("c1"),
+					testcdc.WithPool(testLeasePoolName),
+					testcdc.Available(),
+				),
+				testcd.FullBuilder("c1", "c1", scheme).Build(
+					testcd.WithPoolVersion("e0bc44f74a546c63"),
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.WithCustomization("test-cdc-1"),
+					testcd.Running(),
+				),
+			},
+			expectedTotalClusters:        1,
+			expectedObservedSize:         1,
+			expectedObservedReady:        1,
+			expectedInventoryValidStatus: corev1.ConditionTrue,
+			expectInventory:              true,
+			expectError:                  false,
+			expectedAssignedCDCs:         map[string]string{"test-cdc-1": "c1"},
+		},
+		{
+			name: "cp with inventory - break on dirty cdc - cd ref",
+			existing: []runtime.Object{
+				inventoryPoolBuilder().Build(testcp.WithSize(1)),
+				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(
+					testcdc.WithCD("c1"),
+					testcdc.Available(),
+				),
+			},
+			expectedTotalClusters:        0,
+			expectedObservedSize:         0,
+			expectedObservedReady:        0,
+			expectedInventoryValidStatus: corev1.ConditionTrue,
+			expectedCDCurrentStatus:      corev1.ConditionUnknown,
+			expectInventory:              true,
+			expectError:                  true,
+		},
+		{
+			name: "cp with inventory - break on dirty cdc - cp ref",
+			existing: []runtime.Object{
+				inventoryPoolBuilder().Build(testcp.WithSize(1)),
+				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(
+					testcdc.WithPool("c1"),
+					testcdc.Available(),
+				),
+			},
+			expectedTotalClusters:        0,
+			expectedObservedSize:         0,
+			expectedObservedReady:        0,
+			expectedInventoryValidStatus: corev1.ConditionTrue,
+			expectedCDCurrentStatus:      corev1.ConditionUnknown,
+			expectInventory:              true,
+			expectError:                  true,
+		},
+		{
 			name: "cp with inventory and cdc patch broken is not valid - BrokenBySyntax",
 			existing: []runtime.Object{
 				inventoryPoolBuilder().Build(testcp.WithSize(1)),

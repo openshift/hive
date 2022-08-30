@@ -737,10 +737,6 @@ func (cdcs *cdcCollection) Sort() {
 }
 
 func (cdcs *cdcCollection) Reserve(c client.Client, cdc *hivev1.ClusterDeploymentCustomization, cdName, poolName string) error {
-	if cdc.Status.ClusterDeploymentRef != nil || cdc.Status.ClusterPoolRef != nil {
-		return errors.New("ClusterDeploymentCustomization already reserved")
-	}
-
 	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
 		Type:    conditionsv1.ConditionAvailable,
 		Status:  corev1.ConditionFalse,
@@ -993,9 +989,6 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 				}
 			}
 			// Fix CDC availability
-			if err := cdcs.Unassign(c, cdc); err != nil {
-				return err
-			}
 			if err := cdcs.Reserve(c, cdc, cd.Name, pool.Name); err != nil {
 				return err
 			}

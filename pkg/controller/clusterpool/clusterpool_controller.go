@@ -780,7 +780,11 @@ func (r *ReconcileClusterPool) createCluster(
 			poolRef := poolReference(clp)
 			cd.Spec.ClusterPoolRef = &poolRef
 			if clp.Spec.Inventory != nil {
-				cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdcs.unassigned[0].Name}
+				cdc := cdcs.unassigned[0]
+				if cdcs.reserved[cdc.Name] != nil || cdc.Status.ClusterDeploymentRef != nil || cdc.Status.ClusterPoolRef != nil {
+					return nil, errors.Errorf("ClusterDeploymentCustomization %s is already reserved", cdc.Name)
+				}
+				cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdc.Name}
 			}
 		} else if secretTmp := isInstallConfigSecret(obj); secretTmp != nil {
 			secret = secretTmp

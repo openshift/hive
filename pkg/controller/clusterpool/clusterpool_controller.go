@@ -300,7 +300,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	}
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: clp}, logger)
 
-	if p := clp.Spec.Platform; clp.Spec.RunningCount != clp.Spec.Size && (p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil) {
+	if clp.Spec.RunningCount != clp.Spec.Size && poolAlwaysRunning(clp) {
 		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt, unless runningCount==size")
 	}
 
@@ -1000,6 +1000,12 @@ func poolReference(pool *hivev1.ClusterPool) hivev1.ClusterPoolReference {
 		Namespace: pool.Namespace,
 		PoolName:  pool.Name,
 	}
+}
+
+// poolAlwaysRunning returns true if the Platrform, cloud provider, machines can only be in running state
+func poolAlwaysRunning(pool *hivev1.ClusterPool) bool {
+	p := pool.Spec.Platform
+	return p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil
 }
 
 func (r *ReconcileClusterPool) getCredentialsSecret(pool *hivev1.ClusterPool, secretName string, logger log.FieldLogger) (*corev1.Secret, error) {

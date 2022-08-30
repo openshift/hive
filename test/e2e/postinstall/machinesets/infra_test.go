@@ -9,7 +9,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/mod/semver"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +26,6 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -422,19 +420,5 @@ func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDe
 }
 
 func machineNamePrefix(cd *hivev1.ClusterDeployment, poolName string) (string, error) {
-	// GCP clusters running an OpenShift version earlier than 4.4.8 require leases for machine pool names because the
-	// pool name is limited to a single character.
-	if p := cd.Spec.Platform; p.GCP != nil {
-		version, versionPresent := cd.Labels[constants.VersionMajorMinorPatchLabel]
-		if versionPresent && semver.Compare("v4.4.8", "v"+version) > 0 {
-			return common.WaitForMachinePoolNameLease(
-				common.MustGetConfig(),
-				cd.Namespace,
-				fmt.Sprintf("%s-%s", cd.Name, poolName),
-				20*time.Second,
-			)
-		}
-	}
-
 	return fmt.Sprintf("%s-%s-", cd.Spec.ClusterMetadata.InfraID, poolName), nil
 }

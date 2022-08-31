@@ -80,8 +80,7 @@ const (
   HibernatingHibernationReason = "Hibernating"
 
   // UnsupportedHibernationReason is used as the reason when the cluster spec
-  // specifies that the cluster be moved to a Hibernating state, but either the cluster
-  // version is not compatible with hibernation (< 4.4.8) or the cloud provider of
+  // specifies that the cluster be moved to a Hibernating state, but the cloud provider of
   // the cluster is not supported.
   UnsupportedHibernationReason = "Unsupported"
 )
@@ -134,13 +133,9 @@ type HibernationActuator interface {
 }
 ```
 
-#### Handling Incompatible OpenShift Versions and Cloud Provider
-OpenShift versions earlier than 4.4.8 do not support stopping and starting a cluster without additional work
-to restore etcd. In the case that the cluster deployment's `status.clusterVersionStatus.desired.version` is
-less than 4.4.8, the hibernation controller will set the Hibernating condition to `false` and set the reason
-to Unsupported. This will also be the case if the cluster's cloud provider is not currently supported.
-When later reconciling cluster deployments with this condition set, the hibernation controller will
-continue to check the version in case the cluster is upgraded and eventually is able to be hibernated.
+#### Handling Incompatible Cloud Provider
+The hibernation controller will set the Hibernating condition to `false` and set the reason
+to Unsupported if the cluster's cloud provider is not currently supported.
 
 #### Approving CSRs
 In the case that CSRs must be approved for a cluster that has had its certificates expired while hibernating,

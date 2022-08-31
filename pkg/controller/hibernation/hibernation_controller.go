@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -74,10 +73,6 @@ const (
 )
 
 var (
-	// minimumClusterVersion is the minimum supported version for
-	// hibernation
-	minimumClusterVersion = semver.MustParse("4.4.8")
-
 	// actuators is a list of available actuators for this controller
 	// It is populated via the RegisterActuator function
 	actuators []HibernationActuator
@@ -221,6 +216,8 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 
 	if supported, msg := r.hibernationSupported(cd); !supported {
 		// set hibernating condition to false for unsupported clouds
+		// FIXME: https://issues.redhat.com/browse/HIVE-2016
+		//        Set Ready condition and Status.PowerState to indicate "Running".
 		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported, msg,
 			corev1.ConditionFalse, cdLog)
 		if changed {
@@ -725,17 +722,6 @@ func (r *hibernationReconciler) getActuator(cd *hivev1.ClusterDeployment) Hibern
 func (r *hibernationReconciler) hibernationSupported(cd *hivev1.ClusterDeployment) (bool, string) {
 	if r.getActuator(cd) == nil {
 		return false, "Unsupported platform: no actuator to handle it"
-	}
-	versionString, versionPresent := cd.Labels[constants.VersionMajorMinorPatchLabel]
-	if !versionPresent {
-		return false, "No cluster version is available yet"
-	}
-	version, err := semver.Parse(versionString)
-	if err != nil {
-		return false, fmt.Sprintf("Cannot parse cluster version: %v", err)
-	}
-	if version.LT(minimumClusterVersion) {
-		return false, fmt.Sprintf("Unsupported version, need version %s or greater", minimumClusterVersion.String())
 	}
 	return true, "Hibernation capable"
 }

@@ -881,6 +881,10 @@ func (cdcs *cdcCollection) Unassigned() []*hivev1.ClusterDeploymentCustomization
 	return cdcs.unassigned
 }
 
+func (cdcs *cdcCollection) ByName(name string) *hivev1.ClusterDeploymentCustomization {
+	return cdcs.byCDCName[name]
+}
+
 func (cdcs *cdcCollection) RemoveFinalizer(c client.Client, pool *hivev1.ClusterPool) error {
 	poolFinalizer := fmt.Sprintf("hive.openshift.io/%s", pool.Name)
 
@@ -926,7 +930,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 			}
 		} else {
 			// Ensure the finalizer is present if the CDC is in this pool inventory
-			if _, ok := cdcs.byCDCName[cdc.Name]; !hasFinalizer && ok {
+			if cdcs.ByName(cdc.Name) != nil && !hasFinalizer {
 				controllerutils.AddFinalizer(cdc, poolFinalizer)
 				if err := c.Update(context.Background(), cdc); err != nil {
 					return err
@@ -1012,7 +1016,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 		if cdcRef == nil {
 			continue
 		}
-		if cdc, ok := cdcs.byCDCName[cdcRef.Name]; ok {
+		if cdc := cdcs.ByName(cdcRef.Name); cdc != nil {
 			if err := cdcs.BrokenByCloud(c, cdc); err != nil {
 				return err
 			}
@@ -1031,7 +1035,7 @@ func (cdcs *cdcCollection) SyncClusterDeploymentCustomizationAssignments(c clien
 		if cdcRef == nil {
 			continue
 		}
-		if cdc, ok := cdcs.byCDCName[cdcRef.Name]; ok {
+		if cdc := cdcs.ByName(cdcRef.Name); cdc != nil {
 			if err := cdcs.Succeeded(c, cdc); err != nil {
 				return err
 			}

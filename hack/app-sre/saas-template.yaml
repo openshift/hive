@@ -1207,6 +1207,11 @@ objects:
                   description: Provisioning contains settings used only for initial
                     cluster provisioning. May be unset in the case of adopted clusters.
                   properties:
+                    cliImageOverride:
+                      description: CLIImageOverride allows specifying a URI for the
+                        CLI image (containing the `oc` binary), normally gleaned from
+                        the metadata within the ReleaseImage.
+                      type: string
                     imageSetRef:
                       description: ImageSetRef is a reference to a ClusterImageSet.
                         If a value is specified for ReleaseImage, that will take precedence

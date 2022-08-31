@@ -180,11 +180,18 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		o.log.WithField("installerImage", installerImage).Info("installer image found")
 	}
 
-	cliImage, err := findImageSpec(is, "cli")
-	if err != nil {
-		return errors.Wrap(err, "could not get cli image")
+	var cliImage string
+	// There should be no way we get here with Provisioning == nil, but better safe.
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.CLIImageOverride != "" {
+		cliImage = cd.Spec.Provisioning.CLIImageOverride
+		o.log.WithField("cliImage", cliImage).Info("CLI image overridden")
+	} else {
+		cliImage, err = findImageSpec(is, "cli")
+		if err != nil {
+			return errors.Wrap(err, "could not get cli image")
+		}
+		o.log.WithField("cliImage", cliImage).Info("cli image found")
 	}
-	o.log.WithField("cliImage", cliImage).Info("cli image found")
 
 	releaseMetadataRaw, err := ioutil.ReadFile(filepath.Join(o.WorkDir, releaseMetadataFilename))
 	if err != nil {

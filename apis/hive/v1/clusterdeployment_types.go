@@ -231,6 +231,11 @@ type Provisioning struct {
 	// +optional
 	InstallerImageOverride string `json:"installerImageOverride,omitempty"`
 
+	// CLIImageOverride allows specifying a URI for the CLI image (containing the `oc` binary),
+	// normally gleaned from the metadata within the ReleaseImage.
+	// +optional
+	CLIImageOverride string `json:"cliImageOverride,omitempty"`
+
 	// ImageSetRef is a reference to a ClusterImageSet. If a value is specified for ReleaseImage,
 	// that will take precedence over the one from the ClusterImageSet.
 	ImageSetRef *ClusterImageSetReference `json:"imageSetRef,omitempty"`

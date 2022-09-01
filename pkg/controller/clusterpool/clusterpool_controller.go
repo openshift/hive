@@ -417,6 +417,16 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// of the pool's Size. This needs to take into account the clusters we're creating to satisfy
 	// the immediate demand of pending claims.
 	switch drift := len(cds.Unassigned(true)) - int(clp.Spec.Size) - len(claims.Unassigned()); {
+	// prioritize stale CD deletion for onprem clusters due to limited resources
+	case poolAlwaysRunning(clp):
+		toDelete := cds.Stale()[0]
+		logger := logger.WithField("cluster", toDelete.Name)
+		logger.Info("deleting cluster deployment")
+		if err := cds.Delete(r.Client, toDelete.Name); err != nil {
+			logger.WithError(err).Error("error deleting cluster deployment")
+			return reconcile.Result{}, err
+		}
+		metricStaleClusterDeploymentsDeleted.WithLabelValues(clp.Namespace, clp.Name).Inc()
 	// activity quota exceeded, so no action
 	case availableCurrent <= 0:
 		logger.WithFields(log.Fields{

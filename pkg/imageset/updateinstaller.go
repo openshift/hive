@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -27,6 +29,7 @@ import (
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -185,6 +188,19 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		return errors.Wrap(err, "could not get cli image")
 	}
 	o.log.WithField("cliImage", cliImage).Info("cli image found")
+	// If requested, use the installer image's host for the CLI image as well.
+	if copyDomain, err := strconv.ParseBool(cd.Annotations[constants.CopyCLIImageDomainFromInstallerImage]); err == nil && copyDomain {
+		if !strings.Contains(installerImage, "/") {
+			return errors.New(fmt.Sprintf("invalid installer image %q: expected to find a '/'", installerImage))
+		}
+		if !strings.Contains(cliImage, "/") {
+			return errors.New(fmt.Sprintf("invalid cli image %q: expected to find a '/'", cliImage))
+		}
+		installerDomain := strings.SplitN(installerImage, "/", 2)[0]
+		cliPath := strings.SplitN(cliImage, "/", 2)[1]
+		cliImage = installerDomain + "/" + cliPath
+		o.log.WithField("cliImage", cliImage).Info("overrode cli image host")
+	}
 
 	releaseMetadataRaw, err := ioutil.ReadFile(filepath.Join(o.WorkDir, releaseMetadataFilename))
 	if err != nil {

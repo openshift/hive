@@ -23,14 +23,16 @@ import (
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
-	testInstallerImage     = "registry.io/test-installer-image:latest"
-	testCLIImage           = "registry.io/test-cli-image:latest"
-	testReleaseVersion     = "v0.0.0-test-version"
-	installerImageOverride = "quay.io/foo/bar:baz"
+	testInstallerImage          = "registry.io/test-installer-image:latest"
+	testCLIImage                = "registry.io/test-cli-image:latest"
+	testReleaseVersion          = "v0.0.0-test-version"
+	installerImageOverride      = "quay.io/foo/bar:baz"
+	cliImageWithDifferentDomain = "some-other-domain.com/foo/cli:blah"
 )
 
 func TestUpdateInstallerImageCommand(t *testing.T) {
@@ -52,7 +54,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
 		},
 		{
 			name:                      "failure execution missing cli",
@@ -60,7 +62,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			images: map[string]string{
 				"installer": testInstallerImage,
 			},
-			validateClusterDeployment: validateFailureExecution,
+			validateClusterDeployment: validateFailureExecution("could not get cli image"),
 			expectError:               true,
 		},
 		{
@@ -70,7 +72,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, installerImageResolvedReason),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, installerImageResolvedReason),
 		},
 		{
 			name: "successful execution baremetal platform",
@@ -83,7 +85,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"baremetal-installer": testInstallerImage,
 				"cli":                 testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
 		},
 		{
 			name:                      "successful execution with version in release metadata",
@@ -93,7 +95,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"cli":       testCLIImage,
 			},
 			version:                   testReleaseVersion,
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
 		},
 		{
 			name:                      "installer image override",
@@ -102,7 +104,36 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(installerImageOverride, ""),
+			validateClusterDeployment: validateSuccessfulExecution(installerImageOverride, testCLIImage, ""),
+		},
+		{
+			name:                      "CLI image domain copied from installer image",
+			existingClusterDeployment: testClusterDeploymentWithCLIDomainCopy(),
+			images: map[string]string{
+				"installer": testInstallerImage,
+				"cli":       cliImageWithDifferentDomain,
+			},
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, "registry.io/foo/cli:blah", ""),
+		},
+		{
+			name:                      "copy requested, invalid installer image",
+			existingClusterDeployment: testClusterDeploymentWithCLIDomainCopy(),
+			images: map[string]string{
+				"installer": "invalid image",
+				"cli":       cliImageWithDifferentDomain,
+			},
+			validateClusterDeployment: validateFailureExecution("invalid installer image"),
+			expectError:               true,
+		},
+		{
+			name:                      "copy requested, invalid cli image",
+			existingClusterDeployment: testClusterDeploymentWithCLIDomainCopy(),
+			images: map[string]string{
+				"installer": testInstallerImage,
+				"cli":       "invalid image",
+			},
+			validateClusterDeployment: validateFailureExecution("invalid cli image"),
+			expectError:               true,
 		},
 	}
 
@@ -161,11 +192,23 @@ func testClusterDeploymentWithInstallerImageOverride(override string) *hivev1.Cl
 	return cd
 }
 
+func testClusterDeploymentWithCLIDomainCopy() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	if cd.Annotations == nil {
+		cd.Annotations = map[string]string{}
+	}
+	cd.Annotations[constants.CopyCLIImageDomainFromInstallerImage] = "true"
+	return cd
+}
+
 // If expectedReason is empty, we won't check it.
-func validateSuccessfulExecution(expectedInstallerImage, expectedReason string) func(*testing.T, *hivev1.ClusterDeployment) {
+func validateSuccessfulExecution(expectedInstallerImage, expectedCLIImage, expectedReason string) func(*testing.T, *hivev1.ClusterDeployment) {
 	return func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
 		if assert.NotNil(t, clusterDeployment.Status.InstallerImage, "did not get an installer image in status") {
 			assert.Equal(t, expectedInstallerImage, *clusterDeployment.Status.InstallerImage, "did not get expected installer image in status")
+		}
+		if assert.NotNil(t, clusterDeployment.Status.CLIImage, "did not get a CLI image in status") {
+			assert.Equal(t, expectedCLIImage, *clusterDeployment.Status.CLIImage, "did not get expected CLI image in status")
 		}
 		condition := controllerutils.FindCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
 		if assert.NotNil(t, condition, "could not find InstallerImageResolutionFailed condition") {
@@ -177,11 +220,13 @@ func validateSuccessfulExecution(expectedInstallerImage, expectedReason string) 
 	}
 }
 
-func validateFailureExecution(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
-	condition := controllerutils.FindCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
-	if assert.NotNil(t, condition, "no failure condition found") {
-		assert.Equal(t, corev1.ConditionTrue, condition.Status, "unexpected condition status")
-		assert.Contains(t, condition.Message, "could not get cli image", "condition message does not contain expected error message")
+func validateFailureExecution(substring string) func(*testing.T, *hivev1.ClusterDeployment) {
+	return func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
+		condition := controllerutils.FindCondition(clusterDeployment.Status.Conditions, hivev1.InstallerImageResolutionFailedCondition)
+		if assert.NotNil(t, condition, "no failure condition found") {
+			assert.Equal(t, corev1.ConditionTrue, condition.Status, "unexpected condition status")
+			assert.Contains(t, condition.Message, substring, "condition message does not contain expected error message")
+		}
 	}
 }
 

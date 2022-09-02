@@ -61,6 +61,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool"
@@ -179,6 +180,8 @@ SSH_PRIV_KEY_PATH: File system path of a file containing the SSH private key cor
 			if err != nil {
 				im.log.WithError(err).Fatal("error creating kube clients")
 			}
+
+			awsutils.Hive1862Experiment(im.DynamicClient)
 
 			if err := im.Run(); err != nil {
 				log.WithError(err).Fatal("runtime error")

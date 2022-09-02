@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/installer/pkg/destroy/aws"
 )
 
@@ -30,6 +31,12 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 			if credsDir != "" {
 				go terminateWhenFilesChange(credsDir)
 			}
+
+			client, err := utils.GetClient()
+			if err != nil {
+				log.WithError(err).Fatal("failed to get client")
+			}
+			awsutils.Hive1862Experiment(client)
 
 			// ClusterQuota stomped in return
 			if _, err := opt.Run(); err != nil {

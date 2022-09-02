@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -252,47 +251,23 @@ func InstallerPodSpec(
 		env = append(
 			env,
 			corev1.EnvVar{
-				Name: "AWS_ACCESS_KEY_ID",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: credentialRef,
-						Key:                  constants.AWSAccessKeyIDSecretKey,
-						Optional:             pointer.BoolPtr(true),
-					},
-				},
+				Name:  "HIVE_1862_EXPERIMENT",
+				Value: "Bob's your uncle",
 			},
 			corev1.EnvVar{
-				Name: "AWS_SECRET_ACCESS_KEY",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: credentialRef,
-						Key:                  constants.AWSSecretAccessKeySecretKey,
-						Optional:             pointer.BoolPtr(true),
-					},
-				},
+				Name: "AWS_CREDS_SECRET_NAMESPACE",
+				// The secret lives in the same namespace as the ClusterDeployment
+				Value: cd.Namespace,
+			},
+			corev1.EnvVar{
+				Name:  "AWS_CREDS_SECRET_NAME",
+				Value: credentialRef.Name,
 			},
 			corev1.EnvVar{
 				Name:  "AWS_SDK_LOAD_CONFIG",
 				Value: "true",
 			},
-			corev1.EnvVar{
-				Name:  "AWS_CONFIG_FILE",
-				Value: filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey),
-			},
 		)
-
-		volumes = append(volumes, corev1.Volume{
-			Name: "aws",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: credentialRef.Name,
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      "aws",
-			MountPath: constants.AWSCredsMount,
-		})
 	case cd.Spec.Platform.Azure != nil:
 		volumes = append(volumes, corev1.Volume{
 			Name: "azure",
@@ -738,31 +713,25 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 			Name:            "deprovision",
 			Image:           images.GetHiveImage(),
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Env: []corev1.EnvVar{{
-				Name: "AWS_ACCESS_KEY_ID",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: credentialRef,
-						Key:                  constants.AWSAccessKeyIDSecretKey,
-						Optional:             pointer.BoolPtr(true),
-					},
+			Env: []corev1.EnvVar{
+				{
+					Name:  "HIVE_1862_EXPERIMENT",
+					Value: "Bob's your uncle",
 				},
-			}, {
-				Name: "AWS_SECRET_ACCESS_KEY",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: credentialRef,
-						Key:                  constants.AWSSecretAccessKeySecretKey,
-						Optional:             pointer.BoolPtr(true),
-					},
+				{
+					Name: "AWS_CREDS_SECRET_NAMESPACE",
+					// The secret lives in the same namespace as the ClusterDeprovision
+					Value: req.Namespace,
 				},
-			}, {
-				Name:  "AWS_SDK_LOAD_CONFIG",
-				Value: "true",
-			}, {
-				Name:  "AWS_CONFIG_FILE",
-				Value: filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey),
-			}},
+				{
+					Name:  "AWS_CREDS_SECRET_NAME",
+					Value: credentialRef.Name,
+				},
+				{
+					Name:  "AWS_SDK_LOAD_CONFIG",
+					Value: "true",
+				},
+			},
 			Command: []string{"/usr/bin/hiveutil"},
 			Args: []string{
 				"aws-tag-deprovision",

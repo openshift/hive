@@ -41,7 +41,7 @@ require (
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 	github.com/openshift/generic-admission-server v1.14.1-0.20200903115324-4ddcdd976480
 	github.com/openshift/hive/apis v0.0.0
-	github.com/openshift/installer v0.9.0-master.0.20220711145509-cdb9627de7ef
+	github.com/openshift/installer v0.9.0-master.0.20220901213408-25aa6a41b7ca
 	github.com/openshift/library-go v0.0.0-20220525173854-9b950a41acdc
 	github.com/openshift/machine-api-operator v0.2.1-0.20220601192856-d7fb6b5b87ef
 	github.com/openshift/machine-api-provider-gcp v0.0.0

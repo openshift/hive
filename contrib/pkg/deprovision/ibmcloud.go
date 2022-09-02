@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
+	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
@@ -62,6 +63,12 @@ func NewDeprovisionIBMCloudCommand() *cobra.Command {
 // Complete finishes parsing arguments for the command
 func (o *ibmCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.infraID = args[0]
+
+	client, err := utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to get client")
+	}
+	ibmutils.ConfigureCreds(client)
 
 	// Create IBMCloud Client
 	ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)

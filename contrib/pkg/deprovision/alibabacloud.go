@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
+	aliutils "github.com/openshift/hive/contrib/pkg/utils/alibabacloud"
 	"github.com/openshift/installer/pkg/destroy/alibabacloud"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -55,6 +57,11 @@ func NewDeprovisionAlibabaCloudCommand() *cobra.Command {
 // Complete finishes parsing arguments for the command
 func (o *alibabaCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.infraID = args[0]
+	client, err := utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to get client")
+	}
+	aliutils.ConfigureCreds(client)
 	return nil
 }
 

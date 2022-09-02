@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/client-go/util/homedir"
 
+	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
 )
 
@@ -26,4 +28,16 @@ func GetCreds(credsFile string) ([]byte, error) {
 	}
 	log.WithField("credsFilePath", credsFilePath).Info("Loading gcp service account")
 	return ioutil.ReadFile(credsFilePath)
+}
+
+// ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE
+// and CREDS_SECRET_NAME and configures GCP credential environment variables and config files
+// accordingly.
+func ConfigureCreds(c client.Client) {
+	credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME")
+	if credsSecret == nil {
+		return
+	}
+	utils.ProjectToDir(credsSecret, constants.GCPCredentialsDir)
+	os.Setenv("GOOGLE_CREDENTIALS", constants.GCPCredentialsDir+"/"+constants.GCPCredentialsName)
 }

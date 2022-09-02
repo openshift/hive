@@ -52,6 +52,13 @@ func NewDeprovisionGCPCommand() *cobra.Command {
 // Complete finishes parsing arguments for the command
 func (o *gcpOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.infraID = args[0]
+
+	client, err := utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to get client")
+	}
+	gcputils.ConfigureCreds(client)
+
 	return nil
 }
 

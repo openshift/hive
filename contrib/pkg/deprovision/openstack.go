@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
+	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/types"
 	typesopenstack "github.com/openshift/installer/pkg/types/openstack"
@@ -48,6 +50,13 @@ func NewDeprovisionOpenStackCommand() *cobra.Command {
 // Complete finishes parsing arguments for the command
 func (o *openStackOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.infraID = args[0]
+
+	client, err := utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to get client")
+	}
+	openstackutils.ConfigureCreds(client)
+
 	return nil
 }
 

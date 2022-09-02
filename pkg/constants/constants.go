@@ -184,8 +184,14 @@ const (
 	// to the configmap containing the managed domain configuration.
 	ManagedDomainsVolumeName = "managed-domains"
 
+	// GCPCredentialsDir is the directory containing the GCP credentials file.
+	GCPCredentialsDir = "/.gcp"
+
 	// GCPCredentialsName is the name of the GCP credentials file or secret key.
 	GCPCredentialsName = "osServiceAccount.json"
+
+	// AzureCredentialsDir is the directory containing the Azure credentials file.
+	AzureCredentialsDir = "/.azure"
 
 	// AzureCredentialsName is the name of the Azure credentials file or secret key.
 	AzureCredentialsName = "osServicePrincipal.json"
@@ -194,16 +200,31 @@ const (
 	// where Azure credentials can be found.
 	AzureCredentialsEnvVar = "AZURE_AUTH_LOCATION"
 
+	// OpenStackCertificatesDir is the directory containing OpenStack credentials files.
+	OpenStackCredentialsDir = "/etc/openstack"
+
+	// OpenStackCertificatesDir is the directory containing OpenStack certificates files.
+	OpenStackCertificatesDir = "/etc/openstack-ca"
+
 	// OpenStackCredentialsName is the name of the OpenStack credentials file.
 	OpenStackCredentialsName = "clouds.yaml"
+
+	// SSHPrivateKeyDir is the directory containing the SSH key to be configured on cluster hosts.
+	SSHPrivateKeyDir = "/sshkeys"
 
 	// SSHPrivKeyPathEnvVar is the environment variable Hive will set for the installmanager pod to point to the
 	// path where we mount in the SSH key to be configured on the cluster hosts.
 	SSHPrivKeyPathEnvVar = "SSH_PRIV_KEY_PATH"
 
+	// LibvirtSSHPrivateKeyDir is the directory containing the libvirt SSH key to be configured on cluster hosts.
+	LibvirtSSHPrivateKeyDir = "/libvirtsshkeys"
+
 	// LibvirtSSHPrivKeyPathEnvVar is the environment variable Hive will set for the installmanager pod to point to the
 	// path where we mount in the SSH key for connecting to the bare metal libvirt provisioning host.
 	LibvirtSSHPrivKeyPathEnvVar = "LIBVIRT_SSH_PRIV_KEY_PATH"
+
+	// BoundServiceAccountSigningKeyDir is the directory containing the bound service account signing key file.
+	BoundServiceAccountSigningKeyDir = "/boundsasigningkey"
 
 	// BoundServiceAccountSigningKeyEnvVar contains the path to the bound service account signing key and
 	// is set in the install pod for AWS STS clusters.
@@ -290,6 +311,12 @@ const (
 	// VSphereDataStoreEnvVar is the environment variable specifying the vSphere default datastore.
 	VSphereDataStoreEnvVar = "GOVC_DATASTORE"
 
+	// VSphereCredentialsDir is the directory containing VSphere credentials files.
+	VSphereCredentialsDir = "/vsphere-credentials"
+
+	// VSphereCertificatesDir is the directory containing VSphere certificate files.
+	VSphereCertificatesDir = "/vsphere-certificates"
+
 	// VersionMajorLabel is a label applied to ClusterDeployments to show the version of the cluster
 	// in the form "[MAJOR]".
 	VersionMajorLabel = "hive.openshift.io/version-major"
@@ -301,6 +328,12 @@ const (
 	// VersionMajorMinorPatchLabel is a label applied to ClusterDeployments to show the version of the cluster
 	// in the form "[MAJOR].[MINOR].[PATCH]".
 	VersionMajorMinorPatchLabel = "hive.openshift.io/version-major-minor-patch"
+
+	// OvirtCredentialsDir is the directory containing Ovirt credentials files.
+	OvirtCredentialsDir = "/.ovirt"
+
+	// OvirtCertificatesDir is the directory containing Ovirt certificate files.
+	OvirtCertificatesDir = "/.ovirt-ca"
 
 	// OvirtCredentialsName is the name of the oVirt credentials file.
 	OvirtCredentialsName = "ovirt-config.yaml"

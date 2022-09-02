@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/installer/pkg/destroy/aws"
 )
 
@@ -59,6 +61,12 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []s
 	if o.Logger, err = utils.NewLogger(logLevel); err != nil {
 		return err
 	}
+
+	client, err := utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "failed to get client")
+	}
+	awsutils.ConfigureCreds(client)
 
 	return nil
 }

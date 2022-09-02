@@ -946,7 +946,7 @@ github.com/openshift/hive/apis/hive/v1/vsphere
 github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
 github.com/openshift/hive/apis/scheme
-# github.com/openshift/installer v0.9.0-master.0.20220711145509-cdb9627de7ef
+# github.com/openshift/installer v0.9.0-master.0.20220901213408-25aa6a41b7ca
 ## explicit; go 1.17
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset/installconfig/alibabacloud

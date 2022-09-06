@@ -436,6 +436,11 @@ const (
 	// nonempty, and parseable into such a map, the key/value pairs are blindly included in log lines from hive binaries
 	// (currently only hiveutil).
 	AdditionalLogFieldsEnvVar = "HIVE_ADDITIONAL_LOG_FIELDS"
+
+	// CopyCLIImageDomainFromInstallerImage affects how hive computes the URI of the CLI image when preparing to provision a
+	// cluster. When this annotation is set to a truthy value, hive will parse the installer image URI and use its domain
+	// (everything up to the first `/`) for the CLI image, discarding whatever domain was gleaned from the release image.
+	CopyCLIImageDomainFromInstallerImage = "hive.openshift.io/cli-domain-from-installer-image"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

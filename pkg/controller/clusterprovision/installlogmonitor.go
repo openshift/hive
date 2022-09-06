@@ -84,6 +84,10 @@ func (r *ReconcileClusterProvision) parseInstallLog(log *string, pLog log.FieldL
 		ilrLog := pLog.WithField("regexName", ilr.Name)
 		ilrLog.Debug("parsing regex entry")
 		for _, ss := range ilr.SearchRegexStrings {
+			// Make the expression case insensitive.
+			// NOTE: This works correctly on a regex that already has flaggage. E.g. "(?i)(?s)..."
+			// is equivalent to "(?is)..."
+			ss = "(?i)" + ss
 			ssLog := ilrLog.WithField("searchString", ss)
 			ssLog.Debug("matching search string")
 			switch match, err := regexp.Match(ss, []byte(*log)); {

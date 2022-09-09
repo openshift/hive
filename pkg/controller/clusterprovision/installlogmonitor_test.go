@@ -63,6 +63,7 @@ time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 mas
 	errorCreatingNLB      = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
 	terraformFailedDelete = "level=fatal msg=terraform destroy: failed to destroy using Terraform"
 	noMatchLog            = "an example of something that doesn't match the log regexes"
+	scaCertPullFailedLog  = "Cluster operator insights SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: unable to retrieve SCA certs data from https://api.openshift.com/api/accounts_mgmt/v1/certificates: Post \"https://api.openshift.com/api/accounts_mgmt/v1/certificates\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -74,6 +75,11 @@ func TestParseInstallLog(t *testing.T) {
 		expectedReason  string
 		expectedMessage *string
 	}{
+		{
+			name:           "SCA certs pull failed",
+			log:            pointer.StringPtr(scaCertPullFailedLog),
+			expectedReason: "SCACertsPullFailed",
+		},
 		{
 			name:           "load balancer service linked role prereq",
 			log:            pointer.StringPtr(accessDeniedSLR),

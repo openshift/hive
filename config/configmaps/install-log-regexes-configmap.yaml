@@ -5,8 +5,12 @@ metadata:
   namespace: hive
 data:
   regexes: |
-
-    # AWS Specific
+    - name: SCACertsPullFailed
+      searchRegexStrings:
+      - "SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from"
+      installFailingReason: SCACertsPullFailed
+      installFailingMessage: Cannot pull SCA certificates. Make sure SCA is enabled and try again. See https://access.redhat.com/articles/simple-content-access.
+    # AWS Specific:
     - name: AWSEC2QuotaExceeded
       searchRegexStrings:
       - "failed to generate asset.*Platform Quota Check.*MissingQuota.*ec2"

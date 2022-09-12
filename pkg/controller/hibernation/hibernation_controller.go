@@ -215,12 +215,15 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	readyCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterReadyCondition)
 
 	if supported, msg := r.hibernationSupported(cd); !supported {
-		// set hibernating condition to false for unsupported clouds
-		// FIXME: https://issues.redhat.com/browse/HIVE-2016
-		//        Set Ready condition and Status.PowerState to indicate "Running".
+		// Set hibernating condition to false for unsupported clouds.
+		// Set Ready condition and Status.PowerState to indicate "Running" for consistent UX.
 		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonUnsupported, msg,
 			corev1.ConditionFalse, cdLog)
-		if changed {
+		changed2 := r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonRunning,
+			"No power state actuator -- assuming running", corev1.ConditionTrue, cdLog)
+		changed3 := cd.Status.PowerState != hivev1.ClusterPowerStateRunning
+		if changed || changed2 || changed3 {
+			cd.Status.PowerState = hivev1.ClusterPowerStateRunning
 			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
 		}
 	} else if hibernatingCondition.Reason == hivev1.HibernatingReasonUnsupported {

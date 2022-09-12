@@ -125,13 +125,8 @@ func TestReconcile(t *testing.T) {
 				require.NotNil(t, cond)
 				assert.Equal(t, hivev1.HibernatingReasonUnsupported, cond.Reason)
 				require.NotNil(t, runCond)
-				// FIXME: https://issues.redhat.com/browse/HIVE-2016
-				//        CDs with hibernation unsupported should report Running as soon
-				//        as they're Installed.
-				// assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
-				// assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
-				assert.Equal(t, hivev1.InitializedConditionReason, runCond.Reason)
-				assert.Equal(t, hivev1.ClusterPowerState(""), cd.Status.PowerState)
+				assert.Equal(t, hivev1.ReadyReasonRunning, runCond.Reason)
+				assert.Equal(t, hivev1.ClusterPowerStateRunning, cd.Status.PowerState)
 			},
 		},
 		{

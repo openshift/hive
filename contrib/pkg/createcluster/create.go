@@ -34,6 +34,7 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
+	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -616,6 +617,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			return nil, fmt.Errorf("error reading %s: %v", o.BoundServiceAccountSigningKeyFile, err)
 		}
 		builder.BoundServiceAccountSigningKey = string(signingKey)
+	}
+	if o.CredentialsModeManual {
+		builder.CredentialsMode = installertypes.ManualCredentialsMode
 	}
 
 	switch o.Cloud {

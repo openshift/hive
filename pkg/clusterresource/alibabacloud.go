@@ -88,10 +88,6 @@ func (p *AlibabaCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installer
 	}
 	ic.ControlPlane.Platform.AlibabaCloud = mppMaster
 	ic.Compute[0].Platform.AlibabaCloud = mppWorker
-
-	// Alibaba Cloud only supports manual credentials mode. Manifests including required secrets
-	// must be passed to hive via cd.spec.provisioning.manifestsConfigmapRef
-	ic.CredentialsMode = installertypes.ManualCredentialsMode
 }
 
 func (p *AlibabaCloudBuilder) CredsSecretName(o *Builder) string {

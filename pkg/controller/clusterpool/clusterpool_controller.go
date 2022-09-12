@@ -301,7 +301,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: clp}, logger)
 
 	if clp.Spec.RunningCount != clp.Spec.Size && poolAlwaysRunning(clp) {
-		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt, unless runningCount==size")
+		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt. Must set runningCount==size.")
 	}
 
 	// Initialize cluster pool conditions if not set

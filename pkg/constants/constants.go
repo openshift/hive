@@ -441,6 +441,14 @@ const (
 	// cluster. When this annotation is set to a truthy value, hive will parse the installer image URI and use its domain
 	// (everything up to the first `/`) for the CLI image, discarding whatever domain was gleaned from the release image.
 	CopyCLIImageDomainFromInstallerImage = "hive.openshift.io/cli-domain-from-installer-image"
+
+	// InClusterCredsModeOverrideAnnotation causes hive to change the credentialsMode in the install-config to the specified
+	// value *after* manifests have been generated. Use this to, for example, invoke the installer in Manual mode but create
+	// the cluster in Passthrough mode.
+	InClusterCredsModeOverrideAnnotation = "hive.openshift.io/override-in-cluster-creds-mode"
+
+	// InClusterCredsModeOverrideEnvVar is used to pass the in-cluster creds mode override into the provision job.
+	InClusterCredsModeOverrideEnvVar = "IN_CLUSTER_CREDS_MODE_OVERRIDE"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

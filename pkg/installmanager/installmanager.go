@@ -62,6 +62,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool"
 	"github.com/openshift/hive/pkg/controller/utils"
@@ -856,6 +857,35 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 			return err
 		}
 		m.log.Infof("copied %s to %s", src, dest)
+	}
+
+	// Override in-cluster creds mode if requested
+	if mode := os.Getenv(constants.InClusterCredsModeOverrideEnvVar); mode != "" {
+		// TODO: dedup this
+		destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
+		icData, err := ioutil.ReadFile(destInstallConfigPath)
+		if err != nil {
+			m.log.WithError(err).Error("error reading install-config.yaml")
+			return err
+		}
+
+		ic := new(clusterresource.InstallConfigTemplate)
+		if err := yaml.Unmarshal(icData, ic); err != nil {
+			return errors.Wrap(err, "error parsing install config")
+		}
+
+		m.log.WithField("origMode", ic.CredentialsMode).WithField("newMode", mode).Info("overriding credentials mode in install config")
+
+		ic.CredentialsMode = installertypes.CredentialsMode(mode)
+
+		d, err := yaml.Marshal(ic)
+		if err != nil {
+			return errors.Wrap(err, "error marshalling install config")
+		}
+
+		if err := ioutil.WriteFile(destInstallConfigPath, d, 0644); err != nil {
+			m.log.WithError(err).Error("error writing install-config.yaml")
+		}
 	}
 
 	m.log.Info("running openshift-install create ignition-configs")

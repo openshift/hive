@@ -529,6 +529,16 @@ func InstallerPodSpec(
 		})
 	}
 
+	// Override in-cluster creds mode if requested
+	if a := cd.Annotations; a != nil && a[constants.InClusterCredsModeOverrideAnnotation] != "" {
+		// TODO: Should we validate here? For now, let it blow up downstream.
+		env = append(env, corev1.EnvVar{
+			Name: constants.InClusterCredsModeOverrideEnvVar,
+			Value: a[constants.InClusterCredsModeOverrideAnnotation],
+		})
+	}
+
+
 	if cd.Status.InstallerImage == nil {
 		return nil, fmt.Errorf("installer image not resolved")
 	}

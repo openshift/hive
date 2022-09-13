@@ -445,7 +445,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				testclaim.FullBuilder(testNamespace, "test", scheme).Build(testclaim.WithPool(testLeasePoolName)),
 				unclaimedCDBuilder("c1").Build(
 					testcd.Installed(),
-					testcd.WithStatusPowerState(hivev1.ClusterPowerStateHibernating),
+					testcd.Running(),
 					testcd.WithCustomization("test-cdc-1"),
 				),
 			},

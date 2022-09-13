@@ -337,7 +337,7 @@ func getAllClusterDeploymentsForPool(c client.Client, pool *hivev1.ClusterPool, 
 			if isBroken(&cd, pool, logger) {
 				cdCol.broken = append(cdCol.broken, ref)
 			} else if cd.Spec.Installed {
-				if cd.Status.PowerState == hivev1.ClusterPowerStateRunning || poolAlwaysRunning(pool) {
+				if cd.Status.PowerState == hivev1.ClusterPowerStateRunning {
 					cdCol.assignable = append(cdCol.assignable, ref)
 				} else {
 					cdCol.standby = append(cdCol.standby, ref)

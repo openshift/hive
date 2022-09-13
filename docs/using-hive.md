@@ -1014,7 +1014,7 @@ The [troubleshooting doc](troubleshooting.md#cluster-install-failure-logs) provi
 Once the cluster is provisioned, the admin kubeconfig will be stored in a secret. You can use this with:
 
 ```bash
-./hack/get-kubeconfig.sh ${CLUSTER_NAME} > ${CLUSTER_NAME}.kubeconfig
+./hack/get-admin-kubeconfig.sh ${CLUSTER_NAME} > ${CLUSTER_NAME}.kubeconfig
 export KUBECONFIG=${CLUSTER_NAME}.kubeconfig
 oc get nodes
 ```

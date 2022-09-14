@@ -292,7 +292,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.BoundServiceAccountSigningKeyFile, "bound-service-account-signing-key-file", "", "Private service account signing key (often created with ccoutil create key-pair)")
 	flags.BoolVar(&opt.CredentialsModeManual, "credentials-mode-manual", false, fmt.Sprintf(`Configure the Cloud Credential Operator in the target cluster to Manual mode.
 Implies the use of --manifests to inject custom Secrets for all CredentialsRequests in the cluster.
-Manual credentials mode is enabled by default and is required for the following clouds: %s`, strings.Join(manualModeClouds, "|")))
+This option is redundant (but permitted) for following clouds, which always use manual mode: %s`, strings.Join(manualModeClouds, "|")))
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")

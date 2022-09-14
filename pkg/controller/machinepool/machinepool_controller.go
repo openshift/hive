@@ -597,6 +597,16 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					objectModified = true
 				}
 
+				// Update if the providerspec on the remote machineset is different than the generated machineset providerspec.
+				// This update is only allowed if the override annotation is present on the machinepool.
+				if _, overridePlatformImmutable := pool.Annotations[constants.OverrideMachinePoolPlatformImmutableAnnotation]; overridePlatformImmutable {
+					if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec, ms.Spec.Template.Spec.ProviderSpec) {
+						msLog.Info("platform out of sync")
+						rMS.Spec.Template.Spec.ProviderSpec = ms.Spec.Template.Spec.ProviderSpec
+						objectModified = true
+					}
+				}
+
 				if objectMetaModified || objectModified {
 					rMS.Generation++
 					machineSetsToUpdate = append(machineSetsToUpdate, &rMS)

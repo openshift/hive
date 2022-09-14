@@ -319,6 +319,32 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Update machineset providerspec when override annotation is set",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Annotations = map[string]string{}
+				mp.Annotations[constants.OverrideMachinePoolPlatformImmutableAnnotation] = ""
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 1),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 1),
+			},
+		},
+		{
 			name:        "No cluster deployment",
 			machinePool: testMachinePool(),
 			remoteExisting: []runtime.Object{
@@ -1053,6 +1079,7 @@ func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
 		AMI: machineapi.AWSResourceReference{
 			ID: aws.String(testAMI),
 		},
+		InstanceType: testInstanceType,
 	}
 }
 

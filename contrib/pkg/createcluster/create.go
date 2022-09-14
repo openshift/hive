@@ -34,6 +34,7 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
+	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -119,6 +120,10 @@ var (
 		cloudOpenStack: true,
 		cloudOVirt:     true,
 		cloudVSphere:   true,
+	}
+	manualCCOModeClouds = map[string]bool{
+		cloudAlibaba: true,
+		cloudIBM:     true,
 	}
 )
 
@@ -266,6 +271,13 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	}
 	sort.Strings(clouds)
 
+	manualModeClouds := []string{}
+	for cloud, manual := range manualCCOModeClouds {
+		if manual {
+			manualModeClouds = append(manualModeClouds, cloud)
+		}
+	}
+
 	flags := cmd.Flags()
 	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, fmt.Sprintf("Cloud provider: %s", strings.Join(clouds, "|")))
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
@@ -278,8 +290,9 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2
 	flags.StringVar(&opt.HibernateAfter, "hibernate-after", "", "Automatically hibernate the cluster whenever it has been running for the given duration")
 	flags.StringVar(&opt.PullSecretFile, "pull-secret-file", defaultPullSecretFile, "Pull secret file for cluster")
 	flags.StringVar(&opt.BoundServiceAccountSigningKeyFile, "bound-service-account-signing-key-file", "", "Private service account signing key (often created with ccoutil create key-pair)")
-	flags.BoolVar(&opt.CredentialsModeManual, "credentials-mode-manual", false, "Configure the Cloud Credential Operator in the target cluster to Manual mode. Implies the use of --manifests to inject custom Secrets for all CredentialsRequests in the cluster.")
-
+	flags.BoolVar(&opt.CredentialsModeManual, "credentials-mode-manual", false, fmt.Sprintf(`Configure the Cloud Credential Operator in the target cluster to Manual mode.
+Implies the use of --manifests to inject custom Secrets for all CredentialsRequests in the cluster.
+This option is redundant (but permitted) for following clouds, which always use manual mode: %s`, strings.Join(manualModeClouds, "|")))
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
@@ -383,6 +396,11 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 		o.HibernateAfterDur = &dur
 	}
 
+	if manualCloud := manualCCOModeClouds[o.Cloud]; manualCloud && !o.CredentialsModeManual {
+		o.CredentialsModeManual = true
+		o.log.Infof("Using Manual credentials mode for cloud=%s", o.Cloud)
+	}
+
 	return nil
 }
 
@@ -409,14 +427,6 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("unsupported cloud: %s", o.Cloud)
 	}
 
-	if o.Cloud == cloudAlibaba {
-		if !o.CredentialsModeManual {
-			msg := fmt.Sprintf("--credentials-mode-manual must be set when using --cloud=%q", cloudAlibaba)
-			o.log.Info(msg)
-			return fmt.Errorf(msg)
-		}
-	}
-
 	if o.Cloud == cloudOpenStack {
 		if o.OpenStackAPIFloatingIP == "" {
 			msg := fmt.Sprintf("--openstack-api-floating-ip must be set when using --cloud=%q", cloudOpenStack)
@@ -430,18 +440,8 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		}
 	}
 
-	if o.Cloud == cloudIBM {
-		if !o.CredentialsModeManual {
-			msg := fmt.Sprintf("--credentials-mode-manual must be set when using --cloud=%q", cloudIBM)
-			o.log.Info(msg)
-			return fmt.Errorf(msg)
-		}
-	}
-
-	if o.CredentialsModeManual {
-		if o.ManifestsDir == "" {
-			return fmt.Errorf("--credentials-mode-manual requires --manifests containing custom Secrets with manually provisioned credentials")
-		}
+	if o.CredentialsModeManual && o.ManifestsDir == "" {
+		return fmt.Errorf("Manual credentials mode requires --manifests containing custom Secrets with manually provisioned credentials")
 	}
 
 	if o.AWSPrivateLink && o.Cloud != cloudAWS {
@@ -616,6 +616,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			return nil, fmt.Errorf("error reading %s: %v", o.BoundServiceAccountSigningKeyFile, err)
 		}
 		builder.BoundServiceAccountSigningKey = string(signingKey)
+	}
+	if o.CredentialsModeManual {
+		builder.CredentialsMode = installertypes.ManualCredentialsMode
 	}
 
 	switch o.Cloud {

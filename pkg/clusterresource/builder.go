@@ -85,7 +85,7 @@ type Builder struct {
 
 	// CredentailsMode is the Cloud Credential Operator mode to force in the generated install-config.
 	// Typically left unset for the default ('Mint' mode), or set to 'Manual'.
-	CredentialsMode string
+	CredentialsMode installertypes.CredentialsMode
 
 	// Adopt is a flag indicating we're adopting a pre-existing cluster.
 	Adopt bool
@@ -399,6 +399,10 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 		},
 		AdditionalTrustBundle: o.AdditionalTrustBundle,
 		Publish:               installertypes.PublishingStrategy(o.PublishStrategy),
+	}
+
+	if o.CredentialsMode != "" {
+		installConfig.CredentialsMode = o.CredentialsMode
 	}
 
 	o.CloudBuilder.addInstallConfigPlatform(o, installConfig)

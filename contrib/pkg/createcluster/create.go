@@ -398,7 +398,7 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 
 	if manualCloud := manualCCOModeClouds[o.Cloud]; manualCloud && !o.CredentialsModeManual {
 		o.CredentialsModeManual = true
-		o.log.Infof("Defaulting credentials mode to Manual for cloud=%s", o.Cloud)
+		o.log.Infof("Using Manual credentials mode for cloud=%s", o.Cloud)
 	}
 
 	return nil

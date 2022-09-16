@@ -3,6 +3,8 @@ package clusterprovision
 import (
 	"context"
 	"fmt"
+	"gopkg.in/yaml.v2"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,6 +34,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
+	installertypes "github.com/openshift/installer/pkg/types"
 )
 
 const (
@@ -449,6 +452,9 @@ func (r *ReconcileClusterProvision) transitionStage(
 	if err := r.setCondition(instance, conditionType, corev1.ConditionTrue, reason, message, controllerutils.UpdateConditionAlways, pLog); err != nil {
 		return reconcile.Result{}, err
 	}
+	if stage == hivev1.ClusterProvisionStageFailed || stage == hivev1.ClusterProvisionStageComplete {
+		r.logProvisionSuccessFailureMetric(stage, instance)
+	}
 	if err := r.setStage(instance, stage, pLog); err != nil {
 		return reconcile.Result{}, err
 	}
@@ -582,4 +588,47 @@ func (r *ReconcileClusterProvision) deleteInstallJob(provision *hivev1.ClusterPr
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
+}
+
+// getWorkers fetches the number of worker replicas from the installConfig, and reports "unknown" if not available
+func (r *ReconcileClusterProvision) getWorkers(cd hivev1.ClusterDeployment) string {
+	icSecret := &corev1.Secret{}
+	err := r.Get(context.Background(),
+		types.NamespacedName{
+			Namespace: cd.Namespace,
+			Name:      cd.Spec.Provisioning.InstallConfigSecretRef.Name,
+		},
+		icSecret)
+	if err != nil {
+		r.logger.WithError(err).Error("Error loading install config secret")
+		return "unknown"
+	}
+	ic := &installertypes.InstallConfig{}
+	if err := yaml.Unmarshal(icSecret.Data["install-config.yaml"], &ic); err != nil {
+		r.logger.WithError(err).Error("could not unmarshal InstallConfig")
+		return "unknown"
+	}
+	return strconv.FormatInt(*ic.WorkerMachinePool().Replicas, 10)
+}
+
+func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
+	stage hivev1.ClusterProvisionStage, instance *hivev1.ClusterProvision) {
+	cd := &hivev1.ClusterDeployment{}
+	if err := r.Client.Get(context.Background(), types.NamespacedName{Namespace: instance.Namespace,
+		Name: instance.Spec.ClusterDeploymentRef.Name}, cd); err != nil {
+		r.logger.WithError(err).Error("error getting cluster deployment")
+		return
+	}
+	timeMetric := metricInstallFailureSeconds
+	if stage == hivev1.ClusterProvisionStageComplete {
+		timeMetric = metricInstallSuccessSeconds
+	}
+	timeMetric.WithLabelValues(
+		hivemetrics.GetClusterDeploymentType(cd),
+		cd.Labels[hivev1.HiveClusterPlatformLabel],
+		cd.Labels[hivev1.HiveClusterRegionLabel],
+		*cd.Status.InstallVersion,
+		r.getWorkers(*cd),
+		strconv.Itoa(instance.Spec.Attempt),
+	).Observe(time.Since(instance.CreationTimestamp.Time).Seconds())
 }

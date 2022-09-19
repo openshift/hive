@@ -17,6 +17,10 @@ spec:
         control-plane: clustersync
         controller-tools.k8s.io: "1.0"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
@@ -72,3 +76,7 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]

@@ -113,3 +113,7 @@ func (a *IBMCloudActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, poo
 
 	return installerMachineSets, true, nil
 }
+
+func (a *IBMCloudActuator) MachineProviderSpecEqual(want *runtime.RawExtension, got *runtime.RawExtension, logger log.FieldLogger) (bool, error) {
+	return true, errors.New("MachineProviderSpecEqual is not implemented for the IBM Cloud actuator")
+}

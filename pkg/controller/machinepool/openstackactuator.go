@@ -226,3 +226,7 @@ func (opts *yamlOptsBuilder) updateTrust(cloud string, trust []byte) error {
 	opts.cloudYaml[cloud] = conf
 	return nil
 }
+
+func (a *OpenStackActuator) MachineProviderSpecEqual(want *runtime.RawExtension, got *runtime.RawExtension, logger log.FieldLogger) (bool, error) {
+	return true, errors.New("MachineProviderSpecEqual is not implemented for the OpenStack actuator")
+}

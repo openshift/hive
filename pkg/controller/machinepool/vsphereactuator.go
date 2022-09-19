@@ -103,3 +103,7 @@ func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme
 	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
 	return osImage, nil
 }
+
+func (a *VSphereActuator) MachineProviderSpecEqual(want *runtime.RawExtension, got *runtime.RawExtension, logger log.FieldLogger) (bool, error) {
+	return true, errors.New("MachineProviderSpecEqual is not implemented for the VSphere actuator")
+}

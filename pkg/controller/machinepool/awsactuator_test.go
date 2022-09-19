@@ -31,6 +31,8 @@ import (
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+
+	nested "github.com/antonfisher/nested-logrus-formatter"
 )
 
 const (
@@ -418,7 +420,7 @@ func TestAWSActuator(t *testing.T) {
 			machinePool:       testMachinePool(),
 			masterMachine: func() *machineapi.Machine {
 				m := testMachine("master0", "master")
-				awsMachineProviderConfig := testAWSProviderSpec()
+				awsMachineProviderConfig := testAWSProviderSpec(testInstanceType)
 				awsMachineProviderConfig.AMI = machineapi.AWSResourceReference{
 					Filters: []machineapi.Filter{
 						{
@@ -798,4 +800,61 @@ func withSpotMarketOptions(pool *hivev1.MachinePool) *hivev1.MachinePool {
 func withKMSKey(pool *hivev1.MachinePool) *hivev1.MachinePool {
 	pool.Spec.Platform.AWS.EC2RootVolume.KMSKeyARN = fakeKMSKeyARN
 	return pool
+}
+
+func TestAWSMachineProviderSpecEqual(t *testing.T) {
+	tests := []struct {
+		name              string
+		clusterDeployment *hivev1.ClusterDeployment
+		machinePool       *hivev1.MachinePool
+		wantMachineSet    *machineapi.MachineSet
+		gotMachineSet     *machineapi.MachineSet
+		expectEqual       bool
+		expectedErr       bool
+	}{
+		{
+			name:              "providerSpecs are equal",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			wantMachineSet:    testMachineSet("foo-12345-other-us-east-1a", "other", testInstanceType, true, 1, 0),
+			gotMachineSet:     testMachineSet("foo-12345-other-us-east-1a", "other", testInstanceType, true, 1, 0),
+			expectEqual:       true,
+		},
+		{
+			name:              "providerSpecs are not equal, different instanceType",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			wantMachineSet:    testMachineSet("foo-12345-other-us-east-1a", "other", "cheese.4xlarge", true, 1, 0),
+			gotMachineSet:     testMachineSet("foo-12345-other-us-east-1a", "other", testInstanceType, true, 1, 0),
+			expectEqual:       false,
+		},
+	}
+
+	for _, test := range tests {
+		logger := log.StandardLogger()
+		logger.SetFormatter(&nested.Formatter{
+			HideKeys: true,
+		})
+
+		actuator, err := NewAWSActuator(nil, awsclient.CredentialsSource{}, "", test.machinePool, testMachine("master0", "master"), nil, logger)
+		assert.NoError(t, err)
+		t.Run(test.name, func(t *testing.T) {
+
+			equal, err := actuator.MachineProviderSpecEqual(test.wantMachineSet.Spec.Template.Spec.ProviderSpec.Value,
+				test.gotMachineSet.Spec.Template.Spec.ProviderSpec.Value,
+				nil)
+
+			if test.expectedErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if test.expectEqual {
+				assert.True(t, equal)
+			} else {
+				assert.False(t, equal)
+			}
+		})
+	}
 }

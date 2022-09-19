@@ -11,6 +11,7 @@ import (
 	v1beta1 "github.com/openshift/api/machine/v1beta1"
 	v1 "github.com/openshift/hive/apis/hive/v1"
 	logrus "github.com/sirupsen/logrus"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // MockActuator is a mock of Actuator interface.
@@ -50,4 +51,19 @@ func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.
 func (mr *MockActuatorMockRecorder) GenerateMachineSets(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateMachineSets", reflect.TypeOf((*MockActuator)(nil).GenerateMachineSets), arg0, arg1, arg2)
+}
+
+// MachineProviderSpecEqual mocks base method.
+func (m *MockActuator) MachineProviderSpecEqual(arg0, arg1 *runtime.RawExtension, arg2 logrus.FieldLogger) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MachineProviderSpecEqual", arg0, arg1, arg2)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MachineProviderSpecEqual indicates an expected call of MachineProviderSpecEqual.
+func (mr *MockActuatorMockRecorder) MachineProviderSpecEqual(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MachineProviderSpecEqual", reflect.TypeOf((*MockActuator)(nil).MachineProviderSpecEqual), arg0, arg1, arg2)
 }

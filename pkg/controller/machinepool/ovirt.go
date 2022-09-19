@@ -140,3 +140,7 @@ func decodeOvirtMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtim
 	}
 	return spec, nil
 }
+
+func (a *OvirtActuator) MachineProviderSpecEqual(want *runtime.RawExtension, got *runtime.RawExtension, logger log.FieldLogger) (bool, error) {
+	return true, errors.New("MachineProviderSpecEqual is not implemented for the OVirt actuator")
+}

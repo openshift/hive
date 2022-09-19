@@ -342,7 +342,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return *result, nil
 	}
 
-	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, remoteClusterAPIClient, logger)
+	machineSets, err := r.syncMachineSets(pool, cd, masterMachine, generatedMachineSets, remoteMachineSets, remoteClusterAPIClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineSets")
 		return reconcile.Result{}, err
@@ -526,6 +526,7 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 func (r *ReconcileMachinePool) syncMachineSets(
 	pool *hivev1.MachinePool,
 	cd *hivev1.ClusterDeployment,
+	masterMachine *machineapi.Machine,
 	generatedMachineSets []*machineapi.MachineSet,
 	remoteMachineSets *machineapi.MachineSetList,
 	remoteClusterAPIClient client.Client,
@@ -600,7 +601,16 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				// Update if the providerspec on the remote machineset is different than the generated machineset providerspec.
 				// This update is only allowed if the override annotation is present on the machinepool.
 				if _, overridePlatformImmutable := pool.Annotations[constants.OverrideMachinePoolPlatformImmutableAnnotation]; overridePlatformImmutable {
-					if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec, ms.Spec.Template.Spec.ProviderSpec) {
+					actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, logger)
+					if err != nil {
+						logger.WithError(err).Error("unable to create actuator")
+						return nil, err
+					}
+					equal, err := actuator.MachineProviderSpecEqual(rMS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value, logger)
+					if err != nil {
+						return nil, err
+					}
+					if !equal {
 						msLog.Info("platform out of sync")
 						rMS.Spec.Template.Spec.ProviderSpec = ms.Spec.Template.Spec.ProviderSpec
 						objectModified = true

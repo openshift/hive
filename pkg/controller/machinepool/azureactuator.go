@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	installazure "github.com/openshift/installer/pkg/asset/machines/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -193,4 +194,8 @@ func (a *AzureActuator) gen2ImageExists(infraID, resourceGroupName string) (bool
 		}
 	}
 	return false, nil
+}
+
+func (a *AzureActuator) MachineProviderSpecEqual(want *runtime.RawExtension, got *runtime.RawExtension, logger log.FieldLogger) (bool, error) {
+	return true, errors.New("MachineProviderSpecEqual is not implemented for the Azure actuator")
 }

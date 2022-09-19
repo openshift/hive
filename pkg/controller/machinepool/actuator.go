@@ -2,6 +2,7 @@ package machinepool
 
 import (
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
@@ -19,4 +20,6 @@ type Actuator interface {
 	// or not, and an error. The boolean may be set in situations where we have not encountered an error, but still need
 	// to wait before we can proceed with reconciling. (e.g. obtaining a pool name lease)
 	GenerateMachineSets(*hivev1.ClusterDeployment, *hivev1.MachinePool, log.FieldLogger) (msets []*machineapi.MachineSet, proceed bool, genError error)
+
+	MachineProviderSpecEqual(*runtime.RawExtension, *runtime.RawExtension, log.FieldLogger) (bool, error)
 }

@@ -2,6 +2,7 @@ package machinepool
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
@@ -147,4 +148,8 @@ func getAlibabaCloudImageID(masterMachine *machineapi.Machine, logger log.FieldL
 	imageID := providerSpec.ImageID
 	logger.WithField("image", imageID).Debug("resolved image to use for new machinesets")
 	return imageID, nil
+}
+
+func (a *AlibabaCloudActuator) MachineProviderSpecEqual(want *runtime.RawExtension, got *runtime.RawExtension, logger log.FieldLogger) (bool, error) {
+	return true, errors.New("MachineProviderSpecEqual is not implemented for the Alibaba Cloud actuator")
 }

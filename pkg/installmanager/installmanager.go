@@ -90,6 +90,8 @@ const (
 	defaultPullSecretMountPath          = "/pullsecret/" + corev1.DockerConfigJsonKey
 	defaultManifestsMountPath           = "/manifests"
 	defaultHomeDir                      = "/home/hive" // Used if no HOME env var set.
+	installConfigKeyName                = "install-config"
+	clusterConfigYAML                   = "cluster-config.yaml"
 )
 
 var (
@@ -856,6 +858,13 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 			return err
 		}
 		m.log.Infof("copied %s to %s", src, dest)
+	}
+
+	if effectiveMode, ok := cd.Annotations[constants.OverrideInClusterCredentialsModeAnnotation]; ok {
+		if err := m.overrideCredentialsModeOnInstallConfig(effectiveMode); err != nil {
+			m.log.WithError(err).Error("error overriding credentials mode on install config")
+			return err
+		}
 	}
 
 	m.log.Info("running openshift-install create ignition-configs")
@@ -1688,4 +1697,49 @@ func getHomeDir() string {
 		return home
 	}
 	return defaultHomeDir
+}
+
+func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode string) error {
+	clusterConfigPath := filepath.Join(m.WorkDir, "manifests", clusterConfigYAML)
+	clusterConfigBytes, err := ioutil.ReadFile(clusterConfigPath)
+	if err != nil {
+		return errors.Wrap(err, "error reading install config")
+	}
+
+	clusterConfig := &corev1.ConfigMap{}
+	if err := yaml.Unmarshal(clusterConfigBytes, clusterConfig); err != nil {
+		return errors.Wrap(err, "failed to decode cluster config")
+	}
+
+	data, ok := clusterConfig.Data[installConfigKeyName]
+	if !ok {
+		return fmt.Errorf("did not find key %s in data of cluster-config configmap", installConfigKeyName)
+	}
+
+	installConfig := &installertypes.InstallConfig{}
+	if err := yaml.Unmarshal([]byte(data), installConfig); err != nil {
+		return errors.Wrap(err, "failed to unmarshal install config")
+	}
+
+	installConfig.CredentialsMode = installertypes.CredentialsMode(credentialsMode)
+
+	installConfigBytes, err := yaml.Marshal(installConfig)
+	if err != nil {
+		return errors.Wrap(err, "error marshalling install config")
+	}
+
+	clusterConfig.Data[installConfigKeyName] = string(installConfigBytes)
+
+	clusterConfigBytes, err = yaml.Marshal(clusterConfig)
+	if err != nil {
+		return errors.Wrap(err, "error marshalling cluster config")
+	}
+
+	if err := ioutil.WriteFile(clusterConfigPath, clusterConfigBytes, 0644); err != nil {
+		return errors.Wrap(err, "error writing install-config.yaml")
+	}
+
+	m.log.WithField("newMode", credentialsMode).Info("overrode effective in-cluster credentials mode")
+
+	return nil
 }

@@ -35,7 +35,6 @@ func TestGenerateDeprovision(t *testing.T) {
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTPS_PROXY", testHttpsProxy)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "NO_PROXY", testNoProxy)
-	hiveassert.AssertSecurityContexts(t, &job.Spec.Template.Spec)
 }
 
 func testClusterDeprovision() *hivev1.ClusterDeprovision {
@@ -125,8 +124,6 @@ func TestInstallerPodSpec(t *testing.T) {
 			hiveassert.AssertAllContainersHaveEnvVar(t, actualPodSpec, "HTTP_PROXY", testHttpProxy)
 			hiveassert.AssertAllContainersHaveEnvVar(t, actualPodSpec, "HTTPS_PROXY", testHttpsProxy)
 			hiveassert.AssertAllContainersHaveEnvVar(t, actualPodSpec, "NO_PROXY", testNoProxy)
-			hiveassert.AssertSecurityContexts(t, actualPodSpec)
-
 		})
 	}
 }

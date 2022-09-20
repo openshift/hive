@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -386,34 +385,6 @@ func SetProxyEnvVars(podSpec *corev1.PodSpec, httpProxy, httpsProxy, noProxy str
 	}
 	if noProxy != "" {
 		setEnvVarOnContainers(podSpec, "NO_PROXY", noProxy)
-	}
-}
-
-func applyContainerSecurity(c *corev1.Container) {
-	c.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: pointer.Bool(false),
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{"ALL"},
-		},
-		RunAsNonRoot: pointer.Bool(true),
-	}
-
-}
-
-// ApplyPodSecurity ensures that the pod and its containers have explicit restrictive securityContext
-// to conform to pod security admission rules.
-func ApplyPodSecurity(podSpec *corev1.PodSpec) {
-	podSpec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsNonRoot: pointer.Bool(true),
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
-	}
-	for i := range podSpec.InitContainers {
-		applyContainerSecurity(&podSpec.InitContainers[i])
-	}
-	for i := range podSpec.Containers {
-		applyContainerSecurity(&podSpec.Containers[i])
 	}
 }
 

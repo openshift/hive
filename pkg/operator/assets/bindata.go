@@ -143,10 +143,6 @@ spec:
         control-plane: clustersync
         controller-tools.k8s.io: "1.0"
     spec:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
@@ -202,10 +198,6 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
 `)
 
 func configClustersyncStatefulsetYamlBytes() ([]byte, error) {
@@ -430,10 +422,6 @@ spec:
         app: hiveadmission
         hiveadmission: "true"
     spec:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hiveadmission
       containers:
       - name: hiveadmission
@@ -459,10 +447,6 @@ spec:
             path: /healthz
             port: 9443
             scheme: HTTPS
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
       volumes:
       - name: serving-cert
         secret:
@@ -840,10 +824,6 @@ spec:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hive-controllers
       volumes:
       - name: kubectl-cache
@@ -880,10 +860,6 @@ spec:
           httpGet:
             path: /healthz
             port: 8080
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
       terminationGracePeriodSeconds: 10
 `)
 

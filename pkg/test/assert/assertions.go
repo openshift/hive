@@ -45,34 +45,6 @@ func AssertAllContainersHaveEnvVar(t *testing.T, podSpec *corev1.PodSpec, key, v
 	}
 }
 
-func assertContainerSecurityContext(t *testing.T, c *corev1.Container) {
-	sc := c.SecurityContext
-	if testifyassert.NotNil(t, sc, "container %s must have securityContext", c.Name) {
-		if testifyassert.NotNil(t, sc.AllowPrivilegeEscalation, "container %s must set allowPrivilegeEscalation", c.Name) {
-			testifyassert.False(t, *sc.AllowPrivilegeEscalation, "container %s allowPrivilegeEscalation should be &false", c.Name)
-		}
-		if testifyassert.NotNil(t,
-			sc.Capabilities, "container %s capabilities should be populated", c.Name) &&
-			testifyassert.NotNil(t, sc.Capabilities.Drop, "container %s capabilities should have 'drop'", c.Name) &&
-			testifyassert.Equal(t, 1, len(sc.Capabilities.Drop), "container %s capabilities.drop should have exactly one element", c.Name) {
-			testifyassert.Equal(t, corev1.Capability("ALL"), sc.Capabilities.Drop[0], "container %s should drop ALL capabilities", c.Name)
-		}
-		testifyassert.True(t, *sc.RunAsNonRoot, "container runAsNonRoot should be &true")
-	}
-}
-
-func AssertSecurityContexts(t *testing.T, podSpec *corev1.PodSpec) {
-	sc := podSpec.SecurityContext
-	testifyassert.True(t, *sc.RunAsNonRoot, "pod runAsNonRoot should be &true")
-	testifyassert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, sc.SeccompProfile.Type, "pod seccompProfile type should be RuntimeDefault")
-	for _, c := range podSpec.InitContainers {
-		assertContainerSecurityContext(t, &c)
-	}
-	for _, c := range podSpec.Containers {
-		assertContainerSecurityContext(t, &c)
-	}
-}
-
 // findClusterDeploymentCondition finds the specified condition type in the given list of cluster deployment conditions.
 // If none exists, then returns nil.
 func findClusterDeploymentCondition(conditions []hivev1.ClusterDeploymentCondition, conditionType hivev1.ClusterDeploymentConditionType) *hivev1.ClusterDeploymentCondition {

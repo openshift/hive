@@ -21,10 +21,6 @@ spec:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hive-controllers
       volumes:
       - name: kubectl-cache
@@ -61,8 +57,4 @@ spec:
           httpGet:
             path: /healthz
             port: 8080
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
       terminationGracePeriodSeconds: 10

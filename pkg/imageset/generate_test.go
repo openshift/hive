@@ -26,7 +26,6 @@ func TestGenerateImageSetJob(t *testing.T) {
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTPS_PROXY", testHttpsProxy)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "NO_PROXY", testNoProxy)
-	hiveassert.AssertSecurityContexts(t, &job.Spec.Template.Spec)
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

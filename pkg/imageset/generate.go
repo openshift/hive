@@ -122,7 +122,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 		},
 	}
 	controllerutils.AddLogFieldsEnvVar(cd, job)
-	controllerutils.ApplyPodSecurity(&job.Spec.Template.Spec)
+
 	return job
 }
 

@@ -25,10 +25,6 @@ spec:
         app: hiveadmission
         hiveadmission: "true"
     spec:
-      securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hiveadmission
       containers:
       - name: hiveadmission
@@ -54,10 +50,6 @@ spec:
             path: /healthz
             port: 9443
             scheme: HTTPS
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
       volumes:
       - name: serving-cert
         secret:

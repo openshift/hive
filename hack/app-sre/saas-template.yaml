@@ -7232,9 +7232,18 @@ objects:
             requests:
               cpu: 100m
               memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           volumeMounts:
           - mountPath: /var/cache/kubectl
             name: kubectl-cache
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
         serviceAccountName: hive-operator
         terminationGracePeriodSeconds: 10
         volumes:

@@ -362,6 +362,7 @@ func InstallerPodSpec(
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
 	}
 	controllerutils.SetProxyEnvVars(podSpec, httpProxy, httpsProxy, noProxy)
+	controllerutils.ApplyPodSecurity(podSpec)
 	return podSpec, nil
 }
 
@@ -479,7 +480,7 @@ func GenerateUninstallerJobForDeprovision(
 	}
 	controllerutils.SetProxyEnvVars(&job.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
 	controllerutils.AddLogFieldsEnvVar(req, job)
-
+	controllerutils.ApplyPodSecurity(&job.Spec.Template.Spec)
 	return job, nil
 }
 

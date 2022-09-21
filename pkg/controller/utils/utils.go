@@ -395,7 +395,7 @@ func applyContainerSecurity(c *corev1.Container) {
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		RunAsNonRoot: pointer.Bool(true),
+		RunAsUser: pointer.Int64Ptr(1000620001),
 	}
 
 }
@@ -404,7 +404,7 @@ func applyContainerSecurity(c *corev1.Container) {
 // to conform to pod security admission rules.
 func ApplyPodSecurity(podSpec *corev1.PodSpec) {
 	podSpec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsNonRoot: pointer.Bool(true),
+		RunAsUser: pointer.Int64Ptr(1000620001),
 	}
 	for i := range podSpec.InitContainers {
 		applyContainerSecurity(&podSpec.InitContainers[i])

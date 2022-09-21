@@ -61,6 +61,14 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
+	aliutils "github.com/openshift/hive/contrib/pkg/utils/alibabacloud"
+	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
+	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
+	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
+	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
+	ovirtutils "github.com/openshift/hive/contrib/pkg/utils/ovirt"
+	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool"
@@ -115,6 +123,7 @@ type InstallManager struct {
 	PullSecretMountPath              string
 	ManifestsMountPath               string
 	DynamicClient                    client.Client
+	loadSecrets                      func(*InstallManager, *hivev1.ClusterDeployment)
 	cleanupFailedProvision           func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision           func(*InstallManager, provisionMutation) error
 	readClusterMetadata              func(*InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
@@ -200,6 +209,7 @@ SSH_PRIV_KEY_PATH: File system path of a file containing the SSH private key cor
 // ...except for the clusterProvision field. That's loaded up by Run(), since it involves a REST call.
 func (m *InstallManager) Complete(args []string) error {
 	// Connect up structure's function pointers
+	m.loadSecrets = loadSecrets
 	m.updateClusterProvision = updateClusterProvisionWithRetries
 	m.readClusterMetadata = readClusterMetadata
 	m.uploadAdminKubeconfig = uploadAdminKubeconfig
@@ -273,6 +283,8 @@ func (m *InstallManager) Run() error {
 		m.log.Warn("cluster is already installed, exiting")
 		os.Exit(0)
 	}
+
+	m.loadSecrets(m, cd)
 
 	// sshKeyPaths will contain paths to all ssh keys in use
 	var sshKeyPaths []string
@@ -511,6 +523,61 @@ func (m *InstallManager) Run() error {
 	m.log.Info("install completed successfully")
 
 	return nil
+}
+
+func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
+	// Configure credentials (including certs) appropriately according to the cloud provider
+	switch {
+	case cd.Spec.Platform.AlibabaCloud != nil:
+		aliutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.AWS != nil:
+		awsutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.Azure != nil:
+		azureutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.GCP != nil:
+		gcputils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.OpenStack != nil:
+		openstackutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.VSphere != nil:
+		vsphereutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.Ovirt != nil:
+		ovirtutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.IBMCloud != nil:
+		ibmutils.ConfigureCreds(m.DynamicClient)
+	}
+
+	// Load up the install config and pull secret. These env vars are required; else we'll panic.
+	contributils.ProjectToDir(contributils.LoadSecretOrDie(m.DynamicClient, "INSTALLCONFIG_SECRET_NAME"), "/installconfig")
+	contributils.ProjectToDir(contributils.LoadSecretOrDie(m.DynamicClient, "PULLSECRET_SECRET_NAME"), "/pullsecret")
+
+	// Additional manifests? Could come in on a Secret or a ConfigMap
+	if manSecret := contributils.LoadSecretOrDie(m.DynamicClient, "MANIFESTS_SECRET_NAME"); manSecret != nil {
+		contributils.ProjectToDir(manSecret, "/manifests")
+	} else if manCM := contributils.LoadConfigMapOrDie(m.DynamicClient, "MANIFESTS_CONFIGMAP_NAME"); manCM != nil {
+		contributils.ProjectToDir(manCM, "/manifests")
+	}
+
+	// Custom BoundServiceAccountSigningKey
+	if bsask := contributils.LoadSecretOrDie(m.DynamicClient, "BOUND_TOKEN_SIGNING_KEY_SECRET_NAME"); bsask != nil {
+		contributils.ProjectToDir(bsask, constants.BoundServiceAccountSigningKeyDir, constants.BoundServiceAccountSigningKeyFile)
+		os.Setenv(constants.BoundServiceAccountSigningKeyEnvVar,
+			constants.BoundServiceAccountSigningKeyDir+"/"+constants.BoundServiceAccountSigningKeyFile)
+	}
+
+	// SSH private key
+	if sshkey := contributils.LoadSecretOrDie(m.DynamicClient, "SSH_PRIVATE_KEY_SECRET_PATH"); sshkey != nil {
+		contributils.ProjectToDir(sshkey, constants.SSHPrivateKeyDir)
+		// TODO: Collapse this in initSSHKey
+		os.Setenv(constants.SSHPrivKeyPathEnvVar,
+			constants.SSHPrivateKeyDir+"/"+constants.SSHPrivateKeySecretKey)
+	}
+
+	// BareMetal Libvirt SSH private key
+	if sshkey := contributils.LoadSecretOrDie(m.DynamicClient, "LIBVIRT_SSH_KEYS_SECRET_NAME"); sshkey != nil {
+		contributils.ProjectToDir(sshkey, constants.LibvirtSSHPrivateKeyDir)
+		os.Setenv(constants.LibvirtSSHPrivKeyPathEnvVar,
+			constants.LibvirtSSHPrivateKeyDir+"/"+constants.SSHPrivateKeySecretKey)
+	}
 }
 
 func getActuator() LogUploaderActuator {

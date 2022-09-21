@@ -199,6 +199,8 @@ func TestInstallManager(t *testing.T) {
 			}
 			im.Complete([]string{})
 
+			im.loadSecrets = func(*InstallManager, *hivev1.ClusterDeployment) {}
+
 			im.waitForProvisioningStage = func(*InstallManager) error { return nil }
 
 			if !assert.NoError(t, writeFakeBinary(filepath.Join(tempDir, installerBinary),

@@ -1,9 +1,13 @@
 package alibabacloud
 
 import (
+	"os"
+
+	"github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	ini "gopkg.in/ini.v1"
-	"os"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GetAlibabaCloud Creds reads Alibaba Cloud credentials either from either the specified credentials
@@ -37,4 +41,19 @@ func GetAlibabaCloud(credsFile, defaultCredsFile string) (string, string, error)
 		log.Error("Alibaba Cloud credentials file missing keys in default section")
 	}
 	return accessKeyIDValue.String(), accessKeySecretValue.String(), nil
+}
+
+// ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE
+// and CREDS_SECRET_NAME and configures alibaba cloud credential environment variables accordingly.
+func ConfigureCreds(c client.Client) {
+	credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME")
+	if credsSecret == nil {
+		return
+	}
+	if id := string(credsSecret.Data[constants.AlibabaCloudAccessKeyIDSecretKey]); id != "" {
+		os.Setenv("ALIBABA_CLOUD_ACCESS_KEY_ID", id)
+	}
+	if secret := string(credsSecret.Data[constants.AlibabaCloudAccessKeySecretSecretKey]); secret != "" {
+		os.Setenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", secret)
+	}
 }

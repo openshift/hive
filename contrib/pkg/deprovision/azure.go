@@ -28,13 +28,13 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 		Short: "Deprovision Azure assets (as created by openshift-installer)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := validate(); err != nil {
-				log.WithError(err).Fatal("Failed validating Azure credentials")
-			}
 			uninstaller, err := completeAzureUninstaller(opt.logLevel, opt.cloudName, args)
 			if err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
+			}
+			if err := validate(); err != nil {
+				log.WithError(err).Fatal("Failed validating Azure credentials")
 			}
 
 			// ClusterQuota stomped in return
@@ -64,6 +64,12 @@ func completeAzureUninstaller(logLevel, cloudName string, args []string) (provid
 	if err != nil {
 		return nil, err
 	}
+
+	client, err := utils.GetClient()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get client")
+	}
+	azureutils.ConfigureCreds(client)
 
 	metadata := &types.ClusterMetadata{
 		InfraID: args[0],

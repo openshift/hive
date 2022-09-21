@@ -1,9 +1,14 @@
 package aws
 
 import (
+	"os"
+	"path/filepath"
+
+	"github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	ini "gopkg.in/ini.v1"
-	"os"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GetAWSCreds reads AWS credentials either from either the specified credentials file,
@@ -38,4 +43,28 @@ func GetAWSCreds(credsFile, defaultCredsFile string) (string, string, error) {
 		log.Error("AWS credentials file missing keys in default section")
 	}
 	return accessKeyIDValue.String(), secretAccessKeyValue.String(), nil
+}
+
+// ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE
+// and CREDS_SECRET_NAME and configures AWS credential environment variables and config files
+// accordingly.
+func ConfigureCreds(c client.Client) {
+	credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME")
+	if credsSecret == nil {
+		return
+	}
+	// Should we bounce if any of the following already exist?
+	if id := string(credsSecret.Data[constants.AWSAccessKeyIDSecretKey]); id != "" {
+		os.Setenv("AWS_ACCESS_KEY_ID", id)
+	}
+	if secret := string(credsSecret.Data[constants.AWSSecretAccessKeySecretKey]); secret != "" {
+		os.Setenv("AWS_SECRET_ACCESS_KEY", secret)
+	}
+	if config := credsSecret.Data[constants.AWSConfigSecretKey]; len(config) != 0 {
+		// Lay this down as a file
+		utils.ProjectToDir(credsSecret, constants.AWSCredsMount, constants.AWSConfigSecretKey)
+		os.Setenv("AWS_CONFIG_FILE", filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey))
+	}
+	// Allow credential_process in the config file
+	os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
 }

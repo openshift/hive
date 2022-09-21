@@ -5,10 +5,17 @@
 
 FROM hive-fedora-dev-base:latest
 
+RUN mkdir -p /opt/services
+
 ADD bin/hiveadmission /opt/services/
 ADD bin/operator /opt/services/hive-operator
 ADD bin/manager /opt/services/
 ADD bin/hiveutil /usr/bin/
+
+RUN chgrp -R 0 /opt/services && \
+    chmod -R g=u /opt/services && \
+    chgrp 0 /usr/bin/hiveutil && \
+    chmod g=u /usr/bin/hiveutil
 
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

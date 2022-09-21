@@ -27,8 +27,6 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hiveadmission
       containers:
       - name: hiveadmission

@@ -23,8 +23,6 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hive-controllers
       volumes:
       - name: kubectl-cache

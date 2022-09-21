@@ -7242,8 +7242,6 @@ objects:
             name: kubectl-cache
         securityContext:
           runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
         serviceAccountName: hive-operator
         terminationGracePeriodSeconds: 10
         volumes:

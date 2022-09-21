@@ -64,7 +64,6 @@ func assertContainerSecurityContext(t *testing.T, c *corev1.Container) {
 func AssertSecurityContexts(t *testing.T, podSpec *corev1.PodSpec) {
 	sc := podSpec.SecurityContext
 	testifyassert.True(t, *sc.RunAsNonRoot, "pod runAsNonRoot should be &true")
-	testifyassert.Equal(t, corev1.SeccompProfileTypeRuntimeDefault, sc.SeccompProfile.Type, "pod seccompProfile type should be RuntimeDefault")
 	for _, c := range podSpec.InitContainers {
 		assertContainerSecurityContext(t, &c)
 	}

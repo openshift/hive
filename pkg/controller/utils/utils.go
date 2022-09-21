@@ -405,9 +405,6 @@ func applyContainerSecurity(c *corev1.Container) {
 func ApplyPodSecurity(podSpec *corev1.PodSpec) {
 	podSpec.SecurityContext = &corev1.PodSecurityContext{
 		RunAsNonRoot: pointer.Bool(true),
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
 	}
 	for i := range podSpec.InitContainers {
 		applyContainerSecurity(&podSpec.InitContainers[i])

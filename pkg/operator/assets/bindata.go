@@ -145,8 +145,6 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
@@ -432,8 +430,6 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hiveadmission
       containers:
       - name: hiveadmission
@@ -850,8 +846,6 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
       serviceAccountName: hive-controllers
       volumes:
       - name: kubectl-cache

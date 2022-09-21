@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -671,7 +672,9 @@ func (r *ReconcileClusterDeployment) setupAWSCredentialForAssumeRole(cd *hivev1.
 	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
 }
 
-func (r *ReconcileClusterDeployment) watchClusterProvisions(c controller.Controller) error {
+// watchClusterProvisions sets up a watcher for ClusterProvisions to enqueue their owning ClusterDeployments.
+// The cache argument is used to dictate which plane those objects live in. (It should be the data plane.)
+func (r *ReconcileClusterDeployment) watchClusterProvisions(c controller.Controller, cache cache.Cache) error {
 	handler := &clusterProvisionEventHandler{
 		EnqueueRequestForOwner: handler.EnqueueRequestForOwner{
 			IsController: true,
@@ -679,7 +682,7 @@ func (r *ReconcileClusterDeployment) watchClusterProvisions(c controller.Control
 		},
 		reconciler: r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.ClusterProvision{}}, handler)
+	return c.Watch(source.NewKindWithCache(&hivev1.ClusterProvision{}, cache), handler)
 }
 
 var _ handler.EventHandler = &clusterProvisionEventHandler{}

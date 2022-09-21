@@ -85,7 +85,7 @@ func Add(mgr manager.Manager) error {
 		return errors.Wrap(err, "cannot add Machine API to scheme")
 	}
 
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -114,20 +114,22 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	// Watch for changes to MachinePools
-	err = c.Watch(&source.Kind{Type: &hivev1.MachinePool{}},
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to MachinePools in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.MachinePool{}, dpCache),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent))
 	if err != nil {
 		return err
 	}
 
-	// Watch for MachinePoolNameLeases created for some MachinePools (currently just GCP):
-	if err := r.watchMachinePoolNameLeases(c); err != nil {
+	// Watch for MachinePoolNameLeases in the data plane created for some MachinePools (currently just GCP):
+	if err := r.watchMachinePoolNameLeases(c, dpCache); err != nil {
 		return errors.Wrap(err, "could not watch MachinePoolNameLeases")
 	}
 
-	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	// Watch for changes to ClusterDeployment in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache),
 		controllerutils.NewRateLimitedUpdateEventHandler(
 			handler.EnqueueRequestsFromMapFunc(r.clusterDeploymentWatchHandler),
 			controllerutils.IsClusterDeploymentErrorUpdateEvent))
@@ -135,7 +137,7 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	// Periodically watch MachinePools for syncing status from external clusters
+	// Periodically reconcile all MachinePools for syncing status from external clusters
 	err = c.Watch(newPeriodicSource(r.Client, 30*time.Minute, r.logger), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err

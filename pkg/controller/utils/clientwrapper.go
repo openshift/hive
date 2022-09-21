@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
@@ -52,27 +53,73 @@ func init() {
 	metrics.Registry.MustRegister(metricKubeClientRequestsCancelled)
 }
 
+// dataPlaneClusterSingleton is the Cluster object representing the data plane. In scale mode,
+// this is a distinct Cluster with its own REST Config and Cache. In standard mode, it is just
+// the Manager.
+// NOTE: I would love to just grab this out of the Manager when I need it, but can't find a
+// way to do so. Hence the singleton pattern.
+var dataPlaneClusterSingleton cluster.Cluster
+
+// InitDataPlaneClusterOrDie sets up the data plane Cluster singleton and registers it with the Manager.
+// If we're not in scale mode, this is effectively a no-op and the singleton *is* the Manager.
+func InitDataPlaneClusterOrDie(mgr manager.Manager) {
+	if dataPlaneClusterSingleton != nil {
+		log.Fatal("data plane cluster initialized twice!")
+	}
+
+	dpRestConfig := LoadDataPlaneKubeConfigOrDie()
+	if dpRestConfig == nil {
+		// Standard mode: use the manager's cluster
+		dataPlaneClusterSingleton = mgr
+		return
+	}
+
+	// Scale mode: Create a new cluster for the data plane
+	var err error
+	dataPlaneClusterSingleton, err = cluster.New(
+		dpRestConfig,
+		func(o *cluster.Options) {
+			// NOTE: We currently share scheme with the manager / control plane. cf. cmd/manager/main.go
+			o.Scheme = mgr.GetScheme()
+		})
+	if err != nil {
+		log.WithError(err).Fatal("could not create data plane cluster")
+	}
+
+	// Register this second cluster with the manager
+	mgr.Add(dataPlaneClusterSingleton)
+}
+
+// GetDataPlaneOrDie returns a Cluster object with a REST Config and Cache that can be
+// shared among data plane clients and controllers. If we're in scale mode, this REST
+// Config and Cache are distinct from those of the control plane, which are always shared
+// with the Manager. In standard (non-scale) mode, they are identical to those of the
+// control plane.
+func GetDataPlaneClusterOrDie() cluster.Cluster {
+	if dataPlaneClusterSingleton == nil {
+		log.Fatal("data plane cluster not yet initialized!")
+	}
+	return dataPlaneClusterSingleton
+}
+
 // NewClientsWithMetricsOrDie returns two clients:
 // - The data plane client. In scale mode, this points to the API service denoted by the data-plane-kubeconfig
 //   secret in the target namespace of this deployment. In normal mode, it is identical to...
 // - The control plane client, which points to the API service of the controller manager.
 // ...and a bool indicating whether we are in scale mode (true) or not (false).
+// This should be used by all controllers.
 func NewClientsWithMetricsOrDie(mgr manager.Manager, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) (client.Client, client.Client, bool) {
 	// Control plane client.
-	// Copy the rest config as we want our round trippers to be controller specific.
-	cpClient := newClientWithMetricsOrDie(rest.CopyConfig(mgr.GetConfig()), mgr, ctrlrName, rateLimiter)
+	cpClient := newClientWithMetricsOrDie(mgr, ctrlrName, rateLimiter)
 
-	var dpClient client.Client
-
-	// In scale mode?
-	dpRestConfig := LoadDataPlaneKubeConfigOrDie()
-	if dpRestConfig == nil {
-		// Standard mode: the data plane and control plane are the same. NOTE: This is not a copy.
+	// If we're not in scale mode, don't bother constructing a separate client, which would be
+	// *almost* identical (but would have a separate copy of e.g. the REST Config).
+	if os.Getenv(constants.DataPlaneKubeconfigEnvVar) == "" {
 		return cpClient, cpClient, false
 	}
 
-	// Scale mode: build the client from the data plane REST config
-	dpClient = newClientWithMetricsOrDie(dpRestConfig, mgr, ctrlrName, rateLimiter)
+	// Scale mode: we need a separate client for the data plane
+	dpClient := newClientWithMetricsOrDie(GetDataPlaneClusterOrDie(), ctrlrName, rateLimiter)
 
 	return dpClient, cpClient, true
 }
@@ -104,25 +151,27 @@ func LoadDataPlaneKubeConfigOrDie() *rest.Config {
 
 // newClientWithMetricsOrDie creates a new controller-runtime client with a wrapper which increments
 // metrics for requests by controller name, HTTP method, URL path, and whether or not the request was
-// to a remote cluster.. The client will re-use the managers cache. This should be used in
-// all Hive controllers.
-func newClientWithMetricsOrDie(cfg *rest.Config, mgr manager.Manager, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) client.Client {
+// to a remote cluster. The client will re-use the manager's scheme, but will use the cache specific
+// to `cluster`.
+func newClientWithMetricsOrDie(cluster cluster.Cluster, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) client.Client {
+	// Copy the rest config as we want our round trippers to be controller specific.
+	cfg := rest.CopyConfig(cluster.GetConfig())
+
 	if rateLimiter != nil {
 		cfg.RateLimiter = *rateLimiter
 	}
 	AddControllerMetricsTransportWrapper(cfg, ctrlrName, false)
 
-	options := client.Options{
-		Scheme: mgr.GetScheme(),
-		Mapper: mgr.GetRESTMapper(),
-	}
-	c, err := client.New(cfg, options)
+	c, err := client.New(cfg, client.Options{
+		Scheme: cluster.GetScheme(),
+		Mapper: cluster.GetRESTMapper(),
+	})
 	if err != nil {
 		log.WithError(err).Fatal("unable to initialize metrics wrapped client")
 	}
 
 	dc, err := client.NewDelegatingClient(client.NewDelegatingClientInput{
-		CacheReader: mgr.GetCache(),
+		CacheReader: cluster.GetCache(),
 		Client:      c,
 	})
 	if err != nil {

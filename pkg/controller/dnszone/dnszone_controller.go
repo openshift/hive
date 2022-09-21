@@ -71,7 +71,7 @@ func init() {
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -102,14 +102,16 @@ func add(mgr manager.Manager, r *ReconcileDNSZone, concurrentReconciles int, rat
 		return err
 	}
 
-	// Watch for changes to DNSZone
-	if err := c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent)); err != nil {
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to DNSZone in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.DNSZone{}, dpCache), controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent)); err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
+	// Watch for changes to ClusterDeployment in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache),
 		controllerutils.NewRateLimitedUpdateEventHandler(
 			controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(r, r.logger),
 			controllerutils.IsClusterDeploymentErrorUpdateEvent,

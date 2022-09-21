@@ -112,7 +112,7 @@ const (
 // Add creates a new ClusterDeployment controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -160,6 +160,8 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return errors.New("reconciler supplied is not a ReconcileClusterDeployment")
 	}
 
+	dpCluster := controllerutils.GetDataPlaneClusterOrDie()
+
 	logger := log.WithField("controller", ControllerName)
 	c, err := controller.New("clusterdeployment-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, logger),
@@ -174,26 +176,29 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	// Inject watcher to the clusterdeployment reconciler.
 	controllerutils.InjectWatcher(cdReconciler, c)
 
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{},
+	// Index CDs in the data plane
+	if err := dpCluster.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{},
 		clusterInstallIndexFieldName, indexClusterInstall); err != nil {
 		logger.WithError(err).Error("Error indexing cluster deployment for cluster install")
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	dpCache := dpCluster.GetCache()
+
+	// Watch for changes to ClusterDeployment in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment")
 		return err
 	}
 
-	// Watch for provisions
-	if err := cdReconciler.watchClusterProvisions(c); err != nil {
+	// Watch for provisions in the data plane
+	if err := cdReconciler.watchClusterProvisions(c, dpCache); err != nil {
 		return err
 	}
 
-	// Watch for jobs created by a ClusterDeployment:
+	// Watch for jobs in the control plane created by a ClusterDeployment
 	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
@@ -203,15 +208,15 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return err
 	}
 
-	// Watch for pods created by an install job
+	// Watch for pods in the control plane created by an install job
 	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(selectorPodWatchHandler))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment pods")
 		return err
 	}
 
-	// Watch for deprovision requests created by a ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovision{}}, &handler.EnqueueRequestForOwner{
+	// Watch for deprovision requests in the data plane created by a ClusterDeployment
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeprovision{}, dpCache), &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
@@ -220,8 +225,8 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return err
 	}
 
-	// Watch for dnszones created by a ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForOwner{
+	// Watch for dnszones in the data plane created by a ClusterDeployment
+	err = c.Watch(source.NewKindWithCache(&hivev1.DNSZone{}, dpCache), &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeployment{},
 	})
@@ -230,9 +235,9 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return err
 	}
 
-	// Watch for changes to ClusterSyncs
+	// Watch for changes to ClusterSyncs in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &hiveintv1alpha1.ClusterSync{}},
+		source.NewKindWithCache(&hiveintv1alpha1.ClusterSync{}, dpCache),
 		&handler.EnqueueRequestForOwner{OwnerType: &hivev1.ClusterDeployment{}},
 	); err != nil {
 		return errors.Wrap(err, "cannot start watch on ClusterSyncs")

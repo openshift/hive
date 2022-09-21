@@ -44,7 +44,7 @@ var clusterClaimConditions = []hivev1.ClusterClaimConditionType{
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -74,30 +74,32 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentRecon
 		return err
 	}
 
-	// Watch for changes to ClusterClaim
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterClaim{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to ClusterClaim in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterClaim{}, dpCache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
+	// Watch for changes to ClusterDeployment in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache),
 		controllerutils.NewRateLimitedUpdateEventHandler(
 			handler.EnqueueRequestsFromMapFunc(requestsForClusterDeployment),
 			controllerutils.IsClusterDeploymentErrorUpdateEvent)); err != nil {
 		return err
 	}
 
-	// Watch for changes to the hive-claim-owner Role
+	// Watch for changes to the hive-claim-owner Role in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.Role{}},
+		source.NewKindWithCache(&rbacv1.Role{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleName, r.logger))); err != nil {
 		return err
 	}
 
-	// Watch for changes to the hive-claim-owner RoleBinding
+	// Watch for changes to the hive-claim-owner RoleBinding in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.Role{}},
+		source.NewKindWithCache(&rbacv1.RoleBinding{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleBindingName, r.logger))); err != nil {
 		return err
 	}

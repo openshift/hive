@@ -959,7 +959,6 @@ func TestReconcile(t *testing.T) {
 
 			reconciler := hibernationReconciler{
 				Client: c,
-				logger: log.WithField("controller", "hibernation"),
 				remoteClientBuilder: func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 					return mockBuilder
 				},
@@ -1204,7 +1203,6 @@ func TestHibernateAfter(t *testing.T) {
 
 			reconciler := hibernationReconciler{
 				Client: c,
-				logger: log.WithField("controller", "hibernation"),
 				remoteClientBuilder: func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 					return mockBuilder
 				},

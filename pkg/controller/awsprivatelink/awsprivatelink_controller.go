@@ -65,7 +65,7 @@ var clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentCondit
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -106,16 +106,18 @@ func AddToManager(mgr manager.Manager, r *ReconcileAWSPrivateLink, concurrentRec
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to ClusterDeployment in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment")
 		return err
 	}
 
-	// Watch for changes to ClusterProvision
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterProvision{}},
+	// Watch for changes to ClusterProvision in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterProvision{}, dpCache),
 		&handler.EnqueueRequestForOwner{
 			IsController: true,
 			OwnerType:    &hivev1.ClusterDeployment{},
@@ -124,8 +126,8 @@ func AddToManager(mgr manager.Manager, r *ReconcileAWSPrivateLink, concurrentRec
 		return err
 	}
 
-	// Watch for changes to ClusterDeprovision
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovision{}},
+	// Watch for changes to ClusterDeprovision in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterDeprovision{}, dpCache),
 		&handler.EnqueueRequestForOwner{
 			IsController: true,
 			OwnerType:    &hivev1.ClusterDeployment{},

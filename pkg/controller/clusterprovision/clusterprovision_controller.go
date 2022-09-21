@@ -77,7 +77,7 @@ func init() {
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -114,18 +114,20 @@ func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, 
 		return errors.Wrap(err, "could not create controller")
 	}
 
-	// Watch for changes to ClusterProvision
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterProvision{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to ClusterProvision in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterProvision{}, dpCache), &handler.EnqueueRequestForObject{}); err != nil {
 		return errors.Wrap(err, "could not watch clusterprovisions")
 	}
 
-	// Watch for install jobs created for ClusterProvision
+	// Watch for install jobs in the control plane created for ClusterProvision
 	if err := provisionReconciler.watchJobs(c); err != nil {
 		return errors.Wrap(err, "could not watch jobs")
 	}
 
-	// Watch for changes to ClusterDeployment
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler.EnqueueRequestsFromMapFunc(clusterDeploymentWatchHandler)); err != nil {
+	// Watch for changes to ClusterDeployment in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache), handler.EnqueueRequestsFromMapFunc(clusterDeploymentWatchHandler)); err != nil {
 		return errors.Wrap(err, "could not watch clusterdeployments")
 	}
 

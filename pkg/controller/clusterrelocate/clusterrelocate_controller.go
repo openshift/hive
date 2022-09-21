@@ -72,7 +72,7 @@ func init() {
 // Add creates a new ClusterRelocate controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -96,14 +96,16 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to ClusterDeployment in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache), &handler.EnqueueRequestForObject{}); err != nil {
 		logger.WithError(err).Error("Error watching ClusterDeployment")
 		return err
 	}
 
-	// Watch for changes to ClusterRelocate
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterRelocate{}},
+	// Watch for changes to ClusterRelocate in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterRelocate{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(r.clusterRelocateHandlerFunc)); err != nil {
 		logger.WithError(err).Error("Error watching ClusterRelocate")
 		return err

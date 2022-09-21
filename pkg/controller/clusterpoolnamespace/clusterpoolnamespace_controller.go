@@ -35,7 +35,7 @@ const (
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -68,14 +68,19 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return err
 	}
 
-	// TODO: In scale mode, we're only watching the data plane!
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
 
-	// Watch for changes to Namespaces
+	// Watch for changes to Namespaces in the control plane
 	if err := c.Watch(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
+	// Watch for changes to Namespaces in the data plane
+	if err := c.Watch(source.NewKindWithCache(&corev1.Namespace{}, dpCache), &handler.EnqueueRequestForObject{}); err != nil {
+		return err
+	}
+
+	// Watch for changes to ClusterDeployment in the data plane
 	cdMapFn := func(a client.Object) []reconcile.Request {
 		cd := a.(*hivev1.ClusterDeployment)
 		return []reconcile.Request{{
@@ -83,7 +88,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		}}
 	}
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(cdMapFn)); err != nil {
 		return err
 	}
@@ -109,7 +114,11 @@ func (r *ReconcileClusterPoolNamespace) Reconcile(ctx context.Context, request r
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, logger)
 	defer recobsrv.ObserveControllerReconcileTime()
 
-	// Fetch the Namespace instance
+	// Fetch the Namespace instance from the data plane
+	// NOTE: This reconciler will pop if the namespace changes in either plane. Do we need to fetch
+	// and validate the incarnation in the control plane as well? At the moment we don't: we base
+	// our action on the one from the data plane and then perform the same action on both (i.e.
+	// delete them if appropriate).
 	namespace := &corev1.Namespace{}
 	switch err := r.Get(context.Background(), request.NamespacedName, namespace); {
 	case apierrors.IsNotFound(err):

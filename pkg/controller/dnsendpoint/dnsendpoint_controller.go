@@ -36,7 +36,7 @@ const (
 // RBAC. The Manager will set fields on the Controllers and Start them when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -66,19 +66,22 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	if err := ctrl.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to DNSZone in the data plane
+	if err := ctrl.Watch(source.NewKindWithCache(&hivev1.DNSZone{}, dpCache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
+	// Watch for changes to ClusterDeployment in the data plane
 	if err := ctrl.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache),
 		controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(reconciler, reconciler.logger),
 	); err != nil {
 		return err
 	}
 
-	// Reconcile DNSZones enqueued by nameServerScraper.
+	// Reconcile DNSZones in the data plane enqueued by nameServerScraper.
 	if nameServerChangeNotifier != nil {
 		if err := ctrl.Watch(&source.Channel{Source: nameServerChangeNotifier}, &handler.EnqueueRequestForObject{}); err != nil {
 			log.WithField("controller", ControllerName).WithError(err).Error("unable to set up watch for name server changes")

@@ -68,7 +68,7 @@ func poolKey(namespace, name string) string {
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -99,8 +99,10 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 		return err
 	}
 
-	// Index ClusterDeployments by pool namespace/name
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{}, cdClusterPoolIndex,
+	dpCluster := controllerutils.GetDataPlaneClusterOrDie()
+
+	// Index ClusterDeployments in the data plane by pool namespace/name
+	if err := dpCluster.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{}, cdClusterPoolIndex,
 		func(o client.Object) []string {
 			cd := o.(*hivev1.ClusterDeployment)
 			if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
@@ -112,8 +114,8 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 		return err
 	}
 
-	// Index ClusterClaims by pool name
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterClaim{}, claimClusterPoolIndex,
+	// Index ClusterClaims in the data plane by pool name
+	if err := dpCluster.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterClaim{}, claimClusterPoolIndex,
 		func(o client.Object) []string {
 			claim := o.(*hivev1.ClusterClaim)
 			if poolName := claim.Spec.ClusterPoolName; poolName != "" {
@@ -125,18 +127,20 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 		return err
 	}
 
-	// Watch for changes to ClusterPool
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterPool{}}, &handler.EnqueueRequestForObject{})
+	dpCache := dpCluster.GetCache()
+
+	// Watch for changes to ClusterPool in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterPool{}, dpCache), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterDeployments originating from a pool:
-	if err := r.watchClusterDeployments(c); err != nil {
+	// Watch for changes to ClusterDeployments in the data plane originating from a pool:
+	if err := r.watchClusterDeployments(c, dpCache); err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterClaims
+	// Watch for changes to ClusterClaims in the data plane
 	enqueuePoolForClaim := handler.EnqueueRequestsFromMapFunc(
 		func(o client.Object) []reconcile.Request {
 			claim, ok := o.(*hivev1.ClusterClaim)
@@ -151,31 +155,31 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 			}}
 		},
 	)
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterClaim{}}, enqueuePoolForClaim); err != nil {
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterClaim{}, dpCache), enqueuePoolForClaim); err != nil {
 		return err
 	}
 
-	// Watch for changes to the hive cluster pool admin RoleBindings
+	// Watch for changes to the hive cluster pool admin RoleBindings in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.RoleBinding{}},
+		source.NewKindWithCache(&rbacv1.RoleBinding{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(
 			requestsForRBACResources(r.Client, r.logger)),
 	); err != nil {
 		return err
 	}
 
-	// Watch for changes to the hive-cluster-pool-admin-binding RoleBinding
+	// Watch for changes to the hive-cluster-pool-admin-binding RoleBinding in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.RoleBinding{}},
+		source.NewKindWithCache(&rbacv1.RoleBinding{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(
 			requestsForCDRBACResources(r.Client, clusterPoolAdminRoleBindingName, r.logger)),
 	); err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterDeploymentCustomizations
+	// Watch for changes to ClusterDeploymentCustomizations in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeploymentCustomization{}},
+		source.NewKindWithCache(&hivev1.ClusterDeploymentCustomization{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(
 			requestsForCDCResources(r.Client, r.logger)),
 	); err != nil {

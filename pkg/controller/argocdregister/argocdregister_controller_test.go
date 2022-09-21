@@ -211,8 +211,8 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 			}
 
 			rcd := &ArgoCDRegisterController{
-				Client:     fakeClient,
-				logger:     logger,
+				Client: fakeClient,
+				logger: logger,
 				tlsClientConfigBuilder: func(kubeConfig clientcmd.ClientConfig, _ log.FieldLogger) (TLSClientConfig, error) {
 					return TLSClientConfig{}, nil
 				},

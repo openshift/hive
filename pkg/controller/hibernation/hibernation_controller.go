@@ -88,7 +88,7 @@ var (
 // Add creates a new Hibernation controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -107,7 +107,6 @@ func RegisterActuator(a HibernationActuator) {
 type hibernationReconciler struct {
 	client.Client
 	controlPlaneClient client.Client
-	logger             log.FieldLogger
 	csrUtil            csrHelper
 
 	remoteClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
@@ -115,9 +114,7 @@ type hibernationReconciler struct {
 
 // NewReconciler returns a new Reconciler
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *hibernationReconciler {
-	logger := log.WithField("controller", ControllerName)
 	r := &hibernationReconciler{
-		logger:  logger,
 		csrUtil: &csrUtility{},
 	}
 	r.Client, r.controlPlaneClient, _ = controllerutils.NewClientsWithMetricsOrDie(mgr, ControllerName, &rateLimiter)
@@ -140,8 +137,8 @@ func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentRecon
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	// Watch for changes to ClusterDeployment in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, controllerutils.GetDataPlaneClusterOrDie().GetCache()),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Log(controllerutils.LogLevel(err), "Error setting up a watch on ClusterDeployment")

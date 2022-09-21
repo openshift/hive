@@ -322,27 +322,29 @@ func (r *ReconcileClusterDeployment) watchClusterInstall(gvk schema.GroupVersion
 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(gvk)
-	err := r.watcher.Watch(&source.Kind{Type: obj}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
-		retval := []reconcile.Request{}
+	// Watch for ClusterInstall* changes in the data plane
+	err := r.watcher.Watch(source.NewKindWithCache(obj, controllerutils.GetDataPlaneClusterOrDie().GetCache()),
+		handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+			retval := []reconcile.Request{}
 
-		cdList := &hivev1.ClusterDeploymentList{}
-		if err := r.Client.List(context.TODO(), cdList,
-			client.MatchingFields{clusterInstallIndexFieldName: o.GetName()},
-			client.InNamespace(o.GetNamespace())); err != nil {
-			logger.WithError(err).Error("failed to list cluster deployment matching cluster install index")
+			cdList := &hivev1.ClusterDeploymentList{}
+			if err := r.Client.List(context.TODO(), cdList,
+				client.MatchingFields{clusterInstallIndexFieldName: o.GetName()},
+				client.InNamespace(o.GetNamespace())); err != nil {
+				logger.WithError(err).Error("failed to list cluster deployment matching cluster install index")
+				return retval
+			}
+
+			for _, cd := range cdList.Items {
+				retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+					Namespace: cd.Namespace,
+					Name:      cd.Name,
+				}})
+			}
+			logger.WithField("retval", retval).Debug("trigger reconcile for clusterdeployments for cluster install objects")
+
 			return retval
-		}
-
-		for _, cd := range cdList.Items {
-			retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
-				Namespace: cd.Namespace,
-				Name:      cd.Name,
-			}})
-		}
-		logger.WithField("retval", retval).Debug("trigger reconcile for clusterdeployments for cluster install objects")
-
-		return retval
-	}))
+		}))
 	if err != nil {
 		return err
 	}

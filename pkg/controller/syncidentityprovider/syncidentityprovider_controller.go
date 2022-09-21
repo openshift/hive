@@ -48,7 +48,7 @@ const (
 // Controller and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -80,22 +80,24 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 	reconciler := r.(*ReconcileSyncIdentityProviders)
 
-	// Watch for changes to SyncIdentityProvider
-	err = c.Watch(&source.Kind{Type: &hivev1.SyncIdentityProvider{}},
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to SyncIdentityProvider in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.SyncIdentityProvider{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(reconciler.syncIdentityProviderWatchHandler))
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to SelectorSyncIdentityProvider
-	err = c.Watch(&source.Kind{Type: &hivev1.SelectorSyncIdentityProvider{}},
+	// Watch for changes to SelectorSyncIdentityProvider in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.SelectorSyncIdentityProvider{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(reconciler.selectorSyncIdentityProviderWatchHandler))
 	if err != nil {
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment (easy case)
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to ClusterDeployment in the data plane (easy case)
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache), &handler.EnqueueRequestForObject{})
 	return err
 }
 

@@ -160,8 +160,13 @@ func newRootCommand() *cobra.Command {
 					Logger:             utillogrus.NewLogr(log.StandardLogger()),
 				})
 				if err != nil {
-					log.Fatal(err)
+					log.WithError(err).Fatal("could not create manager")
 				}
+
+				// Set up the data plane cluster. In scale mode, this is a separate Cluster
+				// object that will be registered with the Manager. In standard mode, this
+				// is effectively a no-op.
+				utils.InitDataPlaneClusterOrDie(mgr)
 
 				log.Info("Registering Components.")
 
@@ -170,6 +175,12 @@ func newRootCommand() *cobra.Command {
 				}
 
 				// Setup Scheme for all resources
+				// NOTE: We're reusing the scheme for both control and data plane, even though we're
+				// referencing a disjoint subset of object types from each. It's not a massive waste
+				// of memory, so we're accepting it for now, but in the future perhaps we construct
+				// distinct schemes for each Cluster. (Note that hivev1 would need to straddle both,
+				// as the control plane uses HiveConfig and the data plane uses all the others.)
+				// cf. InitDataPlaneClusterOrDie
 				if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
 					log.Fatal(err)
 				}

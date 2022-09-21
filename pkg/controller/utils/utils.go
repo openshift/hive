@@ -150,7 +150,7 @@ func getQueueRateLimiter(controllerName hivev1.ControllerName) (workqueue.RateLi
 	), nil
 }
 
-func GetControllerConfig(client client.Client, controllerName hivev1.ControllerName) (int, flowcontrol.RateLimiter, workqueue.RateLimiter, error) {
+func GetControllerConfig(controllerName hivev1.ControllerName) (int, flowcontrol.RateLimiter, workqueue.RateLimiter, error) {
 	concurrentReconciles, err := getConcurrentReconciles(controllerName)
 	if err != nil {
 		return 0, nil, nil, err

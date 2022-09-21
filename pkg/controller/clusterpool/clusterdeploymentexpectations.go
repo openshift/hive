@@ -3,6 +3,7 @@ package clusterpool
 import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -14,7 +15,9 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
-func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) error {
+// watchClusterDeployments enqueues the ClusterPool for a ClusterDeployment. The cache argument
+// can be used to indicate which plane those objects exist in. (It should be the data plane.)
+func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller, cache cache.Cache) error {
 	h := &clusterDeploymentEventHandler{
 		EventHandler: handler.EnqueueRequestsFromMapFunc(
 			func(a client.Object) []reconcile.Request {
@@ -27,7 +30,7 @@ func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) 
 		),
 		reconciler: r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	return c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, cache),
 		controllerutils.NewRateLimitedUpdateEventHandler(h, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 }
 

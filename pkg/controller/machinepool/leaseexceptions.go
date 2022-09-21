@@ -6,6 +6,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -20,7 +21,9 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
-func (r *ReconcileMachinePool) watchMachinePoolNameLeases(c controller.Controller) error {
+// watchMachinePoolNameLeases enqueues a MachinePool owned by a changed MachinePoolLease object. The cache
+// argument indicates which plane these objects exist in. (It should be the data plane.)
+func (r *ReconcileMachinePool) watchMachinePoolNameLeases(c controller.Controller, cache cache.Cache) error {
 	h := &machinePoolNameLeaseEventHandler{
 		EnqueueRequestForOwner: handler.EnqueueRequestForOwner{
 			IsController: true,
@@ -28,7 +31,7 @@ func (r *ReconcileMachinePool) watchMachinePoolNameLeases(c controller.Controlle
 		},
 		reconciler: r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.MachinePoolNameLease{}}, h)
+	return c.Watch(source.NewKindWithCache(&hivev1.MachinePoolNameLease{}, cache), h)
 }
 
 var _ handler.EventHandler = &machinePoolNameLeaseEventHandler{}

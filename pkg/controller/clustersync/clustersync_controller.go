@@ -114,7 +114,7 @@ func init() {
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -205,21 +205,23 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconc
 		return err
 	}
 
-	// Watch for changes to ClusterDeployment
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
+
+	// Watch for changes to ClusterDeployment in the data plane
+	if err := c.Watch(source.NewKindWithCache(&hivev1.ClusterDeployment{}, dpCache), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
-	// Watch for changes to SyncSets
+	// Watch for changes to SyncSets in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.SyncSet{}},
+		source.NewKindWithCache(&hivev1.SyncSet{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(requestsForSyncSet)); err != nil {
 		return err
 	}
 
-	// Watch for changes to SelectorSyncSets
+	// Watch for changes to SelectorSyncSets in the data plane
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.SelectorSyncSet{}},
+		source.NewKindWithCache(&hivev1.SelectorSyncSet{}, dpCache),
 		handler.EnqueueRequestsFromMapFunc(requestsForSelectorSyncSet(r.Client, r.logger))); err != nil {
 		return err
 	}

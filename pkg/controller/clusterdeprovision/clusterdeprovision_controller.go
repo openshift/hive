@@ -71,7 +71,7 @@ func init() {
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -116,14 +116,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, 
 		return err
 	}
 
-	// Watch for changes to ClusterDeprovision
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovision{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to ClusterDeprovision in the data plane
+	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeprovision{}, controllerutils.GetDataPlaneClusterOrDie().GetCache()),
+		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching changes to clusterdeprovision")
 		return err
 	}
 
-	// Watch for uninstall jobs created for ClusterDeprovisions
+	// Watch for uninstall jobs in the control plane created for ClusterDeprovisions
 	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &hivev1.ClusterDeprovision{},

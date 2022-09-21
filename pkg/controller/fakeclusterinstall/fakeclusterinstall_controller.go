@@ -36,7 +36,7 @@ const (
 // Add creates a new FakeClusterInstall controller and adds it to the manager with default RBAC.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -66,8 +66,9 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 		return err
 	}
 
-	// Watch for changes to FakeClusterInstall
-	err = c.Watch(&source.Kind{Type: &hiveint.FakeClusterInstall{}}, &handler.EnqueueRequestForObject{})
+	// Watch for changes to FakeClusterInstall in the data plane
+	err = c.Watch(source.NewKindWithCache(&hiveint.FakeClusterInstall{}, controllerutils.GetDataPlaneClusterOrDie().GetCache()),
+		&handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching FakeClusterInstall")
 		return err

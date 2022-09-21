@@ -74,7 +74,7 @@ func Add(mgr manager.Manager) error {
 		return nil
 	}
 
-	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
+	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
@@ -141,8 +141,10 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 }
 
 func (r *ReconcileBackup) registerHiveObjectWatches(c controller.Controller) error {
+	// hiveNamespaceScopedTypesToWatch are all data plane objects
+	dpCache := controllerutils.GetDataPlaneClusterOrDie().GetCache()
 	for _, t := range hiveNamespaceScopedTypesToWatch {
-		err := c.Watch(&source.Kind{Type: t.DeepCopyObject().(client.Object)}, handler.EnqueueRequestsFromMapFunc(
+		err := c.Watch(source.NewKindWithCache(t.DeepCopyObject().(client.Object), dpCache), handler.EnqueueRequestsFromMapFunc(
 			func(mapObj client.Object) []reconcile.Request {
 				// Queue up the NS for this Hive Object
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: mapObj.GetNamespace()}}}

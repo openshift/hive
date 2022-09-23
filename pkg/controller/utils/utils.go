@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -389,32 +390,64 @@ func SetProxyEnvVars(podSpec *corev1.PodSpec, httpProxy, httpsProxy, noProxy str
 	}
 }
 
-func applyContainerSecurity(c *corev1.Container) {
+func applyContainerSecurity(uid *int64, c *corev1.Container) {
 	c.SecurityContext = &corev1.SecurityContext{
 		AllowPrivilegeEscalation: pointer.Bool(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		RunAsUser: pointer.Int64Ptr(1000670001),
 	}
 
+	if uid != nil {
+		c.SecurityContext.RunAsUser = uid
+	} else {
+		c.SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
+	}
 }
 
 // ApplyPodSecurity ensures that the pod and its containers have explicit restrictive securityContext
 // to conform to pod security admission rules.
-func ApplyPodSecurity(podSpec *corev1.PodSpec) {
-	podSpec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsUser: pointer.Int64Ptr(1000670001),
+// When the provided uid is non-nil a RunAsUser of uid will be applied to containers in the podSpec.
+// If no uid is provided then RunAsNonRoot = true will be applied to containers in the podSpec.
+func ApplyPodSecurity(uid *int64, podSpec *corev1.PodSpec) {
+	if uid != nil {
+		podSpec.SecurityContext = &corev1.PodSecurityContext{
+			RunAsUser: uid,
+		}
+	} else {
+		podSpec.SecurityContext = &corev1.PodSecurityContext{
+			RunAsNonRoot: pointer.BoolPtr(true),
+		}
 	}
+
 	for i := range podSpec.InitContainers {
-		applyContainerSecurity(&podSpec.InitContainers[i])
+		applyContainerSecurity(uid, &podSpec.InitContainers[i])
 	}
 	for i := range podSpec.Containers {
-		applyContainerSecurity(&podSpec.Containers[i])
+		applyContainerSecurity(uid, &podSpec.Containers[i])
 	}
 }
 
 func SafeDelete(cl client.Client, ctx context.Context, obj client.Object) error {
 	rv := obj.GetResourceVersion()
 	return cl.Delete(ctx, obj, client.Preconditions{ResourceVersion: &rv})
+}
+
+// UIDFromUIDRangeAnnotation parses the value of an SCC UID range annotation and returns a UID from the
+// beginning of the range (start of range + 1).
+// Given a uidRangeAnnotation of "1000050000/10000" from a namespace annotated with
+// "openshift.io/sa.scc.uid-range": "1000050000/10000" denoting that start=1000050000 with length=10000,
+// UIDFromUIDRangeAnnotation would return &int64(1000050001).
+// When uidRangeAnnotation is an empty string UIDFromUIDRangeAnnotation returns a default UID of &int64(1000000001).
+func UIDFromUIDRangeAnnotation(uidRangeAnnotation string) *int64 {
+	uid := int64(1000000001)
+	if uidRangeAnnotation != "" {
+		res := strings.Split(uidRangeAnnotation, "/")
+		if len(res) > 0 {
+			if value, err := strconv.Atoi(res[0]); err == nil {
+				uid = int64(value + 1)
+			}
+		}
+	}
+	return &uid
 }

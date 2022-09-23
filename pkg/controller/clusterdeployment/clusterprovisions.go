@@ -150,6 +150,18 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 	extraEnvVars = append(extraEnvVars, getAWSServiceProviderEnvVars(cd, cd.Name)...)
 
+	cdNamespace := corev1.Namespace{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, &cdNamespace)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	uidRangeAnnotation := ""
+	if value, ok := cdNamespace.Annotations[constants.SCCUIDRangeAnnotation]; ok {
+		logger.Infof("cdNamespace annotation value: %v", value)
+		uidRangeAnnotation = value
+	}
+	uid := controllerutils.UIDFromUIDRangeAnnotation(uidRangeAnnotation)
+
 	podSpec, err := install.InstallerPodSpec(
 		cd,
 		provisionName,
@@ -158,6 +170,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 		os.Getenv("HTTP_PROXY"),
 		os.Getenv("HTTPS_PROXY"),
 		os.Getenv("NO_PROXY"),
+		uid,
 		extraEnvVars,
 	)
 	if err != nil {

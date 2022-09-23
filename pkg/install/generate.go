@@ -118,6 +118,7 @@ func InstallerPodSpec(
 	releaseImage,
 	serviceAccountName,
 	httpProxy, httpsProxy, noProxy string,
+	runAsUserID *int64,
 	extraEnvVars []corev1.EnvVar,
 ) (*corev1.PodSpec, error) {
 
@@ -362,7 +363,7 @@ func InstallerPodSpec(
 		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
 	}
 	controllerutils.SetProxyEnvVars(podSpec, httpProxy, httpsProxy, noProxy)
-	controllerutils.ApplyPodSecurity(podSpec)
+	controllerutils.ApplyPodSecurity(runAsUserID, podSpec)
 	return podSpec, nil
 }
 
@@ -420,6 +421,7 @@ func GetUninstallJobName(name string) string {
 func GenerateUninstallerJobForDeprovision(
 	req *hivev1.ClusterDeprovision,
 	serviceAccountName, httpProxy, httpsProxy, noProxy string,
+	runAsUserID *int64,
 	extraEnvVars []corev1.EnvVar) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
@@ -480,7 +482,7 @@ func GenerateUninstallerJobForDeprovision(
 	}
 	controllerutils.SetProxyEnvVars(&job.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
 	controllerutils.AddLogFieldsEnvVar(req, job)
-	controllerutils.ApplyPodSecurity(&job.Spec.Template.Spec)
+	controllerutils.ApplyPodSecurity(runAsUserID, &job.Spec.Template.Spec)
 	return job, nil
 }
 

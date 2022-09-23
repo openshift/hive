@@ -57,13 +57,13 @@ func assertContainerSecurityContext(t *testing.T, c *corev1.Container) {
 			testifyassert.Equal(t, 1, len(sc.Capabilities.Drop), "container %s capabilities.drop should have exactly one element", c.Name) {
 			testifyassert.Equal(t, corev1.Capability("ALL"), sc.Capabilities.Drop[0], "container %s should drop ALL capabilities", c.Name)
 		}
-		testifyassert.NotNil(t, *sc.RunAsUser, "container runAsUser should be non nil")
+		testifyassert.True(t, sc.RunAsUser != nil || sc.RunAsNonRoot != nil, "container must set runAsUser or runAsNonRoot within SecurityContext")
 	}
 }
 
 func AssertSecurityContexts(t *testing.T, podSpec *corev1.PodSpec) {
 	sc := podSpec.SecurityContext
-	testifyassert.NotNil(t, *sc.RunAsUser, "pod runAsUser should be non nil")
+	testifyassert.True(t, sc.RunAsNonRoot != nil || sc.RunAsUser != nil, "pod must set runAsUser or runAsNonRoot within SecurityContext")
 	for _, c := range podSpec.InitContainers {
 		assertContainerSecurityContext(t, &c)
 	}

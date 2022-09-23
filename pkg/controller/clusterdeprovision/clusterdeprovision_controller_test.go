@@ -279,7 +279,19 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 					return
 				}
 			}
-			existing := append(test.existing, test.deprovision, test.deployment)
+			existing := append(test.existing, test.deprovision, test.deployment, &corev1.Namespace{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "Namespace",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testNamespace,
+					UID:  types.UID("1234"),
+					Annotations: map[string]string{
+						constants.SCCUIDRangeAnnotation: "1000640000/10000",
+					},
+				},
+			})
 
 			mocks := setupDefaultMocks(t, test.mockDeleteFailure, existing...)
 
@@ -374,7 +386,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 // specified conditions.
 func testUninstallJob(conditions ...batchv1.JobCondition) *batchv1.Job {
 	uninstallJob, _ := install.GenerateUninstallerJobForDeprovision(testClusterDeprovision(),
-		"someserviceaccount", "", "", "", nil)
+		"someserviceaccount", "", "", "", nil, nil)
 	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
 	if err != nil {
 		panic("should never get error calculating job spec hash")

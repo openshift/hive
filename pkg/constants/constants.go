@@ -479,6 +479,10 @@ const (
 	// generating installer manifests. This will be effective in-cluster credentials mode. The valid values for
 	// credentials mode are "Manual", "Mint" and "Passthrough"
 	OverrideInClusterCredentialsModeAnnotation = "hive.openshift.io/override-in-cluster-credentials-mode"
+
+	// SCCUIDRangeAnnotation is the annotation configured within Namespace annotations that indicates the allowed UID range
+	// for containers belonging to pods within the Namespace.
+	SCCUIDRangeAnnotation = "openshift.io/sa.scc.uid-range"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -29,7 +30,7 @@ func init() {
 
 func TestGenerateDeprovision(t *testing.T) {
 	dr := testClusterDeprovision()
-	job, err := GenerateUninstallerJobForDeprovision(dr, "someseviceaccount", testHttpProxy, testHttpsProxy, testNoProxy, nil)
+	job, err := GenerateUninstallerJobForDeprovision(dr, "someseviceaccount", testHttpProxy, testHttpsProxy, testNoProxy, nil, nil)
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)
@@ -118,6 +119,7 @@ func TestInstallerPodSpec(t *testing.T) {
 				testHttpProxy,
 				testHttpsProxy,
 				testNoProxy,
+				pointer.Int64Ptr(10000000000),
 				test.extraEnvVars)
 
 			// Assert

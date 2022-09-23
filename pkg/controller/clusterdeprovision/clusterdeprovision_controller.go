@@ -287,6 +287,18 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		return reconcile.Result{}, err
 	}
 
+	cdNamespace := corev1.Namespace{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, &cdNamespace)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	uidRangeAnnotation := ""
+	if value, ok := cdNamespace.Annotations[constants.SCCUIDRangeAnnotation]; ok {
+		rLog.Infof("cdNamespace annotation value: %v", value)
+		uidRangeAnnotation = value
+	}
+	uid := controllerutils.UIDFromUIDRangeAnnotation(uidRangeAnnotation)
+
 	// Generate an uninstall job
 	rLog.Debug("generating uninstall job")
 	uninstallJob, err := install.GenerateUninstallerJobForDeprovision(instance,
@@ -294,6 +306,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		os.Getenv("HTTP_PROXY"),
 		os.Getenv("HTTPS_PROXY"),
 		os.Getenv("NO_PROXY"),
+		uid,
 		extraEnvVars)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)

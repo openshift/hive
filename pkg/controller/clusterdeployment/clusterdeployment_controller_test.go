@@ -2978,6 +2978,19 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}
 				`, string(b)))
 			}
+			test.existing = append(test.existing, &corev1.Namespace{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "Namespace",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testNamespace,
+					UID:  types.UID("1234"),
+					Annotations: map[string]string{
+						constants.SCCUIDRangeAnnotation: "1000640000/10000",
+					},
+				},
+			})
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)

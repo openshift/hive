@@ -962,6 +962,18 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 	switch err := r.Get(context.Background(), jobKey, existingJob); {
 	// The job does not exist. If the images have been resolved, continue reconciling. Otherwise, create the job.
 	case apierrors.IsNotFound(err):
+		cdNamespace := corev1.Namespace{}
+		err := r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, &cdNamespace)
+		if err != nil {
+			return nil, err
+		}
+		uidRangeAnnotation := ""
+		if value, ok := cdNamespace.Annotations[constants.SCCUIDRangeAnnotation]; ok {
+			cdLog.Infof("cdNamespace annotation value: %v", value)
+			uidRangeAnnotation = value
+		}
+		uid := controllerutils.UIDFromUIDRangeAnnotation(uidRangeAnnotation)
+
 		if areImagesResolved {
 			return nil, r.updateCondition(cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionFalse, imagesResolvedReason, imagesResolvedMsg, cdLog)
 		}
@@ -969,7 +981,9 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.InstallServiceAccountName,
 			os.Getenv("HTTP_PROXY"),
 			os.Getenv("HTTPS_PROXY"),
-			os.Getenv("NO_PROXY"))
+			os.Getenv("NO_PROXY"),
+			uid,
+		)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)

@@ -332,8 +332,9 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 func testClusterDeprovision() *hivev1.ClusterDeprovision {
 	return &hivev1.ClusterDeprovision{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testName,
-			Namespace: testNamespace,
+			Name:       testName,
+			Namespace:  testNamespace,
+			Finalizers: []string{constants.FinalizerOwnsJob},
 		},
 		Spec: hivev1.ClusterDeprovisionSpec{
 			InfraID:   "test-infra-id",

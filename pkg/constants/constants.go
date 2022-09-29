@@ -492,6 +492,10 @@ const (
 	// DataPlaneKubeconfigEnvVar is the name of an environment variable whose value is the path to the mounted kubeconfig
 	// secret for the data plane in a given target namespace.
 	DataPlaneKubeconfigEnvVar = "DATA_PLANE_KUBECONFIG"
+
+	// FinalizerOwnsJob holds an object that owns a Job. In scale mode, we can't use owner references to clean up such
+	// Jobs, as they are on different KASes, so we have to do it manually.
+	FinalizerOwnsJob = "hive.openshift.io/owns-job"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

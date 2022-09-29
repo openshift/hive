@@ -694,7 +694,7 @@ type clusterProvisionEventHandler struct {
 
 // Create implements handler.EventHandler
 func (h *clusterProvisionEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
-	h.reconciler.logger.Info("ClusterProvision created")
+	h.reconciler.logger.WithField("name", e.Object.GetName()).Info("ClusterProvision created")
 	h.reconciler.trackClusterProvisionAdd(e.Object)
 	h.EnqueueRequestForOwner.Create(e, q)
 }

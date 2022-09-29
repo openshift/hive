@@ -102,6 +102,20 @@ func fakeReadFile(content string) func(string) ([]byte, error) {
 	}
 }
 
+func rmOwnsJobFinalizer(cp *hivev1.ClusterProvision) {
+	if cp.Finalizers == nil || len(cp.Finalizers) == 0 {
+		return
+	}
+	finalizers := make([]string, len(cp.Finalizers)-1)
+	for i := range cp.Finalizers {
+		if cp.Finalizers[i] == constants.FinalizerOwnsJob {
+			continue
+		}
+		finalizers = append(finalizers, cp.Finalizers[i])
+	}
+	cp.Finalizers = finalizers
+}
+
 func TestClusterDeploymentReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	openshiftapiv1.Install(scheme.Scheme)
@@ -180,15 +194,38 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Add finalizer",
+			name: "Add deprov finalizer",
 			existing: []runtime.Object{
-				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithoutFinalizer()),
+				func() runtime.Object {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithoutFinalizer())
+					// We're testing the *other* finalizer
+					controllerutil.AddFinalizer(cd, constants.FinalizerOwnsJob)
+					return cd
+				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				if cd == nil || !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-					t.Errorf("did not get expected clusterdeployment finalizer")
+					t.Errorf("did not get expected deprovision finalizer")
+				}
+			},
+		},
+		{
+			name: "Add owns-job finalizer",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithoutFinalizer())
+					// We're testing the *other* finalizer
+					controllerutil.AddFinalizer(cd, hivev1.FinalizerDeprovision)
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if cd == nil || !controllerutils.HasFinalizer(cd, constants.FinalizerOwnsJob) {
+					t.Errorf("did not get expected owns-job finalizer")
 				}
 			},
 		},
@@ -475,6 +512,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					// This would be removed in a separate iteration. This isn't what we're testing.
+					controllerutil.RemoveFinalizer(cd, constants.FinalizerOwnsJob)
 					cd.Spec.Platform.AWS = nil
 					cd.Spec.Platform.BareMetal = &baremetal.Platform{}
 					cd.Labels[hivev1.HiveClusterPlatformLabel] = "baremetal"
@@ -510,6 +549,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testDeletedClusterDeployment())
+					// This would be removed in a separate iteration. This isn't what we're testing.
+					controllerutil.RemoveFinalizer(cd, constants.FinalizerOwnsJob)
 					cd.Spec.Installed = true
 					cd.Spec.PreserveOnDelete = true
 					return cd
@@ -529,6 +570,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testDeletedClusterDeployment())
+					// This would be removed in a separate iteration. This isn't what we're testing.
+					controllerutil.RemoveFinalizer(cd, constants.FinalizerOwnsJob)
 					cd.Spec.PreserveOnDelete = true
 					cd.Spec.Installed = false
 					return cd
@@ -1436,10 +1479,10 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
-				testProvision(tcp.Failed(), tcp.Attempt(0)),
-				testProvision(tcp.Failed(), tcp.Attempt(1)),
-				testProvision(tcp.Failed(), tcp.Attempt(2)),
-				testProvision(tcp.Failed(), tcp.Attempt(3)),
+				testProvision(tcp.Failed(), tcp.Attempt(0), rmOwnsJobFinalizer),
+				testProvision(tcp.Failed(), tcp.Attempt(1), rmOwnsJobFinalizer),
+				testProvision(tcp.Failed(), tcp.Attempt(2), rmOwnsJobFinalizer),
+				testProvision(tcp.Failed(), tcp.Attempt(3), rmOwnsJobFinalizer),
 			},
 			expectPendingCreation: true,
 			validate: func(c client.Client, t *testing.T) {
@@ -1565,7 +1608,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					)
 					return cd
 				}(),
-				testProvision(),
+				testProvision(rmOwnsJobFinalizer),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
@@ -1589,6 +1632,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
+					// This would be removed in a separate iteration. This isn't what we're testing.
+					controllerutil.RemoveFinalizer(cd, constants.FinalizerOwnsJob)
 					now := metav1.Now()
 					cd.DeletionTimestamp = &now
 					cd.Spec.ClusterMetadata = nil
@@ -1952,6 +1997,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					// This would be removed in a separate iteration. This isn't what we're testing.
+					controllerutil.RemoveFinalizer(cd, constants.FinalizerOwnsJob)
 					cd.Spec.ManageDNS = true
 					cd.Spec.Installed = true
 					now := metav1.Now()
@@ -2153,6 +2200,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					// This would be removed in a separate iteration. This isn't what we're testing.
+					controllerutil.RemoveFinalizer(cd, constants.FinalizerOwnsJob)
 					cd.Spec.Installed = true
 					now := metav1.Now()
 					cd.DeletionTimestamp = &now
@@ -3195,7 +3244,7 @@ func TestDeleteStaleProvisions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			provisions := make([]runtime.Object, len(tc.existingAttempts))
 			for i, a := range tc.existingAttempts {
-				provisions[i] = testProvision(tcp.Failed(), tcp.Attempt(a))
+				provisions[i] = testProvision(tcp.Failed(), tcp.Attempt(a), rmOwnsJobFinalizer)
 			}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
@@ -3242,12 +3291,14 @@ func TestDeleteOldFailedProvisions(t *testing.T) {
 					provisions[i] = testProvision(
 						tcp.Failed(),
 						tcp.WithCreationTimestamp(time.Now().Add(-7*24*time.Hour)),
-						tcp.Attempt(i))
+						tcp.Attempt(i),
+						rmOwnsJobFinalizer)
 				} else {
 					provisions[i] = testProvision(
 						tcp.Failed(),
 						tcp.WithCreationTimestamp(time.Now()),
-						tcp.Attempt(i))
+						tcp.Attempt(i),
+						rmOwnsJobFinalizer)
 				}
 			}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
@@ -3269,10 +3320,13 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 			Kind:       "ClusterDeployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       testName,
-			Namespace:  testNamespace,
-			Finalizers: []string{hivev1.FinalizerDeprovision},
-			UID:        types.UID("1234"),
+			Name:      testName,
+			Namespace: testNamespace,
+			Finalizers: []string{
+				hivev1.FinalizerDeprovision,
+				constants.FinalizerOwnsJob,
+			},
+			UID: types.UID("1234"),
 		},
 	}
 	return cd

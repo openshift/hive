@@ -2,19 +2,24 @@ package utils
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 )
@@ -115,4 +120,95 @@ func SyncOwnerReference(owner hivev1.MetaRuntimeObject, object hivev1.MetaRuntim
 
 	objectLogger.Info("Successfully set owner reference using labels")
 	return nil
+}
+
+// labelKeyForOwnerType accepts an instance of an object that can "own" a Job*, and returns the key
+// of the label we put on that Job when it is owned by an object of that type. The error return is
+// nil unless an unknown object type is passed in.
+// *We're talking about manual "ownership" rather than the k8s variety, as the objects live on
+// different servers in scale mode.
+func labelKeyForOwnerType(ownerInstance client.Object) (string, error) {
+	switch ownerInstance.(type) {
+	case *hivev1.ClusterDeployment:
+		return constants.ClusterDeploymentNameLabel, nil
+	case *hivev1.ClusterProvision:
+		return constants.ClusterProvisionNameLabel, nil
+	case *hivev1.ClusterDeprovision:
+		return constants.ClusterDeprovisionNameLabel, nil
+	default:
+		return "", fmt.Errorf("don't know how to get job owner for owner type %T", ownerInstance)
+	}
+
+}
+
+// GetJobOwnerNSName returns the NamespacedName of the object that "owns" the specified job*. The
+// ownerInstance is used to determine the type of the object we expect that owner to be. Returns
+// nil if the specified job has no owner of that type.
+// *We're talking about manual "ownership" rather than the k8s variety, as the objects live on
+// different servers in scale mode.
+func GetJobOwnerNSName(job *batchv1.Job, ownerInstance client.Object, logger log.FieldLogger) *types.NamespacedName {
+	// Parse the instance type to get just the unqualified name
+	lg := logger.WithField("job", job.Name).WithField("ownerType", fmt.Sprintf("%T", ownerInstance))
+	labelKey, err := labelKeyForOwnerType(ownerInstance)
+	if err != nil {
+		lg.Error(err)
+		return nil
+	}
+
+	var labels map[string]string
+	if labels = job.GetLabels(); labels == nil {
+		lg.Debug("Job is not ours: no labels found")
+		return nil
+	}
+	var ownerName string
+	if ownerName = labels[labelKey]; ownerName == "" {
+		logger.Debug("Job is not ours: no name label for owner type")
+		return nil
+	}
+	return &types.NamespacedName{
+		Name: ownerName,
+		// In scale mode, the Job and the owner are in different clusters.
+		// However, they reside in namespaces with the same name.
+		Namespace: job.Namespace,
+	}
+}
+
+// MapJobToOwner returns a handler.MapFunc that maps a Job to the object that "owns" it*. The owner
+// type is expected to be that of the ownerInstance.
+// *We're talking about manual "ownership" rather than the k8s variety, as the objects live on
+// different servers in scale mode.
+func MapJobToOwner(ownerInstance client.Object, logger log.FieldLogger) func(o client.Object) []reconcile.Request {
+	lg := logger.WithField("ownerType", fmt.Sprintf("%T", ownerInstance))
+	return func(o client.Object) []reconcile.Request {
+		job := o.(*batchv1.Job)
+		if job == nil {
+			lg.WithField("gotType", fmt.Sprintf("%T", o)).Error("Error mapping: got unexpected type (expected Job)")
+			return nil
+		}
+		nsName := GetJobOwnerNSName(job, ownerInstance, logger)
+		if nsName == nil {
+			// GetJobOwnerNSName logged
+			return nil
+		}
+		return []reconcile.Request{
+			{
+				NamespacedName: *nsName,
+			},
+		}
+	}
+}
+
+// EnsureOwnedJobsDeleted idempotently deletes all Jobs "owned" by the specified owner*.
+// *We're talking about manual "ownership" rather than the k8s variety, as the objects live on
+// different servers in scale mode.
+func EnsureOwnedJobsDeleted(c client.Client, owner client.Object, logger log.FieldLogger) error {
+	labelKey, err := labelKeyForOwnerType(owner)
+	if err != nil {
+		return errors.Wrap(err, "Invalid input to EnsureOwnedJobDeleted -- please report this bug")
+	}
+	return c.DeleteAllOf(
+		context.TODO(), &batchv1.Job{},
+		client.InNamespace(owner.GetNamespace()),
+		client.MatchingLabels{labelKey: owner.GetName()},
+		client.PropagationPolicy(metav1.DeletePropagationForeground))
 }

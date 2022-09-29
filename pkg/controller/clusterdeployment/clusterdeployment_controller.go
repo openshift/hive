@@ -199,10 +199,9 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for jobs in the control plane created by a ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	})
+	err = c.Watch(
+		&source.Kind{Type: &batchv1.Job{}},
+		handler.EnqueueRequestsFromMapFunc(controllerutils.MapJobToOwner(&hivev1.ClusterDeployment{}, logger)))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment job")
 		return err
@@ -380,14 +379,6 @@ func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerut
 			Controlled: true,
 		},
 		{
-			TypeToList: &batchv1.JobList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeploymentNameLabel: owner.GetName(),
-				constants.JobTypeLabel:               constants.JobTypeImageSet,
-			},
-			Controlled: true,
-		},
-		{
 			TypeToList: &hivev1.ClusterDeprovisionList{},
 			LabelSelector: map[string]string{
 				constants.ClusterDeploymentNameLabel: owner.GetName(),
@@ -534,6 +525,12 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			time.Since(cd.DeletionTimestamp.Time).Seconds())
 
 		return r.syncDeletedClusterDeployment(cd, cdLog)
+	}
+	// Add the owned job finalizer. We could try to be clever and do this only when we create the Job, but that
+	// would be more complicated for negligible gain
+	if !controllerutils.HasFinalizer(cd, constants.FinalizerOwnsJob) {
+		controllerutils.AddFinalizer(cd, constants.FinalizerOwnsJob)
+		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
 	// Check for the delete-after annotation, and if the cluster has expired, delete it
@@ -983,10 +980,6 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.JobTypeLabel, constants.JobTypeImageSet)
-		if err := controllerutil.SetControllerReference(cd, job, r.scheme); err != nil {
-			cdLog.WithError(err).Error("error setting controller reference on job")
-			return nil, err
-		}
 
 		jobLog.WithField("releaseImage", releaseImage).Info("creating imageset job")
 		err = controllerutils.SetupClusterInstallServiceAccount(r, cd.Namespace, cdLog)
@@ -1414,6 +1407,15 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error releasing inventory customization")
 			return reconcile.Result{}, err
 		}
+	}
+
+	// Ensure any owned jobs are cleaned up
+	if controllerutils.HasFinalizer(cd, constants.FinalizerOwnsJob) {
+		if err := controllerutils.EnsureOwnedJobsDeleted(r.controlPlaneClient, cd, cdLog); err != nil {
+			return reconcile.Result{}, err
+		}
+		controllerutils.DeleteFinalizer(cd, constants.FinalizerOwnsJob)
+		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
 	switch {

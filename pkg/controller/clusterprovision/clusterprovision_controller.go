@@ -3,9 +3,10 @@ package clusterprovision
 import (
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"strconv"
 	"time"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,7 +22,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -51,9 +51,6 @@ const (
 )
 
 var (
-	// controllerKind contains the schema.GroupVersionKind for this controller type.
-	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterProvision")
-
 	metricClusterProvisionsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "hive_cluster_provision_results_total",
 		Help: "Counter incremented every time we observe a completed cluster provision.",
@@ -177,8 +174,21 @@ func (r *ReconcileClusterProvision) Reconcile(ctx context.Context, request recon
 	}
 
 	if !instance.DeletionTimestamp.IsZero() {
-		pLog.Debug("ClusterProvision being deleted, skipping")
+		pLog.Debug("ClusterProvision deleted")
+		if controllerutils.HasFinalizer(instance, constants.FinalizerOwnsJob) {
+			if err := controllerutils.EnsureOwnedJobsDeleted(r.controlPlaneClient, instance, pLog); err != nil {
+				return reconcile.Result{}, err
+			}
+			controllerutils.DeleteFinalizer(instance, constants.FinalizerOwnsJob)
+			return reconcile.Result{}, r.Update(context.TODO(), instance)
+		}
 		return reconcile.Result{}, nil
+	}
+	// Add the owned job finalizer. We could try to be clever and do this only when we create the Job, but that
+	// would be more complicated for negligible gain
+	if !controllerutils.HasFinalizer(instance, constants.FinalizerOwnsJob) {
+		controllerutils.AddFinalizer(instance, constants.FinalizerOwnsJob)
+		return reconcile.Result{}, r.Update(context.TODO(), instance)
 	}
 
 	if !r.expectations.SatisfiedExpectations(request.String()) {
@@ -242,10 +252,6 @@ func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision,
 	pLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 	job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterProvisionNameLabel, instance.Name)
 	job.Labels = k8slabels.AddLabel(job.Labels, constants.JobTypeLabel, constants.JobTypeProvision)
-	if err = controllerutil.SetControllerReference(instance, job, r.scheme); err != nil {
-		pLog.WithError(err).Error("error setting controller reference on job")
-		return reconcile.Result{}, err
-	}
 
 	pLog.Infof("creating install job")
 	r.expectations.ExpectCreations(types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}.String(), 1)
@@ -540,14 +546,6 @@ func clusterDeploymentWatchHandler(a client.Object) []reconcile.Request {
 
 func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
 	return []*controllerutils.OwnershipUniqueKey{
-		{
-			TypeToList: &batchv1.JobList{},
-			LabelSelector: map[string]string{
-				constants.ClusterProvisionNameLabel: owner.GetName(),
-				constants.JobTypeLabel:              constants.JobTypeProvision,
-			},
-			Controlled: true,
-		},
 		{
 			TypeToList: &corev1.SecretList{},
 			LabelSelector: map[string]string{

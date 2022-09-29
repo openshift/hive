@@ -20,7 +20,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -80,7 +79,7 @@ func Add(mgr manager.Manager) error {
 	if err != nil {
 		return err
 	}
-	return add(mgr, r, concurrentReconciles, queueRateLimiter)
+	return add(mgr, r, concurrentReconciles, queueRateLimiter, logger)
 }
 
 // newReconciler returns a new reconcile.Reconciler
@@ -104,15 +103,15 @@ func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (re
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter, logger log.FieldLogger) error {
 	// Create a new controller
 	c, err := controller.New("clusterdeprovision-controller", mgr, controller.Options{
-		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
+		Reconciler:              controllerutils.NewDelayingReconciler(r, logger),
 		MaxConcurrentReconciles: concurrentReconciles,
 		RateLimiter:             rateLimiter,
 	})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error getting new clusterdeprovision-controller")
+		logger.WithError(err).Error("Error getting new clusterdeprovision-controller")
 		return err
 	}
 
@@ -120,17 +119,16 @@ func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, 
 	err = c.Watch(source.NewKindWithCache(&hivev1.ClusterDeprovision{}, controllerutils.GetDataPlaneClusterOrDie().GetCache()),
 		&handler.EnqueueRequestForObject{})
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error watching changes to clusterdeprovision")
+		logger.WithError(err).Error("Error watching changes to clusterdeprovision")
 		return err
 	}
 
 	// Watch for uninstall jobs in the control plane created for ClusterDeprovisions
-	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeprovision{},
-	})
+	err = c.Watch(
+		&source.Kind{Type: &batchv1.Job{}},
+		handler.EnqueueRequestsFromMapFunc(controllerutils.MapJobToOwner(&hivev1.ClusterDeprovision{}, logger)))
 	if err != nil {
-		log.WithField("controller", ControllerName).WithError(err).Error("Error watching  uninstall jobs created for clusterdeprovisionreques")
+		logger.WithError(err).Error("Error watching  uninstall jobs created for clusterdeprovisionreques")
 		return err
 	}
 
@@ -173,16 +171,22 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	}
 	rLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: instance}, rLog)
 
-	// Ensure owner references are correctly set
-	err = controllerutils.ReconcileOwnerReferences(instance, generateOwnershipUniqueKeys(instance), r, r.scheme, rLog)
-	if err != nil {
-		rLog.WithError(err).Error("Error reconciling object ownership")
-		return reconcile.Result{}, err
-	}
-
 	if !instance.DeletionTimestamp.IsZero() {
-		rLog.Debug("clusterdeprovision being deleted, skipping")
+		rLog.Debug("clusterdeprovision deleted")
+		if controllerutils.HasFinalizer(instance, constants.FinalizerOwnsJob) {
+			if err := controllerutils.EnsureOwnedJobsDeleted(r.controlPlaneClient, instance, rLog); err != nil {
+				return reconcile.Result{}, err
+			}
+			controllerutils.DeleteFinalizer(instance, constants.FinalizerOwnsJob)
+			return reconcile.Result{}, r.Update(context.TODO(), instance)
+		}
 		return reconcile.Result{}, nil
+	}
+	// Add the owned job finalizer. We could try to be clever and do this only when we create the Job, but that
+	// would be more complicated for negligible gain
+	if !controllerutils.HasFinalizer(instance, constants.FinalizerOwnsJob) {
+		controllerutils.AddFinalizer(instance, constants.FinalizerOwnsJob)
+		return reconcile.Result{}, r.Update(context.TODO(), instance)
 	}
 
 	if instance.Status.Completed {
@@ -323,11 +327,6 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	rLog.WithField("derivedObject", uninstallJob.Name).Debug("Setting labels on derived object")
 	uninstallJob.Labels = k8slabels.AddLabel(uninstallJob.Labels, constants.ClusterDeprovisionNameLabel, instance.Name)
 	uninstallJob.Labels = k8slabels.AddLabel(uninstallJob.Labels, constants.JobTypeLabel, constants.JobTypeDeprovision)
-	err = controllerutil.SetControllerReference(instance, uninstallJob, r.scheme)
-	if err != nil {
-		rLog.Errorf("error setting controller reference on job: %v", err)
-		return reconcile.Result{}, err
-	}
 
 	jobHash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
 	if err != nil {
@@ -428,19 +427,6 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 
 	rLog.Infof("uninstall job not yet successful")
 	return reconcile.Result{}, nil
-}
-
-func generateOwnershipUniqueKeys(owner hivev1.MetaRuntimeObject) []*controllerutils.OwnershipUniqueKey {
-	return []*controllerutils.OwnershipUniqueKey{
-		{
-			TypeToList: &batchv1.JobList{},
-			LabelSelector: map[string]string{
-				constants.ClusterDeprovisionNameLabel: owner.GetName(),
-				constants.JobTypeLabel:                constants.JobTypeDeprovision,
-			},
-			Controlled: true,
-		},
-	}
 }
 
 func (r *ReconcileClusterDeprovision) getActuator(cd *hivev1.ClusterDeprovision) Actuator {

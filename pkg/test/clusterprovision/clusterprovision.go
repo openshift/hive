@@ -48,6 +48,7 @@ func FullBuilder(namespace, name string) Builder {
 		generic.WithResourceVersion("1"),
 		generic.WithNamespace(namespace),
 		generic.WithName(name),
+		generic.WithFinalizer(constants.FinalizerOwnsJob),
 	).Options(
 		WithStage(hivev1.ClusterProvisionStageInitializing),
 	)

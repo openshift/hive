@@ -61,6 +61,12 @@ For each k8s CRUD operation hive needs to perform, the controller stack will dec
 Operations involving workloads will be performed in the control plane, using the client based on the controller manager, as normal.
 Other operations will be performed in the data plane, using a client constructed from the aforementioned kubeconfig.
 
+![scale mode](scalemode.png)
+
+([source](https://docs.google.com/drawings/d/1BqpNn3vMBAQItoVWvFh24xZ07AEm5X-O7qe3UNW5OZU/edit))
+
+A video of a live walkthrough of the [PR](https://github.com/openshift/hive/pull/1854) that (at least initially) implements this feature can be found [here](https://drive.google.com/file/d/1hVhMgR35lrpHX_lgx_x83nXxXQv815Im/view).
+
 ## HiveConfig
 HiveConfig.Spec will grow an additional substruct field, `Spec.ScaleMode`, to hold configuration for this new mode.
 Initially the `ScaleMode` substruct will contain a single boolean field, `Enabled`.

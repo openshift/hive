@@ -36,7 +36,7 @@ Create AWS resources using the [ccoctl](ccoctl.md#steps-create) tool (you will n
 ./ccoctl aws create-all --name <aws_infra_name> --region <aws_region> --credentials-requests-dir ./credrequests --output-dir _output/
 ```
 
-Hive allows passing in arbitrary Kubernetes resource manifests to pass through to the install process. We will leverage this to inject the Secrets and configuration required for an STS cluster by creating a secret containing these manifests in the steps below. The manifests secret will be referenced from the ClusterDeployment.
+Hive allows providing arbitrary Kubernetes resource manifests to pass through to the install process. We will leverage this to inject the Secrets and configuration required for an STS cluster by creating a secret containing these manifests in the steps below. The manifests secret will be referenced from the ClusterDeployment.
 
 ## Create Hive ClusterDeployment
 

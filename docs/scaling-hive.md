@@ -107,12 +107,16 @@ Here is an example graph from a scale test where Hive is running on an m5.xlarge
 
 When you are ready (please read this whole section first!) you can enable scale mode by editing your HiveConfig's `.spec`:
 - Remove `targetNamespace` if present
-- Add `scaleMode: true`
+- Add:
+  ```
+  scaleMode:
+    enabled: true
+  ```
 
 E.g.
 
 ```shell
-oc patch hiveconfig hive --type=json --patch '[{"op": "remove", "path": "/spec/targetNamespace"}, {"op": "add", "path": "/spec/scaleMode", "value": true}]'
+oc patch hiveconfig hive --type=json --patch '[{"op": "remove", "path": "/spec/targetNamespace"}, {"op": "add", "path": "/spec/scaleMode", "value": {"enabled": true}}]'
 ```
 
 This will cause hive to _undeploy_ the controller stack from the erstwhile `targetNamespace` (defaults to `hive` if unspecified) and deploy it into appropriately-labeled namespaces as described below.

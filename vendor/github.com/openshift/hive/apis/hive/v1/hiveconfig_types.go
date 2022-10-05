@@ -156,7 +156,12 @@ type HiveConfigSpec struct {
 	// That data plane will house all etcd objects needed by hive *except* those related to running containers
 	// (e.g. Pod, Job, Deployment, StatefulSet, ReplicaSet) which will run on the local "control plane" per usual.
 	// +optional
-	ScaleMode bool `json:"scaleMode"`
+	ScaleMode *ScaleModeConfig `json:"scaleMode,omitempty"`
+}
+
+type ScaleModeConfig struct {
+	// Enabled configures scale mode to be enabled (true) or disabled (false).
+	Enabled bool `json:"enabled"`
 }
 
 // ReleaseImageVerificationConfigMapReference is a reference to the ConfigMap that

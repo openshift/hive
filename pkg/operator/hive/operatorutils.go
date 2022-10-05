@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -52,4 +53,8 @@ func containerByName(template *corev1.PodSpec, name string) (*corev1.Container, 
 		}
 	}
 	return nil, fmt.Errorf("no container named %s", name)
+}
+
+func isScaleMode(instance *hivev1.HiveConfig) bool {
+	return instance.Spec.ScaleMode != nil && instance.Spec.ScaleMode.Enabled
 }

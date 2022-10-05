@@ -162,7 +162,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 
 	newClusterSyncStatefulSet.Namespace = hiveNSName
 
-	if hiveconfig.Spec.ScaleMode {
+	if isScaleMode(hiveconfig) {
 		controllerutils.AddDataPlaneKubeConfigVolume(&newClusterSyncStatefulSet.Spec.Template.Spec, hiveContainer)
 	}
 

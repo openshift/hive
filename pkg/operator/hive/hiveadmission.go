@@ -120,7 +120,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(), hiveAdmContainer)
 	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 
-	if instance.Spec.ScaleMode {
+	if isScaleMode(instance) {
 		controllerutils.AddDataPlaneKubeConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, hiveAdmContainer)
 	}
 

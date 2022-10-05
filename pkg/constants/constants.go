@@ -481,7 +481,7 @@ const (
 	OverrideInClusterCredentialsModeAnnotation = "hive.openshift.io/override-in-cluster-credentials-mode"
 
 	// DataPlaneNamespaceLabel should be set to `true` on a namespace in which hive should run a deployment when
-	// HiveConfig.Spec.ScaleMode is true.
+	// HiveConfig.Spec.ScaleMode.Enabled is true.
 	DataPlaneNamespaceLabel = "hive.openshift.io/data-plane"
 
 	// DataPlaneKubeconfigSecretName is the name of a Secret in a namespace designated as a data plane in scale mode.

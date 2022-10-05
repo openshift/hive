@@ -148,7 +148,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, failedProvisionConfigMapInfo, hiveContainer)
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, metricsConfigConfigMapInfo, hiveContainer)
 
-	if instance.Spec.ScaleMode {
+	if isScaleMode(instance) {
 		utils.AddDataPlaneKubeConfigVolume(&hiveDeployment.Spec.Template.Spec, hiveContainer)
 	}
 

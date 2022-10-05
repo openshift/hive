@@ -262,7 +262,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		}
 
 		// Use the HiveConfig to see if we're in scale mode; and if not, what the targetNamespace is.
-		if config.Spec.ScaleMode {
+		if isScaleMode(config) {
 			if labels := o.GetLabels(); labels != nil {
 				if b, _ := strconv.ParseBool(labels[targetNamespaceLabel]); b {
 					eLog.Debug("reconciling based on change to target-namespace labeled namespace in scale mode")
@@ -567,11 +567,11 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 // getHiveNamespaces returns a set of target namespaces into which hive controllers should be
 // deployed.
 func (r *ReconcileHiveConfig) getHiveNamespaces(config *hivev1.HiveConfig) (sets.String, error) {
-	if config.Spec.TargetNamespace != "" && config.Spec.ScaleMode {
+	if config.Spec.TargetNamespace != "" && isScaleMode(config) {
 		return nil, fmt.Errorf("TargetNamespace and ScaleMode are mutually exclusive")
 	}
 
-	if config.Spec.TargetNamespace == "" && !config.Spec.ScaleMode {
+	if config.Spec.TargetNamespace == "" && !isScaleMode(config) {
 		return sets.NewString(constants.DefaultHiveNamespace), nil
 	}
 
@@ -642,7 +642,7 @@ func (r *ReconcileHiveConfig) deployToNamespace(instance *hivev1.HiveConfig, h r
 	}
 
 	// Preflight check: in scale mode, the data plane kubeconfig secret must exist or we will refuse to deploy.
-	if instance.Spec.ScaleMode {
+	if isScaleMode(instance) {
 		dpkcs := &corev1.Secret{}
 		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNSName, Name: constants.DataPlaneKubeconfigSecretName}, dpkcs); err != nil {
 			var reason hivev1.TargetNamespaceDeploymentReason = "ErrorFindingDataPlaneKubeConfigSecret"

@@ -637,7 +637,14 @@ spec:
                   objects needed by hive *except* those related to running containers
                   (e.g. Pod, Job, Deployment, StatefulSet, ReplicaSet) which will
                   run on the local "control plane" per usual.
-                type: boolean
+                properties:
+                  enabled:
+                    description: Enabled configures scale mode to be enabled (true)
+                      or disabled (false).
+                    type: boolean
+                required:
+                - enabled
+                type: object
               serviceProviderCredentialsConfig:
                 description: ServiceProviderCredentialsConfig is used to configure
                   credentials related to being a service provider on various cloud

@@ -582,19 +582,39 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					}
 				}
 
-				// Update if the labels on the remote machineset are different than the labels on the generated machineset.
-				// If the length of both labels is zero, then they match, even if one is a nil map and the other is an empty map.
-				if rl, l := rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels; (len(rl) != 0 || len(l) != 0) && !reflect.DeepEqual(rl, l) {
-					msLog.WithField("desired", l).WithField("observed", rl).Info("labels out of sync")
-					rMS.Spec.Template.Spec.Labels = l
-					objectModified = true
+				// Carry over the labels on the remote machineset from the generated machineset. Merging strategy preserves the unique labels of remote machineset.
+				if rMS.Spec.Template.Spec.Labels == nil {
+					rMS.Spec.Template.Spec.Labels = make(map[string]string)
+				}
+				for key, value := range ms.Spec.Template.Spec.Labels {
+					if rMS.Spec.Template.Spec.Labels[key] != value {
+						rMS.Spec.Template.Spec.Labels[key] = value
+						objectModified = true
+					}
 				}
 
-				// Update if the taints on the remote machineset are different than the taints on the generated machineset.
-				// If the length of both taints is zero, then they match, even if one is a nil slice and the other is an empty slice.
-				if rt, t := rMS.Spec.Template.Spec.Taints, ms.Spec.Template.Spec.Taints; (len(rt) != 0 || len(t) != 0) && !reflect.DeepEqual(rt, t) {
-					msLog.WithField("desired", t).WithField("observed", rt).Info("taints out of sync")
-					rMS.Spec.Template.Spec.Taints = t
+				// Carry over the taints on the remote machineset from the generated machineset. Merging strategy preserves the unique taints of remote machineset.
+				if rMS.Spec.Template.Spec.Taints == nil {
+					rMS.Spec.Template.Spec.Taints = []corev1.Taint{}
+				}
+				// Make a temporary map of generated MachineSet's taints for easy lookup
+				gTaintsByKey := make(map[string]*corev1.Taint)
+				for gIndex, gTaint := range ms.Spec.Template.Spec.Taints {
+					gTaintsByKey[gTaint.Key] = &ms.Spec.Template.Spec.Taints[gIndex]
+				}
+				// Go through the remote MachineSet's taints, replacing overlaps with the generated MachineSet
+				for rIndex, rTaint := range rMS.Spec.Template.Spec.Taints {
+					if gTaint, foundTaint := gTaintsByKey[rTaint.Key]; foundTaint {
+						if gTaint.Value != rTaint.Value || gTaint.Effect != rTaint.Effect {
+							rMS.Spec.Template.Spec.Taints[rIndex] = *gTaint
+							objectModified = true
+						}
+						delete(gTaintsByKey, rTaint.Key)
+					}
+				}
+				// Any remaining taints from the temporary map are new and need to be added
+				for _, gTaint := range gTaintsByKey {
+					rMS.Spec.Template.Spec.Taints = append(rMS.Spec.Template.Spec.Taints, *gTaint)
 					objectModified = true
 				}
 

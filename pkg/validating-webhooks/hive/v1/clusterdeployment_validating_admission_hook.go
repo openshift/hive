@@ -723,14 +723,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateDelete(request *admis
 		"method":    "validateDelete",
 	})
 
-	// If running on OpenShift 3.11, OldObject will not be populated. All we can do is accept the DELETE request.
-	if len(request.OldObject.Raw) == 0 {
-		logger.Info("Cannot validate the DELETE since OldObject is empty")
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: true,
-		}
-	}
-
 	oldObject := &hivev1.ClusterDeployment{}
 	if err := a.decoder.DecodeRaw(request.OldObject, oldObject); err != nil {
 		logger.Errorf("Failed unmarshaling Object: %v", err.Error())

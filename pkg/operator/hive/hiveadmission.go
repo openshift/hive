@@ -1,7 +1,6 @@
 package hive
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -21,10 +20,7 @@ import (
 
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -150,22 +146,16 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
 	apiService.Spec.Service.Namespace = hiveNSName
 
-	// If on 3.11 we need to set the service CA on the apiservice.
-	is311, err := r.is311(hLog)
-	if err != nil {
-		hLog.Error("error detecting 3.11 cluster")
-		return err
-	}
-	// If we're running on vanilla Kube (mostly devs using kind), or OpenShift 3.x, we
+	// If we're running on vanilla Kube (mostly devs using kind), we
 	// will not have access to the service cert injection we normally use. Lookup
 	// the cluster CA and inject into the webhooks.
 	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
-	// secret, see hack/hiveadmission-dev-cert.sh.
+	// secret, see hack/hiveadmission-dev-cert.sh. (TODO: automate -- see HIVE-1449.)
 	isOpenShift, err := r.runningOnOpenShift(hLog)
 	if err != nil {
 		return err
 	}
-	if !isOpenShift || is311 {
+	if !isOpenShift {
 		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
 		err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
 		if err != nil {
@@ -280,21 +270,6 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 	}
 
 	return nil
-}
-
-// is311 returns true if this is a 3.11 OpenShift cluster. We check by looking for a ClusterVersion CRD,
-// which should only exist on OpenShift 4.x. We do not expect Hive to ever be deployed on pre-3.11.
-func (r *ReconcileHiveConfig) is311(hLog log.FieldLogger) (bool, error) {
-	cvCRD := &apiextv1.CustomResourceDefinition{}
-	err := r.Get(context.Background(), types.NamespacedName{Name: clusterVersionCRDName}, cvCRD)
-	if err != nil && apierrors.IsNotFound(err) {
-		// If this CRD does not exist, we must not be on a 4.x cluster.
-		return true, nil
-	} else if err != nil {
-		hLog.WithError(err).Error("error fetching clusterversion CRD")
-		return false, err
-	}
-	return false, nil
 }
 
 // allowedContracts is the list of operator whitelisted contracts that hive will accept

@@ -105,10 +105,9 @@ manifests: crd
 
 # controller-gen is adding a yaml break (---) at the beginning of each file. OLM does not like this break.
 # We use yq to strip out the yaml break by having yq replace each file with yq's formatting.
-# This also removes the spec.validation.openAPIV3Schema.type field which OpenShift 3.11 does not like.
 # $1 - CRD file
 define strip-yaml-break
-	@$(YQ) d -i $(1) spec.validation.openAPIV3Schema.type
+	@$(YQ) m -i $(1) $(1)
 
 endef
 

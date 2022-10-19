@@ -986,12 +986,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name:            "Test delete on OpenShift 3.11",
-			oldObject:       nil,
-			operation:       admissionv1beta1.Delete,
-			expectedAllowed: true,
-		},
-		{
 			name:            "vSphere create valid",
 			newObject:       validVSphereClusterDeployment(),
 			operation:       admissionv1beta1.Create,

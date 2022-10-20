@@ -700,9 +700,17 @@ openstack:
 
 `MachinePool` is a YAML configuration by which you can create and scale worker nodes on a deployed cluster. A `MachinePool` will create `MachineSet` resources on the deployed cluster. If supported on your cloud, those MachineSets will automatically span all AZs, or you can specify an explicit list.
 
-To manage `MachinePools` Day 2, you need to define these as well. The definition of the worker pool should mostly match what was specified in `InstallConfig` to prevent replacement of all worker nodes.
+A MachinePool for the worker machinesets is not required. If the user creates a MachinePool for the worker MachineSets, then Hive will manage the worker MachineSets.
 
-`InstallConfig` is limited to the one worker pool, but Hive can sync additional machine pools Day 2.
+MachinePool reconciliation is limited to updating MachineSet replicas to match the replicas configured for the MachinePool. Additionally, When `Labels` or `Taints` are configured for a MachinePool, Hive will completely override any existing `Label` or `Taints` configurations on the associated MachineSets, see [HIVE-2035](https://issues.redhat.com/browse/HIVE-2035).
+
+MachinePool platform is immutable and any changes made to `MachinePool.spec.platform` are blocked by a validating webhook. The Machine Config Operator does not support updating existing machines when platform details are changed in a MachineSet and consequently Hive does not support making such changes to MachinePool platform, see [HIVE-2024](https://issues.redhat.com/browse/HIVE-2024).
+
+The recommended workaround when platform details must be changed is to replace the MachinePool by creating an adjacent MachinePool with the desired configuration.
+* Create replacement MachinePool with desired configuration and `MachinePool.spec.replicas = 0`.
+* Scale down the old MachinePool while scaling up the replacement MachinePool.
+
+`InstallConfig` is limited to the one worker pool, but Hive can sync additional `MachinePools` Day 2.
 
 ```yaml
 apiVersion: hive.openshift.io/v1

@@ -6,6 +6,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 var (
@@ -67,7 +69,7 @@ var (
 		Name: "hive_cluster_deployments_provision_failed_terminal_total",
 		Help: "Counter incremented when a cluster provision has failed and won't be retried.",
 	},
-		[]string{"clusterpool_namespacedname"},
+		[]string{"clusterpool_namespacedname", "cluster_type", "failure_reason"},
 	)
 )
 
@@ -76,7 +78,14 @@ func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment) {
 	if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
 		poolNSName = poolRef.Namespace + "/" + poolRef.PoolName
 	}
-	metricProvisionFailedTerminal.WithLabelValues(poolNSName).Inc()
+	stoppedReason := "unknown"
+	stoppedCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition)
+	if stoppedCondition != nil {
+		stoppedReason = stoppedCondition.Reason
+	}
+	metricProvisionFailedTerminal.WithLabelValues(poolNSName,
+		hivemetrics.GetClusterDeploymentType(cd),
+		stoppedReason).Inc()
 }
 
 func init() {

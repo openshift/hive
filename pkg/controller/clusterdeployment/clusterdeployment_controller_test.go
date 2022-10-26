@@ -990,10 +990,23 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// DNS not ready
 					{
 						Type:   hivev1.DNSNotReadyCondition,
 						Status: corev1.ConditionTrue,
 						Reason: dnsNotReadyReason,
+					},
+					// Still provisioning
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
+					},
+					// Didn't stop provisioning
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
 					},
 				})
 				provisions := getProvisions(c)
@@ -1023,10 +1036,23 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// DNS not ready
 					{
 						Type:   hivev1.DNSNotReadyCondition,
 						Status: corev1.ConditionTrue,
 						Reason: dnsNotReadyReason,
+					},
+					// Still provisioning
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
+					},
+					// Didn't stop provisioning
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
 					},
 				})
 				provisions := getProvisions(c)
@@ -1061,7 +1087,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 						Status: corev1.ConditionTrue,
 						Reason: dnsNotReadyTimedoutReason,
 					},
-					// Not Provisioned
+					// Not provisioned
 					{
 						Type:   hivev1.ProvisionedCondition,
 						Status: corev1.ConditionFalse,
@@ -1079,7 +1105,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "Set condition when DNSZone cannot be created due to credentials missing permissions",
+			name: "Set condition and stop when DNSZone cannot be created due to credentials missing permissions",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
@@ -1094,16 +1120,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// Insufficient credentials
 					{
 						Type:   hivev1.DNSNotReadyCondition,
 						Status: corev1.ConditionTrue,
 						Reason: "InsufficientCredentials",
 					},
+					// Provision stopped
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionFalse,
+						Reason: hivev1.ProvisionedReasonProvisionStopped,
+					},
+					// Not provisioned
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "DNSZoneFailedToReconcile",
+					},
 				})
 			},
 		},
 		{
-			name: "Set condition when DNSZone cannot be created due to api opt-in required for DNS apis",
+			name: "Set condition and stop when DNSZone cannot be created due to api opt-in required for DNS apis",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
@@ -1118,16 +1157,29 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// API opt-in required
 					{
 						Type:   hivev1.DNSNotReadyCondition,
 						Status: corev1.ConditionTrue,
 						Reason: "APIOptInRequiredForDNS",
 					},
+					// Provision stopped
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionFalse,
+						Reason: hivev1.ProvisionedReasonProvisionStopped,
+					},
+					// Not provisioned
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "DNSZoneFailedToReconcile",
+					},
 				})
 			},
 		},
 		{
-			name: "Set condition when DNSZone cannot be created due to authentication failure",
+			name: "Set condition and stop when DNSZone cannot be created due to authentication failure",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
@@ -1142,10 +1194,23 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// Auth failure
 					{
 						Type:   hivev1.DNSNotReadyCondition,
 						Status: corev1.ConditionTrue,
 						Reason: "AuthenticationFailure",
+					},
+					// Provision stopped
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionFalse,
+						Reason: hivev1.ProvisionedReasonProvisionStopped,
+					},
+					// Not provisioned
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "DNSZoneFailedToReconcile",
 					},
 				})
 			},
@@ -1166,11 +1231,24 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cd := getCD(c)
 				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// DNS not ready
 					{
 						Type:    hivev1.DNSNotReadyCondition,
 						Status:  corev1.ConditionTrue,
 						Reason:  "CloudError",
 						Message: "Some cloud error occurred",
+					},
+					// Still provisioning
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
+					},
+					// Didn't stop provisioning
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
 					},
 				})
 			},

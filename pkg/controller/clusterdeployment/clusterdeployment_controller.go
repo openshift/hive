@@ -1591,11 +1591,14 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	apiOptInRequiredCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.APIOptInRequiredCondition)
 	dnsErrorCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.GenericDNSErrorsCondition)
 	var (
-		status              corev1.ConditionStatus
-		reason, message     string
-		dnsCondChanged      bool
-		metricAnnotationSet bool
-		requeueAfter        time.Duration
+		status                 corev1.ConditionStatus
+		reason, message        string
+		dnsCondChanged         bool
+		stoppedCondChanged     bool
+		provisionedCondChanged bool
+		metricAnnotationSet    bool
+		requeueAfter           time.Duration
+		fatalCondition         bool
 	)
 	switch {
 	case availableCondition != nil && availableCondition.Status == corev1.ConditionTrue:
@@ -1606,14 +1609,17 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		status = corev1.ConditionTrue
 		reason = "InsufficientCredentials"
 		message = insufficientCredentialsCondition.Message
+		fatalCondition = true
 	case authenticationFailureCondition != nil && authenticationFailureCondition.Status == corev1.ConditionTrue:
 		status = corev1.ConditionTrue
 		reason = "AuthenticationFailure"
 		message = authenticationFailureCondition.Message
+		fatalCondition = true
 	case apiOptInRequiredCondition != nil && apiOptInRequiredCondition.Status == corev1.ConditionTrue:
 		status = corev1.ConditionTrue
 		reason = "APIOptInRequiredForDNS"
 		message = apiOptInRequiredCondition.Message
+		fatalCondition = true
 	case dnsErrorCondition != nil && dnsErrorCondition.Status == corev1.ConditionTrue:
 		status = corev1.ConditionTrue
 		reason = dnsErrorCondition.Reason
@@ -1621,6 +1627,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	default:
 		status = corev1.ConditionTrue
 		reason, message, requeueAfter = dnsZoneNotReadyMaybeTimedOut(cd, cdLog)
+		// dnsZoneNotReadyMaybeTimedOut will stop provisioning on its own if it feels the need to
 	}
 	cd.Status.Conditions, dnsCondChanged = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		cd.Status.Conditions,
@@ -1629,7 +1636,28 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 		reason,
 		message,
 		controllerutils.UpdateConditionIfReasonOrMessageChange)
-	if dnsCondChanged {
+
+	if fatalCondition {
+		logger.WithField("reason", reason).WithField("message", message).Error("DNSZone is in fatal state")
+		// Fatal state. Set the Provisioned and ProvisionStopped conditions.
+		cd.Status.Conditions, stoppedCondChanged = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.ProvisionStoppedCondition,
+			corev1.ConditionTrue,
+			"DNSZoneFailedToReconcile",
+			"DNSZone failed to reconcile (see the DNSNotReadyCondition condition for details)",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+		// This is what shows up under ProvisionStatus in oc tabular output
+		cd.Status.Conditions, provisionedCondChanged = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.ProvisionedCondition,
+			corev1.ConditionFalse,
+			hivev1.ProvisionedReasonProvisionStopped,
+			"Provisioning failed terminally (see the ProvisionStopped condition for details)",
+			controllerutils.UpdateConditionIfReasonOrMessageChange)
+	}
+
+	if dnsCondChanged || stoppedCondChanged || provisionedCondChanged {
 		if err := r.Status().Update(context.TODO(), cd); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return false, reconcile.Result{}, err

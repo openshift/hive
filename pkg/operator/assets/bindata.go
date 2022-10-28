@@ -1838,6 +1838,7 @@ data:
       searchRegexStrings:
       - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: i/o timeout"
       - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: connect: connection refused"      
+      - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: connect: no route to host"
       installFailingReason: ProxyTimeout
       installFailingMessage: The cluster is installing via a proxy, however the proxy server is refusing or timing out connections. Verify that the proxy is running and would be accessible from the cluster's private subnet(s).
     - name: ProxyInvalidCABundle

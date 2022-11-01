@@ -339,9 +339,10 @@ func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.Cluste
 			Namespace: remoteIngressControllerNamespace,
 		},
 		Spec: ingresscontroller.IngressControllerSpec{
-			Domain:            ingress.Domain,
-			RouteSelector:     ingress.RouteSelector,
-			NamespaceSelector: ingress.NamespaceSelector,
+			Domain:             ingress.Domain,
+			RouteSelector:      ingress.RouteSelector,
+			NamespaceSelector:  ingress.NamespaceSelector,
+			HttpErrorCodePages: ingress.HttpErrorCodePages,
 		},
 	}
 

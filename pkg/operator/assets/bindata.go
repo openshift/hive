@@ -1727,7 +1727,7 @@ data:
       installFailingMessage: AWS Subnet Does Not Exist
     # iam:CreateServiceLinkedRole is a super powerful permission that we don't give to STS clusters. We require it's done as a one-time prereq.
     # This is the error we see when the prereq step was missed.
-    - name: NATGatewayFailed 
+    - name: NATGatewayFailed
       searchRegexStrings:
       - "Error waiting for NAT Gateway (.*) to become available"
       installFailingReason: NATGatewayFailed
@@ -1740,6 +1740,7 @@ data:
     - name: AWSInsufficientPermissions
       searchRegexStrings:
       - "current credentials insufficient for performing cluster installation"
+      - "UnauthorizedOperation: You are not authorized to perform this operation. Encoded authorization failure message"
       installFailingReason: AWSInsufficientPermissions
       installFailingMessage: AWS credentials are insufficient for performing cluster installation
     - name: VcpuLimitExceeded
@@ -1819,7 +1820,7 @@ data:
       installFailingReason: GCPNoWorkerNodes
       installFailingMessage: No worker nodes could be created. Check the machine-api logs.
 
-    
+
     # Bare Metal
     - name: LibvirtSSHKeyPermissionDenied
       searchRegexStrings:
@@ -1837,7 +1838,7 @@ data:
     - name: ProxyTimeout
       searchRegexStrings:
       - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: i/o timeout"
-      - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: connect: connection refused"      
+      - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: connect: connection refused"
       - "error pinging docker registry .+ proxyconnect tcp: dial tcp [^ ]+: connect: no route to host"
       installFailingReason: ProxyTimeout
       installFailingMessage: The cluster is installing via a proxy, however the proxy server is refusing or timing out connections. Verify that the proxy is running and would be accessible from the cluster's private subnet(s).

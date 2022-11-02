@@ -1850,16 +1850,26 @@ data:
 
     # Generic OpenShift Install
     
-    - name: BootstrapFailed
-      searchRegexStrings:
-      - "Bootstrap failed to complete"
-      installFailingReason: BootstrapFailed
-      installFailingMessage: Installation Bootstrap failed to complete. Verify the networking configuration and account permissions and try again.
     - name: KubeAPIWaitTimeout
       searchRegexStrings:
       - "waiting for Kubernetes API: context deadline exceeded"
       installFailingReason: KubeAPIWaitTimeout
       installFailingMessage: Timeout waiting for the Kubernetes API to begin responding
+    - name: KubeAPIWaitFailed
+      searchRegexStrings:
+      - "Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane"
+      installFailingReason: KubeAPIWaitFailed
+      installFailingMessage: Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane
+    - name: BootstrapFailed
+      searchRegexStrings:
+      - "Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane."
+      installFailingReason: BootstrapFailed
+      installFailingMessage: Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane. Verify the networking configuration and account permissions and try again.
+    - name: GenericBootstrapFailed
+      searchRegexStrings:
+      - "Bootstrap failed to complete"
+      installFailingReason: GenericBootstrapFailed
+      installFailingMessage: Installation Bootstrap failed to complete. Verify the networking configuration and account permissions and try again.
     - name: MonitoringOperatorStillUpdating
       searchRegexStrings:
       - "failed to initialize the cluster: Cluster operator monitoring is still updating"
@@ -1880,11 +1890,6 @@ data:
       - "failed to initialize the cluster: Some cluster operators are still updating:"
       installFailingReason: GeneralClusterOperatorsStillUpdating
       installFailingMessage: Timeout waiting for all cluster operators to become ready
-    - name: KubeAPIWaitFailed
-      searchRegexStrings:
-      - "Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane"
-      installFailingReason: KubeAPIWaitFailed
-      installFailingMessage: Failed waiting for Kubernetes API. This error usually happens when there is a problem on the bootstrap host that prevents creating a temporary control plane
     - name: SCACertPullFailed
       searchRegexStrings:
       - "Failed to pull SCA certs from"

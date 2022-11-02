@@ -51,7 +51,7 @@ const (
 	proxyNoRouteToHost          = "time=\"2022-10-27T17:38:30Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:7ffe4cd612be27e355a640e5eec5cd8f923c1400d969fd590f806cffdaabcc56: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \"https://pull.q1w2.quay.rhcloud.com/v2/\": proxyconnect tcp: dial tcp 10.0.1.7:8080: connect: no route to host]): quay.io/openshift-release-dev/ocp-release@sha256:7ffe4cd612be27e355a640e5eec5cd8f923c1400d969fd590f806cffdaabcc56: error pinging docker registry quay.io: Get \"https://quay.io/v2/\": proxyconnect tcp: dial tcp 10.0.1.7:8080: connect: no route to host\""
 	proxyInvalidCABundleLog     = "time=\"2021-08-27T05:56:50Z\" level=info msg=\"[pull.q1w2.quay.rhcloud.com/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry pull.q1w2.quay.rhcloud.com: Get \\\"https://pull.q1w2.quay.rhcloud.com/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority]): quay.io/openshift-release-dev/ocp-release@sha256:7047acb946649cc1f54d98a1c28dd7b487fe91479aa52c13c971ea014a66c8a8: error pinging docker registry quay.io: Get \\\"https://quay.io/v2/\\\": proxyconnect tcp: x509: certificate signed by unknown authority"
 	awsEC2QuotaExceeded         = "time=\"2021-12-12T12:54:36Z\" level=fatal msg=\"failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Quota Check\": error(MissingQuota): ec2/L-1234A56B is not available in us-east-1 because the required number of resources (36) is more than the limit of 32\""
-	bootstrapFailed             = "time=\"2022-01-26T17:44:03Z\" level=error msg=\"Bootstrap failed to complete: Get \"https://api.blahblah.kay6.p1.openshiftapps.com:6443/version?timeout=32s\": dial tcp 12.23.34.45:6443: connect: connection refused\""
+	genericBootstrapFailed      = "time=\"2022-01-26T17:44:03Z\" level=error msg=\"Bootstrap failed to complete: Get \"https://api.blahblah.kay6.p1.openshiftapps.com:6443/version?timeout=32s\": dial tcp 12.23.34.45:6443: connect: connection refused\""
 	awsInvalidVpcId             = "time=\"2022-01-11T18:25:33Z\" level=error msg=\"Error: InvalidVpcID.NotFound: The vpc ID 'vpc-whatever' does not exist\""
 	route53Timeout              = "level=error\nlevel=error msg=Error: error waiting for Route53 Hosted Zone (Z1234567890ACBD) creation: timeout while waiting for state to become 'INSYNC' (last state: 'PENDING', timeout: 15m0s)\nlevel=error\nlevel=error msg= on ../tmp/openshift-install-cluster-260510522/route53/base.tf line 22, in resource \"aws_route53_zone\" \"new_int\":\nlevel=error msg= 22: resource \"aws_route53_zone\" \"new_int\""
 	inconsistentTerraformResult = "time=\"2021-12-01T16:08:46Z\" level=error msg=\"Error: Provider produced inconsistent result after apply\""
@@ -65,6 +65,7 @@ time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 mas
 	terraformFailedDelete = "level=fatal msg=terraform destroy: failed to destroy using Terraform"
 	noMatchLog            = "an example of something that doesn't match the log regexes"
 	scaCertPullFailedLog  = "Cluster operator insights SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: unable to retrieve SCA certs data from https://api.openshift.com/api/accounts_mgmt/v1/certificates: Post \"https://api.openshift.com/api/accounts_mgmt/v1/certificates\""
+	bootstrapFailed       = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -371,6 +372,16 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "BootstrapFailed",
 			log:            pointer.StringPtr(bootstrapFailed),
 			expectedReason: "BootstrapFailed",
+		},
+		{
+			name:           "KubeAPIWaitFailed",
+			log:            pointer.StringPtr(kubeAPIWaitFailedLog),
+			expectedReason: "KubeAPIWaitFailed",
+		},
+		{
+			name:           "GenericBootstrapFailed",
+			log:            pointer.StringPtr(genericBootstrapFailed),
+			expectedReason: "GenericBootstrapFailed",
 		},
 		{
 			name:           "AWSRoute53Timeout",

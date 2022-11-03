@@ -2,46 +2,47 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Cluster Provisioning](#cluster-provisioning)
-  - [DNS](#dns)
-  - [Native](#native)
-    - [Managed DNS](#managed-dns)
-  - [Non-native](#non-native)
-    - [oVirt](#ovirt)
-  - [Pull Secret](#pull-secret)
-  - [OpenShift Version](#openshift-version)
-  - [Cloud credentials](#cloud-credentials)
-    - [Alibaba Cloud](#alibaba-cloud)
-      - [Alibaba Cloud Credential Manifests](#alibaba-cloud-credential-manifests)
-    - [AWS](#aws)
-    - [Azure](#azure)
-    - [GCP](#gcp)
-    - [IBM Cloud](#ibm-cloud)
-      - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
-    - [oVirt](#ovirt-1)
-    - [vSphere](#vsphere)
-    - [OpenStack](#openstack)
-  - [SSH Key Pair](#ssh-key-pair)
-  - [InstallConfig](#installconfig)
-  - [ClusterDeployment](#clusterdeployment)
-  - [Machine Pools](#machine-pools)
-    - [Configuring Availability Zones](#configuring-availability-zones)
-    - [Auto-scaling](#auto-scaling)
-      - [Integration with Horizontal Pod Autoscalers](#integration-with-horizontal-pod-autoscalers)
+- [Using Hive](#using-hive)
+  - [Cluster Provisioning](#cluster-provisioning)
+    - [DNS](#dns)
+      - [Native](#native)
+        - [Managed DNS](#managed-dns)
+      - [Non-native](#non-native)
+        - [oVirt](#ovirt)
+    - [Pull Secret](#pull-secret)
+    - [OpenShift Version](#openshift-version)
+    - [Cloud credentials](#cloud-credentials)
+      - [Alibaba Cloud](#alibaba-cloud)
+        - [Alibaba Cloud Credential Manifests](#alibaba-cloud-credential-manifests)
+      - [AWS](#aws)
+      - [Azure](#azure)
+      - [GCP](#gcp)
+      - [IBM Cloud](#ibm-cloud)
+        - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
+      - [oVirt](#ovirt-1)
+      - [vSphere](#vsphere)
+      - [OpenStack](#openstack)
+    - [SSH Key Pair](#ssh-key-pair)
+    - [InstallConfig](#installconfig)
+    - [ClusterDeployment](#clusterdeployment)
+    - [Machine Pools](#machine-pools)
+      - [Configuring Availability Zones](#configuring-availability-zones)
+      - [Auto-scaling](#auto-scaling)
+        - [Integration with Horizontal Pod Autoscalers](#integration-with-horizontal-pod-autoscalers)
     - [Create Cluster on Bare Metal](#create-cluster-on-bare-metal)
-- [Monitor the Install Job](#monitor-the-install-job)
-  - [Saving Logs for Failed Provisions](#saving-logs-for-failed-provisions)
-  - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
-  - [Access the Web Console](#access-the-web-console)
-- [Managed DNS](#managed-dns-1)
-- [Cluster Adoption](#cluster-adoption)
-  - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
-  - [Adopting with hiveutil](#adopting-with-hiveutil)
-- [Configuration Management](#configuration-management)
-  - [SyncSet](#syncset)
-  - [Scaling ClusterSync](#scaling-clustersync)
-  - [Identity Provider Management](#identity-provider-management)
-- [Cluster Deprovisioning](#cluster-deprovisioning)
+  - [Monitor the Install Job](#monitor-the-install-job)
+    - [Saving Logs for Failed Provisions](#saving-logs-for-failed-provisions)
+    - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
+    - [Access the Web Console](#access-the-web-console)
+  - [Managed DNS](#managed-dns-1)
+  - [Cluster Adoption](#cluster-adoption)
+    - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
+    - [Adopting with hiveutil](#adopting-with-hiveutil)
+  - [Configuration Management](#configuration-management)
+    - [SyncSet](#syncset)
+    - [Scaling ClusterSync](#scaling-clustersync)
+    - [Identity Provider Management](#identity-provider-management)
+  - [Cluster Deprovisioning](#cluster-deprovisioning)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -55,19 +56,19 @@ Hive comes with an optional `hiveutil` binary to assist creating the `ClusterDep
 
 ### DNS
 
-### Native
+#### Native
 
 For clouds where there is support for automated IP allocation and DNS configuration, (Alibaba Cloud, AWS, Azure, IBM Cloud and GCP) an OpenShift installation requires a live and functioning DNS zone in the cloud account into which you will be installing the new cluster(s). For example if you own example.com, you could create a hive.example.com subdomain in Route53, and ensure that you have made the appropriate NS entries under example.com to delegate to the Route53 zone. When creating a new cluster, the installer will make future DNS entries under hive.example.com as needed for the cluster(s).
 
-#### Managed DNS
+##### Managed DNS
 
 In addition to the default OpenShift DNS support, Hive offers a DNS feature called Managed DNS. With Managed DNS, Hive can automatically create delegated zones for approved base domains. For example, if hive.example.com exists and is specified as your managed domain, you can specify a base domain of cluster1.hive.example.com on your `ClusterDeployment`, and Hive will create this zone for you, add forwarding records in the base domain, wait for it to resolve, and then proceed with installation. Read [here](#managed-dns-1) for more details.
 
-### Non-native
+#### Non-native
 
 For other platforms/clouds (OpenStack, oVirt, and VSphere), there is presently no native DNS auto-configuration available. This requires some up-front DNS configuration before a cluster can be installed.  It will typically be necessary to reserve virtual IPs (VIPs) that will be used for the cluster's management (eg `api.mycluster.hive.example.com`) and for the cluster's default ingress routes (eg `\*.apps.mycluster.hive.example.com`). Each platform/cloud's configuration will have its own system for alocating or reserving these IPs. Once the IPs are reserved, DNS entries must be published as A records (or simply making local host entries to manage the DNS-to-IP translations on the host(s) running Hive) so that the cluster's API endpoint will be accessible to Hive.
 
-#### oVirt
+##### oVirt
 
 In addition to reserving IPs for the API and ingress for the cluster, installing pre-4.6 versions of OpenShift onto oVirt requires providing an additional DNS IP for the internal DNS server operated by the cluster. This value must be populated into the Secret containing the `install-config.yaml` information.
 
@@ -861,7 +862,7 @@ A `MachinePool` configured to auto-scaling mode creates a `ClusterAutoscaler` on
 
 > The horizontal pod autoscaler (HPA) and the cluster autoscaler modify cluster resources in different ways. The HPA changes the deployment’s or replica set’s number of replicas based on the current CPU load. If the load increases, the HPA creates new replicas, regardless of the amount of resources available to the cluster. If there are not enough resources, the cluster autoscaler adds resources so that the HPA-created pods can run. If the load decreases, the HPA stops some replicas. If this action causes some nodes to be underutilized or completely empty, the cluster autoscaler deletes the unnecessary nodes.
 
-#### Create Cluster on Bare Metal
+### Create Cluster on Bare Metal
 
 Hive supports bare metal provisioning as provided by [openshift-install](https://github.com/openshift/installer/blob/master/docs/user/metal/install_ipi.md)
 

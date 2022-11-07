@@ -1743,6 +1743,11 @@ data:
       - "UnauthorizedOperation: You are not authorized to perform this operation. Encoded authorization failure message"
       installFailingReason: AWSInsufficientPermissions
       installFailingMessage: AWS credentials are insufficient for performing cluster installation
+    - name: AWSDeniedBySCP
+      searchRegexStrings:
+      - "AccessDenied: .* with an explicit deny in a service control policy"
+      installFailingReason: AWSDeniedBySCP
+      installFailingMessage: "A service control policy (SCP) is too restrictive for performing cluster installation"
     - name: VcpuLimitExceeded
       searchRegexStrings:
       - "VcpuLimitExceeded"

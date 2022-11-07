@@ -40,29 +40,31 @@ type rootDomainsInfo struct {
 // - A bool indicating whether the scraper has scraped that root domain yet.
 // - A map, keyed by subdomain name, of information about each subdomain.
 // The subdomain information is:
+//
 //   - A pointer to a DNSZone. This is populated by the dnsendpoint controller iff it has ever
 //     reconciled that DNSZone (and the DNSZone hasn't been deleted).
+//
 //   - A set of strings representing the name servers the scraper has discovered for the subdomain
 //     in the root domain's hosted zone. This is populated by the scraper; and updated by the
 //     dnsendpoint controller iff it decides the name servers for the subdomain need to be synced
 //     after inspecting the corresponding DNSZone.
 //
-//	{
-//	   "p1.openshiftapps.com": {
-//	      scraped: true
-//	      endpoinsBySubdomain: {
-//	         "abcd.p1.openshiftapps.com": {
-//	            dnsZone: $dnsZone,
-//	            nsValues: {
-//	               "ns-124.awsdns-15.com.",
-//	               ...
-//	            }
-//	         }
-//	         "wxyz.p1.openshiftapps.com": { ... }
-//	      }
-//	   }
-//	   "p2.openshiftapps.com": { ... }
-//	}
+//     {
+//     "p1.openshiftapps.com": {
+//     scraped: true
+//     endpoinsBySubdomain: {
+//     "abcd.p1.openshiftapps.com": {
+//     dnsZone: $dnsZone,
+//     nsValues: {
+//     "ns-124.awsdns-15.com.",
+//     ...
+//     }
+//     }
+//     "wxyz.p1.openshiftapps.com": { ... }
+//     }
+//     }
+//     "p2.openshiftapps.com": { ... }
+//     }
 //
 // This is used as a cache with the intent of reducing the number of queries to the cloud provider.
 //

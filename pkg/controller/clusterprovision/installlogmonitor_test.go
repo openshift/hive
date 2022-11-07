@@ -66,6 +66,7 @@ time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 mas
 	noMatchLog            = "an example of something that doesn't match the log regexes"
 	scaCertPullFailedLog  = "Cluster operator insights SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: unable to retrieve SCA certs data from https://api.openshift.com/api/accounts_mgmt/v1/certificates: Post \"https://api.openshift.com/api/accounts_mgmt/v1/certificates\""
 	bootstrapFailed       = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
+	awsDeniedByScp        = "AccessDenied: entity is not authorized to perform: iam:PressTheButton on resource: Thing with an explicit deny in a service control policy"
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -156,6 +157,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "ProxyInvalidCABundle",
 			log:            pointer.StringPtr(proxyInvalidCABundleLog),
 			expectedReason: "ProxyInvalidCABundle",
+		},
+		{
+			name:           "AWSDeniedBySCP",
+			log:            pointer.StringPtr(awsDeniedByScp),
+			expectedReason: "AWSDeniedBySCP",
 		},
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",

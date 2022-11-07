@@ -3257,6 +3257,11 @@ func (in *Provisioning) DeepCopyInto(out *Provisioning) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.ManifestsSecretRef != nil {
+		in, out := &in.ManifestsSecretRef, &out.ManifestsSecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	if in.SSHPrivateKeySecretRef != nil {
 		in, out := &in.SSHPrivateKeySecretRef, &out.SSHPrivateKeySecretRef
 		*out = new(corev1.LocalObjectReference)

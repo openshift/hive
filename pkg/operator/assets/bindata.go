@@ -1601,7 +1601,7 @@ data:
   regexes: |
     - name: SCACertsPullFailed
       searchRegexStrings:
-      - "SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from"
+      - "Failed to pull SCA certs from"
       installFailingReason: SCACertsPullFailed
       installFailingMessage: Cannot pull SCA certificates. Make sure SCA is enabled and try again. See https://access.redhat.com/articles/simple-content-access.
     # AWS Specific:
@@ -1896,11 +1896,6 @@ data:
       - "failed to initialize the cluster: Some cluster operators are still updating:"
       installFailingReason: GeneralClusterOperatorsStillUpdating
       installFailingMessage: Timeout waiting for all cluster operators to become ready
-    - name: SCACertPullFailed
-      searchRegexStrings:
-      - "Failed to pull SCA certs from"
-      installFailingReason: SCACertPullFailed
-      installFailingMessage: Failed to pull SCA certs
 
     # Keep these at the bottom so that they're only hit if nothing above matches.
     # We don't want to show these to users unless it's a last resort. It's barely better than "unknown error".

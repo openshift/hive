@@ -56,7 +56,6 @@ const (
 	route53Timeout              = "level=error\nlevel=error msg=Error: error waiting for Route53 Hosted Zone (Z1234567890ACBD) creation: timeout while waiting for state to become 'INSYNC' (last state: 'PENDING', timeout: 15m0s)\nlevel=error\nlevel=error msg= on ../tmp/openshift-install-cluster-260510522/route53/base.tf line 22, in resource \"aws_route53_zone\" \"new_int\":\nlevel=error msg= 22: resource \"aws_route53_zone\" \"new_int\""
 	inconsistentTerraformResult = "time=\"2021-12-01T16:08:46Z\" level=error msg=\"Error: Provider produced inconsistent result after apply\""
 	multipleRoute53ZonesFound   = "time=\"2022-03-30T06:51:12Z\" level=error msg=\"Error: multiple Route53Zone found please use vpc_id option to filter\""
-	scaCertPullFailed           = "msg=Cluster operator insights SCANotAvailable is True with NotFound: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: OCM API https://api.openshift.com/api/accounts_mgmt/v1/certificates returned HTTP 404: {\"id\":\"7\",\"kind\":\"Error\",\"href\":\"/api/accounts_mgmt/v1/errors/7\",\"code\":\"ACCT-MGMT-7\",\"reason\":\"The organization (id= whatever) does not have any certificate of type sca. Enable SCA at https://access.redhat.com/management.\",\"operation_id\":\"ce804952-8012-4f78-9d6d-a5538dc35e3a\"}\nlevel=info"
 	// NOTE: This embedded newline matters: our regex must be able to match the two chunks of the message on separate lines.
 	noWorkerNodesFmt = `time="2021-12-09T10:51:06Z" level=debug msg="Symlinking plugin terraform-provider-%s src: \"/usr/bin/openshift-install\" dst: \"/tmp/openshift-install-cluster-723469510/plugins/terraform-provider-%s\""
 time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 master nodes blah"`
@@ -64,9 +63,10 @@ time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 mas
 	errorCreatingNLB      = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
 	terraformFailedDelete = "level=fatal msg=terraform destroy: failed to destroy using Terraform"
 	noMatchLog            = "an example of something that doesn't match the log regexes"
-	scaCertPullFailedLog  = "Cluster operator insights SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: unable to retrieve SCA certs data from https://api.openshift.com/api/accounts_mgmt/v1/certificates: Post \"https://api.openshift.com/api/accounts_mgmt/v1/certificates\""
 	bootstrapFailed       = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
 	awsDeniedByScp        = "AccessDenied: entity is not authorized to perform: iam:PressTheButton on resource: Thing with an explicit deny in a service control policy"
+	scaNotAvailableLog    = "msg=Cluster operator insights SCANotAvailable is True with NotFound: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: OCM API https://api.openshift.com/api/accounts_mgmt/v1/certificates returned HTTP 404: {\"id\":\"7\",\"kind\":\"Error\",\"href\":\"/api/accounts_mgmt/v1/errors/7\",\"code\":\"ACCT-MGMT-7\",\"reason\":\"The organization (id= whatever) does not have any certificate of type sca. Enable SCA at https://access.redhat.com/management.\",\"operation_id\":\"ce804952-8012-4f78-9d6d-a5538dc35e3a\"}\nlevel=info"
+	scaAvailableLog       = "Cluster operator insights SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: unable to retrieve SCA certs data from https://api.openshift.com/api/accounts_mgmt/v1/certificates: Post \"https://api.openshift.com/api/accounts_mgmt/v1/certificates\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -79,8 +79,13 @@ func TestParseInstallLog(t *testing.T) {
 		expectedMessage *string
 	}{
 		{
-			name:           "SCA certs pull failed",
-			log:            pointer.StringPtr(scaCertPullFailedLog),
+			name:           "SCANotAvailable is True",
+			log:            pointer.StringPtr(scaNotAvailableLog),
+			expectedReason: "SCACertsPullFailed",
+		},
+		{
+			name:           "SCAAvailable is False",
+			log:            pointer.StringPtr(scaAvailableLog),
 			expectedReason: "SCACertsPullFailed",
 		},
 		{
@@ -403,11 +408,6 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "MultipleRoute53ZonesFound",
 			log:            pointer.StringPtr(multipleRoute53ZonesFound),
 			expectedReason: "MultipleRoute53ZonesFound",
-		},
-		{
-			name:           "SCACertPullFailed",
-			log:            pointer.StringPtr(scaCertPullFailed),
-			expectedReason: "SCACertPullFailed",
 		},
 		{
 			name:           "AWSVPCDoesNotExist",

@@ -69,9 +69,12 @@ func NewSyncSetValidatingAdmissionHook(decoder *admission.Decoder) *SyncSetValid
 }
 
 // ValidatingResource is called by generic-admission-server on startup to register the returned REST resource through which the
-//                    webhook is accessed by the kube apiserver.
+//
+//	webhook is accessed by the kube apiserver.
+//
 // For example, generic-admission-server uses the data below to register the webhook on the REST resource "/apis/admission.hive.openshift.io/v1/syncsetvalidators".
-//              When the kube apiserver calls this registered REST resource, the generic-admission-server calls the Validate() method below.
+//
+//	When the kube apiserver calls this registered REST resource, the generic-admission-server calls the Validate() method below.
 func (a *SyncSetValidatingAdmissionHook) ValidatingResource() (plural schema.GroupVersionResource, singular string) {
 	log.WithFields(log.Fields{
 		"group":    "admission.hive.openshift.io",

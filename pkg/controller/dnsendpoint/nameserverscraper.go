@@ -40,38 +40,40 @@ type rootDomainsInfo struct {
 // - A bool indicating whether the scraper has scraped that root domain yet.
 // - A map, keyed by subdomain name, of information about each subdomain.
 // The subdomain information is:
-// - A pointer to a DNSZone. This is populated by the dnsendpoint controller iff it has ever
-//   reconciled that DNSZone (and the DNSZone hasn't been deleted).
-// - A set of strings representing the name servers the scraper has discovered for the subdomain
-//   in the root domain's hosted zone. This is populated by the scraper; and updated by the
-//   dnsendpoint controller iff it decides the name servers for the subdomain need to be synced
-//   after inspecting the corresponding DNSZone.
-// {
-//    "p1.openshiftapps.com": {
-//       scraped: true
-//       endpoinsBySubdomain: {
-//          "abcd.p1.openshiftapps.com": {
-//             dnsZone: $dnsZone,
-//             nsValues: {
-//                "ns-124.awsdns-15.com.",
-//                ...
-//             }
-//          }
-//          "wxyz.p1.openshiftapps.com": { ... }
-//       }
-//    }
-//    "p2.openshiftapps.com": { ... }
-// }
+//   - A pointer to a DNSZone. This is populated by the dnsendpoint controller iff it has ever
+//     reconciled that DNSZone (and the DNSZone hasn't been deleted).
+//   - A set of strings representing the name servers the scraper has discovered for the subdomain
+//     in the root domain's hosted zone. This is populated by the scraper; and updated by the
+//     dnsendpoint controller iff it decides the name servers for the subdomain need to be synced
+//     after inspecting the corresponding DNSZone.
+//
+//	{
+//	   "p1.openshiftapps.com": {
+//	      scraped: true
+//	      endpoinsBySubdomain: {
+//	         "abcd.p1.openshiftapps.com": {
+//	            dnsZone: $dnsZone,
+//	            nsValues: {
+//	               "ns-124.awsdns-15.com.",
+//	               ...
+//	            }
+//	         }
+//	         "wxyz.p1.openshiftapps.com": { ... }
+//	      }
+//	   }
+//	   "p2.openshiftapps.com": { ... }
+//	}
+//
 // This is used as a cache with the intent of reducing the number of queries to the cloud provider.
 //
 // On startup, if the dnsendpoint controller reconciles a DNSZone before its corresponding root
 // domain has been scraped, it seeds the cache with the DNSZone and an empty nsValues set, then
 // returns without requeueing.
-// - If the scraper encounters entries for that subdomain, it updates the cache and enqueues that
-//   DNSZone to the dnsendpoint controller.
-// - If the scraper does not see the subdomain at all, this indicates that the dnsendpoint
-//   controller has not yet configured the root hosted zone for this subdomain, so it enqueues the
-//   DNSZone for that case as well.
+//   - If the scraper encounters entries for that subdomain, it updates the cache and enqueues that
+//     DNSZone to the dnsendpoint controller.
+//   - If the scraper does not see the subdomain at all, this indicates that the dnsendpoint
+//     controller has not yet configured the root hosted zone for this subdomain, so it enqueues the
+//     DNSZone for that case as well.
 type rootDomainsMap map[string]*rootDomainsInfo
 
 // Every `defaultScrapePeriod` the scraper queries the cloud provider for the definitive list of
@@ -137,9 +139,9 @@ func (s *nameServerScraper) GetEndpoint(subdomain string) (rootDomain string, na
 }
 
 // CheckSeedScrapeStatus
-// - Ensures the cache has been seeded with this dnsZone. This enables the scraper to enqueue the
-//   DNSZone to the dnsendpoint controller if necessary.
-// - Returns whether the scraper has run yet (ever, since this controller started).
+//   - Ensures the cache has been seeded with this dnsZone. This enables the scraper to enqueue the
+//     DNSZone to the dnsendpoint controller if necessary.
+//   - Returns whether the scraper has run yet (ever, since this controller started).
 func (s *nameServerScraper) CheckSeedScrapeStatus(dnsZone *hivev1.DNSZone, rootDomain string) bool {
 	s.mux.Lock()
 	defer s.mux.Unlock()

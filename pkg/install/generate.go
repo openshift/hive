@@ -486,14 +486,14 @@ func GenerateUninstallerJobForDeprovision(
 // envAndVolumes creates lists of EnvVar, Volume, and VolumeMount suitable for including in a Pod spec
 // that's going to run a hiveutil deprovision command (including aws-tag-deprovision).
 // Args:
-// - ns (required): The namespace in which the credsName and certsName Secrets can be found.
-// - credsVolName, credsDir: The name and mount point of an EmptyDir into which the hiveutil side knows
-//   how to unpack credentials from the secret named by credsName. If either is unspecified, no creds
-//   Volume/VolumeMount will be included in the return.
-// - credsName: The name of a Secret in the `ns` namespace containing credentials in whatever form
-//   hiveutil expects for the given cluod provider. If specified, it is returned in a
-//   "CREDS_SECRET_NAME" EnvVar; otherwise no such env var is included.
-// - certsVolName, certsDir, certsName: Same as their creds* counterparts, but for certificates.
+//   - ns (required): The namespace in which the credsName and certsName Secrets can be found.
+//   - credsVolName, credsDir: The name and mount point of an EmptyDir into which the hiveutil side knows
+//     how to unpack credentials from the secret named by credsName. If either is unspecified, no creds
+//     Volume/VolumeMount will be included in the return.
+//   - credsName: The name of a Secret in the `ns` namespace containing credentials in whatever form
+//     hiveutil expects for the given cluod provider. If specified, it is returned in a
+//     "CREDS_SECRET_NAME" EnvVar; otherwise no such env var is included.
+//   - certsVolName, certsDir, certsName: Same as their creds* counterparts, but for certificates.
 func envAndVolumes(ns, credsVolName, credsDir, credsName, certsVolName, certsDir, certsName string) ([]corev1.EnvVar, []corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}

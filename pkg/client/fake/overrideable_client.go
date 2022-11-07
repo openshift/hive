@@ -8,18 +8,19 @@ import (
 
 // FakeClientWithCustomErrors overrides some of the fake client's methods, allowing them to (not
 // actually run and) throw specific errors. Use it like this:
-//   realFakeClient := NewFakeClient(...)
-//   c := FakeClientWithCustomErrors{
-//       Client: realFakeClient,
-//       DeleteBehavior: []error{nil, fmt.Errorf("Error on the second call"), nil}
-//       UpdateBehavior: []error(fmt.Errorf("Error on the first call"))
-//   }
-//   c.Delete(...) // runs the real fake Delete
-//   c.Delete(...) // skips the real fake Delete and returns the first error
-//   c.Delete(...) // runs the real fake Delete
-//   c.Delete(...) // runs the real fake Delete, even though we ran off the end of the array
-//   c.Update(...) // returns the error
-//   c.Get(...)    // runs the real fake Get, because no overrides
+//
+//	realFakeClient := NewFakeClient(...)
+//	c := FakeClientWithCustomErrors{
+//	    Client: realFakeClient,
+//	    DeleteBehavior: []error{nil, fmt.Errorf("Error on the second call"), nil}
+//	    UpdateBehavior: []error(fmt.Errorf("Error on the first call"))
+//	}
+//	c.Delete(...) // runs the real fake Delete
+//	c.Delete(...) // skips the real fake Delete and returns the first error
+//	c.Delete(...) // runs the real fake Delete
+//	c.Delete(...) // runs the real fake Delete, even though we ran off the end of the array
+//	c.Update(...) // returns the error
+//	c.Get(...)    // runs the real fake Get, because no overrides
 type FakeClientWithCustomErrors struct {
 	// The "Real" fake client
 	crclient.Client

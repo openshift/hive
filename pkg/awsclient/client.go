@@ -307,7 +307,6 @@ func (c *awsClient) GetCallerIdentity(input *sts.GetCallerIdentityInput) (*sts.G
 
 // Options provides the means to control how a client is created and what
 // configuration values will be loaded.
-//
 type Options struct {
 	// Region helps create the clients with correct endpoints.
 	Region string
@@ -368,36 +367,35 @@ type AssumeRoleCredentialsSource struct {
 // configurations.
 //
 // Some examples are,
-// 1. Configure an AWS client using credentials in Secret for ClusterDeployment.
-//    ```go
-//    options := Options{
-//    	Region: cd.Spec.Platform.AWS.Region,
-//    	CredentialsSource: CredentialsSource{
-//    		Secret: &SecretCredentialsSource{
-//    			Namespace: cd.Namespace,
-//    			Ref:       cd.Spec.Platform.AWS.CredentialsSecretRef,
-//    		},
-//    	},
-//    }
-//    client, err := New(kubeClient, options)
-//    ```
-// 2. Configure an AWS client using Assume role chain for ClusterDeployment.
-//    ```go
-//    options := Options{
-//    	Region: cd.Spec.Platform.AWS.Region,
-//    	CredentialsSource: CredentialsSource{
-//    		AssumeRole: &AssumeRoleCredentialsSource{
-//    			SecretRef: corev1.SecretReference{
-//    				Name:      AWSServiceProviderSecretName,
-//    				Namespace: AWSServiceProviderSecretNS,
-//    			},
-//    			Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
-//    		},
-//    	},
-//    }
-//    client, err := New(kubeClient, options)
-//    ```
-//
+//  1. Configure an AWS client using credentials in Secret for ClusterDeployment.
+//     ```go
+//     options := Options{
+//     Region: cd.Spec.Platform.AWS.Region,
+//     CredentialsSource: CredentialsSource{
+//     Secret: &SecretCredentialsSource{
+//     Namespace: cd.Namespace,
+//     Ref:       cd.Spec.Platform.AWS.CredentialsSecretRef,
+//     },
+//     },
+//     }
+//     client, err := New(kubeClient, options)
+//     ```
+//  2. Configure an AWS client using Assume role chain for ClusterDeployment.
+//     ```go
+//     options := Options{
+//     Region: cd.Spec.Platform.AWS.Region,
+//     CredentialsSource: CredentialsSource{
+//     AssumeRole: &AssumeRoleCredentialsSource{
+//     SecretRef: corev1.SecretReference{
+//     Name:      AWSServiceProviderSecretName,
+//     Namespace: AWSServiceProviderSecretNS,
+//     },
+//     Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+//     },
+//     },
+//     }
+//     client, err := New(kubeClient, options)
+//     ```
 func New(kubeClient client.Client, options Options) (Client, error) {
 	source := options.CredentialsSource
 	switch {

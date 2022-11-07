@@ -561,7 +561,15 @@ rules:
   - subjectaccessreviews
   verbs:
   - create
-
+- apiGroups:
+  - flowcontrol.apiserver.k8s.io
+  resources:
+  - prioritylevelconfigurations
+  - flowschemas
+  verbs:
+  - get
+  - list
+  - watch
 `)
 
 func configHiveadmissionHiveadmission_rbac_roleYamlBytes() ([]byte, error) {

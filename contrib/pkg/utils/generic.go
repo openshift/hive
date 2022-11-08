@@ -110,7 +110,7 @@ func NewLogger(logLevel string) (*log.Entry, error) {
 	return logger, nil
 }
 
-// LoadSecretOrDie looks for environment variables named CLUSTERDEPLOYMENT_NAMESPACE and `secretName“.
+// LoadSecretOrDie looks for environment variables named CLUSTERDEPLOYMENT_NAMESPACE and `secretName`.
 // If either is not found, this indicates we are not supposed to use this mode and we return nil. Otherwise, we
 // attempt to load and return the designated secret. We panic if the secret fails to load for any reason.
 func LoadSecretOrDie(c client.Client, secretNameEnvKey string) *corev1.Secret {

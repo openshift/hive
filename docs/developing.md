@@ -40,7 +40,7 @@
 
 - Git
 - Make
-- A recent Go distribution (>=1.18)
+- A recent Go distribution (>=1.19)
 
 ### External tools
 

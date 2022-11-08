@@ -783,9 +783,10 @@ func createVPCEndpointService(awsClient awsclient.Client, cd *hivev1.ClusterDepl
 // reconcileVPCEndpoint ensures that a VPC endpoint is created for the VPC endpoint service in the
 // HUB account.
 // It chooses a VPC from the list of VPCs given to the controller using criteria like
-// 	- VPC that is in the same region as the VPC endpoint service
-//	- VPC that has at least one subnet in the AZs supported by the VPC endpoint service
-//	- VPC that has the fewest existing VPC endpoints ("spread" strategy)
+//   - VPC that is in the same region as the VPC endpoint service
+//   - VPC that has at least one subnet in the AZs supported by the VPC endpoint service
+//   - VPC that has the fewest existing VPC endpoints ("spread" strategy)
+//
 // It currently doesn't manage any properties of the VPC endpoint once it is created.
 func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,
@@ -1274,8 +1275,8 @@ func restConfigFromSecret(kubeconfigSecret *corev1.Secret) (*rest.Config, error)
 }
 
 // awsErrCodeEquals returns true if the error matches all these conditions:
-//  * err is of type awserr.Error
-//  * Error.Code() equals code
+//   - err is of type awserr.Error
+//   - Error.Code() equals code
 func awsErrCodeEquals(err error, code string) bool {
 	if err == nil {
 		return false

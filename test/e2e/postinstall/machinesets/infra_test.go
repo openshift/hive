@@ -210,23 +210,23 @@ func TestNewMachinePool(t *testing.T) {
 }
 
 // TestAutoscalineMachinePool tests the features of an auto-scaling machine pool.
-// 1) The test changes the default worker pool to be a auto-scaling.
-// 2) The test creates a busybox deployment for pods that do not do anything
-//    but that make large CPU requests. The replica count of the deployment
-//    is set to a very large number to ensure that the pods will overwhlem
-//    the CPU available for the worker pool even when scaled out to the max
-//    replicas of the pool.
-// 3) The test verifies that machines (and correspondingly nodes) have been
-//    created to reach the max replicas for the pool.
-// 4) The test deletes the busybox deployment. This will relieve the CPU pressure
-//    on the worker pool. The autoscaler will scale the pool back down to the
-//    min replicas.
-// 5) The test verifies that machines and nodes have been deleted to reach
-//    the min replicas of the pool.
-// 6) The test changes the default worker pool back to use an explicit replica
-//    count.
-// 7) The test verifies that machines and nodes have been deleted to reach
-//    the explicit replica count.
+//  1. The test changes the default worker pool to be a auto-scaling.
+//  2. The test creates a busybox deployment for pods that do not do anything
+//     but that make large CPU requests. The replica count of the deployment
+//     is set to a very large number to ensure that the pods will overwhlem
+//     the CPU available for the worker pool even when scaled out to the max
+//     replicas of the pool.
+//  3. The test verifies that machines (and correspondingly nodes) have been
+//     created to reach the max replicas for the pool.
+//  4. The test deletes the busybox deployment. This will relieve the CPU pressure
+//     on the worker pool. The autoscaler will scale the pool back down to the
+//     min replicas.
+//  5. The test verifies that machines and nodes have been deleted to reach
+//     the min replicas of the pool.
+//  6. The test changes the default worker pool back to use an explicit replica
+//     count.
+//  7. The test verifies that machines and nodes have been deleted to reach
+//     the explicit replica count.
 func TestAutoscalingMachinePool(t *testing.T) {
 	// minReplicas is the minimum number of replicas for the machine pool.
 	// It is set to 10 to ensure that it is at least as large as the number

@@ -1543,10 +1543,10 @@ func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDeleteAndLogAnnotati
 // - Parlays the DNSZone's status conditions into the CD's DNSZoneNotReady condition.
 // - Observes metricDNSDelaySeconds.
 // Returns:
-// - bool: true if the caller should return from the reconcile loop, using the...
-// - Result: suitable for returning from the reconcile loop. If the DNSZone is not ready, it will include a delay to retrigger once
-//   we've waited long enough for it. If the DNSZone becomes ready in the meantime, its update will trigger this controller earlier.
-// - error: the usual; if not nil, the caller should requeue
+//   - bool: true if the caller should return from the reconcile loop, using the...
+//   - Result: suitable for returning from the reconcile loop. If the DNSZone is not ready, it will include a delay to retrigger once
+//     we've waited long enough for it. If the DNSZone becomes ready in the meantime, its update will trigger this controller earlier.
+//   - error: the usual; if not nil, the caller should requeue
 func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, reconcile.Result, error) {
 	switch p := cd.Spec.Platform; {
 	case p.AWS != nil:

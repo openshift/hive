@@ -248,13 +248,11 @@ var featureGatesConfigMapInfo = configMapInfo{
 
 // deployConfigMap deploys a configmap into hive's target namespace for use by one or more controllers.
 // cmInfo is a configMapInfo containing the string constants to be used for the configmap's name
-//
-//	and the key therein that will correspond to the base filename when the configmap is mounted
-//	into the controller's container; and the data to be stored in the configmap.
+// and the key therein that will correspond to the base filename when the configmap is mounted
+// into the controller's container; and the data to be stored in the configmap.
 //
 // namespacesToClean is a list of strings indicating former target namespaces from which this configmap
-//
-//	is to be deleted.
+// is to be deleted.
 func (r *ReconcileHiveConfig) deployConfigMap(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, cmInfo configMapInfo, namespacesToClean []string) (string, error) {
 	cmLog := hLog.WithField("configMap.name", cmInfo.name)
 

@@ -53,6 +53,8 @@ ORIG_NS=$HIVE_NS
 export HIVE_NS=hive-e2e-two
 # 2) Patch the hiveconfig
 oc patch hiveconfig hive -n $HIVE_OPERATOR_NS --type=merge -p '{"spec":{"targetNamespace": "'$HIVE_NS'"}}'
+# Wait for hive-operator to roll out the new namespace
+wait_for_namespace $HIVE_NS 60
 # 3) If USE_MANAGED_DNS=true, "Move" the managed DNS creds secret to the new namespace. (In real
 #    life the user would be responsible for making sure the secret referenced by hiveconfig exists
 #    in the new target namespace -- either by moving the secret or creating a new one and updating

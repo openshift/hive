@@ -218,3 +218,12 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - flowcontrol.apiserver.k8s.io
+  resources:
+  - prioritylevelconfigurations
+  - flowschemas
+  verbs:
+  - get
+  - list
+  - watch

@@ -1,14 +1,17 @@
 package hive
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
+	"github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -18,12 +21,12 @@ import (
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
-	admregv1 "k8s.io/api/admissionregistration/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 const (
@@ -50,44 +53,227 @@ var webhookAssets = []string{
 	"config/hiveadmission/selectorsyncset-webhook.yaml",
 }
 
-func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveNSName string, namespacesToClean []string, additionalHashes ...string) error {
+func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, cpHelper, dpHelper resource.Helper, instance *hivev1.HiveConfig, hiveNSName string, namespacesToClean []string, additionalHashes ...string) error {
 	deploymentAsset := "config/hiveadmission/deployment.yaml"
-	namespacedAssets := []string{
+	cpNamespacedAssets := []string{
 		"config/hiveadmission/service.yaml",
 		"config/hiveadmission/service-account.yaml",
 	}
-	// Delete the assets from previous target namespaces
-	assetsToClean := append(namespacedAssets, deploymentAsset)
+	dpNamespacedAssets := []string{
+		// Modified before applying. For cleanup, the kind+namespace+name matches,
+		// which is sufficient.
+		"config/hiveadmission/service.yaml",
+		"config/hiveadmission/konnectivity-agent.yaml",
+		"config/hiveadmission/endpoints.yaml",
+	}
+	dpGlobalAssets := []string{
+		// Data plane global assets are still specific to one data plane.
+		"config/hiveadmission/apiservice.yaml",
+	}
+
+	////////////////
+	// CLEAN UP DELETED FORMER TARGET NAMESPACES / DATA PLANES
+	////////////////
+	assetsToClean := append(cpNamespacedAssets, deploymentAsset)
 	for _, ns := range namespacesToClean {
 		for _, asset := range assetsToClean {
-			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
+			hLog.
+				WithField("plane", "control").
+				WithField("asset", asset).
+				WithField("oldTargetNamespace", ns).
+				Info("Deleting asset from old target namespace")
 			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := util.DeleteAssetWithNSOverride(h, asset, ns, instance); err != nil {
+			if err := util.DeleteAssetWithNSOverride(cpHelper, asset, ns, instance); err != nil {
 				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
 			}
 		}
 	}
+	if isScaleMode(instance) {
+		for _, ns := range namespacesToClean {
+			for _, asset := range dpNamespacedAssets {
+				hLog.
+					WithField("plane", "data").
+					WithField("asset", asset).
+					WithField("oldTargetNamespace", ns).
+					Info("Deleting asset from old target namespace")
+				// DeleteAssetWithNSOverride already no-ops for IsNotFound
+				if err := util.DeleteAssetWithNSOverride(dpHelper, asset, ns, instance); err != nil {
+					return errors.Wrapf(err, "error deleting asset %s from old target namespace %s on data plane", asset, ns)
+				}
+			}
+		}
+		// Scrub the non-namespaced assets from the data plane.
+		assetsToClean = append(dpGlobalAssets, webhookAssets...)
+		for _, asset := range assetsToClean {
+			hLog.
+				WithField("plane", "data").
+				WithField("asset", asset).
+				Info("Deleting global asset")
+			// DeleteAssetWithNSOverride already no-ops for IsNotFound.
+			// An empty namespace arg works for global assets.
+			if err := util.DeleteAssetWithNSOverride(dpHelper, asset, "", instance); err != nil {
+				return errors.Wrapf(err, "error deleting global asset %s from data plane", asset)
+			}
+
+		}
+	}
+
+	////////////////
+	// APPLY UNMODIFIED NAMESPACED ASSETS TO THE CONTROL PLANE
+	////////////////
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
-	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
+	for _, assetPath := range cpNamespacedAssets {
+		if err := util.ApplyAssetWithNSOverrideAndGC(cpHelper, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
 		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
 	}
 
-	// Apply global non-namespaced assets:
-	applyAssets := []string{
-		"config/hiveadmission/hiveadmission_rbac_role.yaml",
-	}
-	for _, a := range applyAssets {
-		if err := util.ApplyAssetWithGC(h, a, instance, hLog); err != nil {
+	////////////////
+	// APPLY HEADLESS SERVICE AND PROXY IN SCALE MODE
+	// To make admission work in scale mode, we need to create a network connection
+	// *from* the data plane *to* the hiveadmission service in the control plane.
+	// NOTE: This is currently hypershift-specific! For a generic data plane, I
+	// think we would (at least) put the konnectivity-agent in the data plane rather
+	// than the control plane.
+	////////////////
+	if isScaleMode(instance) {
+		// Grab the real Service from the control plane. We need its IP for
+		// - the konnectivity-agent
+		// - the Endpoints object in the data plane
+		svc := &corev1.Service{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Name: "hiveadmission", Namespace: hiveNSName}, svc); err != nil {
+			hLog.WithError(err).Error("error retrieving hiveadmission Service in the control plane")
 			return err
+		}
+		svcIP := svc.Spec.ClusterIP
+		if svcIP == "" {
+			// Should we poll this to give it some time to be generated? Meh, it ought to appear by the
+			// next reconcile; and the code that creates the Service *should* be idempotent, so its IP
+			// shouldn't change.
+			return errors.New("hiveadmission Service has no ClusterIP assigned")
+		}
+
+		// Deploy a headless Service to the data plane
+		// https://kubernetes.io/docs/concepts/services-networking/service/#services-without-selectors
+		dummySvc := util.ReadServiceV1OrDie(assets.MustAsset("config/hiveadmission/service.yaml"))
+		dummySvc.Namespace = hiveNSName
+		// This prevents k8s from automatically syncing the Endpoints (removing its Subsets, making it useless)
+		dummySvc.Spec.Selector = nil
+		dummySvc.Spec.Ports[0].TargetPort = intstr.IntOrString{}
+		if _, err := dpHelper.ApplyRuntimeObject(dummySvc, scheme.Scheme); err != nil {
+			return errors.Wrap(err, "failed to create dummy Service in data plane")
+		}
+		hLog.Infof("headless Service applied to data plane")
+
+		// Create the Endpoints in the data plane with the same namespace/name as the data plane Service,
+		// but the IP points to the control plane Service.
+		// TODO: Convert to EndpointSlice, as Endpoints is "legacy":
+		//       https://kubernetes.io/docs/concepts/services-networking/service/#endpoints
+		ep := util.ReadEndpointsV1OrDie(assets.MustAsset("config/hiveadmission/endpoints.yaml"))
+		for ssi := range ep.Subsets {
+			ep.Subsets[ssi].Addresses = []corev1.EndpointAddress{{IP: svcIP}}
+		}
+		ep.Namespace = hiveNSName
+		if _, err := dpHelper.ApplyRuntimeObject(ep, scheme.Scheme); err != nil {
+			return errors.Wrap(err, "failed to create hiveadmission Endpoints")
+		}
+		hLog.Info("hiveadmission Endpoints applied in data plane")
+
+		// Grab the konnectivity-server deployment from the control plane. We'll use the same image
+		// URI for our agent.
+		ks := &appsv1.Deployment{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Name: "konnectivity-server", Namespace: hiveNSName}, ks); err != nil {
+			hLog.WithError(err).Error("error retrieving konnectivity-server Deployment in the contol plane -- currently scale mode only works with hypershift!")
+		}
+
+		// Deploy the konnectivity agent into the control plane with the IP of the control plane Service
+		kad := util.ReadDeploymentV1OrDie(assets.MustAsset("config/hiveadmission/konnectivity-agent.yaml"))
+		kad.Namespace = hiveNSName
+		kad.Spec.Template.Spec.Containers[0].Image = ks.Spec.Template.Spec.Containers[0].Image
+		// This is kind of ugh...
+		for i, arg := range kad.Spec.Template.Spec.Containers[0].Args {
+			if strings.HasPrefix(arg, "ipv4=") {
+				kad.Spec.Template.Spec.Containers[0].Args[i] = "ipv4=" + svcIP
+			}
+		}
+		if _, err := cpHelper.ApplyRuntimeObject(kad, scheme.Scheme); err != nil {
+			return errors.Wrap(err, "failed to deploy konnectivity-agent")
+		}
+
+	}
+
+	////////////////
+	// APPLY WEBHOOK CONFIGURATIONS AND APISERVICE (GLOBAL)
+	// NOTE: We do this here (within the namespace-scoped function) because in
+	// scale mode, we really are applying the configs multiple times -- once to
+	// each data plane. And in non-scale mode, we're only hitting this function
+	// once anyway.
+	////////////////
+
+	for _, asset := range webhookAssets {
+		if isScaleMode(instance) {
+			// In scale mode, webhook configs are cleaned up explicitly from the data plane.
+			if err := util.ApplyAsset(dpHelper, asset, hLog.WithField("plane", "data")); err != nil {
+				hLog.WithField("webhookAsset", asset).WithError(err).Errorf("error applying validating webhook")
+				return err
+			}
+		} else {
+			// In non-scale mode, we can set OwnerReferences on these to point to the
+			// HiveConfig, so they get cleaned up if it's deleted.
+			wh := util.ReadValidatingWebhookConfigurationV1OrDie(assets.MustAsset(asset))
+			result, err := util.ApplyRuntimeObjectWithGC(cpHelper, wh, instance)
+			if err != nil {
+				hLog.WithField("webhook", wh.Name).WithError(err).Errorf("error applying validating webhook")
+				return err
+			}
+			hLog.WithField("webhook", wh.Name).WithField("result", result).Info("applied validating webhook")
 		}
 	}
 
-	asset := assets.MustAsset(deploymentAsset)
+	hLog.Debug("reading apiservice")
+	asset := assets.MustAsset("config/hiveadmission/apiservice.yaml")
+	apiService := util.ReadAPIServiceV1Beta1OrDie(asset)
+	apiService.Spec.Service.Namespace = hiveNSName
+
+	// If we're running on vanilla Kube (mostly devs using kind), or scale mode, we
+	// will not have access to the service cert injection we normally use. Lookup
+	// the cluster CA and inject into the APIService.
+	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
+	// secret, see hack/hiveadmission-dev-cert.sh. (TODO: automate -- see HIVE-1449.)
+	if isScaleMode(instance) || !r.isOpenShift {
+		hLog.Debug("scale mode or non-OpenShift cluster detected, modifying APIService for CA certs")
+		svcCA, err := r.getServiceCACert(hLog, hiveNSName)
+		if err != nil {
+			return err
+		}
+		apiService.Spec.CABundle = svcCA
+	}
+
+	if isScaleMode(instance) {
+		// In scale mode, the APIService is cleaned up explicitly from the data plane.
+		result, err := dpHelper.ApplyRuntimeObject(apiService, scheme.Scheme)
+		if err != nil {
+			hLog.WithError(err).Errorf("error applying APIService")
+		}
+		hLog.WithField("plane", "data").WithField("result", result).Info("applied APIService")
+	} else {
+
+		result, err := util.ApplyRuntimeObjectWithGC(cpHelper, apiService, instance)
+		if err != nil {
+			hLog.WithError(err).Error("error applying apiservice")
+			return err
+		}
+		hLog.WithField("plane", "control").WithField("result", result).Info("applied APIService")
+	}
+
+	////////////////
+	// LOAD, MODIFY, AND APPLY THE HIVEADMISSION DEPLOYMENT
+	////////////////
+
+	asset = assets.MustAsset(deploymentAsset)
 	hLog.Debug("reading deployment")
 	hiveAdmDeployment := resourceread.ReadDeploymentV1OrDie(asset)
 	hiveAdmContainer, err := containerByName(&hiveAdmDeployment.Spec.Template.Spec, "hiveadmission")
@@ -121,37 +307,9 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 
 	if isScaleMode(instance) {
-		controllerutils.AddDataPlaneKubeConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, hiveAdmContainer)
-	}
-
-	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
-	for i, yaml := range webhookAssets {
-		asset = assets.MustAsset(yaml)
-		wh := util.ReadValidatingWebhookConfigurationV1OrDie(asset, scheme.Scheme)
-		validatingWebhooks[i] = wh
-	}
-
-	hLog.Debug("reading apiservice")
-	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
-	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
-	apiService.Spec.Service.Namespace = hiveNSName
-
-	// If we're running on vanilla Kube (mostly devs using kind), we
-	// will not have access to the service cert injection we normally use. Lookup
-	// the cluster CA and inject into the webhooks.
-	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
-	// secret, see hack/hiveadmission-dev-cert.sh. (TODO: automate -- see HIVE-1449.)
-	isOpenShift, err := r.runningOnOpenShift(hLog)
-	if err != nil {
-		return err
-	}
-	if !isOpenShift {
-		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
-		err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
-		if err != nil {
-			hLog.WithError(err).Error("error injecting certs")
-			return err
-		}
+		// In scale mode, the admission service framework needs to be able to
+		// authenticate to the data plane (TODO: Why??).
+		controllerutils.AddDataPlaneKubeConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, hiveAdmContainer, true)
 	}
 
 	// Set the serving cert CA secret hash as an annotation on the pod template to force a rollout in the event it changes:
@@ -172,41 +330,25 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	hiveAdmDeployment.Spec.Template.Spec.NodeSelector = r.nodeSelector
 	hiveAdmDeployment.Spec.Template.Spec.Tolerations = r.tolerations
 
-	result, err := util.ApplyRuntimeObjectWithGC(h, hiveAdmDeployment, instance)
+	result, err := util.ApplyRuntimeObjectWithGC(cpHelper, hiveAdmDeployment, instance)
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
 	hLog.WithField("result", result).Info("hiveadmission deployment applied")
 
-	result, err = util.ApplyRuntimeObjectWithGC(h, apiService, instance)
-	if err != nil {
-		hLog.WithError(err).Error("error applying apiservice")
-		return err
-	}
-	hLog.Infof("apiservice applied (%s)", result)
-
-	for _, webhook := range validatingWebhooks {
-		result, err = util.ApplyRuntimeObjectWithGC(h, webhook, instance)
-		if err != nil {
-			hLog.WithField("webhook", webhook.Name).WithError(err).Errorf("error applying validating webhook")
-			return err
-		}
-		hLog.WithField("webhook", webhook.Name).Infof("validating webhook: %s", result)
-	}
-
 	hLog.Info("hiveadmission components reconciled successfully")
 	return nil
 }
 
-func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {
+func (r *ReconcileHiveConfig) getServiceCACert(hLog log.FieldLogger, hiveNSName string) ([]byte, error) {
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debugf("listing secrets in %s namespace", hiveNSName)
 	secrets, err := r.hiveSecretListers[hiveNSName].List(labels.Everything())
 	if err != nil {
 		hLog.WithError(err).Error("error listing secrets in hive namespace")
-		return nil, nil, err
+		return nil, err
 	}
 	var firstSATokenSecret *corev1.Secret
 	hLog.Debugf("found %d secrets", len(secrets))
@@ -217,13 +359,12 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 		}
 	}
 	if firstSATokenSecret == nil {
-		return nil, nil, fmt.Errorf("no %s secrets found", corev1.SecretTypeServiceAccountToken)
+		return nil, fmt.Errorf("no %s secrets found", corev1.SecretTypeServiceAccountToken)
 	}
 	kubeCA, ok := firstSATokenSecret.Data["ca.crt"]
 	if !ok {
-		return nil, nil, fmt.Errorf("secret %s did not contain key ca.crt", firstSATokenSecret.Name)
+		return nil, fmt.Errorf("secret %s did not contain key ca.crt", firstSATokenSecret.Name)
 	}
-	hLog.Debugf("found kube CA: %s", string(kubeCA))
 
 	// Load the service CA:
 	serviceCA, ok := firstSATokenSecret.Data["service-ca.crt"]
@@ -232,34 +373,7 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 		serviceCA = kubeCA
 	}
 
-	hLog.Debugf("found service CA: %s", string(serviceCA))
-	return serviceCA, kubeCA, nil
-}
-
-func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, validatingWebhooks []*admregv1.ValidatingWebhookConfiguration, mutatingWebhooks []*admregv1.MutatingWebhookConfiguration, hiveNS string, hLog log.FieldLogger) error {
-	serviceCA, kubeCA, err := r.getCACerts(hLog, hiveNS)
-	if err != nil {
-		return err
-	}
-
-	// Add the service CA to the aggregated API service:
-	apiService.Spec.CABundle = serviceCA
-
-	// Add the kube CA to each validating webhook:
-	for whi := range validatingWebhooks {
-		for whwhi := range validatingWebhooks[whi].Webhooks {
-			validatingWebhooks[whi].Webhooks[whwhi].ClientConfig.CABundle = kubeCA
-		}
-	}
-
-	// Add the kube CA to each mutating webhook:
-	for whi := range mutatingWebhooks {
-		for whwhi := range mutatingWebhooks[whi].Webhooks {
-			mutatingWebhooks[whi].Webhooks[whwhi].ClientConfig.CABundle = kubeCA
-		}
-	}
-
-	return nil
+	return serviceCA, nil
 }
 
 // allowedContracts is the list of operator whitelisted contracts that hive will accept

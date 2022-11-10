@@ -42,6 +42,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/metrics"
 	"github.com/openshift/hive/pkg/operator/util"
@@ -384,6 +385,7 @@ type ReconcileHiveConfig struct {
 	managedConfigCMLister corev1listers.ConfigMapLister
 	ctrlr                 controller.Controller
 	hiveSecretListers     map[string]corev1listers.SecretNamespaceLister
+	isOpenShift           bool
 	mgr                   manager.Manager
 }
 
@@ -495,8 +497,8 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 
 	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
 	if err != nil {
-		hLog.WithError(err).Error("error creating resource helper")
-		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelper", err.Error())
+		hLog.WithError(err).Error("error creating control plane resource helper")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelperCP", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -504,6 +506,20 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	if err := r.cleanupLegacyObjects(hLog); err != nil {
 		hLog.WithError(err).Error("error cleaning up legacy objects")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCleaningLegacyObjects", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	if err := util.ApplyAssetWithGC(h, "config/hiveadmission/hiveadmission_rbac_role.yaml", instance, hLog); err != nil {
+		hLog.WithError(err).Error("error applying hiveadmission RBAC ClusterRole")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorApplyingHiveadmClusterRole", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	if err := r.runningOnOpenShift(hLog); err != nil {
+		hLog.WithError(err).Error("error determining whether this is an OpenShift cluster")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDetectingOpenShift", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -611,18 +627,7 @@ func targetNamespaceStatus(ns string, err error, reason hivev1.TargetNamespaceDe
 	return ret
 }
 
-func (r *ReconcileHiveConfig) deployToNamespace(instance *hivev1.HiveConfig, h resource.Helper, hiveNSName string, namespacesToClean []string, hLog *log.Entry) hivev1.TargetNamespaceStatus {
-	// TODO: Plumb in DataPlaneKubeConfigSecret
-	// - Look for the secret; fail the deploy if not found
-	// - Tell the deployments about it
-
-	hLog = hLog.WithField("targetNamespace", hiveNSName)
-
-	if err := r.establishSecretWatch(hLog, hiveNSName); err != nil {
-		return targetNamespaceStatus(hiveNSName, err, "ErrorEstablishingSecretWatch", hLog)
-	}
-
-	// Ensure the target namespace for hive components exists and create if not:
+func (r *ReconcileHiveConfig) createTargetNamespace(h resource.Helper, hiveNSName string, hLog *log.Entry) error {
 	hiveNamespace := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   hiveNSName,
@@ -635,13 +640,28 @@ func (r *ReconcileHiveConfig) deployToNamespace(instance *hivev1.HiveConfig, h r
 		if apierrors.IsAlreadyExists(err) {
 			hLog.Debug("target namespace already exists")
 		} else {
-			return targetNamespaceStatus(hiveNSName, err, "ErrorCreatingHiveNamespace", hLog)
+			return err
 		}
 	} else {
 		hLog.Info("target namespace created")
 	}
+	return nil
+}
 
-	// Preflight check: in scale mode, the data plane kubeconfig secret must exist or we will refuse to deploy.
+func (r *ReconcileHiveConfig) deployToNamespace(instance *hivev1.HiveConfig, h resource.Helper, hiveNSName string, namespacesToClean []string, hLog *log.Entry) hivev1.TargetNamespaceStatus {
+	hLog = hLog.WithField("targetNamespace", hiveNSName)
+
+	if err := r.establishSecretWatch(hLog, hiveNSName); err != nil {
+		return targetNamespaceStatus(hiveNSName, err, "ErrorEstablishingSecretWatch", hLog)
+	}
+
+	// Ensure the target namespace for hive components exists and create if not:
+	if err := r.createTargetNamespace(h, hiveNSName, hLog.WithField("plane", "control")); err != nil {
+		return targetNamespaceStatus(hiveNSName, err, "ErrorCreatingHiveNamespaceInControlPlane", hLog)
+	}
+
+	// In scale mode, create the data plane client (which we'll also use later) and mirror the target namespace.
+	var dpHelper resource.Helper
 	if isScaleMode(instance) {
 		dpkcs := &corev1.Secret{}
 		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNSName, Name: constants.DataPlaneKubeconfigSecretName}, dpkcs); err != nil {
@@ -653,8 +673,21 @@ func (r *ReconcileHiveConfig) deployToNamespace(instance *hivev1.HiveConfig, h r
 			return targetNamespaceStatus(hiveNSName, err, reason, hLog)
 		}
 		// We're counting on the kubeconfig living in an element called `kubeconfig`
-		if _, exists := dpkcs.Data["kubeconfig"]; !exists {
+		dpkc, exists := dpkcs.Data["kubeconfig"]
+		if !exists {
 			return targetNamespaceStatus(hiveNSName, errors.New("data plane kubeconfig secret does not contain a 'kubeconfig' key"), "InvalidDataPlaneKubeConfigSecret", hLog)
+		}
+		dpRestConfig, err := utils.RESTConfigFromBytes(dpkc)
+		if err != nil {
+			return targetNamespaceStatus(hiveNSName, err, "ErrorLoadingDataPlaneKubeConfig", hLog)
+		}
+		dpHelper, err = resource.NewHelperFromRESTConfig(dpRestConfig, hLog)
+		if err != nil {
+			return targetNamespaceStatus(hiveNSName, err, "ErrorCreatingDataPlaneResourceHelper", hLog)
+		}
+		// Mirror the target namespace in the data plane
+		if err := r.createTargetNamespace(dpHelper, hiveNSName, hLog.WithField("plane", "data")); err != nil {
+			return targetNamespaceStatus(hiveNSName, err, "ErrorCreatingHiveNamespaceInDataPlane", hLog)
 		}
 	}
 
@@ -715,7 +748,7 @@ func (r *ReconcileHiveConfig) deployToNamespace(instance *hivev1.HiveConfig, h r
 		return targetNamespaceStatus(hiveNSName, err, "ErrorDeployingMonitoring", hLog)
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, hiveNSName, namespacesToClean, managedDomainsConfigHash, fgConfigHash, plConfigHash, scConfigHash)
+	err = r.deployHiveAdmission(hLog, h, dpHelper, instance, hiveNSName, namespacesToClean, managedDomainsConfigHash, fgConfigHash, plConfigHash, scConfigHash)
 	if err != nil {
 		return targetNamespaceStatus(hiveNSName, err, "ErrorDeployingHiveAdmission", hLog)
 	}

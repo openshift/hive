@@ -1,15 +1,21 @@
 ---
+# Exposes the hiveadmission pod on the network.
+# In scale mode, this definition is reused to create the headless service in
+# the mirrored target namespace on the data plane.
 apiVersion: v1
 kind: Service
 metadata:
   namespace: hive
   name: hiveadmission
   annotations:
+    # Removed in code for the data plane's headless service in scale mode.
     service.alpha.openshift.io/serving-cert-secret-name: hiveadmission-serving-cert
 spec:
+  # Removed in code for the data plane's headless service in scale mode.
   selector:
     app: hiveadmission
   ports:
   - port: 443
+    # N/A (but harmless) for the data plane's headless service in scale mode.
     targetPort: 9443
     protocol: TCP

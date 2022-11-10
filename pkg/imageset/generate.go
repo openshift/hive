@@ -85,7 +85,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 
 	// If we're in scale mode, mount the data plane kubeconfig secret
 	if os.Getenv(constants.DataPlaneKubeconfigEnvVar) != "" {
-		controllerutils.AddDataPlaneKubeConfigVolume(&podSpec, &podSpec.Containers[0])
+		controllerutils.AddDataPlaneKubeConfigVolume(&podSpec, &podSpec.Containers[0], false)
 	}
 
 	completions := int32(1)

@@ -364,7 +364,7 @@ func InstallerPodSpec(
 
 	// If we're in scale mode, mount the data plane kubeconfig secret on the `hive` pod
 	if os.Getenv(constants.DataPlaneKubeconfigEnvVar) != "" {
-		controllerutils.AddDataPlaneKubeConfigVolume(podSpec, &podSpec.Containers[2])
+		controllerutils.AddDataPlaneKubeConfigVolume(podSpec, &podSpec.Containers[2], false)
 	}
 
 	controllerutils.SetProxyEnvVars(podSpec, httpProxy, httpsProxy, noProxy)
@@ -483,7 +483,7 @@ func GenerateUninstallerJobForDeprovision(
 	if os.Getenv(constants.DataPlaneKubeconfigEnvVar) != "" {
 		// If we're in scale mode, mount the data plane kubeconfig secret. This will trigger the command to load
 		// creds/certs from the secret(s) in the data plane.
-		controllerutils.AddDataPlaneKubeConfigVolume(&job.Spec.Template.Spec, &job.Spec.Template.Spec.Containers[0])
+		controllerutils.AddDataPlaneKubeConfigVolume(&job.Spec.Template.Spec, &job.Spec.Template.Spec.Containers[0], false)
 	}
 
 	for idx := range job.Spec.Template.Spec.Containers {

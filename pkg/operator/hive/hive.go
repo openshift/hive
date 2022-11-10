@@ -149,7 +149,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, metricsConfigConfigMapInfo, hiveContainer)
 
 	if isScaleMode(instance) {
-		utils.AddDataPlaneKubeConfigVolume(&hiveDeployment.Spec.Template.Spec, hiveContainer)
+		utils.AddDataPlaneKubeConfigVolume(&hiveDeployment.Spec.Template.Spec, hiveContainer, false)
 	}
 
 	// This triggers the clusterdeployment controller to copy the secret into the CD's namespace.
@@ -303,11 +303,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/rbac/hive_admin_role_binding.yaml",
 		"config/rbac/hive_reader_role_binding.yaml",
 	}
-	isOpenShift, err := r.runningOnOpenShift(hLog)
-	if err != nil {
-		return err
-	}
-	if isOpenShift {
+	if r.isOpenShift {
 		hLog.Info("deploying OpenShift specific assets")
 		for _, a := range openshiftSpecificAssets {
 			err = util.ApplyAssetWithGC(h, a, instance, hLog)
@@ -431,19 +427,21 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h re
 	hiveContainer.Env = append(hiveContainer.Env, globalPullSecretEnvVar)
 }
 
-func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) (bool, error) {
+func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) error {
 	deploymentConfigGroupVersion := oappsv1.GroupVersion.String()
 	list, err := r.discoveryClient.ServerResourcesForGroupVersion(deploymentConfigGroupVersion)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			hLog.WithError(err).Debug("DeploymentConfig objects not found, not running on OpenShift")
-			return false, nil
+			r.isOpenShift = false
+			return nil
 		}
 		hLog.WithError(err).Error("Error determining whether running on OpenShift")
-		return false, err
+		return err
 	}
 
-	return len(list.APIResources) > 0, nil
+	r.isOpenShift = len(list.APIResources) > 0
+	return nil
 }
 
 func (r *ReconcileHiveConfig) cleanupLegacySyncSetInstances(hLog log.FieldLogger) error {

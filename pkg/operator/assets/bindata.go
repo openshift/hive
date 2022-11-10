@@ -8,8 +8,10 @@
 // config/hiveadmission/clusterprovision-webhook.yaml
 // config/hiveadmission/deployment.yaml
 // config/hiveadmission/dnszones-webhook.yaml
+// config/hiveadmission/endpoints.yaml
 // config/hiveadmission/hiveadmission_rbac_role.yaml
 // config/hiveadmission/hiveadmission_rbac_role_binding.yaml
+// config/hiveadmission/konnectivity-agent.yaml
 // config/hiveadmission/machinepool-webhook.yaml
 // config/hiveadmission/selectorsyncset-webhook.yaml
 // config/hiveadmission/service-account.yaml
@@ -230,6 +232,8 @@ kind: APIService
 metadata:
   name: v1.admission.hive.openshift.io
   annotations:
+    # Removed in code for scale mode. Instead, spec.caBundle is injected
+    # explicitly, containing the openshift-service-ca cert.
     service.alpha.openshift.io/inject-cabundle: "true"
 spec:
   group: admission.hive.openshift.io
@@ -516,6 +520,40 @@ func configHiveadmissionDnszonesWebhookYaml() (*asset, error) {
 	return a, nil
 }
 
+var _configHiveadmissionEndpointsYaml = []byte(`---
+# Scale mode only. This Endpoints object needs to
+# - have the same namespace/name as the hiveadmission Service
+# - point to the IP of the control plane incarnation of that Service
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: hiveadmission
+  namespace: replace-target-namespace
+subsets:
+- addresses:
+  # Replaced in code with the IP of the hiveadmission Service in the
+  # control plane
+  - ip: replace-hiveadmission-service-ip
+  ports:
+  - port: 443
+    protocol: TCP
+`)
+
+func configHiveadmissionEndpointsYamlBytes() ([]byte, error) {
+	return _configHiveadmissionEndpointsYaml, nil
+}
+
+func configHiveadmissionEndpointsYaml() (*asset, error) {
+	bytes, err := configHiveadmissionEndpointsYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/hiveadmission/endpoints.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 var _configHiveadmissionHiveadmission_rbac_roleYaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -612,6 +650,130 @@ func configHiveadmissionHiveadmission_rbac_role_bindingYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "config/hiveadmission/hiveadmission_rbac_role_binding.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _configHiveadmissionKonnectivityAgentYaml = []byte(`---
+# Scale mode only. Agent that brokers network traffic from the data plane to
+# the control plane. This is only necessary for admission webhooks -- all other
+# communication flows in the other direction.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: konnectivity-agent-hiveadmission
+  # Replaced in code with the namespace of the data plane deployment.
+  namespace: replace-target-namespace
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: konnectivity-agent
+      hypershift.openshift.io/control-plane-component: konnectivity-agent
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: konnectivity-agent
+        hypershift.openshift.io/control-plane-component: konnectivity-agent
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - --logtostderr=true
+        - --ca-cert
+        - /etc/konnectivity/agent/ca.crt
+        - --agent-cert
+        - /etc/konnectivity/agent/tls.crt
+        - --agent-key
+        - /etc/konnectivity/agent/tls.key
+        - --proxy-server-host
+        - konnectivity-server
+        - --proxy-server-port
+        - "8091"
+        - --health-server-port
+        - "2041"
+        - --agent-identifiers
+        # Replaced in code with the hiveadmission Service IP
+        - ipv4=replace-service-ip
+        - --keepalive-time
+        - 30s
+        - --probe-interval
+        - 30s
+        - --sync-interval
+        - 1m
+        - --sync-interval-cap
+        - 5m
+        command:
+        - /usr/bin/proxy-agent
+        # Replaced in code with the image reference from the konnectivity-server
+        # deployment in the target namespace. That image contains both server
+        # and agent binaries.
+        image: replace-konnectivity-server-image
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: healthz
+            port: 2041
+            scheme: HTTP
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          successThreshold: 1
+          timeoutSeconds: 30
+        name: konnectivity-agent
+        resources:
+          requests:
+            cpu: 40m
+            memory: 50Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/konnectivity/agent
+          name: agent-certs
+      dnsPolicy: ClusterFirst
+      priorityClassName: hypershift-control-plane
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - effect: NoSchedule
+        key: hypershift.openshift.io/control-plane
+        operator: Equal
+        value: "true"
+      volumes:
+      - name: agent-certs
+        secret:
+          defaultMode: 420
+          secretName: konnectivity-agent
+`)
+
+func configHiveadmissionKonnectivityAgentYamlBytes() ([]byte, error) {
+	return _configHiveadmissionKonnectivityAgentYaml, nil
+}
+
+func configHiveadmissionKonnectivityAgentYaml() (*asset, error) {
+	bytes, err := configHiveadmissionKonnectivityAgentYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "config/hiveadmission/konnectivity-agent.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -732,18 +894,24 @@ func configHiveadmissionServiceAccountYaml() (*asset, error) {
 }
 
 var _configHiveadmissionServiceYaml = []byte(`---
+# Exposes the hiveadmission pod on the network.
+# In scale mode, this definition is reused to create the headless service in
+# the mirrored target namespace on the data plane.
 apiVersion: v1
 kind: Service
 metadata:
   namespace: hive
   name: hiveadmission
   annotations:
+    # Removed in code for the data plane's headless service in scale mode.
     service.alpha.openshift.io/serving-cert-secret-name: hiveadmission-serving-cert
 spec:
+  # Removed in code for the data plane's headless service in scale mode.
   selector:
     app: hiveadmission
   ports:
   - port: 443
+    # N/A (but harmless) for the data plane's headless service in scale mode.
     targetPort: 9443
     protocol: TCP
 `)
@@ -2138,8 +2306,10 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/clusterprovision-webhook.yaml":        configHiveadmissionClusterprovisionWebhookYaml,
 	"config/hiveadmission/deployment.yaml":                      configHiveadmissionDeploymentYaml,
 	"config/hiveadmission/dnszones-webhook.yaml":                configHiveadmissionDnszonesWebhookYaml,
+	"config/hiveadmission/endpoints.yaml":                       configHiveadmissionEndpointsYaml,
 	"config/hiveadmission/hiveadmission_rbac_role.yaml":         configHiveadmissionHiveadmission_rbac_roleYaml,
 	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml": configHiveadmissionHiveadmission_rbac_role_bindingYaml,
+	"config/hiveadmission/konnectivity-agent.yaml":              configHiveadmissionKonnectivityAgentYaml,
 	"config/hiveadmission/machinepool-webhook.yaml":             configHiveadmissionMachinepoolWebhookYaml,
 	"config/hiveadmission/selectorsyncset-webhook.yaml":         configHiveadmissionSelectorsyncsetWebhookYaml,
 	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
@@ -2230,8 +2400,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"clusterprovision-webhook.yaml":        {configHiveadmissionClusterprovisionWebhookYaml, map[string]*bintree{}},
 			"deployment.yaml":                      {configHiveadmissionDeploymentYaml, map[string]*bintree{}},
 			"dnszones-webhook.yaml":                {configHiveadmissionDnszonesWebhookYaml, map[string]*bintree{}},
+			"endpoints.yaml":                       {configHiveadmissionEndpointsYaml, map[string]*bintree{}},
 			"hiveadmission_rbac_role.yaml":         {configHiveadmissionHiveadmission_rbac_roleYaml, map[string]*bintree{}},
 			"hiveadmission_rbac_role_binding.yaml": {configHiveadmissionHiveadmission_rbac_role_bindingYaml, map[string]*bintree{}},
+			"konnectivity-agent.yaml":              {configHiveadmissionKonnectivityAgentYaml, map[string]*bintree{}},
 			"machinepool-webhook.yaml":             {configHiveadmissionMachinepoolWebhookYaml, map[string]*bintree{}},
 			"selectorsyncset-webhook.yaml":         {configHiveadmissionSelectorsyncsetWebhookYaml, map[string]*bintree{}},
 			"service-account.yaml":                 {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},

@@ -13,6 +13,8 @@ kind: APIService
 metadata:
   name: v1.admission.hive.openshift.io
   annotations:
+    # Removed in code for scale mode. Instead, spec.caBundle is injected
+    # explicitly, containing the openshift-service-ca cert.
     service.alpha.openshift.io/inject-cabundle: "true"
 spec:
   group: admission.hive.openshift.io

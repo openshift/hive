@@ -394,7 +394,7 @@ func SafeDelete(cl client.Client, ctx context.Context, obj client.Object) error 
 	return cl.Delete(ctx, obj, client.Preconditions{ResourceVersion: &rv})
 }
 
-func AddDataPlaneKubeConfigVolume(podSpec *corev1.PodSpec, container *corev1.Container) {
+func AddDataPlaneKubeConfigVolume(podSpec *corev1.PodSpec, container *corev1.Container, addAuth bool) {
 	volname := "data-plane-kubeconfig"
 	filename := "kubeconfig"
 	mountpath := "/data/data-plane-kubeconfig"
@@ -424,4 +424,7 @@ func AddDataPlaneKubeConfigVolume(podSpec *corev1.PodSpec, container *corev1.Con
 	podSpec.Volumes = append(podSpec.Volumes, volume)
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 	container.Env = append(container.Env, envVar)
+	if addAuth {
+		container.Args = append(container.Args, fmt.Sprintf("--authentication-kubeconfig=%s/%s", mountpath, filename))
+	}
 }

@@ -1,0 +1,17 @@
+---
+# Scale mode only. This Endpoints object needs to
+# - have the same namespace/name as the hiveadmission Service
+# - point to the IP of the control plane incarnation of that Service
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: hiveadmission
+  namespace: replace-target-namespace
+subsets:
+- addresses:
+  # Replaced in code with the IP of the hiveadmission Service in the
+  # control plane
+  - ip: replace-hiveadmission-service-ip
+  ports:
+  - port: 443
+    protocol: TCP

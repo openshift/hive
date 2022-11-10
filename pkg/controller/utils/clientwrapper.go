@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,9 +104,10 @@ func GetDataPlaneClusterOrDie() cluster.Cluster {
 }
 
 // NewClientsWithMetricsOrDie returns two clients:
-// - The data plane client. In scale mode, this points to the API service denoted by the data-plane-kubeconfig
-//   secret in the target namespace of this deployment. In normal mode, it is identical to...
-// - The control plane client, which points to the API service of the controller manager.
+//   - The data plane client. In scale mode, this points to the API service denoted by the data-plane-kubeconfig
+//     secret in the target namespace of this deployment. In normal mode, it is identical to...
+//   - The control plane client, which points to the API service of the controller manager.
+//
 // ...and a bool indicating whether we are in scale mode (true) or not (false).
 // This should be used by all controllers.
 func NewClientsWithMetricsOrDie(mgr manager.Manager, ctrlrName hivev1.ControllerName, rateLimiter *flowcontrol.RateLimiter) (client.Client, client.Client, bool) {
@@ -136,17 +138,26 @@ func LoadDataPlaneKubeConfigOrDie() *rest.Config {
 	if err != nil {
 		log.WithError(err).WithField("path", dpkcPath).Fatal("unable to read data plane kubeconfig file")
 	}
-	dpConfig, err := clientcmd.Load(kcData)
+	dpRestConfig, err := RESTConfigFromBytes(kcData)
 	if err != nil {
-		log.WithError(err).Fatal("unable to load data plane kubeconfig")
-	}
-	dpRestConfig, err := clientcmd.NewDefaultClientConfig(*dpConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
-	if err != nil {
-		log.WithError(err).Fatal("failed to parse data plane kubeconfig")
+		log.WithError(err).Fatal("unable to convert data plane kubeconfig")
 	}
 
 	log.Info("Loaded data plane kubeconfig")
 	return dpRestConfig
+}
+
+func RESTConfigFromBytes(kcData []byte) (*rest.Config, error) {
+	dpConfig, err := clientcmd.Load(kcData)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to load data plane kubeconfig")
+	}
+	dpRestConfig, err := clientcmd.NewDefaultClientConfig(*dpConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse data plane kubeconfig")
+	}
+
+	return dpRestConfig, nil
 }
 
 // newClientWithMetricsOrDie creates a new controller-runtime client with a wrapper which increments

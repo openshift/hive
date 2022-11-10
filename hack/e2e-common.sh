@@ -103,6 +103,21 @@ PULL_SECRET_FILE="${PULL_SECRET_FILE:-${CLUSTER_PROFILE_DIR}/pull-secret}"
 export HIVE_NS="hive-e2e"
 export HIVE_OPERATOR_NS="hive-operator"
 
+# wait_for_namespace polls the namespace named by $1 and succeeds when it appears.
+# Otherwise it eventually times out after $2 seconds and hard exits.
+function wait_for_namespace {
+  echo -n "Waiting $2 seconds for namespace $1 to appear"
+  i=0
+  while [[ $i -lt $2 ]]; do
+    oc get namespace $1 >/dev/null 2>&1 && return 0
+    i=$((i+1))
+    echo -n .
+    sleep 1
+  done
+  echo " Timed out!"
+  exit 1
+}
+
 function save_hive_logs() {
   tmpf=$(mktemp)
   for x in "hive-controllers ${HIVE_NS}" "hiveadmission ${HIVE_NS}" "hive-operator ${HIVE_OPERATOR_NS}"; do
@@ -129,6 +144,16 @@ function save_hive_logs() {
   if oc get hiveconfig hive -o yaml > $tmpf; then
     mv $tmpf "${ARTIFACT_DIR}/hiveconfig-hive.yaml"
   fi
+  # Save webhook manifests. This loop will iterate zero times if there aren't any.
+  oc get validatingwebhookconfiguration -o name | awk -F/ '/hive/ {print $2}' | while read vwc; do
+    oc get validatingwebhookconfiguration $vwc -o yaml > ${ARTIFACT_DIR}/${vwc}.yaml
+  done
+  # Save service manifests
+  oc get service -n $HIVE_NS -o yaml > $ARTIFACT_DIR/services.yaml
+  # Save the hiveadmission APIService
+  if oc get apiservice v1.admission.hive.openshift.io -o yaml > $tmpf; then
+    mv $tmpf $ARTIFACT_DIR/apiservice-hiveadmission.yaml
+  fi
 }
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.
@@ -141,18 +166,8 @@ IMG="${HIVE_IMAGE}" make deploy
 # Timeout needs to account for Deployment=>ReplicaSet=>Pod=>Container as well
 # as the operator starting up and reconciling HiveConfig to create the
 # targetNamespace.
-echo -n "Waiting for namespace $HIVE_NS to appear"
-i=0
-while [[ $i -lt 180 ]]; do
-  oc get namespace $HIVE_NS >/dev/null 2>&1 && break
-  i=$((i+1))
-  echo -n .
-  sleep 1
-done
-if ! oc get namespace $HIVE_NS >/dev/null 2>&1; then
-  echo " Timed out!"
-  exit 1
-fi
+wait_for_namespace $HIVE_NS 180
+
 echo
 
 SRC_ROOT=$(git rev-parse --show-toplevel)

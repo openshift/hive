@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -100,6 +101,8 @@ const (
 	defaultHomeDir                      = "/home/hive" // Used if no HOME env var set.
 	installConfigKeyName                = "install-config"
 	clusterConfigYAML                   = "cluster-config.yaml"
+	overrideCredsYAML                   = "99_cloud-creds-secret.yaml"
+	clusterInfraConfigYAML              = "cluster-infrastructure-02-config.yml"
 )
 
 var (
@@ -931,6 +934,13 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 		if err := m.overrideCredentialsModeOnInstallConfig(effectiveMode); err != nil {
 			m.log.WithError(err).Error("error overriding credentials mode on install config")
 			return err
+		}
+		//If Azure, need fill up azure_resource_prefix and azure_resourcegroup if 99_cloud-creds-secret.yaml exists
+		if cd.Spec.Platform.Azure != nil {
+			if err := m.patchAzureOverrideCreds(); err != nil {
+				m.log.WithError(err).Error("error patching the azure override creds")
+				return err
+			}
 		}
 	}
 
@@ -1808,5 +1818,64 @@ func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode 
 
 	m.log.WithField("newMode", credentialsMode).Info("overrode effective in-cluster credentials mode")
 
+	return nil
+}
+
+func (m *InstallManager) patchAzureOverrideCreds() error {
+	overrideCredsPath := filepath.Join(m.WorkDir, "manifests", overrideCredsYAML)
+	overrideCredsBytes, err := ioutil.ReadFile(overrideCredsPath)
+	if err != nil {
+		return errors.Wrap(err, "error reading 99_cloud-creds-secret.yaml")
+	}
+	c, err := yamlutils.Decode(overrideCredsBytes)
+	if err != nil {
+		return errors.Wrap(err, "unable to decode 99_cloud-creds-secret.yaml content")
+	}
+	if isAzureCreds, _ := yamlutils.Test(c, "/metadata/name", "azure-credentials"); !isAzureCreds {
+		return errors.Wrap(err, "wrong input, secret name is not azure-credentials in 99_cloud-creds-secret.yaml")
+	}
+	region, err := exec.Command("bash", "-c", fmt.Sprintf("grep %s %s |awk -F ': ' '{print $2}'", "region", filepath.Join(m.WorkDir, "manifests", clusterConfigYAML))).Output()
+	if err != nil {
+		return errors.Wrap(err, "error to grep region from manifests")
+	}
+	infraName, err := exec.Command("bash", "-c", fmt.Sprintf("grep %s %s |awk -F ': ' '{print $2}'", "infrastructureName", filepath.Join(m.WorkDir, "manifests", clusterInfraConfigYAML))).Output()
+	if err != nil {
+		return errors.Wrap(err, "error to grep infrastructureName from manifests")
+	}
+	resourceGroupName, err := exec.Command("bash", "-c", fmt.Sprintf("grep %s %s |awk -F ': ' '{print $2}'", "resourceGroupName", filepath.Join(m.WorkDir, "manifests", clusterInfraConfigYAML))).Output()
+	if err != nil {
+		return errors.Wrap(err, "error to grep resourceGroupName from manifests")
+	}
+	regionBase64 := interface{}(base64.RawStdEncoding.EncodeToString(region))
+	infraNameBase64 := interface{}(base64.RawStdEncoding.EncodeToString(infraName))
+	resourceGroupNameBase64 := interface{}(base64.RawStdEncoding.EncodeToString(resourceGroupName))
+	ops := yamlpatch.Patch{
+		yamlpatch.Operation{
+			Op:    "add",
+			Path:  yamlpatch.OpPath("/data/azure_region"),
+			Value: yamlpatch.NewNode(&regionBase64),
+		},
+		yamlpatch.Operation{
+			Op:    "add",
+			Path:  yamlpatch.OpPath("/data/azure_resource_prefix"),
+			Value: yamlpatch.NewNode(&infraNameBase64),
+		},
+		yamlpatch.Operation{
+			Op:    "add",
+			Path:  yamlpatch.OpPath("/data/azure_resourcegroup"),
+			Value: yamlpatch.NewNode(&resourceGroupNameBase64),
+		},
+	}
+	// Apply patch to 99_cloud-creds-secret.yaml
+	modifiedBytes, err := ops.Apply(overrideCredsBytes)
+	if err != nil {
+		return errors.Wrap(err, "error applying on 99_cloud-creds-secret.yaml")
+	}
+	if modifiedBytes != nil {
+		err = ioutil.WriteFile(overrideCredsPath, modifiedBytes, 0644)
+		if err != nil {
+			return errors.Wrap(err, "error writing 99_cloud-creds-secret.yaml")
+		}
+	}
 	return nil
 }

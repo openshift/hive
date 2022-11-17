@@ -4,7 +4,7 @@
 
 Hive is published to [OperatorHub](https://operatorhub.io/operator/hive-operator) weekly and this is the best method to install and use Hive if you do not need to build from source.
 
-1. Create a 'hive' namespace doing
+1. Create a `hive` namespace,
     ```
     $ oc new-project hive
     ```
@@ -13,22 +13,22 @@ Hive is published to [OperatorHub](https://operatorhub.io/operator/hive-operator
     * Search for “hive” and select the "Hive for Red Hat OpenShift" operator and click Install.
     * Select the “alpha” update channel, install to a specific namespace (select the “hive” namespace previously created), approval strategy: automatic, and press Install.
     * You should now have a hive-operator pod running in the hive namespace.
-1. Create a HiveConfig to trigger the actual deployment of Hive.
-    * Create a hive_config.yaml file with the following content:
+1. Create a `HiveConfig` to trigger the actual deployment of Hive.
+    * Create a `hive_config.yaml` file with the following content:
 
-```yaml
-apiVersion: hive.openshift.io/v1
-kind: HiveConfig
-metadata:
-  name: hive
-spec:
-  logLevel: debug
-  targetNamespace: hive
-```
-  * Apply hive_config.yaml,
-  ```
-  $ oc apply -f hive_config.yaml
-  ```
+      ```yaml
+      apiVersion: hive.openshift.io/v1
+      kind: HiveConfig
+      metadata:
+        name: hive
+      spec:
+        logLevel: debug
+        targetNamespace: hive
+      ```
+    * Apply `hive_config.yaml`,
+      ```
+      $ oc apply -f hive_config.yaml
+      ```
 
 The hive-operator pod should now deploy the remaining components (hive-controllers, hive-clustersync, hiveadmission), and once running Hive is now ready to begin accepting ClusterDeployments.
 

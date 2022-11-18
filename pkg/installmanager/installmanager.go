@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/tidwall/gjson"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
@@ -931,16 +932,9 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 	}
 
 	if effectiveMode, ok := cd.Annotations[constants.OverrideInClusterCredentialsModeAnnotation]; ok {
-		if err := m.overrideCredentialsModeOnInstallConfig(effectiveMode); err != nil {
+		if err := m.overrideCredentialsModeOnInstallConfig(effectiveMode, cd); err != nil {
 			m.log.WithError(err).Error("error overriding credentials mode on install config")
 			return err
-		}
-		//If Azure, need fill up azure_resource_prefix and azure_resourcegroup if 99_cloud-creds-secret.yaml exists
-		if cd.Spec.Platform.Azure != nil {
-			if err := m.patchAzureOverrideCreds(); err != nil {
-				m.log.WithError(err).Error("error patching the azure override creds")
-				return err
-			}
 		}
 	}
 
@@ -1776,11 +1770,11 @@ func getHomeDir() string {
 	return defaultHomeDir
 }
 
-func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode string) error {
+func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode string, cd *hivev1.ClusterDeployment) error {
 	clusterConfigPath := filepath.Join(m.WorkDir, "manifests", clusterConfigYAML)
 	clusterConfigBytes, err := ioutil.ReadFile(clusterConfigPath)
 	if err != nil {
-		return errors.Wrap(err, "error reading install config")
+		return errors.Wrap(err, "error reading cluster config")
 	}
 
 	clusterConfig := &corev1.ConfigMap{}
@@ -1813,42 +1807,62 @@ func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode 
 	}
 
 	if err := ioutil.WriteFile(clusterConfigPath, clusterConfigBytes, 0644); err != nil {
-		return errors.Wrap(err, "error writing install-config.yaml")
+		return errors.Wrap(err, "error writing cluster-config.yaml")
 	}
 
 	m.log.WithField("newMode", credentialsMode).Info("overrode effective in-cluster credentials mode")
 
-	return nil
-}
+	if cd.Spec.Platform.Azure == nil {
+		return nil
+	}
 
-func (m *InstallManager) patchAzureOverrideCreds() error {
+	//If Azure, need fill up azure_resource_prefix and azure_resourcegroup for 99_cloud-creds-secret.yaml
+	m.log.Info("patch 99_cloud-creds-secret.yaml when platform is azure")
+	region := installConfig.Platform.Azure.Region
+
+	//Read infrastructureName/resourceGroupName from manifests cluster-infrastructure-02-config.yml
+	clusterInfraConfigPath := filepath.Join(m.WorkDir, "manifests", clusterInfraConfigYAML)
+	clusterInfraConfigBytes, err := ioutil.ReadFile(clusterInfraConfigPath)
+	if err != nil {
+		return errors.Wrap(err, "error reading manifests cluster-infrastructure-02-config.yml")
+	}
+
+	clusterInfraConfigJson, err := yaml.YAMLToJSONStrict(clusterInfraConfigBytes)
+	if err != nil {
+		return errors.Wrap(err, "error converting cluster-infrastructure-02-config.yml to json")
+	}
+
+	infraName := gjson.Get(string(clusterInfraConfigJson), `status.infrastructureName`).String()
+	resourceGroupName := gjson.Get(string(clusterInfraConfigJson), `status.platformStatus.azure.resourceGroupName`).String()
+	if region == "" || infraName == "" || resourceGroupName == "" {
+		return fmt.Errorf("error reading from manifests, region=%s, infrastructureName=%s, resourceGroupName=%s", region, infraName, resourceGroupName)
+	}
+
+	//Read credentials secret 99_cloud-creds-secret.yaml for patching
 	overrideCredsPath := filepath.Join(m.WorkDir, "manifests", overrideCredsYAML)
 	overrideCredsBytes, err := ioutil.ReadFile(overrideCredsPath)
 	if err != nil {
 		return errors.Wrap(err, "error reading 99_cloud-creds-secret.yaml")
 	}
-	c, err := yamlutils.Decode(overrideCredsBytes)
+
+	overrideCredsJson, err := yaml.YAMLToJSONStrict(overrideCredsBytes)
 	if err != nil {
-		return errors.Wrap(err, "unable to decode 99_cloud-creds-secret.yaml content")
+		return errors.Wrap(err, "error converting 99_cloud-creds-secret.yaml to json")
 	}
-	if isAzureCreds, _ := yamlutils.Test(c, "/metadata/name", "azure-credentials"); !isAzureCreds {
-		return errors.Wrap(err, "wrong input, secret name is not azure-credentials in 99_cloud-creds-secret.yaml")
+
+	//Return error if any of region/infraName/resourceGroupName already exist
+	regionInput := gjson.Get(string(overrideCredsJson), `data.azure_region`).String()
+	infraNameInput := gjson.Get(string(clusterInfraConfigJson), `data.azure_resource_prefix`).String()
+	resourceGroupNameInput := gjson.Get(string(clusterInfraConfigJson), `data.azure_resourcegroup`).String()
+
+	if regionInput != "" || infraNameInput != "" || resourceGroupNameInput != "" {
+		return fmt.Errorf("azure_region/azure_resource_prefix/azure_resourcegroup already exists in %s", overrideCredsYAML)
 	}
-	region, err := exec.Command("bash", "-c", fmt.Sprintf("grep %s %s |awk -F ': ' '{print $2}'", "region", filepath.Join(m.WorkDir, "manifests", clusterConfigYAML))).Output()
-	if err != nil {
-		return errors.Wrap(err, "error to grep region from manifests")
-	}
-	infraName, err := exec.Command("bash", "-c", fmt.Sprintf("grep %s %s |awk -F ': ' '{print $2}'", "infrastructureName", filepath.Join(m.WorkDir, "manifests", clusterInfraConfigYAML))).Output()
-	if err != nil {
-		return errors.Wrap(err, "error to grep infrastructureName from manifests")
-	}
-	resourceGroupName, err := exec.Command("bash", "-c", fmt.Sprintf("grep %s %s |awk -F ': ' '{print $2}'", "resourceGroupName", filepath.Join(m.WorkDir, "manifests", clusterInfraConfigYAML))).Output()
-	if err != nil {
-		return errors.Wrap(err, "error to grep resourceGroupName from manifests")
-	}
-	regionBase64 := interface{}(base64.RawStdEncoding.EncodeToString(region))
-	infraNameBase64 := interface{}(base64.RawStdEncoding.EncodeToString(infraName))
-	resourceGroupNameBase64 := interface{}(base64.RawStdEncoding.EncodeToString(resourceGroupName))
+
+	regionBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(region)))
+	infraNameBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(infraName)))
+	resourceGroupNameBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(resourceGroupName)))
+
 	ops := yamlpatch.Patch{
 		yamlpatch.Operation{
 			Op:    "add",
@@ -1866,16 +1880,20 @@ func (m *InstallManager) patchAzureOverrideCreds() error {
 			Value: yamlpatch.NewNode(&resourceGroupNameBase64),
 		},
 	}
+
 	// Apply patch to 99_cloud-creds-secret.yaml
 	modifiedBytes, err := ops.Apply(overrideCredsBytes)
 	if err != nil {
-		return errors.Wrap(err, "error applying on 99_cloud-creds-secret.yaml")
+		return errors.Wrap(err, "error applying patch on 99_cloud-creds-secret.yaml")
 	}
+
 	if modifiedBytes != nil {
 		err = ioutil.WriteFile(overrideCredsPath, modifiedBytes, 0644)
 		if err != nil {
 			return errors.Wrap(err, "error writing 99_cloud-creds-secret.yaml")
 		}
+		m.log.Info("patched 99_cloud-creds-secret.yaml successfully")
 	}
+
 	return nil
 }

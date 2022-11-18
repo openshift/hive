@@ -1613,6 +1613,11 @@ data:
       installFailingReason: SCACertsPullFailed
       installFailingMessage: Cannot pull SCA certificates. Make sure SCA is enabled and try again. See https://access.redhat.com/articles/simple-content-access.
     # AWS Specific:
+    - name: AWSInsufficientCapacity
+      searchRegexStrings:
+      - "Error: .*InsufficientInstanceCapacity.* Our system will be working on provisioning additional capacity"
+      installFailingReason: AWSInsufficientCapacity
+      installFailingMessage: AWS currently does not have sufficient capacity to provision the requested EC2 instances in the specified Availability Zone. Please try again later or in a different Availability Zone.
     - name: AWSEC2QuotaExceeded
       searchRegexStrings:
       - "failed to generate asset.*Platform Quota Check.*MissingQuota.*ec2"

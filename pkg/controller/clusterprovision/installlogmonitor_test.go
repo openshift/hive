@@ -65,8 +65,6 @@ time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 mas
 	noMatchLog              = "an example of something that doesn't match the log regexes"
 	bootstrapFailed         = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
 	awsDeniedByScp          = "AccessDenied: entity is not authorized to perform: iam:PressTheButton on resource: Thing with an explicit deny in a service control policy"
-	scaNotAvailableLog      = "msg=Cluster operator insights SCANotAvailable is True with NotFound: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: OCM API https://api.openshift.com/api/accounts_mgmt/v1/certificates returned HTTP 404: {\"id\":\"7\",\"kind\":\"Error\",\"href\":\"/api/accounts_mgmt/v1/errors/7\",\"code\":\"ACCT-MGMT-7\",\"reason\":\"The organization (id= whatever) does not have any certificate of type sca. Enable SCA at https://access.redhat.com/management.\",\"operation_id\":\"ce804952-8012-4f78-9d6d-a5538dc35e3a\"}\nlevel=info"
-	scaAvailableLog         = "Cluster operator insights SCAAvailable is False with NonHTTPError: Failed to pull SCA certs from https://api.openshift.com/api/accounts_mgmt/v1/certificates: unable to retrieve SCA certs data from https://api.openshift.com/api/accounts_mgmt/v1/certificates: Post \"https://api.openshift.com/api/accounts_mgmt/v1/certificates\""
 	awsInsufficientCapacity = "level=error msg=\"failed to fetch Cluster: failed to generate asset \"Cluster\": failure applying terraform for \"cluster\" stage: failed to create cluster: failed to apply Terraform: exit status 1\n\nError: Error launching source instance: InsufficientInstanceCapacity: We currently do not have sufficient m5.2xlarge capacity in the Availability Zone you requested (eu-south-1b). Our system will be working on provisioning additional capacity. You can currently get m5.2xlarge capacity by not specifying an Availability Zone in your request or choosing eu-south-1a, eu-south-1c."
 )
 
@@ -83,16 +81,6 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "AWSInsufficientCapacity",
 			log:            pointer.StringPtr(awsInsufficientCapacity),
 			expectedReason: "AWSInsufficientCapacity",
-		},
-		{
-			name:           "SCANotAvailable is True",
-			log:            pointer.StringPtr(scaNotAvailableLog),
-			expectedReason: "SCACertsPullFailed",
-		},
-		{
-			name:           "SCAAvailable is False",
-			log:            pointer.StringPtr(scaAvailableLog),
-			expectedReason: "SCACertsPullFailed",
 		},
 		{
 			name:           "load balancer service linked role prereq",

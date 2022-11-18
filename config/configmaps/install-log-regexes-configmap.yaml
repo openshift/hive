@@ -5,11 +5,6 @@ metadata:
   namespace: hive
 data:
   regexes: |
-    - name: SCACertsPullFailed
-      searchRegexStrings:
-      - "Failed to pull SCA certs from"
-      installFailingReason: SCACertsPullFailed
-      installFailingMessage: Cannot pull SCA certificates. Make sure SCA is enabled and try again. See https://access.redhat.com/articles/simple-content-access.
     # AWS Specific:
     - name: AWSInsufficientCapacity
       searchRegexStrings:

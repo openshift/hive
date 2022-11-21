@@ -679,7 +679,7 @@ type ClusterIngress struct {
 
 	// HttpErrorCodePages allows configuring custom HTTP error pages using the IngressController object
 	// +optional
-	HttpErrorCodePages configv1.ConfigMapNameReference `json:"httpErrorCodePages,omitempty"`
+	HttpErrorCodePages *configv1.ConfigMapNameReference `json:"httpErrorCodePages,omitempty"`
 }
 
 // ControlPlaneConfigSpec contains additional configuration settings for a target

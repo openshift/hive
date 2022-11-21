@@ -3,6 +3,7 @@ package remoteingress
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -48,7 +49,7 @@ type SyncSetIngressEntry struct {
 	routeSelector      *metav1.LabelSelector
 	namespaceSelector  *metav1.LabelSelector
 	defaultCertificate string
-	HttpErrorCodePages *configv1.ConfigMapNameReference
+	httpErrorCodePages *configv1.ConfigMapNameReference
 }
 
 func TestRemoteClusterIngressReconcile(t *testing.T) {
@@ -91,7 +92,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 			name: "Test multiple ingress",
 			localObjects: func() []runtime.Object {
 				objects := []runtime.Object{}
-				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, "", configv1.ConfigMapNameReference{})
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, "", nil)
 				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.IngressCertificateNotFoundCondition,
 					Status: corev1.ConditionUnknown,
@@ -114,7 +115,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 			name: "Test updating existing syncset",
 			localObjects: func() []runtime.Object {
 				objects := []runtime.Object{}
-				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, "", configv1.ConfigMapNameReference{})
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, "", nil)
 				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.IngressCertificateNotFoundCondition,
 					Status: corev1.ConditionUnknown,
@@ -171,7 +172,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 			name: "Test setting routeSelector",
 			localObjects: func() []runtime.Object {
 				objects := []runtime.Object{}
-				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", testRouteSelector(), nil, "", configv1.ConfigMapNameReference{})
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", testRouteSelector(), nil, "", nil)
 				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.IngressCertificateNotFoundCondition,
 					Status: corev1.ConditionUnknown,
@@ -195,7 +196,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 			name: "Test setting namespaceSelector",
 			localObjects: func() []runtime.Object {
 				objects := []runtime.Object{}
-				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, testNamespaceSelector(), "", configv1.ConfigMapNameReference{})
+				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, testNamespaceSelector(), "", nil)
 				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.IngressCertificateNotFoundCondition,
 					Status: corev1.ConditionUnknown,
@@ -255,7 +256,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				objects = append(objects, ss)
 
 				// now add the extra ingress entry (use same certBundle)
-				addIngressToClusterDeployment(cd, "secondingress", "moreingress.example.com", nil, nil, testDefaultIngressServingCertificate, configv1.ConfigMapNameReference{})
+				addIngressToClusterDeployment(cd, "secondingress", "moreingress.example.com", nil, nil, testDefaultIngressServingCertificate, nil)
 				cd.Spec.CertificateBundles = addCertificateBundlesForIngressList(cd)
 				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.IngressCertificateNotFoundCondition,
@@ -293,7 +294,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				objects := []runtime.Object{}
 				// syncset object with extra ingress (pointing to same certBundle)
 				cdExtraIngress := testClusterDeploymentWithManualCertificate()
-				addIngressToClusterDeployment(cdExtraIngress, "secondingress", "moreingress.example.com", nil, nil, testDefaultIngressServingCertificate, configv1.ConfigMapNameReference{})
+				addIngressToClusterDeployment(cdExtraIngress, "secondingress", "moreingress.example.com", nil, nil, testDefaultIngressServingCertificate, nil)
 				cdExtraIngress.Spec.CertificateBundles = addCertificateBundlesForIngressList(cdExtraIngress)
 				ss := syncSetFromClusterDeployment(cdExtraIngress)
 				objects = append(objects, ss)
@@ -331,7 +332,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				objects := []runtime.Object{}
 				// cluster with two ingress to two different certbundles
 				cd := testClusterDeploymentWithManualCertificate()
-				addIngressToClusterDeployment(cd, "secondingress", "moreingress.example.com", nil, nil, "secondCertBundle", configv1.ConfigMapNameReference{})
+				addIngressToClusterDeployment(cd, "secondingress", "moreingress.example.com", nil, nil, "secondCertBundle", nil)
 				cd.Spec.CertificateBundles = addCertificateBundlesForIngressList(cd)
 				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.IngressCertificateNotFoundCondition,
@@ -368,7 +369,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 			name: "Test setting httpErrorCodePages",
 			localObjects: func() []runtime.Object {
 				objects := []runtime.Object{}
-				cd := addIngressToClusterDeployment(testClusterDeployment(), "secondingress", "moreingress.example.com", nil, nil, "", configv1.ConfigMapNameReference{})
+				cd := testClusterDeploymentWithHttpErrorCodePages()
 				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.IngressCertificateNotFoundCondition,
 					Status: corev1.ConditionUnknown,
@@ -380,7 +381,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 				{
 					name:               testDefaultIngressName,
 					domain:             testIngressDomain,
-					HttpErrorCodePages: testHttpErrorCodePages(),
+					httpErrorCodePages: testHttpErrorCodePages("custom-configmap"),
 				},
 			},
 		},
@@ -561,14 +562,17 @@ func testRouteSelector() *metav1.LabelSelector {
 	return selector
 }
 
-func testHttpErrorCodePages() *configv1.ConfigMapNameReference {
-	httpErrorCodePages := &configv1.ConfigMapNameReference{
-		Name: "custom-configmap",
+func testHttpErrorCodePages(configmap string) *configv1.ConfigMapNameReference {
+	if configmap != "" {
+		httpErrorCodePages := &configv1.ConfigMapNameReference{
+			Name: configmap,
+		}
+		return httpErrorCodePages
 	}
-	return httpErrorCodePages
+	return nil
 }
 
-func addIngressToClusterDeployment(cd *hivev1.ClusterDeployment, ingressName, ingressDomain string, routeSelector, namespaceSelector *metav1.LabelSelector, servingCertificate string, httpErrorCodePages configv1.ConfigMapNameReference) *hivev1.ClusterDeployment {
+func addIngressToClusterDeployment(cd *hivev1.ClusterDeployment, ingressName, ingressDomain string, routeSelector, namespaceSelector *metav1.LabelSelector, servingCertificate string, httpErrorCodePages *configv1.ConfigMapNameReference) *hivev1.ClusterDeployment {
 	cd.Spec.Ingress = append(cd.Spec.Ingress, hivev1.ClusterIngress{
 		Name:               ingressName,
 		Domain:             ingressDomain,
@@ -612,9 +616,17 @@ func fakeSecretListForCertBundles(cd *hivev1.ClusterDeployment) []*corev1.Secret
 func testClusterDeploymentWithManualCertificate() *hivev1.ClusterDeployment {
 	cd := testClusterDeploymentWithoutIngress()
 
-	cd = addIngressToClusterDeployment(cd, testDefaultIngressName, testIngressDomain, nil, nil, testDefaultIngressServingCertificate, configv1.ConfigMapNameReference{})
+	cd = addIngressToClusterDeployment(cd, testDefaultIngressName, testIngressDomain, nil, nil, testDefaultIngressServingCertificate, nil)
 
 	cd.Spec.CertificateBundles = addCertificateBundlesForIngressList(cd)
+
+	return cd
+}
+
+func testClusterDeploymentWithHttpErrorCodePages() *hivev1.ClusterDeployment {
+	cd := testClusterDeploymentWithoutIngress()
+
+	cd = addIngressToClusterDeployment(cd, testDefaultIngressName, testIngressDomain, nil, nil, "", testHttpErrorCodePages("custom-configmap"))
 
 	return cd
 }
@@ -622,7 +634,7 @@ func testClusterDeploymentWithManualCertificate() *hivev1.ClusterDeployment {
 func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeploymentWithoutIngress()
 
-	cd = addIngressToClusterDeployment(cd, testDefaultIngressName, testIngressDomain, nil, nil, "", configv1.ConfigMapNameReference{})
+	cd = addIngressToClusterDeployment(cd, testDefaultIngressName, testIngressDomain, nil, nil, "", nil)
 
 	return cd
 }
@@ -705,6 +717,7 @@ type createdResourceInfo struct {
 	namespaceSelector  *metav1.LabelSelector
 	routeSelector      *metav1.LabelSelector
 	defaultCertificate string
+	httpErrorCodePages *configv1.ConfigMapNameReference
 }
 type createdSyncSetInfo struct {
 	name           string
@@ -738,7 +751,6 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			created.resources = append(created.resources, cr)
 			continue
 		}
-
 		ic, ok := raw.Object.(*ingresscontroller.IngressController)
 		if ok {
 			cr := createdResourceInfo{
@@ -748,6 +760,9 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 				domain:            ic.Spec.Domain,
 				namespaceSelector: ic.Spec.NamespaceSelector,
 				routeSelector:     ic.Spec.RouteSelector,
+			}
+			if !reflect.DeepEqual(ic.Spec.HttpErrorCodePages, configv1.ConfigMapNameReference{}) {
+				cr.httpErrorCodePages = &ic.Spec.HttpErrorCodePages
 			}
 			if ic.Spec.DefaultCertificate != nil {
 				cr.defaultCertificate = ic.Spec.DefaultCertificate.Name
@@ -792,6 +807,7 @@ func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedS
 				assert.Equal(t, ic.namespaceSelector, resObj.namespaceSelector, "unexpected namespaceSelector on ingressController: %v", ic.name)
 				assert.Equal(t, ic.routeSelector, resObj.routeSelector, "unexpected routeSelector on ingressController: %v", ic.name)
 				assert.Equal(t, ic.defaultCertificate, resObj.defaultCertificate, "unexpected DefaultCertificate on ingressController: %v", ic.name)
+				assert.Equal(t, ic.httpErrorCodePages, resObj.httpErrorCodePages, "unexpected HttpErrorCodePages field on ingressController: %v", ic.name)
 			}
 		}
 		assert.True(t, found, "didn't find expected ingressController: %v", ic.name)

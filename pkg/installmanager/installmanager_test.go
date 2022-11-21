@@ -863,3 +863,80 @@ spec:
 		})
 	}
 }
+
+func Test_patchAzureOverrideCreds(t *testing.T) {
+	var clusterInfraConfigBytes []byte = []byte(`---
+apiVersion: config.openshift.io/v1
+kind: Infrastructure
+status:
+  infrastructureName: hive-cluster-g7fqb
+  platformStatus:
+    azure:
+      cloudName: AzurePublicCloud
+      resourceGroupName: hive-cluster-g7fqb-rg
+`)
+
+	cases := []struct {
+		name                string
+		overrideSecretBytes []byte
+		expectModified      bool
+		expectErr           bool
+	}{
+		{
+			name: "Patch applies successfully",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_client_id: YWFhCg==
+`),
+			expectModified: true,
+			expectErr:      false,
+		},
+		{
+			name: "Patch applies successfully with region exists",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_region: Y2VudHJhbHVz
+`),
+			expectModified: true,
+			expectErr:      false,
+		},
+		{
+			name: "Patch fails due to azure_resource_prefix exists",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_resource_prefix: YWFhCg==
+`),
+			expectModified: false,
+			expectErr:      true,
+		},
+		{
+			name: "Patch fails due to azure_resourcegroup exists",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_resourcegroup: YWFhCg==
+`),
+			expectModified: false,
+			expectErr:      true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			modifiedBytes, err := patchAzureOverrideCreds([]byte(tc.overrideSecretBytes), clusterInfraConfigBytes, "centralus")
+			if tc.expectModified {
+				assert.NotNil(t, modifiedBytes, "expected credential secret to be modified")
+			} else {
+				assert.Nil(t, modifiedBytes, "expected credential secret to not be modified")
+			}
+			if tc.expectErr {
+				assert.Error(t, err, "expected error patching credential secret")
+			} else {
+				assert.NoError(t, err, "unexpected error patching credential secret")
+			}
+		})
+	}
+}

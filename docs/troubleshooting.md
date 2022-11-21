@@ -7,6 +7,7 @@
     - [Retrieving stored install logs for a specific cluster provision](#retrieving-stored-install-logs-for-a-specific-cluster-provision)
   - [Deprovision](#deprovision)
   - [HiveAdmission](#hiveadmission)
+  - [Dealing with `x509: certificate signed by unknown authority`](#dealing-with-x509-certificate-signed-by-unknown-authority)
 
 ## Cluster Install Failure Logs
 
@@ -62,3 +63,85 @@ For instance, try this:
 # oc create --raw /apis/admission.hive.openshift.io/v1/dnszones -f config/samples/hiveadmission-review-failure.json -v 8 | jq
 ```
 
+## Dealing with `x509: certificate signed by unknown authority`
+
+If your cluster is unreachable, and you are seeing `x509: certificate signed by unknown authority` error messages, this is the SOP for you.  There are several ways to regain access to a cluster in this state.  **In all cases, you will need the certificate authority (CA) file for your new API certificate** in standard PEM format.  It should look something like this:
+
+```sh
+$ cat new-ca-certificate.pem
+```
+
+```
+-----BEGIN CERTIFICATE-----
+<base64 encoded certificate blob>
+-----END CERTIFICATE-----
+...
+-----BEGIN CERTIFICATE-----
+<potentially more base64 encoded certificate blobs>
+-----END CERTIFICATE-----
+```
+
+### Replacing the API certificate of a managed single cluster with kubeconfig
+
+In order for a new API certificate to be accepted by the system, the CA certificate used to sign the new API certificate must be added to the kubeconfig, alongside or replacing any existing certificates. Start by inspecting your current kubeconfig:
+
+```sh
+$ export MY_KUBECONFIG_NAME=$(oc get cd $CLUSTERNAME -o "jsonpath={.spec.clusterMetadata.adminKubeconfigSecretRef.name}")
+$ oc extract secret/$MY_KUBECONFIG_NAME --keys=kubeconfig --to=- > my-kubeconfig-file
+$ cat my-kubeconfig-file
+```
+
+```yaml
+...
+clusters:
+- cluster:
+    certificate-authority-data: <base64 encoded blob>
+    server: https://api.<your cluster>.<your domain>:6443
+  name: <your cluster>
+...
+```
+
+The field `certificate-authority-data` is what needs to be updated. When base64 decoded, it looks something like this:
+
+```sh
+$ echo <base64 encoded blob> | base64 --decode > decoded-existing-certs.pem
+$ cat decoded-existing-certs.pem
+```
+
+```
+-----BEGIN CERTIFICATE-----
+<base64 encoded certificate blob>
+-----END CERTIFICATE-----
+...
+-----BEGIN CERTIFICATE-----
+<potentially more base64 encoded certificate blobs>
+-----END CERTIFICATE-----
+```
+
+Concatenate your new CA certificate with the existing decoded CA certificates:
+
+```sh
+$ cat decoded-existing-certs.pem new-ca-certificate.pem | openssl base64 -A
+```
+
+Copy the contents of this new base64 encoded blob and use it to replace the `certificate-authority-data` field in your kubeconfig. After the kubeconfig file is ready, patch your cluster to use the new kubeconfig:
+
+```sh
+$ oc patch secret $MY_KUBECONFIG_NAME --type='json' -p="[{'op': 'replace', 'path': '/data/kubeconfig', 'value': '$(openssl base64 -A -in my-updated-kubeconfig-file)'},{'op': 'replace', 'path': '/data/raw-kubeconfig', 'value': '$(openssl base64 -A -in my-updated-kubeconfig-file)'}]"
+```
+
+### Setting a new CA certificate globally on the managing cluster with hiveconfig
+
+Hive can use its own configuration file to configure an additional CA certificate which will be added to kubeconfigs referenced by _ALL_ ClusterDeployments.  Use the `hack/set-additional-ca.sh` script to accomplish this:
+
+```sh
+$ hack/set-additional-ca.sh new-ca-certificate.pem
+```
+
+Note that this technique will replace any existing additional CA certificates that Hive currently is using.  If you wish to add your new CA to the existing additional CA, you must merge the new and old CAs together:
+
+```sh
+$ oc extract secret/additional-ca -n hive --to=- | base64 --decode > old-ca-certificate.pem
+$ cat old-ca-certificate.pem new-ca-certificate.pem > combined-ca-certificates.pem
+$ hack/set-additional-ca.sh combined-ca-certificates.pem
+```

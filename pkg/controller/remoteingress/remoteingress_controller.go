@@ -358,6 +358,10 @@ func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.Cluste
 		}
 	}
 
+	if ingress.HttpErrorCodePages != nil {
+		newIngress.Spec.HttpErrorCodePages = *ingress.HttpErrorCodePages
+	}
+
 	return &newIngress
 }
 

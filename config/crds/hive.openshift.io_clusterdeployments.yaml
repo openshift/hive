@@ -287,6 +287,17 @@ spec:
                         full DNS suffix that the resulting IngressController object
                         will service (eg abcd.mycluster.mydomain.com).
                       type: string
+                    httpErrorCodePages:
+                      description: HttpErrorCodePages allows configuring custom HTTP
+                        error pages using the IngressController object
+                      properties:
+                        name:
+                          description: name is the metadata.name of the referenced
+                            config map
+                          type: string
+                      required:
+                      - name
+                      type: object
                     name:
                       description: Name of the ClusterIngress object to create.
                       type: string

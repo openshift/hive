@@ -1,6 +1,7 @@
 package v1
 
 import (
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -675,6 +676,10 @@ type ClusterIngress struct {
 	// should be used for this Ingress
 	// +optional
 	ServingCertificate string `json:"servingCertificate,omitempty"`
+
+	// HttpErrorCodePages allows configuring custom HTTP error pages using the IngressController object
+	// +optional
+	HttpErrorCodePages *configv1.ConfigMapNameReference `json:"httpErrorCodePages,omitempty"`
 }
 
 // ControlPlaneConfigSpec contains additional configuration settings for a target

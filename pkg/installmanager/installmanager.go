@@ -1876,7 +1876,7 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 			return nil, errors.Wrap(err, "error decoding data.azure_region")
 		}
 		if region != string(regionDecode) {
-			return nil, fmt.Errorf("azure_region=%s already exists in 99_cloud-creds-secret.yaml but different to region in ClusterDeployment.spec", string(regionDecode))
+			return nil, fmt.Errorf("azure_region=%s already exists in 99_cloud-creds-secret.yaml but different to region=%s in ClusterDeployment.spec", string(regionDecode), region)
 		}
 	}
 
@@ -1897,7 +1897,7 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 
 	ops := yamlpatch.Patch{
 		yamlpatch.Operation{
-			Op:    "add",
+			Op:    "add", //ok even if /data/azure_region already exists
 			Path:  yamlpatch.OpPath("/data/azure_region"),
 			Value: yamlpatch.NewNode(&regionBase64),
 		},
@@ -1911,9 +1911,6 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 			Path:  yamlpatch.OpPath("/data/azure_resourcegroup"),
 			Value: yamlpatch.NewNode(&resourceGroupNameBase64),
 		},
-	}
-	if regionInput != "" {
-		ops = ops[1:3]
 	}
 
 	// Apply patch to 99_cloud-creds-secret.yaml

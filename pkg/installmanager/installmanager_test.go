@@ -33,6 +33,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+	yamlutils "github.com/openshift/hive/pkg/util/yaml"
 )
 
 const (
@@ -893,7 +894,7 @@ data:
 			expectErr:      false,
 		},
 		{
-			name: "Patch applies successfully with region exists",
+			name: "Patch applies successfully with region exists and same",
 			overrideSecretBytes: []byte(`---
 apiVersion: v1
 data:
@@ -901,6 +902,16 @@ data:
 `),
 			expectModified: true,
 			expectErr:      false,
+		},
+		{
+			name: "Patch fails due to region exists but different",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_region: ZWFzdHVzCg==//eastus
+`),
+			expectModified: false,
+			expectErr:      true,
 		},
 		{
 			name: "Patch fails due to azure_resource_prefix exists",
@@ -936,6 +947,16 @@ data:
 				assert.Error(t, err, "expected error patching credential secret")
 			} else {
 				assert.NoError(t, err, "unexpected error patching credential secret")
+			}
+			if tc.expectModified {
+				c, err := yamlutils.Decode(*modifiedBytes)
+				assert.NoError(t, err, "expected to be able to decode patched credential secret")
+				isRegionCorrect, _ := yamlutils.Test(c, "/data/azure_region", "Y2VudHJhbHVz")
+				assert.Equal(t, true, isRegionCorrect, "expected /data/azure_region filled correctly in patched credential secret")
+				isPrefixCorrect, _ := yamlutils.Test(c, "/data/azure_resource_prefix", "aGl2ZS1jbHVzdGVyLWc3ZnFi") //base64 for hive-cluster-g7fqb
+				assert.Equal(t, true, isPrefixCorrect, "expected /data/azure_resource_prefix filled correctly in patched credential secret")
+				isGroupCorrect, _ := yamlutils.Test(c, "/data/azure_resourcegroup", "aGl2ZS1jbHVzdGVyLWc3ZnFiLXJn") //base64 for hive-cluster-g7fqb-rg
+				assert.Equal(t, true, isGroupCorrect, "expected /data/azure_resourcegroup filled correctly in patched credential secret")
 			}
 		})
 	}

@@ -893,6 +893,7 @@ data:
 			expectModified: true,
 			expectErr:      false,
 		},
+		//azure_region is base64(centralus)
 		{
 			name: "Patch applies successfully with region exists and same",
 			overrideSecretBytes: []byte(`---
@@ -903,12 +904,13 @@ data:
 			expectModified: true,
 			expectErr:      false,
 		},
+		//azure_region is base64(eastus)
 		{
 			name: "Patch fails due to region exists but different",
 			overrideSecretBytes: []byte(`---
 apiVersion: v1
 data:
-  azure_region: ZWFzdHVzCg==//eastus
+  azure_region: ZWFzdHVzCg==
 `),
 			expectModified: false,
 			expectErr:      true,
@@ -952,11 +954,11 @@ data:
 				c, err := yamlutils.Decode(*modifiedBytes)
 				assert.NoError(t, err, "expected to be able to decode patched credential secret")
 				isRegionCorrect, _ := yamlutils.Test(c, "/data/azure_region", "Y2VudHJhbHVz")
-				assert.Equal(t, true, isRegionCorrect, "expected /data/azure_region filled correctly in patched credential secret")
+				assert.True(t, isRegionCorrect, "expected /data/azure_region filled correctly in patched credential secret")
 				isPrefixCorrect, _ := yamlutils.Test(c, "/data/azure_resource_prefix", "aGl2ZS1jbHVzdGVyLWc3ZnFi") //base64 for hive-cluster-g7fqb
-				assert.Equal(t, true, isPrefixCorrect, "expected /data/azure_resource_prefix filled correctly in patched credential secret")
+				assert.True(t, isPrefixCorrect, "expected /data/azure_resource_prefix filled correctly in patched credential secret")
 				isGroupCorrect, _ := yamlutils.Test(c, "/data/azure_resourcegroup", "aGl2ZS1jbHVzdGVyLWc3ZnFiLXJn") //base64 for hive-cluster-g7fqb-rg
-				assert.Equal(t, true, isGroupCorrect, "expected /data/azure_resourcegroup filled correctly in patched credential secret")
+				assert.True(t, isGroupCorrect, "expected /data/azure_resourcegroup filled correctly in patched credential secret")
 			}
 		})
 	}

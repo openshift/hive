@@ -33,6 +33,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+	yamlutils "github.com/openshift/hive/pkg/util/yaml"
 )
 
 const (
@@ -859,6 +860,105 @@ spec:
 				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within Security Group Filters in AWSMachineProviderConfig")
 				assert.Equal(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Name, "vpc-id", "expected an vpc-id named filter to be configured within Security Group Filters in AWSMachineProviderConfig")
 				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Values, "testvpc123", "expected testvpc123 to be configured within Security Group Filters in AWSMachineProviderConfig")
+			}
+		})
+	}
+}
+
+func Test_patchAzureOverrideCreds(t *testing.T) {
+	var clusterInfraConfigBytes []byte = []byte(`---
+apiVersion: config.openshift.io/v1
+kind: Infrastructure
+status:
+  infrastructureName: hive-cluster-g7fqb
+  platformStatus:
+    azure:
+      cloudName: AzurePublicCloud
+      resourceGroupName: hive-cluster-g7fqb-rg
+`)
+
+	cases := []struct {
+		name                string
+		overrideSecretBytes []byte
+		expectModified      bool
+		expectErr           bool
+	}{
+		{
+			name: "Patch applies successfully",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_client_id: YWFhCg==
+`),
+			expectModified: true,
+			expectErr:      false,
+		},
+		//azure_region is base64(centralus)
+		{
+			name: "Patch applies successfully with region exists and same",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_region: Y2VudHJhbHVz
+`),
+			expectModified: true,
+			expectErr:      false,
+		},
+		//azure_region is base64(eastus)
+		{
+			name: "Patch fails due to region exists but different",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_region: ZWFzdHVzCg==
+`),
+			expectModified: false,
+			expectErr:      true,
+		},
+		{
+			name: "Patch fails due to azure_resource_prefix exists",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_resource_prefix: YWFhCg==
+`),
+			expectModified: false,
+			expectErr:      true,
+		},
+		{
+			name: "Patch fails due to azure_resourcegroup exists",
+			overrideSecretBytes: []byte(`---
+apiVersion: v1
+data:
+  azure_resourcegroup: YWFhCg==
+`),
+			expectModified: false,
+			expectErr:      true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			modifiedBytes, err := patchAzureOverrideCreds([]byte(tc.overrideSecretBytes), clusterInfraConfigBytes, "centralus")
+			if tc.expectModified {
+				assert.NotNil(t, modifiedBytes, "expected credential secret to be modified")
+			} else {
+				assert.Nil(t, modifiedBytes, "expected credential secret to not be modified")
+			}
+			if tc.expectErr {
+				assert.Error(t, err, "expected error patching credential secret")
+			} else {
+				assert.NoError(t, err, "unexpected error patching credential secret")
+			}
+			if tc.expectModified {
+				c, err := yamlutils.Decode(*modifiedBytes)
+				assert.NoError(t, err, "expected to be able to decode patched credential secret")
+				isRegionCorrect, _ := yamlutils.Test(c, "/data/azure_region", "Y2VudHJhbHVz")
+				assert.True(t, isRegionCorrect, "expected /data/azure_region filled correctly in patched credential secret")
+				isPrefixCorrect, _ := yamlutils.Test(c, "/data/azure_resource_prefix", "aGl2ZS1jbHVzdGVyLWc3ZnFi") //base64 for hive-cluster-g7fqb
+				assert.True(t, isPrefixCorrect, "expected /data/azure_resource_prefix filled correctly in patched credential secret")
+				isGroupCorrect, _ := yamlutils.Test(c, "/data/azure_resourcegroup", "aGl2ZS1jbHVzdGVyLWc3ZnFiLXJn") //base64 for hive-cluster-g7fqb-rg
+				assert.True(t, isGroupCorrect, "expected /data/azure_resourcegroup filled correctly in patched credential secret")
 			}
 		})
 	}

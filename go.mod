@@ -53,6 +53,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.2
+	github.com/tidwall/gjson v1.14.3
 	github.com/vmware/govmomi v0.27.4
 	golang.org/x/crypto v0.0.0-20220321153916-2c7772ba3064
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
@@ -339,7 +340,11 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
 
-require github.com/google/gnostic v0.5.7-v3refs // indirect
+require (
+	github.com/google/gnostic v0.5.7-v3refs // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
+)
 
 // sub modules
 replace github.com/openshift/hive/apis => ./apis

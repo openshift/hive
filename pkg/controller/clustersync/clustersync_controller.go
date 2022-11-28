@@ -909,6 +909,8 @@ func applyToTargetCluster(
 	applyFn func(obj []byte) (resource.ApplyResult, error),
 	logger log.FieldLogger,
 ) error {
+	logger = logger.WithField("uid", obj.GetUID()).WithField("resource_version", obj.GetResourceVersion())
+
 	startTime := time.Now()
 	labels := obj.GetLabels()
 	if labels == nil {
@@ -924,16 +926,17 @@ func applyToTargetCluster(
 		return err
 	}
 
+	logger.Info("attempting to apply resource")
 	applyResult, err := applyFn(bytes)
 	// Record the amount of time we took to apply this specific resource. When combined with the metric for duration of
 	// our kube client requests, we can get an idea how much time we're spending cpu bound vs network bound.
 	applyTime := metav1.Now().Sub(startTime).Seconds()
 	if err != nil {
-		logger.WithError(err).Warn("error applying resource")
+		logger.WithError(err).WithField("applyTime", applyTime).Warn("error applying resource")
 		metricResourcesApplied.WithLabelValues(applyFnMetricLabel, metricResultError).Inc()
 		metricTimeToApplySyncSetResource.WithLabelValues(applyFnMetricLabel, metricResultError).Observe(applyTime)
 	} else {
-		logger.WithField("applyResult", applyResult).Debug("resource applied")
+		logger.WithField("applyResult", applyResult).WithField("applyTime", applyTime).Info("resource applied")
 		metricResourcesApplied.WithLabelValues(applyFnMetricLabel, metricResultSuccess).Inc()
 		metricTimeToApplySyncSetResource.WithLabelValues(applyFnMetricLabel, metricResultSuccess).Observe(applyTime)
 	}

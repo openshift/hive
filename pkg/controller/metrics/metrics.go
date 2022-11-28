@@ -752,6 +752,15 @@ func GetClusterDeploymentType(obj metav1.Object) string {
 	return hivev1.DefaultClusterType
 }
 
+// IsClusterTypeX returns the value of the clusterTypeLabel label if set, otherwise unknown.
+// Specifically used for cases like STS, Private-Link or Managed-VPC
+func IsClusterTypeX(obj metav1.Object, clusterTypeLabel string) string {
+	if typeStr, ok := obj.GetLabels()[clusterTypeLabel]; ok {
+		return typeStr
+	}
+	return "unknown"
+}
+
 // ReconcileObserver is used to track, log, and report metrics for controller reconcile time and outcome. Each
 // controller should instantiate one near the start of the reconcile loop, and defer a call to
 // ObserveControllerReconcileTime.

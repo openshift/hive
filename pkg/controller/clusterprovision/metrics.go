@@ -12,7 +12,7 @@ var (
 		Help:    "Time taken before a cluster provision failed to install",
 		Buckets: []float64{30, 120, 300, 600, 1800},
 	},
-		[]string{"cluster_type", "platform", "region", "cluster_version", "workers", "install_attempt"},
+		[]string{"cluster_type", "sts", "private_link", "managed_vpc", "platform", "region", "cluster_version", "workers", "install_attempt"},
 	)
 
 	metricInstallSuccessSeconds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -20,7 +20,7 @@ var (
 		Help:    "Time taken before a cluster provision succeeded to install",
 		Buckets: []float64{1800, 2400, 3000, 3600},
 	},
-		[]string{"cluster_type", "platform", "region", "cluster_version", "workers", "install_attempt"},
+		[]string{"cluster_type", "sts", "private_link", "managed_vpc", "platform", "region", "cluster_version", "workers", "install_attempt"},
 	)
 )
 

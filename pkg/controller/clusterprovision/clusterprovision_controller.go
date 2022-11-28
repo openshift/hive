@@ -625,6 +625,9 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 	}
 	timeMetric.WithLabelValues(
 		hivemetrics.GetClusterDeploymentType(cd),
+		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel),
 		cd.Labels[hivev1.HiveClusterPlatformLabel],
 		cd.Labels[hivev1.HiveClusterRegionLabel],
 		*cd.Status.InstallVersion,

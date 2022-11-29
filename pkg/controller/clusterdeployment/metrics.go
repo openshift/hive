@@ -6,6 +6,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -17,7 +18,7 @@ var (
 			Help:    "Distribution of the number of restarts for all completed cluster installations.",
 			Buckets: []float64{0, 2, 10, 20, 50},
 		},
-		[]string{"cluster_type"},
+		[]string{"cluster_type", "sts", "private_link", "managed_vpc"},
 	)
 	metricInstallJobDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
@@ -44,19 +45,19 @@ var (
 		Name: "hive_cluster_deployments_created_total",
 		Help: "Counter incremented every time we observe a new cluster.",
 	},
-		[]string{"cluster_type"},
+		[]string{"cluster_type", "sts", "private_link", "managed_vpc"},
 	)
 	metricClustersInstalled = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "hive_cluster_deployments_installed_total",
 		Help: "Counter incremented every time we observe a successful installation.",
 	},
-		[]string{"cluster_type"},
+		[]string{"cluster_type", "sts", "private_link", "managed_vpc"},
 	)
 	metricClustersDeleted = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "hive_cluster_deployments_deleted_total",
 		Help: "Counter incremented every time we observe a deleted cluster.",
 	},
-		[]string{"cluster_type"},
+		[]string{"cluster_type", "sts", "private_link", "managed_vpc"},
 	)
 	metricDNSDelaySeconds = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
@@ -69,7 +70,7 @@ var (
 		Name: "hive_cluster_deployments_provision_failed_terminal_total",
 		Help: "Counter incremented when a cluster provision has failed and won't be retried.",
 	},
-		[]string{"clusterpool_namespacedname", "cluster_type", "failure_reason"},
+		[]string{"clusterpool_namespacedname", "cluster_type", "sts", "private_link", "managed_vpc", "failure_reason"},
 	)
 )
 
@@ -85,6 +86,9 @@ func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment) {
 	}
 	metricProvisionFailedTerminal.WithLabelValues(poolNSName,
 		hivemetrics.GetClusterDeploymentType(cd),
+		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel),
 		stoppedReason).Inc()
 }
 

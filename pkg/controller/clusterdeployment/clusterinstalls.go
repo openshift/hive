@@ -212,10 +212,16 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			logger.WithField("duration", installDuration.Seconds()).Debug("install job completed")
 			metricInstallJobDuration.Observe(float64(installDuration.Seconds()))
 
-			metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
+			metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
+				hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+				hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+				hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).
 				Observe(float64(cd.Status.InstallRestarts))
 
-			metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+			metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
+				hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+				hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+				hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).Inc()
 
 			if r.protectedDelete {
 				// Set protected delete on for the ClusterDeployment.

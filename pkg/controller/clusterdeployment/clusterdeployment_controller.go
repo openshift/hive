@@ -572,7 +572,10 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
+			hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+			hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+			hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).Inc()
 		return reconcile.Result{}, nil
 	}
 
@@ -1428,7 +1431,10 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 	// Increment the clusters deleted counter:
-	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
+		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).Inc()
 
 	return nil
 }

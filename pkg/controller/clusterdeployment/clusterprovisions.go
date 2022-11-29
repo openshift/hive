@@ -513,10 +513,16 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
 
 	// Report a metric for the total number of install restarts:
-	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
+	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
+		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).
 		Observe(float64(cd.Status.InstallRestarts))
 
-	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
+		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).Inc()
 
 	return reconcile.Result{}, nil
 }

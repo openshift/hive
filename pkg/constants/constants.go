@@ -134,6 +134,24 @@ const (
 	// the cluster, causing its machines to remain in their current state (unless acted on externally) regardless of CD.Spec.PowerState.
 	PowerStatePauseAnnotation = "hive.openshift.io/powerstate-pause"
 
+	// ReconcilePauseAnnotation is an annotation used by ClusterDeployment. If "true", (most) controllers will (mostly) ignore the CD until
+	// the annotation is cleared/non-truthy. Exceptions:
+	// - clusterclaim: We'll still mark the CD for deletion by the clusterpool controller when the claim is deleted.
+	// - clusterpool:
+	//   - We'll still delete CDs* for various reasons, including
+	//     - Associated claim is deleted (per above)
+	//     - To satisfy pool capacity constraints
+	//     - To flush out broken or stale clusters
+	//   - We'll still update CD PowerState when it's time to hibernate or resume a pool cluster. But the hibernation controller won't
+	//   effect that change while the annotation is still set.
+	//   - We'll still create new ClusterDeployments to satisfy pool capacities. If you include this annotation in
+	//   ClusterPool.Spec.Annotations, those ClusterDeployments will be created with it set, so we won't do anything (like provision the
+	//   cluster) until it's unset.
+	// - clusterpoolnamespace: We'll still delete CDs*.
+	// *Note that this only entails setting the deletionTimestamp; the other controllers won't do anything about it (like deprovisioning
+	// the cluster) while the annotation is still set.
+	ReconcilePauseAnnotation = "hive.openshift.io/reconcile-pause"
+
 	// HiveManagedLabel is a label added to any resources we sync to the remote cluster to help identify that they are
 	// managed by Hive, and any manual changes may be undone the next time the resource is reconciled.
 	HiveManagedLabel = "hive.openshift.io/managed"

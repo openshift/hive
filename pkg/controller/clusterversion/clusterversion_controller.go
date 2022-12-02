@@ -3,6 +3,7 @@ package clusterversion
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/blang/semver/v4"
 	log "github.com/sirupsen/logrus"
@@ -111,6 +112,12 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
+
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile due to ClusterDeployment pause annotation")
+		return reconcile.Result{}, nil
+	}
+
 	// If the clusterdeployment is deleted, do not reconcile.
 	if cd.DeletionTimestamp != nil {
 		return reconcile.Result{}, nil

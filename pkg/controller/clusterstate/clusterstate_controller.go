@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -121,6 +122,10 @@ func (r *ReconcileClusterState) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, err
 	}
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, logger)
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		logger.Info("skipping reconcile due to ClusterDeployment pause annotation")
+		return reconcile.Result{}, nil
+	}
 
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, logger)

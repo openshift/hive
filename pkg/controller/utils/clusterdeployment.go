@@ -30,6 +30,10 @@ func IsClusterPausedOrRelocating(cd *hivev1.ClusterDeployment, logger log.FieldL
 		logger.WithField("annotation", constants.SyncsetPauseAnnotation).Warn("syncing to cluster is disabled by annotation")
 		return true
 	}
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		logger.WithField("annotation", constants.ReconcilePauseAnnotation).Warn("reconcile disabled by annotation")
+		return true
+	}
 	if _, relocating := cd.Annotations[constants.RelocateAnnotation]; relocating {
 		logger.WithField("annotation", constants.RelocateAnnotation).Info("syncing to cluster is disabled by annotation")
 		return true

@@ -299,6 +299,11 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 	}
 	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
 
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile due to ClusterDeployment pause annotation")
+		return reconcile.Result{}, nil
+	}
+
 	// Ensure owner references are correctly set
 	err = controllerutils.ReconcileOwnerReferences(cd, generateOwnershipUniqueKeys(cd), r, r.scheme, r.logger)
 	if err != nil {

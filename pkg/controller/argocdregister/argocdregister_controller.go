@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -152,6 +153,11 @@ func (r *ArgoCDRegisterController) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
+
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile due to ClusterDeployment pause annotation")
+		return reconcile.Result{}, nil
+	}
 
 	if !cd.Spec.Installed {
 		cdLog.Info("cluster installation is not complete")

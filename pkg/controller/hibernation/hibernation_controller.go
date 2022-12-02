@@ -149,7 +149,7 @@ func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentRecon
 }
 
 // Reconcile syncs a single ClusterDeployment
-func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
+func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
@@ -254,8 +254,11 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	shouldHibernate := cd.Spec.PowerState == hivev1.ClusterPowerStateHibernating
 	// set readyToHibernate if hibernate after is ready to kick in hibernation
 	var readyToHibernate bool
+	var requeueAfter time.Duration
 
-	// Check if HibernateAfter is set, and decide to hibernate or requeue
+	// If HibernateAfter is set, compute where we are on the timeline.
+	// If we've passed the HibernateAfter window, readyToHibernate will be true;
+	// if not, we'll set requeueAfter to a positive value: the time until we should kick off the hibernation.
 	if cd.Spec.HibernateAfter != nil && !shouldHibernate {
 		// As the baseline timestamp for determining whether HibernateAfter should trigger, we use the latest of:
 		// - When the cluster finished installing (status.installedTimestamp)
@@ -289,7 +292,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 			}
 
 			if hibernatingCondition.Status == corev1.ConditionUnknown {
-				hibLog.Debug("cluster has never been hibernated")
+				hibLog.Debug("cluster has never been hibernated") // I mean, unless it's adopted or disaster-recovered, maybe. We'll check that stuff later.
 				isRunning = true
 			}
 			if readyCondition.Status == corev1.ConditionTrue {
@@ -307,22 +310,11 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 				})
 				expiry := stamps[0].Add(hibernateAfterDur)
 				hibLog.Debugf("cluster should be hibernating after: %s", expiry)
-				if time.Now().After(expiry) {
-					hibLog.WithField("expiry", expiry).Debug("cluster has been running longer than hibernate-after duration, moving to hibernating powerState")
+				requeueAfter := time.Until(expiry)
+
+				if requeueAfter <= 0 {
+					hibLog.WithField("expiry", expiry).Debug("cluster has been running longer than hibernate-after duration, will hibernate")
 					readyToHibernate = true
-				} else {
-					requeueNow := result.Requeue && result.RequeueAfter <= 0
-					if returnErr == nil && !requeueNow {
-						// We have the hibernateAfter time but cluster has not been running that long yet.
-						// Set requeueAfter for just after so that we requeue cluster for hibernation once reconcile has completed
-						requeueAfter := time.Until(expiry)
-						if requeueAfter < result.RequeueAfter || result.RequeueAfter <= 0 {
-							hibLog.Infof("cluster will reconcile due to hibernate-after time in: %v", requeueAfter)
-							result.RequeueAfter = requeueAfter
-							result.Requeue = true
-							return result, err
-						}
-					}
 				}
 			}
 		}
@@ -371,6 +363,19 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		}
 		return r.checkClusterStopped(cd, false, cdLog)
 	}
+
+	// If status hasn't been initialized, we're in one of two states:
+	// - We've just installed the cluster (most likely)
+	// - We're initializing status on a pre-existing cluster -- either an adoption or disaster recovery.
+	// In this case we don't actually know whether the cluster is running. Decide whether we think it should
+	// be, and if so, ensure it is started. This will initialize these status fields.
+	if cd.Status.PowerState == "" || hibernatingCondition.Status == corev1.ConditionUnknown || readyCondition.Status == corev1.ConditionUnknown {
+		cdLog.Debug("Power states are uninitialized!")
+		// We expect to be running, but make sure of it (e.g. if recovering with no status, we might be hibernating)
+		_, err := r.checkClusterRunning(cd, syncSetsApplied, cdLog, readyCondition)
+		return reconcile.Result{}, err
+	}
+
 	// If we get here, we're not supposed to be hibernating
 	if isFakeCluster {
 		changed := r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonResumingOrRunning,
@@ -389,7 +394,30 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	if shouldStartMachines(cd, hibernatingCondition, readyCondition) {
 		return r.startMachines(cd, cdLog)
 	}
-	return r.checkClusterRunning(cd, syncSetsApplied, cdLog, readyCondition)
+
+	isAllTheWayUp, err := r.checkClusterRunning(cd, syncSetsApplied, cdLog, readyCondition)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	result := reconcile.Result{
+		// If we're not Running, force requeue so we can keep polling
+		Requeue: !isAllTheWayUp,
+	}
+
+	// If hibernateAfter was set, and indicates a point still in the future,
+	// defer requeueing until hibernateAfter has expired.
+	// UNLESS we're not yet Running; in that case we want to requeue right away so we can keep polling.
+	if requeueAfter > 0 && isAllTheWayUp {
+		// We have the hibernateAfter time but cluster has not been running that long yet.
+		// Set requeueAfter for just after so that we requeue cluster for hibernation once reconcile has completed
+		cdLog.Infof("cluster will reconcile due to hibernate-after time in: %v", requeueAfter)
+		result = reconcile.Result{
+			RequeueAfter: requeueAfter,
+		}
+	}
+	return result, nil
+
 }
 
 func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
@@ -501,6 +529,7 @@ func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment
 	return reconcile.Result{}, nil
 }
 
+// TODO: the first return needs to be a bool indicating whether we're all the way Running
 func (r *hibernationReconciler) checkClusterRunning(cd *hivev1.ClusterDeployment, syncSetsApplied bool, logger log.FieldLogger,
 	readyCondition *hivev1.ClusterDeploymentCondition) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)

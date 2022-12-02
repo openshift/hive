@@ -85,10 +85,10 @@ func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment) {
 		stoppedReason = stoppedCondition.Reason
 	}
 	metricProvisionFailedTerminal.WithLabelValues(poolNSName,
-		hivemetrics.GetClusterDeploymentType(cd),
-		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
-		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
-		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel),
+		hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel),
 		stoppedReason).Inc()
 }
 

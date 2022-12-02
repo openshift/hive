@@ -272,7 +272,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				return
 			}
 			for _, cd := range clusterDeployments.Items {
-				clusterType := GetClusterDeploymentType(&cd)
+				clusterType := GetClusterDeploymentType(&cd, hivev1.HiveClusterTypeLabel)
 				accumulator.processCluster(&cd)
 
 				if cd.DeletionTimestamp != nil {
@@ -534,7 +534,7 @@ func processJobs(jobs []batchv1.Job) (runningTotal, succeededTotal, failedTotal 
 	failed := map[string]int{}
 	succeeded := map[string]int{}
 	for _, job := range jobs {
-		clusterType := GetClusterDeploymentType(&job)
+		clusterType := GetClusterDeploymentType(&job, hivev1.HiveClusterTypeLabel)
 
 		// Sort the jobs:
 		if job.Status.Failed > 0 {
@@ -660,7 +660,7 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 		return
 	}
 
-	clusterType := GetClusterDeploymentType(cd)
+	clusterType := GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel)
 	ca.ensureClusterTypeBuckets(clusterType)
 	ca.clusterTypesSet[clusterType] = true
 
@@ -743,22 +743,12 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovis
 	}
 }
 
-// GetClusterDeploymentType returns the value of the hive.openshift.io/cluster-type label if set,
-// otherwise a default value.
-func GetClusterDeploymentType(obj metav1.Object) string {
-	if typeStr, ok := obj.GetLabels()[hivev1.HiveClusterTypeLabel]; ok {
+// GetClusterDeploymentType returns the value of the label if set, otherwise a default value.
+func GetClusterDeploymentType(obj metav1.Object, label string) string {
+	if typeStr, ok := obj.GetLabels()[label]; ok {
 		return typeStr
 	}
 	return hivev1.DefaultClusterType
-}
-
-// IsClusterTypeX returns the value of the clusterTypeLabel label if set, otherwise unknown.
-// Specifically used for cases like STS, Private-Link or Managed-VPC
-func IsClusterTypeX(obj metav1.Object, clusterTypeLabel string) string {
-	if typeStr, ok := obj.GetLabels()[clusterTypeLabel]; ok {
-		return typeStr
-	}
-	return "unknown"
 }
 
 // ReconcileObserver is used to track, log, and report metrics for controller reconcile time and outcome. Each

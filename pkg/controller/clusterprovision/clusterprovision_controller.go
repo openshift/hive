@@ -379,7 +379,7 @@ func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.Clus
 	pLog.Info("install job succeeded")
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageComplete, "InstallComplete", "Install job has completed successfully", pLog)
 	if err == nil {
-		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), resultSuccess).Inc()
+		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel), resultSuccess).Inc()
 	}
 	return result, err
 }
@@ -393,8 +393,8 @@ func (r *ReconcileClusterProvision) reconcileFailedJob(instance *hivev1.ClusterP
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
 	if err == nil {
 		// Increment a counter metric for this cluster type and error reason:
-		metricInstallErrors.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), reason).Inc()
-		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance), resultFailure).Inc()
+		metricInstallErrors.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel), reason).Inc()
+		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel), resultFailure).Inc()
 	}
 	return result, err
 }
@@ -624,10 +624,10 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 		timeMetric = metricInstallSuccessSeconds
 	}
 	timeMetric.WithLabelValues(
-		hivemetrics.GetClusterDeploymentType(cd),
-		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
-		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
-		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel),
+		hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel),
 		cd.Labels[hivev1.HiveClusterPlatformLabel],
 		cd.Labels[hivev1.HiveClusterRegionLabel],
 		*cd.Status.InstallVersion,

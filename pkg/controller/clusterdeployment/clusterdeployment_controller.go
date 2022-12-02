@@ -526,7 +526,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
 			cd.Name,
 			cd.Namespace,
-			hivemetrics.GetClusterDeploymentType(cd)).Set(
+			hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel)).Set(
 			time.Since(cd.DeletionTimestamp.Time).Seconds())
 
 		return r.syncDeletedClusterDeployment(cd, cdLog)
@@ -572,10 +572,10 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
-			hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
-			hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
-			hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).Inc()
+		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+			hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
+			hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
+			hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel)).Inc()
 		return reconcile.Result{}, nil
 	}
 
@@ -1431,10 +1431,10 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 	// Increment the clusters deleted counter:
-	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd),
-		hivemetrics.IsClusterTypeX(cd, constants.STSClusterLabel),
-		hivemetrics.IsClusterTypeX(cd, constants.PrivateLinkClusterLabel),
-		hivemetrics.IsClusterTypeX(cd, constants.ManagedVPCLabel)).Inc()
+	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
+		hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel)).Inc()
 
 	return nil
 }
@@ -1859,7 +1859,7 @@ func clearDeprovisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog l
 	cleared := hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.Delete(map[string]string{
 		"cluster_deployment": cd.Name,
 		"namespace":          cd.Namespace,
-		"cluster_type":       hivemetrics.GetClusterDeploymentType(cd),
+		"cluster_type":       hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
 	})
 	if cleared {
 		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds)

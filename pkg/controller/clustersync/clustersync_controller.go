@@ -223,20 +223,6 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconc
 		return err
 	}
 
-	// Watch for changes to ClusterSync. These have the same name/namespace as the relevant
-	// ClusterDeployment, so when a ClusterSync watch triggers, the CD of the same name will be reconciled.
-	// When the CD reconciles, it will look up the related ClusterSync.
-	if err := c.Watch(&source.Kind{Type: &hiveintv1alpha1.ClusterSync{}}, &handler.EnqueueRequestForObject{}); err != nil {
-		return err
-	}
-
-	// Watch for changes to ClusterSyncLease. These have the same name/namespace as the relevant
-	// ClusterDeployment, so when a ClusterSyncLease watch triggers, the CD of the same name will be reconciled.
-	// When the CD reconciles, it will look up the related ClusterSyncLease.
-	if err := c.Watch(&source.Kind{Type: &hiveintv1alpha1.ClusterSyncLease{}}, &handler.EnqueueRequestForObject{}); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -421,6 +407,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
+	needToCreateClusterSync := false
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	switch err := r.Get(context.Background(), request.NamespacedName, clusterSync); {
 	case apierrors.IsNotFound(err):
@@ -430,17 +417,13 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		ownerRef := metav1.NewControllerRef(cd, cd.GroupVersionKind())
 		ownerRef.Controller = nil
 		clusterSync.OwnerReferences = []metav1.OwnerReference{*ownerRef}
-		switch err := r.Create(context.Background(), clusterSync); {
-		case apierrors.IsAlreadyExists(err):
-			// race condition, just proceed
-		case err != nil:
+		if err := r.Create(context.Background(), clusterSync); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not create ClusterSync")
 			return reconcile.Result{}, err
-		default: // clusterSync was created successfully
-			recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeClusterSyncCreated)
-			// requeue immediately so that we reconcile soon after the ClusterSync is created
-			return reconcile.Result{Requeue: true}, nil
 		}
+		recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeClusterSyncCreated)
+		// requeue immediately so that we reconcile soon after the ClusterSync is created
+		return reconcile.Result{Requeue: true}, nil
 	case err != nil:
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return reconcile.Result{}, err
@@ -470,15 +453,10 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	needToRenew := r.timeUntilRenew(lease) <= 0
-
-	if needToCreateLease {
-		logger.Info("need to reapply all syncsets (missing lease)")
-	} else if needToRenew {
-		logger.Info("need to reapply all syncsets (time to renew)")
+	needToDoFullReapply := needToCreateClusterSync || r.timeUntilFullReapply(lease) <= 0
+	if needToDoFullReapply {
+		logger.Info("need to reapply all syncsets")
 	}
-
-	needToDoFullReapply := needToCreateLease || needToRenew
 	recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeFullSync)
 
 	// Apply SyncSets
@@ -547,7 +525,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		}
 	}
 
-	result := reconcile.Result{Requeue: true, RequeueAfter: r.timeUntilRenew(lease)}
+	result := reconcile.Result{Requeue: true, RequeueAfter: r.timeUntilFullReapply(lease)}
 	if syncSetsNeedRequeue || selectorSyncSetsNeedRequeue {
 		result.RequeueAfter = 0
 	}
@@ -1154,7 +1132,7 @@ func orderResources(a, b hiveintv1alpha1.SyncResourceReference) bool {
 	return a.Name < b.Name
 }
 
-func (r *ReconcileClusterSync) timeUntilRenew(lease *hiveintv1alpha1.ClusterSyncLease) time.Duration {
+func (r *ReconcileClusterSync) timeUntilFullReapply(lease *hiveintv1alpha1.ClusterSyncLease) time.Duration {
 	timeUntilNext := r.reapplyInterval - time.Since(lease.Spec.RenewTime.Time) +
 		time.Duration(reapplyIntervalJitter*rand.Float64()*r.reapplyInterval.Seconds())*time.Second
 	if timeUntilNext < 0 {

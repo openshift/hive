@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -143,6 +144,11 @@ func (r *ReconcileControlPlaneCerts) Reconcile(ctx context.Context, request reco
 		return reconcile.Result{}, err
 	}
 	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
+
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile due to ClusterDeployment pause annotation")
+		return reconcile.Result{}, nil
+	}
 
 	// Initialize cluster deployment conditions if not present
 	newConditions, changed := controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentControlPlaneCertsConditions)

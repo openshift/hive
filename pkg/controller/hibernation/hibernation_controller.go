@@ -171,6 +171,11 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	}
 	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
 
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile due to ClusterDeployment pause annotation")
+		return reconcile.Result{}, nil
+	}
+
 	// If cluster is already deleted, skip any processing
 	if !cd.DeletionTimestamp.IsZero() {
 		return reconcile.Result{}, nil

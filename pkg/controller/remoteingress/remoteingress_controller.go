@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -156,6 +157,11 @@ func (r *ReconcileRemoteClusterIngress) Reconcile(ctx context.Context, request r
 		return reconcile.Result{}, err
 	}
 	cdLog = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, cdLog)
+	if paused, err := strconv.ParseBool(cd.Annotations[constants.ReconcilePauseAnnotation]); err == nil && paused {
+		cdLog.Info("skipping reconcile due to ClusterDeployment pause annotation")
+		return reconcile.Result{}, nil
+	}
+
 	rContext.clusterDeployment = cd
 
 	// Initialize cluster deployment conditions if not present

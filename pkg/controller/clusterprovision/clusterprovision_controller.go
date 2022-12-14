@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -54,24 +52,15 @@ var (
 	// controllerKind contains the schema.GroupVersionKind for this controller type.
 	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterProvision")
 
-	metricClusterProvisionsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_provision_results_total",
-		Help: "Counter incremented every time we observe a completed cluster provision.",
-	},
-		[]string{"cluster_type", "result"},
-	)
-	metricInstallErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_install_errors",
-		Help: "Counter incremented every time we observe certain errors strings in install logs.",
-	},
-		[]string{"cluster_type", "reason"},
-	)
-)
+	// mapClusterTypeLabelToValue is a map that corresponds to MetricsWithClusterTypeLabels provided in metrics config.
+	// The key in the map is the name of the label used in defining the metric, and the value would be the cluster
+	// deployment label to look for while reporting the metric
+	mapClusterTypeLabelToValue map[string]string
 
-func init() {
-	metrics.Registry.MustRegister(metricInstallErrors)
-	metrics.Registry.MustRegister(metricClusterProvisionsTotal)
-}
+	// optionalClusterTypeLabels contains all the label keys from mapClusterTypeLabelToValue if provided. This slice is
+	// useful for defining the relevant metrics
+	optionalClusterTypeLabels []string
+)
 
 // Add creates a new ClusterProvision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -82,6 +71,18 @@ func Add(mgr manager.Manager) error {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
 	}
+	// Read the metrics config from hiveconfig and set values for mapClusterTypeLabelToValue, if present
+	mConfig, err := hivemetrics.ReadMetricsConfig()
+	if err != nil {
+		log.WithError(err).Error("error reading metrics config")
+		return err
+	}
+	mapClusterTypeLabelToValue = make(map[string]string)
+	mapClusterTypeLabelToValue, optionalClusterTypeLabels = hivemetrics.GetOptionalClusterTypeLabels(mConfig)
+	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
+	// read the hiveconfig, and we register them only once.
+	registerMetrics()
+
 	return add(mgr, newReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
@@ -379,7 +380,10 @@ func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.Clus
 	pLog.Info("install job succeeded")
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageComplete, "InstallComplete", "Install job has completed successfully", pLog)
 	if err == nil {
-		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel), resultSuccess).Inc()
+		hivemetrics.LogCounterMetricWithOptionalLabels(metricClusterProvisionsTotal, instance, map[string]string{
+			"cluster_type": hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel),
+			"result":       resultSuccess,
+		}, mapClusterTypeLabelToValue, pLog)
 	}
 	return result, err
 }
@@ -393,8 +397,14 @@ func (r *ReconcileClusterProvision) reconcileFailedJob(instance *hivev1.ClusterP
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
 	if err == nil {
 		// Increment a counter metric for this cluster type and error reason:
-		metricInstallErrors.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel), reason).Inc()
-		metricClusterProvisionsTotal.WithLabelValues(hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel), resultFailure).Inc()
+		hivemetrics.LogCounterMetricWithOptionalLabels(metricInstallErrors, instance, map[string]string{
+			"cluster_type": hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel),
+			"reason":       reason,
+		}, mapClusterTypeLabelToValue, pLog)
+		hivemetrics.LogCounterMetricWithOptionalLabels(metricClusterProvisionsTotal, instance, map[string]string{
+			"cluster_type": hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel),
+			"result":       resultFailure,
+		}, mapClusterTypeLabelToValue, pLog)
 	}
 	return result, err
 }
@@ -623,15 +633,13 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 	if stage == hivev1.ClusterProvisionStageComplete {
 		timeMetric = metricInstallSuccessSeconds
 	}
-	timeMetric.WithLabelValues(
-		hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel),
-		cd.Labels[hivev1.HiveClusterPlatformLabel],
-		cd.Labels[hivev1.HiveClusterRegionLabel],
-		*cd.Status.InstallVersion,
-		r.getWorkers(*cd),
-		strconv.Itoa(instance.Spec.Attempt),
-	).Observe(time.Since(instance.CreationTimestamp.Time).Seconds())
+	hivemetrics.LogHistogramMetricWithOptionalLabels(timeMetric, time.Since(instance.CreationTimestamp.Time).Seconds(),
+		cd, map[string]string{
+			"cluster_type":    hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+			"platform":        cd.Labels[hivev1.HiveClusterPlatformLabel],
+			"region":          cd.Labels[hivev1.HiveClusterRegionLabel],
+			"cluster_version": *cd.Status.InstallVersion,
+			"workers":         r.getWorkers(*cd),
+			"install_attempt": strconv.Itoa(instance.Spec.Attempt),
+		}, mapClusterTypeLabelToValue, r.logger)
 }

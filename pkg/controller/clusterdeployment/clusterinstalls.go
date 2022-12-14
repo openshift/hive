@@ -212,16 +212,14 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			logger.WithField("duration", installDuration.Seconds()).Debug("install job completed")
 			metricInstallJobDuration.Observe(float64(installDuration.Seconds()))
 
-			metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-				hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
-				hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
-				hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel)).
-				Observe(float64(cd.Status.InstallRestarts))
+			hivemetrics.LogHistogramMetricWithOptionalLabels(metricCompletedInstallJobRestarts,
+				float64(cd.Status.InstallRestarts), cd, map[string]string{
+					"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+				}, mapClusterTypeLabelToValue, logger)
 
-			metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-				hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
-				hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
-				hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel)).Inc()
+			hivemetrics.LogCounterMetricWithOptionalLabels(metricClustersInstalled, cd, map[string]string{
+				"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+			}, mapClusterTypeLabelToValue, logger)
 
 			if r.protectedDelete {
 				// Set protected delete on for the ClusterDeployment.
@@ -279,7 +277,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		}
 		// If we declared the provision terminally failed, bump our metric
 		if provisionFailedTerminal {
-			incProvisionFailedTerminal(cd)
+			incProvisionFailedTerminal(cd, logger)
 		}
 	}
 

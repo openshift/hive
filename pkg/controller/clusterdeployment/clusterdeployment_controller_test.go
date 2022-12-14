@@ -94,6 +94,8 @@ current-context: admin
 
 func init() {
 	log.SetLevel(log.DebugLevel)
+	// Register the metrics to avoid panics during testing
+	registerMetrics()
 }
 
 func fakeReadFile(content string) func(string) ([]byte, error) {

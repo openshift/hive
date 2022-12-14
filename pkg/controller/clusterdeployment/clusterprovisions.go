@@ -92,7 +92,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
 				return reconcile.Result{}, err
 			}
-			incProvisionFailedTerminal(cd)
+			incProvisionFailedTerminal(cd, logger)
 		}
 		return reconcile.Result{}, nil
 	}
@@ -513,16 +513,14 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
 
 	// Report a metric for the total number of install restarts:
-	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel)).
-		Observe(float64(cd.Status.InstallRestarts))
+	hivemetrics.LogHistogramMetricWithOptionalLabels(metricCompletedInstallJobRestarts,
+		float64(cd.Status.InstallRestarts), cd, map[string]string{
+			"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+		}, mapClusterTypeLabelToValue, cdLog)
 
-	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.STSClusterLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.PrivateLinkClusterLabel),
-		hivemetrics.GetClusterDeploymentType(cd, constants.ManagedVPCLabel)).Inc()
+	hivemetrics.LogCounterMetricWithOptionalLabels(metricClustersInstalled, cd, map[string]string{
+		"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+	}, mapClusterTypeLabelToValue, cdLog)
 
 	return reconcile.Result{}, nil
 }

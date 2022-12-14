@@ -244,7 +244,7 @@ type Calculator struct {
 func (mc *Calculator) Start(ctx context.Context) error {
 	log.Info("started metrics calculator goroutine")
 	// Get the metrics config from hiveConfig
-	mConfig, err := readMetricsConfig()
+	mConfig, err := ReadMetricsConfig()
 	if err != nil {
 		log.WithError(err).Error("error reading metrics config")
 		return err
@@ -797,9 +797,9 @@ func (ca *clusterAccumulator) addConditionToMap(cond hivev1.ClusterDeploymentCon
 	ca.conditions[cond][clusterType]++
 }
 
-// readMetricsConfig reads the metrics config from the file pointed to by the MetricsConfigFileEnvVar
+// ReadMetricsConfig reads the metrics config from the file pointed to by the MetricsConfigFileEnvVar
 // environment variable.
-func readMetricsConfig() (*metricsconfig.MetricsConfig, error) {
+func ReadMetricsConfig() (*metricsconfig.MetricsConfig, error) {
 	path := os.Getenv(constants.MetricsConfigFileEnvVar)
 	config := &metricsconfig.MetricsConfig{}
 	if len(path) == 0 {
@@ -815,6 +815,54 @@ func readMetricsConfig() (*metricsconfig.MetricsConfig, error) {
 	}
 
 	return config, nil
+}
+
+// GetOptionalClusterTypeLabels reads the MetricsWithClusterTypeLabels from the metrics config and returns the same as a
+// map, as well as a slice of metric labels. The latter is helpful for defining the relevant metrics
+func GetOptionalClusterTypeLabels(mConfig *metricsconfig.MetricsConfig) (map[string]string, []string) {
+	var mapClusterTypeLabelToValue = make(map[string]string)
+	var optionalClusterTypeLabels []string
+	for k, v := range mConfig.MetricsWithClusterTypeLabels {
+		mapClusterTypeLabelToValue[k] = v
+		optionalClusterTypeLabels = append(optionalClusterTypeLabels, k)
+	}
+	return mapClusterTypeLabelToValue, optionalClusterTypeLabels
+}
+
+// LogHistogramMetricWithOptionalLabels is used to log a histogram type metric with support for optional cluster type
+// labels. Caller should ensure there isn't an overlap between fixed and optional labels.
+func LogHistogramMetricWithOptionalLabels(metric *prometheus.HistogramVec, value float64, obj metav1.Object,
+	fixedLabels map[string]string, optionalLabels map[string]string, log log.FieldLogger) {
+	// Build a partial label vector for non-optional metrics
+	curriedVec, err := metric.CurryWith(fixedLabels)
+	// Add optional labels, if present. Labels added here must not have been already added in the step above
+	for k, v := range optionalLabels {
+		curriedVec, err = curriedVec.CurryWith(prometheus.Labels{k: GetClusterDeploymentType(obj, v)})
+	}
+	if err != nil {
+		// The possibility of hitting an error here is low, but report it and don't observe the metric in case it happens
+		log.WithError(err).Error("error observing metric")
+	} else {
+		curriedVec.WithLabelValues().Observe(value)
+	}
+}
+
+// LogCounterMetricWithOptionalLabels is used to log a counter type metric with support for optional cluster type
+// labels. Caller should ensure there isn't an overlap between fixed and optional labels.
+func LogCounterMetricWithOptionalLabels(metric *prometheus.CounterVec, obj metav1.Object, fixedLabels map[string]string,
+	optionalLabels map[string]string, log log.FieldLogger) {
+	// Build a partial label vector for non-optional metrics
+	curriedVec, err := metric.CurryWith(fixedLabels)
+	// Add optional labels, if present. Labels added here must not have been already added in the step above
+	for k, v := range optionalLabels {
+		curriedVec, err = curriedVec.CurryWith(prometheus.Labels{k: GetClusterDeploymentType(obj, v)})
+	}
+	if err != nil {
+		// The possibility of hitting an error here is low, but report it and don't observe the metric in case it happens
+		log.WithError(err).Error("error observing metric")
+	} else {
+		curriedVec.WithLabelValues().Inc()
+	}
 }
 
 // logHistogramDurationMetric should be used to log duration metrics of Histogram type

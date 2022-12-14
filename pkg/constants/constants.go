@@ -448,18 +448,6 @@ const (
 	// installing. Use with caution.
 	ResumeSkipsClusterOperatorsLabel = "hive.openshift.io/resume-skips-cluster-operators"
 
-	// 	STSClusterLabel is an optional label that can be applied to ClusterDeployments to denote it uses short-lived
-	//	credentials. It is used as a label for some metrics.
-	STSClusterLabel = "api.openshift.com/sts"
-
-	// 	PrivateLinkClusterLabel is an optional label that can be applied to ClusterDeployments to denote it is uses
-	//	private-link. It is used as a label for some metrics.
-	PrivateLinkClusterLabel = "api.openshift.com/private-link"
-
-	// 	ManagedVPCLabel is an optional label that can be applied to ClusterDeployments to denote the VPC is managed by
-	//	SD. It is used as a label for some metrics.
-	ManagedVPCLabel = "api.openshift.com/managed-vpc"
-
 	// IBMCloudAPIKeySecretKey is a key used to store an api key token within a secret
 	IBMCloudAPIKeySecretKey = "ibmcloud_api_key"
 

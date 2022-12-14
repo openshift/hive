@@ -19,6 +19,13 @@ func (in *MetricsConfig) DeepCopyInto(out *MetricsConfig) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.MetricsWithClusterTypeLabels != nil {
+		in, out := &in.MetricsWithClusterTypeLabels, &out.MetricsWithClusterTypeLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

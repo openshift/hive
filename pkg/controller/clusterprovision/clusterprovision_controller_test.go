@@ -45,6 +45,8 @@ const (
 
 func init() {
 	log.SetLevel(log.DebugLevel)
+	// Register the metrics to avoid panics during testing
+	registerMetrics()
 }
 
 func TestClusterProvisionReconcile(t *testing.T) {

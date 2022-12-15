@@ -39,6 +39,13 @@ type PlatformStatus struct {
 // PrivateLinkAccess configures access to the cluster API using AWS PrivateLink
 type PrivateLinkAccess struct {
 	Enabled bool `json:"enabled"`
+
+	// AllowedPrincipals is a list of additional allowed principal ARNs to be configured
+	// for the Private Link cluster's VPC Endpoint Service.
+	// ARNs provided as AllowedPrincipals will be configured for the cluster's VPC Endpoint
+	// Service in addition to the IAM entity used by Hive.
+	// +optional
+	AllowedPrincipals *[]string `json:"allowedPrincipals,omitempty"`
 }
 
 // PrivateLinkAccessStatus contains the observed state for PrivateLinkAccess resources.

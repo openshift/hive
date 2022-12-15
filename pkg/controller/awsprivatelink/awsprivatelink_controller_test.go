@@ -998,6 +998,63 @@ users:
 			"AccessDenied: not authorized to DescribeVpcEndpoints"),
 		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
+		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change additional allowed principals, endpoint access denied",
+
+		existing: []runtime.Object{
+			testProvision("test-cd-provision-0",
+				provisionWithInfraID("test-cd-1234"),
+				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
+			func() *hivev1.ClusterDeployment {
+				// Need to instantiate a new builder for each test otherwise the enabledPrivateLinkBuilder defined earlier assumes
+				// the modifications for all tests that use the predefined builder function.
+				// eg. using a function like withAllowedPrincipals(...) to modify:
+				// enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0"),withAllowedPrincipals(...)),
+				cd := cdBuilder.
+					Options(testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
+						PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true}}),
+						testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+						}),
+						testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+						}),
+					).Build()
+				cd.Status.ProvisionRef = &corev1.LocalObjectReference{Name: "test-cd-provision-0"}
+				cd.Spec.Platform.AWS.PrivateLink.AllowedPrincipals = &[]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"}
+				return cd
+			}(),
+		},
+		inventory: validInventory,
+		configureAWSClient: func(m *mock.MockClient) {
+			clusternlb := mockDiscoverLB(m)
+			service := mockExistingService(m, clusternlb, func(s *ec2.ServiceConfiguration) {})
+
+			m.EXPECT().GetCallerIdentity(gomock.Any()).Return(&sts.GetCallerIdentityOutput{Arn: aws.String("aws:iam:12345:hub-user")}, nil)
+			m.EXPECT().DescribeVpcEndpointServicePermissions(gomock.Any()).
+				Return(&ec2.DescribeVpcEndpointServicePermissionsOutput{
+					AllowedPrincipals: []*ec2.AllowedPrincipal{{
+						Principal: aws.String("aws:iam:12345:some-that-should-not-be-allowed"),
+					}},
+				}, nil)
+			m.EXPECT().ModifyVpcEndpointServicePermissions(&ec2.ModifyVpcEndpointServicePermissionsInput{
+				AddAllowedPrincipals:    aws.StringSlice([]string{"aws:iam:12345:another-user", "aws:iam:12345:hub-user", "aws:iam:12345:some-user"}),
+				RemoveAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:some-that-should-not-be-allowed"}),
+				ServiceId:               service.ServiceId,
+			}).Return(nil, nil)
+
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+		},
+
+		hasFinalizer: true,
+		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+		},
+		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
+			"AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no matching az",
 
 		existing: []runtime.Object{

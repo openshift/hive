@@ -695,17 +695,25 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpointService(awsClient *awsClie
 	for _, allowed := range permResp.AllowedPrincipals {
 		oldPerms.Insert(aws.StringValue(allowed.Principal))
 	}
-	desriredPerms := sets.NewString(aws.StringValue(stsResp.Arn))
+	// desiredPerms is the set of Allowed Principals that will be configured for the cluster's VPC Endpoint Service.
+	// desiredPerms only contains the IAM entity used by Hive by default but may contain additional Allowed Principal
+	// ARNs as configured within cd.Spec.Platform.AWS.PrivateLink.AllowedPrincipals.
+	desiredPerms := sets.NewString(aws.StringValue(stsResp.Arn))
+	if allowedPrincipals := cd.Spec.Platform.AWS.PrivateLink.AllowedPrincipals; allowedPrincipals != nil {
+		for _, allowedPrincipal := range *allowedPrincipals {
+			desiredPerms.Insert(allowedPrincipal)
+		}
+	}
 
-	if !desriredPerms.Equal(oldPerms) {
+	if !desiredPerms.Equal(oldPerms) {
 		modified = true
 		input := &ec2.ModifyVpcEndpointServicePermissionsInput{
 			ServiceId: serviceConfig.ServiceId,
 		}
-		if added := desriredPerms.Difference(oldPerms).List(); len(added) > 0 {
+		if added := desiredPerms.Difference(oldPerms).List(); len(added) > 0 {
 			input.AddAllowedPrincipals = aws.StringSlice(added)
 		}
-		if removed := oldPerms.Difference(desriredPerms).List(); len(removed) > 0 {
+		if removed := oldPerms.Difference(desiredPerms).List(); len(removed) > 0 {
 			input.RemoveAllowedPrincipals = aws.StringSlice(removed)
 		}
 		_, err := awsClient.user.ModifyVpcEndpointServicePermissions(input)

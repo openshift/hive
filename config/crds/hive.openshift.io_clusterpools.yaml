@@ -305,6 +305,16 @@ spec:
                           accross AWS accounts and allows clients to connect to services
                           using AWS's internal networking instead of the Internet.
                         properties:
+                          allowedPrincipals:
+                            description: AllowedPrincipals is a list of additional
+                              allowed principal ARNs to be configured for the Private
+                              Link cluster's VPC Endpoint Service. ARNs provided as
+                              AllowedPrincipals will be configured for the cluster's
+                              VPC Endpoint Service in addition to the IAM entity used
+                              by Hive.
+                            items:
+                              type: string
+                            type: array
                           enabled:
                             type: boolean
                         required:

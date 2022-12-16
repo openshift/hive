@@ -1145,6 +1145,37 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
 		},
+		{
+			name: "cd.spec.platform.aws.privateLink.allowedPrincipals is a mutable field",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{
+					Enabled:           true,
+					AllowedPrincipals: &[]string{"aws:iam:12345:some-user"},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+			awsPrivateLink: &hivev1.AWSPrivateLinkConfig{
+				EndpointVPCInventory: []hivev1.AWSPrivateLinkInventory{{
+					AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+						Region: "some-region",
+						VPCID:  "vpc-id",
+					},
+				}, {
+					AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
+						Region: "test-region",
+						VPCID:  "vpc-id-2",
+					},
+				}},
+			},
+		},
 	}
 
 	for _, tc := range cases {

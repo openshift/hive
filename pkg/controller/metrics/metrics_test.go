@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -159,9 +160,9 @@ func TestInstallJobs(t *testing.T) {
 		},
 	}
 	running, succeeded, failed := processJobs(jobs)
-	assert.Equal(t, 2, running[hivev1.DefaultClusterType])
-	assert.Equal(t, 1, succeeded[hivev1.DefaultClusterType])
-	assert.Equal(t, 1, failed[hivev1.DefaultClusterType])
+	assert.Equal(t, 2, running[constants.MetricLabelDefaultValue])
+	assert.Equal(t, 1, succeeded[constants.MetricLabelDefaultValue])
+	assert.Equal(t, 1, failed[constants.MetricLabelDefaultValue])
 }
 
 func testClusterDeployment(name, clusterType string, created metav1.Time, installed bool) hivev1.ClusterDeployment {

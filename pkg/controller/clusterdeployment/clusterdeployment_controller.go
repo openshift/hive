@@ -77,15 +77,6 @@ var (
 		// ImageSet condition initialized by cluster deployment
 		hivev1.InstallerImageResolutionFailedCondition,
 	}
-
-	// mapClusterTypeLabelToValue is a map that corresponds to MetricsWithClusterTypeLabels provided in metrics config.
-	// The key in the map is the name of the label used in defining the metric, and the value would be the cluster
-	// deployment label to look for while reporting the metric
-	mapClusterTypeLabelToValue map[string]string
-
-	// optionalClusterTypeLabels contains all the label keys from mapClusterTypeLabelToValue if provided. This slice is
-	// useful for defining the relevant metrics
-	optionalClusterTypeLabels []string
 )
 
 const (
@@ -132,11 +123,9 @@ func Add(mgr manager.Manager) error {
 		log.WithError(err).Error("error reading metrics config")
 		return err
 	}
-	mapClusterTypeLabelToValue = make(map[string]string)
-	mapClusterTypeLabelToValue, optionalClusterTypeLabels = hivemetrics.GetOptionalClusterTypeLabels(mConfig)
 	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
 	// read the hiveconfig, and we register them only once.
-	registerMetrics()
+	registerMetrics(mConfig)
 	return AddToManager(mgr, NewReconciler(mgr, logger, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
@@ -546,7 +535,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
 			cd.Name,
 			cd.Namespace,
-			hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel)).Set(
+			hivemetrics.GetLabelValue(cd, hivev1.HiveClusterTypeLabel)).Set(
 			time.Since(cd.DeletionTimestamp.Time).Seconds())
 
 		return r.syncDeletedClusterDeployment(cd, cdLog)
@@ -592,9 +581,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		hivemetrics.LogCounterMetricWithOptionalLabels(metricClustersCreated, cd, map[string]string{
-			"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-		}, mapClusterTypeLabelToValue, cdLog)
+		metricClustersCreated.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{}, 1)
 		return reconcile.Result{}, nil
 	}
 
@@ -1450,9 +1437,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 	// Increment the clusters deleted counter:
-	hivemetrics.LogCounterMetricWithOptionalLabels(metricClustersDeleted, cd, map[string]string{
-		"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-	}, mapClusterTypeLabelToValue, cdLog)
+	metricClustersDeleted.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{}, 1)
 	return nil
 }
 
@@ -1876,7 +1861,7 @@ func clearDeprovisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog l
 	cleared := hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.Delete(map[string]string{
 		"cluster_deployment": cd.Name,
 		"namespace":          cd.Namespace,
-		"cluster_type":       hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
+		"cluster_type":       hivemetrics.GetLabelValue(cd, hivev1.HiveClusterTypeLabel),
 	})
 	if cleared {
 		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds)

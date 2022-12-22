@@ -31,10 +31,6 @@ const (
 	// alert on cluster types differently.
 	HiveClusterTypeLabel = "hive.openshift.io/cluster-type"
 
-	// DefaultClusterType will be used when the above HiveClusterTypeLabel is unset. This
-	// value will not be added as a label, only used for metrics vectors.
-	DefaultClusterType = "unspecified"
-
 	// HiveInstallLogLabel is used on ConfigMaps uploaded by the install manager which contain an install log.
 	HiveInstallLogLabel = "hive.openshift.io/install-log"
 

@@ -7,6 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -43,12 +44,12 @@ var (
 
 	// Declare the metrics which allow optional labels to be added.
 	// They are defined later once the hive config has been read.
-	metricCompletedInstallJobRestarts *prometheus.HistogramVec
+	metricCompletedInstallJobRestarts hivemetrics.HistogramVecWithDynamicLabels
 
-	metricClustersCreated         *prometheus.CounterVec
-	metricClustersInstalled       *prometheus.CounterVec
-	metricClustersDeleted         *prometheus.CounterVec
-	metricProvisionFailedTerminal *prometheus.CounterVec
+	metricClustersCreated         hivemetrics.CounterVecWithDynamicLabels
+	metricClustersInstalled       hivemetrics.CounterVecWithDynamicLabels
+	metricClustersDeleted         hivemetrics.CounterVecWithDynamicLabels
+	metricProvisionFailedTerminal hivemetrics.CounterVecWithDynamicLabels
 )
 
 func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment, log log.FieldLogger) {
@@ -61,47 +62,70 @@ func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment, log log.FieldLogge
 	if stoppedCondition != nil {
 		stoppedReason = stoppedCondition.Reason
 	}
-	hivemetrics.LogCounterMetricWithOptionalLabels(metricProvisionFailedTerminal, cd, map[string]string{
+	fixedLabels := map[string]string{
 		"clusterpool_namespacedname": poolNSName,
-		"cluster_type":               hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
 		"failure_reason":             stoppedReason,
-	}, mapClusterTypeLabelToValue, log)
+	}
+	metricProvisionFailedTerminal.ObserveMetricWithDynamicLabels(cd, log, fixedLabels, 1)
 }
 
-func registerMetrics() {
+func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
+	mapClusterTypeLabelToValue := hivemetrics.GetOptionalClusterTypeLabels(mConfig)
+	optionalClusterTypeLabels := hivemetrics.GetSortedKeys(mapClusterTypeLabelToValue)
+	defaultLabels := &hivemetrics.DynamicLabels{
+		FixedLabels:    []string{},
+		OptionalLabels: mapClusterTypeLabelToValue,
+	}
 
-	metricCompletedInstallJobRestarts = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_completed_install_restart",
-			Help:    "Distribution of the number of restarts for all completed cluster installations.",
-			Buckets: []float64{0, 2, 10, 20, 50},
+	metricCompletedInstallJobRestarts = hivemetrics.HistogramVecWithDynamicLabels{
+		HistogramVec: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "hive_cluster_deployment_completed_install_restart",
+				Help:    "Distribution of the number of restarts for all completed cluster installations.",
+				Buckets: []float64{0, 2, 10, 20, 50},
+			},
+			optionalClusterTypeLabels),
+		DynamicLabels: defaultLabels,
+	}
+
+	metricClustersCreated = hivemetrics.CounterVecWithDynamicLabels{
+		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_created_total",
+			Help: "Counter incremented every time we observe a new cluster.",
 		},
-		append([]string{"cluster_type"}, optionalClusterTypeLabels...),
-	)
-	metricClustersCreated = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_created_total",
-		Help: "Counter incremented every time we observe a new cluster.",
-	},
-		append([]string{"cluster_type"}, optionalClusterTypeLabels...),
-	)
-	metricClustersInstalled = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_installed_total",
-		Help: "Counter incremented every time we observe a successful installation.",
-	},
-		append([]string{"cluster_type"}, optionalClusterTypeLabels...),
-	)
-	metricClustersDeleted = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_deleted_total",
-		Help: "Counter incremented every time we observe a deleted cluster.",
-	},
-		append([]string{"cluster_type"}, optionalClusterTypeLabels...),
-	)
-	metricProvisionFailedTerminal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "hive_cluster_deployments_provision_failed_terminal_total",
-		Help: "Counter incremented when a cluster provision has failed and won't be retried.",
-	},
-		append([]string{"clusterpool_namespacedname", "cluster_type", "failure_reason"}, optionalClusterTypeLabels...),
-	)
+			optionalClusterTypeLabels),
+		DynamicLabels: defaultLabels,
+	}
+	metricClustersInstalled = hivemetrics.CounterVecWithDynamicLabels{
+		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_installed_total",
+			Help: "Counter incremented every time we observe a successful installation.",
+		},
+			optionalClusterTypeLabels),
+		DynamicLabels: defaultLabels,
+	}
+	metricClustersDeleted = hivemetrics.CounterVecWithDynamicLabels{
+		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_deleted_total",
+			Help: "Counter incremented every time we observe a deleted cluster.",
+		},
+			optionalClusterTypeLabels),
+		DynamicLabels: defaultLabels,
+	}
+	metricProvisionFailedTerminal = hivemetrics.CounterVecWithDynamicLabels{
+		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_provision_failed_terminal_total",
+			Help: "Counter incremented when a cluster provision has failed and won't be retried.",
+		},
+			append([]string{"clusterpool_namespacedname", "failure_reason"}, optionalClusterTypeLabels...)),
+		DynamicLabels: &hivemetrics.DynamicLabels{
+			FixedLabels: []string{
+				"clusterpool_namespacedname",
+				"failure_reason",
+			},
+			OptionalLabels: mapClusterTypeLabelToValue,
+		},
+	}
 
 	metrics.Registry.MustRegister(metricInstallJobDuration)
 	metrics.Registry.MustRegister(metricCompletedInstallJobRestarts)

@@ -51,15 +51,6 @@ const (
 var (
 	// controllerKind contains the schema.GroupVersionKind for this controller type.
 	controllerKind = hivev1.SchemeGroupVersion.WithKind("ClusterProvision")
-
-	// mapClusterTypeLabelToValue is a map that corresponds to MetricsWithClusterTypeLabels provided in metrics config.
-	// The key in the map is the name of the label used in defining the metric, and the value would be the cluster
-	// deployment label to look for while reporting the metric
-	mapClusterTypeLabelToValue map[string]string
-
-	// optionalClusterTypeLabels contains all the label keys from mapClusterTypeLabelToValue if provided. This slice is
-	// useful for defining the relevant metrics
-	optionalClusterTypeLabels []string
 )
 
 // Add creates a new ClusterProvision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -77,11 +68,9 @@ func Add(mgr manager.Manager) error {
 		log.WithError(err).Error("error reading metrics config")
 		return err
 	}
-	mapClusterTypeLabelToValue = make(map[string]string)
-	mapClusterTypeLabelToValue, optionalClusterTypeLabels = hivemetrics.GetOptionalClusterTypeLabels(mConfig)
 	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
 	// read the hiveconfig, and we register them only once.
-	registerMetrics()
+	registerMetrics(mConfig)
 
 	return add(mgr, newReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
@@ -380,10 +369,7 @@ func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.Clus
 	pLog.Info("install job succeeded")
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageComplete, "InstallComplete", "Install job has completed successfully", pLog)
 	if err == nil {
-		hivemetrics.LogCounterMetricWithOptionalLabels(metricClusterProvisionsTotal, instance, map[string]string{
-			"cluster_type": hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel),
-			"result":       resultSuccess,
-		}, mapClusterTypeLabelToValue, pLog)
+		metricClusterProvisionsTotal.ObserveMetricWithDynamicLabels(instance, pLog, map[string]string{"result": resultSuccess}, 1)
 	}
 	return result, err
 }
@@ -397,14 +383,8 @@ func (r *ReconcileClusterProvision) reconcileFailedJob(instance *hivev1.ClusterP
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
 	if err == nil {
 		// Increment a counter metric for this cluster type and error reason:
-		hivemetrics.LogCounterMetricWithOptionalLabels(metricInstallErrors, instance, map[string]string{
-			"cluster_type": hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel),
-			"reason":       reason,
-		}, mapClusterTypeLabelToValue, pLog)
-		hivemetrics.LogCounterMetricWithOptionalLabels(metricClusterProvisionsTotal, instance, map[string]string{
-			"cluster_type": hivemetrics.GetClusterDeploymentType(instance, hivev1.HiveClusterTypeLabel),
-			"result":       resultFailure,
-		}, mapClusterTypeLabelToValue, pLog)
+		metricInstallErrors.ObserveMetricWithDynamicLabels(instance, pLog, map[string]string{"reason": reason}, 1)
+		metricClusterProvisionsTotal.ObserveMetricWithDynamicLabels(instance, pLog, map[string]string{"result": resultFailure}, 1)
 	}
 	return result, err
 }
@@ -633,13 +613,12 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 	if stage == hivev1.ClusterProvisionStageComplete {
 		timeMetric = metricInstallSuccessSeconds
 	}
-	hivemetrics.LogHistogramMetricWithOptionalLabels(timeMetric, time.Since(instance.CreationTimestamp.Time).Seconds(),
-		cd, map[string]string{
-			"cluster_type":    hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-			"platform":        cd.Labels[hivev1.HiveClusterPlatformLabel],
-			"region":          cd.Labels[hivev1.HiveClusterRegionLabel],
-			"cluster_version": *cd.Status.InstallVersion,
-			"workers":         r.getWorkers(*cd),
-			"install_attempt": strconv.Itoa(instance.Spec.Attempt),
-		}, mapClusterTypeLabelToValue, r.logger)
+	fixedLabels := map[string]string{
+		"platform":        cd.Labels[hivev1.HiveClusterPlatformLabel],
+		"region":          cd.Labels[hivev1.HiveClusterRegionLabel],
+		"cluster_version": *cd.Status.InstallVersion,
+		"workers":         r.getWorkers(*cd),
+		"install_attempt": strconv.Itoa(instance.Spec.Attempt),
+	}
+	timeMetric.ObserveMetricWithDynamicLabels(cd, r.logger, fixedLabels, time.Since(instance.CreationTimestamp.Time).Seconds())
 }

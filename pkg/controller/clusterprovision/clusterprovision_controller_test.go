@@ -26,6 +26,7 @@ import (
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -45,8 +46,9 @@ const (
 
 func init() {
 	log.SetLevel(log.DebugLevel)
-	// Register the metrics to avoid panics during testing
-	registerMetrics()
+	// While the metrics need not be registered for this test suite, they still need to be defined to avoid panics
+	// during the tests
+	registerMetrics(&metricsconfig.MetricsConfig{})
 }
 
 func TestClusterProvisionReconcile(t *testing.T) {

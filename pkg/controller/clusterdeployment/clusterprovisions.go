@@ -27,7 +27,6 @@ import (
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
-	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -513,14 +512,10 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
 
 	// Report a metric for the total number of install restarts:
-	hivemetrics.LogHistogramMetricWithOptionalLabels(metricCompletedInstallJobRestarts,
-		float64(cd.Status.InstallRestarts), cd, map[string]string{
-			"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-		}, mapClusterTypeLabelToValue, cdLog)
+	metricCompletedInstallJobRestarts.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{},
+		float64(cd.Status.InstallRestarts))
 
-	hivemetrics.LogCounterMetricWithOptionalLabels(metricClustersInstalled, cd, map[string]string{
-		"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-	}, mapClusterTypeLabelToValue, cdLog)
+	metricClustersInstalled.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{}, 1)
 
 	return reconcile.Result{}, nil
 }

@@ -20,7 +20,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
-	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -212,14 +211,10 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			logger.WithField("duration", installDuration.Seconds()).Debug("install job completed")
 			metricInstallJobDuration.Observe(float64(installDuration.Seconds()))
 
-			hivemetrics.LogHistogramMetricWithOptionalLabels(metricCompletedInstallJobRestarts,
-				float64(cd.Status.InstallRestarts), cd, map[string]string{
-					"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-				}, mapClusterTypeLabelToValue, logger)
+			metricCompletedInstallJobRestarts.ObserveMetricWithDynamicLabels(cd, logger, map[string]string{},
+				float64(cd.Status.InstallRestarts))
 
-			hivemetrics.LogCounterMetricWithOptionalLabels(metricClustersInstalled, cd, map[string]string{
-				"cluster_type": hivemetrics.GetClusterDeploymentType(cd, hivev1.HiveClusterTypeLabel),
-			}, mapClusterTypeLabelToValue, logger)
+			metricClustersInstalled.ObserveMetricWithDynamicLabels(cd, logger, map[string]string{}, 1)
 
 			if r.protectedDelete {
 				// Set protected delete on for the ClusterDeployment.

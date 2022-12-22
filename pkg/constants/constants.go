@@ -497,6 +497,11 @@ const (
 	// generating installer manifests. This will be effective in-cluster credentials mode. The valid values for
 	// credentials mode are "Manual", "Mint" and "Passthrough"
 	OverrideInClusterCredentialsModeAnnotation = "hive.openshift.io/override-in-cluster-credentials-mode"
+
+	// MetricLabelDefaultValue is used while defining a metric. All labels must have a non-empty string value, otherwise
+	// there is a risk for the metric to be defined with fewer labels than expected. Set this constant as the default
+	// value when the value is unknown
+	MetricLabelDefaultValue = "unspecified"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

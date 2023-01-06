@@ -1146,7 +1146,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
-			name: "cd.spec.platform.aws.privateLink.allowedPrincipals is a mutable field",
+			name: "cd.spec.platform.aws.privateLink.additionalAllowedPrincipals is a mutable field",
 			oldObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{Enabled: true}
@@ -1155,8 +1155,8 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
 				cd.Spec.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccess{
-					Enabled:           true,
-					AllowedPrincipals: &[]string{"aws:iam:12345:some-user"},
+					Enabled:                     true,
+					AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:some-user"},
 				}
 				return cd
 			}(),

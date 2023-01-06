@@ -998,7 +998,7 @@ users:
 			"AccessDenied: not authorized to DescribeVpcEndpoints"),
 		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
-		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change additional allowed principals, endpoint access denied",
+		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change add additional allowed principals, endpoint access denied",
 
 		existing: []runtime.Object{
 			testProvision("test-cd-provision-0",
@@ -1007,8 +1007,8 @@ users:
 			func() *hivev1.ClusterDeployment {
 				// Need to instantiate a new builder for each test otherwise the enabledPrivateLinkBuilder defined earlier assumes
 				// the modifications for all tests that use the predefined builder function.
-				// eg. using a function like withAllowedPrincipals(...) to modify:
-				// enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0"),withAllowedPrincipals(...)),
+				// eg. using a function like withAdditionalAllowedPrincipals(...) to modify:
+				// enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0"),withAdditionalAllowedPrincipals(...)),
 				cd := cdBuilder.
 					Options(testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
 						PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true}}),
@@ -1022,7 +1022,7 @@ users:
 						}),
 					).Build()
 				cd.Status.ProvisionRef = &corev1.LocalObjectReference{Name: "test-cd-provision-0"}
-				cd.Spec.Platform.AWS.PrivateLink.AllowedPrincipals = &[]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"}
+				cd.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals = &[]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"}
 				return cd
 			}(),
 		},
@@ -1043,14 +1043,86 @@ users:
 				RemoveAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:some-that-should-not-be-allowed"}),
 				ServiceId:               service.ServiceId,
 			}).Return(nil, nil)
-
 			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
 		},
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{
+				Name:                        "vpce-svc-12345.vpc.amazon.com",
+				ID:                          "vpce-svc-12345",
+				AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"},
+			},
 		},
+		// AdditionalAllowedPrincipals are effected on the VPC Endpoint Service before we DescribeVpcEndpoints so fail to describe them
+		// to simplify the test.
+		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
+			"AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+	}, {
+		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change remove additional allowed principals, endpoint access denied",
+
+		existing: []runtime.Object{
+			testProvision("test-cd-provision-0",
+				provisionWithInfraID("test-cd-1234"),
+				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
+			func() *hivev1.ClusterDeployment {
+				// Need to instantiate a new builder for each test otherwise the enabledPrivateLinkBuilder defined earlier assumes
+				// the modifications for all tests that use the predefined builder function.
+				// eg. using a function like withAdditionalAllowedPrincipals(...) to modify:
+				// enabledPrivateLinkBuilder.Build(withClusterProvision("test-cd-provision-0"),withAdditionalAllowedPrincipals(...)),
+				cd := cdBuilder.
+					Options(testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
+						PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true}}),
+						testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+						}),
+						testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+							Status: corev1.ConditionUnknown,
+							Type:   hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+						}),
+					).Build()
+				cd.Status.ProvisionRef = &corev1.LocalObjectReference{Name: "test-cd-provision-0"}
+				// There are no additionalAllowedPrincipals defined
+				cd.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals = nil
+				initPrivateLinkStatus(cd)
+				// Status has previous additionalAllowedPrincipals defined
+				cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals = &[]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"}
+				return cd
+			}(),
+		},
+		inventory: validInventory,
+		configureAWSClient: func(m *mock.MockClient) {
+			clusternlb := mockDiscoverLB(m)
+			service := mockExistingService(m, clusternlb, func(s *ec2.ServiceConfiguration) {})
+
+			m.EXPECT().GetCallerIdentity(gomock.Any()).Return(&sts.GetCallerIdentityOutput{Arn: aws.String("aws:iam:12345:hub-user")}, nil)
+			m.EXPECT().DescribeVpcEndpointServicePermissions(gomock.Any()).
+				Return(&ec2.DescribeVpcEndpointServicePermissionsOutput{
+					AllowedPrincipals: []*ec2.AllowedPrincipal{
+						{Principal: aws.String("aws:iam:12345:another-user")},
+						{Principal: aws.String("aws:iam:12345:hub-user")},
+						{Principal: aws.String("aws:iam:12345:some-user")},
+					},
+				}, nil)
+			m.EXPECT().ModifyVpcEndpointServicePermissions(&ec2.ModifyVpcEndpointServicePermissionsInput{
+				RemoveAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"}),
+				ServiceId:               service.ServiceId,
+			}).Return(nil, nil)
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+		},
+
+		hasFinalizer: true,
+		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
+			VPCEndpointService: hivev1aws.VPCEndpointService{
+				Name: "vpce-svc-12345.vpc.amazon.com",
+				ID:   "vpce-svc-12345",
+				// There will be no additionalAllowedPrincipals recorded in status
+			},
+		},
+		// AdditionalAllowedPrincipals are effected on the VPC Endpoint Service before we DescribeVpcEndpoints so fail to describe them
+		// to simplify the test.
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
 			"AccessDenied: not authorized to DescribeVpcEndpoints"),
 		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
@@ -2076,18 +2148,120 @@ func Test_shouldSync(t *testing.T) {
 	}, {
 		name: "ready for less than 2 hours, installed",
 
-		desired: cdBuilder.Build(
-			testcd.Installed(),
-			testcd.WithCondition(hivev1.ClusterDeploymentCondition{
-				Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-				Status:        corev1.ConditionTrue,
-				LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
-			}),
-		),
-
+		desired: func() *hivev1.ClusterDeployment {
+			cd := cdBuilder.Build(
+				testcd.Installed(),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status:        corev1.ConditionTrue,
+					LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+				}),
+				testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
+					PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true}}),
+			)
+			initPrivateLinkStatus(cd)
+			cd.Status.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccessStatus{
+				VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			}
+			return cd
+		}(),
 		shouldSync: false,
 		syncAfter:  1 * time.Hour,
-	}}
+	}, {
+		name: "ready for less than 2 hours, installed, additionalAllowedPrincipals principal ARN added",
+
+		desired: func() *hivev1.ClusterDeployment {
+			cd := cdBuilder.Build(
+				testcd.Installed(),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status:        corev1.ConditionTrue,
+					LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+				}),
+				testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
+					PrivateLink: &hivev1aws.PrivateLinkAccess{
+						Enabled: true,
+						// Spec has an AdditionalAllowedPrincipal that isn't in Status, expect shouldSync=true
+						AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:some-user", "aws:iam:12345:another-user"},
+					},
+				}),
+			)
+			initPrivateLinkStatus(cd)
+			cd.Status.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccessStatus{
+				VPCEndpointService: hivev1aws.VPCEndpointService{
+					Name:                        "vpce-svc-12345.vpc.amazon.com",
+					ID:                          "vpce-svc-12345",
+					AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:some-user"},
+				},
+			}
+			return cd
+		}(),
+
+		shouldSync: true,
+	}, {
+		name: "ready for less than 2 hours, installed, additionalAllowedPrincipals principal ARN removed",
+
+		desired: func() *hivev1.ClusterDeployment {
+			cd := cdBuilder.Build(
+				testcd.Installed(),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status:        corev1.ConditionTrue,
+					LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+				}),
+				testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
+					PrivateLink: &hivev1aws.PrivateLinkAccess{
+						Enabled:                     true,
+						AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:some-user"},
+					},
+				}),
+			)
+			initPrivateLinkStatus(cd)
+			cd.Status.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccessStatus{
+				VPCEndpointService: hivev1aws.VPCEndpointService{
+					Name: "vpce-svc-12345.vpc.amazon.com",
+					ID:   "vpce-svc-12345",
+					// Status has an AdditionalAllowedPrincipal that isn't in Spec, expect shouldSync=true
+					AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:some-user", "aws:iam:12345:another-user"},
+				},
+			}
+			return cd
+		}(),
+
+		shouldSync: true,
+	}, {
+		name: "ready for less than 2 hours, installed, additionalAllowedPrincipals principal ARN added, additionalAllowedPrincipals status unset",
+
+		desired: func() *hivev1.ClusterDeployment {
+			cd := cdBuilder.Build(
+				testcd.Installed(),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:          hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+					Status:        corev1.ConditionTrue,
+					LastProbeTime: metav1.Time{Time: time.Now().Add(-1 * time.Hour)},
+				}),
+				testcd.WithAWSPlatform(&hivev1aws.Platform{Region: "us-east-1",
+					PrivateLink: &hivev1aws.PrivateLinkAccess{
+						Enabled: true,
+						// Spec has an AdditionalAllowedPrincipal that isn't in Status, expect shouldSync=true
+						AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:some-user", "aws:iam:12345:another-user"},
+					},
+				}),
+			)
+			initPrivateLinkStatus(cd)
+			cd.Status.Platform.AWS.PrivateLink = &hivev1aws.PrivateLinkAccessStatus{
+				VPCEndpointService: hivev1aws.VPCEndpointService{
+					Name: "vpce-svc-12345.vpc.amazon.com",
+					ID:   "vpce-svc-12345",
+					// AdditionalAllowedPrincipals is absent from status, expect shouldSync=true
+				},
+			}
+			return cd
+		}(),
+
+		shouldSync: true,
+	},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1 := shouldSync(tt.desired)

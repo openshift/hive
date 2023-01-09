@@ -3,7 +3,8 @@
 set -e
 
 TEST_NAME=e2e
-source ${0%/*}/e2e-common.sh
+DIR=${0%/*}
+source ${DIR}/e2e-common.sh
 
 
 function teardown() {
@@ -20,7 +21,7 @@ function teardown() {
   fi
 
   # This is here for backup. The test-e2e-destroycluster test
-  # should normally delete the clusterdeployemnt. Only if the
+  # should normally delete the clusterdeployment. Only if the
   # test fails before then, this will ensure we at least attempt
   # to delete the cluster.
 	echo "Deleting ClusterDeployment ${CLUSTER_NAME}"
@@ -88,7 +89,70 @@ if [[ $rc -ne 0 ]]; then
   exit 1
 fi
 
+function install_check() {
+  i=1
+  cluster_name=$1
+  while [ $i -le ${max_cluster_deployment_status_checks} ]; do
+    CD_JSON=$(oc get cd ${cluster_name} -n ${CLUSTER_NAMESPACE} -o json)
+    if [[ $(jq .spec.installed <<<"${CD_JSON}") == "true" ]] ; then
+      INSTALL_RESULT="success"
+      break
+    fi
+    PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionFailed")' <<<"${CD_JSON}")
+    if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
+      INSTALL_RESULT="failure"
+      FAILURE_TYPE=ProvisionFailed
+      FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
+      FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
+      break
+    fi
+    PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionStopped")' <<<"${CD_JSON}")
+    if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
+      INSTALL_RESULT="failure"
+      FAILURE_TYPE=ProvisionStopped
+      FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
+      FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
+      break
+    fi
+    # HACK: We've seen flakes where the dnszone controller can't instantiate the AWS actuator because
+    # the *-aws-creds secret hasn't come to life yet. This causes the dnszone controller to ignore it
+    # for 2h, which is too long for this test; and the CD is stuck during that time. So here we
+    # detect whether that condition has happened, and then kick the DNSZone object in such a way that
+    # the controller stops ignoring it and tries to resync it.
+    DNS_COND=$(jq -r '.status.conditions[] | select(.type == "DNSNotReady")' <<<"${CD_JSON}")
+    if [[ $(jq -r .status <<<"${DNS_COND}") == 'True' ]] && [[ $(jq -r .reason <<<"${DNS_COND}") == 'ActuatorNotInitialized' ]]; then
+      echo "Found DNSNotReady=>ActuatorNotInitialized condition. Forcing DNSZone to resync..."
+      # The DNSZone is in the CD's namespace. Its name is the CD name suffixed with '-zone'. Resetting
+      # its lastSyncGeneration should trigger a resync.
+      ${DIR}/statuspatch dnszone -n ${CLUSTER_NAMESPACE} ${cluster_name}-zone <<< '.status.lastSyncGeneration = 0'
+    fi
+    sleep ${sleep_between_cluster_deployment_status_checks}
+    echo "Still waiting for the ClusterDeployment ${cluster_name} to install. Status check #${i}/${max_cluster_deployment_status_checks}... "
+    i=$((i + 1))
+  done
+
+  case "${INSTALL_RESULT}" in
+      success)
+          echo "ClusterDeployment ${cluster_name} was installed successfully"
+          ;;
+      failure)
+          echo "ClusterDeployment ${cluster_name} provision failed" >&2
+          echo "Type: $FAILURE_TYPE" >&2
+          echo "Reason: $FAILURE_REASON" >&2
+          echo "Message: $FAILURE_MESSAGE" >&2
+          ;;
+      *)
+          echo "Timed out waiting for the ClusterDeployment ${cluster_name} to install" >&2
+          echo "You may be interested in its status conditions:" >&2
+          jq -r .status.conditions <<<"${CD_JSON}" >&2
+          ;;
+  esac
+
+}
+
 export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
+
+HIBERNATE_AFTER="2h"
 
 echo "Creating cluster deployment"
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
@@ -101,7 +165,8 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--install-once=true \
 	--uninstall-once=true \
 	${MANAGED_DNS_ARG} \
-	${EXTRA_CREATE_CLUSTER_ARGS}
+	${EXTRA_CREATE_CLUSTER_ARGS} \
+  --hibernate-after=${HIBERNATE_AFTER}
 
 # Sanity check the cluster deployment printer
 i=1
@@ -151,69 +216,43 @@ oc get events -n ${CLUSTER_NAMESPACE}
 
 echo "Waiting for the ClusterDeployment ${CLUSTER_NAME} to install"
 INSTALL_RESULT=""
+install_check $CLUSTER_NAME
 
-i=1
-while [ $i -le ${max_cluster_deployment_status_checks} ]; do
-  CD_JSON=$(oc get cd ${CLUSTER_NAME} -n ${CLUSTER_NAMESPACE} -o json)
-  if [[ $(jq .spec.installed <<<"${CD_JSON}") == "true" ]] ; then
-    INSTALL_RESULT="success"
-    break
-  fi
-  PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionFailed")' <<<"${CD_JSON}")
-  if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
-    INSTALL_RESULT="failure"
-    FAILURE_TYPE=ProvisionFailed
-    FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
-    FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
-    break
-  fi
-  PF_COND=$(jq -r '.status.conditions[] | select(.type == "ProvisionStopped")' <<<"${CD_JSON}")
-  if [[ $(jq -r .status <<<"${PF_COND}") == 'True' ]]; then
-    INSTALL_RESULT="failure"
-    FAILURE_TYPE=ProvisionStopped
-    FAILURE_REASON=$(jq -r .reason <<<"${PF_COND}")
-    FAILURE_MESSAGE=$(jq -r .message <<<"${PF_COND}")
-    break
-  fi
-  # HACK: We've seen flakes where the dnszone controller can't instantiate the AWS actuator because
-  # the *-aws-creds secret hasn't come to life yet. This causes the dnszone controller to ignore it
-  # for 2h, which is too long for this test; and the CD is stuck during that time. So here we
-  # detect whether that condition has happened, and then kick the DNSZone object in such a way that
-  # the controller stops ignoring it and tries to resync it.
-  DNS_COND=$(jq -r '.status.conditions[] | select(.type == "DNSNotReady")' <<<"${CD_JSON}")
-  if [[ $(jq -r .status <<<"${DNS_COND}") == 'True' ]] && [[ $(jq -r .reason <<<"${DNS_COND}") == 'ActuatorNotInitialized' ]]; then
-    echo "Found DNSNotReady=>ActuatorNotInitialized condition. Forcing DNSZone to resync..."
-    # The DNSZone is in the CD's namespace. Its name is the CD name suffixed with '-zone'. Resetting
-    # its lastSyncGeneration should trigger a resync.
-    ${0%/*}/statuspatch dnszone -n ${CLUSTER_NAMESPACE} ${CLUSTER_NAME}-zone <<< '.status.lastSyncGeneration = 0'
-  fi
-  sleep ${sleep_between_cluster_deployment_status_checks}
-  echo "Still waiting for the ClusterDeployment ${CLUSTER_NAME} to install. Status check #${i}/${max_cluster_deployment_status_checks}... "
-  i=$((i + 1))
-done
-
-case "${INSTALL_RESULT}" in
-    success)
-        echo "ClusterDeployment ${CLUSTER_NAME} was installed successfully"
-        ;;
-    failure)
-        echo "ClusterDeployment ${CLUSTER_NAME} provision failed" >&2
-        echo "Type: $FAILURE_TYPE" >&2
-        echo "Reason: $FAILURE_REASON" >&2
-        echo "Message: $FAILURE_MESSAGE" >&2
-        ;;
-    *)
-        echo "Timed out waiting for the ClusterDeployment ${CLUSTER_NAME} to install" >&2
-        echo "You may be interested in its status conditions:" >&2
-        jq -r .status.conditions <<<"${CD_JSON}" >&2
-        ;;
-esac
-
-capture_manifests
 capture_cluster_logs $CLUSTER_NAME $CLUSTER_NAMESPACE $INSTALL_RESULT
-
+capture_manifests
 echo "Running post-install tests"
 make test-e2e-postinstall
+
+# poll status.powerState Running
+if [[ ${INSTALL_RESULT} == "success" ]]; then
+
+  EXPECTED_STATE=$(oc get cd -n ${CLUSTER_NAMESPACE} ${CLUSTER_NAME} -o json | jq -r '.spec.powerState')
+  
+  # Expected state will be null prior to hibernation if not otherwise specified
+  if [[ ${EXPECTED_STATE} == "null" ]]; then
+    EXPECTED_STATE="Running" # Is this correct?
+  fi
+
+  wait_for_hibernation_state $CLUSTER_NAME $EXPECTED_STATE
+  POWER_STATE_RESULT=$(echo $?)
+  # TODO: Do somthing with POWER_STATE_RESULT or is printed error message sufficient?
+
+  # Patch ClusterDeployment to hibernate now
+  if [[ ${EXPECTED_STATE} == "Running" ]]; then
+
+    EXPECTED_STATE="Hibernating"
+
+    CD_JSON=$(oc get cd $CLUSTER_NAME -n $CLUSTER_NAMESPACE -o json)
+    jq '.spec += {"hibernateAfter": "1s"}' <<< ${CD_JSON} | oc apply -f -
+
+    # poll status.powerState Hibernating
+    wait_for_hibernation_state $CLUSTER_NAME $EXPECTED_STATE
+    POWER_STATE_RESULT=$(echo $?)
+    # TODO: Do something with POWER_STATE_RESULT or is printed error message sufficient?
+
+  fi
+
+fi
 
 echo "Running destroy test"
 make test-e2e-destroycluster

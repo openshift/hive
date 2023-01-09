@@ -50,36 +50,6 @@ function count_cds() {
   jq -r '.items | length' <<<"$J"
 }
 
-function wait_for_hibernation_state() {
-  local CLUSTER_NAME=$1
-  local EXPECTED_STATE=$2
-  echo "Waiting for ClusterDeployment $CLUSTER_NAME to be $EXPECTED_STATE"
-  local i=1
-  while [[ $i -le ${max_tries} ]]; do
-    if [[ $i -gt 1 ]]; then
-      # Don't sleep on first loop
-      echo "sleeping ${sleep_between_tries} seconds"
-      sleep ${sleep_between_tries}
-    fi
-
-    powerState=$(oc get cd -n $CLUSTER_NAME $CLUSTER_NAME -o json | jq -r '.status.powerState')
-    if [[ "${powerState}" == $EXPECTED_STATE ]]; then
-      echo "Success"
-      break
-    else
-      echo -n "Failed, "
-    fi
-
-    i=$((i + 1))
-  done
-
-  if [[ $i -ge ${max_tries} ]] ; then
-    # Failed the maximum amount of times.
-    echo "ClusterDeployment $CLUSTER_NAME still not $EXPECTED_STATE" >&2
-    echo "Actual state: ${powerState}" >&2
-    exit 9
-  fi
-}
 
 # Verify no CDs exist yet
 NUM_CDS=$(count_cds)
@@ -259,7 +229,7 @@ fi
 ## Test hibernating fake cluster
 echo "Hibernating fake cluster"
 set_power_state $cd Hibernating
-wait_for_hibernation_state $cd Hibernating
+wait_for_hibernation_state_or_exit $cd Hibernating
 installed=$(oc get cd -n $cd $cd -o json | jq -r '.status.installedTimestamp')
 hibernated=$(oc get cd -n $cd $cd -o json | jq -r '.status.conditions[] | select(.type=="Hibernating") | .lastTransitionTime')
 delta_seconds=$((`date -d "$hibernated" +%s`-`date -d "$installed" +%s`))
@@ -306,22 +276,22 @@ verify_cluster_name $REAL_POOL_NAME "cdc-test" $NEW_CLUSTER_NAME
 #       sure that's the one that gets claimed for the meat of this test.
 CLUSTER_NAME=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'$REAL_POOL_NAME'") | .metadata.name')
 
-wait_for_hibernation_state $CLUSTER_NAME Hibernating
+wait_for_hibernation_state_or_exit $CLUSTER_NAME Hibernating
 
 echo "Claiming"
 CLAIM_NAME=the-claim
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool claim -n $CLUSTER_NAMESPACE $REAL_POOL_NAME $CLAIM_NAME
 
-wait_for_hibernation_state $CLUSTER_NAME Running
+wait_for_hibernation_state_or_exit $CLUSTER_NAME Running
 
 echo "Re-hibernating"
 set_power_state $CLUSTER_NAME Hibernating
 
-wait_for_hibernation_state $CLUSTER_NAME Hibernating
+wait_for_hibernation_state_or_exit $CLUSTER_NAME Hibernating
 
 echo "Re-resuming"
 set_power_state $CLUSTER_NAME Running
 
-wait_for_hibernation_state $CLUSTER_NAME Running
+wait_for_hibernation_state_or_exit $CLUSTER_NAME Running
 
 # Let the cleanup trap do the cleanup.

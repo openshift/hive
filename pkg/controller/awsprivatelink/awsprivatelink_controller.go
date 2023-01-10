@@ -727,11 +727,11 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpointService(awsClient *awsClie
 		input := &ec2.ModifyVpcEndpointServicePermissionsInput{
 			ServiceId: serviceConfig.ServiceId,
 		}
-		if added := desiredPerms.Difference(oldPerms).List(); len(added) > 0 {
-			input.AddAllowedPrincipals = aws.StringSlice(added)
+		if added := desiredPerms.Difference(oldPerms); len(added) > 0 {
+			input.AddAllowedPrincipals = aws.StringSlice(added.List())
 		}
-		if removed := oldPerms.Difference(desiredPerms).List(); len(removed) > 0 {
-			input.RemoveAllowedPrincipals = aws.StringSlice(removed)
+		if removed := oldPerms.Difference(desiredPerms); len(removed) > 0 {
+			input.RemoveAllowedPrincipals = aws.StringSlice(removed.List())
 		}
 		serviceLog.WithField("addAllowed", aws.StringValueSlice(input.AddAllowedPrincipals)).
 			WithField("removeAllowed", aws.StringValueSlice(input.RemoveAllowedPrincipals)).

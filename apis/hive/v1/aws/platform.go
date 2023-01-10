@@ -61,8 +61,13 @@ type PrivateLinkAccessStatus struct {
 type VPCEndpointService struct {
 	Name string `json:"name,omitempty"`
 	ID   string `json:"id,omitempty"`
+	// DefaultAllowedPrincipal is the ARN of the IAM entity used by Hive as configured for the Private
+	// Link cluster's VPC Endpoint Service.
 	// +optional
 	DefaultAllowedPrincipal *string `json:"defaultAllowedPrincipal,omitempty"`
+	// AdditionalAllowedPrincipals is a list of additional allowed principal ARNs that have been configured
+	// for the Private Link cluster's VPC Endpoint Service. This list in Status is used to determine if a sync
+	// of Allowed Principals is needed outside of the regular reconcile period of 2hrs.
 	// +optional
 	AdditionalAllowedPrincipals *[]string `json:"additionalAllowedPrincipals,omitempty"`
 }

@@ -1544,10 +1544,20 @@ objects:
                             vpcEndpointService:
                               properties:
                                 additionalAllowedPrincipals:
+                                  description: AdditionalAllowedPrincipals is a list
+                                    of additional allowed principal ARNs that have
+                                    been configured for the Private Link cluster's
+                                    VPC Endpoint Service. This list in Status is used
+                                    to determine if a sync of Allowed Principals is
+                                    needed outside of the regular reconcile period
+                                    of 2hrs.
                                   items:
                                     type: string
                                   type: array
                                 defaultAllowedPrincipal:
+                                  description: DefaultAllowedPrincipal is the ARN
+                                    of the IAM entity used by Hive as configured for
+                                    the Private Link cluster's VPC Endpoint Service.
                                   type: string
                                 id:
                                   type: string

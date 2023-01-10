@@ -1253,6 +1253,11 @@ func (in *ClusterIngress) DeepCopyInto(out *ClusterIngress) {
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.HttpErrorCodePages != nil {
+		in, out := &in.HttpErrorCodePages, &out.HttpErrorCodePages
+		*out = new(configv1.ConfigMapNameReference)
+		**out = **in
+	}
 	return
 }
 

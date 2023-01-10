@@ -350,6 +350,24 @@ func shouldSync(desired *hivev1.ClusterDeployment) (bool, time.Duration) {
 		// if it is less than a minute, sync after a minute
 		syncAfter = time.Minute
 	}
+
+	if desired.Spec.Platform.AWS.PrivateLink != nil {
+		statusAdditionalAllowedPrincipals := sets.NewString()
+		if desired.Status.Platform != nil &&
+			desired.Status.Platform.AWS != nil &&
+			desired.Status.Platform.AWS.PrivateLink != nil &&
+			desired.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals != nil {
+			statusAdditionalAllowedPrincipals = sets.NewString(*desired.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals...)
+		}
+		specAdditionalAllowedPrincipals := sets.NewString()
+		if desired.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals != nil {
+			specAdditionalAllowedPrincipals = sets.NewString(*desired.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals...)
+		}
+		if !specAdditionalAllowedPrincipals.Equal(statusAdditionalAllowedPrincipals) {
+			return true, 0 // there is a diff between configured additionalAllowedPrincipals within spec and additionalallowedPrincipals within status, sync now.
+		}
+	}
+
 	// We didn't meet any of the criteria above, so we should not sync.
 	return false, syncAfter
 }
@@ -437,7 +455,7 @@ func (r *ReconcileAWSPrivateLink) setReadyCondition(cd *hivev1.ClusterDeployment
 		return nil
 	}
 	curr.Status.Conditions = conditions
-	logger.Debug("setting AWSPrivateLinkReadyClusterDeploymentCondition to %s", completed)
+	logger.Debugf("setting AWSPrivateLinkReadyClusterDeploymentCondition to %s", completed)
 	return r.Status().Update(context.TODO(), curr)
 }
 
@@ -695,24 +713,64 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpointService(awsClient *awsClie
 	for _, allowed := range permResp.AllowedPrincipals {
 		oldPerms.Insert(aws.StringValue(allowed.Principal))
 	}
-	desriredPerms := sets.NewString(aws.StringValue(stsResp.Arn))
+	// desiredPerms is the set of Allowed Principals that will be configured for the cluster's VPC Endpoint Service.
+	// desiredPerms only contains the IAM entity used by Hive (defaultARN) by default but may contain additional Allowed Principal
+	// ARNs as configured within cd.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals.
+	defaultARN := aws.StringValue(stsResp.Arn)
+	desiredPerms := sets.NewString(defaultARN)
+	if allowedPrincipals := cd.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals; allowedPrincipals != nil {
+		desiredPerms.Insert(*allowedPrincipals...)
+	}
 
-	if !desriredPerms.Equal(oldPerms) {
+	if !desiredPerms.Equal(oldPerms) {
 		modified = true
 		input := &ec2.ModifyVpcEndpointServicePermissionsInput{
 			ServiceId: serviceConfig.ServiceId,
 		}
-		if added := desriredPerms.Difference(oldPerms).List(); len(added) > 0 {
-			input.AddAllowedPrincipals = aws.StringSlice(added)
+		if added := desiredPerms.Difference(oldPerms); len(added) > 0 {
+			input.AddAllowedPrincipals = aws.StringSlice(added.List())
 		}
-		if removed := oldPerms.Difference(desriredPerms).List(); len(removed) > 0 {
-			input.RemoveAllowedPrincipals = aws.StringSlice(removed)
+		if removed := oldPerms.Difference(desiredPerms); len(removed) > 0 {
+			input.RemoveAllowedPrincipals = aws.StringSlice(removed.List())
 		}
+		serviceLog.WithField("addAllowed", aws.StringValueSlice(input.AddAllowedPrincipals)).
+			WithField("removeAllowed", aws.StringValueSlice(input.RemoveAllowedPrincipals)).
+			Infof("updating VPC Endpoint Service permission to match the desired state")
 		_, err := awsClient.user.ModifyVpcEndpointServicePermissions(input)
 		if err != nil {
 			serviceLog.WithField("addAllowed", aws.StringValueSlice(input.AddAllowedPrincipals)).
 				WithField("removeAllowed", aws.StringValueSlice(input.RemoveAllowedPrincipals)).
 				WithError(err).Error("error updating VPC Endpoint Service permission to match the desired state")
+			return modified, nil, err
+		}
+	}
+
+	// Update status with modified additionalAllowedPrincipals
+	// Permissions were modified on the vpc endpoint service or were not modified (because they were
+	// correct) and status is empty so status must be updated.
+	// Checking for empty status avoids a rare hotloop that could occur when the vpc endpoint is deleted externally
+	// and recreated by hive which wipes out the status in ensureVPCEndpointService(). If the allowed principals on
+	// the vpc endpoint service were correct, no modification would occur but status would remain empty resulting in
+	// shouldSync() always returning true.
+	specHasAdditionalAllowedPrincipals := cd.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals != nil
+	additionalAllowedPrincipalsStatusEmpty := cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals == nil
+	defaultAllowedPrincipalStatusEmpty := cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.DefaultAllowedPrincipal == nil
+	if modified || (specHasAdditionalAllowedPrincipals && additionalAllowedPrincipalsStatusEmpty) || defaultAllowedPrincipalStatusEmpty {
+		initPrivateLinkStatus(cd)
+		// Remove the defaultARN from the list of AdditionalAllowedPrincipals to be recorded in
+		// cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals.
+		// The defaultARN will be stored in a separate status field
+		// cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.DefaultAllowedPrincipal
+		desiredPerms.Delete(defaultARN)
+		desiredPermsSlice := desiredPerms.List() // sorted by sets.List()
+		if len(desiredPermsSlice) == 0 {
+			cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals = nil
+		} else {
+			cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals = &desiredPermsSlice
+		}
+		cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.DefaultAllowedPrincipal = &defaultARN
+		if err := r.updatePrivateLinkStatus(cd, logger); err != nil {
+			logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointService additionalAllowedPrincipals")
 			return modified, nil, err
 		}
 	}

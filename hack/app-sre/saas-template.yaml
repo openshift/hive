@@ -922,6 +922,16 @@ objects:
                             services using AWS's internal networking instead of the
                             Internet.
                           properties:
+                            additionalAllowedPrincipals:
+                              description: AdditionalAllowedPrincipals is a list of
+                                additional allowed principal ARNs to be configured
+                                for the Private Link cluster's VPC Endpoint Service.
+                                ARNs provided as AdditionalAllowedPrincipals will
+                                be configured for the cluster's VPC Endpoint Service
+                                in addition to the IAM entity used by Hive.
+                              items:
+                                type: string
+                              type: array
                             enabled:
                               type: boolean
                           required:
@@ -1533,6 +1543,22 @@ objects:
                               type: string
                             vpcEndpointService:
                               properties:
+                                additionalAllowedPrincipals:
+                                  description: AdditionalAllowedPrincipals is a list
+                                    of additional allowed principal ARNs that have
+                                    been configured for the Private Link cluster's
+                                    VPC Endpoint Service. This list in Status is used
+                                    to determine if a sync of Allowed Principals is
+                                    needed outside of the regular reconcile period
+                                    of 2hrs.
+                                  items:
+                                    type: string
+                                  type: array
+                                defaultAllowedPrincipal:
+                                  description: DefaultAllowedPrincipal is the ARN
+                                    of the IAM entity used by Hive as configured for
+                                    the Private Link cluster's VPC Endpoint Service.
+                                  type: string
                                 id:
                                   type: string
                                 name:
@@ -2292,6 +2318,16 @@ objects:
                             services using AWS's internal networking instead of the
                             Internet.
                           properties:
+                            additionalAllowedPrincipals:
+                              description: AdditionalAllowedPrincipals is a list of
+                                additional allowed principal ARNs to be configured
+                                for the Private Link cluster's VPC Endpoint Service.
+                                ARNs provided as AdditionalAllowedPrincipals will
+                                be configured for the cluster's VPC Endpoint Service
+                                in addition to the IAM entity used by Hive.
+                              items:
+                                type: string
+                              type: array
                             enabled:
                               type: boolean
                           required:

@@ -719,9 +719,7 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpointService(awsClient *awsClie
 	defaultARN := aws.StringValue(stsResp.Arn)
 	desiredPerms := sets.NewString(defaultARN)
 	if allowedPrincipals := cd.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals; allowedPrincipals != nil {
-		for _, allowedPrincipal := range *allowedPrincipals {
-			desiredPerms.Insert(allowedPrincipal)
-		}
+		desiredPerms.Insert(*allowedPrincipals...)
 	}
 
 	if !desiredPerms.Equal(oldPerms) {

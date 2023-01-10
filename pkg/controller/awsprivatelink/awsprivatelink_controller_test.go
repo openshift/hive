@@ -1741,7 +1741,6 @@ users:
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockedAWSClient := mock.NewMockClient(mockCtrl)
 
 			if test.configureAWSClient != nil {

@@ -237,7 +237,6 @@ func TestReconcile(t *testing.T) {
 			hivev1.AddToScheme(scheme)
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.cd).Build()
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			if test.errorConnecting != nil {
 				mockRemoteClientBuilder.EXPECT().UsePrimaryAPIURL().Return(mockRemoteClientBuilder)

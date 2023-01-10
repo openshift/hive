@@ -410,7 +410,6 @@ func TestDNSEndpointReconcile(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			logger := log.WithField("controller", ControllerName)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(tc.dnsZone).Build()
 			mockQuery := mock.NewMockQuery(mockCtrl)

@@ -2981,7 +2981,6 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 
@@ -3071,7 +3070,6 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
@@ -3762,7 +3760,6 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingCD...).Build()
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
@@ -3926,7 +3923,6 @@ func TestMergePullSecrets(t *testing.T) {
 			}
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
@@ -3993,7 +3989,6 @@ func TestCopyInstallLogSecret(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
@@ -4164,7 +4159,6 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 			existingObjs := append(test.existingObjs, test.clusterDeployment)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,

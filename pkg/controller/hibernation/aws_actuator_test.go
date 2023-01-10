@@ -230,7 +230,6 @@ func TestMachinesStoppedAndRunning(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			awsClient := mockawsclient.NewMockClient(ctrl)
 			setupClientInstances(awsClient, test.instances)
 			if test.setupClient != nil {

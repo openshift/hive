@@ -50,7 +50,6 @@ func TestUploadLogs(t *testing.T) {
 			mocks := setupDefaultMocks(t, test.existing...)
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			// The aws actuator won't run without this set.
 			if test.setupEnvVars {

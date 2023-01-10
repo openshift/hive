@@ -546,7 +546,6 @@ func TestAWSActuator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.machinePool).Build()
 			awsClient := mockaws.NewMockClient(mockCtrl)

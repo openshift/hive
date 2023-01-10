@@ -66,7 +66,6 @@ func TestNewReconciler(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockManager := mock.NewMockManager(mockCtrl)
 			mockManager.EXPECT().GetScheme().Return(nil)
 			test.setup()

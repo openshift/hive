@@ -149,7 +149,6 @@ func TestIBMCloudStopAndStartMachines(t *testing.T) {
 			} else {
 				assert.Nil(t, err)
 			}
-			ctrl.Finish()
 		})
 	}
 

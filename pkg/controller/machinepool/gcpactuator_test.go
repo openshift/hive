@@ -177,7 +177,6 @@ func TestGCPActuator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			gClient := mockgcp.NewMockClient(mockCtrl)
 			clusterDeployment := testGCPClusterDeployment(testName, testInfraID)

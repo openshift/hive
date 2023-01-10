@@ -174,7 +174,6 @@ func TestInstallManager(t *testing.T) {
 			mocks := setupDefaultMocks(t, existing...)
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			// create a fake install-config
 			mountedInstallConfigFile := filepath.Join(tempDir, "mounted-install-config.yaml")

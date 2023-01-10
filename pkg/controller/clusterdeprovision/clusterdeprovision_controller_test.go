@@ -284,7 +284,6 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 			mocks := setupDefaultMocks(t, test.mockDeleteFailure, existing...)
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			if test.mockGetCallerIdentity {
 				mocks.mockAWSClient.EXPECT().

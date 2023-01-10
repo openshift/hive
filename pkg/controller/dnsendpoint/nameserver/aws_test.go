@@ -174,7 +174,6 @@ func TestAWSGet(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockAWSClient := mock.NewMockClient(mockCtrl)
 			awsQuery := &awsQuery{
 				getAWSClient: func() (awsclient.Client, error) {

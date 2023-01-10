@@ -62,6 +62,8 @@ type VPCEndpointService struct {
 	Name string `json:"name,omitempty"`
 	ID   string `json:"id,omitempty"`
 	// +optional
+	DefaultAllowedPrincipal *string `json:"defaultAllowedPrincipal,omitempty"`
+	// +optional
 	AdditionalAllowedPrincipals *[]string `json:"additionalAllowedPrincipals,omitempty"`
 }
 

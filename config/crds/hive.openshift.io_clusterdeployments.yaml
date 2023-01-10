@@ -1142,6 +1142,8 @@ spec:
                                 items:
                                   type: string
                                 type: array
+                              defaultAllowedPrincipal:
+                                type: string
                               id:
                                 type: string
                               name:

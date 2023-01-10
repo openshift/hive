@@ -756,11 +756,13 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpointService(awsClient *awsClie
 	// shouldSync() always returning true.
 	specHasAdditionalAllowedPrincipals := cd.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals != nil
 	additionalAllowedPrincipalsStatusEmpty := cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals == nil
-	if modified || (specHasAdditionalAllowedPrincipals && additionalAllowedPrincipalsStatusEmpty) {
+	defaultAllowedPrincipalStatusEmpty := cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.DefaultAllowedPrincipal == nil
+	if modified || (specHasAdditionalAllowedPrincipals && additionalAllowedPrincipalsStatusEmpty) || defaultAllowedPrincipalStatusEmpty {
 		initPrivateLinkStatus(cd)
-		// Remove the defaultARN from the list of AdditionalAllowedPrincipals to be recorded in status.
-		// Status only contains the AdditionalAllowedPrincipals defined in
-		// ClusterDeployment.Spec.Platform.AWS.PrivateLink.AdditionalAllowedPrincipals.
+		// Remove the defaultARN from the list of AdditionalAllowedPrincipals to be recorded in
+		// cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals.
+		// The defaultARN will be stored in a separate status field
+		// cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.DefaultAllowedPrincipal
 		desiredPerms.Delete(defaultARN)
 		desiredPermsSlice := desiredPerms.List() // sorted by sets.List()
 		if len(desiredPermsSlice) == 0 {
@@ -768,6 +770,7 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpointService(awsClient *awsClie
 		} else {
 			cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals = &desiredPermsSlice
 		}
+		cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.DefaultAllowedPrincipal = &defaultARN
 		if err := r.updatePrivateLinkStatus(cd, logger); err != nil {
 			logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointService additionalAllowedPrincipals")
 			return modified, nil, err

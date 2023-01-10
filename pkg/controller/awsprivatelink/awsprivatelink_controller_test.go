@@ -888,7 +888,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
 			"AccessDenied: not authorized to DescribeVpcEndpoints"),
@@ -921,7 +921,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
 			"AccessDenied: not authorized to DescribeVpcEndpoints"),
@@ -955,7 +955,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
 			"AccessDenied: not authorized to DescribeVpcEndpoints"),
@@ -992,7 +992,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
 			"AccessDenied: not authorized to DescribeVpcEndpoints"),
@@ -1051,6 +1051,7 @@ users:
 			VPCEndpointService: hivev1aws.VPCEndpointService{
 				Name:                        "vpce-svc-12345.vpc.amazon.com",
 				ID:                          "vpce-svc-12345",
+				DefaultAllowedPrincipal:     aws.String("aws:iam:12345:hub-user"),
 				AdditionalAllowedPrincipals: &[]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"},
 			},
 		},
@@ -1116,8 +1117,9 @@ users:
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
 			VPCEndpointService: hivev1aws.VPCEndpointService{
-				Name: "vpce-svc-12345.vpc.amazon.com",
-				ID:   "vpce-svc-12345",
+				Name:                    "vpce-svc-12345.vpc.amazon.com",
+				ID:                      "vpce-svc-12345",
+				DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user"),
 				// There will be no additionalAllowedPrincipals recorded in status
 			},
 		},
@@ -1157,7 +1159,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "NoSupportedAZsInInventory",
 			"no supported VPC in inventory which support the AZs of the service"),
@@ -1293,7 +1295,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-22",
 			HostedZoneID:       "HZ22",
 		},
@@ -1318,7 +1320,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 		},
 		expectedConditions: getExpectedConditions(true, "CouldNotCalculateAPIDomain",
@@ -1356,7 +1358,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
@@ -1402,7 +1404,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
@@ -1443,7 +1445,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
@@ -1492,7 +1494,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
@@ -1547,7 +1549,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
@@ -1603,7 +1605,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
@@ -1668,7 +1670,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},
@@ -1740,7 +1742,7 @@ users:
 
 		hasFinalizer: true,
 		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
-			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 			VPCEndpointID:      "vpce-12345",
 			HostedZoneID:       "HZ12345",
 		},

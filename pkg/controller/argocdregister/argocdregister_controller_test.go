@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -201,8 +200,6 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "argocdregister")
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			if test.argoCDEnabled {
 				os.Setenv(constants.ArgoCDEnvVar, "true")

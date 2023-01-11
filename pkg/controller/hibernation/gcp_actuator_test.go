@@ -116,7 +116,6 @@ func TestGCPStopAndStartMachines(t *testing.T) {
 				t.Fatal("Invalid function to test")
 			}
 			assert.Nil(t, err)
-			ctrl.Finish()
 		})
 	}
 

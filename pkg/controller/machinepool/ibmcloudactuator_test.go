@@ -119,7 +119,6 @@ func TestIBMCloudActuator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			ibmcloudClient := mockibm.NewMockAPI(mockCtrl)
 

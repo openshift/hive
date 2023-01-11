@@ -716,7 +716,6 @@ func TestScrape(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockQuery := mock.NewMockQuery(mockCtrl)
 			tc.configureQuery(mockQuery)
 			changeNotifications := make(chan client.Object, 100)

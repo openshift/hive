@@ -59,7 +59,6 @@ func TestGetCISInstanceCRN(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			ibmcloudClient := mockibm.NewMockAPI(mockCtrl)
 
@@ -98,7 +97,6 @@ func TestGetAccountID(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			ibmcloudClient := mockibm.NewMockAPI(mockCtrl)
 

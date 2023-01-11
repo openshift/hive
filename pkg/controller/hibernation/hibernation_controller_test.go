@@ -988,7 +988,6 @@ func TestReconcile(t *testing.T) {
 				require.Nil(t, err)
 				test.validate(t, cd)
 			}
-			ctrl.Finish()
 		})
 	}
 
@@ -1186,7 +1185,6 @@ func TestHibernateAfter(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			mockActuator := mock.NewMockHibernationActuator(ctrl)
 			mockActuator.EXPECT().CanHandle(gomock.Any()).AnyTimes().Return(!test.hibernationUnsupported)
 			if test.setupActuator != nil {

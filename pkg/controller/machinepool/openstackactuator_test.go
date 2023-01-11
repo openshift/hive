@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,10 +38,6 @@ func BROKEN__TestOpenStackActuator(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
 			actuator := &OpenStackActuator{
 				logger: log.WithField("actuator", "openstackactuator_test"),
 			}

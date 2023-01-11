@@ -239,7 +239,6 @@ func areSyncStatusesEqual(t *testing.T, syncSetType string, expectedStatuses, ac
 
 func TestReconcileClusterSync_NewClusterDeployment(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	rt := newReconcileTest(t, mockCtrl, scheme,
 		cdBuilder(scheme).Build(),
@@ -306,7 +305,6 @@ func TestReconcileClusterSync_NoWorkToDo(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			var existing []runtime.Object
 			if tc.cd != nil {
 				existing = append(existing,
@@ -340,7 +338,6 @@ func TestReconcileClusterSync_ApplyResource(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(string(tc.applyMode), func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourceToApply := testConfigMap("dest-namespace", "dest-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -419,7 +416,6 @@ func TestGetAndCheckClustersyncStatefulSet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			rt := newReconcileTest(t, mockCtrl, scheme, tc.existingObjects...)
 
 			// Act
@@ -530,7 +526,6 @@ func TestIsSyncAssignedToMe(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			rt := newReconcileTest(t, mockCtrl, scheme)
 			rt.r.ordinalID = tc.ordinalID
 
@@ -566,7 +561,6 @@ func TestReconcileClusterSync_ApplySecret(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(string(tc.applyMode), func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
@@ -618,7 +612,6 @@ func TestReconcileClusterSync_ApplyPatch(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(string(tc.applyMode), func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 				testsyncset.ForClusterDeployments(testCDName),
@@ -671,7 +664,6 @@ func TestReconcileClusterSync_ApplyAllTypes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(string(tc.applyMode), func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourceToApply := testConfigMap("resource-namespace", "resource-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -764,7 +756,6 @@ func TestReconcileClusterSync_Reapply(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourceToApply := testConfigMap("dest-namespace", "dest-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -805,7 +796,6 @@ func TestReconcileClusterSync_Reapply(t *testing.T) {
 
 func TestReconcileClusterSync_NewSyncSetApplied(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	existingResource := testConfigMap("dest-namespace", "dest-name")
 	existingSyncSet := testsyncset.FullBuilder(testNamespace, "existing-syncset", scheme).Build(
@@ -844,7 +834,6 @@ func TestReconcileClusterSync_NewSyncSetApplied(t *testing.T) {
 
 func TestReconcileClusterSync_SyncSetRenamed(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 
 	// clustersync exists for old syncset
@@ -917,7 +906,6 @@ func TestReconcileClusterSync_SyncSetDeleted(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			existingSyncStatusBuilder := newSyncStatusBuilder("test-syncset").Options(
 				withTransitionInThePast(),
@@ -972,7 +960,6 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourceToApply := testConfigMap("dest-namespace", "retained-resource")
 			resourceToApply2 := testConfigMap("another-namespace", "another-resource")
@@ -1055,7 +1042,6 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 
 func TestReconcileClusterSync_ErrorApplyingResource(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	resourceToApply := testConfigMap("dest-namespace", "dest-name")
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -1084,7 +1070,6 @@ func TestReconcileClusterSync_ErrorApplyingResource(t *testing.T) {
 
 func TestReconcileClusterSync_ErrorDecodingResource(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
@@ -1109,7 +1094,6 @@ func TestReconcileClusterSync_ErrorDecodingResource(t *testing.T) {
 
 func TestReconcileClusterSync_ErrorApplyingSecret(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
@@ -1150,7 +1134,6 @@ func TestReconcileClusterSync_ErrorApplyingSecret(t *testing.T) {
 
 func TestReconcileClusterSync_ErrorApplyingPatch(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
@@ -1254,7 +1237,6 @@ func TestReconcileClusterSync_SkipAfterFailingResource(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourcesToApply := make([]hivev1.MetaRuntimeObject, 3)
 			for i := range resourcesToApply {
@@ -1430,7 +1412,6 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 			}
 			t.Run(fmt.Sprintf("permutation %03d", permutation), func(t *testing.T) {
 				mockCtrl := gomock.NewController(t)
-				defer mockCtrl.Finish()
 				syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 					testsyncset.ForClusterDeployments(testCDName),
 					testsyncset.WithGeneration(2),
@@ -1543,7 +1524,6 @@ func TestReconcileClusterSync_FailingSyncSetDoesNotBlockOtherSyncSets(t *testing
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourcesToApply := make([]hivev1.MetaRuntimeObject, 3)
 			for i := range resourcesToApply {
@@ -1634,7 +1614,6 @@ func TestReconcileClusterSync_FailureMessage(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			syncSets := make([]runtime.Object, tc.failingSyncSets)
 			for i := range syncSets {
@@ -1728,7 +1707,6 @@ func TestReconcileClusterSync_PartialApply(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourceToApply := testConfigMap("dest-namespace", "dest-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -1756,7 +1734,6 @@ func TestReconcileClusterSync_PartialApply(t *testing.T) {
 
 func TestReconcileClusterSync_ErrorDeleting(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	existingSyncStatus := buildSyncStatus("test-syncset",
 		withResourcesToDelete(testConfigMapRef("dest-namespace", "dest-name")),
@@ -1805,7 +1782,6 @@ func TestReconcileClusterSync_DeleteErrorDoesNotBlockOtherDeletes(t *testing.T) 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			existingSyncStatus := buildSyncStatus("test-syncset",
 				withResourcesToDelete(
@@ -1879,7 +1855,6 @@ func TestReconcileClusterSync_ApplyBehavior(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(string(tc.applyBehavior), func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			scheme := newScheme()
 			resourceToApply := testConfigMap("resource-namespace", "resource-name")
 			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -1944,7 +1919,6 @@ func TestReconcileClusterSync_ApplyBehavior(t *testing.T) {
 
 func TestReconcileClusterSync_IgnoreNotApplicableSyncSets(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	syncSetResourceToApply := testConfigMap("dest-namespace", "resource-from-applicable-syncset")
 	applicableSyncSet := testsyncset.FullBuilder(testNamespace, "applicable-syncset", scheme).Build(
@@ -1993,7 +1967,6 @@ func TestReconcileClusterSync_IgnoreNotApplicableSyncSets(t *testing.T) {
 
 func TestReconcileClusterSync_ApplySecretForSelectorSyncSet(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	cd := cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value"))
 	selectorSyncSet := testselectorsyncset.FullBuilder("test-selectorsyncset", scheme).Build(
@@ -2032,7 +2005,6 @@ func TestReconcileClusterSync_ApplySecretForSelectorSyncSet(t *testing.T) {
 
 func TestReconcileClusterSync_MissingSecretNamespaceForSelectorSyncSet(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	cd := cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value"))
 	selectorSyncSet := testselectorsyncset.FullBuilder("test-selectorsyncset", scheme).Build(
@@ -2064,7 +2036,6 @@ func TestReconcileClusterSync_MissingSecretNamespaceForSelectorSyncSet(t *testin
 
 func TestReconcileClusterSync_ValidSecretNamespaceForSyncSet(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
@@ -2102,7 +2073,6 @@ func TestReconcileClusterSync_ValidSecretNamespaceForSyncSet(t *testing.T) {
 
 func TestReconcileClusterSync_InvalidSecretNamespaceForSyncSet(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
@@ -2136,7 +2106,6 @@ func TestReconcileClusterSync_InvalidSecretNamespaceForSyncSet(t *testing.T) {
 
 func TestReconcileClusterSync_MissingSourceSecret(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
 		testsyncset.ForClusterDeployments(testCDName),
@@ -2164,7 +2133,6 @@ func TestReconcileClusterSync_MissingSourceSecret(t *testing.T) {
 
 func TestReconcileClusterSync_ConditionNotMutatedWhenMessageNotChanged(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	resourceToApply := testConfigMap("dest-namespace", "dest-name")
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -2216,7 +2184,6 @@ func TestReconcileClusterSync_ConditionNotMutatedWhenMessageNotChanged(t *testin
 
 func TestReconcileClusterSync_FirstSuccessTime(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
 	resourceToApply := testConfigMap("dest-namespace", "dest-name")
@@ -2272,7 +2239,6 @@ func TestReconcileClusterSync_FirstSuccessTime(t *testing.T) {
 
 func TestReconcileClusterSync_NoFirstSuccessTimeSet(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -2321,7 +2287,6 @@ func TestReconcileClusterSync_NoFirstSuccessTimeSet(t *testing.T) {
 
 func TestReconcileClusterSync_FirstSuccessTimeSetWithNoSyncSets(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
 	clusterSync := clusterSyncBuilder(scheme).Build()
@@ -2350,7 +2315,6 @@ func TestReconcileClusterSync_FirstSuccessTimeSetWithNoSyncSets(t *testing.T) {
 
 func TestReconcileClusterSync_SyncToUpsertResourceApplyMode(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	resourcesToApply := testConfigMap("dest-namespace", "dest-name")
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
@@ -2405,7 +2369,6 @@ func TestReconcileClusterSync_SyncToUpsertResourceApplyMode(t *testing.T) {
 
 func TestReconcileClusterSync_UpsertToSyncResourceApplyMode(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	scheme := newScheme()
 	resourcesToApply := testConfigMap("dest-namespace", "dest-name")
 	syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(

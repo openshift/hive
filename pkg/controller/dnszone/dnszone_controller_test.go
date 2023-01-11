@@ -196,7 +196,6 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
@@ -347,7 +346,6 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			err := setFakeDNSZoneInKube(mocks, tc.dnsZone)
 			require.NoError(t, err, "failed to create DNSZone into fake client")
@@ -482,7 +480,6 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
@@ -594,7 +591,6 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
@@ -1064,7 +1060,6 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 			zr.dnsZone = tc.dnsZone
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-			defer mocks.mockCtrl.Finish()
 
 			// Act
 			zr.SetConditionsForError(tc.error)

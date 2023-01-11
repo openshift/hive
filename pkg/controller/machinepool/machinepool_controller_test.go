@@ -773,7 +773,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			remoteFakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
 
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			mockActuator := mock.NewMockActuator(mockCtrl)
 			if test.generatedMachineSets != nil {

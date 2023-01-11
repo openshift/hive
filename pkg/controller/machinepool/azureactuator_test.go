@@ -257,7 +257,6 @@ func TestAzureActuator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			aClient := mockazure.NewMockClient(mockCtrl)
 

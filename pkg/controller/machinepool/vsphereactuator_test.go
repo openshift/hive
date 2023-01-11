@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,9 +42,6 @@ func TestVSphereActuator(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			machineapi.AddToScheme(scheme.Scheme)
-
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 
 			actuator, err := NewVSphereActuator(test.masterMachine, scheme.Scheme, log.WithField("actuator", "vsphereactuator_test"))
 			assert.NoError(t, err, "unexpected error creating VSphereActuator")

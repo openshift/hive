@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -169,9 +168,6 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 				),
 			)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
-
-			mockController := gomock.NewController(t)
-			defer mockController.Finish()
 
 			applier := &fakeApplier{}
 			r := &ReconcileControlPlaneCerts{

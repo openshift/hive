@@ -133,7 +133,6 @@ func TestAlibabaCloudStopAndStartMachines(t *testing.T) {
 			} else {
 				assert.Nil(t, err)
 			}
-			ctrl.Finish()
 		})
 	}
 

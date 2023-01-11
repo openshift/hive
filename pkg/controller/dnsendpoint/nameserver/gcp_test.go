@@ -167,7 +167,6 @@ func TestGCPGet(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
 			mockGCPClient := mock.NewMockClient(mockCtrl)
 			gcpQuery := &gcpQuery{
 				getGCPClient: func() (gcpclient.Client, error) {

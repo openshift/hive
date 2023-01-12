@@ -7,7 +7,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: checkpoints.hive.openshift.io
   spec:
@@ -75,17 +75,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterclaims.hive.openshift.io
   spec:
@@ -189,6 +183,7 @@ objects:
                     - kind
                     - name
                     type: object
+                    x-kubernetes-map-type: atomic
                   type: array
               required:
               - clusterPoolName
@@ -245,17 +240,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterdeploymentcustomizations.hive.openshift.io
   spec:
@@ -331,6 +320,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 clusterPoolRef:
                   description: ClusterPoolRef is the name of the current cluster pool
                     the CDC used at.
@@ -340,6 +330,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 conditions:
                   description: Conditions describes the state of the operator's reconciliation
                     functionality.
@@ -381,17 +372,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterdeployments.hive.openshift.io
   spec:
@@ -468,6 +453,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 certificateBundles:
                   description: CertificateBundles is a list of certificate bundles
                     associated with this cluster
@@ -487,6 +473,7 @@ objects:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       generate:
                         description: Generate indicates whether this bundle should
                           have real certificates generated for it.
@@ -534,6 +521,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     adminPasswordSecretRef:
                       description: AdminPasswordSecretRef references the secret containing
                         the admin username/password which can be used to login to
@@ -544,6 +532,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     clusterID:
                       description: ClusterID is a globally unique identifier for this
                         cluster generated during installation. Used for reporting
@@ -588,6 +577,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     namespace:
                       description: Namespace is the namespace where the ClusterPool
                         resides.
@@ -728,6 +718,7 @@ objects:
                               only "value". The requirements are ANDed.
                             type: object
                         type: object
+                        x-kubernetes-map-type: atomic
                       routeSelector:
                         description: RouteSelector allows filtering the set of Routes
                           serviced by the ingress controller
@@ -774,6 +765,7 @@ objects:
                               only "value". The requirements are ANDed.
                             type: object
                         type: object
+                        x-kubernetes-map-type: atomic
                       servingCertificate:
                         description: ServingCertificate references a CertificateBundle
                           in the ClusterDeployment.Spec that should be used for this
@@ -851,6 +843,7 @@ objects:
                                 contains only "value". The requirements are ANDed.
                               type: object
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - agentSelector
                       type: object
@@ -867,6 +860,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the Alibaba Cloud region where
                             the cluster will be created.
@@ -903,6 +897,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         privateLink:
                           description: PrivateLink allows uses to enable access to
                             the cluster's API server using AWS PrivateLink. AWS PrivateLink
@@ -959,6 +954,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the Azure region where the
                             cluster will be created.
@@ -983,6 +979,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - libvirtSSHPrivateKeySecretRef
                       type: object
@@ -999,6 +996,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the GCP region where the cluster
                             will be created.
@@ -1031,6 +1029,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the IBM Cloud region where
                             the cluster will be created.
@@ -1059,8 +1058,8 @@ objects:
                             \ to either \"/etc/openstack-ca/<key name containing the\
                             \ trust bundle in credentialsSecretRef Secret>\" or \"\
                             /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\". \n\
-                            \ For example, \"\"\"clouds.yaml clouds:   shiftstack:\
-                            \     auth: ...     cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"\
+                            \ For example, \"\"\"clouds.yaml clouds: shiftstack: auth:\
+                            \ ... cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"\
                             \ \"\"\""
                           properties:
                             name:
@@ -1068,6 +1067,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         cloud:
                           description: Cloud will be used to indicate the OS_CLOUD
                             value to use the right section from the clouds.yaml in
@@ -1082,6 +1082,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         trunkSupport:
                           description: TrunkSupport indicates whether or not to use
                             trunk ports in your OpenShift cluster.
@@ -1104,6 +1105,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         credentialsSecretRef:
                           description: 'CredentialsSecretRef refers to a secret that
                             contains the oVirt account access credentials with fields:
@@ -1114,6 +1116,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         ovirt_cluster_id:
                           description: The target cluster under which all VMs will
                             run
@@ -1147,6 +1150,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         cluster:
                           description: Cluster is the name of the cluster virtual
                             machines will be cloned into.
@@ -1161,6 +1165,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         datacenter:
                           description: Datacenter is the name of the datacenter to
                             use in the vCenter.
@@ -1231,6 +1236,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     installerEnv:
                       description: InstallerEnv are extra environment variables to
                         pass through to the installer. This may be used to enable
@@ -1278,6 +1284,7 @@ objects:
                                 required:
                                 - key
                                 type: object
+                                x-kubernetes-map-type: atomic
                               fieldRef:
                                 description: 'Selects a field of the pod: supports
                                   metadata.name, metadata.namespace, `metadata.labels[''<KEY>'']`,
@@ -1296,6 +1303,7 @@ objects:
                                 required:
                                 - fieldPath
                                 type: object
+                                x-kubernetes-map-type: atomic
                               resourceFieldRef:
                                 description: 'Selects a resource of the container:
                                   only resources limits and requests (limits.cpu,
@@ -1321,6 +1329,7 @@ objects:
                                 required:
                                 - resource
                                 type: object
+                                x-kubernetes-map-type: atomic
                               secretKeyRef:
                                 description: Selects a key of a secret in the pod's
                                   namespace
@@ -1342,6 +1351,7 @@ objects:
                                 required:
                                 - key
                                 type: object
+                                x-kubernetes-map-type: atomic
                             type: object
                         required:
                         - name
@@ -1363,6 +1373,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     manifestsSecretRef:
                       description: ManifestsSecretRef is a reference to user-provided
                         manifests to add to or replace manifests that are generated
@@ -1374,6 +1385,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     releaseImage:
                       description: ReleaseImage is the image containing metadata for
                         all components that run in the cluster, and is the primary
@@ -1403,6 +1415,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                   type: object
                 pullSecretRef:
                   description: PullSecretRef is the reference to the secret to use
@@ -1413,6 +1426,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
               required:
               - baseDomain
               - clusterName
@@ -1542,6 +1556,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 webConsoleURL:
                   description: WebConsoleURL is the URL for the cluster's web console
                     UI.
@@ -1552,17 +1567,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterdeprovisions.hive.openshift.io
   spec:
@@ -1645,6 +1654,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region is the Alibaba region for this deprovision
                           type: string
@@ -1680,6 +1690,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region is the AWS region for this deprovisioning
                           type: string
@@ -1710,6 +1721,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       type: object
                     gcp:
                       description: GCP contains GCP-specific deprovision settings
@@ -1723,6 +1735,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region is the GCP region for this deprovision
                           type: string
@@ -1745,6 +1758,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the IBM Cloud region
                           type: string
@@ -1767,6 +1781,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         cloud:
                           description: Cloud is the secion in the clouds.yaml secret
                             below to use for auth/connectivity.
@@ -1780,6 +1795,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - cloud
                       type: object
@@ -1796,6 +1812,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         clusterID:
                           description: The oVirt cluster ID
                           type: string
@@ -1809,6 +1826,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - certificatesSecretRef
                       - clusterID
@@ -1828,6 +1846,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         credentialsSecretRef:
                           description: CredentialsSecretRef is the vSphere account
                             credentials to use for deprovisioning the cluster
@@ -1837,6 +1856,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         vCenter:
                           description: VCenter is the vSphere vCenter hostname.
                           type: string
@@ -1899,17 +1919,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterimagesets.hive.openshift.io
   spec:
@@ -1963,17 +1977,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterpools.hive.openshift.io
   spec:
@@ -2125,6 +2133,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 inventory:
                   description: Inventory maintains a list of entries consumed by the
                     ClusterPool to customize the default ClusterDeployment.
@@ -2221,6 +2230,7 @@ objects:
                                 contains only "value". The requirements are ANDed.
                               type: object
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - agentSelector
                       type: object
@@ -2237,6 +2247,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the Alibaba Cloud region where
                             the cluster will be created.
@@ -2273,6 +2284,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         privateLink:
                           description: PrivateLink allows uses to enable access to
                             the cluster's API server using AWS PrivateLink. AWS PrivateLink
@@ -2329,6 +2341,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the Azure region where the
                             cluster will be created.
@@ -2353,6 +2366,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - libvirtSSHPrivateKeySecretRef
                       type: object
@@ -2369,6 +2383,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the GCP region where the cluster
                             will be created.
@@ -2401,6 +2416,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region specifies the IBM Cloud region where
                             the cluster will be created.
@@ -2429,8 +2445,8 @@ objects:
                             \ to either \"/etc/openstack-ca/<key name containing the\
                             \ trust bundle in credentialsSecretRef Secret>\" or \"\
                             /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\". \n\
-                            \ For example, \"\"\"clouds.yaml clouds:   shiftstack:\
-                            \     auth: ...     cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"\
+                            \ For example, \"\"\"clouds.yaml clouds: shiftstack: auth:\
+                            \ ... cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"\
                             \ \"\"\""
                           properties:
                             name:
@@ -2438,6 +2454,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         cloud:
                           description: Cloud will be used to indicate the OS_CLOUD
                             value to use the right section from the clouds.yaml in
@@ -2452,6 +2469,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         trunkSupport:
                           description: TrunkSupport indicates whether or not to use
                             trunk ports in your OpenShift cluster.
@@ -2474,6 +2492,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         credentialsSecretRef:
                           description: 'CredentialsSecretRef refers to a secret that
                             contains the oVirt account access credentials with fields:
@@ -2484,6 +2503,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         ovirt_cluster_id:
                           description: The target cluster under which all VMs will
                             run
@@ -2517,6 +2537,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         cluster:
                           description: Cluster is the name of the cluster virtual
                             machines will be cloned into.
@@ -2531,6 +2552,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         datacenter:
                           description: Datacenter is the name of the datacenter to
                             use in the vCenter.
@@ -2568,6 +2590,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 runningCount:
                   description: RunningCount is the number of clusters we should keep
                     running. The remainder will be kept hibernated until claimed.
@@ -2659,17 +2682,11 @@ objects:
           specReplicasPath: .spec.size
           statusReplicasPath: .status.size
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     labels:
       contracts.hive.openshift.io/clusterinstall: 'false'
@@ -2724,6 +2741,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 adminPasswordSecretRef:
                   description: AdminPasswordSecretRef references the secret containing
                     the admin username/password which can be used to login to this
@@ -2734,6 +2752,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 attempt:
                   description: Attempt is which attempt number of the cluster deployment
                     that this ClusterProvision is
@@ -2747,6 +2766,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 clusterID:
                   description: ClusterID is a globally unique identifier for this
                     cluster generated during installation. Used for reporting metrics
@@ -2834,23 +2854,18 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
               type: object
           type: object
       served: true
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterrelocates.hive.openshift.io
   spec:
@@ -2933,6 +2948,7 @@ objects:
                         are ANDed.
                       type: object
                   type: object
+                  x-kubernetes-map-type: atomic
                 kubeconfigSecretRef:
                   description: KubeconfigSecretRef is a reference to the secret containing
                     the kubeconfig for the destination Hive instance. The kubeconfig
@@ -2960,17 +2976,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clusterstates.hive.openshift.io
   spec:
@@ -3067,17 +3077,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clustersyncleases.hiveinternal.openshift.io
   spec:
@@ -3124,17 +3128,11 @@ objects:
           type: object
       served: true
       storage: true
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: clustersyncs.hiveinternal.openshift.io
   spec:
@@ -3380,17 +3378,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: dnszones.hive.openshift.io
   spec:
@@ -3470,6 +3462,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     region:
                       description: Region is the AWS region to use for route53 operations.
                         This defaults to us-east-1. For AWS China, use cn-northwest-1.
@@ -3501,6 +3494,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     resourceGroupName:
                       description: ResourceGroupName specifies the Azure resource
                         group in which the Hosted Zone should be created.
@@ -3524,6 +3518,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                   required:
                   - credentialsSecretRef
                   type: object
@@ -3623,17 +3618,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     labels:
       contracts.hive.openshift.io/clusterinstall: 'true'
@@ -3695,6 +3684,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     adminPasswordSecretRef:
                       description: AdminPasswordSecretRef references the secret containing
                         the admin username/password which can be used to login to
@@ -3705,6 +3695,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     clusterID:
                       description: ClusterID is a globally unique identifier for this
                         cluster generated during installation. Used for reporting
@@ -3784,17 +3775,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: hiveconfigs.hive.openshift.io
   spec:
@@ -3843,6 +3828,7 @@ objects:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   type: array
                 argoCDConfig:
                   description: ArgoCD specifies configuration for ArgoCD integration.
@@ -3865,10 +3851,10 @@ objects:
                   description: AWSPrivateLink defines the configuration for the aws-private-link
                     controller. It provides 3 major pieces of information required
                     by the controller, 1. The Credentials that should be used to create
-                    AWS PrivateLink resources other than     what exist in the customer's
+                    AWS PrivateLink resources other than what exist in the customer's
                     account. 2. A list of VPCs that can be used by the controller
-                    to choose one to create AWS VPC Endpoints     for the AWS VPC
-                    Endpoint Services created for ClusterDeployments in their     corresponding
+                    to choose one to create AWS VPC Endpoints for the AWS VPC Endpoint
+                    Services created for ClusterDeployments in their corresponding
                     regions. 3. A list of VPCs that should be able to resolve the
                     DNS addresses setup for Private Link.
                   properties:
@@ -3896,6 +3882,7 @@ objects:
                                   uid?'
                                 type: string
                             type: object
+                            x-kubernetes-map-type: atomic
                           region:
                             type: string
                           vpcID:
@@ -3915,6 +3902,7 @@ objects:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     dnsRecordType:
                       default: Alias
                       description: DNSRecordType defines what type of DNS record should
@@ -4157,7 +4145,7 @@ objects:
                             with AWS S3. It will need permission to upload logs to
                             S3. Secret should have keys named aws_access_key_id and
                             aws_secret_access_key that contain the AWS credentials.
-                            Example Secret:   data:     aws_access_key_id: minio     aws_secret_access_key:
+                            Example Secret: data: aws_access_key_id: minio aws_secret_access_key:
                             minio123'
                           properties:
                             name:
@@ -4165,6 +4153,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region is the AWS region to use for S3 operations.
                             This defaults to us-east-1. For AWS China, use cn-northwest-1.
@@ -4234,6 +4223,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 logLevel:
                   description: LogLevel is the level of logging to use for the Hive
                     controllers. Acceptable levels, from coarsest to finest, are panic,
@@ -4275,6 +4265,7 @@ objects:
                                   uid?'
                                 type: string
                             type: object
+                            x-kubernetes-map-type: atomic
                           region:
                             description: Region is the AWS region to use for route53
                               operations. This defaults to us-east-1. For AWS China,
@@ -4313,6 +4304,7 @@ objects:
                                   uid?'
                                 type: string
                             type: object
+                            x-kubernetes-map-type: atomic
                           resourceGroupName:
                             description: ResourceGroupName specifies the Azure resource
                               group containing the DNS zones for the domains being
@@ -4347,6 +4339,7 @@ objects:
                                   uid?'
                                 type: string
                             type: object
+                            x-kubernetes-map-type: atomic
                         required:
                         - credentialsSecretRef
                         type: object
@@ -4405,20 +4398,17 @@ objects:
                     \ more details. The keys within the config map in the data field\
                     \ define how verification is performed: \n verifier-public-key-*:\
                     \ One or more GPG public keys in ASCII form that must have signed\
-                    \ the                        release image by digest. \n store-*:\
-                    \ A URL (scheme file://, http://, or https://) location that contains\
-                    \ signatures. These          signatures are in the atomic container\
-                    \ signature format. The URL will have the digest          of the\
-                    \ image appended to it as \"<STORE>/<ALGO>=<DIGEST>/signature-<NUMBER>\"\
-                    \ as described          in the container image signing format.\
-                    \ The docker-image-manifest section of the          signature\
-                    \ must match the release image digest. Signatures are searched\
-                    \ starting at          NUMBER 1 and incrementing if the signature\
-                    \ exists but is not valid. The signature is a          GPG signed\
-                    \ and encrypted JSON message. The file store is provided for testing\
-                    \ only at          the current time, although future versions\
-                    \ of the CVO might allow host mounting of          signatures.\
-                    \ \n See https://github.com/containers/image/blob/ab49b0a48428c623a8f03b41b9083d48966b34a9/docs/signature-protocols.md\
+                    \ the release image by digest. \n store-*: A URL (scheme file://,\
+                    \ http://, or https://) location that contains signatures. These\
+                    \ signatures are in the atomic container signature format. The\
+                    \ URL will have the digest of the image appended to it as \"<STORE>/<ALGO>=<DIGEST>/signature-<NUMBER>\"\
+                    \ as described in the container image signing format. The docker-image-manifest\
+                    \ section of the signature must match the release image digest.\
+                    \ Signatures are searched starting at NUMBER 1 and incrementing\
+                    \ if the signature exists but is not valid. The signature is a\
+                    \ GPG signed and encrypted JSON message. The file store is provided\
+                    \ for testing only at the current time, although future versions\
+                    \ of the CVO might allow host mounting of signatures. \n See https://github.com/containers/image/blob/ab49b0a48428c623a8f03b41b9083d48966b34a9/docs/signature-protocols.md\
                     \ for a description of the signature store \n The returned verifier\
                     \ will require that any new release image will only be considered\
                     \ verified if each provided public key has signed the release\
@@ -4457,6 +4447,7 @@ objects:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       type: object
                   type: object
                 syncSetReapplyInterval:
@@ -4533,17 +4524,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: machinepoolnameleases.hive.openshift.io
   spec:
@@ -4599,17 +4584,11 @@ objects:
       served: true
       storage: true
       subresources: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: machinepools.hive.openshift.io
   spec:
@@ -4679,6 +4658,7 @@ objects:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 labels:
                   additionalProperties:
                     type: string
@@ -5236,17 +5216,11 @@ objects:
           specReplicasPath: .spec.replicas
           statusReplicasPath: .status.replicas
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: selectorsyncidentityproviders.hive.openshift.io
   spec:
@@ -5328,6 +5302,7 @@ objects:
                         are ANDed.
                       type: object
                   type: object
+                  x-kubernetes-map-type: atomic
                 identityProviders:
                   description: IdentityProviders is an ordered list of ways for a
                     user to identify themselves
@@ -5690,9 +5665,9 @@ objects:
                           insecure:
                             description: 'insecure, if true, indicates the connection
                               should not use TLS WARNING: Should not be set to `true`
-                              with the URL scheme "ldaps://" as "ldaps://" URLs always          attempt
-                              to connect using TLS, even when `insecure` is set to
-                              `true` When `true`, "ldap://" URLS connect insecurely.
+                              with the URL scheme "ldaps://" as "ldaps://" URLs always
+                              attempt to connect using TLS, even when `insecure` is
+                              set to `true` When `true`, "ldap://" URLS connect insecurely.
                               When `false`, "ldap://" URLs are upgraded to a TLS connection
                               using StartTLS as specified in https://tools.ietf.org/html/rfc2830.'
                             type: boolean
@@ -5711,7 +5686,7 @@ objects:
                           by this provider. - It MUST be unique and not shared by
                           any other identity provider used - It MUST be a valid path
                           segment: name cannot equal "." or ".." or contain "/" or
-                          "%" or ":"   Ref: https://godoc.org/github.com/openshift/origin/pkg/user/apis/user/validation#ValidateIdentityProviderName'
+                          "%" or ":" Ref: https://godoc.org/github.com/openshift/origin/pkg/user/apis/user/validation#ValidateIdentityProviderName'
                         type: string
                       openID:
                         description: openID enables user authentication using OpenID
@@ -5841,8 +5816,9 @@ objects:
                               /authorize requests to Unauthenticated requests from
                               OAuth clients which expect WWW-Authenticate challenges
                               will be redirected here. ${url} is replaced with the
-                              current URL, escaped to be safe in a query parameter   https://www.example.com/sso-login?then=${url}
-                              ${query} is replaced with the current query string   https://www.example.com/auth-proxy/oauth/authorize?${query}
+                              current URL, escaped to be safe in a query parameter
+                              https://www.example.com/sso-login?then=${url} ${query}
+                              is replaced with the current query string https://www.example.com/auth-proxy/oauth/authorize?${query}
                               Required when challenge is set to true.
                             type: string
                           clientCommonNames:
@@ -5870,8 +5846,8 @@ objects:
                               /authorize requests to Unauthenticated requests from
                               OAuth clients which expect interactive logins will be
                               redirected here ${url} is replaced with the current
-                              URL, escaped to be safe in a query parameter   https://www.example.com/sso-login?then=${url}
-                              ${query} is replaced with the current query string   https://www.example.com/auth-proxy/oauth/authorize?${query}
+                              URL, escaped to be safe in a query parameter https://www.example.com/sso-login?then=${url}
+                              ${query} is replaced with the current query string https://www.example.com/auth-proxy/oauth/authorize?${query}
                               Required when login is set to true.
                             type: string
                           nameHeaders:
@@ -5902,17 +5878,11 @@ objects:
           type: object
       served: true
       storage: true
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: selectorsyncsets.hive.openshift.io
   spec:
@@ -6012,6 +5982,7 @@ objects:
                         are ANDed.
                       type: object
                   type: object
+                  x-kubernetes-map-type: atomic
                 patches:
                   description: Patches is the list of patches to apply.
                   items:
@@ -6113,17 +6084,11 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: syncidentityproviders.hive.openshift.io
   spec:
@@ -6173,6 +6138,7 @@ objects:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   type: array
                 identityProviders:
                   description: IdentityProviders is an ordered list of ways for a
@@ -6536,9 +6502,9 @@ objects:
                           insecure:
                             description: 'insecure, if true, indicates the connection
                               should not use TLS WARNING: Should not be set to `true`
-                              with the URL scheme "ldaps://" as "ldaps://" URLs always          attempt
-                              to connect using TLS, even when `insecure` is set to
-                              `true` When `true`, "ldap://" URLS connect insecurely.
+                              with the URL scheme "ldaps://" as "ldaps://" URLs always
+                              attempt to connect using TLS, even when `insecure` is
+                              set to `true` When `true`, "ldap://" URLS connect insecurely.
                               When `false`, "ldap://" URLs are upgraded to a TLS connection
                               using StartTLS as specified in https://tools.ietf.org/html/rfc2830.'
                             type: boolean
@@ -6557,7 +6523,7 @@ objects:
                           by this provider. - It MUST be unique and not shared by
                           any other identity provider used - It MUST be a valid path
                           segment: name cannot equal "." or ".." or contain "/" or
-                          "%" or ":"   Ref: https://godoc.org/github.com/openshift/origin/pkg/user/apis/user/validation#ValidateIdentityProviderName'
+                          "%" or ":" Ref: https://godoc.org/github.com/openshift/origin/pkg/user/apis/user/validation#ValidateIdentityProviderName'
                         type: string
                       openID:
                         description: openID enables user authentication using OpenID
@@ -6687,8 +6653,9 @@ objects:
                               /authorize requests to Unauthenticated requests from
                               OAuth clients which expect WWW-Authenticate challenges
                               will be redirected here. ${url} is replaced with the
-                              current URL, escaped to be safe in a query parameter   https://www.example.com/sso-login?then=${url}
-                              ${query} is replaced with the current query string   https://www.example.com/auth-proxy/oauth/authorize?${query}
+                              current URL, escaped to be safe in a query parameter
+                              https://www.example.com/sso-login?then=${url} ${query}
+                              is replaced with the current query string https://www.example.com/auth-proxy/oauth/authorize?${query}
                               Required when challenge is set to true.
                             type: string
                           clientCommonNames:
@@ -6716,8 +6683,8 @@ objects:
                               /authorize requests to Unauthenticated requests from
                               OAuth clients which expect interactive logins will be
                               redirected here ${url} is replaced with the current
-                              URL, escaped to be safe in a query parameter   https://www.example.com/sso-login?then=${url}
-                              ${query} is replaced with the current query string   https://www.example.com/auth-proxy/oauth/authorize?${query}
+                              URL, escaped to be safe in a query parameter https://www.example.com/sso-login?then=${url}
+                              ${query} is replaced with the current query string https://www.example.com/auth-proxy/oauth/authorize?${query}
                               Required when login is set to true.
                             type: string
                           nameHeaders:
@@ -6749,17 +6716,11 @@ objects:
           type: object
       served: true
       storage: true
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: apiextensions.k8s.io/v1
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.6.0
+      controller-gen.kubebuilder.io/version: (devel)
     creationTimestamp: null
     name: syncsets.hive.openshift.io
   spec:
@@ -6827,6 +6788,7 @@ objects:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   type: array
                 patches:
                   description: Patches is the list of patches to apply.
@@ -6931,12 +6893,6 @@ objects:
       storage: true
       subresources:
         status: {}
-  status:
-    acceptedNames:
-      kind: ''
-      plural: ''
-    conditions: []
-    storedVersions: []
 - apiVersion: v1
   kind: ServiceAccount
   metadata:

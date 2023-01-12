@@ -294,6 +294,28 @@ spec:
                     description: ovnKubernetesConfig configures the ovn-kubernetes
                       plugin.
                     properties:
+                      egressIPConfig:
+                        description: egressIPConfig holds the configuration for EgressIP
+                          options.
+                        properties:
+                          reachabilityTotalTimeoutSeconds:
+                            description: reachabilityTotalTimeout configures the EgressIP
+                              node reachability check total timeout in seconds. If
+                              the EgressIP node cannot be reached within this timeout,
+                              the node is declared down. Setting a large value may
+                              cause the EgressIP feature to react slowly to node changes.
+                              In particular, it may react slowly for EgressIP nodes
+                              that really have a genuine problem and are unreachable.
+                              When omitted, this means the user has no opinion and
+                              the platform is left to choose a reasonable default,
+                              which is subject to change over time. The current default
+                              is 1 second. A value of 0 disables the EgressIP node's
+                              reachability check.
+                            format: int32
+                            maximum: 60
+                            minimum: 0
+                            type: integer
+                        type: object
                       gatewayConfig:
                         description: gatewayConfig holds the configuration for node
                           gateway options.
@@ -357,7 +379,6 @@ spec:
                         minimum: 0
                         type: integer
                       policyAuditConfig:
-                        default: {}
                         description: policyAuditConfig is the configuration for network
                           policy audit events. If unset, reported defaults are used.
                         properties:
@@ -396,6 +417,24 @@ spec:
                               messages, e.g. "kern". Default is "local0"
                             type: string
                         type: object
+                      v4InternalSubnet:
+                        description: v4InternalSubnet is a v4 subnet used internally
+                          by ovn-kubernetes in case the default one is being already
+                          used by something else. It must not overlap with any other
+                          subnet being used by OpenShift or by the node network. The
+                          size of the subnet must be larger than the number of nodes.
+                          The value cannot be changed after installation. Default
+                          is 100.64.0.0/16
+                        type: string
+                      v6InternalSubnet:
+                        description: v6InternalSubnet is a v6 subnet used internally
+                          by ovn-kubernetes in case the default one is being already
+                          used by something else. It must not overlap with any other
+                          subnet being used by OpenShift or by the node network. The
+                          size of the subnet must be larger than the number of nodes.
+                          The value cannot be changed after installation. Default
+                          is fd98::/48
+                        type: string
                     type: object
                   type:
                     description: type is the type of network All NetworkTypes are
@@ -520,6 +559,34 @@ spec:
                   migration. The migration procedure allows to change the network
                   type and the MTU.
                 properties:
+                  features:
+                    description: features contains the features migration configuration.
+                      Set this to migrate feature configuration when changing the
+                      cluster default network provider. if unset, the default operation
+                      is to migrate all the configuration of supported features.
+                    properties:
+                      egressFirewall:
+                        default: true
+                        description: egressFirewall specifies whether or not the Egress
+                          Firewall configuration is migrated automatically when changing
+                          the cluster default network provider. If unset, this property
+                          defaults to 'true' and Egress Firewall configure is migrated.
+                        type: boolean
+                      egressIP:
+                        default: true
+                        description: egressIP specifies whether or not the Egress
+                          IP configuration is migrated automatically when changing
+                          the cluster default network provider. If unset, this property
+                          defaults to 'true' and Egress IP configure is migrated.
+                        type: boolean
+                      multicast:
+                        default: true
+                        description: multicast specifies whether or not the multicast
+                          configuration is migrated automatically when changing the
+                          cluster default network provider. If unset, this property
+                          defaults to 'true' and multicast configure is migrated.
+                        type: boolean
+                    type: object
                   mtu:
                     description: mtu contains the MTU migration configuration. Set
                       this to allow changing the MTU values for the default network.

@@ -5,10 +5,11 @@ import (
 
 	"sort"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
+	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/gcp"
-
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -36,12 +37,19 @@ var (
 		"europe-west3":            "Frankfurt, Germany",
 		"europe-west4":            "Eemshaven, Netherlands",
 		"europe-west6":            "Zürich, Switzerland",
+		"europe-west8":            "Milan, Italy",
+		"europe-west9":            "Paris, France",
+		"europe-southwest1":       "Madrid, Spain",
+		"me-west1":                "Tel Aviv, Israel",
 		"northamerica-northeast1": "Montréal, Québec, Canada",
 		"northamerica-northeast2": "Toronto, Ontario, Canada",
 		"southamerica-east1":      "São Paulo, Brazil",
+		"southamerica-west1":      "Santiago, Chile",
 		"us-central1":             "Council Bluffs, Iowa, USA",
 		"us-east1":                "Moncks Corner, South Carolina, USA",
 		"us-east4":                "Ashburn, Virginia, USA",
+		"us-east5":                "Columbus, Ohio, USA",
+		"us-south1":               "Dallas, Texas, USA",
 		"us-west1":                "The Dalles, Oregon, USA",
 		"us-west2":                "Los Angeles, California, USA",
 		"us-west3":                "Salt Lake City, Utah, USA",
@@ -60,7 +68,7 @@ var (
 )
 
 // ValidatePlatform checks that the specified platform is valid.
-func ValidatePlatform(p *gcp.Platform, fldPath *field.Path) field.ErrorList {
+func ValidatePlatform(p *gcp.Platform, fldPath *field.Path, ic *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if p.Region == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("region"), "must provide a region"))
@@ -68,6 +76,15 @@ func ValidatePlatform(p *gcp.Platform, fldPath *field.Path) field.ErrorList {
 	if p.DefaultMachinePlatform != nil {
 		allErrs = append(allErrs, ValidateMachinePool(p, p.DefaultMachinePlatform, fldPath.Child("defaultMachinePlatform"))...)
 		allErrs = append(allErrs, ValidateDefaultDiskType(p.DefaultMachinePlatform, fldPath.Child("defaultMachinePlatform"))...)
+	}
+	if p.NetworkProjectID != "" {
+		if p.Network == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("network"), "must provide a network when a networkProjectID is specified"))
+		}
+		if ic.CredentialsMode != types.ManualCredentialsMode && ic.CredentialsMode != types.PassthroughCredentialsMode {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("credentialsMode"),
+				ic.CredentialsMode, []string{string(types.ManualCredentialsMode), string(types.PassthroughCredentialsMode)}))
+		}
 	}
 	if p.Network != "" {
 		if p.ComputeSubnet == "" {
@@ -77,6 +94,14 @@ func ValidatePlatform(p *gcp.Platform, fldPath *field.Path) field.ErrorList {
 			allErrs = append(allErrs, field.Required(fldPath.Child("controlPlaneSubnet"), "must provide a control plane subnet when a network is specified"))
 		}
 	}
+
+	if p.CreateFirewallRules != "" {
+		validCreateFirewallRules := sets.NewString(string(gcp.CreateFirewallRulesEnabled), string(gcp.CreateFirewallRulesDisabled))
+		if !validCreateFirewallRules.Has(string(p.CreateFirewallRules)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("createFirewallRules"), p.CreateFirewallRules, validCreateFirewallRules.List()))
+		}
+	}
+
 	if (p.ComputeSubnet != "" || p.ControlPlaneSubnet != "") && p.Network == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("network"), "must provide a VPC network when supplying subnets"))
 	}

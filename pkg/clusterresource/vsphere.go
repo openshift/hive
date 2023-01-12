@@ -142,8 +142,8 @@ func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installer
 			DefaultDatastore: p.DefaultDatastore,
 			Folder:           p.Folder,
 			Cluster:          p.Cluster,
-			APIVIP:           p.APIVIP,
-			IngressVIP:       p.IngressVIP,
+			APIVIPs:          []string{p.APIVIP},
+			IngressVIPs:      []string{p.IngressVIP},
 			Network:          p.Network,
 		},
 	}

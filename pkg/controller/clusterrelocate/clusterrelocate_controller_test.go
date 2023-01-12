@@ -88,11 +88,12 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 	namespaceBuilder := testnamespace.FullBuilder(namespace, scheme)
 
 	cases := []struct {
-		name              string
-		cd                *hivev1.ClusterDeployment
-		srcResources      []runtime.Object
-		destResources     []runtime.Object
-		expectedResources []client.Object
+		name                string
+		cd                  *hivev1.ClusterDeployment
+		srcResources        []runtime.Object
+		destResources       []runtime.Object
+		expectedResources   []client.Object
+		unexpectedResources []client.Object
 	}{
 		{
 			name: "no relocation",
@@ -395,6 +396,12 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
 				),
 			},
+			unexpectedResources: []client.Object{
+				secretBuilder.Build(
+					testsecret.WithType(corev1.SecretTypeServiceAccountToken),
+					testsecret.WithDataKeyValue("test-key", []byte("test-data")),
+				),
+			},
 		},
 		{
 			name: "ignore secret owned by service account token",
@@ -424,6 +431,56 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				namespaceBuilder.Build(),
 				cdBuilder.Build(
 					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
+				),
+			},
+			unexpectedResources: []client.Object{
+				secretBuilder.Build(
+					testsecret.Generic(testgeneric.WithName("test-sa-token")),
+					testsecret.WithType(corev1.SecretTypeServiceAccountToken),
+					testsecret.WithDataKeyValue("test-key-sa-token", []byte("test-data-sa-token")),
+				),
+				secretBuilder.Build(
+					testsecret.Generic(testgeneric.WithName("test-dockercfg")),
+					testsecret.WithDataKeyValue("test-key-dockercfg", []byte("test-data-dockercfg")),
+					func(secret *corev1.Secret) {
+						secret.OwnerReferences = append(secret.OwnerReferences, metav1.OwnerReference{
+							Kind: "Secret",
+							Name: "test-sa-token",
+						})
+					},
+				),
+			},
+		},
+		{
+			name: "ignore kube-controller-manager crt configmaps",
+			cd: cdBuilder.Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				Type:   hivev1.RelocationFailedCondition,
+				Status: corev1.ConditionUnknown,
+			})),
+			srcResources: []runtime.Object{
+				crBuilder.Build(),
+				cmBuilder.Build(
+					testcm.WithName("kube-root-ca.crt"),
+				),
+				cmBuilder.Build(
+					testcm.WithName("openshift-service-ca.crt"),
+				),
+				// make sure a normal one is copied
+				cmBuilder.Build(),
+			},
+			expectedResources: []client.Object{
+				namespaceBuilder.Build(),
+				cdBuilder.Build(
+					testcd.Generic(withRelocateAnnotation(crName, hivev1.RelocateIncoming)),
+				),
+				cmBuilder.Build(),
+			},
+			unexpectedResources: []client.Object{
+				cmBuilder.Build(
+					testcm.WithName("kube-root-ca.crt"),
+				),
+				cmBuilder.Build(
+					testcm.WithName("openshift-service-ca.crt"),
 				),
 			},
 		},
@@ -798,6 +855,14 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 					continue
 				}
 				assert.Equal(t, obj, destObj, "destination object different than expected object")
+			}
+			for _, obj := range tc.unexpectedResources {
+				objKey := client.ObjectKeyFromObject(obj)
+				destObj := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(client.Object)
+				err = destClient.Get(context.Background(), objKey, destObj)
+				if assert.Error(t, err, "expected error getting destination object") {
+					assert.True(t, apierrors.IsNotFound(err), "expected error to be 'not found'")
+				}
 			}
 		})
 	}

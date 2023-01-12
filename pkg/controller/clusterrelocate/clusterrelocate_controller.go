@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -64,6 +65,10 @@ var (
 		Name: "hive_aborted_cluster_relocations",
 		Help: "Total number of aborted cluster relocations.",
 	}, []string{"cluster_relocate", "reason"})
+
+	// HIVE-2080: Ignore (do not copy) ConfigMaps laid down by the kube-controller-manager
+	// in every namespace.
+	ignoreConfigMapNames = sets.NewString("kube-root-ca.crt", "openshift-service-ca.crt")
 )
 
 func init() {
@@ -755,11 +760,17 @@ func replaceOutgoingToIncoming(obj hivev1.MetaRuntimeObject) error {
 // resource will not be copied.
 func (r *ReconcileClusterRelocate) ignoreResource(obj runtime.Object, logger log.FieldLogger) (bool, error) {
 	switch t := obj.(type) {
+	case *corev1.ConfigMap:
+		return r.ignoreConfigMap(t, logger)
 	case *corev1.Secret:
 		return r.ignoreSecret(t, logger)
 	default:
 		return false, nil
 	}
+}
+
+func (r *ReconcileClusterRelocate) ignoreConfigMap(cm *corev1.ConfigMap, logger log.FieldLogger) (bool, error) {
+	return ignoreConfigMapNames.Has(cm.Name), nil
 }
 
 // ignoreSecret determines whether a secret should be ignored during a copy to a destination cluster. An ignored

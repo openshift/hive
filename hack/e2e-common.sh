@@ -278,7 +278,8 @@ function capture_cluster_logs() {
 
 function wait_for_hibernation_state() {
   local CLUSTER_NAME=$1
-  local EXPECTED_STATE=$2
+  local CLUSTER_NAMESPACE=$2
+  local EXPECTED_STATE=$3
   echo "Waiting for ClusterDeployment $CLUSTER_NAME to be $EXPECTED_STATE"
   local i=1
   while [[ $i -le ${max_tries} ]]; do
@@ -288,7 +289,7 @@ function wait_for_hibernation_state() {
       sleep ${sleep_between_tries}
     fi
 
-    powerState=$(oc get cd -n $CLUSTER_NAME $CLUSTER_NAME -o json | jq -r '.status.powerState')
+    powerState=$(oc get cd -n $CLUSTER_NAMESPACE $CLUSTER_NAME -o json | jq -r '.status.powerState')
     if [[ "${powerState}" == $EXPECTED_STATE ]]; then
       echo "Success"
       break
@@ -303,13 +304,6 @@ function wait_for_hibernation_state() {
     # Failed the maximum amount of times.
     echo "ClusterDeployment $CLUSTER_NAME still not $EXPECTED_STATE" >&2
     echo "Actual state: ${powerState}" >&2
-    return 9
-  fi
-}
-
-function wait_for_hibernation_state_or_exit() {
-  rc=$(wait_for_hibernation_state $cd Hibernating; echo $?)
-  if [[ $rc != 0 ]]; then
-    exit $rc
+    exit 9
   fi
 }

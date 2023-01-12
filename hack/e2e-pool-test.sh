@@ -229,7 +229,7 @@ fi
 ## Test hibernating fake cluster
 echo "Hibernating fake cluster"
 set_power_state $cd Hibernating
-wait_for_hibernation_state_or_exit $cd Hibernating
+wait_for_hibernation_state $cd $cd Hibernating
 installed=$(oc get cd -n $cd $cd -o json | jq -r '.status.installedTimestamp')
 hibernated=$(oc get cd -n $cd $cd -o json | jq -r '.status.conditions[] | select(.type=="Hibernating") | .lastTransitionTime')
 delta_seconds=$((`date -d "$hibernated" +%s`-`date -d "$installed" +%s`))
@@ -276,22 +276,22 @@ verify_cluster_name $REAL_POOL_NAME "cdc-test" $NEW_CLUSTER_NAME
 #       sure that's the one that gets claimed for the meat of this test.
 CLUSTER_NAME=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'$REAL_POOL_NAME'") | .metadata.name')
 
-wait_for_hibernation_state_or_exit $CLUSTER_NAME Hibernating
+wait_for_hibernation_state $CLUSTER_NAME $CLUSTER_NAME Hibernating
 
 echo "Claiming"
 CLAIM_NAME=the-claim
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool claim -n $CLUSTER_NAMESPACE $REAL_POOL_NAME $CLAIM_NAME
 
-wait_for_hibernation_state_or_exit $CLUSTER_NAME Running
+wait_for_hibernation_state $CLUSTER_NAME $CLUSTER_NAME Running
 
 echo "Re-hibernating"
 set_power_state $CLUSTER_NAME Hibernating
 
-wait_for_hibernation_state_or_exit $CLUSTER_NAME Hibernating
+wait_for_hibernation_state $CLUSTER_NAME $CLUSTER_NAME Hibernating
 
 echo "Re-resuming"
 set_power_state $CLUSTER_NAME Running
 
-wait_for_hibernation_state_or_exit $CLUSTER_NAME Running
+wait_for_hibernation_state $CLUSTER_NAME $CLUSTER_NAME Running
 
 # Let the cleanup trap do the cleanup.

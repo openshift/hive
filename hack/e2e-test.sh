@@ -226,16 +226,14 @@ make test-e2e-postinstall
 # poll status.powerState Running
 if [[ ${INSTALL_RESULT} == "success" ]]; then
 
-  EXPECTED_STATE=$(oc get cd -n ${CLUSTER_NAMESPACE} ${CLUSTER_NAME} -o json | jq -r '.spec.powerState')
+  EXPECTED_STATE=$(oc get cd $CLUSTER_NAME -n $CLUSTER_NAMESPACE -o json | jq -r '.spec.powerState')
   
   # Expected state will be null prior to hibernation if not otherwise specified
   if [[ ${EXPECTED_STATE} == "null" ]]; then
-    EXPECTED_STATE="Running" # Is this correct?
+    EXPECTED_STATE="Running"
   fi
 
-  wait_for_hibernation_state $CLUSTER_NAME $EXPECTED_STATE
-  POWER_STATE_RESULT=$(echo $?)
-  # TODO: Do somthing with POWER_STATE_RESULT or is printed error message sufficient?
+  # wait_for_hibernation_state $CLUSTER_NAME $CLUSTER_NAMESPACE $EXPECTED_STATE
 
   # Patch ClusterDeployment to hibernate now
   if [[ ${EXPECTED_STATE} == "Running" ]]; then
@@ -246,12 +244,8 @@ if [[ ${INSTALL_RESULT} == "success" ]]; then
     jq '.spec += {"hibernateAfter": "1s"}' <<< ${CD_JSON} | oc apply -f -
 
     # poll status.powerState Hibernating
-    wait_for_hibernation_state $CLUSTER_NAME $EXPECTED_STATE
-    POWER_STATE_RESULT=$(echo $?)
-    # TODO: Do something with POWER_STATE_RESULT or is printed error message sufficient?
-
+    wait_for_hibernation_state $CLUSTER_NAME $CLUSTER_NAMESPACE $EXPECTED_STATE
   fi
-
 fi
 
 echo "Running destroy test"

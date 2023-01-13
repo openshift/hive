@@ -1203,11 +1203,7 @@ If the cluster you are looking to adopt is on AWS and leverages Privatelink, you
       region: us-east-1
 ```      
 
-It's also important to include any other configurations that may be in place in the original clusters' ClusterDeployment, such as `certificateBundles` settings or `controlPlaneConfig` settings as these are leveraged by certman-operator if in use. It's a good idea to compare your adoption manifest to your existing ClusterDeployment manifest. Any new secret refs added to your adoption manifest will require correlating secrets to live on the adopting cluster in the correct namespace.
-
 ### Adopting with hiveutil
-
-_NOTE: If you have any customizations outside of the sample manfiest (Privatelink, certificate configurations), the `hiveutil` method may not encompass all those._
 
 [hiveutil](hiveutil.md) is a development focused CLI tool which can be built from the hive repo. To adopt a cluster specify the following flags:
 

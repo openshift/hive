@@ -80,7 +80,7 @@ A Kubernetes or OpenShift cluster is required to run Hive from source. If you wo
 
 [Kind](https://github.com/kubernetes-sigs/kind) can be used as a lightweight development environment for deploying and testing Hive. Currently, we support 0.8.1 version of Kind. The following instructions cover creating an insecure local registry (allowing for dramatically faster push/pull), and configuring your host OS, as well as the kind cluster to access it. This approch runs Hive in a container as you would in production, giving you the best coverage for manual testing.
 
-This approach requires [Docker](https://docs.docker.com/install).
+This approach requires either [Podman](https://podman.io/) or [Docker](https://docs.docker.com/install).
 
 If you encounter ImagePullErrors, and your kind container cannot reach your registry container, you may be experiencing problems with Fedora (at least 32, possibly earlier as well) and Docker. You can attempt to work around this by changing the FirewallBackend in the /etc/firewalld/firewalld.conf file from nftables to iptables and restarting docker. (see [this comment](https://github.com/kubernetes-sigs/kind/issues/1547#issuecomment-623756313)
 
@@ -89,18 +89,13 @@ Create a local insecure registry (if one does not already exist) and then a kind
 
 ```bash
 ./hack/create-kind-cluster.sh hive
+export KUBECONFIG=~/.kube/kind-hive.kubeconfig
 ```
 
-NOTE:  The following error will occur the first time you create your registry container, it is harmless and can be safely ignored.
-
-```
-Error response from daemon: container fcca36a26da5601d6453c0c53ab5909eb6ca8ffe42de0f8634dd7213f107cef0 is not connected to network kind
-```
-
-`docker ps` should now show you a "registry" and a "hive" container running.
+`podman ps` or `docker ps` should now show you a "registry" and a "hive" container running.
 
 ```bash
-$ docker ps
+$ podman ps
 CONTAINER ID        IMAGE                  COMMAND                  CREATED             STATUS              PORTS                       NAMES
 ffddd07cd9e1        kindest/node:v1.18.2   "/usr/local/bin/entr…"   32 minutes ago      Up 32 minutes       127.0.0.1:36933->6443/tcp   hive-control-plane
 8060ab7c8116        registry:2             "/entrypoint.sh /etc…"   2 days ago          Up 2 days           0.0.0.0:5000->5000/tcp      kind-registry
@@ -136,6 +131,14 @@ The most resilient method of deploying Hive is to build and publish a container 
 
 This method is quite slow, but reliable.
 
+Podman:
+```bash
+export IMG="quay.io/{username}/hive:latest"
+make buildah-dev-push deploy
+oc delete pods -n hive --all
+```
+
+Docker:
 ```bash
 export IMG="quay.io/{username}/hive:latest"
 make image-hive docker-push deploy
@@ -515,5 +518,3 @@ Display some text data on the snapshot:
 ```bash
 $ go tool pprof --text cpu.pprof
 ```
-
-

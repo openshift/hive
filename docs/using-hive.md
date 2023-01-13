@@ -112,7 +112,7 @@ type: kubernetes.io/dockerconfigjson
 ```
 
 ```bash
-oc edit hiveconfig hive
+oc patch hiveconfig hive --type=merge --patch '{"spec": {"globalPullSecretRef": {"name": "global-pull-secret"}}}'
 ```
 
 ```yaml

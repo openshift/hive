@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: hiveconfigs.hive.openshift.io
 spec:
@@ -50,6 +50,7 @@ spec:
                         TODO: Add other useful fields. apiVersion, kind, uid?'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 type: array
               argoCDConfig:
                 description: ArgoCD specifies configuration for ArgoCD integration.
@@ -72,12 +73,12 @@ spec:
                 description: AWSPrivateLink defines the configuration for the aws-private-link
                   controller. It provides 3 major pieces of information required by
                   the controller, 1. The Credentials that should be used to create
-                  AWS PrivateLink resources other than     what exist in the customer's
+                  AWS PrivateLink resources other than what exist in the customer's
                   account. 2. A list of VPCs that can be used by the controller to
-                  choose one to create AWS VPC Endpoints     for the AWS VPC Endpoint
-                  Services created for ClusterDeployments in their     corresponding
-                  regions. 3. A list of VPCs that should be able to resolve the DNS
-                  addresses setup for Private Link.
+                  choose one to create AWS VPC Endpoints for the AWS VPC Endpoint
+                  Services created for ClusterDeployments in their corresponding regions.
+                  3. A list of VPCs that should be able to resolve the DNS addresses
+                  setup for Private Link.
                 properties:
                   associatedVPCs:
                     description: "AssociatedVPCs is the list of VPCs that should be
@@ -102,6 +103,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           type: string
                         vpcID:
@@ -121,6 +123,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   dnsRecordType:
                     default: Alias
                     description: DNSRecordType defines what type of DNS record should
@@ -360,14 +363,15 @@ spec:
                           the TargetNamespace that will be used to authenticate with
                           AWS S3. It will need permission to upload logs to S3. Secret
                           should have keys named aws_access_key_id and aws_secret_access_key
-                          that contain the AWS credentials. Example Secret:   data:     aws_access_key_id:
-                          minio     aws_secret_access_key: minio123'
+                          that contain the AWS credentials. Example Secret: data:
+                          aws_access_key_id: minio aws_secret_access_key: minio123'
                         properties:
                           name:
                             description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region is the AWS region to use for S3 operations.
                           This defaults to us-east-1. For AWS China, use cn-northwest-1.
@@ -435,6 +439,7 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+                x-kubernetes-map-type: atomic
               logLevel:
                 description: LogLevel is the level of logging to use for the Hive
                   controllers. Acceptable levels, from coarsest to finest, are panic,
@@ -475,6 +480,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         region:
                           description: Region is the AWS region to use for route53
                             operations. This defaults to us-east-1. For AWS China,
@@ -511,6 +517,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                         resourceGroupName:
                           description: ResourceGroupName specifies the Azure resource
                             group containing the DNS zones for the domains being managed.
@@ -543,6 +550,7 @@ spec:
                                 TODO: Add other useful fields. apiVersion, kind, uid?'
                               type: string
                           type: object
+                          x-kubernetes-map-type: atomic
                       required:
                       - credentialsSecretRef
                       type: object
@@ -599,19 +607,18 @@ spec:
                   \n See https://github.com/openshift/cluster-update-keys for more
                   details. The keys within the config map in the data field define
                   how verification is performed: \n verifier-public-key-*: One or
-                  more GPG public keys in ASCII form that must have signed the                        release
+                  more GPG public keys in ASCII form that must have signed the release
                   image by digest. \n store-*: A URL (scheme file://, http://, or
-                  https://) location that contains signatures. These          signatures
-                  are in the atomic container signature format. The URL will have
-                  the digest          of the image appended to it as \"<STORE>/<ALGO>=<DIGEST>/signature-<NUMBER>\"
-                  as described          in the container image signing format. The
-                  docker-image-manifest section of the          signature must match
-                  the release image digest. Signatures are searched starting at          NUMBER
-                  1 and incrementing if the signature exists but is not valid. The
-                  signature is a          GPG signed and encrypted JSON message. The
-                  file store is provided for testing only at          the current
-                  time, although future versions of the CVO might allow host mounting
-                  of          signatures. \n See https://github.com/containers/image/blob/ab49b0a48428c623a8f03b41b9083d48966b34a9/docs/signature-protocols.md
+                  https://) location that contains signatures. These signatures are
+                  in the atomic container signature format. The URL will have the
+                  digest of the image appended to it as \"<STORE>/<ALGO>=<DIGEST>/signature-<NUMBER>\"
+                  as described in the container image signing format. The docker-image-manifest
+                  section of the signature must match the release image digest. Signatures
+                  are searched starting at NUMBER 1 and incrementing if the signature
+                  exists but is not valid. The signature is a GPG signed and encrypted
+                  JSON message. The file store is provided for testing only at the
+                  current time, although future versions of the CVO might allow host
+                  mounting of signatures. \n See https://github.com/containers/image/blob/ab49b0a48428c623a8f03b41b9083d48966b34a9/docs/signature-protocols.md
                   for a description of the signature store \n The returned verifier
                   will require that any new release image will only be considered
                   verified if each provided public key has signed the release image
@@ -649,6 +656,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                     type: object
                 type: object
               syncSetReapplyInterval:
@@ -724,9 +732,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

@@ -1855,6 +1855,10 @@ type EC2API interface {
 	GetInstanceTypesFromInstanceRequirementsPages(*ec2.GetInstanceTypesFromInstanceRequirementsInput, func(*ec2.GetInstanceTypesFromInstanceRequirementsOutput, bool) bool) error
 	GetInstanceTypesFromInstanceRequirementsPagesWithContext(aws.Context, *ec2.GetInstanceTypesFromInstanceRequirementsInput, func(*ec2.GetInstanceTypesFromInstanceRequirementsOutput, bool) bool, ...request.Option) error
 
+	GetInstanceUefiData(*ec2.GetInstanceUefiDataInput) (*ec2.GetInstanceUefiDataOutput, error)
+	GetInstanceUefiDataWithContext(aws.Context, *ec2.GetInstanceUefiDataInput, ...request.Option) (*ec2.GetInstanceUefiDataOutput, error)
+	GetInstanceUefiDataRequest(*ec2.GetInstanceUefiDataInput) (*request.Request, *ec2.GetInstanceUefiDataOutput)
+
 	GetIpamAddressHistory(*ec2.GetIpamAddressHistoryInput) (*ec2.GetIpamAddressHistoryOutput, error)
 	GetIpamAddressHistoryWithContext(aws.Context, *ec2.GetIpamAddressHistoryInput, ...request.Option) (*ec2.GetIpamAddressHistoryOutput, error)
 	GetIpamAddressHistoryRequest(*ec2.GetIpamAddressHistoryInput) (*request.Request, *ec2.GetIpamAddressHistoryOutput)
@@ -2087,6 +2091,10 @@ type EC2API interface {
 	ModifyInstanceEventWindow(*ec2.ModifyInstanceEventWindowInput) (*ec2.ModifyInstanceEventWindowOutput, error)
 	ModifyInstanceEventWindowWithContext(aws.Context, *ec2.ModifyInstanceEventWindowInput, ...request.Option) (*ec2.ModifyInstanceEventWindowOutput, error)
 	ModifyInstanceEventWindowRequest(*ec2.ModifyInstanceEventWindowInput) (*request.Request, *ec2.ModifyInstanceEventWindowOutput)
+
+	ModifyInstanceMaintenanceOptions(*ec2.ModifyInstanceMaintenanceOptionsInput) (*ec2.ModifyInstanceMaintenanceOptionsOutput, error)
+	ModifyInstanceMaintenanceOptionsWithContext(aws.Context, *ec2.ModifyInstanceMaintenanceOptionsInput, ...request.Option) (*ec2.ModifyInstanceMaintenanceOptionsOutput, error)
+	ModifyInstanceMaintenanceOptionsRequest(*ec2.ModifyInstanceMaintenanceOptionsInput) (*request.Request, *ec2.ModifyInstanceMaintenanceOptionsOutput)
 
 	ModifyInstanceMetadataOptions(*ec2.ModifyInstanceMetadataOptionsInput) (*ec2.ModifyInstanceMetadataOptionsOutput, error)
 	ModifyInstanceMetadataOptionsWithContext(aws.Context, *ec2.ModifyInstanceMetadataOptionsInput, ...request.Option) (*ec2.ModifyInstanceMetadataOptionsOutput, error)
@@ -2548,6 +2556,9 @@ type EC2API interface {
 
 	WaitUntilNatGatewayAvailable(*ec2.DescribeNatGatewaysInput) error
 	WaitUntilNatGatewayAvailableWithContext(aws.Context, *ec2.DescribeNatGatewaysInput, ...request.WaiterOption) error
+
+	WaitUntilNatGatewayDeleted(*ec2.DescribeNatGatewaysInput) error
+	WaitUntilNatGatewayDeletedWithContext(aws.Context, *ec2.DescribeNatGatewaysInput, ...request.WaiterOption) error
 
 	WaitUntilNetworkInterfaceAvailable(*ec2.DescribeNetworkInterfacesInput) error
 	WaitUntilNetworkInterfaceAvailableWithContext(aws.Context, *ec2.DescribeNetworkInterfacesInput, ...request.WaiterOption) error

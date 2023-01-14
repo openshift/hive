@@ -41,9 +41,9 @@ func TestAlibabaCloudActuator(t *testing.T) {
 				mockGetAvailableZonesByInstanceType(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testAlibabaInstanceType)
 			},
 			expectedMachineSetReplicas: map[string]int32{
-				generateAlibabaCloudMachineSetName("worker", "1"): 1,
-				generateAlibabaCloudMachineSetName("worker", "2"): 1,
-				generateAlibabaCloudMachineSetName("worker", "3"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "1"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "2"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "3"): 1,
 			},
 		},
 		{
@@ -55,9 +55,9 @@ func TestAlibabaCloudActuator(t *testing.T) {
 				return p
 			}(),
 			expectedMachineSetReplicas: map[string]int32{
-				generateAlibabaCloudMachineSetName("worker", "A"): 1,
-				generateAlibabaCloudMachineSetName("worker", "B"): 1,
-				generateAlibabaCloudMachineSetName("worker", "C"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "A"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "B"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "C"): 1,
 			},
 		},
 		{
@@ -84,9 +84,9 @@ func TestAlibabaCloudActuator(t *testing.T) {
 				mockGetAvailableZonesByInstanceType(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testAlibabaInstanceType)
 			},
 			expectedMachineSetReplicas: map[string]int32{
-				generateAlibabaCloudMachineSetName("worker", "1"): 1,
-				generateAlibabaCloudMachineSetName("worker", "2"): 1,
-				generateAlibabaCloudMachineSetName("worker", "3"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "1"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "2"): 1,
+				generateAlibabaCloudMachineSetName("worker-test-region", "3"): 1,
 			},
 		},
 	}

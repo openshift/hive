@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: clusterdeployments.hive.openshift.io
 spec:
@@ -77,6 +77,7 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+                x-kubernetes-map-type: atomic
               certificateBundles:
                 description: CertificateBundles is a list of certificate bundles associated
                   with this cluster
@@ -96,6 +97,7 @@ spec:
                             TODO: Add other useful fields. apiVersion, kind, uid?'
                           type: string
                       type: object
+                      x-kubernetes-map-type: atomic
                     generate:
                       description: Generate indicates whether this bundle should have
                         real certificates generated for it.
@@ -143,6 +145,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   adminPasswordSecretRef:
                     description: AdminPasswordSecretRef references the secret containing
                       the admin username/password which can be used to login to this
@@ -153,6 +156,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   clusterID:
                     description: ClusterID is a globally unique identifier for this
                       cluster generated during installation. Used for reporting metrics
@@ -197,6 +201,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   namespace:
                     description: Namespace is the namespace where the ClusterPool
                       resides.
@@ -346,6 +351,7 @@ spec:
                             only "value". The requirements are ANDed.
                           type: object
                       type: object
+                      x-kubernetes-map-type: atomic
                     routeSelector:
                       description: RouteSelector allows filtering the set of Routes
                         serviced by the ingress controller
@@ -391,6 +397,7 @@ spec:
                             only "value". The requirements are ANDed.
                           type: object
                       type: object
+                      x-kubernetes-map-type: atomic
                     servingCertificate:
                       description: ServingCertificate references a CertificateBundle
                         in the ClusterDeployment.Spec that should be used for this
@@ -468,6 +475,7 @@ spec:
                               only "value". The requirements are ANDed.
                             type: object
                         type: object
+                        x-kubernetes-map-type: atomic
                     required:
                     - agentSelector
                     type: object
@@ -484,6 +492,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the Alibaba Cloud region where
                           the cluster will be created.
@@ -520,6 +529,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       privateLink:
                         description: PrivateLink allows uses to enable access to the
                           cluster's API server using AWS PrivateLink. AWS PrivateLink
@@ -583,6 +593,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the Azure region where the cluster
                           will be created.
@@ -607,6 +618,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                     required:
                     - libvirtSSHPrivateKeySecretRef
                     type: object
@@ -623,6 +635,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the GCP region where the cluster
                           will be created.
@@ -655,6 +668,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the IBM Cloud region where the
                           cluster will be created.
@@ -682,8 +696,8 @@ spec:
                           file must set the \"cacert\" field to either \"/etc/openstack-ca/<key
                           name containing the trust bundle in credentialsSecretRef
                           Secret>\" or \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\".
-                          \n For example, \"\"\"clouds.yaml clouds:   shiftstack:
-                          \    auth: ...     cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"
+                          \n For example, \"\"\"clouds.yaml clouds: shiftstack: auth:
+                          ... cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"
                           \"\"\""
                         properties:
                           name:
@@ -691,6 +705,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       cloud:
                         description: Cloud will be used to indicate the OS_CLOUD value
                           to use the right section from the clouds.yaml in the CredentialsSecretRef.
@@ -704,6 +719,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       trunkSupport:
                         description: TrunkSupport indicates whether or not to use
                           trunk ports in your OpenShift cluster.
@@ -726,6 +742,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       credentialsSecretRef:
                         description: 'CredentialsSecretRef refers to a secret that
                           contains the oVirt account access credentials with fields:
@@ -736,6 +753,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       ovirt_cluster_id:
                         description: The target cluster under which all VMs will run
                         type: string
@@ -768,6 +786,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       cluster:
                         description: Cluster is the name of the cluster virtual machines
                           will be cloned into.
@@ -782,6 +801,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       datacenter:
                         description: Datacenter is the name of the datacenter to use
                           in the vCenter.
@@ -852,6 +872,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   installerEnv:
                     description: InstallerEnv are extra environment variables to pass
                       through to the installer. This may be used to enable additional
@@ -897,6 +918,7 @@ spec:
                               required:
                               - key
                               type: object
+                              x-kubernetes-map-type: atomic
                             fieldRef:
                               description: 'Selects a field of the pod: supports metadata.name,
                                 metadata.namespace, `metadata.labels[''<KEY>'']`,
@@ -915,6 +937,7 @@ spec:
                               required:
                               - fieldPath
                               type: object
+                              x-kubernetes-map-type: atomic
                             resourceFieldRef:
                               description: 'Selects a resource of the container: only
                                 resources limits and requests (limits.cpu, limits.memory,
@@ -939,6 +962,7 @@ spec:
                               required:
                               - resource
                               type: object
+                              x-kubernetes-map-type: atomic
                             secretKeyRef:
                               description: Selects a key of a secret in the pod's
                                 namespace
@@ -959,6 +983,7 @@ spec:
                               required:
                               - key
                               type: object
+                              x-kubernetes-map-type: atomic
                           type: object
                       required:
                       - name
@@ -980,6 +1005,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   manifestsSecretRef:
                     description: ManifestsSecretRef is a reference to user-provided
                       manifests to add to or replace manifests that are generated
@@ -991,6 +1017,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                   releaseImage:
                     description: ReleaseImage is the image containing metadata for
                       all components that run in the cluster, and is the primary and
@@ -1020,6 +1047,7 @@ spec:
                           TODO: Add other useful fields. apiVersion, kind, uid?'
                         type: string
                     type: object
+                    x-kubernetes-map-type: atomic
                 type: object
               pullSecretRef:
                 description: PullSecretRef is the reference to the secret to use when
@@ -1030,6 +1058,7 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+                x-kubernetes-map-type: atomic
             required:
             - baseDomain
             - clusterName
@@ -1173,6 +1202,7 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+                x-kubernetes-map-type: atomic
               webConsoleURL:
                 description: WebConsoleURL is the URL for the cluster's web console
                   UI.
@@ -1183,9 +1213,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

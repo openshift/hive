@@ -55,8 +55,10 @@ var (
 		none.Name,
 	}
 
-	// OKD is a setting to enable community-only modifications
-	OKD = false
+	// FCOS is a setting to enable Fedora CoreOS-only modifications
+	FCOS = false
+	// SCOS is a setting to enable CentOS Stream CoreOS-only modifications
+	SCOS = false
 )
 
 // PublishingStrategy is a strategy for how various endpoints for the cluster are exposed.
@@ -68,6 +70,17 @@ const (
 	ExternalPublishingStrategy PublishingStrategy = "External"
 	// InternalPublishingStrategy exposes the endpoints for the cluster to the private network only.
 	InternalPublishingStrategy PublishingStrategy = "Internal"
+)
+
+// PolicyType is for usage polices that are applied to additionalTrustBundle.
+// +kubebuilder:validation:Enum="";Proxyonly;Always
+type PolicyType string
+
+const (
+	// PolicyProxyOnly  enables use of AdditionalTrustBundle when http/https proxy is configured.
+	PolicyProxyOnly PolicyType = "Proxyonly"
+	// PolicyAlways ignores all conditions and uses AdditionalTrustBundle.
+	PolicyAlways PolicyType = "Always"
 )
 
 //go:generate go run ../../vendor/sigs.k8s.io/controller-tools/cmd/controller-gen crd:crdVersions=v1 paths=. output:dir=../../data/data/
@@ -84,6 +97,13 @@ type InstallConfig struct {
 	//
 	// +optional
 	AdditionalTrustBundle string `json:"additionalTrustBundle,omitempty"`
+
+	// AdditionalTrustBundlePolicy determines when to add the AdditionalTrustBundle
+	// to the nodes' trusted certificate store. "Proxyonly" is the default.
+	// The field can be set to following specified values.
+	// "Proxyonly" : adds the AdditionalTrustBundle to nodes when http/https proxy is configured.
+	// "Always" : always adds AdditionalTrustBundle.
+	AdditionalTrustBundlePolicy PolicyType `json:"additionalTrustBundlePolicy,omitempty"`
 
 	// SSHKey is the public Secure Shell (SSH) key to provide access to instances.
 	// +optional
@@ -166,6 +186,10 @@ type InstallConfig struct {
 	// Capabilities configures the installation of optional core cluster components.
 	// +optional
 	Capabilities *Capabilities `json:"capabilities,omitempty"`
+
+	// FeatureSet enables features that are not part of the default feature set.
+	// +optional
+	FeatureSet configv1.FeatureSet `json:"featureSet,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.
@@ -173,9 +197,19 @@ func (c *InstallConfig) ClusterDomain() string {
 	return fmt.Sprintf("%s.%s", c.ObjectMeta.Name, strings.TrimSuffix(c.BaseDomain, "."))
 }
 
+// IsFCOS returns true if Fedora CoreOS-only modifications are enabled
+func (c *InstallConfig) IsFCOS() bool {
+	return FCOS
+}
+
+// IsSCOS returns true if CentOs Stream CoreOS-only modifications are enabled
+func (c *InstallConfig) IsSCOS() bool {
+	return SCOS
+}
+
 // IsOKD returns true if community-only modifications are enabled
 func (c *InstallConfig) IsOKD() bool {
-	return OKD
+	return c.IsFCOS() || c.IsSCOS()
 }
 
 // IsSingleNodeOpenShift returns true if the install-config has been configured for
@@ -281,8 +315,9 @@ func (p *Platform) Name() string {
 // Networking defines the pod network provider in the cluster.
 type Networking struct {
 	// NetworkType is the type of network to install.
-	// The default value is OVNKubernetes for Single Node OpenShift
-	// and OpenShiftSDN for all other platforms.
+	// The default value is OVNKubernetes.
+	//
+	// +kubebuilder:default=OVNKubernetes
 	// +optional
 	NetworkType string `json:"networkType,omitempty"`
 
@@ -291,7 +326,7 @@ type Networking struct {
 	// be empty or match the first entry in the list.
 	// Default is 10.0.0.0/16 for all platforms other than libvirt and Power VS.
 	// For libvirt, the default is 192.168.126.0/24.
-	// For Power VS, the default is 192.168.0.0/16.
+	// For Power VS, the default is 192.168.0.0/24.
 	//
 	// +optional
 	MachineNetwork []MachineNetworkEntry `json:"machineNetwork,omitempty"`

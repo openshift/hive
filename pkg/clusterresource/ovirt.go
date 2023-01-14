@@ -117,8 +117,8 @@ func (p *OvirtCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 			ClusterID:       p.ClusterID,
 			StorageDomainID: p.StorageDomainID,
 			NetworkName:     p.NetworkName,
-			APIVIP:          p.APIVIP,
-			IngressVIP:      p.IngressVIP,
+			APIVIPs:         []string{p.APIVIP},
+			IngressVIPs:     []string{p.IngressVIP},
 		},
 	}
 }

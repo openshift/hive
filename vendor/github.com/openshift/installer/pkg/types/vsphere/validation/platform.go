@@ -2,18 +2,21 @@ package validation
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/installer/pkg/types/vsphere"
+
 	"github.com/openshift/installer/pkg/validate"
 )
 
 // ValidatePlatform checks that the specified platform is valid.
 func ValidatePlatform(p *vsphere.Platform, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
 	if len(p.VCenter) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("vCenter"), "must specify the name of the vCenter"))
 	}
@@ -36,11 +39,6 @@ func ValidatePlatform(p *vsphere.Platform, fldPath *field.Path) field.ErrorList 
 		}
 	}
 
-	// If all VIPs are empty, skip IP validation.  All VIPs are required to be defined together.
-	if strings.Join([]string{p.APIVIP, p.IngressVIP}, "") != "" {
-		allErrs = append(allErrs, validateVIPs(p, fldPath)...)
-	}
-
 	// folder is optional, but if provided should pass validation
 	if len(p.Folder) != 0 {
 		allErrs = append(allErrs, validateFolder(p, fldPath)...)
@@ -56,6 +54,191 @@ func ValidatePlatform(p *vsphere.Platform, fldPath *field.Path) field.ErrorList 
 		allErrs = append(allErrs, validateDiskType(p, fldPath)...)
 	}
 
+	if len(p.FailureDomains) > 0 || len(p.VCenters) > 0 {
+		allErrs = append(allErrs, validateMultiZone(p, fldPath)...)
+	}
+
+	return allErrs
+}
+
+func validateMultiZone(p *vsphere.Platform, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(p.VCenters) == 0 {
+		// if p.VCenters is empty, populate a single vCenter based on the legacy platform spec
+		p.VCenters = append(p.VCenters, vsphere.VCenter{
+			Server:      p.VCenter,
+			Port:        443,
+			Username:    p.Username,
+			Password:    p.Password,
+			Datacenters: []string{p.Datacenter},
+		})
+
+		// populate failure domains that dont explicitly define a server
+		for idx, failureDomain := range p.FailureDomains {
+			if len(failureDomain.Server) == 0 {
+				p.FailureDomains[idx].Server = p.VCenter
+			}
+			if len(failureDomain.Topology.Datacenter) == 0 {
+				p.FailureDomains[idx].Topology.Datacenter = p.Datacenter
+			}
+			if len(failureDomain.Topology.ComputeCluster) == 0 {
+				p.FailureDomains[idx].Topology.ComputeCluster = fmt.Sprintf("/%s/host/%s", p.Datacenter, p.Cluster)
+			}
+			if len(failureDomain.Topology.ResourcePool) == 0 {
+				p.FailureDomains[idx].Topology.ResourcePool = p.ResourcePool
+			}
+			if len(failureDomain.Topology.Networks) == 0 && len(p.Network) > 0 {
+				if len(failureDomain.Topology.Networks) == 0 {
+					p.FailureDomains[idx].Topology.Networks = []string{p.Network}
+				}
+			}
+			if len(failureDomain.Topology.Datastore) == 0 {
+				p.FailureDomains[idx].Topology.Datastore = p.DefaultDatastore
+			}
+
+			if len(failureDomain.Topology.ResourcePool) == 0 {
+				// If the legacy resourcePool is not defined we can't use it for FailureDomain
+				if len(p.ResourcePool) != 0 {
+					if strings.Contains(p.ResourcePool, p.FailureDomains[idx].Topology.Datacenter) {
+						// Only use the legacy resourcePool platform spec parameter if the datacenter exists in the path.
+						if strings.Contains(p.ResourcePool, p.FailureDomains[idx].Topology.ComputeCluster) {
+							p.FailureDomains[idx].Topology.ResourcePool = p.ResourcePool
+						} else {
+							allErrs = append(allErrs, field.Invalid(fldPath.Child("resourcePool"), p.ResourcePool, fmt.Sprintf("resource pool must be in compute cluster %s; please define it in a topology", p.FailureDomains[idx].Topology.ComputeCluster)))
+						}
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("resourcePool"), p.ResourcePool, fmt.Sprintf("resource pool must be in datacenter %s; please define it in a topology", p.FailureDomains[idx].Topology.Datacenter)))
+					}
+				}
+			}
+			if len(failureDomain.Topology.Folder) == 0 {
+				// If the legacy folder is not defined we can't use it for FailureDomain
+				if len(p.Folder) != 0 {
+					// Only use the legacy folder platform spec parameter if the datacenter exists in the path.
+					if strings.Contains(p.Folder, p.FailureDomains[idx].Topology.Datacenter) {
+						p.FailureDomains[idx].Topology.Folder = p.Folder
+					} else {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("folder"), p.Folder, fmt.Sprintf("folder must be in datacenter %s; please define it in a topology", p.FailureDomains[idx].Topology.Datacenter)))
+					}
+				}
+			}
+		}
+	}
+
+	allErrs = append(allErrs, validateVCenters(p, fldPath.Child("vcenters"))...)
+	if len(allErrs) > 0 {
+		// if vcenters fails validation, this will cascade to failureDomains and deploymentZones
+		return allErrs
+	}
+
+	if len(p.FailureDomains) > 0 {
+		allErrs = append(allErrs, validateFailureDomains(p, fldPath.Child("failureDomains"))...)
+	} else if len(p.VCenters) > 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("failureDomains"), "must be defined if vcenters is defined"))
+	}
+
+	return allErrs
+}
+
+func validateVCenters(p *vsphere.Platform, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(p.VCenters) > 1 {
+		return field.ErrorList{field.TooMany(fldPath, len(p.VCenters), 1)}
+	}
+
+	for _, vCenter := range p.VCenters {
+		if len(vCenter.Server) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("server"), "must be the domain name or IP address of the vCenter"))
+		} else {
+			if err := validate.Host(vCenter.Server); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("server"), vCenter.Server, "must be the domain name or IP address of the vCenter"))
+			}
+		}
+		if len(vCenter.Username) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("username"), "must specify the username"))
+		}
+		if len(vCenter.Password) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("password"), "must specify the password"))
+		}
+		if len(vCenter.Datacenters) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("datacenters"), "must specify at least one datacenter"))
+		}
+	}
+	return allErrs
+}
+
+func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	topologyFld := fldPath.Child("topology")
+	var associatedVCenter *vsphere.VCenter
+	for _, failureDomain := range p.FailureDomains {
+		if len(failureDomain.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify the name"))
+		}
+		if len(failureDomain.Server) > 0 {
+			for _, vcenter := range p.VCenters {
+				if vcenter.Server == failureDomain.Server {
+					associatedVCenter = &vcenter
+					break
+				}
+			}
+			if associatedVCenter == nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("server"), failureDomain.Server, "server does not exist in vcenters"))
+			}
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("server"), "must specify a vCenter server"))
+		}
+
+		if len(failureDomain.Zone) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("zone"), "must specify zone tag value"))
+		}
+
+		if len(failureDomain.Region) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("region"), "must specify region tag value"))
+		}
+
+		if len(failureDomain.Topology.Datacenter) == 0 {
+			allErrs = append(allErrs, field.Required(topologyFld.Child("datacenter"), "must specify a datacenter"))
+		}
+
+		if len(failureDomain.Topology.Datastore) == 0 {
+			allErrs = append(allErrs, field.Required(topologyFld.Child("datastore"), "must specify a datastore"))
+		}
+
+		if len(failureDomain.Topology.Networks) == 0 {
+			allErrs = append(allErrs, field.Required(topologyFld.Child("networks"), "must specify a network"))
+		}
+		// Folder in failuredomain is optional
+		if len(failureDomain.Topology.Folder) != 0 {
+			folderPathRegexp := regexp.MustCompile("^\\/(.*?)\\/vm\\/(.*?)$")
+			folderPathParts := folderPathRegexp.FindStringSubmatch(failureDomain.Topology.Folder)
+			if len(folderPathParts) < 3 {
+				return append(allErrs, field.Invalid(topologyFld.Child("folder"), failureDomain.Topology.Folder, "full path of folder must be provided in format /<datacenter>/vm/<folder>"))
+			}
+
+			if !strings.Contains(failureDomain.Topology.Folder, failureDomain.Topology.Datacenter) {
+				return append(allErrs, field.Invalid(topologyFld.Child("folder"), failureDomain.Topology.Folder, "the folder defined does not exist in the correct datacenter"))
+			}
+		}
+
+		if len(failureDomain.Topology.ComputeCluster) == 0 {
+			allErrs = append(allErrs, field.Required(topologyFld.Child("computeCluster"), "must specify a computeCluster"))
+		} else {
+			computeCluster := failureDomain.Topology.ComputeCluster
+			clusterPathRegexp := regexp.MustCompile("^\\/(.*?)\\/host\\/(.*?)$")
+			clusterPathParts := clusterPathRegexp.FindStringSubmatch(computeCluster)
+			if len(clusterPathParts) < 3 {
+				return append(allErrs, field.Invalid(topologyFld.Child("computeCluster"), computeCluster, "full path of compute cluster must be provided in format /<datacenter>/host/<cluster>"))
+			}
+			datacenterName := clusterPathParts[1]
+
+			if len(failureDomain.Topology.Datacenter) != 0 && datacenterName != failureDomain.Topology.Datacenter {
+				return append(allErrs, field.Invalid(topologyFld.Child("computeCluster"), computeCluster, fmt.Sprintf("compute cluster must be in datacenter %s", failureDomain.Topology.Datacenter)))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -69,30 +252,6 @@ func ValidateForProvisioning(p *vsphere.Platform, fldPath *field.Path) field.Err
 
 	if len(p.Network) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("network"), "must specify the network"))
-	}
-
-	allErrs = append(allErrs, validateVIPs(p, fldPath)...)
-	return allErrs
-}
-
-// validateVIPs checks that all required VIPs are provided and are valid IP addresses.
-func validateVIPs(p *vsphere.Platform, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if len(p.APIVIP) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("apiVIP"), "must specify a VIP for the API"))
-	} else if err := validate.IP(p.APIVIP); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVIP"), p.APIVIP, err.Error()))
-	}
-
-	if len(p.IngressVIP) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("ingressVIP"), "must specify a VIP for Ingress"))
-	} else if err := validate.IP(p.IngressVIP); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("ingressVIP"), p.IngressVIP, err.Error()))
-	}
-
-	if len(p.APIVIP) != 0 && len(p.IngressVIP) != 0 && p.APIVIP == p.IngressVIP {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("apiVIP"), p.APIVIP, "IPs for both API and Ingress should not be the same."))
 	}
 
 	return allErrs

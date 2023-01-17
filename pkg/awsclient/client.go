@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -515,7 +514,7 @@ func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Sessio
 	// Special case to not use a secret to gather credentials.
 	if secret != nil {
 		config := awsCLIConfigFromSecret(secret)
-		f, err := ioutil.TempFile("", "hive-aws-config")
+		f, err := os.CreateTemp("", "hive-aws-config")
 		if err != nil {
 			return nil, err
 		}

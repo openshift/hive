@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -342,7 +341,7 @@ func (m *InstallManager) Run() error {
 	go m.tailFullInstallLog(scrubInstallLog)
 
 	m.log.Info("copying install-config.yaml")
-	icData, err := ioutil.ReadFile(m.InstallConfigMountPath)
+	icData, err := os.ReadFile(m.InstallConfigMountPath)
 	if err != nil {
 		m.log.WithError(err).Error("error reading install-config.yaml")
 		return err
@@ -353,7 +352,7 @@ func (m *InstallManager) Run() error {
 		return err
 	}
 	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
-	if err := ioutil.WriteFile(destInstallConfigPath, icData, 0644); err != nil {
+	if err := os.WriteFile(destInstallConfigPath, icData, 0644); err != nil {
 		m.log.WithError(err).Error("error writing install-config.yaml")
 	}
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
@@ -887,7 +886,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 				return nil
 			}
 
-			manifestBytes, err := ioutil.ReadFile(path)
+			manifestBytes, err := os.ReadFile(path)
 			if err != nil {
 				m.log.WithError(err).Error("error reading manifest file")
 				return err
@@ -904,7 +903,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 					m.log.WithError(err).Error("error retrieving file info")
 					return err
 				}
-				err = ioutil.WriteFile(path, *modifiedManifestBytes, info.Mode())
+				err = os.WriteFile(path, *modifiedManifestBytes, info.Mode())
 				if err != nil {
 					m.log.WithError(err).Error("error writing manifest")
 					return err
@@ -1138,7 +1137,7 @@ func readClusterMetadata(m *InstallManager) ([]byte, *installertypes.ClusterMeta
 		return nil, nil, err
 	}
 
-	metadataBytes, err := ioutil.ReadFile(fullMetadataPath)
+	metadataBytes, err := os.ReadFile(fullMetadataPath)
 	if err != nil {
 		m.log.WithError(err).WithField("metadata", fullMetadataPath).Error("error reading cluster metadata file")
 		return nil, nil, err
@@ -1222,7 +1221,7 @@ func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment, sshPrivKeyPath
 
 	// At this point, all log files are in m.LogsDir
 	// Gather the filenames
-	files, err := ioutil.ReadDir(m.LogsDir)
+	files, err := os.ReadDir(m.LogsDir)
 	if err != nil {
 		m.log.WithError(err).WithField("clusterprovision", types.NamespacedName{Name: m.ClusterProvision.Name, Namespace: m.ClusterProvision.Namespace}).Error("error reading Logsdir")
 		return
@@ -1281,13 +1280,13 @@ func (m *InstallManager) initSSHKey(envVar string) (string, error) {
 
 	// copy the mounted volume with the ssh private key to
 	// a temporary file, which allows us to chmod it 0600 to appease ssh-add.
-	input, err := ioutil.ReadFile(sshPrivKeyPath)
+	input, err := os.ReadFile(sshPrivKeyPath)
 	if err != nil {
 		m.log.WithError(err).Error("error reading ssh private key to copy")
 		return "", err
 	}
 
-	if err := ioutil.WriteFile(sshCopyTempFile, input, 0600); err != nil {
+	if err := os.WriteFile(sshCopyTempFile, input, 0600); err != nil {
 		m.log.WithError(err).Error("error writing copy of ssh private key")
 		return "", err
 	}
@@ -1382,7 +1381,7 @@ func readInstallerLog(m *InstallManager, scrubInstallLog bool) (string, error) {
 		return "", err
 	}
 
-	logBytes, err := ioutil.ReadFile(installerConsoleLogFilePath)
+	logBytes, err := os.ReadFile(installerConsoleLogFilePath)
 	if err != nil {
 		m.log.WithError(err).WithField("path", installerConsoleLogFilePath).Error("error reading log file")
 		return "", err
@@ -1447,7 +1446,7 @@ func uploadAdminKubeconfig(m *InstallManager) (*corev1.Secret, error) {
 		return nil, err
 	}
 
-	kubeconfigBytes, err := ioutil.ReadFile(fullPath)
+	kubeconfigBytes, err := os.ReadFile(fullPath)
 	if err != nil {
 		m.log.WithError(err).WithField("path", fullPath).Error("error reading admin kubeconfig file")
 		return nil, err
@@ -1498,7 +1497,7 @@ func loadAdminPassword(m *InstallManager) (string, error) {
 		return "", err
 	}
 
-	passwordBytes, err := ioutil.ReadFile(fullPath)
+	passwordBytes, err := os.ReadFile(fullPath)
 	if err != nil {
 		m.log.WithError(err).WithField("path", fullPath).Error("error reading admin password file")
 		return "", err
@@ -1684,7 +1683,7 @@ func (m *InstallManager) writeSSHKnownHosts(homeDir string, knownHosts []string)
 		return err
 	}
 	allKnownHosts := strings.Join(knownHosts, "\n")
-	if err := ioutil.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte(allKnownHosts), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(sshDir, "known_hosts"), []byte(allKnownHosts), 0644); err != nil {
 		m.log.WithError(err).Error("error writing ssh known_hosts")
 		return err
 	}
@@ -1750,7 +1749,7 @@ func isDirNonEmpty(dir string) bool {
 }
 
 func pasteInPullSecret(icData []byte, pullSecretFile string) ([]byte, error) {
-	pullSecretData, err := ioutil.ReadFile(pullSecretFile)
+	pullSecretData, err := os.ReadFile(pullSecretFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not read the pull secret file")
 	}
@@ -1772,7 +1771,7 @@ func getHomeDir() string {
 
 func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode string, cd *hivev1.ClusterDeployment) error {
 	clusterConfigPath := filepath.Join(m.WorkDir, "manifests", clusterConfigYAML)
-	clusterConfigBytes, err := ioutil.ReadFile(clusterConfigPath)
+	clusterConfigBytes, err := os.ReadFile(clusterConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "error reading cluster config")
 	}
@@ -1806,7 +1805,7 @@ func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode 
 		return errors.Wrap(err, "error marshalling cluster config")
 	}
 
-	if err := ioutil.WriteFile(clusterConfigPath, clusterConfigBytes, 0644); err != nil {
+	if err := os.WriteFile(clusterConfigPath, clusterConfigBytes, 0644); err != nil {
 		return errors.Wrap(err, "error writing cluster-config.yaml")
 	}
 
@@ -1821,7 +1820,7 @@ func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode 
 
 	//Read 99_cloud-creds-secret.yaml
 	overrideCredsPath := filepath.Join(m.WorkDir, "manifests", overrideCredsYAML)
-	overrideCredsBytes, err := ioutil.ReadFile(overrideCredsPath)
+	overrideCredsBytes, err := os.ReadFile(overrideCredsPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			m.log.Info("99_cloud-creds-secret.yaml doesn't exist, continue installation")
@@ -1833,7 +1832,7 @@ func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode 
 
 	//Read infrastructureName/resourceGroupName from manifests cluster-infrastructure-02-config.yml
 	clusterInfraConfigPath := filepath.Join(m.WorkDir, "manifests", clusterInfraConfigYAML)
-	clusterInfraConfigBytes, err := ioutil.ReadFile(clusterInfraConfigPath)
+	clusterInfraConfigBytes, err := os.ReadFile(clusterInfraConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "error reading manifests cluster-infrastructure-02-config.yml")
 	}
@@ -1844,7 +1843,7 @@ func (m *InstallManager) overrideCredentialsModeOnInstallConfig(credentialsMode 
 	}
 
 	if modifiedBytes != nil {
-		err = ioutil.WriteFile(overrideCredsPath, *modifiedBytes, 0644)
+		err = os.WriteFile(overrideCredsPath, *modifiedBytes, 0644)
 		if err != nil {
 			return errors.Wrap(err, "error writing 99_cloud-creds-secret.yaml")
 		}

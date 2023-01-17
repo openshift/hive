@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -150,7 +149,7 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		o.setImageResolutionErrorCondition(cd, returnErr)
 	}()
 
-	imageStreamData, err := ioutil.ReadFile(filepath.Join(o.WorkDir, imageReferencesFilename))
+	imageStreamData, err := os.ReadFile(filepath.Join(o.WorkDir, imageReferencesFilename))
 	if err != nil {
 		return errors.Wrapf(err, "could not read %s file", imageReferencesFilename)
 	}
@@ -202,7 +201,7 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		o.log.WithField("cliImage", cliImage).Info("overrode cli image host")
 	}
 
-	releaseMetadataRaw, err := ioutil.ReadFile(filepath.Join(o.WorkDir, releaseMetadataFilename))
+	releaseMetadataRaw, err := os.ReadFile(filepath.Join(o.WorkDir, releaseMetadataFilename))
 	if err != nil {
 		return errors.Wrapf(err, "could not read %s file", releaseMetadataFilename)
 	}

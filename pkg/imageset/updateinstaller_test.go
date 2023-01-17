@@ -3,7 +3,7 @@ package imageset
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -140,7 +140,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewClientBuilder().WithRuntimeObjects(test.existingClusterDeployment).Build()
-			workDir, err := ioutil.TempDir("", "test-update")
+			workDir, err := os.MkdirTemp("", "test-update")
 			if err != nil {
 				t.Fatalf("error creating test directory: %v", err)
 			}
@@ -254,7 +254,7 @@ func writeImageReferencesFile(t *testing.T, dir string, images map[string]string
 	}
 	imageStreamData, err := yaml.Marshal(imageStream)
 	require.NoError(t, err, "failed to marshal image stream")
-	err = ioutil.WriteFile(filepath.Join(dir, imageReferencesFilename), imageStreamData, 0644)
+	err = os.WriteFile(filepath.Join(dir, imageReferencesFilename), imageStreamData, 0644)
 	require.NoError(t, err, "failed to write image references file")
 }
 
@@ -265,6 +265,6 @@ func writeReleaseMetadataFile(t *testing.T, dir string, version string) {
 	}
 	rmRaw, err := json.Marshal(rm)
 	require.NoError(t, err, "failed to marshal release metadata")
-	err = ioutil.WriteFile(filepath.Join(dir, releaseMetadataFilename), rmRaw, 0644)
+	err = os.WriteFile(filepath.Join(dir, releaseMetadataFilename), rmRaw, 0644)
 	require.NoError(t, err, "failed to write release metadata file")
 }

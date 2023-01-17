@@ -1,7 +1,6 @@
 package ovirt
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -29,7 +28,7 @@ func GetCreds(credsFile string) ([]byte, error) {
 			break
 		}
 	}
-	return ioutil.ReadFile(credsFile)
+	return os.ReadFile(credsFile)
 }
 
 // ConfigureCreds loads secrets designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE,

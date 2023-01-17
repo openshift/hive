@@ -1,7 +1,7 @@
 package resource
 
 import (
-	"io/ioutil"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -43,7 +43,7 @@ func GenerateClientConfigFromRESTConfig(name string, restConfig *rest.Config) *c
 	}
 
 	if restConfig.WrapTransport != nil && len(restConfig.BearerToken) == 0 {
-		token, err := ioutil.ReadFile(tokenFile)
+		token, err := os.ReadFile(tokenFile)
 		if err != nil {
 			log.WithError(err).Warning("empty bearer token and cannot read token file")
 		} else {

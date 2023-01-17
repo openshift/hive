@@ -2,7 +2,6 @@ package testresource
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -30,7 +29,7 @@ func NewTestResourceCommand() *cobra.Command {
 }
 
 func mustRead(file string) []byte {
-	content, err := ioutil.ReadFile(file)
+	content, err := os.ReadFile(file)
 	if err != nil {
 		log.Fatalf("erorr reading file %s: %v", file, err)
 	}

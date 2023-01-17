@@ -1,7 +1,6 @@
 package openstack
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -33,7 +32,7 @@ func GetCreds(credsFile string) ([]byte, error) {
 		}
 	}
 	log.WithField("credsFile", credsFile).Info("Loading OpenStack creds")
-	return ioutil.ReadFile(credsFile)
+	return os.ReadFile(credsFile)
 }
 
 // ConfigureCreds loads secrets designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE,

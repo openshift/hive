@@ -2,7 +2,6 @@ package contracts
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 
 	"github.com/openshift/hive/pkg/constants"
@@ -67,7 +66,7 @@ func ReadSupportContractsFile() (SupportedContractImplementationsList, error) {
 
 	var supportedList SupportedContractImplementationsList
 
-	fileBytes, err := ioutil.ReadFile(fpath)
+	fileBytes, err := os.ReadFile(fpath)
 	if os.IsNotExist(err) {
 		return supportedList, nil
 	}

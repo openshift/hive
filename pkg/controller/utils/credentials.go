@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"strings"
@@ -79,7 +78,7 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 func createRootCAFiles(certificateSecret *corev1.Secret) ([]string, error) {
 	fileList := []string{}
 	for _, fileContent := range certificateSecret.Data {
-		tmpFile, err := ioutil.TempFile("", "rootcacerts")
+		tmpFile, err := os.CreateTemp("", "rootcacerts")
 		if err != nil {
 			return fileList, err
 		}

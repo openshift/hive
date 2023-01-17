@@ -1,7 +1,6 @@
 package gcp
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -27,7 +26,7 @@ func GetCreds(credsFile string) ([]byte, error) {
 		credsFilePath = credsFile
 	}
 	log.WithField("credsFilePath", credsFilePath).Info("Loading gcp service account")
-	return ioutil.ReadFile(credsFilePath)
+	return os.ReadFile(credsFilePath)
 }
 
 // ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE

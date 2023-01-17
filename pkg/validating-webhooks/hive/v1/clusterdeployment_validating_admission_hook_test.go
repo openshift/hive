@@ -2,7 +2,6 @@ package v1
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -1232,7 +1231,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 }
 
 func TestNewClusterDeploymentValidatingAdmissionHook(t *testing.T) {
-	tempFile, err := ioutil.TempFile("", "")
+	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
 	}

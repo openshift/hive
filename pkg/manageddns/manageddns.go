@@ -2,7 +2,6 @@ package manageddns
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -19,7 +18,7 @@ func ReadManagedDomainsFile() ([]hivev1.ManageDNSConfig, error) {
 
 	domains := []hivev1.ManageDNSConfig{}
 
-	fileBytes, err := ioutil.ReadFile(managedDomainsFile)
+	fileBytes, err := os.ReadFile(managedDomainsFile)
 	if err != nil {
 		return domains, err
 	}

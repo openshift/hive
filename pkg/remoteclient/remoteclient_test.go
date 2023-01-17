@@ -2,7 +2,7 @@ package remoteclient
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -287,7 +287,7 @@ func withUnreachableCondition(status corev1.ConditionStatus, probeTime time.Time
 
 func testKubeconfigSecret(t *testing.T) *corev1.Secret {
 	kubeconfigFile := filepath.Join("testdata", "kubeconfig.sample")
-	kubeconfig, err := ioutil.ReadFile(kubeconfigFile)
+	kubeconfig, err := os.ReadFile(kubeconfigFile)
 	if err != nil {
 		t.Fatal(err)
 	}

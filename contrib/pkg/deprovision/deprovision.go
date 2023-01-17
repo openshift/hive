@@ -1,7 +1,6 @@
 package deprovision
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -58,7 +57,7 @@ func terminateWhenFilesChange(dir string) {
 				// skip symlinks
 				return nil
 			}
-			data, err := ioutil.ReadFile(path)
+			data, err := os.ReadFile(path)
 			if err != nil {
 				return errors.Wrapf(err, "could not read contents of %s", path)
 			}

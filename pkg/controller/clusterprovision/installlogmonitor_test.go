@@ -59,14 +59,15 @@ const (
 	// NOTE: This embedded newline matters: our regex must be able to match the two chunks of the message on separate lines.
 	noWorkerNodesFmt = `time="2021-12-09T10:51:06Z" level=debug msg="Symlinking plugin terraform-provider-%s src: \"/usr/bin/openshift-install\" dst: \"/tmp/openshift-install-cluster-723469510/plugins/terraform-provider-%s\""
 time="2021-12-09T10:53:06Z" level=error msg="blahblah. Got 0 worker nodes, 3 master nodes blah"`
-	targetGroupNotFound     = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:0123445698:targetgroup/aaaabbbbcccc/dddd): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd' not found"
-	errorCreatingNLB        = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
-	terraformFailedDelete   = "level=fatal msg=terraform destroy: failed to destroy using Terraform"
-	noMatchLog              = "an example of something that doesn't match the log regexes"
-	bootstrapFailed         = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
-	awsDeniedByScp          = "AccessDenied: entity is not authorized to perform: iam:PressTheButton on resource: Thing with an explicit deny in a service control policy"
-	awsInsufficientCapacity = "level=error msg=\"failed to fetch Cluster: failed to generate asset \"Cluster\": failure applying terraform for \"cluster\" stage: failed to create cluster: failed to apply Terraform: exit status 1\n\nError: Error launching source instance: InsufficientInstanceCapacity: We currently do not have sufficient m5.2xlarge capacity in the Availability Zone you requested (eu-south-1b). Our system will be working on provisioning additional capacity. You can currently get m5.2xlarge capacity by not specifying an Availability Zone in your request or choosing eu-south-1a, eu-south-1c."
-	gp3VolumeLimitExceeded  = "Error launching source instance: VolumeLimitExceeded: You have exceeded your maximum gp3 storage limit of 50 TiB in this region. Please contact AWS Support to request an Elastic Block Store service limit increase."
+	targetGroupNotFound                     = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:0123445698:targetgroup/aaaabbbbcccc/dddd): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd' not found"
+	errorCreatingNLB                        = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
+	terraformFailedDelete                   = "level=fatal msg=terraform destroy: failed to destroy using Terraform"
+	noMatchLog                              = "an example of something that doesn't match the log regexes"
+	bootstrapFailed                         = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
+	awsDeniedByScp                          = "AccessDenied: entity is not authorized to perform: iam:PressTheButton on resource: Thing with an explicit deny in a service control policy"
+	awsInsufficientCapacity                 = "level=error msg=\"failed to fetch Cluster: failed to generate asset \"Cluster\": failure applying terraform for \"cluster\" stage: failed to create cluster: failed to apply Terraform: exit status 1\n\nError: Error launching source instance: InsufficientInstanceCapacity: We currently do not have sufficient m5.2xlarge capacity in the Availability Zone you requested (eu-south-1b). Our system will be working on provisioning additional capacity. You can currently get m5.2xlarge capacity by not specifying an Availability Zone in your request or choosing eu-south-1a, eu-south-1c."
+	gp3VolumeLimitExceeded                  = "Error launching source instance: VolumeLimitExceeded: You have exceeded your maximum gp3 storage limit of 50 TiB in this region. Please contact AWS Support to request an Elastic Block Store service limit increase."
+	defaultEbsKmsKeyInsufficientPermissions = "level=error msg=Error: Error waiting for instance (i-abcdefg01234) to become ready: Failed to reach target state. Reason: Client.InternalError: Client error on launch"
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -82,6 +83,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "Gp3VolumeLimitExceeded",
 			log:            pointer.String(gp3VolumeLimitExceeded),
 			expectedReason: "Gp3VolumeLimitExceeded",
+		},
+		{
+			name:           "DefaultEbsKmsKeyInsufficientPermissions",
+			log:            pointer.String(defaultEbsKmsKeyInsufficientPermissions),
+			expectedReason: "DefaultEbsKmsKeyInsufficientPermissions",
 		},
 		{
 			name:           "AWSInsufficientCapacity",

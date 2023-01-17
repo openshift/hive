@@ -87,6 +87,11 @@ data:
         - "Error: multiple Route53Zone found"
       installFailingReason: MultipleRoute53ZonesFound
       installFailingMessage: Multiple Route53 zones found
+    - name: DefaultEbsKmsKeyInsufficientPermissions
+      searchRegexStrings:
+        - "Client.InternalError: Client error on launch"
+      installFailingReason: DefaultEbsKmsKeyInsufficientPermissions
+      installFailingMessage: Default KMS key for EBS encryption has insufficient permissions to launch EC2 instances
     - name: SimulatorThrottling
       searchRegexStrings:
       - "validate AWS credentials: checking install permissions: error simulating policy: Throttling: Rate exceeded"

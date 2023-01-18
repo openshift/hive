@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -281,7 +281,7 @@ func authJSONFromSecretSource(secret *corev1.Secret) func() ([]byte, error) {
 
 func authJSONFromFileSource(filename string) func() ([]byte, error) {
 	return func() ([]byte, error) {
-		return ioutil.ReadFile(filename)
+		return os.ReadFile(filename)
 	}
 }
 

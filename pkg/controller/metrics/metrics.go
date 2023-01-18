@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"time"
@@ -808,7 +807,7 @@ func readMetricsConfig() (*metricsconfig.MetricsConfig, error) {
 		return config, errors.New("metrics config environment variable not set")
 	}
 
-	fileBytes, err := ioutil.ReadFile(path)
+	fileBytes, err := os.ReadFile(path)
 	if err != nil {
 		return config, err
 	}

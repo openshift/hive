@@ -10,7 +10,6 @@ import (
 	"go/parser"
 	"go/token"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 
 	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -152,7 +151,7 @@ type config struct {
 
 func (c *config) load(options *VerifyImportsOptions) error {
 
-	raw, err := ioutil.ReadFile(options.ConfigFile)
+	raw, err := os.ReadFile(options.ConfigFile)
 	if err != nil {
 		options.Logger.WithError(err).Error("Failed reading config file")
 		return err

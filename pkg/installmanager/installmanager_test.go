@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -159,12 +158,12 @@ func TestInstallManager(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", "installmanagertest")
+			tempDir, err := os.MkdirTemp("", "installmanagertest")
 			require.NoError(t, err)
 			defer os.RemoveAll(tempDir)
 			defer os.Remove(installerConsoleLogFilePath)
 
-			binaryTempDir, err := ioutil.TempDir(tempDir, "bin")
+			binaryTempDir, err := os.MkdirTemp(tempDir, "bin")
 			require.NoError(t, err)
 
 			pullSecret := testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecretName, corev1.DockerConfigJsonKey, "{}")
@@ -177,13 +176,13 @@ func TestInstallManager(t *testing.T) {
 
 			// create a fake install-config
 			mountedInstallConfigFile := filepath.Join(tempDir, "mounted-install-config.yaml")
-			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
+			if err := os.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
 				t.Fatalf("error creating temporary fake install-config file: %v", err)
 			}
 
 			// create a fake pull secret file
 			mountedPullSecretFile := filepath.Join(tempDir, "mounted-pull-secret.json")
-			if err := ioutil.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
+			if err := os.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
 				t.Fatalf("error creating temporary fake pull secret file: %v", err)
 			}
 
@@ -349,7 +348,7 @@ func TestInstallManager(t *testing.T) {
 
 func writeFakeBinary(fileName string, contents string) error {
 	data := []byte(contents)
-	err := ioutil.WriteFile(fileName, data, 0755)
+	err := os.WriteFile(fileName, data, 0755)
 	return err
 }
 
@@ -517,7 +516,7 @@ func TestInstallManagerSSH(t *testing.T) {
 			}
 
 			// temp dir to hold fake ssh-add and ssh-agent and ssh keys
-			testDir, err := ioutil.TempDir("", "installmanagersshfake")
+			testDir, err := os.MkdirTemp("", "installmanagersshfake")
 			if err != nil {
 				t.Fatalf("error creating directory hold temp ssh items: %v", err)
 			}
@@ -525,7 +524,7 @@ func TestInstallManagerSSH(t *testing.T) {
 
 			// create a fake SSH private key file
 			sshKeyFile := filepath.Join(testDir, "tempSSHKey")
-			if err := ioutil.WriteFile(sshKeyFile, []byte("FAKE SSH KEY CONTENT"), 0600); err != nil {
+			if err := os.WriteFile(sshKeyFile, []byte("FAKE SSH KEY CONTENT"), 0600); err != nil {
 				t.Fatalf("error creating temporary fake SSH key file: %v", err)
 			}
 
@@ -535,7 +534,7 @@ func TestInstallManagerSSH(t *testing.T) {
 				sshAddBinFileContent = alwaysErrorBinary
 			}
 			sshAddBinFile := filepath.Join(testDir, "ssh-add")
-			if err := ioutil.WriteFile(sshAddBinFile, []byte(sshAddBinFileContent), 0555); err != nil {
+			if err := os.WriteFile(sshAddBinFile, []byte(sshAddBinFileContent), 0555); err != nil {
 				t.Fatalf("error creating fake ssh-add binary: %v", err)
 			}
 
@@ -545,23 +544,23 @@ func TestInstallManagerSSH(t *testing.T) {
 				sshAgentBinFileContent = alwaysErrorBinary
 			}
 			sshAgentBinFile := filepath.Join(testDir, "ssh-agent")
-			if err := ioutil.WriteFile(sshAgentBinFile, []byte(sshAgentBinFileContent), 0555); err != nil {
+			if err := os.WriteFile(sshAgentBinFile, []byte(sshAgentBinFileContent), 0555); err != nil {
 				t.Fatalf("error creating fake ssh-agent binary: %v", err)
 			}
 
 			// create a fake install-config
 			mountedInstallConfigFile := filepath.Join(testDir, "mounted-install-config.yaml")
-			if err := ioutil.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
+			if err := os.WriteFile(mountedInstallConfigFile, []byte("INSTALL_CONFIG: FAKE"), 0600); err != nil {
 				t.Fatalf("error creating temporary fake install-config file: %v", err)
 			}
 
 			// create a fake pull secret file
 			mountedPullSecretFile := filepath.Join(testDir, "mounted-pull-secret.json")
-			if err := ioutil.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
+			if err := os.WriteFile(mountedPullSecretFile, []byte("{}"), 0600); err != nil {
 				t.Fatalf("error creating temporary fake pull secret file: %v", err)
 			}
 
-			tempDir, err := ioutil.TempDir("", "installmanagersshtestresults")
+			tempDir, err := os.MkdirTemp("", "installmanagersshtestresults")
 			if err != nil {
 				t.Fatalf("errored while setting up temp dir for test: %v", err)
 			}
@@ -651,7 +650,7 @@ func TestInstallManagerSSHKnownHosts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tempDir, err := ioutil.TempDir("", "installmanagersshknownhosts")
+			tempDir, err := os.MkdirTemp("", "installmanagersshknownhosts")
 			require.NoError(t, err, "error creating test tempdir")
 			defer os.RemoveAll(tempDir)
 
@@ -661,7 +660,7 @@ func TestInstallManagerSSHKnownHosts(t *testing.T) {
 			err = im.writeSSHKnownHosts(tempDir, test.knownHosts)
 			require.NoError(t, err, "error writing ssh known hosts ")
 
-			content, err := ioutil.ReadFile(filepath.Join(tempDir, ".ssh", "known_hosts"))
+			content, err := os.ReadFile(filepath.Join(tempDir, ".ssh", "known_hosts"))
 			require.NoError(t, err, "error reading expected ssh known_hosts file")
 
 			assert.Equal(t, test.expectedFile, string(content), "unexpected known_hosts file contents")
@@ -688,13 +687,13 @@ func TestIsBootstrapComplete(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			dir, err := ioutil.TempDir("", "TestIsBootstrapComplete")
+			dir, err := os.MkdirTemp("", "TestIsBootstrapComplete")
 			if err != nil {
 				t.Fatalf("could not create temp dir: %v", err)
 			}
 			defer os.RemoveAll(dir)
 			script := fmt.Sprintf("#!/bin/bash\nexit %d", tc.errCode)
-			if err := ioutil.WriteFile(path.Join(dir, "openshift-install"), []byte(script), 0777); err != nil {
+			if err := os.WriteFile(path.Join(dir, "openshift-install"), []byte(script), 0777); err != nil {
 				t.Fatalf("could not write openshift-install file: %v", err)
 			}
 			im := &InstallManager{WorkDir: dir}
@@ -710,11 +709,11 @@ func Test_pasteInPullSecret(t *testing.T) {
 		"install-config-with-existing-pull-secret.yaml",
 	} {
 		t.Run(inputFile, func(t *testing.T) {
-			icData, err := ioutil.ReadFile(filepath.Join("testdata", inputFile))
+			icData, err := os.ReadFile(filepath.Join("testdata", inputFile))
 			if !assert.NoError(t, err, "unexpected error reading install-config.yaml") {
 				return
 			}
-			expected, err := ioutil.ReadFile(filepath.Join("testdata", "install-config-with-pull-secret.yaml"))
+			expected, err := os.ReadFile(filepath.Join("testdata", "install-config-with-pull-secret.yaml"))
 			if !assert.NoError(t, err, "unexpected error reading install-config-with-pull-secret.yaml") {
 				return
 			}

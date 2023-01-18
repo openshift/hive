@@ -2,7 +2,7 @@ package operator
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -52,7 +52,7 @@ func TestOperatorDeployment(t *testing.T) {
 }
 
 func readHiveCRDs(t *testing.T) []*apiextv1.CustomResourceDefinition {
-	files, err := ioutil.ReadDir(crdDirectory)
+	files, err := os.ReadDir(crdDirectory)
 	if err != nil {
 		t.Fatalf("cannot read crd directory: %v", err)
 	}
@@ -61,7 +61,7 @@ func readHiveCRDs(t *testing.T) []*apiextv1.CustomResourceDefinition {
 		if !strings.HasSuffix(file.Name(), ".yaml") {
 			continue
 		}
-		b, err := ioutil.ReadFile(filepath.Join(crdDirectory, file.Name()))
+		b, err := os.ReadFile(filepath.Join(crdDirectory, file.Name()))
 		if err != nil {
 			t.Fatalf("cannot read crd file %s: %v", file.Name(), err)
 		}

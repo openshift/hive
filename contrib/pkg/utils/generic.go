@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -38,7 +38,7 @@ func DetermineReleaseImageFromSource(sourceURL string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -75,7 +75,7 @@ func GetPullSecret(logger log.FieldLogger, pullSecret string, pullSecretFile str
 		return pullSecret, nil
 	}
 	if len(pullSecretFile) > 0 {
-		data, err := ioutil.ReadFile(pullSecretFile)
+		data, err := os.ReadFile(pullSecretFile)
 		if err != nil {
 			logger.Error("Cannot read pull secret file")
 			return "", err

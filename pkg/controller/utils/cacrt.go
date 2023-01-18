@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +26,7 @@ func SetupAdditionalCA() error {
 		return nil
 	}
 
-	data, err := ioutil.ReadFile(additionalCA)
+	data, err := os.ReadFile(additionalCA)
 	if err != nil {
 		return fmt.Errorf("cannot read additional CA file(%s): %v", additionalCA, err)
 	}

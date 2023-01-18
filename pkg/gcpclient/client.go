@@ -2,8 +2,8 @@ package gcpclient
 
 import (
 	"context"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -376,7 +376,7 @@ func authJSONFromSecretSource(secret *corev1.Secret) func() ([]byte, error) {
 
 func authJSONFromFileSource(filename string) func() ([]byte, error) {
 	return func() ([]byte, error) {
-		return ioutil.ReadFile(filename)
+		return os.ReadFile(filename)
 	}
 }
 

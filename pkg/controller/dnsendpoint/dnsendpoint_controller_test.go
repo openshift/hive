@@ -3,7 +3,6 @@ package dnsendpoint
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
@@ -626,7 +625,7 @@ func TestMultiCloudDNSSetup(t *testing.T) {
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			// Set up managed domains file/environment
-			tempFile, err := ioutil.TempFile("", "")
+			tempFile, err := os.CreateTemp("", "")
 			if err != nil {
 				t.Fatalf("unexpected: %v", err)
 			}

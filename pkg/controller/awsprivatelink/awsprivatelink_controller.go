@@ -3,7 +3,6 @@ package awsprivatelink
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"regexp"
@@ -1363,7 +1362,7 @@ func ReadAWSPrivateLinkControllerConfigFile() (*hivev1.AWSPrivateLinkConfig, err
 
 	config := &hivev1.AWSPrivateLinkConfig{}
 
-	fileBytes, err := ioutil.ReadFile(fPath)
+	fileBytes, err := os.ReadFile(fPath)
 	if os.IsNotExist(err) {
 		return config, nil
 	}

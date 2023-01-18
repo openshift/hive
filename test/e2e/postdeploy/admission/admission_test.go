@@ -2,7 +2,7 @@ package admission
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -77,7 +77,7 @@ func TestAdmission(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			file := filepath.Join("testdata", test.file)
-			b, err := ioutil.ReadFile(file)
+			b, err := os.ReadFile(file)
 			if err != nil {
 				t.Fatalf("Unexpected file read error: %v", err)
 			}

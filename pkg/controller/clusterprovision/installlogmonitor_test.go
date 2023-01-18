@@ -2,7 +2,7 @@ package clusterprovision
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -450,7 +450,7 @@ func TestParseInstallLog(t *testing.T) {
 // buildRegexConfigMap reads the install log regexes configmap from within config/configmaps/install-log-regexes-configmap.yaml
 func buildRegexConfigMap() runtime.Object {
 	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
-	stream, err := ioutil.ReadFile("../../../config/configmaps/install-log-regexes-configmap.yaml")
+	stream, err := os.ReadFile("../../../config/configmaps/install-log-regexes-configmap.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}

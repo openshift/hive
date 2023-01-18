@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"time"
@@ -567,10 +566,10 @@ func (r *ReconcileClusterDeployment) copyInstallLogSecret(destNamespace string, 
 	return controllerutils.CopySecret(r, src, dest, nil, nil)
 }
 
-// NOTE: Ugly-but-simple way to mock ioutil.ReadFile for test purposes.
+// NOTE: Ugly-but-simple way to mock os.ReadFile for test purposes.
 // https://stackoverflow.com/questions/20923938/how-would-i-mock-a-call-to-ioutil-readfile-in-go/37035375
 // This variable is overridden by fakeReadFile.
-var readFile = ioutil.ReadFile
+var readFile = os.ReadFile
 
 // readProvisionFailedConfig reads the provision fail config from the file pointed to
 // by the FailedProvisionConfigFileEnvVar environment variable.

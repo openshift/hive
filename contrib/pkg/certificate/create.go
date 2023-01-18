@@ -3,7 +3,6 @@ package certificate
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"os/user"
@@ -83,7 +82,7 @@ func (o *Options) Run() error {
 	if err != nil {
 		return err
 	}
-	certbotDir, err := ioutil.TempDir("", "")
+	certbotDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return errors.New("cannot create temporary directory for certbot")
 	}
@@ -167,11 +166,11 @@ func (o *Options) getBaseDomainID() (string, error) {
 }
 
 func copyFile(src, dst string) error {
-	b, err := ioutil.ReadFile(src)
+	b, err := os.ReadFile(src)
 	if err != nil {
 		return errors.Wrapf(err, "cannot read %s", src)
 	}
-	err = ioutil.WriteFile(dst, b, 0644)
+	err = os.WriteFile(dst, b, 0644)
 	if err != nil {
 		return errors.Wrapf(err, "cannot write %s", dst)
 	}

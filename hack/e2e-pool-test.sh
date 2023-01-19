@@ -229,7 +229,7 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
 
 # Add customization to REAL POOL
 # NOTE: Use the cdcci- prefix for this cluster name so it gets caught by our leak detector.
-NEW_CLUSTER_NAME=cdcci-${$CLUSTER_NAME#*-}
+NEW_CLUSTER_NAME=cdcci-${CLUSTER_NAME#*-}
 create_customization "cdc-test" "${CLUSTER_NAMESPACE}" "${NEW_CLUSTER_NAME}"
 oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
 

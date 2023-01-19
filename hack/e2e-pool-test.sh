@@ -228,8 +228,8 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
   | oc apply -f -
 
 # Add customization to REAL POOL
-# NOTE: Use the hiveci- prefix for cluster names so they get caught by our leak detector.
-NEW_CLUSTER_NAME="hiveci-cdc-$(cat /dev/urandom | tr -dc 'a-z' | fold -w 4 | head -n 1)"
+# NOTE: Use the cdcci- prefix for this cluster name so it gets caught by our leak detector.
+NEW_CLUSTER_NAME=cdcci-${CLUSTER_NAME#*-}
 create_customization "cdc-test" "${CLUSTER_NAMESPACE}" "${NEW_CLUSTER_NAME}"
 oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
 

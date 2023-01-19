@@ -108,6 +108,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	if err != nil {
 		return err
 	}
+	applyDeploymentConfig(instance, hivev1.DeploymentNameAdmission, hiveAdmContainer, hLog)
 
 	hiveAdmDeployment.Namespace = hiveNSName
 	if r.hiveImage != "" {

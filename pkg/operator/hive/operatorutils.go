@@ -63,3 +63,28 @@ func containerByName(template *corev1.PodSpec, name string) (*corev1.Container, 
 	}
 	return nil, fmt.Errorf("no container named %s", name)
 }
+
+// applyDeploymentConfig looks in hiveConfig for a spec.deploymentConfig whose deploymentName matches the
+// deploymentName parameter. If found, it copies the guts of that deploymentConfig into the container, as
+// appropriate.
+// NOTE: Currently each deployment/statefulset has only one container. If that changes in the future, we
+// will need to expand the DeploymentConfig struct to include a way to specify one or more containers,
+// and expand this function's parameter list accordingly.
+func applyDeploymentConfig(hiveConfig *hivev1.HiveConfig, deploymentName hivev1.DeploymentName, container *corev1.Container, hLog log.FieldLogger) {
+	logger := hLog.WithField("deploymentName", deploymentName)
+	if hiveConfig.Spec.DeploymentConfig == nil {
+		return
+	}
+	for _, dc := range *hiveConfig.Spec.DeploymentConfig {
+		if dc.DeploymentName != deploymentName {
+			continue
+		}
+		// Currently DeploymentConfig only has Resources. If those are absent, nothing to do.
+		if dc.Resources == nil {
+			logger.Warn("Ignoring deploymentConfig with no resources")
+			continue
+		}
+		logger.Info("Overriding resources from deploymentConfig")
+		container.Resources = *dc.Resources
+	}
+}

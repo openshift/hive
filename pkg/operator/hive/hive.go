@@ -102,6 +102,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if err != nil {
 		return err
 	}
+	applyDeploymentConfig(instance, hivev1.DeploymentNameControllers, hiveContainer, hLog)
 
 	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {

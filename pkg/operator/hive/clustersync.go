@@ -48,6 +48,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	if err != nil {
 		return err
 	}
+	applyDeploymentConfig(hiveconfig, hivev1.DeploymentNameClustersync, hiveContainer, hLog)
 
 	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {

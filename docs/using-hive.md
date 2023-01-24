@@ -2,47 +2,47 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Using Hive](#using-hive)
-  - [Cluster Provisioning](#cluster-provisioning)
-    - [DNS](#dns)
-      - [Native](#native)
-        - [Managed DNS](#managed-dns)
-      - [Non-native](#non-native)
-        - [oVirt](#ovirt)
-    - [Pull Secret](#pull-secret)
-    - [OpenShift Version](#openshift-version)
-    - [Cloud credentials](#cloud-credentials)
-      - [Alibaba Cloud](#alibaba-cloud)
-        - [Alibaba Cloud Credential Manifests](#alibaba-cloud-credential-manifests)
-      - [AWS](#aws)
-      - [Azure](#azure)
-      - [GCP](#gcp)
-      - [IBM Cloud](#ibm-cloud)
-        - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
-      - [oVirt](#ovirt-1)
-      - [vSphere](#vsphere)
-      - [OpenStack](#openstack)
-    - [SSH Key Pair](#ssh-key-pair)
-    - [InstallConfig](#installconfig)
-    - [ClusterDeployment](#clusterdeployment)
-    - [Machine Pools](#machine-pools)
-      - [Configuring Availability Zones](#configuring-availability-zones)
-      - [Auto-scaling](#auto-scaling)
-        - [Integration with Horizontal Pod Autoscalers](#integration-with-horizontal-pod-autoscalers)
-    - [Create Cluster on Bare Metal](#create-cluster-on-bare-metal)
-  - [Monitor the Install Job](#monitor-the-install-job)
-    - [Saving Logs for Failed Provisions](#saving-logs-for-failed-provisions)
-    - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
-    - [Access the Web Console](#access-the-web-console)
-  - [Managed DNS](#managed-dns-1)
-  - [Cluster Adoption](#cluster-adoption)
-    - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
-    - [Adopting with hiveutil](#adopting-with-hiveutil)
-  - [Configuration Management](#configuration-management)
-    - [SyncSet](#syncset)
-    - [Scaling ClusterSync](#scaling-clustersync)
-    - [Identity Provider Management](#identity-provider-management)
-  - [Cluster Deprovisioning](#cluster-deprovisioning)
+- [Cluster Provisioning](#cluster-provisioning)
+  - [DNS](#dns)
+    - [Native](#native)
+      - [Managed DNS](#managed-dns)
+    - [Non-native](#non-native)
+      - [oVirt](#ovirt)
+  - [Pull Secret](#pull-secret)
+  - [OpenShift Version](#openshift-version)
+  - [Cloud credentials](#cloud-credentials)
+    - [Alibaba Cloud](#alibaba-cloud)
+      - [Alibaba Cloud Credential Manifests](#alibaba-cloud-credential-manifests)
+    - [AWS](#aws)
+    - [Azure](#azure)
+    - [GCP](#gcp)
+    - [IBM Cloud](#ibm-cloud)
+      - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
+    - [oVirt](#ovirt-1)
+    - [vSphere](#vsphere)
+    - [OpenStack](#openstack)
+  - [SSH Key Pair](#ssh-key-pair)
+  - [InstallConfig](#installconfig)
+  - [ClusterDeployment](#clusterdeployment)
+  - [Machine Pools](#machine-pools)
+    - [Configuring Availability Zones](#configuring-availability-zones)
+    - [Auto-scaling](#auto-scaling)
+      - [Integration with Horizontal Pod Autoscalers](#integration-with-horizontal-pod-autoscalers)
+  - [Create Cluster on Bare Metal](#create-cluster-on-bare-metal)
+- [Monitor the Install Job](#monitor-the-install-job)
+  - [Saving Logs for Failed Provisions](#saving-logs-for-failed-provisions)
+  - [Cluster Admin Kubeconfig](#cluster-admin-kubeconfig)
+  - [Access the Web Console](#access-the-web-console)
+- [Managed DNS](#managed-dns-1)
+- [Cluster Adoption](#cluster-adoption)
+  - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
+  - [Adopting with hiveutil](#adopting-with-hiveutil)
+- [Configuration Management](#configuration-management)
+  - [Vertical Scaling](#vertical-scaling)
+  - [SyncSet](#syncset)
+  - [Scaling ClusterSync](#scaling-clustersync)
+  - [Identity Provider Management](#identity-provider-management)
+- [Cluster Deprovisioning](#cluster-deprovisioning)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1212,6 +1212,36 @@ bin/hiveutil create-cluster --namespace=namespace-to-adopt-into --base-domain=ex
 ```
 
 ## Configuration Management
+
+### Vertical Scaling
+hive-operator deploys each component (the [hive-controllers](../config/controllers/deployment.yaml) and [hiveadmission](../config/hiveadmission/deployment.yaml) Deployments; and the [hive-clustersync](../config/clustersync/statefulset.yaml) StatefulSet) with default resource requests.
+If you need to scale any of these components vertically, you may add one or more `deploymentConfig` sections to HiveConfig's `spec`. For example:
+
+```yaml
+  deploymentConfig:
+  - deploymentName: hive-controllers
+    resources:
+      requests:
+        memory: 256Mi
+  - deploymentName: hive-clustersync
+    resources:
+      requests:
+        cpu: 30m
+        memory: 257Mi
+      limits:
+        cpu: 50m
+  - deploymentName: hiveadmission
+    resources:
+      requests:
+        cpu: 20m
+```
+
+For each entry, the `deploymentName` must match the `metadata.name` of the Deployment/StatefulSet.
+The `resources` is a standard corev1.ResourceRequirements.
+
+See [below](#scaling-clustersync) for information on _horizontally_ scaling the clustersync controller.
+
+Note: The hive-operator itself must be scaled by directly editing its Deployment.
 
 ### SyncSet
 

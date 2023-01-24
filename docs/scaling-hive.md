@@ -10,7 +10,13 @@ Most importantly, be aware that Hive uses CRDs to store its state. The amount of
 
 # Horizontal vs. Vertical Scale
 
-With the exception of install pods (used only when clusters are installing), Hive 1.x is not horizontally scalable at the worker level. Most of the work Hive does happens in the hive-controllers pod, which is one single pod on one single worker. This means that when no installs are running, if you have a cluster with 10 workers, 9 of the workers are very bored. Hive clusters are prime candidates for using worker autoscaling. Keep the worker count as low as you can, but allow bursts of concurrent installs to call for temporary workers to spin up.
+With the exception of install pods (used only when clusters are installing), Hive 1.x is not horizontally scalable at the worker level with the exception of the [clustersync controller](using-hive.md#scaling-clustersync).
+Most of the work Hive does happens in the hive-controllers pod, which is one single pod on one single worker.
+This means that when no installs are running, if you have a cluster with 10 workers, 9 of the workers are very bored.
+Hive clusters are prime candidates for using worker autoscaling.
+Keep the worker count as low as you can, but allow bursts of concurrent installs to call for temporary workers to spin up.
+
+See [using hive](using-hive.md#vertical-scaling) for information about vertically scaling the hive-controllers, hive-clustersync, and hiveadmission pods themselves.
 
 In AWS, Hive performs best on C (CPU Optimized) instance types. Hive performs fine on M (General purpose) instances, but C instances are better.
 

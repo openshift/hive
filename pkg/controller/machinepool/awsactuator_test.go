@@ -64,7 +64,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone1"): 3,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -81,7 +81,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone3"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -99,7 +99,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone3"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -133,7 +133,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedSubnetIDInMachineSet: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -146,7 +146,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedErr: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -169,7 +169,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "SubnetsNotFound",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -198,7 +198,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "MoreThanOneSubnetForZone",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -226,7 +226,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "NoSubnetForAvailabilityZone",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -255,7 +255,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "InsufficientPublicSubnets",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -289,7 +289,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedSubnetIDInMachineSet: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -323,7 +323,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedSubnetIDInMachineSet: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -338,7 +338,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone1"): 3,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -352,7 +352,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "UnsupportedSpotMarketOptions",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -368,7 +368,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedKMSKey: fakeKMSKeyARN,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -395,7 +395,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "ConfigurationSupported",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -409,7 +409,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "UnsupportedSpotMarketOptions",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 		},
 		{
@@ -491,7 +491,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.StringPtr(testAMI),
+				ID: pointer.String(testAMI),
 			},
 			expectedSGFilters: []machineapi.Filter{
 				{
@@ -656,8 +656,8 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) *gomock.Call {
 	input := &ec2.DescribeAvailabilityZonesInput{
 		Filters: []*ec2.Filter{{
-			Name:   pointer.StringPtr("region-name"),
-			Values: []*string{pointer.StringPtr(testRegion)},
+			Name:   pointer.String("region-name"),
+			Values: []*string{pointer.String(testRegion)},
 		}},
 	}
 	availabilityZones := make([]*ec2.AvailabilityZone, len(zones))

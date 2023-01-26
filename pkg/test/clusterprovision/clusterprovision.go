@@ -100,8 +100,8 @@ func WithStage(stage hivev1.ClusterProvisionStage) Option {
 func Successful(clusterID, infraID, kubeconfigSecretName, passwordSecretName string) Option {
 	return func(clusterProvision *hivev1.ClusterProvision) {
 		clusterProvision.Spec.Stage = hivev1.ClusterProvisionStageComplete
-		clusterProvision.Spec.ClusterID = pointer.StringPtr(clusterID)
-		clusterProvision.Spec.InfraID = pointer.StringPtr(infraID)
+		clusterProvision.Spec.ClusterID = pointer.String(clusterID)
+		clusterProvision.Spec.InfraID = pointer.String(infraID)
 		clusterProvision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: kubeconfigSecretName}
 		clusterProvision.Spec.AdminPasswordSecretRef = &corev1.LocalObjectReference{Name: passwordSecretName}
 	}

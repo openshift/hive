@@ -703,8 +703,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
-					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image")
-					cd.Status.CLIImage = pointer.StringPtr("test-cli-image")
+					cd.Status.InstallerImage = pointer.String("test-installer-image")
+					cd.Status.CLIImage = pointer.String("test-cli-image")
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.InstallImagesNotResolvedCondition,
 						corev1.ConditionTrue, "test-reason", "test-message")
@@ -727,8 +727,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
-					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image")
-					cd.Status.CLIImage = pointer.StringPtr("test-cli-image")
+					cd.Status.InstallerImage = pointer.String("test-installer-image")
+					cd.Status.CLIImage = pointer.String("test-cli-image")
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
@@ -780,7 +780,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallConfigSecret(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
-					cd.Status.InstallerImage = pointer.StringPtr("test-installer-image:latest")
+					cd.Status.InstallerImage = pointer.String("test-installer-image:latest")
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
@@ -3318,8 +3318,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd.Labels[hivev1.HiveClusterRegionLabel] = "us-east-1"
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
-		InstallerImage: pointer.StringPtr("installer-image:latest"),
-		CLIImage:       pointer.StringPtr("cli:latest"),
+		InstallerImage: pointer.String("installer-image:latest"),
+		CLIImage:       pointer.String("cli:latest"),
 	}
 
 	return cd
@@ -3814,7 +3814,7 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 		},
 	}
 	cd.Status = hivev1.ClusterDeploymentStatus{
-		InstallerImage: pointer.StringPtr("installer-image:latest"),
+		InstallerImage: pointer.String("installer-image:latest"),
 	}
 	return cd
 }

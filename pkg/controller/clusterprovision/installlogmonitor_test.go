@@ -80,97 +80,97 @@ func TestParseInstallLog(t *testing.T) {
 	}{
 		{
 			name:           "Gp3VolumeLimitExceeded",
-			log:            pointer.StringPtr(gp3VolumeLimitExceeded),
+			log:            pointer.String(gp3VolumeLimitExceeded),
 			expectedReason: "Gp3VolumeLimitExceeded",
 		},
 		{
 			name:           "AWSInsufficientCapacity",
-			log:            pointer.StringPtr(awsInsufficientCapacity),
+			log:            pointer.String(awsInsufficientCapacity),
 			expectedReason: "AWSInsufficientCapacity",
 		},
 		{
 			name:           "load balancer service linked role prereq",
-			log:            pointer.StringPtr(accessDeniedSLR),
+			log:            pointer.String(accessDeniedSLR),
 			expectedReason: "AWSAccessDeniedSLR",
 		},
 		{
 			name:           "DNS already exists",
-			log:            pointer.StringPtr(dnsAlreadyExistsLog),
+			log:            pointer.String(dnsAlreadyExistsLog),
 			expectedReason: "DNSAlreadyExists",
 		},
 		{
 			name:           "PendingVerification",
-			log:            pointer.StringPtr(pendingVerificationLog),
+			log:            pointer.String(pendingVerificationLog),
 			expectedReason: "PendingVerification",
 		},
 		{
 			name:           "Wildcard",
-			log:            pointer.StringPtr(gcpInvalidProjectIDLog),
+			log:            pointer.String(gcpInvalidProjectIDLog),
 			expectedReason: "GCPInvalidProjectID",
 		},
 		{
 			name:           "Escaped single quotes",
-			log:            pointer.StringPtr(gcpSSDQUotaLog),
+			log:            pointer.String(gcpSSDQUotaLog),
 			expectedReason: "GCPQuotaSSDTotalGBExceeded",
 		},
 		{
 			name:           "AWSNATGatewayLimitExceeded",
-			log:            pointer.StringPtr(natGatewayLimitExceeded),
+			log:            pointer.String(natGatewayLimitExceeded),
 			expectedReason: "AWSNATGatewayLimitExceeded",
 		},
 		{
 			name:           "AWSVPCLimitExceeded",
-			log:            pointer.StringPtr(vpcLimitExceeded),
+			log:            pointer.String(vpcLimitExceeded),
 			expectedReason: "AWSVPCLimitExceeded",
 		},
 		{
 			name:           "AWSRoute53LimitExceeded",
-			log:            pointer.StringPtr(route53LimitExceeded),
+			log:            pointer.String(route53LimitExceeded),
 			expectedReason: "TooManyRoute53Zones",
 		},
 		{
 			name:           "Generic ResourceLimitExceeded",
-			log:            pointer.StringPtr(genericLimitExceeded),
+			log:            pointer.String(genericLimitExceeded),
 			expectedReason: "FallbackResourceLimitExceeded",
 		},
 		{
 			name:           "Credentials are invalid",
-			log:            pointer.StringPtr(invalidCredentials),
+			log:            pointer.String(invalidCredentials),
 			expectedReason: "InvalidCredentials",
 		},
 		{
 			name:           "Failed waiting for Kubernetes API",
-			log:            pointer.StringPtr(kubeAPIWaitFailedLog),
+			log:            pointer.String(kubeAPIWaitFailedLog),
 			expectedReason: "KubeAPIWaitFailed",
 		},
 		{
 			name:           "ProxyTimeout",
-			log:            pointer.StringPtr(proxyTimeoutLog),
+			log:            pointer.String(proxyTimeoutLog),
 			expectedReason: "ProxyTimeout",
 		},
 		{
 			name:           "Proxy Connection Refused",
-			log:            pointer.StringPtr(proxyConnectionRefused),
+			log:            pointer.String(proxyConnectionRefused),
 			expectedReason: "ProxyTimeout",
 		},
 		{
 			name:           "Proxy No Route To Host",
-			log:            pointer.StringPtr(proxyNoRouteToHost),
+			log:            pointer.String(proxyNoRouteToHost),
 			expectedReason: "ProxyTimeout",
 		},
 		{
 			name:           "ProxyInvalidCABundle",
-			log:            pointer.StringPtr(proxyInvalidCABundleLog),
+			log:            pointer.String(proxyInvalidCABundleLog),
 			expectedReason: "ProxyInvalidCABundle",
 		},
 		{
 			name:           "AWSDeniedBySCP",
-			log:            pointer.StringPtr(awsDeniedByScp),
+			log:            pointer.String(awsDeniedByScp),
 			expectedReason: "AWSDeniedBySCP",
 		},
 		{
 			name: "KubeAPIWaitTimeout from additional regex entries",
-			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
+			log:  pointer.String(kubeAPIWaitTimeoutLog),
 			existing: []runtime.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -207,7 +207,7 @@ func TestParseInstallLog(t *testing.T) {
 		},
 		{
 			name: "regexes take precedence over additionalRegexes",
-			log:  pointer.StringPtr(kubeAPIWaitTimeoutLog),
+			log:  pointer.String(kubeAPIWaitTimeoutLog),
 			existing: []runtime.Object{
 				&corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -248,19 +248,19 @@ func TestParseInstallLog(t *testing.T) {
 		},
 		{
 			name:            "no matching log",
-			log:             pointer.StringPtr(noMatchLog),
+			log:             pointer.String(noMatchLog),
 			expectedReason:  unknownReason,
-			expectedMessage: pointer.StringPtr(noMatchLog),
+			expectedMessage: pointer.String(noMatchLog),
 		},
 		{
 			name:           "missing regex configmap",
-			log:            pointer.StringPtr(dnsAlreadyExistsLog),
+			log:            pointer.String(dnsAlreadyExistsLog),
 			existing:       []runtime.Object{},
 			expectedReason: unknownReason,
 		},
 		{
 			name: "missing regexes data entry",
-			log:  pointer.StringPtr(dnsAlreadyExistsLog),
+			log:  pointer.String(dnsAlreadyExistsLog),
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
@@ -271,7 +271,7 @@ func TestParseInstallLog(t *testing.T) {
 		},
 		{
 			name: "malformed regex",
-			log:  pointer.StringPtr(dnsAlreadyExistsLog),
+			log:  pointer.String(dnsAlreadyExistsLog),
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
@@ -285,7 +285,7 @@ func TestParseInstallLog(t *testing.T) {
 		},
 		{
 			name: "skip bad regex entry",
-			log:  pointer.StringPtr(dnsAlreadyExistsLog),
+			log:  pointer.String(dnsAlreadyExistsLog),
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
@@ -310,7 +310,7 @@ func TestParseInstallLog(t *testing.T) {
 		},
 		{
 			name: "skip bad search string",
-			log:  pointer.StringPtr(dnsAlreadyExistsLog),
+			log:  pointer.String(dnsAlreadyExistsLog),
 			existing: []runtime.Object{&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      regexConfigMapName,
@@ -331,102 +331,102 @@ func TestParseInstallLog(t *testing.T) {
 		},
 		{
 			name:           "GCP compute quota",
-			log:            pointer.StringPtr(gcpCPUQuotaLog),
+			log:            pointer.String(gcpCPUQuotaLog),
 			expectedReason: "GCPComputeQuotaExceeded",
 		},
 		{
 			name:           "GCP service account quota",
-			log:            pointer.StringPtr(gcpServiceAccountQuotaLog),
+			log:            pointer.String(gcpServiceAccountQuotaLog),
 			expectedReason: "GCPServiceAccountQuotaExceeded",
 		},
 		{
 			name:           "Can't delete IAM role",
-			log:            pointer.StringPtr(awsDeleteRoleFailed),
+			log:            pointer.String(awsDeleteRoleFailed),
 			expectedReason: "ErrorDeletingIAMRole",
 		},
 		{
 			name:           "AWSSubnetDoesNotExist",
-			log:            pointer.StringPtr(subnetDoesNotExist),
+			log:            pointer.String(subnetDoesNotExist),
 			expectedReason: "AWSSubnetDoesNotExist",
 		},
 		{
 			name:           "NATGatewayFailed",
-			log:            pointer.StringPtr(natGateWayFailed),
+			log:            pointer.String(natGateWayFailed),
 			expectedReason: "NATGatewayFailed",
 		},
 		{
 			name:           "AWSInsufficientPermissions",
-			log:            pointer.StringPtr(insufficientPermissions),
+			log:            pointer.String(insufficientPermissions),
 			expectedReason: "AWSInsufficientPermissions",
 		},
 		{
 			name:           "LoadBalancerLimitExceeded",
-			log:            pointer.StringPtr(loadBalancerLimitExceeded),
+			log:            pointer.String(loadBalancerLimitExceeded),
 			expectedReason: "LoadBalancerLimitExceeded",
 		},
 		{
 			name:           "AWSEC2QuotaExceeded",
-			log:            pointer.StringPtr(awsEC2QuotaExceeded),
+			log:            pointer.String(awsEC2QuotaExceeded),
 			expectedReason: "AWSEC2QuotaExceeded",
 		},
 		{
 			name:           "AWSNoWorkerNodes",
-			log:            pointer.StringPtr(fmt.Sprintf(noWorkerNodesFmt, "aws", "aws")),
+			log:            pointer.String(fmt.Sprintf(noWorkerNodesFmt, "aws", "aws")),
 			expectedReason: "AWSNoWorkerNodes",
 		},
 		{
 			name:           "GCPNoWorkerNodes",
-			log:            pointer.StringPtr(fmt.Sprintf(noWorkerNodesFmt, "gcp", "gcp")),
+			log:            pointer.String(fmt.Sprintf(noWorkerNodesFmt, "gcp", "gcp")),
 			expectedReason: "GCPNoWorkerNodes",
 		},
 		{
 			name:           "BootstrapFailed",
-			log:            pointer.StringPtr(bootstrapFailed),
+			log:            pointer.String(bootstrapFailed),
 			expectedReason: "BootstrapFailed",
 		},
 		{
 			name:           "KubeAPIWaitFailed",
-			log:            pointer.StringPtr(kubeAPIWaitFailedLog),
+			log:            pointer.String(kubeAPIWaitFailedLog),
 			expectedReason: "KubeAPIWaitFailed",
 		},
 		{
 			name:           "GenericBootstrapFailed",
-			log:            pointer.StringPtr(genericBootstrapFailed),
+			log:            pointer.String(genericBootstrapFailed),
 			expectedReason: "GenericBootstrapFailed",
 		},
 		{
 			name:           "AWSRoute53Timeout",
-			log:            pointer.StringPtr(route53Timeout),
+			log:            pointer.String(route53Timeout),
 			expectedReason: "AWSRoute53Timeout",
 		},
 		{
 			name:           "InconsistentTerraformResult",
-			log:            pointer.StringPtr(inconsistentTerraformResult),
+			log:            pointer.String(inconsistentTerraformResult),
 			expectedReason: "InconsistentTerraformResult",
 		},
 		{
 			name:           "MultipleRoute53ZonesFound",
-			log:            pointer.StringPtr(multipleRoute53ZonesFound),
+			log:            pointer.String(multipleRoute53ZonesFound),
 			expectedReason: "MultipleRoute53ZonesFound",
 		},
 		{
 			name:           "AWSVPCDoesNotExist",
-			log:            pointer.StringPtr(awsInvalidVpcId),
+			log:            pointer.String(awsInvalidVpcId),
 			expectedReason: "AWSVPCDoesNotExist",
 		},
 		{
 			name:           "TargetGroupNotFound",
-			log:            pointer.StringPtr(targetGroupNotFound),
+			log:            pointer.String(targetGroupNotFound),
 			expectedReason: "TargetGroupNotFound",
 		},
 		{
 			name:           "ErrorCreatingNetworkLoadBalancer",
-			log:            pointer.StringPtr(errorCreatingNLB),
+			log:            pointer.String(errorCreatingNLB),
 			expectedReason: "ErrorCreatingNetworkLoadBalancer",
 		},
 		{
 			name:           "ErrorDestroyingBootstrapResources",
-			log:            pointer.StringPtr(terraformFailedDelete),
+			log:            pointer.String(terraformFailedDelete),
 			expectedReason: "InstallerFailedToDestroyResources",
 		},
 	}

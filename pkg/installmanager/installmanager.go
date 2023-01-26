@@ -416,7 +416,7 @@ func (m *InstallManager) Run() error {
 		if err := m.updateClusterProvision(
 			m,
 			func(provision *hivev1.ClusterProvision) {
-				provision.Spec.InstallLog = pointer.StringPtr(installLog)
+				provision.Spec.InstallLog = pointer.String(installLog)
 			},
 		); err != nil {
 			m.log.WithError(err).Error("error updating cluster provision with asset generation log")
@@ -450,8 +450,8 @@ func (m *InstallManager) Run() error {
 		m,
 		func(provision *hivev1.ClusterProvision) {
 			provision.Spec.Metadata = &runtime.RawExtension{Raw: metadataBytes}
-			provision.Spec.InfraID = pointer.StringPtr(metadata.InfraID)
-			provision.Spec.ClusterID = pointer.StringPtr(metadata.ClusterID)
+			provision.Spec.InfraID = pointer.String(metadata.InfraID)
+			provision.Spec.ClusterID = pointer.String(metadata.ClusterID)
 
 			provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{
 				Name: kubeconfigSecret.Name,
@@ -509,7 +509,7 @@ func (m *InstallManager) Run() error {
 		if err := m.updateClusterProvision(
 			m,
 			func(provision *hivev1.ClusterProvision) {
-				provision.Spec.InstallLog = pointer.StringPtr(installLog)
+				provision.Spec.InstallLog = pointer.String(installLog)
 			},
 		); err != nil {
 			m.log.WithError(err).Warning("error updating cluster provision with installer log")

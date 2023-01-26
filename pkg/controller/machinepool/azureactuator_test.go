@@ -531,10 +531,10 @@ func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockCli
 	page.EXPECT().Values().Return(
 		[]compute.ResourceSku{
 			{
-				Name: pointer.StringPtr(testInstanceType),
+				Name: pointer.String(testInstanceType),
 				LocationInfo: &[]compute.ResourceSkuLocationInfo{
 					{
-						Location: pointer.StringPtr(testRegion),
+						Location: pointer.String(testRegion),
 						Zones:    &zones,
 					},
 				},

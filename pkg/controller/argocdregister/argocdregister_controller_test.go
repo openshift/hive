@@ -303,8 +303,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
 		APIURL:         "http://test-api.test.com",
-		InstallerImage: pointer.StringPtr("installer-image:latest"),
-		CLIImage:       pointer.StringPtr("cli:latest"),
+		InstallerImage: pointer.String("installer-image:latest"),
+		CLIImage:       pointer.String("cli:latest"),
 	}
 
 	return cd

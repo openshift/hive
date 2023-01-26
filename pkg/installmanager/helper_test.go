@@ -58,7 +58,7 @@ func testClusterProvisionWithInfraIDSet() *hivev1.ClusterProvision {
 				Name: testDeploymentName,
 			},
 			Stage:   hivev1.ClusterProvisionStageProvisioning,
-			InfraID: pointer.StringPtr("dummy-infra-id"),
+			InfraID: pointer.String("dummy-infra-id"),
 		},
 	}
 }

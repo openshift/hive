@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -741,6 +742,7 @@ users:
 		configureAWSClient func(*mock.MockClient)
 
 		hasFinalizer        bool
+		expectDeleted       bool
 		expectedAnnotations map[string]string
 		expectedStatus      *hivev1aws.PrivateLinkAccessStatus
 		expectedConditions  []hivev1.ClusterDeploymentCondition
@@ -1867,6 +1869,24 @@ users:
 		expectedAnnotations: map[string]string{
 			lastCleanupAnnotationKey: "test-cd-1234",
 		},
+	}, {
+		name: "cd deleted with privatelink enabled and preserveondelete enabled",
+
+		existing: []runtime.Object{
+			enabledPrivateLinkBuilder.GenericOptions(
+				generic.Deleted(),
+				generic.WithFinalizer(finalizer),
+			).Build(
+				withClusterMetadata("test-cd-1234", "test-cd-provision-0-kubeconfig"),
+				withPrivateLink(&hivev1aws.PrivateLinkAccessStatus{
+					VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345"},
+					VPCEndpointID:      "vpce-12345",
+					HostedZoneID:       "HZ12345",
+				}),
+				withPreserveOnDelete(true),
+			),
+		},
+		expectDeleted: true,
 	}}
 
 	for _, test := range cases {
@@ -1905,6 +1925,10 @@ users:
 			}
 			cd := &hivev1.ClusterDeployment{}
 			err = fakeClient.Get(context.TODO(), key, cd)
+			if test.expectDeleted {
+				assert.True(t, apierrors.IsNotFound(err))
+				return
+			}
 			require.NoError(t, err)
 
 			if test.hasFinalizer {
@@ -1950,6 +1974,12 @@ func withClusterMetadata(infraID, kubeconfigSecretName string) testcd.Option {
 				Name: kubeconfigSecretName,
 			},
 		}
+	}
+}
+
+func withPreserveOnDelete(value bool) testcd.Option {
+	return func(cd *hivev1.ClusterDeployment) {
+		cd.Spec.PreserveOnDelete = value
 	}
 }
 

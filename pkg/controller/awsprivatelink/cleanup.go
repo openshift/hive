@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -77,14 +76,22 @@ func (r *ReconcileAWSPrivateLink) cleanupPreviousProvisionAttempt(cd *hivev1.Clu
 }
 
 func cleanupRequired(cd *hivev1.ClusterDeployment) bool {
-	var plStatus hivev1aws.PrivateLinkAccessStatus
-	if cd.Status.Platform != nil && cd.Status.Platform.AWS != nil && cd.Status.Platform.AWS.PrivateLink != nil {
-		plStatus = *cd.Status.Platform.AWS.PrivateLink
+	// There is nothing to do when PrivateLink is undefined. This either means it was never enabled, or it was already cleaned up.
+	if cd.Status.Platform == nil || cd.Status.Platform.AWS == nil || cd.Status.Platform.AWS.PrivateLink == nil {
+		return false
 	}
-	return plStatus.VPCEndpointID != "" ||
-		plStatus.VPCEndpointService.ID != "" ||
-		plStatus.VPCEndpointService.Name != "" ||
-		plStatus.HostedZoneID != ""
+	// There is nothing to do when deleting a ClusterDeployment with PreserveOnDelete and PrivateLink enabled.
+	// NOTE: If a ClusterDeployment is deleted after a failed install with PreserveOnDelete set, the PrivateLink
+	// resources are not cleaned up. This is by design as the rest of the cloud resources are also not cleaned up.
+	if cd.DeletionTimestamp != nil &&
+		cd.Spec.PreserveOnDelete &&
+		cd.Spec.Platform.AWS.PrivateLink.Enabled {
+		return false
+	}
+	return cd.Status.Platform.AWS.PrivateLink.VPCEndpointID != "" ||
+		cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.ID != "" ||
+		cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.Name != "" ||
+		cd.Status.Platform.AWS.PrivateLink.HostedZoneID != ""
 }
 
 func (r *ReconcileAWSPrivateLink) cleanupPrivateLink(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger log.FieldLogger) error {

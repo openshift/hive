@@ -1761,6 +1761,11 @@ data:
       - "VcpuLimitExceeded"
       installFailingReason: VcpuLimitExceeded
       installFailingMessage: The install requires more vCPU capacity than your current vCPU limit
+    - name: Gp3VolumeLimitExceeded
+      searchRegexStrings:
+      - "VolumeLimitExceeded: You have exceeded your maximum gp3 storage limit"
+      installFailingReason: Gp3VolumeLimitExceeded
+      installFailingMessage: "The installation failed due to insufficient gp3 storage quota in the region (QuotaCode L-7A658B76)"
     - name: UserInitiatedShutdown
       searchRegexStrings:
       - "Error waiting for instance .* to become ready .* User initiated shutdown"
@@ -1863,7 +1868,7 @@ data:
 
 
     # Generic OpenShift Install
-    
+
     - name: KubeAPIWaitTimeout
       searchRegexStrings:
       - "waiting for Kubernetes API: context deadline exceeded"

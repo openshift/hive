@@ -68,7 +68,7 @@ endif
 # `UnknownBranch`. However, the {commitcount} and {sha} should still be accurate.
 SOURCE_GIT_TAG := v$(shell export HOME=$(HOME); python3 -mpip install --user gitpython >&2; hack/version.py)
 
-BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/... ./config/monitoring/...
+BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
 $(call build-image,hive,$(IMG),./Dockerfile,.)

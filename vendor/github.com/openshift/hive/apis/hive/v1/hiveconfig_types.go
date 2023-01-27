@@ -143,11 +143,14 @@ type HiveConfigSpec struct {
 
 	FeatureGates *FeatureGateSelection `json:"featureGates,omitempty"`
 
-	// ExportMetrics specifies whether the operator should enable metrics for hive controllers
-	// to be extracted for prometheus.
-	// When set to true, the operator deploys ServiceMonitors so that the prometheus instances that
-	// extract metrics. The operator also sets up RBAC in the TargetNamespace so that openshift
-	// prometheus in the cluster can list/access objects required to pull metrics.
+	// ExportMetrics has been disabled and has no effect. If upgrading from a version where it was
+	// active, please be aware of the following in your HiveConfig.Spec.TargetNamespace (default
+	// `hive` if unset):
+	// 1) ServiceMonitors named hive-controllers and hive-clustersync;
+	// 2) Role and RoleBinding named prometheus-k8s;
+	// 3) The `openshift.io/cluster-monitoring` metadata.label on the Namespace itself.
+	// You may wish to delete these resources. Or you may wish to continue using them to enable
+	// monitoring in your environment; but be aware that hive will no longer reconcile them.
 	ExportMetrics bool `json:"exportMetrics,omitempty"`
 
 	// MetricsConfig encapsulates metrics specific configurations, like opting in for certain metrics.

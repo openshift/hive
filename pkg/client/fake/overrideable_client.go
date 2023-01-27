@@ -50,7 +50,7 @@ func clientOverride(behavior []error, numCalls int) error {
 }
 
 // Get overrides the fake client's Get, conditionally bypassing it and returning an error instead.
-func (f FakeClientWithCustomErrors) Get(ctx context.Context, key crclient.ObjectKey, obj crclient.Object) error {
+func (f FakeClientWithCustomErrors) Get(ctx context.Context, key crclient.ObjectKey, obj crclient.Object, opts ...crclient.GetOption) error {
 	// Always increment the call count, but not until we're done.
 	defer func() { f.numGetCalls++ }()
 	if err := clientOverride(f.GetBehavior, f.numGetCalls); err != nil {

@@ -917,8 +917,8 @@ func Test_summarizeMachinesError(t *testing.T) {
 			testMachineSetMachine("machine-1", "worker", testName),
 			func() *machineapi.Machine {
 				m := testMachineSetMachine("machine-2", "worker", testName)
-				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.StringPtr("GoneNotComingBack"))
-				m.Status.ErrorMessage = pointer.StringPtr("The machine is not found")
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.String("GoneNotComingBack"))
+				m.Status.ErrorMessage = pointer.String("The machine is not found")
 				return m
 			}(),
 			testMachineSetMachine("machine-3", "worker", testName),
@@ -933,14 +933,14 @@ func Test_summarizeMachinesError(t *testing.T) {
 			testMachineSetMachine("machine-1", "worker", testName),
 			func() *machineapi.Machine {
 				m := testMachineSetMachine("machine-2", "worker", testName)
-				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.StringPtr("GoneNotComingBack"))
-				m.Status.ErrorMessage = pointer.StringPtr("The machine is not found")
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.String("GoneNotComingBack"))
+				m.Status.ErrorMessage = pointer.String("The machine is not found")
 				return m
 			}(),
 			func() *machineapi.Machine {
 				m := testMachineSetMachine("machine-3", "worker", testName)
-				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.StringPtr("InsufficientResources"))
-				m.Status.ErrorMessage = pointer.StringPtr("No available quota")
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.String("InsufficientResources"))
+				m.Status.ErrorMessage = pointer.String("No available quota")
 				return m
 			}(),
 			testMachineSet(testName, "worker", false, 3, 0),

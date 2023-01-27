@@ -208,12 +208,12 @@ func setupAzureClientInstances(client *mockazureclient.MockClient, instances map
 			name := fmt.Sprintf("%s-%d", state, i)
 			instanceViewStatus := []compute.InstanceViewStatus{
 				{
-					Code: pointer.StringPtr("PowerState/" + state),
+					Code: pointer.String("PowerState/" + state),
 				},
 			}
 			vms = append(vms, compute.VirtualMachine{
-				Name: pointer.StringPtr(name),
-				ID:   pointer.StringPtr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", azureTestSubscription, azureTestResourceGroup, name)),
+				Name: pointer.String(name),
+				ID:   pointer.String(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", azureTestSubscription, azureTestResourceGroup, name)),
 				VirtualMachineProperties: &compute.VirtualMachineProperties{
 					InstanceView: &compute.VirtualMachineInstanceView{
 						Statuses: &instanceViewStatus,

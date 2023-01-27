@@ -250,9 +250,9 @@ func setupIBMCloudClientInstances(ibmCloudClient *mockibmclient.MockAPI, statuse
 	for status, count := range statuses {
 		for i := 0; i < count; i++ {
 			instances = append(instances, vpcv1.Instance{
-				Name:   pointer.StringPtr(fmt.Sprintf("%s-%d", status, i)),
-				ID:     pointer.StringPtr(fmt.Sprintf("%s-%d", status, i)),
-				Status: pointer.StringPtr(status),
+				Name:   pointer.String(fmt.Sprintf("%s-%d", status, i)),
+				ID:     pointer.String(fmt.Sprintf("%s-%d", status, i)),
+				Status: pointer.String(status),
 			})
 		}
 	}

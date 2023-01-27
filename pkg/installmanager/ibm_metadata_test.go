@@ -89,7 +89,7 @@ func TestGetAccountID(t *testing.T) {
 		{
 			name: "AccountID Found",
 			existingAPIKey: &iamidentityv1.APIKey{
-				AccountID: pointer.StringPtr("testaccountid"),
+				AccountID: pointer.String("testaccountid"),
 			},
 			expectErr: false,
 		},

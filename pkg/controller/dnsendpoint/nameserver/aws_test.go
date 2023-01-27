@@ -182,12 +182,12 @@ func TestAWSGet(t *testing.T) {
 			}
 			for i, out := range tc.listHostedZonesOutputs {
 				in := &route53.ListHostedZonesByNameInput{
-					DNSName:  pointer.StringPtr("test-domain."),
-					MaxItems: pointer.StringPtr("5"),
+					DNSName:  pointer.String("test-domain."),
+					MaxItems: pointer.String("5"),
 				}
 				if i > 0 {
-					in.DNSName = pointer.StringPtr("next-dns-name")
-					in.HostedZoneId = pointer.StringPtr("next-hosted-zone-id")
+					in.DNSName = pointer.String("next-dns-name")
+					in.HostedZoneId = pointer.String("next-hosted-zone-id")
 				}
 				mockAWSClient.EXPECT().
 					ListHostedZonesByName(gomock.Eq(in)).
@@ -195,12 +195,12 @@ func TestAWSGet(t *testing.T) {
 			}
 			for i, out := range tc.listResourceRecordSetsOutputs {
 				in := &route53.ListResourceRecordSetsInput{
-					HostedZoneId: pointer.StringPtr("test-zone-id"),
-					MaxItems:     pointer.StringPtr("100"),
+					HostedZoneId: pointer.String("test-zone-id"),
+					MaxItems:     pointer.String("100"),
 				}
 				if i > 0 {
-					in.StartRecordName = pointer.StringPtr("next-record-name")
-					in.StartRecordType = pointer.StringPtr("next-record-type")
+					in.StartRecordName = pointer.String("next-record-name")
+					in.StartRecordType = pointer.String("next-record-type")
 				}
 				mockAWSClient.EXPECT().
 					ListResourceRecordSets(gomock.Eq(in)).
@@ -236,8 +236,8 @@ func withHostedZones(hostedZones ...*route53.HostedZone) listHostedZonesOutputOp
 func hzTruncated() listHostedZonesOutputOption {
 	return func(out *route53.ListHostedZonesByNameOutput) {
 		out.IsTruncated = pointer.BoolPtr(true)
-		out.NextDNSName = pointer.StringPtr("next-dns-name")
-		out.NextHostedZoneId = pointer.StringPtr("next-hosted-zone-id")
+		out.NextDNSName = pointer.String("next-dns-name")
+		out.NextHostedZoneId = pointer.String("next-hosted-zone-id")
 	}
 }
 
@@ -282,8 +282,8 @@ func withRecordSets(recordSets ...*route53.ResourceRecordSet) listResourceRecord
 func rrsTruncated() listResourceRecordSetsOutputOption {
 	return func(out *route53.ListResourceRecordSetsOutput) {
 		out.IsTruncated = pointer.BoolPtr(true)
-		out.NextRecordName = pointer.StringPtr("next-record-name")
-		out.NextRecordType = pointer.StringPtr("next-record-type")
+		out.NextRecordName = pointer.String("next-record-name")
+		out.NextRecordType = pointer.String("next-record-type")
 	}
 }
 
@@ -295,7 +295,7 @@ func testRecordSet(name string, recordType string, values ...string) *route53.Re
 	}
 	for i, value := range values {
 		recordSet.ResourceRecords[i] = &route53.ResourceRecord{
-			Value: pointer.StringPtr(value),
+			Value: pointer.String(value),
 		}
 	}
 	return recordSet

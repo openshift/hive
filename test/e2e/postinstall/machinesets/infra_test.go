@@ -286,10 +286,10 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	if clusterAutoscaler.Spec.ScaleDown == nil {
 		clusterAutoscaler.Spec.ScaleDown = &autoscalingv1.ScaleDownConfig{}
 	}
-	clusterAutoscaler.Spec.ScaleDown.DelayAfterAdd = pointer.StringPtr("10s")
-	clusterAutoscaler.Spec.ScaleDown.DelayAfterDelete = pointer.StringPtr("10s")
-	clusterAutoscaler.Spec.ScaleDown.DelayAfterFailure = pointer.StringPtr("10s")
-	clusterAutoscaler.Spec.ScaleDown.UnneededTime = pointer.StringPtr("10s")
+	clusterAutoscaler.Spec.ScaleDown.DelayAfterAdd = pointer.String("10s")
+	clusterAutoscaler.Spec.ScaleDown.DelayAfterDelete = pointer.String("10s")
+	clusterAutoscaler.Spec.ScaleDown.DelayAfterFailure = pointer.String("10s")
+	clusterAutoscaler.Spec.ScaleDown.UnneededTime = pointer.String("10s")
 	err = rc.Update(context.Background(), clusterAutoscaler)
 	require.NoError(t, err, "could not update the cluster autoscaler")
 

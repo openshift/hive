@@ -86,6 +86,22 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *Re
 	}
 }
 
+func indexClusterDeploymentsByClusterPool(o client.Object) []string {
+	cd := o.(*hivev1.ClusterDeployment)
+	if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
+		return []string{poolKey(poolRef.Namespace, poolRef.PoolName)}
+	}
+	return []string{}
+}
+
+func indexClusterClaimsByClusterPool(o client.Object) []string {
+	claim := o.(*hivev1.ClusterClaim)
+	if poolName := claim.Spec.ClusterPoolName; poolName != "" {
+		return []string{poolName}
+	}
+	return []string{}
+}
+
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
 func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
 	// Create a new controller
@@ -99,27 +115,17 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	}
 
 	// Index ClusterDeployments by pool namespace/name
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterDeployment{}, cdClusterPoolIndex,
-		func(o client.Object) []string {
-			cd := o.(*hivev1.ClusterDeployment)
-			if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
-				return []string{poolKey(poolRef.Namespace, poolRef.PoolName)}
-			}
-			return []string{}
-		}); err != nil {
+	if err := mgr.GetFieldIndexer().
+		IndexField(
+			context.TODO(), &hivev1.ClusterDeployment{}, cdClusterPoolIndex, indexClusterDeploymentsByClusterPool); err != nil {
 		log.WithError(err).Error("Error indexing ClusterDeployments by ClusterPool")
 		return err
 	}
 
 	// Index ClusterClaims by pool name
-	if err := mgr.GetFieldIndexer().IndexField(context.TODO(), &hivev1.ClusterClaim{}, claimClusterPoolIndex,
-		func(o client.Object) []string {
-			claim := o.(*hivev1.ClusterClaim)
-			if poolName := claim.Spec.ClusterPoolName; poolName != "" {
-				return []string{poolName}
-			}
-			return []string{}
-		}); err != nil {
+	if err := mgr.GetFieldIndexer().
+		IndexField(
+			context.TODO(), &hivev1.ClusterClaim{}, claimClusterPoolIndex, indexClusterClaimsByClusterPool); err != nil {
 		log.WithError(err).Error("Error indexing ClusterClaims by ClusterPool")
 		return err
 	}

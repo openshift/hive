@@ -19,8 +19,7 @@ type Interface interface {
 	HiveinternalV1alpha1() hiveinternalv1alpha1.HiveinternalV1alpha1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	hiveV1               *hivev1.HiveV1Client

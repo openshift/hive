@@ -39,6 +39,7 @@ import (
 const (
 	namespace = "test-namespace"
 	cdName    = "test-cluster-deployment"
+	finalizer = "test-finalizer"
 )
 
 func TestReconcile(t *testing.T) {
@@ -75,13 +76,48 @@ func TestReconcile(t *testing.T) {
 		expectRequeueAfter     time.Duration
 	}{
 		{
-			name: "cluster deleted",
-			cd:   cdBuilder.GenericOptions(testgeneric.Deleted()).Options(o.shouldHibernate).Build(),
-			cs:   csBuilder.Build(),
+			name: "cluster deleted with finalizer",
+			// Note: For the time being, tests which add a deletion timestamp require a finalizer in order to behave as expected,
+			// due to the following issue: https://github.com/kubernetes-sigs/controller-runtime/issues/2184
+			cd: cdBuilder.GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(finalizer)).Options(o.shouldHibernate).Build(),
+			cs: csBuilder.Build(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				cond, runCond := getHibernatingAndRunningConditions(cd)
-				assert.Nil(t, cond, "not expecting hibernating condition")
-				assert.Nil(t, runCond, "not expecting running condition")
+				if assert.NotNil(t, cond) {
+					assert.Equal(t, corev1.ConditionUnknown, cond.Status)
+					assert.Equal(t, hivev1.HibernatingReasonClusterDeploymentDeleted, cond.Reason)
+				}
+				if assert.NotNil(t, runCond) {
+					assert.Equal(t, corev1.ConditionUnknown, runCond.Status)
+					assert.Equal(t, hivev1.ReadyReasonClusterDeploymentDeleted, runCond.Reason)
+				}
+				assert.Equal(t, hivev1.ClusterPowerStateUnknown, string(cd.Status.PowerState))
+			},
+		},
+		{
+			name: "cluster deleted with finalizer, conditions initialized",
+			cd: cdBuilder.GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(finalizer)).Options(o.shouldHibernate,
+				testcd.WithPowerState(hivev1.ClusterPowerStateRunning),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterHibernatingCondition,
+					Status: corev1.ConditionFalse,
+				}),
+				testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ClusterDeploymentConditionType(hivev1.ClusterRunningCondition),
+					Status: corev1.ConditionTrue,
+				})).Build(),
+			cs: csBuilder.Build(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				cond, runCond := getHibernatingAndRunningConditions(cd)
+				if assert.NotNil(t, cond) {
+					assert.Equal(t, corev1.ConditionUnknown, cond.Status)
+					assert.Equal(t, hivev1.HibernatingReasonClusterDeploymentDeleted, cond.Reason)
+				}
+				if assert.NotNil(t, runCond) {
+					assert.Equal(t, corev1.ConditionUnknown, runCond.Status)
+					assert.Equal(t, hivev1.ReadyReasonClusterDeploymentDeleted, runCond.Reason)
+				}
+				assert.Equal(t, hivev1.ClusterPowerStateUnknown, string(cd.Status.PowerState))
 			},
 		},
 		{

@@ -178,7 +178,8 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 
 	// If cluster is already deleted, skip any processing
 	if !cd.DeletionTimestamp.IsZero() {
-		return reconcile.Result{}, nil
+		msg := "ClusterDeployment has been marked for deletion"
+		return r.setStatusStatesUnknown(cd, hivev1.HibernatingReasonClusterDeploymentDeleted, hivev1.ReadyReasonClusterDeploymentDeleted, msg, cdLog)
 	}
 
 	// Initialize cluster deployment conditions if not present
@@ -200,20 +201,8 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	// controller attempting to reconcile desired CD.Spec.PowerState.
 	if paused, err := strconv.ParseBool(cd.Annotations[constants.PowerStatePauseAnnotation]); err == nil && paused {
 		cdLog.Info("skipping reconcile of PowerState as the powerstate-pause annotation is set")
-		changed := false
-		if cd.Status.PowerState != hivev1.ClusterPowerStateUnknown {
-			changed = true
-			cd.Status.PowerState = hivev1.ClusterPowerStateUnknown
-		}
 		msg := "the powerstate-pause annotation is set"
-		changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonPowerStatePaused, msg, corev1.ConditionUnknown, cdLog) ||
-			changed
-		changed = r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonPowerStatePaused, msg, corev1.ConditionUnknown, cdLog) ||
-			changed
-		if changed {
-			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
-		}
-		return reconcile.Result{}, nil
+		return r.setStatusStatesUnknown(cd, hivev1.HibernatingReasonPowerStatePaused, hivev1.ReadyReasonPowerStatePaused, msg, cdLog)
 	}
 
 	hibernatingCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ClusterHibernatingCondition)
@@ -890,4 +879,23 @@ func shouldStartMachines(cd *hivev1.ClusterDeployment, hibernatingCondition *hiv
 		return false
 	}
 	return true
+}
+
+func (r *hibernationReconciler) setStatusStatesUnknown(cd *hivev1.ClusterDeployment, hibernateReason string, readyReason string,
+	msg string, logger log.FieldLogger) (result reconcile.Result, returnErr error) {
+
+	changed := false
+	if cd.Status.PowerState != hivev1.ClusterPowerStateUnknown {
+		changed = true
+		cd.Status.PowerState = hivev1.ClusterPowerStateUnknown
+	}
+	changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hibernateReason, msg, corev1.ConditionUnknown, logger) ||
+		changed
+	changed = r.setCDCondition(cd, hivev1.ClusterReadyCondition, readyReason, msg, corev1.ConditionUnknown, logger) ||
+		changed
+	if changed {
+		return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, logger)
+	}
+	return reconcile.Result{}, nil
+
 }

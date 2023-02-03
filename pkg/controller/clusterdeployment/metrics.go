@@ -69,7 +69,7 @@ var (
 		Name: "hive_cluster_deployments_provision_failed_terminal_total",
 		Help: "Counter incremented when a cluster provision has failed and won't be retried.",
 	},
-		[]string{"clusterpool_namespacedname", "cluster_type", "failure_reason"},
+		[]string{"clusterpool_namespacedname", "cluster_type", "failure_reason", "cluster_id"},
 	)
 )
 
@@ -85,7 +85,18 @@ func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment) {
 	}
 	metricProvisionFailedTerminal.WithLabelValues(poolNSName,
 		hivemetrics.GetClusterDeploymentType(cd),
-		stoppedReason).Inc()
+		stoppedReason,
+		getClusterId(cd)).Inc()
+}
+
+// getClusterId returns the cluster ID for the given cluster deployment by looking at the label api.openshift.com/id: <cluster ID>.
+// If the cluster ID is not set, it returns "".
+func getClusterId(cd *hivev1.ClusterDeployment) string {
+	clusterId, ok := cd.Labels["api.openshift.com/id"]
+	if !ok {
+		return ""
+	}
+	return clusterId
 }
 
 func init() {

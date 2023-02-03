@@ -178,7 +178,11 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 
 	// If cluster is already deleted, skip any processing
 	if !cd.DeletionTimestamp.IsZero() {
-		return reconcile.Result{}, nil
+		cd.Status.PowerState = hivev1.ClusterPowerStateUnknown
+		msg := "ClusterDeployment has been marked for deletion"
+		r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonClusterDeploymentDeleted, msg, corev1.ConditionUnknown, cdLog)
+		r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonClusterDeploymentDeleted, msg, corev1.ConditionUnknown, cdLog)
+		return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
 	}
 
 	// Initialize cluster deployment conditions if not present

@@ -526,6 +526,9 @@ const (
 	// HibernatingReasonPowerStatePaused indicates that we can't/won't discover the state of the
 	// cluster's cloud machines because the powerstate-paused annotation is set.
 	HibernatingReasonPowerStatePaused = "PowerStatePaused"
+	// HibernatingReasonClusterDeploymentDeleted indicates that a Cluster Deployment has been deleted
+	// and that the cluster is deprovisioning unless preserveOnDelete is set to true.
+	HibernatingReasonClusterDeploymentDeleted = "ClusterDeploymentDeleted"
 
 	// ReadyReasonStoppingOrHibernating is used as the reason for the Ready condition when the cluster
 	// is stopping or hibernating. Precise details are available in the Hibernating condition.
@@ -549,6 +552,9 @@ const (
 	// ReadyReasonPowerStatePaused indicates that we can't/won't discover the state of the
 	// cluster's cloud machines because the powerstate-paused annotation is set.
 	ReadyReasonPowerStatePaused = "PowerStatePaused"
+	// ReadyReasonClusterDeploymentDeleted indicates that a Cluster Deployment has been deleted
+	// and that the cluster is deprovisioning unless preserveOnDelete is set to true.
+	ReadyReasonClusterDeploymentDeleted = "ClusterDeploymentDeleted"
 )
 
 // Provisioned status condition reasons

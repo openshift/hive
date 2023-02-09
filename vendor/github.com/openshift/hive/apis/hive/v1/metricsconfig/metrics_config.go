@@ -16,5 +16,5 @@ type MetricsConfig struct {
 	// Affected metrics are those whose type implements the metricsWithDynamicLabels interface found in
 	// pkg/controller/metrics/metrics_with_dynamic_labels.go
 	// +optional
-	AdditionalClusterDeploymentLabels map[string]string `json:"additionalClusterDeploymentLabels,omitempty"`
+	AdditionalClusterDeploymentLabels *map[string]string `json:"additionalClusterDeploymentLabels,omitempty"`
 }

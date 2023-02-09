@@ -2,7 +2,6 @@ package clusterprovision
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -20,58 +19,45 @@ var (
 
 func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 	mapClusterTypeLabelToValue := hivemetrics.GetOptionalClusterTypeLabels(mConfig)
-	optionalClusterTypeLabels := hivemetrics.GetSortedKeys(mapClusterTypeLabelToValue)
 
-	metricClusterProvisionsTotal = hivemetrics.CounterVecWithDynamicLabels{
-		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricClusterProvisionsTotal = *hivemetrics.NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
 			Name: "hive_cluster_provision_results_total",
 			Help: "Counter incremented every time we observe a completed cluster provision.",
 		},
-			append([]string{"result"}, optionalClusterTypeLabels...)),
-		DynamicLabels: &hivemetrics.DynamicLabels{
-			FixedLabels:    []string{"result"},
-			OptionalLabels: mapClusterTypeLabelToValue,
-		},
-	}
-	metricInstallErrors = hivemetrics.CounterVecWithDynamicLabels{
-		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+		hivemetrics.WithFixedLabels([]string{"result"}),
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
+	metricInstallErrors = *hivemetrics.NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
 			Name: "hive_install_errors",
 			Help: "Counter incremented every time we observe certain errors strings in install logs.",
 		},
-			append([]string{"reason"}, optionalClusterTypeLabels...)),
-		DynamicLabels: &hivemetrics.DynamicLabels{
-			FixedLabels:    []string{"reason"},
-			OptionalLabels: mapClusterTypeLabelToValue,
-		},
-	}
+		hivemetrics.WithFixedLabels([]string{"reason"}),
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
 
-	metricInstallFailureSeconds = hivemetrics.HistogramVecWithDynamicLabels{
-		HistogramVec: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+	metricInstallFailureSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
+		&prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_install_failure_total",
 			Help:    "Time taken before a cluster provision failed to install",
 			Buckets: []float64{30, 120, 300, 600, 1800},
 		},
-			append([]string{"platform", "region", "cluster_version", "workers", "install_attempt"}, optionalClusterTypeLabels...)),
-		DynamicLabels: &hivemetrics.DynamicLabels{
-			FixedLabels:    []string{"platform", "region", "cluster_version", "workers", "install_attempt"},
-			OptionalLabels: mapClusterTypeLabelToValue,
-		},
-	}
-	metricInstallSuccessSeconds = hivemetrics.HistogramVecWithDynamicLabels{
-		HistogramVec: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		hivemetrics.WithFixedLabels([]string{"platform", "region", "cluster_version", "workers", "install_attempt"}),
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
+	metricInstallSuccessSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
+		&prometheus.HistogramOpts{
 			Name:    "hive_cluster_deployment_install_success_total",
 			Help:    "Time taken before a cluster provision succeeded to install",
 			Buckets: []float64{1800, 2400, 3000, 3600},
 		},
-			append([]string{"platform", "region", "cluster_version", "workers", "install_attempt"}, optionalClusterTypeLabels...)),
-		DynamicLabels: &hivemetrics.DynamicLabels{
-			FixedLabels:    []string{"platform", "region", "cluster_version", "workers", "install_attempt"},
-			OptionalLabels: mapClusterTypeLabelToValue,
-		},
-	}
+		hivemetrics.WithFixedLabels([]string{"platform", "region", "cluster_version", "workers", "install_attempt"}),
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
 
-	metrics.Registry.MustRegister(metricInstallErrors)
-	metrics.Registry.MustRegister(metricClusterProvisionsTotal)
-	metrics.Registry.MustRegister(metricInstallFailureSeconds)
-	metrics.Registry.MustRegister(metricInstallSuccessSeconds)
+	metricInstallErrors.RegisterMetricWithDynamicLabels()
+	metricClusterProvisionsTotal.RegisterMetricWithDynamicLabels()
+	metricInstallFailureSeconds.RegisterMetricWithDynamicLabels()
+	metricInstallSuccessSeconds.RegisterMetricWithDynamicLabels()
 }

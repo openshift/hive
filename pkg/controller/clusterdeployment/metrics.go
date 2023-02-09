@@ -71,69 +71,54 @@ func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment, log log.FieldLogge
 
 func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 	mapClusterTypeLabelToValue := hivemetrics.GetOptionalClusterTypeLabels(mConfig)
-	optionalClusterTypeLabels := hivemetrics.GetSortedKeys(mapClusterTypeLabelToValue)
-	defaultLabels := &hivemetrics.DynamicLabels{
-		FixedLabels:    []string{},
-		OptionalLabels: mapClusterTypeLabelToValue,
-	}
 
-	metricCompletedInstallJobRestarts = hivemetrics.HistogramVecWithDynamicLabels{
-		HistogramVec: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    "hive_cluster_deployment_completed_install_restart",
-				Help:    "Distribution of the number of restarts for all completed cluster installations.",
-				Buckets: []float64{0, 2, 10, 20, 50},
-			},
-			optionalClusterTypeLabels),
-		DynamicLabels: defaultLabels,
-	}
-
-	metricClustersCreated = hivemetrics.CounterVecWithDynamicLabels{
-		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+	metricCompletedInstallJobRestarts = *hivemetrics.NewHistogramVecWithDynamicLabels(
+		&prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_completed_install_restart",
+			Help:    "Distribution of the number of restarts for all completed cluster installations.",
+			Buckets: []float64{0, 2, 10, 20, 50},
+		},
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
+	metricClustersCreated = *hivemetrics.NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
 			Name: "hive_cluster_deployments_created_total",
 			Help: "Counter incremented every time we observe a new cluster.",
 		},
-			optionalClusterTypeLabels),
-		DynamicLabels: defaultLabels,
-	}
-	metricClustersInstalled = hivemetrics.CounterVecWithDynamicLabels{
-		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
+	metricClustersInstalled = *hivemetrics.NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
 			Name: "hive_cluster_deployments_installed_total",
 			Help: "Counter incremented every time we observe a successful installation.",
 		},
-			optionalClusterTypeLabels),
-		DynamicLabels: defaultLabels,
-	}
-	metricClustersDeleted = hivemetrics.CounterVecWithDynamicLabels{
-		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
+	metricClustersDeleted = *hivemetrics.NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
 			Name: "hive_cluster_deployments_deleted_total",
 			Help: "Counter incremented every time we observe a deleted cluster.",
 		},
-			optionalClusterTypeLabels),
-		DynamicLabels: defaultLabels,
-	}
-	metricProvisionFailedTerminal = hivemetrics.CounterVecWithDynamicLabels{
-		CounterVec: prometheus.NewCounterVec(prometheus.CounterOpts{
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
+	metricProvisionFailedTerminal = *hivemetrics.NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
 			Name: "hive_cluster_deployments_provision_failed_terminal_total",
 			Help: "Counter incremented when a cluster provision has failed and won't be retried.",
 		},
-			append([]string{"clusterpool_namespacedname", "failure_reason"}, optionalClusterTypeLabels...)),
-		DynamicLabels: &hivemetrics.DynamicLabels{
-			FixedLabels: []string{
-				"clusterpool_namespacedname",
-				"failure_reason",
-			},
-			OptionalLabels: mapClusterTypeLabelToValue,
-		},
-	}
+		hivemetrics.WithFixedLabels([]string{"clusterpool_namespacedname", "failure_reason"}),
+		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+	)
 
 	metrics.Registry.MustRegister(metricInstallJobDuration)
-	metrics.Registry.MustRegister(metricCompletedInstallJobRestarts)
 	metrics.Registry.MustRegister(metricInstallDelaySeconds)
 	metrics.Registry.MustRegister(metricImageSetDelaySeconds)
-	metrics.Registry.MustRegister(metricClustersCreated)
-	metrics.Registry.MustRegister(metricClustersInstalled)
-	metrics.Registry.MustRegister(metricClustersDeleted)
 	metrics.Registry.MustRegister(metricDNSDelaySeconds)
-	metrics.Registry.MustRegister(metricProvisionFailedTerminal)
+
+	metricProvisionFailedTerminal.RegisterMetricWithDynamicLabels()
+	metricCompletedInstallJobRestarts.RegisterMetricWithDynamicLabels()
+	metricClustersCreated.RegisterMetricWithDynamicLabels()
+	metricClustersInstalled.RegisterMetricWithDynamicLabels()
+	metricClustersDeleted.RegisterMetricWithDynamicLabels()
+
 }

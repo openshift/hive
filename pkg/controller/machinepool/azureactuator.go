@@ -3,6 +3,7 @@ package machinepool
 import (
 	"context"
 	"fmt"
+	"github.com/blang/semver/v4"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/azureclient"
 )
+
+var versionsSupportingAzureImageGallery = semver.MustParseRange(">=4.12.0")
 
 // AzureActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
@@ -135,6 +138,11 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	// The imageID parameter is not used. The image is determined by the infraID.
 	const imageID = ""
 
+	useImageGallery, err := shouldUseImageGallery(cd)
+	if err != nil {
+		return nil, false, err
+	}
+
 	installerMachineSets, err := installazure.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
@@ -143,6 +151,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		workerRole,
 		workerUserDataName,
 		capabilities,
+		useImageGallery,
 	)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
@@ -193,4 +202,18 @@ func (a *AzureActuator) gen2ImageExists(infraID, resourceGroupName string) (bool
 		}
 	}
 	return false, nil
+}
+
+func shouldUseImageGallery(cd *hivev1.ClusterDeployment) (bool, error) {
+	versionString, err := getClusterVersion(cd)
+	if err != nil {
+		return true, fmt.Errorf("failed to get cluster semver: %w", err)
+	}
+
+	version, err := semver.ParseTolerant(versionString)
+	if err != nil {
+		return true, fmt.Errorf("failed to parse cluster semver: %w", err)
+	}
+
+	return versionsSupportingAzureImageGallery(version), nil
 }

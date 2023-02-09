@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: clusterdeprovisions.hive.openshift.io
 spec:
@@ -84,6 +84,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region is the Alibaba region for this deprovision
                         type: string
@@ -119,6 +120,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region is the AWS region for this deprovisioning
                         type: string
@@ -148,6 +150,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                     type: object
                   gcp:
                     description: GCP contains GCP-specific deprovision settings
@@ -161,6 +164,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region is the GCP region for this deprovision
                         type: string
@@ -183,6 +187,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the IBM Cloud region
                         type: string
@@ -205,6 +210,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       cloud:
                         description: Cloud is the secion in the clouds.yaml secret
                           below to use for auth/connectivity.
@@ -218,6 +224,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                     required:
                     - cloud
                     type: object
@@ -234,6 +241,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       clusterID:
                         description: The oVirt cluster ID
                         type: string
@@ -247,6 +255,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                     required:
                     - certificatesSecretRef
                     - clusterID
@@ -266,6 +275,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       credentialsSecretRef:
                         description: CredentialsSecretRef is the vSphere account credentials
                           to use for deprovisioning the cluster
@@ -275,6 +285,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       vCenter:
                         description: VCenter is the vSphere vCenter hostname.
                         type: string
@@ -334,9 +345,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

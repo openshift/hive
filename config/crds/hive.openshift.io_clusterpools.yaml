@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: clusterpools.hive.openshift.io
 spec:
@@ -152,6 +152,7 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+                x-kubernetes-map-type: atomic
               inventory:
                 description: Inventory maintains a list of entries consumed by the
                   ClusterPool to customize the default ClusterDeployment.
@@ -246,6 +247,7 @@ spec:
                               only "value". The requirements are ANDed.
                             type: object
                         type: object
+                        x-kubernetes-map-type: atomic
                     required:
                     - agentSelector
                     type: object
@@ -262,6 +264,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the Alibaba Cloud region where
                           the cluster will be created.
@@ -298,6 +301,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       privateLink:
                         description: PrivateLink allows uses to enable access to the
                           cluster's API server using AWS PrivateLink. AWS PrivateLink
@@ -351,6 +355,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the Azure region where the cluster
                           will be created.
@@ -375,6 +380,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                     required:
                     - libvirtSSHPrivateKeySecretRef
                     type: object
@@ -391,6 +397,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the GCP region where the cluster
                           will be created.
@@ -423,6 +430,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       region:
                         description: Region specifies the IBM Cloud region where the
                           cluster will be created.
@@ -450,8 +458,8 @@ spec:
                           file must set the \"cacert\" field to either \"/etc/openstack-ca/<key
                           name containing the trust bundle in credentialsSecretRef
                           Secret>\" or \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\".
-                          \n For example, \"\"\"clouds.yaml clouds:   shiftstack:
-                          \    auth: ...     cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"
+                          \n For example, \"\"\"clouds.yaml clouds: shiftstack: auth:
+                          ... cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"
                           \"\"\""
                         properties:
                           name:
@@ -459,6 +467,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       cloud:
                         description: Cloud will be used to indicate the OS_CLOUD value
                           to use the right section from the clouds.yaml in the CredentialsSecretRef.
@@ -472,6 +481,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       trunkSupport:
                         description: TrunkSupport indicates whether or not to use
                           trunk ports in your OpenShift cluster.
@@ -494,6 +504,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       credentialsSecretRef:
                         description: 'CredentialsSecretRef refers to a secret that
                           contains the oVirt account access credentials with fields:
@@ -504,6 +515,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       ovirt_cluster_id:
                         description: The target cluster under which all VMs will run
                         type: string
@@ -536,6 +548,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       cluster:
                         description: Cluster is the name of the cluster virtual machines
                           will be cloned into.
@@ -550,6 +563,7 @@ spec:
                               TODO: Add other useful fields. apiVersion, kind, uid?'
                             type: string
                         type: object
+                        x-kubernetes-map-type: atomic
                       datacenter:
                         description: Datacenter is the name of the datacenter to use
                           in the vCenter.
@@ -587,6 +601,7 @@ spec:
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
                 type: object
+                x-kubernetes-map-type: atomic
               runningCount:
                 description: RunningCount is the number of clusters we should keep
                   running. The remainder will be kept hibernated until claimed. By
@@ -677,9 +692,3 @@ spec:
         specReplicasPath: .spec.size
         statusReplicasPath: .status.size
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

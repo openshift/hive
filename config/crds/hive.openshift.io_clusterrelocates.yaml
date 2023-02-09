@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: clusterrelocates.hive.openshift.io
 spec:
@@ -84,6 +84,7 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+                x-kubernetes-map-type: atomic
               kubeconfigSecretRef:
                 description: KubeconfigSecretRef is a reference to the secret containing
                   the kubeconfig for the destination Hive instance. The kubeconfig
@@ -111,9 +112,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

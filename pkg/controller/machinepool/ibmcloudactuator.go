@@ -103,6 +103,11 @@ func (a *IBMCloudActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, poo
 	installerMachineSets, err := installibmcloud.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
+
+		// A default empty map will work fine here, see:
+		// vendor/github.com/openshift/installer/pkg/asset/machines/ibmcloud/machines.go:148
+		make(map[string]string),
+
 		computePool,
 		workerRole,
 		workerUserDataName,

@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.0
+    controller-gen.kubebuilder.io/version: (devel)
   creationTimestamp: null
   name: selectorsyncidentityproviders.hive.openshift.io
 spec:
@@ -82,6 +82,7 @@ spec:
                       are ANDed.
                     type: object
                 type: object
+                x-kubernetes-map-type: atomic
               identityProviders:
                 description: IdentityProviders is an ordered list of ways for a user
                   to identify themselves
@@ -440,11 +441,11 @@ spec:
                         insecure:
                           description: 'insecure, if true, indicates the connection
                             should not use TLS WARNING: Should not be set to `true`
-                            with the URL scheme "ldaps://" as "ldaps://" URLs always          attempt
-                            to connect using TLS, even when `insecure` is set to `true`
-                            When `true`, "ldap://" URLS connect insecurely. When `false`,
-                            "ldap://" URLs are upgraded to a TLS connection using
-                            StartTLS as specified in https://tools.ietf.org/html/rfc2830.'
+                            with the URL scheme "ldaps://" as "ldaps://" URLs always
+                            attempt to connect using TLS, even when `insecure` is
+                            set to `true` When `true`, "ldap://" URLS connect insecurely.
+                            When `false`, "ldap://" URLs are upgraded to a TLS connection
+                            using StartTLS as specified in https://tools.ietf.org/html/rfc2830.'
                           type: boolean
                         url:
                           description: 'url is an RFC 2255 URL which specifies the
@@ -460,8 +461,8 @@ spec:
                       description: 'name is used to qualify the identities returned
                         by this provider. - It MUST be unique and not shared by any
                         other identity provider used - It MUST be a valid path segment:
-                        name cannot equal "." or ".." or contain "/" or "%" or ":"   Ref:
-                        https://godoc.org/github.com/openshift/origin/pkg/user/apis/user/validation#ValidateIdentityProviderName'
+                        name cannot equal "." or ".." or contain "/" or "%" or ":"
+                        Ref: https://godoc.org/github.com/openshift/origin/pkg/user/apis/user/validation#ValidateIdentityProviderName'
                       type: string
                     openID:
                       description: openID enables user authentication using OpenID
@@ -590,8 +591,8 @@ spec:
                             /authorize requests to Unauthenticated requests from OAuth
                             clients which expect WWW-Authenticate challenges will
                             be redirected here. ${url} is replaced with the current
-                            URL, escaped to be safe in a query parameter   https://www.example.com/sso-login?then=${url}
-                            ${query} is replaced with the current query string   https://www.example.com/auth-proxy/oauth/authorize?${query}
+                            URL, escaped to be safe in a query parameter https://www.example.com/sso-login?then=${url}
+                            ${query} is replaced with the current query string https://www.example.com/auth-proxy/oauth/authorize?${query}
                             Required when challenge is set to true.
                           type: string
                         clientCommonNames:
@@ -618,8 +619,8 @@ spec:
                             /authorize requests to Unauthenticated requests from OAuth
                             clients which expect interactive logins will be redirected
                             here ${url} is replaced with the current URL, escaped
-                            to be safe in a query parameter   https://www.example.com/sso-login?then=${url}
-                            ${query} is replaced with the current query string   https://www.example.com/auth-proxy/oauth/authorize?${query}
+                            to be safe in a query parameter https://www.example.com/sso-login?then=${url}
+                            ${query} is replaced with the current query string https://www.example.com/auth-proxy/oauth/authorize?${query}
                             Required when login is set to true.
                           type: string
                         nameHeaders:
@@ -650,9 +651,3 @@ spec:
         type: object
     served: true
     storage: true
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

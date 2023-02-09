@@ -7,11 +7,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/generic-admission-server/pkg/apiserver"
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-
-	"github.com/openshift/generic-admission-server/pkg/apiserver"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const defaultEtcdPathPrefix = "/registry/online.openshift.io"
@@ -30,7 +32,7 @@ func NewAdmissionServerOptions(out, errOut io.Writer, admissionHooks ...apiserve
 		// TODO we will nil out the etcd storage options.  This requires a later level of k8s.io/apiserver
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
-			apiserver.Codecs.LegacyCodec(admissionv1beta1.SchemeGroupVersion),
+			apiserver.Codecs.LegacyCodec(admissionv1.SchemeGroupVersion, admissionv1beta1.SchemeGroupVersion),
 		),
 
 		AdmissionHooks: admissionHooks,
@@ -40,6 +42,12 @@ func NewAdmissionServerOptions(out, errOut io.Writer, admissionHooks ...apiserve
 	}
 	o.RecommendedOptions.Etcd = nil
 	o.RecommendedOptions.Admission = nil
+
+	// we can also optimize the authz options.  We know that system:masters should always be authorized for actions and the
+	// delegating authorizer now allows this.
+	o.RecommendedOptions.Authorization = o.RecommendedOptions.Authorization.
+		WithAlwaysAllowPaths("/healthz", "/readyz", "/livez"). // this allows the kubelet to always get health and readiness without causing an access check
+		WithAlwaysAllowGroups("system:masters")                // in a kube cluster, system:masters can take any action, so there is no need to ask for an authz check
 
 	return o
 }
@@ -90,11 +98,18 @@ func (o AdmissionServerOptions) Config() (*apiserver.Config, error) {
 		return nil, err
 	}
 
+	kubeconfigFile := o.RecommendedOptions.CoreAPI.CoreAPIKubeconfigPath
+	restConfig, err := getClientConfig(kubeconfigFile)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
 			AdmissionHooks: o.AdmissionHooks,
 		},
+		RestConfig: restConfig,
 	}
 	return config, nil
 }
@@ -110,4 +125,23 @@ func (o AdmissionServerOptions) RunAdmissionServer(stopCh <-chan struct{}) error
 		return err
 	}
 	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+}
+
+func getClientConfig(kubeconfigFile string) (*rest.Config, error) {
+	var kubeconfig *rest.Config
+	var err error
+	if len(kubeconfigFile) > 0 {
+		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigFile}
+		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+		kubeconfig, err = loader.ClientConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load kubeconfig at %q: %v", kubeconfigFile, err)
+		}
+	} else {
+		kubeconfig, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return kubeconfig, nil
 }

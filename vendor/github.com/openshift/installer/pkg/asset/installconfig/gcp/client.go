@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	googleoauth "golang.org/x/oauth2/google"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	compute "google.golang.org/api/compute/v1"
 	dns "google.golang.org/api/dns/v1"
@@ -22,12 +23,14 @@ type API interface {
 	GetMachineType(ctx context.Context, project, zone, machineType string) (*compute.MachineType, error)
 	GetPublicDomains(ctx context.Context, project string) ([]string, error)
 	GetPublicDNSZone(ctx context.Context, project, baseDomain string) (*dns.ManagedZone, error)
+	GetDNSZoneByName(ctx context.Context, project, zoneName string) (*dns.ManagedZone, error)
 	GetSubnetworks(ctx context.Context, network, project, region string) ([]*compute.Subnetwork, error)
 	GetProjects(ctx context.Context) (map[string]string, error)
 	GetRegions(ctx context.Context, project string) ([]string, error)
 	GetRecordSets(ctx context.Context, project, zone string) ([]*dns.ResourceRecordSet, error)
 	GetZones(ctx context.Context, project, filter string) ([]*compute.Zone, error)
 	GetEnabledServices(ctx context.Context, project string) ([]string, error)
+	GetCredentials() *googleoauth.Credentials
 }
 
 // Client makes calls to the GCP API.
@@ -107,6 +110,24 @@ func (c *Client) GetPublicDomains(ctx context.Context, project string) ([]string
 		return publicZones, err
 	}
 	return publicZones, nil
+}
+
+// GetDNSZoneByName returns a DNS zone matching the `zoneName` if the DNS zone exists
+// and can be seen (correct permissions for a private zone) in the project.
+func (c *Client) GetDNSZoneByName(ctx context.Context, project, zoneName string) (*dns.ManagedZone, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Minute)
+	defer cancel()
+
+	svc, err := c.getDNSService(ctx)
+	if err != nil {
+		return nil, err
+	}
+	returnedZone, err := svc.ManagedZones.Get(project, zoneName).Context(ctx).Do()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get DNS Zones")
+	}
+	return returnedZone, nil
+
 }
 
 // GetPublicDNSZone returns a public DNS zone for a basedomain.
@@ -316,4 +337,9 @@ func (c *Client) getServiceUsageService(ctx context.Context) (*serviceusage.Serv
 		return nil, errors.Wrap(err, "failed to create service usage service")
 	}
 	return svc, nil
+}
+
+// GetCredentials returns the credentials used to authenticate the GCP session.
+func (c *Client) GetCredentials() *googleoauth.Credentials {
+	return c.ssn.Credentials
 }

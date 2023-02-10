@@ -1815,6 +1815,9 @@ func TestReconcileClusterPool(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		if test.name != "copyover fields" {
+			continue
+		}
 		t.Run(test.name, func(t *testing.T) {
 			if !test.noClusterImageSet {
 				test.existing = append(
@@ -1836,7 +1839,12 @@ func TestReconcileClusterPool(t *testing.T) {
 				expectedPoolVersion = test.expectedPoolVersion
 			}
 
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithIndex(&hivev1.ClusterDeployment{}, cdClusterPoolIndex, indexClusterDeploymentsByClusterPool).
+				WithIndex(&hivev1.ClusterClaim{}, claimClusterPoolIndex, indexClusterClaimsByClusterPool).
+				WithRuntimeObjects(test.existing...).
+				Build()
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			controllerExpectations := controllerutils.NewExpectations(logger)

@@ -6,7 +6,6 @@ import (
 	golog "log"
 	"math/rand"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -274,10 +273,6 @@ func (writer klogWriter) Write(data []byte) (n int, err error) {
 func main() {
 	defer klog.Flush()
 	rand.Seed(time.Now().UnixNano())
-	go func() {
-		log.Info("Starting pprof endpoint")
-		log.Println(http.ListenAndServe(":6060", nil))
-	}()
 	cmd := newRootCommand()
 	err := cmd.Execute()
 	if err != nil {

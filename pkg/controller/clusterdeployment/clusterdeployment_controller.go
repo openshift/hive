@@ -125,7 +125,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
 	// read the hiveconfig, and we register them only once.
-	registerMetrics(mConfig)
+	registerMetrics(mConfig, logger)
 	return AddToManager(mgr, NewReconciler(mgr, logger, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
@@ -581,7 +581,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		metricClustersCreated.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{}, 1)
+		metricClustersCreated.Observe(cd, nil, 1)
 		return reconcile.Result{}, nil
 	}
 
@@ -1437,7 +1437,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 	// Increment the clusters deleted counter:
-	metricClustersDeleted.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{}, 1)
+	metricClustersDeleted.Observe(cd, nil, 1)
 	return nil
 }
 

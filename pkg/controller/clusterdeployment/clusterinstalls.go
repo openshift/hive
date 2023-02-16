@@ -211,10 +211,9 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			logger.WithField("duration", installDuration.Seconds()).Debug("install job completed")
 			metricInstallJobDuration.Observe(float64(installDuration.Seconds()))
 
-			metricCompletedInstallJobRestarts.ObserveMetricWithDynamicLabels(cd, logger, map[string]string{},
-				float64(cd.Status.InstallRestarts))
+			metricCompletedInstallJobRestarts.Observe(cd, nil, float64(cd.Status.InstallRestarts))
 
-			metricClustersInstalled.ObserveMetricWithDynamicLabels(cd, logger, map[string]string{}, 1)
+			metricClustersInstalled.Observe(cd, nil, 1)
 
 			if r.protectedDelete {
 				// Set protected delete on for the ClusterDeployment.

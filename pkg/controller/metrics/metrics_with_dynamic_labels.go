@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -14,8 +15,8 @@ import (
 
 // metricsWithDynamicLabels encompasses metrics that can have optional labels.
 type metricsWithDynamicLabels interface {
-	ObserveMetricWithDynamicLabels(metav1.Object, log.FieldLogger, map[string]string, float64)
-	RegisterMetricWithDynamicLabels()
+	Observe(metav1.Object, map[string]string, float64)
+	Register()
 }
 
 type dynamicLabels struct {
@@ -27,61 +28,47 @@ type dynamicLabels struct {
 	optionalLabels map[string]string
 }
 
-func WithFixedLabels(labels []string) func(*dynamicLabels) {
-	return func(d *dynamicLabels) {
-		d.fixedLabels = labels
-	}
-}
-
-func WithOptionalLabels(labels map[string]string) func(*dynamicLabels) {
-	return func(d *dynamicLabels) {
-		d.optionalLabels = labels
-	}
-}
-
-// getLabelList combines fixed and optional labels and returns the list without duplicates.
+// getLabelList combines the fixed and optional labels and returns the list with just the labels that can be used to
+// define the metric
 func (d *dynamicLabels) getLabelList() []string {
 	var finalList []string
-
-	// Ensure there isn't an overlap between fixed and optional labels
-	keys := make(map[string]bool)
-	for _, entry := range append(d.fixedLabels, getKeys(d.optionalLabels)...) {
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
-			finalList = append(finalList, entry)
-		}
+	finalList = append(finalList, d.fixedLabels...)
+	for label := range d.optionalLabels {
+		finalList = append(finalList, label)
 	}
 	return finalList
 }
 
-// buildLabels fetches the optional label values and merges the maps of fixedLabels and optionalLabels without
-// duplicates. The resultant map can be used for observing the metric.
-func (d *dynamicLabels) buildLabels(fixedLabels map[string]string, obj metav1.Object) prometheus.Labels {
-	optionalLabels := make(map[string]string, len(d.optionalLabels))
-	for _, v := range getKeys(d.optionalLabels) {
-		optionalLabels[v] = GetLabelValue(obj, d.optionalLabels[v])
+// getRepeatedLabel detects and returns the first optional label it encounters, that overlaps with another label
+func (d *dynamicLabels) getRepeatedLabel() string {
+	keys := sets.Set[string]{}
+	for _, val := range d.fixedLabels {
+		keys.Insert(val)
 	}
-	labels := make(map[string]string, len(d.getLabelList()))
-	for label, value := range fixedLabels {
-		labels[label] = value
+	for key := range d.optionalLabels {
+		if keys.Has(key) {
+			return key
+		}
+		keys.Insert(key)
 	}
-	for label, value := range optionalLabels {
-		labels[label] = value
-	}
-	return labels
+	return ""
 }
 
-// defaultMissingLabels ensures a value is present for all corresponding labels of a metric. If missing, it sets it to a
-// default value
-func defaultMissingLabels(labelKeys []string, valueMap map[string]string) map[string]string {
-	if len(valueMap) < len(labelKeys) {
-		for _, v := range labelKeys {
-			if _, ok := valueMap[v]; !ok {
-				valueMap[v] = constants.MetricLabelDefaultValue
-			}
+// buildLabels fetches the optional label values and merges the maps of fixedLabels and optionalLabels. The resultant
+// map can be used for observing the metric.
+func (d *dynamicLabels) buildLabels(fixedLabels map[string]string, obj metav1.Object) prometheus.Labels {
+	labels := make(map[string]string, len(d.fixedLabels)+len(d.optionalLabels))
+	for _, label := range d.fixedLabels {
+		if value := fixedLabels[label]; value != "" {
+			labels[label] = value
+		} else {
+			labels[label] = constants.MetricLabelDefaultValue
 		}
 	}
-	return valueMap
+	for key, value := range d.optionalLabels {
+		labels[key] = GetLabelValue(obj, value)
+	}
+	return labels
 }
 
 type CounterVecWithDynamicLabels struct {
@@ -90,29 +77,30 @@ type CounterVecWithDynamicLabels struct {
 	*dynamicLabels
 }
 
-func NewCounterVecWithDynamicLabels(counterOpts *prometheus.CounterOpts,
-	labelOptions ...func(labels *dynamicLabels)) *CounterVecWithDynamicLabels {
+func NewCounterVecWithDynamicLabels(counterOpts *prometheus.CounterOpts, fixedLabels []string,
+	optionalLabels map[string]string, log log.FieldLogger) *CounterVecWithDynamicLabels {
 	counterVecMetric := &CounterVecWithDynamicLabels{
-		CounterOpts:   counterOpts,
-		dynamicLabels: &dynamicLabels{},
+		CounterOpts: counterOpts,
+		dynamicLabels: &dynamicLabels{
+			fixedLabels:    fixedLabels,
+			optionalLabels: optionalLabels,
+		},
 	}
-	for _, o := range labelOptions {
-		o(counterVecMetric.dynamicLabels)
+	if repeatedLabel := counterVecMetric.getRepeatedLabel(); repeatedLabel != "" {
+		log.Errorf("HiveConfig.Spec.AdditionalClusterDeploymentLabels[%q] conflicts with a fixed label for the metric %s. Please rename your label.", repeatedLabel, counterOpts.Name)
 	}
 	counterVecMetric.metric = prometheus.NewCounterVec(*counterVecMetric.CounterOpts, counterVecMetric.getLabelList())
 	return counterVecMetric
 }
 
-// RegisterMetricWithDynamicLabels registers the CounterVec metric.
-func (c CounterVecWithDynamicLabels) RegisterMetricWithDynamicLabels() {
+// Register registers the CounterVec metric.
+func (c CounterVecWithDynamicLabels) Register() {
 	metrics.Registry.MustRegister(c.metric)
 }
 
-// ObserveMetricWithDynamicLabels logs the counter metric. It simply increments the value, so last parameter isn't used.
-func (c CounterVecWithDynamicLabels) ObserveMetricWithDynamicLabels(obj metav1.Object, log log.FieldLogger,
-	fixedLabels map[string]string, _ float64) {
-	labels := defaultMissingLabels(c.getLabelList(), c.buildLabels(fixedLabels, obj))
-	c.metric.With(labels).Inc()
+// Observe logs the counter metric. It simply increments the value, so last parameter isn't used.
+func (c CounterVecWithDynamicLabels) Observe(obj metav1.Object, fixedLabels map[string]string, _ float64) {
+	c.metric.With(c.buildLabels(fixedLabels, obj)).Inc()
 }
 
 type HistogramVecWithDynamicLabels struct {
@@ -121,30 +109,30 @@ type HistogramVecWithDynamicLabels struct {
 	*dynamicLabels
 }
 
-func NewHistogramVecWithDynamicLabels(histogramOpts *prometheus.HistogramOpts,
-	labelOptions ...func(labels *dynamicLabels)) *HistogramVecWithDynamicLabels {
+func NewHistogramVecWithDynamicLabels(histogramOpts *prometheus.HistogramOpts, fixedLabels []string,
+	optionalLabels map[string]string, log log.FieldLogger) *HistogramVecWithDynamicLabels {
 	histogramVecMetric := &HistogramVecWithDynamicLabels{
 		HistogramOpts: histogramOpts,
-		dynamicLabels: &dynamicLabels{},
+		dynamicLabels: &dynamicLabels{
+			fixedLabels:    fixedLabels,
+			optionalLabels: optionalLabels,
+		},
 	}
-	for _, o := range labelOptions {
-		o(histogramVecMetric.dynamicLabels)
+	if repeatedLabel := histogramVecMetric.getRepeatedLabel(); repeatedLabel != "" {
+		log.Errorf("HiveConfig.Spec.AdditionalClusterDeploymentLabels[%q] conflicts with a fixed label for the metric %s. Please rename your label.", repeatedLabel, histogramOpts.Name)
 	}
-	histogramVecMetric.metric = prometheus.NewHistogramVec(*histogramVecMetric.HistogramOpts,
-		histogramVecMetric.getLabelList())
+	histogramVecMetric.metric = prometheus.NewHistogramVec(*histogramVecMetric.HistogramOpts, histogramVecMetric.getLabelList())
 	return histogramVecMetric
 }
 
-// RegisterMetricWithDynamicLabels registers the HistogramVec metric.
-func (h HistogramVecWithDynamicLabels) RegisterMetricWithDynamicLabels() {
+// Register registers the HistogramVec metric.
+func (h HistogramVecWithDynamicLabels) Register() {
 	metrics.Registry.MustRegister(h.metric)
 }
 
-// ObserveMetricWithDynamicLabels observes the histogram metric with val value.
-func (h HistogramVecWithDynamicLabels) ObserveMetricWithDynamicLabels(obj metav1.Object, log log.FieldLogger,
-	fixedLabels map[string]string, val float64) {
-	labels := defaultMissingLabels(h.getLabelList(), h.buildLabels(fixedLabels, obj))
-	h.metric.With(labels).Observe(val)
+// Observe observes the histogram metric with val value.
+func (h HistogramVecWithDynamicLabels) Observe(obj metav1.Object, fixedLabels map[string]string, val float64) {
+	h.metric.With(h.buildLabels(fixedLabels, obj)).Observe(val)
 }
 
 var _ metricsWithDynamicLabels = CounterVecWithDynamicLabels{}
@@ -154,9 +142,8 @@ var _ metricsWithDynamicLabels = HistogramVecWithDynamicLabels{}
 // as a map
 func GetOptionalClusterTypeLabels(mConfig *metricsconfig.MetricsConfig) map[string]string {
 	var mapClusterTypeLabelToValue = make(map[string]string)
-	// Currently "cluster_type" is a non-optional label for these metrics, so if the config is empty (default), set the
+	// "cluster_type" is a non-optional label for these metrics, so if the config is empty (default), set the
 	// "cluster_type" label
-	// TODO: remove as a part of https://issues.redhat.com/browse/HIVE-2077
 	if mConfig.AdditionalClusterDeploymentLabels == nil {
 		mapClusterTypeLabelToValue["cluster_type"] = hivev1.HiveClusterTypeLabel
 	} else {
@@ -165,13 +152,4 @@ func GetOptionalClusterTypeLabels(mConfig *metricsconfig.MetricsConfig) map[stri
 		}
 	}
 	return mapClusterTypeLabelToValue
-}
-
-// getKeys gets the keys of a map
-func getKeys(labelMap map[string]string) []string {
-	var keys []string
-	for k := range labelMap {
-		keys = append(keys, k)
-	}
-	return keys
 }

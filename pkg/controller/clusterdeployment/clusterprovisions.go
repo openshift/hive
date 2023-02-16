@@ -512,10 +512,9 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
 
 	// Report a metric for the total number of install restarts:
-	metricCompletedInstallJobRestarts.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{},
-		float64(cd.Status.InstallRestarts))
+	metricCompletedInstallJobRestarts.Observe(cd, nil, float64(cd.Status.InstallRestarts))
 
-	metricClustersInstalled.ObserveMetricWithDynamicLabels(cd, cdLog, map[string]string{}, 1)
+	metricClustersInstalled.Observe(cd, nil, 1)
 
 	return reconcile.Result{}, nil
 }

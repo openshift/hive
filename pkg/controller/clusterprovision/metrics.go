@@ -2,6 +2,7 @@ package clusterprovision
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -17,7 +18,7 @@ var (
 	metricInstallSuccessSeconds hivemetrics.HistogramVecWithDynamicLabels
 )
 
-func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
+func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) {
 	mapClusterTypeLabelToValue := hivemetrics.GetOptionalClusterTypeLabels(mConfig)
 
 	metricClusterProvisionsTotal = *hivemetrics.NewCounterVecWithDynamicLabels(
@@ -25,16 +26,18 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 			Name: "hive_cluster_provision_results_total",
 			Help: "Counter incremented every time we observe a completed cluster provision.",
 		},
-		hivemetrics.WithFixedLabels([]string{"result"}),
-		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+		[]string{"result"},
+		mapClusterTypeLabelToValue,
+		log,
 	)
 	metricInstallErrors = *hivemetrics.NewCounterVecWithDynamicLabels(
 		&prometheus.CounterOpts{
 			Name: "hive_install_errors",
 			Help: "Counter incremented every time we observe certain errors strings in install logs.",
 		},
-		hivemetrics.WithFixedLabels([]string{"reason"}),
-		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+		[]string{"reason"},
+		mapClusterTypeLabelToValue,
+		log,
 	)
 
 	metricInstallFailureSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
@@ -43,8 +46,9 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 			Help:    "Time taken before a cluster provision failed to install",
 			Buckets: []float64{30, 120, 300, 600, 1800},
 		},
-		hivemetrics.WithFixedLabels([]string{"platform", "region", "cluster_version", "workers", "install_attempt"}),
-		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
+		mapClusterTypeLabelToValue,
+		log,
 	)
 	metricInstallSuccessSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
 		&prometheus.HistogramOpts{
@@ -52,12 +56,13 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 			Help:    "Time taken before a cluster provision succeeded to install",
 			Buckets: []float64{1800, 2400, 3000, 3600},
 		},
-		hivemetrics.WithFixedLabels([]string{"platform", "region", "cluster_version", "workers", "install_attempt"}),
-		hivemetrics.WithOptionalLabels(mapClusterTypeLabelToValue),
+		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
+		mapClusterTypeLabelToValue,
+		log,
 	)
 
-	metricInstallErrors.RegisterMetricWithDynamicLabels()
-	metricClusterProvisionsTotal.RegisterMetricWithDynamicLabels()
-	metricInstallFailureSeconds.RegisterMetricWithDynamicLabels()
-	metricInstallSuccessSeconds.RegisterMetricWithDynamicLabels()
+	metricInstallErrors.Register()
+	metricClusterProvisionsTotal.Register()
+	metricInstallFailureSeconds.Register()
+	metricInstallSuccessSeconds.Register()
 }

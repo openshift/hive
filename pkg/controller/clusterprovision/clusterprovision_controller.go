@@ -70,7 +70,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
 	// read the hiveconfig, and we register them only once.
-	registerMetrics(mConfig)
+	registerMetrics(mConfig, logger)
 
 	return add(mgr, newReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
@@ -369,7 +369,7 @@ func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.Clus
 	pLog.Info("install job succeeded")
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageComplete, "InstallComplete", "Install job has completed successfully", pLog)
 	if err == nil {
-		metricClusterProvisionsTotal.ObserveMetricWithDynamicLabels(instance, pLog, map[string]string{"result": resultSuccess}, 1)
+		metricClusterProvisionsTotal.Observe(instance, map[string]string{"result": resultSuccess}, 1)
 	}
 	return result, err
 }
@@ -383,8 +383,8 @@ func (r *ReconcileClusterProvision) reconcileFailedJob(instance *hivev1.ClusterP
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, reason, message, pLog)
 	if err == nil {
 		// Increment a counter metric for this cluster type and error reason:
-		metricInstallErrors.ObserveMetricWithDynamicLabels(instance, pLog, map[string]string{"reason": reason}, 1)
-		metricClusterProvisionsTotal.ObserveMetricWithDynamicLabels(instance, pLog, map[string]string{"result": resultFailure}, 1)
+		metricInstallErrors.Observe(instance, map[string]string{"reason": reason}, 1)
+		metricClusterProvisionsTotal.Observe(instance, map[string]string{"result": resultFailure}, 1)
 	}
 	return result, err
 }
@@ -620,5 +620,5 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 		"workers":         r.getWorkers(*cd),
 		"install_attempt": strconv.Itoa(instance.Spec.Attempt),
 	}
-	timeMetric.ObserveMetricWithDynamicLabels(cd, r.logger, fixedLabels, time.Since(instance.CreationTimestamp.Time).Seconds())
+	timeMetric.Observe(cd, fixedLabels, time.Since(instance.CreationTimestamp.Time).Seconds())
 }

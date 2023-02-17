@@ -5,31 +5,49 @@ import (
 	"go/ast"
 	"go/token"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/mgechev/revive/internal/typeparams"
 	"github.com/mgechev/revive/lint"
 )
 
 // ExportedRule lints given else constructs.
-type ExportedRule struct{}
+type ExportedRule struct {
+	configured             bool
+	checkPrivateReceivers  bool
+	disableStutteringCheck bool
+	stuttersMsg            string
+	sync.Mutex
+}
+
+func (r *ExportedRule) configure(arguments lint.Arguments) {
+	r.Lock()
+	if !r.configured {
+		var sayRepetitiveInsteadOfStutters bool
+		r.checkPrivateReceivers, r.disableStutteringCheck, sayRepetitiveInsteadOfStutters = r.getConf(arguments)
+		r.stuttersMsg = "stutters"
+		if sayRepetitiveInsteadOfStutters {
+			r.stuttersMsg = "is repetitive"
+		}
+
+		r.configured = true
+	}
+	r.Unlock()
+}
 
 // Apply applies the rule to given file.
 func (r *ExportedRule) Apply(file *lint.File, args lint.Arguments) []lint.Failure {
-	var failures []lint.Failure
+	r.configure(args)
 
-	if isTest(file) {
+	var failures []lint.Failure
+	if file.IsTest() {
 		return failures
 	}
 
-	checkPrivateReceivers, disableStutteringCheck, sayRepetitiveInsteadOfStutters := r.getConf(args)
-
-	stuttersMsg := "stutters"
-	if sayRepetitiveInsteadOfStutters {
-		stuttersMsg = "is repetitive"
-	}
-
 	fileAst := file.AST
+
 	walker := lintExported{
 		file:    file,
 		fileAst: fileAst,
@@ -37,9 +55,9 @@ func (r *ExportedRule) Apply(file *lint.File, args lint.Arguments) []lint.Failur
 			failures = append(failures, failure)
 		},
 		genDeclMissingComments: make(map[*ast.GenDecl]bool),
-		checkPrivateReceivers:  checkPrivateReceivers,
-		disableStutteringCheck: disableStutteringCheck,
-		stuttersMsg:            stuttersMsg,
+		checkPrivateReceivers:  r.checkPrivateReceivers,
+		disableStutteringCheck: r.disableStutteringCheck,
+		stuttersMsg:            r.stuttersMsg,
 	}
 
 	ast.Walk(&walker, fileAst)
@@ -48,11 +66,11 @@ func (r *ExportedRule) Apply(file *lint.File, args lint.Arguments) []lint.Failur
 }
 
 // Name returns the rule name.
-func (r *ExportedRule) Name() string {
+func (*ExportedRule) Name() string {
 	return "exported"
 }
 
-func (r *ExportedRule) getConf(args lint.Arguments) (checkPrivateReceivers bool, disableStutteringCheck bool, sayRepetitiveInsteadOfStutters bool) {
+func (r *ExportedRule) getConf(args lint.Arguments) (checkPrivateReceivers, disableStutteringCheck, sayRepetitiveInsteadOfStutters bool) {
 	// if any, we expect a slice of strings as configuration
 	if len(args) < 1 {
 		return
@@ -99,8 +117,8 @@ func (w *lintExported) lintFuncDoc(fn *ast.FuncDecl) {
 	if fn.Recv != nil && len(fn.Recv.List) > 0 {
 		// method
 		kind = "method"
-		recv := receiverType(fn)
-		if !ast.IsExported(recv) && !w.checkPrivateReceivers {
+		recv := typeparams.ReceiverType(fn)
+		if !w.checkPrivateReceivers && !ast.IsExported(recv) {
 			// receiver is unexported
 			return
 		}
@@ -109,7 +127,8 @@ func (w *lintExported) lintFuncDoc(fn *ast.FuncDecl) {
 		}
 		switch name {
 		case "Len", "Less", "Swap":
-			if w.file.Pkg.Sortable[recv] {
+			sortables := w.file.Pkg.Sortable()
+			if sortables[recv] {
 				return
 			}
 		}
@@ -232,7 +251,7 @@ func (w *lintExported) lintValueSpecDoc(vs *ast.ValueSpec, gd *ast.GenDecl, genD
 		return
 	}
 
-	if vs.Doc == nil && gd.Doc == nil {
+	if vs.Doc == nil && vs.Comment == nil && gd.Doc == nil {
 		if genDeclMissingComments[gd] {
 			return
 		}
@@ -250,15 +269,21 @@ func (w *lintExported) lintValueSpecDoc(vs *ast.ValueSpec, gd *ast.GenDecl, genD
 		return
 	}
 	// If this GenDecl has parens and a comment, we don't check its comment form.
-	if gd.Lparen.IsValid() && gd.Doc != nil {
+	if gd.Doc != nil && gd.Lparen.IsValid() {
 		return
 	}
 	// The relevant text to check will be on either vs.Doc or gd.Doc.
 	// Use vs.Doc preferentially.
-	doc := vs.Doc
-	if doc == nil {
+	var doc *ast.CommentGroup
+	switch {
+	case vs.Doc != nil:
+		doc = vs.Doc
+	case vs.Comment != nil && gd.Doc == nil:
+		doc = vs.Comment
+	default:
 		doc = gd.Doc
 	}
+
 	prefix := name + " "
 	s := normalizeText(doc.Text())
 	if !strings.HasPrefix(s, prefix) {

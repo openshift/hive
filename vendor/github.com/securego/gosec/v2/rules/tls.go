@@ -20,6 +20,8 @@ import (
 	"crypto/tls"
 	"fmt"
 	"go/ast"
+	"go/types"
+	"strconv"
 
 	"github.com/securego/gosec/v2"
 )
@@ -85,12 +87,45 @@ func (t *insecureConfigTLS) processTLSConfVal(n *ast.KeyValueExpr, c *gosec.Cont
 			}
 
 		case "MinVersion":
-			if ival, ierr := gosec.GetInt(n.Value); ierr == nil {
+			if d, ok := n.Value.(*ast.Ident); ok {
+				obj := d.Obj
+				if obj == nil {
+					for _, f := range c.PkgFiles {
+						obj = f.Scope.Lookup(d.Name)
+						if obj != nil {
+							break
+						}
+					}
+				}
+				if vs, ok := obj.Decl.(*ast.ValueSpec); ok && len(vs.Values) > 0 {
+					if s, ok := vs.Values[0].(*ast.SelectorExpr); ok {
+						x := s.X.(*ast.Ident).Name
+						sel := s.Sel.Name
+
+						for _, imp := range c.Pkg.Imports() {
+							if imp.Name() == x {
+								tObj := imp.Scope().Lookup(sel)
+								if cst, ok := tObj.(*types.Const); ok {
+									// ..got the value check if this can be translated
+									if minVersion, err := strconv.ParseInt(cst.Val().String(), 10, 64); err == nil {
+										t.actualMinVersion = minVersion
+									}
+								}
+							}
+						}
+					}
+					if ival, ierr := gosec.GetInt(vs.Values[0]); ierr == nil {
+						t.actualMinVersion = ival
+					}
+				}
+			} else if ival, ierr := gosec.GetInt(n.Value); ierr == nil {
 				t.actualMinVersion = ival
 			} else {
 				if se, ok := n.Value.(*ast.SelectorExpr); ok {
-					if pkg, ok := se.X.(*ast.Ident); ok && pkg.Name == "tls" {
-						t.actualMinVersion = t.mapVersion(se.Sel.Name)
+					if pkg, ok := se.X.(*ast.Ident); ok {
+						if ip, ok := gosec.GetImportPath(pkg.Name, c); ok && ip == "crypto/tls" {
+							t.actualMinVersion = t.mapVersion(se.Sel.Name)
+						}
 					}
 				}
 			}
@@ -100,8 +135,10 @@ func (t *insecureConfigTLS) processTLSConfVal(n *ast.KeyValueExpr, c *gosec.Cont
 				t.actualMaxVersion = ival
 			} else {
 				if se, ok := n.Value.(*ast.SelectorExpr); ok {
-					if pkg, ok := se.X.(*ast.Ident); ok && pkg.Name == "tls" {
-						t.actualMaxVersion = t.mapVersion(se.Sel.Name)
+					if pkg, ok := se.X.(*ast.Ident); ok {
+						if ip, ok := gosec.GetImportPath(pkg.Name, c); ok && ip == "crypto/tls" {
+							t.actualMaxVersion = t.mapVersion(se.Sel.Name)
+						}
 					}
 				}
 			}

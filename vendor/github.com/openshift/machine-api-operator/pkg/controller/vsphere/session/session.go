@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 
@@ -52,6 +53,8 @@ type Session struct {
 
 	username string
 	password string
+
+	sessionKey string
 }
 
 func newClientWithTimeout(ctx context.Context, u *url.URL, insecure bool, timeout time.Duration) (*govmomi.Client, error) {
@@ -109,9 +112,10 @@ func GetOrCreate(
 	}
 
 	session := Session{
-		Client:   client,
-		username: username,
-		password: password,
+		Client:     client,
+		username:   username,
+		password:   password,
+		sessionKey: sessionKey,
 	}
 
 	session.Finder = find.NewFinder(session.Client.Client, false)
@@ -217,4 +221,23 @@ func (s *Session) WithRestClient(ctx context.Context, f func(c *rest.Client) err
 	}()
 
 	return f(c)
+}
+
+func (s *Session) WithCachingTagsManager(ctx context.Context, f func(m *CachingTagsManager) error) error {
+	c := rest.NewClient(s.Client.Client)
+
+	user := url.UserPassword(s.username, s.password)
+	if err := c.Login(ctx, user); err != nil {
+		return err
+	}
+
+	defer func() {
+		if err := c.Logout(ctx); err != nil {
+			klog.Errorf("Failed to logout: %v", err)
+		}
+	}()
+
+	m := newTagsCachingClient(tags.NewManager(c), s.sessionKey)
+
+	return f(m)
 }

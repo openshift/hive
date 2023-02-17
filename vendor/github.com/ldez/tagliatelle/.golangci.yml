@@ -10,8 +10,6 @@ linters-settings:
       - fieldalignment
   gocyclo:
     min-complexity: 15
-  maligned:
-    suggest-new: true
   goconst:
     min-len: 5
     min-occurrences: 3
@@ -26,7 +24,7 @@ linters-settings:
   gofumpt:
     extra-rules: true
   depguard:
-    list-type: blacklist
+    list-type: denylist
     include-go-root: false
     packages:
       - github.com/sirupsen/logrus
@@ -48,11 +46,19 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    - maligned # deprecated
+    - deadcode # deprecated
+    - exhaustivestruct # deprecated
+    - golint # deprecated
+    - ifshort # deprecated
     - interfacer # deprecated
+    - maligned # deprecated
+    - nosnakecase # deprecated
     - scopelint # deprecated
+    - structcheck # deprecated
+    - varcheck # deprecated
     - sqlclosecheck # not relevant (SQL)
     - rowserrcheck # not relevant (SQL)
+    - execinquery # not relevant (SQL)
     - cyclop # duplicate of gocyclo
     - lll
     - dupl
@@ -62,16 +68,21 @@ linters:
     - goerr113
     - wrapcheck
     - exhaustive
-    - exhaustivestruct
+    - exhaustruct
     - testpackage
     - tparallel
     - paralleltest
     - prealloc
     - ifshort
     - forcetypeassert
+    - varnamelen
+    - nilnil
+    - errchkjson
+    - nonamedreturns
 
 issues:
   exclude-use-default: false
   max-per-linter: 0
   max-same-issues: 0
-  exclude: []
+  exclude:
+    - 'package-comments: should have a package comment'

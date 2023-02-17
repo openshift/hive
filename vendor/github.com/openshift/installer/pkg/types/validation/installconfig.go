@@ -11,14 +11,15 @@ import (
 	"strings"
 
 	dockerref "github.com/containers/image/docker/reference"
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilsnet "k8s.io/utils/net"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
@@ -47,7 +48,6 @@ import (
 	"github.com/openshift/installer/pkg/types/vsphere"
 	vspherevalidation "github.com/openshift/installer/pkg/types/vsphere/validation"
 	"github.com/openshift/installer/pkg/validate"
-	utilsnet "k8s.io/utils/net"
 )
 
 // list of known plugins that require hostPrefix to be set
@@ -770,9 +770,10 @@ func validateProxy(p *types.Proxy, c *types.InstallConfig, fldPath *field.Path) 
 			v = strings.TrimSpace(v)
 			errDomain := validate.NoProxyDomainName(v)
 			_, _, errCIDR := net.ParseCIDR(v)
-			if errDomain != nil && errCIDR != nil {
+			ip := net.ParseIP(v)
+			if errDomain != nil && errCIDR != nil && ip == nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("noProxy"), p.NoProxy, fmt.Sprintf(
-					"each element of noProxy must be a CIDR or domain without wildcard characters, which is violated by element %d %q", idx, v)))
+					"each element of noProxy must be a IP, CIDR or domain without wildcard characters, which is violated by element %d %q", idx, v)))
 			}
 		}
 	}
@@ -999,30 +1000,8 @@ func validateFeatureSet(c *types.InstallConfig) field.ErrorList {
 	if c.FeatureSet != configv1.TechPreviewNoUpgrade {
 		errMsg := "the TechPreviewNoUpgrade feature set must be enabled to use this field"
 
-		if c.GCP != nil && len(c.GCP.NetworkProjectID) > 0 {
-			allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "gcp", "networkProjectID"), errMsg))
-		}
-
-		if c.VSphere != nil {
-			if len(c.VSphere.FailureDomains) > 0 {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "vsphere", "failureDomains"), errMsg))
-			}
-
-			if len(c.VSphere.VCenters) > 0 {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "vsphere", "vcenters"), errMsg))
-			}
-
-			if c.VSphere.DefaultMachinePlatform != nil && len(c.VSphere.DefaultMachinePlatform.Zones) > 0 {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "vsphere", "defaultMachinePlatform", "zones"), errMsg))
-			}
-
-			if c.ControlPlane != nil && c.ControlPlane.Platform.VSphere != nil && len(c.ControlPlane.Platform.VSphere.Zones) > 0 {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("controlPlane", "platform", "vsphere", "zones"), errMsg))
-			}
-
-			if len(c.Compute) != 0 && c.Compute[0].Platform.VSphere != nil && len(c.Compute[0].Platform.VSphere.Zones) > 0 {
-				allErrs = append(allErrs, field.Forbidden(field.NewPath("compute", "platform", "vsphere", "zones"), errMsg))
-			}
+		if c.Azure != nil && len(c.Azure.UserTags) > 0 {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "azure", "userTags"), errMsg))
 		}
 	}
 

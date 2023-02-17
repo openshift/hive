@@ -33,11 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/drain"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -102,7 +100,16 @@ const (
 var DefaultActuator Actuator
 
 func AddWithActuator(mgr manager.Manager, actuator Actuator) error {
-	return add(mgr, newReconciler(mgr, actuator))
+	if err := add(mgr, newReconciler(mgr, actuator), "machine-controller"); err != nil {
+		return err
+	}
+	if err := addWithOpts(mgr, controller.Options{
+		Reconciler:  newDrainController(mgr),
+		RateLimiter: newDrainRateLimiter(),
+	}, "machine-drain-controller"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // newReconciler returns a new reconcile.Reconciler
@@ -125,9 +132,14 @@ func stringPointerDeref(stringPointer *string) string {
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r reconcile.Reconciler, controllerName string) error {
+	return addWithOpts(mgr, controller.Options{Reconciler: r}, controllerName)
+}
+
+// add adds a new Controller to mgr with r as the reconcile.Reconciler
+func addWithOpts(mgr manager.Manager, opts controller.Options, controllerName string) error {
 	// Create a new controller
-	c, err := controller.New("machine_controller", mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(controllerName, mgr, opts)
 	if err != nil {
 		return err
 	}
@@ -217,30 +229,12 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 		}
 
 		klog.Infof("%v: reconciling machine triggers delete", machineName)
-		// Drain node before deletion
-		// If a machine is not linked to a node, just delete the machine. Since a node
-		// can be unlinked from a machine when the node goes NotReady and is removed
-		// by cloud controller manager. In that case some machines would never get
-		// deleted without a manual intervention.
-		if _, exists := m.ObjectMeta.Annotations[ExcludeNodeDrainingAnnotation]; !exists && m.Status.NodeRef != nil {
-			// pre-drain.delete lifecycle hook
-			// Return early without error, will requeue if/when the hook owner removes the annotation.
-			if len(m.Spec.LifecycleHooks.PreDrain) > 0 {
-				klog.Infof("%v: not draining machine: lifecycle blocked by pre-drain hook", machineName)
-				return reconcile.Result{}, nil
-			}
-
-			if err := r.drainNode(ctx, m); err != nil {
-				klog.Errorf("%v: failed to drain node for machine: %v", machineName, err)
-				conditions.Set(m, conditions.FalseCondition(
-					machinev1.MachineDrained,
-					machinev1.MachineDrainError,
-					machinev1.ConditionSeverityWarning,
-					"could not drain machine: %v", err,
-				))
-				return delayIfRequeueAfterError(err)
-			}
-			conditions.Set(m, conditions.TrueCondition(machinev1.MachineDrained))
+		// check if machine was already drained
+		drainedCondition := conditions.Get(m, machinev1.MachineDrained)
+		if drainedCondition == nil || drainedCondition.Status != corev1.ConditionTrue {
+			klog.Infof("%s: waiting for node to be drained before deleting instance", machineName)
+			// this will requeue and proceed when drain controller will set the condition
+			return reconcile.Result{}, nil
 		}
 
 		// pre-term.delete lifecycle hook
@@ -399,70 +393,6 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 	return reconcile.Result{RequeueAfter: requeueAfter}, nil
 }
 
-func (r *ReconcileMachine) drainNode(ctx context.Context, machine *machinev1.Machine) error {
-	kubeClient, err := kubernetes.NewForConfig(r.config)
-	if err != nil {
-		return fmt.Errorf("unable to build kube client: %v", err)
-	}
-	node, err := kubeClient.CoreV1().Nodes().Get(ctx, machine.Status.NodeRef.Name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// If an admin deletes the node directly, we'll end up here.
-			klog.Infof("Could not find node from noderef, it may have already been deleted: %v", machine.Status.NodeRef.Name)
-			return nil
-		}
-		return fmt.Errorf("unable to get node %q: %v", machine.Status.NodeRef.Name, err)
-	}
-
-	drainer := &drain.Helper{
-		Ctx:                 ctx,
-		Client:              kubeClient,
-		Force:               true,
-		IgnoreAllDaemonSets: true,
-		DeleteEmptyDirData:  true,
-		GracePeriodSeconds:  -1,
-		// If a pod is not evicted in 20 seconds, retry the eviction next time the
-		// machine gets reconciled again (to allow other machines to be reconciled).
-		Timeout: 20 * time.Second,
-		OnPodDeletedOrEvicted: func(pod *corev1.Pod, usingEviction bool) {
-			verbStr := "Deleted"
-			if usingEviction {
-				verbStr = "Evicted"
-			}
-			klog.Info(fmt.Sprintf("%s pod from Node", verbStr),
-				"pod", fmt.Sprintf("%s/%s", pod.Name, pod.Namespace))
-		},
-		Out:    writer{klog.Info},
-		ErrOut: writer{klog.Error},
-	}
-
-	if nodeIsUnreachable(node) {
-		klog.Infof("%q: Node %q is unreachable, draining will ignore gracePeriod. PDBs are still honored.",
-			machine.Name, node.Name)
-		// Since kubelet is unreachable, pods will never disappear and we still
-		// need SkipWaitForDeleteTimeoutSeconds so we don't wait for them.
-		drainer.SkipWaitForDeleteTimeoutSeconds = skipWaitForDeleteTimeoutSeconds
-		drainer.GracePeriodSeconds = 1
-	}
-
-	if err := drain.RunCordonOrUncordon(drainer, node, true); err != nil {
-		// Can't cordon a node
-		klog.Warningf("cordon failed for node %q: %v", node.Name, err)
-		return &RequeueAfterError{RequeueAfter: 20 * time.Second}
-	}
-
-	if err := drain.RunNodeDrain(drainer, node.Name); err != nil {
-		// Machine still tries to terminate after drain failure
-		klog.Warningf("drain failed for machine %q: %v", machine.Name, err)
-		return &RequeueAfterError{RequeueAfter: 20 * time.Second}
-	}
-
-	klog.Infof("drain successful for machine %q", machine.Name)
-	r.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Deleted", "Node %q drained", node.Name)
-
-	return nil
-}
-
 func (r *ReconcileMachine) deleteNode(ctx context.Context, name string) error {
 	var node corev1.Node
 	if err := r.Client.Get(ctx, client.ObjectKey{Name: name}, &node); err != nil {
@@ -500,8 +430,11 @@ func isInvalidMachineConfigurationError(err error) bool {
 // Because the conditions are set on the machine outside of this function, we must pass the original state of the
 // machine conditions so that the diff can be calculated properly within this function.
 func (r *ReconcileMachine) updateStatus(ctx context.Context, machine *machinev1.Machine, phase string, failureCause error, originalConditions []machinev1.Condition) error {
+	phaseChanged := false
 	if stringPointerDeref(machine.Status.Phase) != phase {
 		klog.V(3).Infof("%v: going into phase %q", machine.GetName(), phase)
+
+		phaseChanged = true
 	}
 
 	// Ensure the lifecycle hook conditions are accurate whenever the status is updated
@@ -565,8 +498,10 @@ func (r *ReconcileMachine) updateStatus(ctx context.Context, machine *machinev1.
 	}
 
 	// Update the metric after everything else has succeeded to prevent duplicate
-	// entries when there are failures
-	if phase != phaseDeleting {
+	// entries when there are failures.
+	// Only update when there is a change to the phase to avoid duplicating entries for
+	// individual machines.
+	if phaseChanged && phase != phaseDeleting {
 		// Apart from deleting, update the transition metric
 		// Deleting would always end up in the infinite bucket
 		timeElapsed := r.now().Sub(machine.GetCreationTimestamp().Time).Seconds()

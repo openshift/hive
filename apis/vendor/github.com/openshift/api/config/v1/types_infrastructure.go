@@ -101,6 +101,19 @@ type InfrastructureStatus struct {
 	// +kubebuilder:default=HighlyAvailable
 	// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica
 	InfrastructureTopology TopologyMode `json:"infrastructureTopology"`
+
+	// cpuPartitioning expresses if CPU partitioning is a currently enabled feature in the cluster.
+	// CPU Partitioning means that this cluster can support partitioning workloads to specific CPU Sets.
+	// Valid values are "None" and "AllNodes". When omitted, the default value is "None".
+	// The default value of "None" indicates that no nodes will be setup with CPU partitioning.
+	// The "AllNodes" value indicates that all nodes have been setup with CPU partitioning,
+	// and can then be further configured via the PerformanceProfile API.
+	// +kubebuilder:default=None
+	// +default="None"
+	// +kubebuilder:validation:Enum=None;AllNodes
+	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
+	// +optional
+	CPUPartitioning CPUPartitioningMode `json:"cpuPartitioning,omitempty"`
 }
 
 // TopologyMode defines the topology mode of the control/infra nodes.
@@ -123,8 +136,19 @@ const (
 	ExternalTopologyMode TopologyMode = "External"
 )
 
+// CPUPartitioningMode defines the mode for CPU partitioning
+type CPUPartitioningMode string
+
+const (
+	// CPUPartitioningNone means that no CPU Partitioning is on in this cluster infrastructure
+	CPUPartitioningNone CPUPartitioningMode = "None"
+
+	// CPUPartitioningAllNodes means that all nodes are configured with CPU Partitioning in this cluster
+	CPUPartitioningAllNodes CPUPartitioningMode = "AllNodes"
+)
+
 // PlatformType is a specific supported infrastructure provider.
-// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt;EquinixMetal;PowerVS;AlibabaCloud;Nutanix
+// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt;EquinixMetal;PowerVS;AlibabaCloud;Nutanix;External
 type PlatformType string
 
 const (
@@ -172,6 +196,9 @@ const (
 
 	// NutanixPlatformType represents Nutanix infrastructure.
 	NutanixPlatformType PlatformType = "Nutanix"
+
+	// ExternalPlatformType represents generic infrastructure provider. Platform-specific components should be supplemented separately.
+	ExternalPlatformType PlatformType = "External"
 )
 
 // IBMCloudProviderType is a specific supported IBM Cloud provider cluster type
@@ -188,6 +215,50 @@ const (
 	// This is utilized in IBM Cloud Satellite environments.
 	IBMCloudProviderTypeUPI IBMCloudProviderType = "UPI"
 )
+
+// CloudControllerManagerState defines whether Cloud Controller Manager presence is expected or not
+type CloudControllerManagerState string
+
+const (
+	// Cloud Controller Manager is enabled and expected to be installed.
+	// This value indicates that new nodes should be tainted as uninitialized when created,
+	// preventing them from running workloads until they are initialized by the cloud controller manager.
+	CloudControllerManagerExternal CloudControllerManagerState = "External"
+
+	// Cloud Controller Manager is disabled and not expected to be installed.
+	// This value indicates that new nodes should not be tainted
+	// and no extra node initialization is expected from the cloud controller manager.
+	CloudControllerManagerNone CloudControllerManagerState = "None"
+)
+
+// CloudControllerManagerSpec holds Cloud Controller Manager (a.k.a. CCM or CPI) related settings
+type CloudControllerManagerSpec struct {
+	// state determines whether or not an external Cloud Controller Manager is expected to
+	// be installed within the cluster.
+	// https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#running-cloud-controller-manager
+	//
+	// When set to "External", new nodes will be tainted as uninitialized when created,
+	// preventing them from running workloads until they are initialized by the cloud controller manager.
+	// When omitted or set to "None", new nodes will be not tainted
+	// and no extra initialization from the cloud controller manager is expected.
+	// +kubebuilder:validation:Enum="";External;None
+	// +optional
+	State CloudControllerManagerState `json:"state"`
+}
+
+// ExternalPlatformSpec holds the desired state for the generic External infrastructure provider.
+type ExternalPlatformSpec struct {
+	// PlatformName holds the arbitrary string representing the infrastructure provider name, expected to be set at the installation time.
+	// This field is solely for informational and reporting purposes and is not expected to be used for decision-making.
+	// +kubebuilder:default:="Unknown"
+	// +default="Unknown"
+	// +kubebuilder:validation:XValidation:rule="oldSelf == 'Unknown' || self == oldSelf",message="platform name cannot be changed once set"
+	// +optional
+	PlatformName string `json:"platformName,omitempty"`
+	// CloudControllerManager contains settings specific to the external Cloud Controller Manager (a.k.a. CCM or CPI)
+	// +optional
+	CloudControllerManager CloudControllerManagerSpec `json:"cloudControllerManager"`
+}
 
 // PlatformSpec holds the desired state specific to the underlying infrastructure provider
 // of the current cluster. Since these are used at spec-level for the underlying cluster, it
@@ -256,7 +327,15 @@ type PlatformSpec struct {
 	// Nutanix contains settings specific to the Nutanix infrastructure provider.
 	// +optional
 	Nutanix *NutanixPlatformSpec `json:"nutanix,omitempty"`
+
+	// ExternalPlatformType represents generic infrastructure provider.
+	// Platform-specific components should be supplemented separately.
+	// +optional
+	External *ExternalPlatformSpec `json:"external,omitempty"`
 }
+
+// ExternalPlatformStatus holds the current status of the generic External infrastructure provider.
+type ExternalPlatformStatus struct{}
 
 // PlatformStatus holds the current status specific to the underlying infrastructure provider
 // of the current cluster. Since these are used at status-level for the underlying cluster, it
@@ -326,6 +405,10 @@ type PlatformStatus struct {
 	// Nutanix contains settings specific to the Nutanix infrastructure provider.
 	// +optional
 	Nutanix *NutanixPlatformStatus `json:"nutanix,omitempty"`
+
+	// External contains settings specific to the generic External infrastructure provider.
+	// +optional
+	External *ExternalPlatformStatus `json:"external,omitempty"`
 }
 
 // AWSServiceEndpoint store the configuration of a custom url to
@@ -401,6 +484,7 @@ type AWSResourceTag struct {
 type AzurePlatformSpec struct{}
 
 // AzurePlatformStatus holds the current status of the Azure infrastructure provider.
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.resourceTags) && !has(self.resourceTags) || has(oldSelf.resourceTags) && has(self.resourceTags)",message="resourceTags may only be configured during installation"
 type AzurePlatformStatus struct {
 	// resourceGroupName is the Resource Group for new Azure resources created for the cluster.
 	ResourceGroupName string `json:"resourceGroupName"`
@@ -419,6 +503,34 @@ type AzurePlatformStatus struct {
 	// armEndpoint specifies a URL to use for resource management in non-soverign clouds such as Azure Stack.
 	// +optional
 	ARMEndpoint string `json:"armEndpoint,omitempty"`
+
+	// resourceTags is a list of additional tags to apply to Azure resources created for the cluster.
+	// See https://docs.microsoft.com/en-us/rest/api/resources/tags for information on tagging Azure resources.
+	// Due to limitations on Automation, Content Delivery Network, DNS Azure resources, a maximum of 15 tags
+	// may be applied. OpenShift reserves 5 tags for internal use, allowing 10 tags for user configuration.
+	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:XValidation:rule="self.all(x, x in oldSelf) && oldSelf.all(x, x in self)",message="resourceTags are immutable and may only be configured during installation"
+	// +optional
+	ResourceTags []AzureResourceTag `json:"resourceTags,omitempty"`
+}
+
+// AzureResourceTag is a tag to apply to Azure resources created for the cluster.
+type AzureResourceTag struct {
+	// key is the key part of the tag. A tag key can have a maximum of 128 characters and cannot be empty. Key
+	// must begin with a letter, end with a letter, number or underscore, and must contain only alphanumeric
+	// characters and the following special characters `_ . -`.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:Pattern=`^[a-zA-Z]([0-9A-Za-z_.-]*[0-9A-Za-z_])?$`
+	Key string `json:"key"`
+	// value is the value part of the tag. A tag value can have a maximum of 256 characters and cannot be empty. Value
+	// must contain only alphanumeric characters and the following special characters `_ + , - . / : ; < = > ? @`.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:Pattern=`^[0-9A-Za-z_.=+-@]+$`
+	Value string `json:"value"`
 }
 
 // AzureCloudEnvironment is the name of the Azure cloud environment
@@ -775,7 +887,6 @@ type VSpherePlatformSpec struct {
 	// ---
 	// + If VCenters is not defined use the existing cloud-config configmap defined
 	// + in openshift-config.
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
 	// +kubebuilder:validation:MaxItems=1
 	// +kubebuilder:validation:MinItems=0
 	// +optional
@@ -783,7 +894,6 @@ type VSpherePlatformSpec struct {
 
 	// failureDomains contains the definition of region, zone and the vCenter topology.
 	// If this is omitted failure domains (regions and zones) will not be used.
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
 	// +optional
 	FailureDomains []VSpherePlatformFailureDomainSpec `json:"failureDomains,omitempty"`
 
@@ -792,7 +902,6 @@ type VSpherePlatformSpec struct {
 	// If this field is omitted, networking defaults to the legacy
 	// address selection behavior which is to only support a single address and
 	// return the first one found.
-	// +openshift:enable:FeatureSets=TechPreviewNoUpgrade
 	// +optional
 	NodeNetworking VSpherePlatformNodeNetworking `json:"nodeNetworking,omitempty"`
 }

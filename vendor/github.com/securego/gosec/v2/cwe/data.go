@@ -90,6 +90,11 @@ var (
 			Name:        "Insecure Temporary File",
 		},
 		{
+			ID:          "400",
+			Description: "The software does not properly control the allocation and maintenance of a limited resource, thereby enabling an actor to influence the amount of resources consumed, eventually leading to the exhaustion of available resources.",
+			Name:        "Uncontrolled Resource Consumption",
+		},
+		{
 			ID:          "409",
 			Description: "The software does not handle or incorrectly handles a compressed input with a very high compression ratio that produces a large output.",
 			Name:        "Improper Handling of Highly Compressed Data (Data Amplification)",
@@ -123,6 +128,11 @@ var (
 			ID:          "89",
 			Description: "The software constructs all or part of an SQL command using externally-influenced input from an upstream component, but it does not neutralize or incorrectly neutralizes special elements that could modify the intended SQL command when it is sent to a downstream component.",
 			Name:        "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+		},
+		{
+			ID:          "676",
+			Description: "The program invokes a potentially dangerous function that could introduce a vulnerability if it is used incorrectly, but the function can also be used safely.",
+			Name:        "Use of Potentially Dangerous Function",
 		},
 	}
 )

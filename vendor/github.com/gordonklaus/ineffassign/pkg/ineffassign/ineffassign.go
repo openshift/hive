@@ -60,6 +60,7 @@ type builder struct {
 	block     *block
 	vars      map[*ast.Object]*variable
 	results   []*ast.FieldList
+	defers    []bool
 	breaks    branchStack
 	continues branchStack
 	gotos     branchStack
@@ -181,6 +182,9 @@ func (bld *builder) Visit(n ast.Node) ast.Visitor {
 		}
 		brek.setDestination(bld.newBlock(exits...))
 		bld.breaks.pop()
+	case *ast.DeferStmt:
+		bld.defers[len(bld.defers)-1] = true
+		return bld
 	case *ast.LabeledStmt:
 		bld.gotos.get(n.Label).setDestination(bld.newBlock(bld.block))
 		bld.labelStmt = n
@@ -324,8 +328,15 @@ func (bld *builder) Visit(n ast.Node) ast.Visitor {
 func isZeroInitializer(x ast.Expr) bool {
 	// Assume that a call expression of a single argument is a conversion expression.  We can't do better without type information.
 	if c, ok := x.(*ast.CallExpr); ok {
-		switch c.Fun.(type) {
-		case *ast.Ident, *ast.SelectorExpr:
+		fun := c.Fun
+		if p, ok := fun.(*ast.ParenExpr); ok {
+			fun = p.X
+		}
+		if s, ok := fun.(*ast.StarExpr); ok {
+			fun = s.X
+		}
+		switch fun.(type) {
+		case *ast.Ident, *ast.SelectorExpr, *ast.ArrayType, *ast.StructType, *ast.FuncType, *ast.InterfaceType, *ast.MapType, *ast.ChanType:
 		default:
 			return false
 		}
@@ -342,7 +353,7 @@ func isZeroInitializer(x ast.Expr) bool {
 			return true
 		}
 	case *ast.Ident:
-		return x.Name == "false" && x.Obj == nil
+		return (x.Name == "false" || x.Name == "nil") && x.Obj == nil
 	}
 
 	return false
@@ -353,6 +364,7 @@ func (bld *builder) fun(typ *ast.FuncType, body *ast.BlockStmt) {
 		v.fundept++
 	}
 	bld.results = append(bld.results, typ.Results)
+	bld.defers = append(bld.defers, false)
 
 	b := bld.block
 	bld.newBlock()
@@ -362,6 +374,7 @@ func (bld *builder) fun(typ *ast.FuncType, body *ast.BlockStmt) {
 	bld.block = b
 
 	bld.results = bld.results[:len(bld.results)-1]
+	bld.defers = bld.defers[:len(bld.defers)-1]
 	for _, v := range bld.vars {
 		v.fundept--
 	}
@@ -415,8 +428,11 @@ func (bld *builder) swtch(stmt ast.Stmt, cases []ast.Stmt) {
 	bld.breaks.pop()
 }
 
-// An operation that might panic marks named function results as used.
+// If an operation might panic and be recovered, mark named function results as used.
 func (bld *builder) maybePanic() {
+	if len(bld.defers) == 0 || !bld.defers[len(bld.defers)-1] {
+		return
+	}
 	if len(bld.results) == 0 {
 		return
 	}

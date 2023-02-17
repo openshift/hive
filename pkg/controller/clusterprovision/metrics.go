@@ -28,7 +28,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		[]string{"result"},
 		mapClusterTypeLabelToValue,
-		log,
 	)
 	metricInstallErrors = *hivemetrics.NewCounterVecWithDynamicLabels(
 		&prometheus.CounterOpts{
@@ -37,7 +36,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		[]string{"reason"},
 		mapClusterTypeLabelToValue,
-		log,
 	)
 
 	metricInstallFailureSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
@@ -48,7 +46,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
 		mapClusterTypeLabelToValue,
-		log,
 	)
 	metricInstallSuccessSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
 		&prometheus.HistogramOpts{
@@ -58,7 +55,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
 		mapClusterTypeLabelToValue,
-		log,
 	)
 
 	metricInstallErrors.Register()

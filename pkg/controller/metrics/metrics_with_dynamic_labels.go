@@ -1,9 +1,9 @@
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
+	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -39,19 +39,21 @@ func (d *dynamicLabels) getLabelList() []string {
 	return finalList
 }
 
-// getRepeatedLabel detects and returns the first optional label it encounters, that overlaps with another label
-func (d *dynamicLabels) getRepeatedLabel() string {
+// getRepeatedLabels detects and returns the optional labels that overlap with another label.
+func (d *dynamicLabels) getRepeatedLabels() []string {
+	var returnList []string
 	keys := sets.Set[string]{}
 	for _, val := range d.fixedLabels {
 		keys.Insert(val)
 	}
 	for key := range d.optionalLabels {
 		if keys.Has(key) {
-			return key
+			returnList = append(returnList, key)
+		} else {
+			keys.Insert(key)
 		}
-		keys.Insert(key)
 	}
-	return ""
+	return returnList
 }
 
 // buildLabels fetches the optional label values and merges the maps of fixedLabels and optionalLabels. The resultant
@@ -78,7 +80,7 @@ type CounterVecWithDynamicLabels struct {
 }
 
 func NewCounterVecWithDynamicLabels(counterOpts *prometheus.CounterOpts, fixedLabels []string,
-	optionalLabels map[string]string, log log.FieldLogger) *CounterVecWithDynamicLabels {
+	optionalLabels map[string]string) *CounterVecWithDynamicLabels {
 	counterVecMetric := &CounterVecWithDynamicLabels{
 		CounterOpts: counterOpts,
 		dynamicLabels: &dynamicLabels{
@@ -86,8 +88,8 @@ func NewCounterVecWithDynamicLabels(counterOpts *prometheus.CounterOpts, fixedLa
 			optionalLabels: optionalLabels,
 		},
 	}
-	if repeatedLabel := counterVecMetric.getRepeatedLabel(); repeatedLabel != "" {
-		log.Errorf("HiveConfig.Spec.AdditionalClusterDeploymentLabels[%q] conflicts with a fixed label for the metric %s. Please rename your label.", repeatedLabel, counterOpts.Name)
+	if repeatedLabels := counterVecMetric.getRepeatedLabels(); repeatedLabels != nil {
+		panic(fmt.Sprintf("Label(s) %v in HiveConfig.Spec.AdditionalClusterDeploymentLabels conflict with fixed label(s) for the metric %s. Please rename your label.", repeatedLabels, counterOpts.Name))
 	}
 	counterVecMetric.metric = prometheus.NewCounterVec(*counterVecMetric.CounterOpts, counterVecMetric.getLabelList())
 	return counterVecMetric
@@ -110,7 +112,7 @@ type HistogramVecWithDynamicLabels struct {
 }
 
 func NewHistogramVecWithDynamicLabels(histogramOpts *prometheus.HistogramOpts, fixedLabels []string,
-	optionalLabels map[string]string, log log.FieldLogger) *HistogramVecWithDynamicLabels {
+	optionalLabels map[string]string) *HistogramVecWithDynamicLabels {
 	histogramVecMetric := &HistogramVecWithDynamicLabels{
 		HistogramOpts: histogramOpts,
 		dynamicLabels: &dynamicLabels{
@@ -118,8 +120,8 @@ func NewHistogramVecWithDynamicLabels(histogramOpts *prometheus.HistogramOpts, f
 			optionalLabels: optionalLabels,
 		},
 	}
-	if repeatedLabel := histogramVecMetric.getRepeatedLabel(); repeatedLabel != "" {
-		log.Errorf("HiveConfig.Spec.AdditionalClusterDeploymentLabels[%q] conflicts with a fixed label for the metric %s. Please rename your label.", repeatedLabel, histogramOpts.Name)
+	if repeatedLabels := histogramVecMetric.getRepeatedLabels(); repeatedLabels != nil {
+		panic(fmt.Sprintf("Label(s) %v in HiveConfig.Spec.AdditionalClusterDeploymentLabels conflict with fixed label(s) for the metric %s. Please rename your label.", repeatedLabels, histogramOpts.Name))
 	}
 	histogramVecMetric.metric = prometheus.NewHistogramVec(*histogramVecMetric.HistogramOpts, histogramVecMetric.getLabelList())
 	return histogramVecMetric

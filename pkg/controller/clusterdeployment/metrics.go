@@ -80,7 +80,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		nil,
 		mapClusterTypeLabelToValue,
-		log,
 	)
 	metricClustersCreated = *hivemetrics.NewCounterVecWithDynamicLabels(
 		&prometheus.CounterOpts{
@@ -89,7 +88,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		nil,
 		mapClusterTypeLabelToValue,
-		log,
 	)
 	metricClustersInstalled = *hivemetrics.NewCounterVecWithDynamicLabels(
 		&prometheus.CounterOpts{
@@ -98,7 +96,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		nil,
 		mapClusterTypeLabelToValue,
-		log,
 	)
 	metricClustersDeleted = *hivemetrics.NewCounterVecWithDynamicLabels(
 		&prometheus.CounterOpts{
@@ -107,7 +104,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		nil,
 		mapClusterTypeLabelToValue,
-		log,
 	)
 	metricProvisionFailedTerminal = *hivemetrics.NewCounterVecWithDynamicLabels(
 		&prometheus.CounterOpts{
@@ -116,7 +112,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) 
 		},
 		[]string{"clusterpool_namespacedname", "failure_reason"},
 		mapClusterTypeLabelToValue,
-		log,
 	)
 
 	metrics.Registry.MustRegister(metricInstallJobDuration)

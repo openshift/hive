@@ -27,7 +27,6 @@ import (
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
-	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -92,7 +91,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
 				return reconcile.Result{}, err
 			}
-			incProvisionFailedTerminal(cd)
+			incProvisionFailedTerminal(cd, logger)
 		}
 		return reconcile.Result{}, nil
 	}
@@ -513,10 +512,9 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
 
 	// Report a metric for the total number of install restarts:
-	metricCompletedInstallJobRestarts.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).
-		Observe(float64(cd.Status.InstallRestarts))
+	metricCompletedInstallJobRestarts.Observe(cd, nil, float64(cd.Status.InstallRestarts))
 
-	metricClustersInstalled.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+	metricClustersInstalled.Observe(cd, nil, 1)
 
 	return reconcile.Result{}, nil
 }

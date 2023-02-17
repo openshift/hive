@@ -244,7 +244,7 @@ type Calculator struct {
 func (mc *Calculator) Start(ctx context.Context) error {
 	log.Info("started metrics calculator goroutine")
 	// Get the metrics config from hiveConfig
-	mConfig, err := readMetricsConfig()
+	mConfig, err := ReadMetricsConfig()
 	if err != nil {
 		log.WithError(err).Error("error reading metrics config")
 		return err
@@ -272,7 +272,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				return
 			}
 			for _, cd := range clusterDeployments.Items {
-				clusterType := GetClusterDeploymentType(&cd)
+				clusterType := GetLabelValue(&cd, hivev1.HiveClusterTypeLabel)
 				accumulator.processCluster(&cd)
 
 				if cd.DeletionTimestamp != nil {
@@ -534,7 +534,7 @@ func processJobs(jobs []batchv1.Job) (runningTotal, succeededTotal, failedTotal 
 	failed := map[string]int{}
 	succeeded := map[string]int{}
 	for _, job := range jobs {
-		clusterType := GetClusterDeploymentType(&job)
+		clusterType := GetLabelValue(&job, hivev1.HiveClusterTypeLabel)
 
 		// Sort the jobs:
 		if job.Status.Failed > 0 {
@@ -660,7 +660,7 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 		return
 	}
 
-	clusterType := GetClusterDeploymentType(cd)
+	clusterType := GetLabelValue(cd, hivev1.HiveClusterTypeLabel)
 	ca.ensureClusterTypeBuckets(clusterType)
 	ca.clusterTypesSet[clusterType] = true
 
@@ -743,13 +743,12 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovis
 	}
 }
 
-// GetClusterDeploymentType returns the value of the hive.openshift.io/cluster-type label if set,
-// otherwise a default value.
-func GetClusterDeploymentType(obj metav1.Object) string {
-	if typeStr, ok := obj.GetLabels()[hivev1.HiveClusterTypeLabel]; ok {
+// GetLabelValue returns the value of the label if set, otherwise a default value.
+func GetLabelValue(obj metav1.Object, label string) string {
+	if typeStr := obj.GetLabels()[label]; typeStr != "" {
 		return typeStr
 	}
-	return hivev1.DefaultClusterType
+	return constants.MetricLabelDefaultValue
 }
 
 // ReconcileObserver is used to track, log, and report metrics for controller reconcile time and outcome. Each
@@ -798,9 +797,9 @@ func (ca *clusterAccumulator) addConditionToMap(cond hivev1.ClusterDeploymentCon
 	ca.conditions[cond][clusterType]++
 }
 
-// readMetricsConfig reads the metrics config from the file pointed to by the MetricsConfigFileEnvVar
+// ReadMetricsConfig reads the metrics config from the file pointed to by the MetricsConfigFileEnvVar
 // environment variable.
-func readMetricsConfig() (*metricsconfig.MetricsConfig, error) {
+func ReadMetricsConfig() (*metricsconfig.MetricsConfig, error) {
 	path := os.Getenv(constants.MetricsConfigFileEnvVar)
 	config := &metricsconfig.MetricsConfig{}
 	if len(path) == 0 {

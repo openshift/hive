@@ -117,6 +117,15 @@ func Add(mgr manager.Manager) error {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
 	}
+	// Read the metrics config from hive config and set values for mapClusterTypeLabelToValue, if present
+	mConfig, err := hivemetrics.ReadMetricsConfig()
+	if err != nil {
+		log.WithError(err).Error("error reading metrics config")
+		return err
+	}
+	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
+	// read the hiveconfig, and we register them only once.
+	registerMetrics(mConfig, logger)
 	return AddToManager(mgr, NewReconciler(mgr, logger, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
@@ -526,7 +535,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
 			cd.Name,
 			cd.Namespace,
-			hivemetrics.GetClusterDeploymentType(cd)).Set(
+			hivemetrics.GetLabelValue(cd, hivev1.HiveClusterTypeLabel)).Set(
 			time.Since(cd.DeletionTimestamp.Time).Seconds())
 
 		return r.syncDeletedClusterDeployment(cd, cdLog)
@@ -572,7 +581,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		metricClustersCreated.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
+		metricClustersCreated.Observe(cd, nil, 1)
 		return reconcile.Result{}, nil
 	}
 
@@ -1428,8 +1437,7 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 	hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 
 	// Increment the clusters deleted counter:
-	metricClustersDeleted.WithLabelValues(hivemetrics.GetClusterDeploymentType(cd)).Inc()
-
+	metricClustersDeleted.Observe(cd, nil, 1)
 	return nil
 }
 
@@ -1853,7 +1861,7 @@ func clearDeprovisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog l
 	cleared := hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.Delete(map[string]string{
 		"cluster_deployment": cd.Name,
 		"namespace":          cd.Namespace,
-		"cluster_type":       hivemetrics.GetClusterDeploymentType(cd),
+		"cluster_type":       hivemetrics.GetLabelValue(cd, hivev1.HiveClusterTypeLabel),
 	})
 	if cleared {
 		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds)

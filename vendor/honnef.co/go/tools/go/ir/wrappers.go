@@ -21,7 +21,6 @@ package ir
 
 import (
 	"fmt"
-
 	"go/types"
 )
 
@@ -41,7 +40,6 @@ import (
 //   - the result may be a thunk or a wrapper.
 //
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
-//
 func makeWrapper(prog *Program, sel *types.Selection) *Function {
 	obj := sel.Obj().(*types.Func)       // the declared function
 	sig := sel.Type().(*types.Signature) // type of this wrapper
@@ -89,7 +87,7 @@ func makeWrapper(prog *Program, sel *types.Selection) *Function {
 			var c Call
 			c.Call.Value = &Builtin{
 				name: "ir:wrapnilchk",
-				sig: types.NewSignature(nil,
+				sig: types.NewSignatureType(nil, nil, nil,
 					types.NewTuple(anonVar(sel.Recv()), anonVar(tString), anonVar(tString)),
 					types.NewTuple(anonVar(sel.Recv())), false),
 			}
@@ -139,7 +137,6 @@ func makeWrapper(prog *Program, sel *types.Selection) *Function {
 // createParams creates parameters for wrapper method fn based on its
 // Signature.Params, which do not include the receiver.
 // start is the index of the first regular parameter to use.
-//
 func createParams(fn *Function, start int) {
 	tparams := fn.Signature.Params()
 	for i, n := start, tparams.Len(); i < n; i++ {
@@ -158,22 +155,21 @@ func createParams(fn *Function, start int) {
 // Use MakeClosure with such a wrapper to construct a bound method
 // closure.  e.g.:
 //
-//   type T int          or:  type T interface { meth() }
-//   func (t T) meth()
-//   var t T
-//   f := t.meth
-//   f() // calls t.meth()
+//	type T int          or:  type T interface { meth() }
+//	func (t T) meth()
+//	var t T
+//	f := t.meth
+//	f() // calls t.meth()
 //
 // f is a closure of a synthetic wrapper defined as if by:
 //
-//   f := func() { return t.meth() }
+//	f := func() { return t.meth() }
 //
 // Unlike makeWrapper, makeBound need perform no indirection or field
 // selections because that can be done before the closure is
 // constructed.
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(meth.Prog.methodsMu)
-//
 func makeBound(prog *Program, obj *types.Func) *Function {
 	prog.methodsMu.Lock()
 	defer prog.methodsMu.Unlock()
@@ -225,22 +221,21 @@ func makeBound(prog *Program, obj *types.Func) *Function {
 //
 // Precondition: sel.Kind() == types.MethodExpr.
 //
-//   type T int          or:  type T interface { meth() }
-//   func (t T) meth()
-//   f := T.meth
-//   var t T
-//   f(t) // calls t.meth()
+//	type T int          or:  type T interface { meth() }
+//	func (t T) meth()
+//	f := T.meth
+//	var t T
+//	f(t) // calls t.meth()
 //
 // f is a synthetic wrapper defined as if by:
 //
-//   f := func(t T) { return t.meth() }
+//	f := func(t T) { return t.meth() }
 //
 // TODO(adonovan): opt: currently the stub is created even when used
 // directly in a function call: C.f(i, 0).  This is less efficient
 // than inlining the stub.
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(meth.Prog.methodsMu)
-//
 func makeThunk(prog *Program, sel *types.Selection) *Function {
 	if sel.Kind() != types.MethodExpr {
 		panic(sel)
@@ -258,7 +253,7 @@ func makeThunk(prog *Program, sel *types.Selection) *Function {
 	defer prog.methodsMu.Unlock()
 
 	// Canonicalize key.recv to avoid constructing duplicate thunks.
-	canonRecv, ok := prog.canon.At(key.recv).(types.Type)
+	canonRecv, ok := prog.canon.At(key.recv)
 	if !ok {
 		canonRecv = key.recv
 		prog.canon.Set(key.recv, canonRecv)
@@ -277,7 +272,7 @@ func makeThunk(prog *Program, sel *types.Selection) *Function {
 }
 
 func changeRecv(s *types.Signature, recv *types.Var) *types.Signature {
-	return types.NewSignature(recv, s.Params(), s.Results(), s.Variadic())
+	return types.NewSignatureType(recv, nil, nil, s.Params(), s.Results(), s.Variadic())
 }
 
 // selectionKey is like types.Selection but a usable map key.
@@ -287,4 +282,100 @@ type selectionKey struct {
 	obj      types.Object
 	index    string
 	indirect bool
+}
+
+// makeInstance creates a wrapper function with signature sig that calls the generic function fn.
+// If targs is not nil, fn is a function and targs describes the concrete type arguments.
+// If targs is nil, fn is a method and the type arguments are derived from the receiver.
+func makeInstance(prog *Program, fn *Function, sig *types.Signature, targs *types.TypeList) *Function {
+	if sig.Recv() != nil {
+		assert(targs == nil)
+		// Methods don't have their own type parameters, but the receiver does
+		targs = deref(sig.Recv().Type()).(*types.Named).TypeArgs()
+	} else {
+		assert(targs != nil)
+	}
+
+	wrapper := fn.generics.At(targs)
+	if wrapper != nil {
+		return wrapper
+	}
+
+	var name string
+	if sig.Recv() != nil {
+		name = fn.name
+	} else {
+		name = fmt.Sprintf("%s$generic#%d", fn.name, fn.generics.Len())
+	}
+	w := &Function{
+		name:         name,
+		object:       fn.object,
+		Signature:    sig,
+		Synthetic:    SyntheticGeneric,
+		Prog:         prog,
+		functionBody: new(functionBody),
+	}
+	w.initHTML(prog.PrintFunc)
+	w.startBody()
+	if sig.Recv() != nil {
+		w.addParamObj(sig.Recv(), nil)
+	}
+	createParams(w, 0)
+	var c Call
+	c.Call.Value = fn
+	tresults := fn.Signature.Results()
+	if tresults.Len() == 1 {
+		c.typ = tresults.At(0).Type()
+	} else {
+		c.typ = tresults
+	}
+
+	changeType := func(v Value, typ types.Type) Value {
+		if types.Identical(v.Type(), typ) {
+			return v
+		}
+		var c ChangeType
+		c.X = v
+		c.typ = typ
+		return w.emit(&c, nil)
+	}
+
+	for i, arg := range w.Params {
+		if sig.Recv() != nil {
+			if i == 0 {
+				c.Call.Args = append(c.Call.Args, changeType(w.Params[0], fn.Signature.Recv().Type()))
+			} else {
+				c.Call.Args = append(c.Call.Args, changeType(arg, fn.Signature.Params().At(i-1).Type()))
+			}
+		} else {
+			c.Call.Args = append(c.Call.Args, changeType(arg, fn.Signature.Params().At(i).Type()))
+		}
+	}
+	for i := 0; i < targs.Len(); i++ {
+		arg := targs.At(i)
+		c.Call.TypeArgs = append(c.Call.TypeArgs, arg)
+	}
+	results := w.emit(&c, nil)
+	var ret Return
+	switch tresults.Len() {
+	case 0:
+	case 1:
+		ret.Results = []Value{changeType(results, sig.Results().At(0).Type())}
+	default:
+		for i := 0; i < tresults.Len(); i++ {
+			v := emitExtract(w, results, i, nil)
+			ret.Results = append(ret.Results, changeType(v, sig.Results().At(i).Type()))
+		}
+	}
+
+	w.Exit = w.newBasicBlock("exit")
+	emitJump(w, w.Exit, nil)
+	w.currentBlock = w.Exit
+	w.emit(&ret, nil)
+	w.currentBlock = nil
+
+	w.finishBody()
+
+	fn.generics.Set(targs, w)
+	return w
 }

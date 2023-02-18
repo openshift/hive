@@ -9,6 +9,10 @@ package ir
 import (
 	"fmt"
 	"go/types"
+
+	"honnef.co/go/tools/analysis/lint"
+
+	"golang.org/x/exp/typeparams"
 )
 
 // MethodValue returns the Function implementing method sel, building
@@ -20,7 +24,6 @@ import (
 // Thread-safe.
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(prog.methodsMu)
-//
 func (prog *Program) MethodValue(sel *types.Selection) *Function {
 	if sel.Kind() != types.MethodVal {
 		panic(fmt.Sprintf("MethodValue(%s) kind != MethodVal", sel))
@@ -42,7 +45,6 @@ func (prog *Program) MethodValue(sel *types.Selection) *Function {
 // LookupMethod returns the implementation of the method of type T
 // identified by (pkg, name).  It returns nil if the method exists but
 // is abstract, and panics if T has no such method.
-//
 func (prog *Program) LookupMethod(T types.Type, pkg *types.Package, name string) *Function {
 	sel := prog.MethodSets.MethodSet(T).Lookup(pkg, name)
 	if sel == nil {
@@ -60,7 +62,7 @@ type methodSet struct {
 // Precondition: !isInterface(T).
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
 func (prog *Program) createMethodSet(T types.Type) *methodSet {
-	mset, ok := prog.methodSets.At(T).(*methodSet)
+	mset, ok := prog.methodSets.At(T)
 	if !ok {
 		mset = &methodSet{mapping: make(map[string]*Function)}
 		prog.methodSets.Set(T, mset)
@@ -100,14 +102,13 @@ func (prog *Program) addMethod(mset *methodSet, sel *types.Selection) *Function 
 // Thread-safe.
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(prog.methodsMu)
-//
 func (prog *Program) RuntimeTypes() []types.Type {
 	prog.methodsMu.Lock()
 	defer prog.methodsMu.Unlock()
 
 	var res []types.Type
-	prog.methodSets.Iterate(func(T types.Type, v interface{}) {
-		if v.(*methodSet).complete {
+	prog.methodSets.Iterate(func(T types.Type, v *methodSet) {
+		if v.complete {
 			res = append(res, T)
 		}
 	})
@@ -116,10 +117,15 @@ func (prog *Program) RuntimeTypes() []types.Type {
 
 // declaredFunc returns the concrete function/method denoted by obj.
 // Panic ensues if there is none.
-//
 func (prog *Program) declaredFunc(obj *types.Func) *Function {
-	if v := prog.packageLevelValue(obj); v != nil {
-		return v.(*Function)
+	if origin := typeparams.OriginMethod(obj); origin != obj {
+		// Calling method on instantiated type, create a wrapper that calls the generic type's method
+		base := prog.packageLevelValue(origin)
+		return makeInstance(prog, base.(*Function), obj.Type().(*types.Signature), nil)
+	} else {
+		if v := prog.packageLevelValue(obj); v != nil {
+			return v.(*Function)
+		}
 	}
 	panic("no concrete method: " + obj.String())
 }
@@ -139,7 +145,6 @@ func (prog *Program) declaredFunc(obj *types.Func) *Function {
 // TODO(adonovan): make this faster.  It accounts for 20% of SSA build time.
 //
 // EXCLUSIVE_LOCKS_ACQUIRED(prog.methodsMu)
-//
 func (prog *Program) needMethodsOf(T types.Type) {
 	prog.methodsMu.Lock()
 	prog.needMethods(T, false)
@@ -150,10 +155,9 @@ func (prog *Program) needMethodsOf(T types.Type) {
 // Recursive case: skip => don't create methods for T.
 //
 // EXCLUSIVE_LOCKS_REQUIRED(prog.methodsMu)
-//
 func (prog *Program) needMethods(T types.Type, skip bool) {
 	// Each package maintains its own set of types it has visited.
-	if prevSkip, ok := prog.runtimeTypes.At(T).(bool); ok {
+	if prevSkip, ok := prog.runtimeTypes.At(T); ok {
 		// needMethods(T) was previously called
 		if !prevSkip || skip {
 			return // already seen, with same or false 'skip' value
@@ -186,7 +190,7 @@ func (prog *Program) needMethods(T types.Type, skip bool) {
 	case *types.Basic:
 		// nop
 
-	case *types.Interface:
+	case *types.Interface, *types.TypeParam:
 		// nop---handled by recursion over method set.
 
 	case *types.Pointer:
@@ -212,7 +216,7 @@ func (prog *Program) needMethods(T types.Type, skip bool) {
 	case *types.Named:
 		// A pointer-to-named type can be derived from a named
 		// type via reflection.  It may have methods too.
-		prog.needMethods(types.NewPointer(T), false)
+		prog.needMethods(types.NewPointer(t), false)
 
 		// Consider 'type T struct{S}' where S has methods.
 		// Reflection provides no way to get from T to struct{S},
@@ -234,6 +238,6 @@ func (prog *Program) needMethods(T types.Type, skip bool) {
 		}
 
 	default:
-		panic(T)
+		lint.ExhaustiveTypeSwitch(T)
 	}
 }

@@ -23,7 +23,6 @@ import (
 // Functions (including methods) and Globals use RelString and
 // all types are displayed with relType, so that only cross-package
 // references are package-qualified.
-//
 func relName(v Value, i Instruction) string {
 	if v == nil {
 		return "<nil>"
@@ -127,6 +126,10 @@ func printCall(v *CallCommon, prefix string, instr Instruction) string {
 			fmt.Fprintf(&b, "%sInvoke %s.%s", prefix, relName(v.Value, instr), v.Method.Name())
 		}
 	}
+	for _, arg := range v.TypeArgs {
+		b.WriteString(" ")
+		b.WriteString(relType(arg, instr.Parent().pkg()))
+	}
 	for _, arg := range v.Args {
 		b.WriteString(" ")
 		b.WriteString(relName(arg, instr))
@@ -154,6 +157,10 @@ func (v *Load) String() string {
 	return fmt.Sprintf("Load <%s> %s", relType(v.Type(), v.Parent().pkg()), relName(v.X, v))
 }
 
+func (v *Copy) String() string {
+	return fmt.Sprintf("Copy <%s> %s", relType(v.Type(), v.Parent().pkg()), relName(v.X, v))
+}
+
 func printConv(prefix string, v, x Value) string {
 	from := v.Parent().pkg()
 	return fmt.Sprintf("%s <%s> %s",
@@ -162,10 +169,12 @@ func printConv(prefix string, v, x Value) string {
 		relName(x, v.(Instruction)))
 }
 
-func (v *ChangeType) String() string      { return printConv("ChangeType", v, v.X) }
-func (v *Convert) String() string         { return printConv("Convert", v, v.X) }
-func (v *ChangeInterface) String() string { return printConv("ChangeInterface", v, v.X) }
-func (v *MakeInterface) String() string   { return printConv("MakeInterface", v, v.X) }
+func (v *ChangeType) String() string          { return printConv("ChangeType", v, v.X) }
+func (v *Convert) String() string             { return printConv("Convert", v, v.X) }
+func (v *ChangeInterface) String() string     { return printConv("ChangeInterface", v, v.X) }
+func (v *SliceToArrayPointer) String() string { return printConv("SliceToArrayPointer", v, v.X) }
+func (v *SliceToArray) String() string        { return printConv("SliceToArray", v, v.X) }
+func (v *MakeInterface) String() string       { return printConv("MakeInterface", v, v.X) }
 
 func (v *MakeClosure) String() string {
 	from := v.Parent().pkg()
@@ -210,7 +219,8 @@ func (v *MakeChan) String() string {
 
 func (v *FieldAddr) String() string {
 	from := v.Parent().pkg()
-	st := deref(v.X.Type()).Underlying().(*types.Struct)
+	// v.X.Type() might be a pointer to a type parameter whose core type is a pointer to a struct
+	st := deref(typeutil.CoreType(deref(v.X.Type()))).Underlying().(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {
@@ -220,7 +230,7 @@ func (v *FieldAddr) String() string {
 }
 
 func (v *Field) String() string {
-	st := v.X.Type().Underlying().(*types.Struct)
+	st := typeutil.CoreType(v.X.Type()).Underlying().(*types.Struct)
 	// Be robust against a bad index.
 	name := "?"
 	if 0 <= v.Field && v.Field < st.NumFields() {
@@ -278,8 +288,8 @@ func (s *Jump) String() string {
 		block = s.block.Succs[0].Index
 	}
 	str := fmt.Sprintf("Jump → b%d", block)
-	if s.Comment != "" {
-		str = fmt.Sprintf("%s # %s", str, s.Comment)
+	if s.Comment() != "" {
+		str = fmt.Sprintf("%s # %s", str, s.Comment())
 	}
 	return str
 }
@@ -312,6 +322,31 @@ func (s *ConstantSwitch) String() string {
 	fmt.Fprint(&b, " →")
 	for _, succ := range s.block.Succs {
 		fmt.Fprintf(&b, " b%d", succ.Index)
+	}
+	return b.String()
+}
+
+func (v *CompositeValue) String() string {
+	var b bytes.Buffer
+	from := v.Parent().pkg()
+	fmt.Fprintf(&b, "CompositeValue <%s>", relType(v.Type(), from))
+	if v.NumSet >= len(v.Values) {
+		// All values provided
+		fmt.Fprint(&b, " [all]")
+	} else if v.Bitmap.BitLen() == 0 {
+		// No values provided
+		fmt.Fprint(&b, " [none]")
+	} else {
+		// Some values provided
+		bits := []byte(fmt.Sprintf("%0*b", len(v.Values), &v.Bitmap))
+		for i := 0; i < len(bits)/2; i++ {
+			o := len(bits) - 1 - i
+			bits[i], bits[o] = bits[o], bits[i]
+		}
+		fmt.Fprintf(&b, " [%s]", bits)
+	}
+	for _, vv := range v.Values {
+		fmt.Fprintf(&b, " %s", relName(vv, v))
 	}
 	return b.String()
 }

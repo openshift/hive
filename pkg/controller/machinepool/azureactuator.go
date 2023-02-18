@@ -152,6 +152,8 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		workerUserDataName,
 		capabilities,
 		useImageGallery,
+		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
+		nil,
 	)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }

@@ -11,7 +11,7 @@ import (
 type BlankImportsRule struct{}
 
 // Name returns the rule name.
-func (r *BlankImportsRule) Name() string {
+func (*BlankImportsRule) Name() string {
 	return "blank-imports"
 }
 
@@ -43,7 +43,7 @@ func (r *BlankImportsRule) Apply(file *lint.File, _ lint.Arguments) []lint.Failu
 			prev := file.AST.Imports[i-1]
 			prevPos := file.ToPosition(prev.Pos())
 
-			isSubsequentBlancInAGroup := isBlank(prev.Name) && prevPos.Line+1 == pos.Line && prev.Path.Value != embedImportPath
+			isSubsequentBlancInAGroup := prevPos.Line+1 == pos.Line && prev.Path.Value != embedImportPath && isBlank(prev.Name)
 			if isSubsequentBlancInAGroup {
 				continue
 			}
@@ -62,7 +62,7 @@ func (r *BlankImportsRule) Apply(file *lint.File, _ lint.Arguments) []lint.Failu
 	return failures
 }
 
-func (r *BlankImportsRule) fileHasValidEmbedComment(fileAst *ast.File) bool {
+func (*BlankImportsRule) fileHasValidEmbedComment(fileAst *ast.File) bool {
 	for _, commentGroup := range fileAst.Comments {
 		for _, comment := range commentGroup.List {
 			if strings.HasPrefix(comment.Text, "//go:embed ") {

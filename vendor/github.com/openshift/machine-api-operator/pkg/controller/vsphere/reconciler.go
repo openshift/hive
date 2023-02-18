@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	machineapierros "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -48,6 +49,7 @@ const (
 	GuestInfoIgnitionData     = "guestinfo.ignition.config.data"
 	GuestInfoIgnitionEncoding = "guestinfo.ignition.config.data.encoding"
 	GuestInfoHostname         = "guestinfo.hostname"
+	StealClock                = "stealclock.enable"
 )
 
 // vSphere tasks description IDs, for determinate task types (clone, delete, etc)
@@ -55,6 +57,10 @@ const (
 	cloneVmTaskDescriptionId    = "VirtualMachine.clone"
 	destroyVmTaskDescriptionId  = "VirtualMachine.destroy"
 	powerOffVmTaskDescriptionId = "VirtualMachine.powerOff"
+)
+
+const (
+	machinePhaseProvisioning = "Provisioning"
 )
 
 // Reconciler runs the logic to reconciles a machine resource towards its desired state
@@ -134,6 +140,28 @@ func (r *Reconciler) create() error {
 	} else if !taskIsFinished {
 		return fmt.Errorf("%v task %v has not finished", moTask.Info.DescriptionId, moTask.Reference().Value)
 	}
+
+	// if clone task finished successfully, power on the vm
+	if moTask.Info.DescriptionId == cloneVmTaskDescriptionId {
+		klog.Infof("Powering on cloned machine: %v", r.machine.Name)
+		task, err := powerOn(r.machineScope)
+		if err != nil {
+			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+				Name:      r.machine.Name,
+				Namespace: r.machine.Namespace,
+				Reason:    "PowerOn task finished with error",
+			})
+			conditionFailed := conditionFailed()
+			conditionFailed.Message = err.Error()
+			statusError := setProviderStatus(task, conditionFailed, r.machineScope, nil)
+			if statusError != nil {
+				return fmt.Errorf("Failed to set provider status: %w", err)
+			}
+			return err
+		}
+		return setProviderStatus(task, conditionSuccess(), r.machineScope, nil)
+	}
+
 	// If taskIsFinished then next reconcile should result in update.
 	return nil
 }
@@ -216,13 +244,33 @@ func (r *Reconciler) exists() (bool, error) {
 		return false, fmt.Errorf("%v: failed validating machine provider spec: %w", r.machine.GetName(), err)
 	}
 
-	if _, err := findVM(r.machineScope); err != nil {
+	vmRef, err := findVM(r.machineScope)
+	if err != nil {
 		if !isNotFound(err) {
 			return false, err
 		}
 		klog.Infof("%v: does not exist", r.machine.GetName())
 		return false, nil
 	}
+
+	// Check if machine was powered on after clone.
+	// If it is powered off and in "Provisioning" phase, treat machine as non-existed yet and requeue for proceed
+	// with creation procedure.
+	powerState := types.VirtualMachinePowerState(pointer.StringDeref(r.machineScope.providerStatus.InstanceState, ""))
+	if powerState == "" {
+		vm := &virtualMachine{
+			Context: r.machineScope.Context,
+			Obj:     object.NewVirtualMachine(r.machineScope.session.Client.Client, vmRef),
+			Ref:     vmRef,
+		}
+		powerState, err = vm.getPowerState()
+	}
+
+	if pointer.StringDeref(r.machine.Status.Phase, "") == machinePhaseProvisioning && powerState == types.VirtualMachinePowerStatePoweredOff {
+		klog.Infof("%v: already exists, but was not powered on after clone, requeue ", r.machine.GetName())
+		return false, nil
+	}
+
 	klog.Infof("%v: already exists", r.machine.GetName())
 	return true, nil
 }
@@ -701,6 +749,10 @@ func clone(s *machineScope) (string, error) {
 		Key:   GuestInfoHostname,
 		Value: s.machine.GetName(),
 	})
+	extraConfig = append(extraConfig, &types.OptionValue{
+		Key:   StealClock,
+		Value: "TRUE",
+	})
 
 	spec := types.VirtualMachineCloneSpec{
 		Config: &types.VirtualMachineConfigSpec{
@@ -722,7 +774,7 @@ func clone(s *machineScope) (string, error) {
 			Pool:         types.NewReference(resourcepool.Reference()),
 			DiskMoveType: diskMoveType,
 		},
-		PowerOn:  true,
+		PowerOn:  false, // Create powered off machine, for power it on later in "create" procedure
 		Snapshot: snapshotRef,
 	}
 
@@ -733,6 +785,37 @@ func clone(s *machineScope) (string, error) {
 	taskVal := task.Reference().Value
 	klog.V(3).Infof("%v: running task: %+v", s.machine.GetName(), taskVal)
 	return taskVal, nil
+}
+
+func powerOn(s *machineScope) (string, error) {
+	vmRef, err := findVM(s)
+	if err != nil {
+		if !isNotFound(err) {
+			return "", err
+		}
+		return "", fmt.Errorf("vm not found during creation for powering on: %w", err)
+	}
+
+	datacenter := s.session.Datacenter
+	if datacenter == nil { // if there is no dataceneter, fallback to old powerOn method via vm object
+		vm := &virtualMachine{
+			Context: s.Context,
+			Obj:     object.NewVirtualMachine(s.session.Client.Client, vmRef),
+			Ref:     vmRef,
+		}
+
+		return vm.powerOnVM()
+	}
+
+	overrideDRS := &types.OptionValue{
+		Key:   string(types.ClusterPowerOnVmOptionOverrideAutomationLevel),
+		Value: string(types.DrsBehaviorFullyAutomated),
+	}
+	task, err := datacenter.PowerOnVM(s.Context, []types.ManagedObjectReference{vmRef}, overrideDRS)
+	if err != nil {
+		return "", fmt.Errorf("error powering on %s vm: %w", s.machine.Name, err)
+	}
+	return task.Reference().Value, nil
 }
 
 func getDiskSpec(s *machineScope, devices object.VirtualDeviceList) (types.BaseVirtualDeviceConfigSpec, error) {
@@ -1011,15 +1094,13 @@ func (vm *virtualMachine) getPowerState() (types.VirtualMachinePowerState, error
 
 // reconcileTags ensures that the required tags are present on the virtual machine, eg the Cluster ID
 // that is used by the installer on cluster deletion to ensure ther are no leaked resources.
-func (vm *virtualMachine) reconcileTags(ctx context.Context, session *session.Session, machine *machinev1.Machine) error {
-	if err := session.WithRestClient(vm.Context, func(c *rest.Client) error {
+func (vm *virtualMachine) reconcileTags(ctx context.Context, sessionInstance *session.Session, machine *machinev1.Machine) error {
+	if err := sessionInstance.WithCachingTagsManager(vm.Context, func(c *session.CachingTagsManager) error {
 		klog.Infof("%v: Reconciling attached tags", machine.GetName())
-
-		m := tags.NewManager(c)
 
 		clusterID := machine.Labels[machinev1.MachineClusterIDLabel]
 
-		attached, err := vm.checkAttachedTag(ctx, clusterID, m)
+		attached, err := vm.checkAttachedTag(ctx, clusterID, c)
 		if err != nil {
 			return err
 		}
@@ -1027,7 +1108,7 @@ func (vm *virtualMachine) reconcileTags(ctx context.Context, session *session.Se
 		if !attached {
 			klog.Infof("%v: Attaching %s tag to vm", machine.GetName(), clusterID)
 			// the tag should already be created by installer
-			if err := m.AttachTag(ctx, clusterID, vm.Ref); err != nil {
+			if err := c.AttachTag(ctx, clusterID, vm.Ref); err != nil {
 				return err
 			}
 		}
@@ -1041,7 +1122,7 @@ func (vm *virtualMachine) reconcileTags(ctx context.Context, session *session.Se
 }
 
 // checkAttachedTag returns true if tag is already attached to a vm or tag doesn't exist
-func (vm *virtualMachine) checkAttachedTag(ctx context.Context, tagName string, m *tags.Manager) (bool, error) {
+func (vm *virtualMachine) checkAttachedTag(ctx context.Context, tagName string, m *session.CachingTagsManager) (bool, error) {
 	// cluster ID tag doesn't exists in UPI, we should skip tag attachment if it's not found
 	foundTag, err := vm.foundTag(ctx, tagName, m)
 	if err != nil {
@@ -1066,9 +1147,21 @@ func (vm *virtualMachine) checkAttachedTag(ctx context.Context, tagName string, 
 	return false, nil
 }
 
-func (vm *virtualMachine) foundTag(ctx context.Context, tagName string, m *tags.Manager) (bool, error) {
-	tags, err := m.ListTags(ctx)
+// tagToCategoryName converts the tag name to the category name based upon the format set up by the installer.
+// Note this is only valid in IPI clusters as typically a UPI cluster won't have the cluster ID tag, in which case the
+// controller skips tag creation.
+// Ref: https://github.com/openshift/installer/blob/f912534f12491721e3874e2bf64f7fa8d44aa7f5/data/data/vsphere/pre-bootstrap/main.tf#L57
+// Ref: https://github.com/openshift/installer/blob/f912534f12491721e3874e2bf64f7fa8d44aa7f5/pkg/destroy/vsphere/vsphere.go#L231
+func tagToCategoryName(tagName string) string {
+	return fmt.Sprintf("openshift-%s", tagName)
+}
+
+func (vm *virtualMachine) foundTag(ctx context.Context, tagName string, m *session.CachingTagsManager) (bool, error) {
+	tags, err := m.ListTagsForCategory(ctx, tagToCategoryName(tagName))
 	if err != nil {
+		if isNotFoundErr(err) {
+			return false, nil
+		}
 		return false, err
 	}
 

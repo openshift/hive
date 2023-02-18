@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"gopkg.in/gcfg.v1"
 
@@ -243,4 +245,10 @@ func ProviderStatusFromRawExtension(rawExtension *runtime.RawExtension) (*machin
 
 	klog.V(5).Infof("Got provider Status from raw extension: %+v", providerStatus)
 	return providerStatus, nil
+}
+
+// isNotFoundErr checks if error message contains "Not Found" message.
+// vSphere api client does not expose error type, so we can rely only on error message
+func isNotFoundErr(err error) bool {
+	return err != nil && strings.HasSuffix(err.Error(), http.StatusText(http.StatusNotFound))
 }

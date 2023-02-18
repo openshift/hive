@@ -63,7 +63,7 @@ go:lint:mnd:
   needs: []
   image: golang:latest
   before_script:
-    - go get -u github.com/tommy-muehle/go-mnd/cmd/mnd
+    - go get -u github.com/tommy-muehle/go-mnd/v2/cmd/mnd
     - go mod tidy
     - go mod vendor
   script:
@@ -118,7 +118,7 @@ The ```-ignored-numbers``` option let's you define a comma separated list of num
 For example: `-ignored-numbers=1000,10_000,3.14159264`
 
 The ```-ignored-functions``` option let's you define a comma separated list of function name regexp patterns to exclude.  
-For example: `-ignored-functions=math.*,http.StatusText`
+For example: `-ignored-functions=math.*,http.StatusText,make`
 
 The ```-ignored-files``` option let's you define a comma separated list of filename regexp patterns to exclude.  
 For example: `-ignored-files=magic_.*.go,.*_numbers.go`

@@ -22,6 +22,27 @@ type MachinePool struct {
 	//
 	// +optional
 	Tags []string `json:"tags,omitempty"`
+
+	// SecureBoot Defines whether the instance should have secure boot enabled.
+	// secure boot Verify the digital signature of all boot components, and halt the boot process if signature verification fails.
+	// If omitted, the platform chooses a default, which is subject to change over time, currently that default is false.
+	// +kubebuilder:validation:Enum=Enabled;Disabled
+	// +optional
+	SecureBoot string `json:"secureBoot,omitempty"`
+
+	// OnHostMaintenance determines the behavior when a maintenance event occurs that might cause the instance to reboot.
+	// Allowed values are "Migrate" and "Terminate".
+	// If omitted, the platform chooses a default, which is subject to change over time, currently that default is "Migrate".
+	// +kubebuilder:validation:Enum=Migrate;Terminate;
+	// +optional
+	OnHostMaintenance string `json:"onHostMaintenance,omitempty"`
+
+	// ConfidentialCompute Defines whether the instance should have confidential compute enabled.
+	// If enabled OnHostMaintenance is required to be set to "Terminate".
+	// If omitted, the platform chooses a default, which is subject to change over time, currently that default is false.
+	// +kubebuilder:validation:Enum=Enabled;Disabled
+	// +optional
+	ConfidentialCompute string `json:"confidentialCompute,omitempty"`
 }
 
 // OSDisk defines the disk for machines on GCP.
@@ -75,6 +96,17 @@ func (a *MachinePool) Set(required *MachinePool) {
 			a.EncryptionKey = &EncryptionKeyReference{}
 		}
 		a.EncryptionKey.Set(required.EncryptionKey)
+	}
+	if required.SecureBoot != "" {
+		a.SecureBoot = required.SecureBoot
+	}
+
+	if required.OnHostMaintenance != "" {
+		a.OnHostMaintenance = required.OnHostMaintenance
+	}
+
+	if required.ConfidentialCompute != "" {
+		a.ConfidentialCompute = required.ConfidentialCompute
 	}
 }
 

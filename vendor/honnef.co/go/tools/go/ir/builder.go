@@ -31,14 +31,12 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+
+	"honnef.co/go/tools/analysis/lint"
+	"honnef.co/go/tools/go/types/typeutil"
+
+	"golang.org/x/exp/typeparams"
 )
-
-type opaqueType struct {
-	types.Type
-	name string
-}
-
-func (t *opaqueType) String() string { return t.name }
 
 var (
 	varOk    = newVar("ok", tBool)
@@ -46,12 +44,10 @@ var (
 
 	// Type constants.
 	tBool       = types.Typ[types.Bool]
-	tByte       = types.Typ[types.Byte]
 	tInt        = types.Typ[types.Int]
 	tInvalid    = types.Typ[types.Invalid]
 	tString     = types.Typ[types.String]
 	tUntypedNil = types.Typ[types.UntypedNil]
-	tRangeIter  = &opaqueType{nil, "iter"} // the type of all "range" iterators
 	tEface      = types.NewInterfaceType(nil, nil).Complete()
 )
 
@@ -67,7 +63,6 @@ type builder struct {
 // to t or f depending on its value, performing various simplifications.
 //
 // Postcondition: fn.currentBlock is nil.
-//
 func (b *builder) cond(fn *Function, e ast.Expr, t, f *BasicBlock) *If {
 	switch e := e.(type) {
 	case *ast.ParenExpr:
@@ -106,7 +101,6 @@ func (b *builder) cond(fn *Function, e ast.Expr, t, f *BasicBlock) *If {
 // logicalBinop emits code to fn to evaluate e, a &&- or
 // ||-expression whose reified boolean value is wanted.
 // The value is returned.
-//
 func (b *builder) logicalBinop(fn *Function, e *ast.BinaryExpr) Value {
 	rhs := fn.newBasicBlock("binop.rhs")
 	done := fn.newBasicBlock("binop.done")
@@ -165,7 +159,6 @@ func (b *builder) logicalBinop(fn *Function, e *ast.BinaryExpr) Value {
 // Multi-result expressions include CallExprs in a multi-value
 // assignment or return statement, and "value,ok" uses of
 // TypeAssertExpr, IndexExpr (when X is a map), and Recv.
-//
 func (b *builder) exprN(fn *Function, e ast.Expr) Value {
 	typ := fn.Pkg.typeOf(e).(*types.Tuple)
 	switch e := e.(type) {
@@ -182,7 +175,7 @@ func (b *builder) exprN(fn *Function, e ast.Expr) Value {
 		return fn.emit(&c, e)
 
 	case *ast.IndexExpr:
-		mapt := fn.Pkg.typeOf(e.X).Underlying().(*types.Map)
+		mapt := typeutil.CoreType(fn.Pkg.typeOf(e.X)).Underlying().(*types.Map)
 		lookup := &MapLookup{
 			X:       b.expr(fn, e.X),
 			Index:   emitConv(fn, b.expr(fn, e.Index), mapt.Key(), e),
@@ -207,11 +200,18 @@ func (b *builder) exprN(fn *Function, e ast.Expr) Value {
 // The result is nil if no special handling was required; in this case
 // the caller should treat this like an ordinary library function
 // call.
-//
 func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ types.Type, source ast.Node) Value {
 	switch obj.Name() {
 	case "make":
-		switch typ.Underlying().(type) {
+		styp := typ.Underlying()
+		if _, ok := typ.Underlying().(*types.Interface); ok {
+			// This must be a type parameter with a core type.
+			// Set styp to the core type and generate instructions based on it.
+			assert(typeparams.IsTypeParam(typ))
+			styp = typeutil.CoreType(typ)
+			assert(styp != nil)
+		}
+		switch styp.(type) {
 		case *types.Slice:
 			n := b.expr(fn, args[1])
 			m := n
@@ -221,7 +221,7 @@ func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ
 			if m, ok := m.(*Const); ok {
 				// treat make([]T, n, m) as new([m]T)[:n]
 				cap := m.Int64()
-				at := types.NewArray(typ.Underlying().(*types.Slice).Elem(), cap)
+				at := types.NewArray(styp.Underlying().(*types.Slice).Elem(), cap)
 				alloc := emitNew(fn, at, source)
 				v := &Slice{
 					X:    alloc,
@@ -254,6 +254,9 @@ func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ
 			v := &MakeChan{Size: sz}
 			v.setType(typ)
 			return fn.emit(v, source)
+
+		default:
+			lint.ExhaustiveTypeSwitch(typ.Underlying())
 		}
 
 	case "new":
@@ -261,11 +264,15 @@ func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ
 		return alloc
 
 	case "len", "cap":
-		// Special case: len or cap of an array or *array is
-		// based on the type, not the value which may be nil.
-		// We must still evaluate the value, though.  (If it
-		// was side-effect free, the whole call would have
-		// been constant-folded.)
+		// Special case: len or cap of an array or *array is based on the type, not the value which may be nil. We must
+		// still evaluate the value, though. (If it was side-effect free, the whole call would have been
+		// constant-folded.)
+		//
+		// For example, for len(gen()), we need to evaluate gen() for its side-effects, but don't need the returned
+		// value to determine the length of the array, which is constant.
+		//
+		// This never applies to type parameters. Even if the constraint has a structural type, len/cap on a type
+		// parameter aren't constant.
 		t := deref(fn.Pkg.typeOf(args[0])).Underlying()
 		if at, ok := t.(*types.Array); ok {
 			b.expr(fn, args[0]) // for effects only
@@ -292,10 +299,10 @@ func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ
 // addressable expression e as being a potentially escaping pointer
 // value.  For example, in this code:
 //
-//   a := A{
-//     b: [1]B{B{c: 1}}
-//   }
-//   return &a.b[0].c
+//	a := A{
+//	  b: [1]B{B{c: 1}}
+//	}
+//	return &a.b[0].c
 //
 // the application of & causes a.b[0].c to have its address taken,
 // which means that ultimately the local variable a must be
@@ -306,8 +313,7 @@ func (b *builder) builtin(fn *Function, obj *types.Builtin, args []ast.Expr, typ
 // - &x, including when implicit in method call or composite literals.
 // - a[:] iff a is an array (not *array)
 // - references to variables in lexically enclosing functions.
-//
-func (b *builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
+func (b *builder) addr(fn *Function, e ast.Expr, escaping bool) (RET lvalue) {
 	switch e := e.(type) {
 	case *ast.Ident:
 		if isBlankIdent(e) {
@@ -356,28 +362,58 @@ func (b *builder) addr(fn *Function, e ast.Expr, escaping bool) lvalue {
 	case *ast.IndexExpr:
 		var x Value
 		var et types.Type
-		switch t := fn.Pkg.typeOf(e.X).Underlying().(type) {
-		case *types.Array:
+		xt := fn.Pkg.typeOf(e.X)
+
+		// Indexing doesn't need a core type, it only requires all types to be similar enough. For example, []int64 |
+		// [5]int64 can be indexed. The element types do have to match though.
+
+		terms, err := typeparams.NormalTerms(xt)
+		if err != nil {
+			panic(fmt.Sprintf("unexpected error: %s", err))
+		}
+		isArrayLike := func() (types.Type, bool) {
+			for _, term := range terms {
+				arr, ok := term.Type().Underlying().(*types.Array)
+				if ok {
+					return arr.Elem(), true
+				}
+			}
+			return nil, false
+		}
+
+		isSliceLike := func() (types.Type, bool) {
+			for _, term := range terms {
+				switch t := term.Type().Underlying().(type) {
+				case *types.Slice:
+					return t.Elem(), true
+				case *types.Pointer:
+					return t.Elem().Underlying().(*types.Array).Elem(), true
+				}
+			}
+			return nil, false
+		}
+
+		if elem, ok := isArrayLike(); ok {
+			// array
 			x = b.addr(fn, e.X, escaping).address(fn)
-			et = types.NewPointer(t.Elem())
-		case *types.Pointer: // *array
+			et = types.NewPointer(elem)
+		} else if elem, ok := isSliceLike(); ok {
+			// slice or *array
 			x = b.expr(fn, e.X)
-			et = types.NewPointer(t.Elem().Underlying().(*types.Array).Elem())
-		case *types.Slice:
-			x = b.expr(fn, e.X)
-			et = types.NewPointer(t.Elem())
-		case *types.Map:
+			et = types.NewPointer(elem)
+		} else if t, ok := typeutil.CoreType(xt).Underlying().(*types.Map); ok {
 			return &element{
 				m: b.expr(fn, e.X),
 				k: emitConv(fn, b.expr(fn, e.Index), t.Key(), e.Index),
 				t: t.Elem(),
 			}
-		default:
+		} else {
 			panic("unexpected container type in IndexExpr: " + t.String())
 		}
+
 		v := &IndexAddr{
 			X:     x,
-			Index: emitConv(fn, b.expr(fn, e.Index), tInt, e.Index),
+			Index: b.expr(fn, e.Index),
 		}
 		v.setType(et)
 		return &address{addr: fn.emit(v, e), expr: e}
@@ -393,17 +429,28 @@ type store struct {
 	lhs    lvalue
 	rhs    Value
 	source ast.Node
+
+	// if debugRef is set no other fields will be set
+	debugRef *DebugRef
 }
 
 type storebuf struct{ stores []store }
 
 func (sb *storebuf) store(lhs lvalue, rhs Value, source ast.Node) {
-	sb.stores = append(sb.stores, store{lhs, rhs, source})
+	sb.stores = append(sb.stores, store{lhs, rhs, source, nil})
+}
+
+func (sb *storebuf) storeDebugRef(ref *DebugRef) {
+	sb.stores = append(sb.stores, store{debugRef: ref})
 }
 
 func (sb *storebuf) emit(fn *Function) {
 	for _, s := range sb.stores {
-		s.lhs.store(fn, s.rhs, s.source)
+		if s.debugRef == nil {
+			s.lhs.store(fn, s.rhs, s.source)
+		} else {
+			fn.emit(s.debugRef, nil)
+		}
 	}
 }
 
@@ -420,7 +467,6 @@ func (sb *storebuf) emit(fn *Function) {
 // storebuf sb so that they can be executed later.  This allows correct
 // in-place update of existing variables when the RHS is a composite
 // literal that may reference parts of the LHS.
-//
 func (b *builder) assign(fn *Function, loc lvalue, e ast.Expr, isZero bool, sb *storebuf, source ast.Node) {
 	// Can we initialize it in place?
 	if e, ok := unparen(e).(*ast.CompositeLit); ok {
@@ -429,6 +475,13 @@ func (b *builder) assign(fn *Function, loc lvalue, e ast.Expr, isZero bool, sb *
 		// an &-operation is implied.
 		if _, ok := loc.(blank); !ok { // avoid calling blank.typ()
 			if isPointer(loc.typ()) {
+				// Example input that hits this code:
+				//
+				// 	type S1 struct{ X int }
+				// 	x := []*S1{
+				// 		{1}, // <-- & is implied
+				// 	}
+				// 	_ = x
 				ptr := b.addr(fn, e, true).address(fn)
 				// copy address
 				if sb != nil {
@@ -441,7 +494,7 @@ func (b *builder) assign(fn *Function, loc lvalue, e ast.Expr, isZero bool, sb *
 		}
 
 		if _, ok := loc.(*address); ok {
-			if isInterface(loc.typ()) {
+			if isInterface(loc.typ()) && !typeparams.IsTypeParam(loc.typ()) {
 				// e.g. var x interface{} = T{...}
 				// Can't in-place initialize an interface value.
 				// Fall back to copying.
@@ -458,9 +511,16 @@ func (b *builder) assign(fn *Function, loc lvalue, e ast.Expr, isZero bool, sb *
 
 				// Subtle: emit debug ref for aggregate types only;
 				// slice and map are handled by store ops in compLit.
-				switch loc.typ().Underlying().(type) {
+				switch typeutil.CoreType(loc.typ()).Underlying().(type) {
 				case *types.Struct, *types.Array:
-					emitDebugRef(fn, e, addr, true)
+					if sb != nil {
+						// Make sure we don't emit DebugRefs before the store has actually occurred
+						if ref := makeDebugRef(fn, e, addr, true); ref != nil {
+							sb.storeDebugRef(ref)
+						}
+					} else {
+						emitDebugRef(fn, e, addr, true)
+					}
 				}
 
 				return
@@ -479,7 +539,6 @@ func (b *builder) assign(fn *Function, loc lvalue, e ast.Expr, isZero bool, sb *
 
 // expr lowers a single-result expression e to IR form, emitting code
 // to fn and returning the Value defined by the expression.
-//
 func (b *builder) expr(fn *Function, e ast.Expr) Value {
 	e = unparen(e)
 
@@ -603,17 +662,24 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		}
 
 	case *ast.SliceExpr:
-		var low, high, max Value
 		var x Value
-		switch fn.Pkg.typeOf(e.X).Underlying().(type) {
-		case *types.Array:
-			// Potentially escaping.
-			x = b.addr(fn, e.X, true).address(fn)
-		case *types.Basic, *types.Slice, *types.Pointer: // *array
+		if core := typeutil.CoreType(fn.Pkg.typeOf(e.X)); core != nil {
+			switch core.Underlying().(type) {
+			case *types.Array:
+				// Potentially escaping.
+				x = b.addr(fn, e.X, true).address(fn)
+			case *types.Basic, *types.Slice, *types.Pointer: // *array
+				x = b.expr(fn, e.X)
+			default:
+				panic("unreachable")
+			}
+		} else {
+			// We're indexing a string | []byte. Note that other combinations such as []byte | [4]byte are currently not
+			// allowed by the language.
 			x = b.expr(fn, e.X)
-		default:
-			panic("unreachable")
 		}
+
+		var low, high, max Value
 		if e.High != nil {
 			high = b.expr(fn, e.High)
 		}
@@ -645,6 +711,10 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		if v := fn.Prog.packageLevelValue(obj); v != nil {
 			if _, ok := obj.(*types.Var); ok {
 				return emitLoad(fn, v, e) // var (address)
+			}
+			if instance, ok := fn.Pkg.info.Instances[e]; ok {
+				// Instantiated generic function
+				return makeInstance(fn.Prog, v.(*Function), instance.Type.(*types.Signature), instance.TypeArgs)
 			}
 			return v // (func)
 		}
@@ -701,42 +771,67 @@ func (b *builder) expr0(fn *Function, e ast.Expr, tv types.TypeAndValue) Value {
 		panic("unexpected expression-relative selector")
 
 	case *ast.IndexExpr:
-		switch t := fn.Pkg.typeOf(e.X).Underlying().(type) {
-		case *types.Array:
-			// Non-addressable array (in a register).
+		// IndexExpr might either be an actual indexing operation, or an instantiation
+		xt := fn.Pkg.typeOf(e.X)
+
+		terms, err := typeparams.NormalTerms(xt)
+		if err != nil {
+			panic(fmt.Sprintf("unexpected error: %s", err))
+		}
+		isNonAddressableIndexable := func() (types.Type, bool) {
+			for _, term := range terms {
+				switch t := term.Type().Underlying().(type) {
+				case *types.Array:
+					return t.Elem(), true
+				case *types.Basic:
+					// a string
+					return types.Universe.Lookup("byte").Type(), true
+				}
+			}
+			return nil, false
+		}
+
+		isAddressableIndexable := func() (types.Type, bool) {
+			for _, term := range terms {
+				switch t := term.Type().Underlying().(type) {
+				case *types.Slice:
+					return t.Elem(), true
+				case *types.Pointer:
+					return t.Elem().Underlying().(*types.Array).Elem(), true
+				}
+			}
+			return nil, false
+		}
+
+		if elem, ok := isNonAddressableIndexable(); ok {
+			// At least one of the types is non-addressable
 			v := &Index{
-				X:     b.expr(fn, e.X),
-				Index: emitConv(fn, b.expr(fn, e.Index), tInt, e.Index),
-			}
-			v.setType(t.Elem())
-			return fn.emit(v, e)
-
-		case *types.Map:
-			// Maps are not addressable.
-			mapt := fn.Pkg.typeOf(e.X).Underlying().(*types.Map)
-			v := &MapLookup{
-				X:     b.expr(fn, e.X),
-				Index: emitConv(fn, b.expr(fn, e.Index), mapt.Key(), e.Index),
-			}
-			v.setType(mapt.Elem())
-			return fn.emit(v, e)
-
-		case *types.Basic: // => string
-			// Strings are not addressable.
-			v := &StringLookup{
 				X:     b.expr(fn, e.X),
 				Index: b.expr(fn, e.Index),
 			}
-			v.setType(tByte)
+			v.setType(elem)
 			return fn.emit(v, e)
-
-		case *types.Slice, *types.Pointer: // *array
-			// Addressable slice/array; use IndexAddr and Load.
+		} else if _, ok := isAddressableIndexable(); ok {
+			// All types are addressable (otherwise the previous branch would've fired)
 			return b.addr(fn, e, false).load(fn, e)
-
-		default:
+		} else if t, ok := typeutil.CoreType(xt).Underlying().(*types.Map); ok {
+			// Maps are not addressable.
+			v := &MapLookup{
+				X:     b.expr(fn, e.X),
+				Index: emitConv(fn, b.expr(fn, e.Index), t.Key(), e.Index),
+			}
+			v.setType(t.Elem())
+			return fn.emit(v, e)
+		} else if _, ok := xt.Underlying().(*types.Signature); ok {
+			// Instantiating a generic function
+			return b.expr(fn, e.X)
+		} else {
 			panic("unexpected container type in IndexExpr: " + t.String())
 		}
+
+	case *ast.IndexListExpr:
+		// Instantiating a generic function
+		return b.expr(fn, e.X)
 
 	case *ast.CompositeLit, *ast.StarExpr:
 		// Addressable types (lvalues)
@@ -763,7 +858,6 @@ func (b *builder) stmtList(fn *Function, list []ast.Stmt) {
 // must thus be addressable.
 //
 // escaping is defined as per builder.addr().
-//
 func (b *builder) receiver(fn *Function, e ast.Expr, wantAddr, escaping bool, sel *types.Selection, source ast.Node) Value {
 	var v Value
 	if wantAddr && !sel.Indirect() && !isPointer(fn.Pkg.typeOf(e)) {
@@ -783,7 +877,6 @@ func (b *builder) receiver(fn *Function, e ast.Expr, wantAddr, escaping bool, se
 // setCallFunc populates the function parts of a CallCommon structure
 // (Func, Method, Recv, Args[0]) based on the kind of invocation
 // occurring in e.
-//
 func (b *builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	// Is this a method call?
 	if selector, ok := unparen(e.Fun).(*ast.SelectorExpr); ok {
@@ -796,10 +889,15 @@ func (b *builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 			v := b.receiver(fn, selector.X, wantAddr, escaping, sel, selector)
 			if isInterface(recv) {
 				// Invoke-mode call.
+
+				// Methods in interfaces cannot have their own type parameters, so we needn't do anything for type
+				// parameters.
 				c.Value = v
 				c.Method = obj
 			} else {
 				// "Call"-mode call.
+
+				// declaredFunc takes care of creating wrappers for functions with type parameters.
 				c.Value = fn.Prog.declaredFunc(obj)
 				c.Args = append(c.Args, v)
 			}
@@ -836,15 +934,15 @@ func (b *builder) setCallFunc(fn *Function, e *ast.CallExpr, c *CallCommon) {
 		// - apply implicit field selections.
 		// - use MethodVal logic to populate fields of c.
 	}
-
 	// Evaluate the function operand in the usual way.
+	//
+	// Code in expr takes care of creating wrappers for functions with type parameters.
 	c.Value = b.expr(fn, e.Fun)
 }
 
 // emitCallArgs emits to f code for the actual parameters of call e to
 // a (possibly built-in) function of effective type sig.
 // The argument values are appended to args, which is then returned.
-//
 func (b *builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallExpr, args []Value) []Value {
 	// f(x, y, z...): pass slice z straight through.
 	if e.Ellipsis != 0 {
@@ -915,13 +1013,12 @@ func (b *builder) emitCallArgs(fn *Function, sig *types.Signature, e *ast.CallEx
 
 // setCall emits to fn code to evaluate all the parameters of a function
 // call e, and populates *c with those values.
-//
 func (b *builder) setCall(fn *Function, e *ast.CallExpr, c *CallCommon) {
 	// First deal with the f(...) part and optional receiver.
 	b.setCallFunc(fn, e, c)
 
 	// Then append the other actual parameters.
-	sig, _ := fn.Pkg.typeOf(e.Fun).Underlying().(*types.Signature)
+	sig, _ := typeutil.CoreType(fn.Pkg.typeOf(e.Fun)).(*types.Signature)
 	if sig == nil {
 		panic(fmt.Sprintf("no signature for call of %s", e.Fun))
 	}
@@ -936,7 +1033,6 @@ func (b *builder) assignOp(fn *Function, loc lvalue, val Value, op token.Token, 
 
 // localValueSpec emits to fn code to define all of the vars in the
 // function-local ValueSpec, spec.
-//
 func (b *builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 	switch {
 	case len(spec.Values) == len(spec.Names):
@@ -979,7 +1075,6 @@ func (b *builder) localValueSpec(fn *Function, spec *ast.ValueSpec) {
 // isDef is true if this is a short variable declaration (:=).
 //
 // Note the similarity with localValueSpec.
-//
 func (b *builder) assignStmt(fn *Function, lhss, rhss []ast.Expr, isDef bool, source ast.Node) {
 	// Side effects of all LHSs and RHSs must occur in left-to-right order.
 	lvals := make([]lvalue, len(lhss))
@@ -1045,46 +1140,64 @@ func (b *builder) arrayLen(fn *Function, elts []ast.Expr) int64 {
 //
 // Because the elements of a composite literal may refer to the
 // variables being updated, as in the second line below,
+//
 //	x := T{a: 1}
 //	x = T{a: x.a}
-// all the reads must occur before all the writes.  Thus all stores to
-// loc are emitted to the storebuf sb for later execution.
+//
+// all the reads must occur before all the writes. This is implicitly handled by the write buffering effected by
+// compositeElement.
 //
 // A CompositeLit may have pointer type only in the recursive (nested)
 // case when the type name is implicit.  e.g. in []*T{{}}, the inner
 // literal has type *T behaves like &T{}.
 // In that case, addr must hold a T, not a *T.
-//
 func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero bool, sb *storebuf) {
+	// Even though we no longer need storebuf for nested composite literals (because compositeElements act as buffers
+	// themselves), we still need storebuf for things like multiple assignment, e.g. 't.F1, t.F2 = T2{1}, T2{t.F1.X}'
+
 	typ := deref(fn.Pkg.typeOf(e))
-	switch t := typ.Underlying().(type) {
+	switch t := typeutil.CoreType(typ).(type) {
 	case *types.Struct:
-		if !isZero && len(e.Elts) != t.NumFields() {
-			// memclear
-			sb.store(&address{addr, nil}, zeroValue(fn, deref(addr.Type()), e), e)
-			isZero = true
-		}
-		for i, e := range e.Elts {
-			fieldIndex := i
-			if kv, ok := e.(*ast.KeyValueExpr); ok {
-				fname := kv.Key.(*ast.Ident).Name
-				for i, n := 0, t.NumFields(); i < n; i++ {
-					sf := t.Field(i)
-					if sf.Name() == fname {
-						fieldIndex = i
-						e = kv.Value
-						break
+		lvalue := &address{addr: addr, expr: e}
+		if len(e.Elts) == 0 {
+			if !isZero {
+				sb.store(lvalue, zeroValue(fn, deref(addr.Type()), e), e)
+			}
+		} else {
+			v := &CompositeValue{
+				Values: make([]Value, t.NumFields()),
+			}
+			for i := 0; i < t.NumFields(); i++ {
+				v.Values[i] = emitConst(fn, zeroConst(t.Field(i).Type()))
+			}
+			v.setType(typ)
+
+			for i, e := range e.Elts {
+				fieldIndex := i
+				if kv, ok := e.(*ast.KeyValueExpr); ok {
+					fname := kv.Key.(*ast.Ident).Name
+					for i, n := 0, t.NumFields(); i < n; i++ {
+						sf := t.Field(i)
+						if sf.Name() == fname {
+							fieldIndex = i
+							e = kv.Value
+							break
+						}
 					}
 				}
+
+				ce := &compositeElement{
+					cv:   v,
+					idx:  fieldIndex,
+					t:    t.Field(fieldIndex).Type(),
+					expr: e,
+				}
+				b.assign(fn, ce, e, isZero, sb, e)
+				v.Bitmap.SetBit(&v.Bitmap, fieldIndex, 1)
+				v.NumSet++
 			}
-			sf := t.Field(fieldIndex)
-			faddr := &FieldAddr{
-				X:     addr,
-				Field: fieldIndex,
-			}
-			faddr.setType(types.NewPointer(sf.Type()))
-			fn.emit(faddr, e)
-			b.assign(fn, &address{addr: faddr, expr: e}, e, isZero, sb, e)
+			fn.emit(v, e)
+			sb.store(lvalue, v, e)
 		}
 
 	case *types.Array, *types.Slice:
@@ -1098,43 +1211,60 @@ func (b *builder) compLit(fn *Function, addr Value, e *ast.CompositeLit, isZero 
 		case *types.Array:
 			at = t
 			array = addr
-
-			if !isZero && int64(len(e.Elts)) != at.Len() {
-				// memclear
-				sb.store(&address{array, nil}, zeroValue(fn, deref(array.Type()), e), e)
-			}
 		}
 
-		var idx *Const
-		for _, e := range e.Elts {
-			if kv, ok := e.(*ast.KeyValueExpr); ok {
-				idx = b.expr(fn, kv.Key).(*Const)
-				e = kv.Value
-			} else {
-				var idxval int64
-				if idx != nil {
-					idxval = idx.Int64() + 1
+		var final Value
+		if len(e.Elts) == 0 {
+			if !isZero {
+				zc := emitConst(fn, zeroConst(at))
+				final = zc
+			}
+		} else {
+			v := &CompositeValue{
+				Values: make([]Value, at.Len()),
+			}
+			zc := emitConst(fn, zeroConst(at.Elem()))
+			for i := range v.Values {
+				v.Values[i] = zc
+			}
+			v.setType(at)
+
+			var idx *Const
+			for _, e := range e.Elts {
+				if kv, ok := e.(*ast.KeyValueExpr); ok {
+					idx = b.expr(fn, kv.Key).(*Const)
+					e = kv.Value
+				} else {
+					var idxval int64
+					if idx != nil {
+						idxval = idx.Int64() + 1
+					}
+					idx = emitConst(fn, intConst(idxval)).(*Const)
 				}
-				idx = emitConst(fn, intConst(idxval))
-			}
-			iaddr := &IndexAddr{
-				X:     array,
-				Index: idx,
-			}
-			iaddr.setType(types.NewPointer(at.Elem()))
-			fn.emit(iaddr, e)
-			if t != at { // slice
-				// backing array is unaliased => storebuf not needed.
-				b.assign(fn, &address{addr: iaddr, expr: e}, e, true, nil, e)
-			} else {
-				b.assign(fn, &address{addr: iaddr, expr: e}, e, true, sb, e)
-			}
-		}
 
+				iaddr := &compositeElement{
+					cv:   v,
+					idx:  int(idx.Int64()),
+					t:    at.Elem(),
+					expr: e,
+				}
+
+				b.assign(fn, iaddr, e, true, sb, e)
+				v.Bitmap.SetBit(&v.Bitmap, int(idx.Int64()), 1)
+				v.NumSet++
+			}
+			final = v
+			fn.emit(v, e)
+		}
 		if t != at { // slice
+			if final != nil {
+				sb.store(&address{addr: array}, final, e)
+			}
 			s := &Slice{X: array}
 			s.setType(typ)
 			sb.store(&address{addr: addr, expr: e}, fn.emit(s, e), e)
+		} else if final != nil {
+			sb.store(&address{addr: array, expr: e}, final, e)
 		}
 
 	case *types.Map:
@@ -1286,7 +1416,6 @@ func (b *builder) switchStmt(fn *Function, s *ast.SwitchStmt, label *lblock) {
 
 // switchStmt emits to fn code for the switch statement s, optionally
 // labelled by label.
-//
 func (b *builder) switchStmtDynamic(fn *Function, s *ast.SwitchStmt, label *lblock) {
 	// We treat SwitchStmt like a sequential if-else chain.
 	// Multiway dispatch can be recovered later by irutil.Switches()
@@ -1547,7 +1676,6 @@ func (b *builder) typeSwitchStmt(fn *Function, s *ast.TypeSwitchStmt, label *lbl
 
 // selectStmt emits to fn code for the select statement s, optionally
 // labelled by label.
-//
 func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (noreturn bool) {
 	if len(s.Body.List) == 0 {
 		instr := &Select{Blocking: true}
@@ -1599,7 +1727,7 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 				Dir:  types.SendOnly,
 				Chan: ch,
 				Send: emitConv(fn, b.expr(fn, comm.Value),
-					ch.Type().Underlying().(*types.Chan).Elem(), comm),
+					typeutil.CoreType(ch.Type()).Underlying().(*types.Chan).Elem(), comm),
 				Pos: comm.Arrow,
 			}
 			if debugInfo {
@@ -1642,7 +1770,7 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 	vars = append(vars, varIndex, varOk)
 	for _, st := range states {
 		if st.Dir == types.RecvOnly {
-			tElem := st.Chan.Type().Underlying().(*types.Chan).Elem()
+			tElem := typeutil.CoreType(st.Chan.Type()).Underlying().(*types.Chan).Elem()
 			vars = append(vars, anonVar(tElem))
 		}
 	}
@@ -1734,7 +1862,6 @@ func (b *builder) selectStmt(fn *Function, s *ast.SelectStmt, label *lblock) (no
 
 // forStmt emits to fn code for the for statement s, optionally
 // labelled by label.
-//
 func (b *builder) forStmt(fn *Function, s *ast.ForStmt, label *lblock) {
 	//	...init...
 	//      jump loop
@@ -1791,7 +1918,6 @@ func (b *builder) forStmt(fn *Function, s *ast.ForStmt, label *lblock) {
 // over array, *array or slice value x.
 // The v result is defined only if tv is non-nil.
 // forPos is the position of the "for" token.
-//
 func (b *builder) rangeIndexed(fn *Function, x Value, tv types.Type, source ast.Node) (k, v Value, loop, done *BasicBlock) {
 	//
 	//      length = len(x)
@@ -1806,23 +1932,28 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv types.Type, source ast.
 	// 	jump loop
 	// done:                                   (target of break)
 
+	// We store in an Alloc and load it on each iteration so that lifting produces the necessary σ nodes
+	xAlloc := newVariable(fn, x.Type(), source)
+	xAlloc.store(x)
+
 	// Determine number of iterations.
-	var length Value
-	if arr, ok := deref(x.Type()).Underlying().(*types.Array); ok {
-		// For array or *array, the number of iterations is
-		// known statically thanks to the type.  We avoid a
-		// data dependence upon x, permitting later dead-code
-		// elimination if x is pure, static unrolling, etc.
-		// Ranging over a nil *array may have >0 iterations.
-		// We still generate code for x, in case it has effects.
-		length = emitConst(fn, intConst(arr.Len()))
+	//
+	// We store the length in an Alloc and load it on each iteration so that lifting produces the necessary σ nodes
+	length := newVariable(fn, tInt, source)
+	if arr, ok := deref(x.Type()).Underlying().(*types.Array); ok && !typeparams.IsTypeParam(x.Type()) {
+		// For array or *array, the number of iterations is known statically thanks to the type. We avoid a data
+		// dependence upon x, permitting later dead-code elimination if x is pure, static unrolling, etc. Ranging over a
+		// nil *array may have >0 iterations. We still generate code for x, in case it has effects.
+		//
+		// This intentionally misses type parameters with core types, because their length isn't technically constant.
+		length.store(emitConst(fn, intConst(arr.Len())))
 	} else {
 		// length = len(x).
 		var c Call
 		c.Call.Value = makeLen(x.Type())
 		c.Call.Args = []Value{x}
 		c.setType(tInt)
-		length = fn.emit(&c, source)
+		length.store(fn.emit(&c, source))
 	}
 
 	index := fn.addLocal(tInt, source)
@@ -1842,12 +1973,13 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv types.Type, source ast.
 
 	body := fn.newBasicBlock("rangeindex.body")
 	done = fn.newBasicBlock("rangeindex.done")
-	emitIf(fn, emitCompare(fn, token.LSS, incr, length, source), body, done, source)
+	emitIf(fn, emitCompare(fn, token.LSS, incr, length.load(), source), body, done, source)
 	fn.currentBlock = body
 
 	k = emitLoad(fn, index, source)
 	if tv != nil {
-		switch t := x.Type().Underlying().(type) {
+		x := xAlloc.load()
+		switch t := typeutil.CoreType(x.Type()).Underlying().(type) {
 		case *types.Array:
 			instr := &Index{
 				X:     x,
@@ -1883,7 +2015,6 @@ func (b *builder) rangeIndexed(fn *Function, x Value, tv types.Type, source ast.
 // Range/Next/Extract to iterate over map or string value x.
 // tk and tv are the types of the key/value results k and v, or nil
 // if the respective component is not wanted.
-//
 func (b *builder) rangeIter(fn *Function, x Value, tk, tv types.Type, source ast.Node) (k, v Value, loop, done *BasicBlock) {
 	//
 	//	it = range x
@@ -1907,36 +2038,40 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv types.Type, source ast
 	}
 
 	rng := &Range{X: x}
-	rng.setType(tRangeIter)
-	it := fn.emit(rng, source)
+	rng.setType(typeutil.NewIterator(types.NewTuple(
+		varOk,
+		newVar("k", tk),
+		newVar("v", tv),
+	)))
+	it := newVariable(fn, rng.typ, source)
+	it.store(fn.emit(rng, source))
 
 	loop = fn.newBasicBlock("rangeiter.loop")
 	emitJump(fn, loop, source)
 	fn.currentBlock = loop
 
-	_, isString := x.Type().Underlying().(*types.Basic)
+	// Go doesn't currently allow ranging over string|[]byte, so isString is decidable.
+	_, isString := typeutil.CoreType(x.Type()).Underlying().(*types.Basic)
 
-	okv := &Next{
-		Iter:     it,
+	okvInstr := &Next{
+		Iter:     it.load(),
 		IsString: isString,
 	}
-	okv.setType(types.NewTuple(
-		varOk,
-		newVar("k", tk),
-		newVar("v", tv),
-	))
-	fn.emit(okv, source)
+	okvInstr.setType(rng.typ.(*typeutil.Iterator).Elem())
+	fn.emit(okvInstr, source)
+	okv := newVariable(fn, okvInstr.Type(), source)
+	okv.store(okvInstr)
 
 	body := fn.newBasicBlock("rangeiter.body")
 	done = fn.newBasicBlock("rangeiter.done")
-	emitIf(fn, emitExtract(fn, okv, 0, source), body, done, source)
+	emitIf(fn, emitExtract(fn, okv.load(), 0, source), body, done, source)
 	fn.currentBlock = body
 
 	if tk != tInvalid {
-		k = emitExtract(fn, okv, 1, source)
+		k = emitExtract(fn, okv.load(), 1, source)
 	}
 	if tv != tInvalid {
-		v = emitExtract(fn, okv, 2, source)
+		v = emitExtract(fn, okv.load(), 2, source)
 	}
 	return
 }
@@ -1946,7 +2081,6 @@ func (b *builder) rangeIter(fn *Function, x Value, tk, tv types.Type, source ast
 // tk is the channel's element type, or nil if the k result is
 // not wanted
 // pos is the position of the '=' or ':=' token.
-//
 func (b *builder) rangeChan(fn *Function, x Value, tk types.Type, source ast.Node) (k Value, loop, done *BasicBlock) {
 	//
 	// loop:                                   (target of continue)
@@ -1962,20 +2096,49 @@ func (b *builder) rangeChan(fn *Function, x Value, tk types.Type, source ast.Nod
 	loop = fn.newBasicBlock("rangechan.loop")
 	emitJump(fn, loop, source)
 	fn.currentBlock = loop
-	retv := emitRecv(fn, x, true, types.NewTuple(newVar("k", x.Type().Underlying().(*types.Chan).Elem()), varOk), source)
+
+	recv := emitRecv(fn, x, true, types.NewTuple(newVar("k", typeutil.CoreType(x.Type()).Underlying().(*types.Chan).Elem()), varOk), source)
+	retv := newVariable(fn, recv.Type(), source)
+	retv.store(recv)
+
 	body := fn.newBasicBlock("rangechan.body")
 	done = fn.newBasicBlock("rangechan.done")
-	emitIf(fn, emitExtract(fn, retv, 1, source), body, done, source)
+	emitIf(fn, emitExtract(fn, retv.load(), 1, source), body, done, source)
 	fn.currentBlock = body
 	if tk != nil {
-		k = emitExtract(fn, retv, 0, source)
+		k = emitExtract(fn, retv.load(), 0, source)
 	}
 	return
 }
 
+type variable struct {
+	alloc  *Alloc
+	fn     *Function
+	source ast.Node
+}
+
+func newVariable(fn *Function, typ types.Type, source ast.Node) *variable {
+	alloc := &Alloc{}
+	alloc.setType(types.NewPointer(typ))
+	fn.emit(alloc, source)
+	fn.Locals = append(fn.Locals, alloc)
+	return &variable{
+		alloc:  alloc,
+		fn:     fn,
+		source: source,
+	}
+}
+
+func (v *variable) store(sv Value) {
+	emitStore(v.fn, v.alloc, sv, v.source)
+}
+
+func (v *variable) load() Value {
+	return emitLoad(v.fn, v.alloc, v.source)
+}
+
 // rangeStmt emits to fn code for the range statement s, optionally
 // labelled by label.
-//
 func (b *builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock, source ast.Node) {
 	var tk, tv types.Type
 	if s.Key != nil && !isBlankIdent(s.Key) {
@@ -2004,7 +2167,7 @@ func (b *builder) rangeStmt(fn *Function, s *ast.RangeStmt, label *lblock, sourc
 
 	var k, v Value
 	var loop, done *BasicBlock
-	switch rt := x.Type().Underlying().(type) {
+	switch rt := typeutil.CoreType(x.Type()).Underlying().(type) {
 	case *types.Slice, *types.Array, *types.Pointer: // *array
 		k, v, loop, done = b.rangeIndexed(fn, x, tv, source)
 
@@ -2085,7 +2248,7 @@ start:
 		instr := &Send{
 			Chan: b.expr(fn, s.Chan),
 			X: emitConv(fn, b.expr(fn, s.Value),
-				fn.Pkg.typeOf(s.Chan).Underlying().(*types.Chan).Elem(), s),
+				typeutil.CoreType(fn.Pkg.typeOf(s.Chan)).Underlying().(*types.Chan).Elem(), s),
 		}
 		fn.emit(instr, s)
 
@@ -2182,7 +2345,7 @@ start:
 			block = fn.labelledBlock(s.Label)._goto
 		}
 		j := emitJump(fn, block, s)
-		j.Comment = s.Tok.String()
+		j.comment = s.Tok.String()
 		fn.currentBlock = fn.newBasicBlock("unreachable")
 
 	case *ast.BlockStmt:
@@ -2322,7 +2485,6 @@ func (b *builder) buildFunction(fn *Function) {
 
 // buildFuncDecl builds IR code for the function or method declared
 // by decl in package pkg.
-//
 func (b *builder) buildFuncDecl(pkg *Package, decl *ast.FuncDecl) {
 	id := decl.Name
 	if isBlankIdent(id) {
@@ -2345,7 +2507,6 @@ func (b *builder) buildFuncDecl(pkg *Package, decl *ast.FuncDecl) {
 // need only build a single package.
 //
 // Build is idempotent and thread-safe.
-//
 func (prog *Program) Build() {
 	for _, p := range prog.packages {
 		p.Build()
@@ -2359,7 +2520,6 @@ func (prog *Program) Build() {
 // error-free).
 //
 // Build is idempotent and thread-safe.
-//
 func (p *Package) Build() { p.buildOnce.Do(p.build) }
 
 func (p *Package) build() {

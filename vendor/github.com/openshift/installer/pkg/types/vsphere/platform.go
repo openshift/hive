@@ -19,6 +19,12 @@ const (
 
 	// DiskTypeEagerZeroedThick uses EagerZeroedThick disk provisioning type for vsphere in the cluster.
 	DiskTypeEagerZeroedThick DiskType = "eagerZeroedThick"
+
+	// TagCategoryRegion the tag category associated with regions.
+	TagCategoryRegion = "openshift-region"
+
+	// TagCategoryZone the tag category associated with zones.
+	TagCategoryZone = "openshift-zone"
 )
 
 // Platform stores any global configuration used for vsphere platforms
@@ -92,7 +98,6 @@ type Platform struct {
 	DiskType DiskType `json:"diskType,omitempty"`
 	// VCenters holds the connection details for services to communicate with vCenter.
 	// Currently only a single vCenter is supported.
-	// VCenters is available in TechPreview.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:MaxItems=1
 	// +kubebuilder:validation:MinItems=1
@@ -100,7 +105,6 @@ type Platform struct {
 	// FailureDomains holds the VSpherePlatformFailureDomainSpec which contains
 	// the definition of region, zone and the vCenter topology.
 	// If this is omitted failure domains (regions and zones) will not be used.
-	// FailureDomains is available in TechPreview.
 	// +kubebuilder:validation:Optional
 	FailureDomains []FailureDomain `json:"failureDomains,omitempty"`
 }

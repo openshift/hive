@@ -11,11 +11,14 @@ import (
 	"go/constant"
 	"go/types"
 	"strconv"
+	"strings"
+
+	"golang.org/x/exp/typeparams"
+	"honnef.co/go/tools/go/types/typeutil"
 )
 
 // NewConst returns a new constant of the specified value and type.
 // val must be valid according to the specification of Const.Value.
-//
 func NewConst(val constant.Value, typ types.Type) *Const {
 	return &Const{
 		register: register{
@@ -33,7 +36,6 @@ func intConst(i int64) *Const {
 
 // nilConst returns a nil constant of the specified type, which may
 // be any reference type, including interfaces.
-//
 func nilConst(typ types.Type) *Const {
 	return NewConst(nil, typ)
 }
@@ -43,35 +45,85 @@ func stringConst(s string) *Const {
 	return NewConst(constant.MakeString(s), tString)
 }
 
-// zeroConst returns a new "zero" constant of the specified type,
-// which must not be an array or struct type: the zero values of
-// aggregates are well-defined but cannot be represented by Const.
-//
-func zeroConst(t types.Type) *Const {
-	switch t := t.(type) {
-	case *types.Basic:
-		switch {
-		case t.Info()&types.IsBoolean != 0:
-			return NewConst(constant.MakeBool(false), t)
-		case t.Info()&types.IsNumeric != 0:
-			return NewConst(constant.MakeInt64(0), t)
-		case t.Info()&types.IsString != 0:
-			return NewConst(constant.MakeString(""), t)
-		case t.Kind() == types.UnsafePointer:
-			fallthrough
-		case t.Kind() == types.UntypedNil:
-			return nilConst(t)
-		default:
-			panic(fmt.Sprint("zeroConst for unexpected type:", t))
-		}
-	case *types.Pointer, *types.Slice, *types.Interface, *types.Chan, *types.Map, *types.Signature:
+// zeroConst returns a new "zero" constant of the specified type.
+func zeroConst(t types.Type) Constant {
+	if _, ok := t.Underlying().(*types.Interface); ok && !typeparams.IsTypeParam(t) {
+		// Handle non-generic interface early to simplify following code.
 		return nilConst(t)
-	case *types.Named:
-		return NewConst(zeroConst(t.Underlying()).Value, t)
-	case *types.Array, *types.Struct, *types.Tuple:
-		panic(fmt.Sprint("zeroConst applied to aggregate:", t))
 	}
-	panic(fmt.Sprint("zeroConst: unexpected ", t))
+
+	tset := typeutil.NewTypeSet(t)
+
+	switch typ := tset.CoreType().(type) {
+	case *types.Struct:
+		values := make([]Value, typ.NumFields())
+		for i := 0; i < typ.NumFields(); i++ {
+			values[i] = zeroConst(typ.Field(i).Type())
+		}
+		return &AggregateConst{
+			register: register{typ: t},
+			Values:   values,
+		}
+	case *types.Tuple:
+		values := make([]Value, typ.Len())
+		for i := 0; i < typ.Len(); i++ {
+			values[i] = zeroConst(typ.At(i).Type())
+		}
+		return &AggregateConst{
+			register: register{typ: t},
+			Values:   values,
+		}
+	}
+
+	isNillable := func(term *types.Term) bool {
+		switch typ := term.Type().Underlying().(type) {
+		case *types.Pointer, *types.Slice, *types.Interface, *types.Chan, *types.Map, *types.Signature, *typeutil.Iterator:
+			return true
+		case *types.Basic:
+			switch typ.Kind() {
+			case types.UnsafePointer, types.UntypedNil:
+				return true
+			default:
+				return false
+			}
+		default:
+			return false
+		}
+	}
+
+	isInfo := func(info types.BasicInfo) func(*types.Term) bool {
+		return func(term *types.Term) bool {
+			basic, ok := term.Type().Underlying().(*types.Basic)
+			if !ok {
+				return false
+			}
+			return (basic.Info() & info) != 0
+		}
+	}
+
+	isArray := func(term *types.Term) bool {
+		_, ok := term.Type().Underlying().(*types.Array)
+		return ok
+	}
+
+	switch {
+	case tset.All(isInfo(types.IsNumeric)):
+		return NewConst(constant.MakeInt64(0), t)
+	case tset.All(isInfo(types.IsString)):
+		return NewConst(constant.MakeString(""), t)
+	case tset.All(isInfo(types.IsBoolean)):
+		return NewConst(constant.MakeBool(false), t)
+	case tset.All(isNillable):
+		return nilConst(t)
+	case tset.All(isArray):
+		var k ArrayConst
+		k.setType(t)
+		return &k
+	default:
+		var k GenericConst
+		k.setType(t)
+		return &k
+	}
 }
 
 func (c *Const) RelString(from *types.Package) string {
@@ -93,7 +145,47 @@ func (c *Const) RelString(from *types.Package) string {
 }
 
 func (c *Const) String() string {
+	if c.block == nil {
+		// Constants don't have a block till late in the compilation process. But we want to print consts during
+		// debugging.
+		return c.RelString(nil)
+	}
 	return c.RelString(c.Parent().pkg())
+}
+
+func (v *ArrayConst) RelString(pkg *types.Package) string {
+	return fmt.Sprintf("ArrayConst <%s>", relType(v.Type(), pkg))
+}
+
+func (v *ArrayConst) String() string {
+	return v.RelString(v.Parent().pkg())
+}
+
+func (v *AggregateConst) RelString(pkg *types.Package) string {
+	values := make([]string, len(v.Values))
+	for i, v := range v.Values {
+		if v != nil {
+			values[i] = v.Name()
+		} else {
+			values[i] = "nil"
+		}
+	}
+	return fmt.Sprintf("AggregateConst <%s> (%s)", relType(v.Type(), pkg), strings.Join(values, ", "))
+}
+
+func (v *AggregateConst) String() string {
+	if v.block == nil {
+		return v.RelString(nil)
+	}
+	return v.RelString(v.Parent().pkg())
+}
+
+func (v *GenericConst) RelString(pkg *types.Package) string {
+	return fmt.Sprintf("GenericConst <%s>", relType(v.Type(), pkg))
+}
+
+func (v *GenericConst) String() string {
+	return v.RelString(v.Parent().pkg())
 }
 
 // IsNil returns true if this constant represents a typed or untyped nil value.
@@ -103,7 +195,6 @@ func (c *Const) IsNil() bool {
 
 // Int64 returns the numeric value of this constant truncated to fit
 // a signed 64-bit integer.
-//
 func (c *Const) Int64() int64 {
 	switch x := constant.ToInt(c.Value); x.Kind() {
 	case constant.Int:
@@ -120,7 +211,6 @@ func (c *Const) Int64() int64 {
 
 // Uint64 returns the numeric value of this constant truncated to fit
 // an unsigned 64-bit integer.
-//
 func (c *Const) Uint64() uint64 {
 	switch x := constant.ToInt(c.Value); x.Kind() {
 	case constant.Int:
@@ -137,7 +227,6 @@ func (c *Const) Uint64() uint64 {
 
 // Float64 returns the numeric value of this constant truncated to fit
 // a float64.
-//
 func (c *Const) Float64() float64 {
 	f, _ := constant.Float64Val(c.Value)
 	return f
@@ -145,9 +234,52 @@ func (c *Const) Float64() float64 {
 
 // Complex128 returns the complex value of this constant truncated to
 // fit a complex128.
-//
 func (c *Const) Complex128() complex128 {
 	re, _ := constant.Float64Val(constant.Real(c.Value))
 	im, _ := constant.Float64Val(constant.Imag(c.Value))
 	return complex(re, im)
+}
+
+func (c *Const) equal(o Constant) bool {
+	// TODO(dh): don't use == for types, this will miss identical pointer types, among others
+	oc, ok := o.(*Const)
+	if !ok {
+		return false
+	}
+	return c.typ == oc.typ && c.Value == oc.Value
+}
+
+func (c *AggregateConst) equal(o Constant) bool {
+	oc, ok := o.(*AggregateConst)
+	if !ok {
+		return false
+	}
+	// TODO(dh): don't use == for types, this will miss identical pointer types, among others
+	if c.typ != oc.typ {
+		return false
+	}
+	for i, v := range c.Values {
+		if !v.(Constant).equal(oc.Values[i].(Constant)) {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *ArrayConst) equal(o Constant) bool {
+	oc, ok := o.(*ArrayConst)
+	if !ok {
+		return false
+	}
+	// TODO(dh): don't use == for types, this will miss identical pointer types, among others
+	return c.typ == oc.typ
+}
+
+func (c *GenericConst) equal(o Constant) bool {
+	oc, ok := o.(*GenericConst)
+	if !ok {
+		return false
+	}
+	// TODO(dh): don't use == for types, this will miss identical pointer types, among others
+	return c.typ == oc.typ
 }

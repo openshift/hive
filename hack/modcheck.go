@@ -60,7 +60,6 @@ func mapExclude(theList []*modfile.Exclude) map[string]string {
 }
 
 type replacement struct {
-	oldver  string
 	newpath string
 	newver  string
 }
@@ -68,9 +67,13 @@ type replacement struct {
 func mapReplace(theList []*modfile.Replace) map[string]replacement {
 	ret := make(map[string]replacement, len(theList))
 	for _, item := range theList {
+		// If the replaced component (on the left) has a version specified explicitly, include it in the hash.
+		// This allows us to specify replacements for different versions of the same library.
 		path := item.Old.Path
+		if item.Old.Version != "" {
+			path = path + "@" + item.Old.Version
+		}
 		repl := replacement{
-			oldver:  item.Old.Version,
 			newpath: item.New.Path,
 			newver:  item.New.Version,
 		}

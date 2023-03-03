@@ -4001,13 +4001,13 @@ func TestCopyInstallLogSecret(t *testing.T) {
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
-			for _, envVar := range test.existingEnvVars {
+			for i, envVar := range test.existingEnvVars {
 				if err := os.Setenv(envVar.Name, envVar.Value); err == nil {
-					defer func() {
-						if err := os.Unsetenv(envVar.Name); err != nil {
+					defer func(evar corev1.EnvVar) {
+						if err := os.Unsetenv(evar.Name); err != nil {
 							t.Error(err)
 						}
-					}()
+					}(test.existingEnvVars[i])
 				} else {
 					t.Error(err)
 				}

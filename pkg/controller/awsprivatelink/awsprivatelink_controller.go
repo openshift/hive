@@ -939,7 +939,10 @@ func (r *ReconcileAWSPrivateLink) reconcileHostedZone(awsClient *awsClient,
 	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,
 	vpcEndpoint *ec2.VpcEndpoint, apiDomain string,
 	logger log.FieldLogger) (bool, string, error) {
-	modified, hostedZoneID, err := r.ensureHostedZone(awsClient.hub, cd, vpcEndpoint, apiDomain, logger)
+
+	// Select from SharedHostedZoneDomains; default to apiDomain.
+	hostedZoneDomain := selectDomain(apiDomain, r.controllerconfig.SharedHostedZoneDomains)
+	modified, hostedZoneID, err := r.ensureHostedZone(awsClient.hub, cd, vpcEndpoint, hostedZoneDomain, logger)
 	if err != nil {
 		logger.WithError(err).Error("error ensuring Hosted Zone was created")
 		return modified, "", err
@@ -968,6 +971,28 @@ func (r *ReconcileAWSPrivateLink) reconcileHostedZone(awsClient *awsClient,
 		return modified, "", err
 	}
 	return modified, hostedZoneID, nil
+}
+
+// selectDomain determines if the specified domain is a subdomain of any item
+// in the list and returns the most accurately matching one. Default to the
+// subdomain when no matches are found.
+func selectDomain(subdomain string, domains []string) string {
+	// The subdomain is empty, no results found.
+	if subdomain == "" {
+		return subdomain
+	}
+	bestMatch := ""
+	for _, domain := range domains {
+		// Always select the longest possible domain name that matches.
+		if len(domain) > len(bestMatch) && strings.HasSuffix(subdomain, "."+domain) {
+			bestMatch = domain
+		}
+	}
+	// No matches found; default to the subdomain
+	if bestMatch == "" {
+		return subdomain
+	}
+	return bestMatch
 }
 
 func (r *ReconcileAWSPrivateLink) recordSet(awsClient awsclient.Client, apiDomain string, vpcEndpoint *ec2.VpcEndpoint) (*route53.ResourceRecordSet, error) {

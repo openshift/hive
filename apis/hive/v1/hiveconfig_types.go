@@ -192,6 +192,17 @@ type AWSPrivateLinkConfig struct {
 	// +kubebuilder:default=Alias
 	// +optional
 	DNSRecordType AWSPrivateLinkDNSRecordType `json:"dnsRecordType,omitempty"`
+
+	// SharedHostedZoneDomains is a list of domain names for private hosted
+	// zones that are to be shared by multiple clusters' privatelink
+	// records. They must exist in the same account as the Hive cluster and
+	// be associated with the privatelink VPC. When a cluster's domain is a
+	// subdomain of any item in the list, the privatelink record will be
+	// created in the zone of the item that most closely matches. Otherwise
+	// a new private hosted zone will be created for the cluster.
+	//
+	// +optional
+	SharedHostedZoneDomains []string `json:"sharedHostedZoneDomains,omitempty"`
 }
 
 // AWSPrivateLinkDNSRecordType defines what type of DNS record should be created in Private Hosted Zone

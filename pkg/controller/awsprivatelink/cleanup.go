@@ -2,6 +2,7 @@ package awsprivatelink
 
 import (
 	"context"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -136,9 +137,13 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 		hzID = cd.Status.Platform.AWS.PrivateLink.HostedZoneID
 	}
 
+	// Figure out the API address for cluster. The error handling is only
+	// needed when the hzID is empty because then we will not be able to
+	// discover the hzID and should exit.
+	apiDomain, err := initialURL(r.Client,
+		client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name})
+
 	if hzID == "" { // since we don't have the hz ID, we try to discover it to prevent leaks
-		apiDomain, err := initialURL(r.Client,
-			client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name})
 		if apierrors.IsNotFound(err) {
 			logger.Info("no hostedZoneID in status and admin kubeconfig does not exist, skipping hosted zone cleanup")
 			return nil
@@ -171,6 +176,30 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 	}
 
 	hzLog := logger.WithField("hostedZoneID", hzID)
+
+	// Determine if hzID is one of SharedHostedZoneDomains
+	var isSharedHostedZone bool
+	zoneResp, err := awsClient.GetHostedZone(&route53.GetHostedZoneInput{
+		Id: aws.String(hzID),
+	})
+	if awsErrCodeEquals(err, "NoSuchHostedZone") {
+		return nil // no more work
+	}
+	if err != nil {
+		hzLog.WithError(err).Error("failed to get the hosted zone")
+		return err
+	}
+	for _, domain := range r.controllerconfig.SharedHostedZoneDomains {
+		if strings.EqualFold(domain, strings.TrimSuffix(aws.StringValue(zoneResp.HostedZone.Name), ".")) {
+			isSharedHostedZone = true
+			break
+		}
+	}
+	if isSharedHostedZone && apiDomain == "" {
+		// unable to determine specific record(s) to delete from SharedHostedZones.
+		return nil
+	}
+
 	recordsResp, err := awsClient.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 		HostedZoneId: aws.String(hzID),
 	})
@@ -186,6 +215,11 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 			// can't delete SOA and NS types
 			continue
 		}
+		if isSharedHostedZone &&
+			!strings.EqualFold(apiDomain, strings.TrimSuffix(aws.StringValue(aws.String(*record.Name)), ".")) {
+			// only the apiDomain record(s) should be deleted from SharedHostedZones
+			continue
+		}
 		_, err := awsClient.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 			HostedZoneId: aws.String(hzID),
 			ChangeBatch: &route53.ChangeBatch{
@@ -199,6 +233,11 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 			hzLog.WithField("record", *record.Name).WithError(err).Error("failed to list the hosted zone")
 			return err
 		}
+	}
+
+	// SharedHostedZones should not be deleted; exit here.
+	if isSharedHostedZone {
+		return nil
 	}
 
 	_, err = awsClient.DeleteHostedZone(&route53.DeleteHostedZoneInput{

@@ -443,6 +443,49 @@ func testSecret(name string, data map[string]string) *corev1.Secret {
 	return s
 }
 
+func TestSelectDomain(t *testing.T) {
+	tests := []struct {
+		name      string
+		subdomain string
+		domains   []string
+		expected  string
+	}{{
+		name:      "subdomain is empty",
+		subdomain: "",
+		expected:  "",
+	}, {
+		name:      "domains is empty",
+		subdomain: "api.c.domain",
+		expected:  "api.c.domain",
+	}, {
+		name:      "subdomain is found in domains, best match",
+		subdomain: "api.c.domain",
+		domains:   []string{"a.domain", "b.domain", "c.domain", "domain"},
+		expected:  "c.domain",
+	}, {
+		name:      "subdomain is found in domains, no overmatching",
+		subdomain: "api.c.domain",
+		domains:   []string{"more.c.domain", "c.domain", "domain"},
+		expected:  "c.domain",
+	}, {
+		name:      "subdomain is found in domains, match whole names only",
+		subdomain: "api.c.domain",
+		domains:   []string{"longc.domain", "c.domain", "domain"},
+		expected:  "c.domain",
+	}, {
+		name:      "subdomain is not found in domains",
+		subdomain: "api.c.domain",
+		domains:   []string{"a.domain", "b.domain"},
+		expected:  "api.c.domain",
+	}}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := selectDomain(test.subdomain, test.domains)
+			assert.EqualValues(t, result, test.expected)
+		})
+	}
+}
+
 // createVpcEndpointInputMatcher implements gomock.Matcher, succeeding if the input is an
 // ec2.CreateVpcEndpointInput whose VpcId equals the configured vpcId.
 type createVpcEndpointInputMatcher struct {
@@ -1832,6 +1875,15 @@ users:
 			m.EXPECT().DeleteVpcEndpointServiceConfigurations(&ec2.DeleteVpcEndpointServiceConfigurationsInput{
 				ServiceIds: aws.StringSlice([]string{"vpce-svc-12345"}),
 			}).Return(nil, nil)
+			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
+				HostedZone: &route53.HostedZone{
+					Id: aws.String("vpc-1"),
+				},
+				VPCs: []*route53.VPC{{
+					VPCId:     endpoint.VpcId,
+					VPCRegion: aws.String("us-east-1"),
+				}},
+			}, nil)
 		},
 
 		hasFinalizer: true,

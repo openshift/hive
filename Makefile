@@ -298,7 +298,7 @@ docker-dev-push: build image-hive-fedora-dev docker-push
 # Build the dev image using builah
 .PHONY: buildah-dev-build
 buildah-dev-build:
-	buildah bud -f Dockerfile --tag ${IMG}
+	buildah bud --ulimit nofile=10239:10240 -f ./Dockerfile --tag ${IMG}
 
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push

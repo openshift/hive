@@ -9058,7 +9058,7 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/build-machinery-go v0.0.0-20220913142420-e25cf57ea46d
+# github.com/openshift/build-machinery-go v0.0.0-20230306181456-d321ffa04533
 ## explicit; go 1.13
 github.com/openshift/build-machinery-go
 github.com/openshift/build-machinery-go/make

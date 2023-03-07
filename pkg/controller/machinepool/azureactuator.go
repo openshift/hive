@@ -3,9 +3,10 @@ package machinepool
 import (
 	"context"
 	"fmt"
-	"github.com/blang/semver/v4"
 	"strings"
 	"time"
+
+	"github.com/blang/semver/v4"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -64,6 +65,10 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		Platform: installertypes.Platform{
 			Azure: &installertypesazure.Platform{
 				Region: cd.Spec.Platform.Azure.Region,
+				// ResourceGroupName may be overridden within the install-config but
+				// must also be set within ClusterDeployment Azure platform to be
+				// picked up by the install-config created here for MachineSet generation.
+				ResourceGroupName: cd.Spec.Platform.Azure.ResourceGroupName,
 			},
 		},
 	}
@@ -106,7 +111,9 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		// to determine if we should allow resultant machinesets to consume a "gen2" image.
 		gen2ImageExists, err := a.gen2ImageExists(cd.Spec.ClusterMetadata.InfraID, ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
 		if err != nil {
-			return nil, false, err
+			return nil, false, errors.Wrap(err, `error listing images in resource group, set resourceGroupName
+				                                 within ClusterDeployment platform (cd.Spec.Platform.Azure.ResourceGroupName)
+				                                 if custom resource group specified in install config`)
 		}
 		if !gen2ImageExists {
 			// Modify capabilities to ensure that a V1 image is chosen by installazure.MachineSets()

@@ -600,6 +600,9 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 	if req.Spec.Platform.Azure.CloudName != nil {
 		containers[0].Args = append(containers[0].Args, "--azure-cloud-name", req.Spec.Platform.Azure.CloudName.Name())
 	}
+	if req.Spec.Platform.Azure.ResourceGroupName != "" {
+		containers[0].Args = append(containers[0].Args, "--azure-resource-group-name", req.Spec.Platform.Azure.ResourceGroupName)
+	}
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
 

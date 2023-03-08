@@ -4,7 +4,7 @@
 
 set -exv
 
-GIT_HASH=`git rev-parse --short=7 HEAD`
+GIT_HASH=`git rev-parse --short=10 HEAD`
 IMG="quay.io/app-sre/hive:${GIT_HASH}"
 
 ### Accommodate docker or podman

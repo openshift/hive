@@ -162,7 +162,7 @@ def build_and_push_image(registry_auth_file, image_repo, image_tag, dry_run, bui
     if build_engine == "buildah":
         build = dict(
             query="buildah images -nq {}",
-            build="buildah bud --tag {} -f ./Dockerfile",
+            build="buildah bud --ulimit nofile=10239:10240 --tag {} -f ./Dockerfile",
             push="buildah push --authfile={} {}",
         )
         registry_auth_arg = registry_auth_file

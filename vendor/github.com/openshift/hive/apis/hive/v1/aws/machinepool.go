@@ -7,8 +7,14 @@ type MachinePoolPlatform struct {
 	Zones []string `json:"zones,omitempty"`
 
 	// Subnets is the list of subnets to which to attach the machines.
-	// There must be exactly one private subnet for each availability zone used.
-	// If public subnets are specified, there must be exactly one private and one public subnet specified for each availability zone.
+	// There must be exactly one private subnet for each availability zones used.
+	//
+	// Public subnets may be specified in addition to private subnets but public subnets will
+	// be filtered out of the subnets list. MachineSets will only use private subnets.
+	// If public subnets are specified, there must be exactly one private and one public subnet
+	// provided for each availability zone.
+	// Note that subnets will be observed to be public if they have an "kubernetes.io/role/elb"
+	// tag in AWS.
 	Subnets []string `json:"subnets,omitempty"`
 
 	// InstanceType defines the ec2 instance type.

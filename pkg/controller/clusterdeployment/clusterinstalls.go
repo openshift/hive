@@ -271,7 +271,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		}
 		// If we declared the provision terminally failed, bump our metric
 		if provisionFailedTerminal {
-			incProvisionFailedTerminal(cd, logger)
+			incProvisionFailedTerminal(cd)
 		}
 	}
 

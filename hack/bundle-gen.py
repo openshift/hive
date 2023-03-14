@@ -12,6 +12,7 @@ import sys
 import tempfile
 import urllib3
 import yaml
+import semver
 
 import version
 
@@ -198,6 +199,60 @@ def build_and_push_image(registry_auth_file, image_repo, image_tag, dry_run, bui
         build['push'].format(registry_auth_arg, container_name).split(),
         check=True,
     )
+
+
+# get_previous_version grabs the previous hive version (without the leading `v`) from
+# COMMUNITY_OPERATORS_HIVE_PKG_URL package yaml for the provided channel_name.
+def get_previous_version2(work_dir, channel_name):
+    upstream_repo = "git@github.com:dlom/community-operators-prod.git"
+    upstream_branch = "mold-convert-to-bundle-test-branch"
+    dir_name = "previous-version-determiner"
+
+    repo_full_path = os.path.join(work_dir, dir_name)
+    # clone git repo
+    try:
+        git.Repo.clone_from(upstream_repo, repo_full_path)
+    except:
+        print("Failed to clone repo {} to {}".format(upstream_repo, repo_full_path))
+        raise
+
+    # get to the right place on the filesystem
+    print("Working in %s" % repo_full_path)
+    os.chdir(repo_full_path)
+
+    repo = git.Repo(repo_full_path)
+
+    # Starting branch
+    print("Checkout latest {}".format(upstream_branch))
+    try:
+        repo.git.checkout(upstream_branch)
+    except:
+        print("Failed to checkout {}".format(upstream_branch))
+        raise
+
+    highest_version = "0.0.0"
+    try:
+        hive_dir = os.path.join(repo_full_path, HIVE_SUB_DIR)
+        for version in os.listdir(hive_dir):
+            annotation_yaml_path = os.path.join(hive_dir, version, "metadata", "annotations.yaml")
+            with open(annotation_yaml_path, "r") as stream:
+                annotation_yaml = yaml.load(stream, Loader=yaml.SafeLoader)
+                version_channel = annotation_yaml["annotations"]["operators.operatorframework.io.bundle.channel.default.v1"]
+                if version_channel == channel_name:
+                    if semver.compare(version, highest_version) > 0:
+                        highest_version = version
+    except:
+        print(
+            "Unable to determine previous hive version from {}",
+            upstream_repo,
+        )
+        raise
+
+    if highest_version == "0.0.0":
+        # Channel not found -- no previous version.
+        return None
+
+    return highest_version
 
 
 # get_previous_version grabs the previous hive version (without the leading `v`) from
@@ -547,9 +602,12 @@ if __name__ == "__main__":
         # Omit version graph stuff
         prev_version = None
     else:
-        prev_version = get_previous_version(channel)
+        prev_version = get_previous_version2(work_dir.name, channel)
         if hive_version == prev_version:
             raise ValueError("Version {} already exists upstream".format(hive_version))
+
+    print("previous version is: {}".format(prev_version))
+    exit(0)
 
     image_tag = args.image_tag_override or 'v{}'.format(hive_version)
     build_and_push_image(args.registry_auth_file, args.image_repo, image_tag, args.dry_run or args.dummy_bundle, args.build_engine)

@@ -7,56 +7,75 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
+const (
+	shortSuffix = "deploy"
+	// hashLen is 10 to represent "-" + hash + "-" (hash itself is always 8 characters)
+	hashLen = 10
+)
+
 func TestGetName(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		shortName := randSeq(rand.Intn(validation.DNS1123SubdomainMaxLength-1) + 1)
-		longName := randSeq(validation.DNS1123SubdomainMaxLength + rand.Intn(100))
+		// shortBase + "-" + hash will be underneath the maximum limit without any truncation
+		shortBase := randSeq(rand.Intn(validation.DNS1123SubdomainMaxLength-hashLen) + 1)
+
+		// Any usage of longBase/longSuffix will definitely need to be truncated
+		longBase := randSeq(validation.DNS1123SubdomainMaxLength + rand.Intn(100) + 1)
+		longSuffix := randSeq(validation.DNS1123SubdomainMaxLength + rand.Intn(100) + 1)
 
 		tests := []struct {
-			base, suffix, expected string
+			name, base, suffix, expected string
 		}{
 			{
-				base:     shortName,
-				suffix:   "deploy",
-				expected: shortName + "-deploy",
+				name:     "Short base and short suffix without truncation",
+				base:     shortBase,
+				suffix:   shortSuffix,
+				expected: shortBase + "-deploy",
 			},
 			{
-				base:     longName,
-				suffix:   "deploy",
-				expected: longName[:validation.DNS1123SubdomainMaxLength-16] + "-" + hash(longName) + "-deploy",
+				name:     "Long base and short suffix truncates base and inserts hash",
+				base:     longBase,
+				suffix:   shortSuffix,
+				expected: longBase[:validation.DNS1123SubdomainMaxLength-hashLen-len(shortSuffix)] + "-" + hash(longBase) + "-" + shortSuffix,
 			},
 			{
-				base:     shortName,
-				suffix:   longName,
-				expected: shortName + "-" + hash(shortName+"-"+longName),
+				name:     "Short base and long suffix inserts a hash instead of appending suffix",
+				base:     shortBase,
+				suffix:   longSuffix,
+				expected: shortBase + "-" + hash(shortBase+"-"+longSuffix),
 			},
 			{
+				name:     "Empty base and short suffix",
 				base:     "",
-				suffix:   shortName,
-				expected: "-" + shortName,
+				suffix:   shortSuffix,
+				expected: "-" + shortSuffix,
 			},
 			{
+				name:     "Empty base and long suffix appends hash of suffix",
 				base:     "",
-				suffix:   longName,
-				expected: "-" + hash("-"+longName),
+				suffix:   longSuffix,
+				expected: "-" + hash("-"+longSuffix),
 			},
 			{
-				base:     shortName,
+				name:     "Short base and no suffix",
+				base:     shortBase,
 				suffix:   "",
-				expected: shortName + "-",
+				expected: shortBase + "-",
 			},
 			{
-				base:     longName,
+				name:     "Long base and no suffix",
+				base:     longBase,
 				suffix:   "",
-				expected: longName[:validation.DNS1123SubdomainMaxLength-10] + "-" + hash(longName) + "-",
+				expected: longBase[:validation.DNS1123SubdomainMaxLength-hashLen] + "-" + hash(longBase) + "-",
 			},
 		}
 
 		for _, test := range tests {
-			result := GetName(test.base, test.suffix, validation.DNS1123SubdomainMaxLength)
-			if result != test.expected {
-				t.Errorf("Got unexpected result. Expected: %s Got: %s", test.expected, result)
-			}
+			t.Run(test.name, func(t *testing.T) {
+				result := GetName(test.base, test.suffix, validation.DNS1123SubdomainMaxLength)
+				if result != test.expected {
+					t.Errorf("Got unexpected result. \nExpected: %s\nGot:      %s", test.expected, result)
+				}
+			})
 		}
 	}
 }
@@ -89,10 +108,10 @@ func TestGetNameReturnShortNames(t *testing.T) {
 	}
 }
 
-// From k8s.io/kubernetes/pkg/api/generator.go
-var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789-")
-
 func randSeq(n int) string {
+	// From k8s.io/kubernetes/pkg/api/generator.go
+	var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789-")
+
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]

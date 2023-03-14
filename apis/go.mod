@@ -1,6 +1,6 @@
 module github.com/openshift/hive/apis
 
-go 1.19
+go 1.20
 
 require (
 	github.com/openshift/api v3.9.1-0.20191111211345-a27ff30ebf09+incompatible

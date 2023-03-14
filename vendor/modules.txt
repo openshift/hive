@@ -9110,7 +9110,7 @@ github.com/openshift/generic-admission-server/pkg/cmd
 github.com/openshift/generic-admission-server/pkg/cmd/server
 github.com/openshift/generic-admission-server/pkg/registry/admissionreview
 # github.com/openshift/hive/apis v0.0.0 => ./apis
-## explicit; go 1.19
+## explicit; go 1.20
 github.com/openshift/hive/apis
 github.com/openshift/hive/apis/helpers
 github.com/openshift/hive/apis/hive/v1

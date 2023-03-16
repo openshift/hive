@@ -151,6 +151,14 @@ spec:
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
+                      resourceGroupName:
+                        description: ResourceGroupName is the name of an already existing
+                          resource group where the cluster was installed. This resource
+                          group should only be used for this specific cluster and
+                          the cluster components will assume ownership of all resources
+                          in the resource group. Destroying the cluster using installer
+                          will delete this resource group.
+                        type: string
                     type: object
                   gcp:
                     description: GCP contains GCP-specific deprovision settings

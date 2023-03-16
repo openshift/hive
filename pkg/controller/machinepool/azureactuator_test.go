@@ -3,8 +3,9 @@ package machinepool
 import (
 	"context"
 	"fmt"
-	"github.com/openshift/hive/pkg/constants"
 	"testing"
+
+	"github.com/openshift/hive/pkg/constants"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/golang/mock/gomock"
@@ -476,6 +477,28 @@ func TestAzureActuator(t *testing.T) {
 				Type:      "MarketplaceWithPlan",
 			},
 		},
+		{
+			name: "ClusterDeployment provides ResourceGroupName",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testAzureClusterDeployment()
+				cd.Spec.Platform.Azure.ResourceGroupName = "custom-resource-group"
+				return cd
+			}(),
+			pool: testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+					testAzureImage(compute.HyperVGenerationTypesV2),
+				})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -499,13 +522,13 @@ func TestAzureActuator(t *testing.T) {
 				assert.Error(t, err, "expected error for test case")
 			} else {
 				assert.NoError(t, err, "unexpected error for test case")
-				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage)
+				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage, test.clusterDeployment)
 			}
 		})
 	}
 }
 
-func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedImage *machineapi.Image) {
+func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedImage *machineapi.Image, clusterDeployment *hivev1.ClusterDeployment) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -520,6 +543,17 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 		}
 		if expectedImage != nil {
 			assert.Equal(t, expectedImage, &azureProvider.Image)
+		}
+
+		// Ensure MachineSet's ResourceGroup is equal to ClusterDeployment ResourceGroupName
+		// when ResourceGroupName provided from ClusterDeployment
+		if resourceGroupNameOverride := clusterDeployment.Spec.Platform.Azure.ResourceGroupName; resourceGroupNameOverride != "" {
+			assert.Equal(t, resourceGroupNameOverride, azureProvider.ResourceGroup, "azureProviderSpec has unexpected ResourceGroup")
+		} else {
+			// Ensure MachineSet ResourceGroup is prefixed with the InfraID
+			// when ResourceGroupName not provided from ClusterDeployment
+			// Default ResourceGroup is "<InfraID>-rg"
+			assert.Equal(t, fmt.Sprintf("%s-rg", clusterDeployment.Spec.ClusterMetadata.InfraID), azureProvider.ResourceGroup, "azureProviderSpec has unexpected ResourceGroup")
 		}
 	}
 }

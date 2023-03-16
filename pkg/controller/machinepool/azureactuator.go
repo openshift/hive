@@ -65,9 +65,9 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		Platform: installertypes.Platform{
 			Azure: &installertypesazure.Platform{
 				Region: cd.Spec.Platform.Azure.Region,
-				// ResourceGroupName may be overridden within the install-config but
-				// must also be set within ClusterDeployment Azure platform to be
-				// picked up by the install-config created here for MachineSet generation.
+				// ResourceGroupName may be overridden within the install-config and
+				// must be set within ClusterDeployment Azure platform to be picked
+				// up by the install-config created here for MachineSet generation.
 				ResourceGroupName: cd.Spec.Platform.Azure.ResourceGroupName,
 			},
 		},

@@ -380,9 +380,41 @@ func (StatuspageProvider) SwaggerDoc() map[string]string {
 	return map_StatuspageProvider
 }
 
+var map_AWSCSIDriverConfigSpec = map[string]string{
+	"":          "AWSCSIDriverConfigSpec defines properties that can be configured for the AWS CSI driver.",
+	"kmsKeyARN": "kmsKeyARN sets the cluster default storage class to encrypt volumes with a user-defined KMS key, rather than the default KMS key used by AWS. The value may be either the ARN or Alias ARN of a KMS key.",
+}
+
+func (AWSCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_AWSCSIDriverConfigSpec
+}
+
+var map_AzureCSIDriverConfigSpec = map[string]string{
+	"":                  "AzureCSIDriverConfigSpec defines properties that can be configured for the Azure CSI driver.",
+	"diskEncryptionSet": "diskEncryptionSet sets the cluster default storage class to encrypt volumes with a customer-managed encryption set, rather than the default platform-managed keys.",
+}
+
+func (AzureCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_AzureCSIDriverConfigSpec
+}
+
+var map_AzureDiskEncryptionSet = map[string]string{
+	"":               "AzureDiskEncryptionSet defines the configuration for a disk encryption set.",
+	"subscriptionID": "subscriptionID defines the Azure subscription that contains the disk encryption set. The value should meet the following conditions: 1. It should be a 128-bit number. 2. It should be 36 characters (32 hexadecimal characters and 4 hyphens) long. 3. It should be displayed in five groups separated by hyphens (-). 4. The first group should be 8 characters long. 5. The second, third, and fourth groups should be 4 characters long. 6. The fifth group should be 12 characters long. An Example SubscrionID: f2007bbf-f802-4a47-9336-cf7c6b89b378",
+	"resourceGroup":  "resourceGroup defines the Azure resource group that contains the disk encryption set. The value should consist of only alphanumberic characters, underscores (_), parentheses, hyphens and periods. The value should not end in a period and be at most 90 characters in length.",
+	"name":           "name is the name of the disk encryption set that will be set on the default storage class. The value should consist of only alphanumberic characters, underscores (_), hyphens, and be at most 80 characters in length.",
+}
+
+func (AzureDiskEncryptionSet) SwaggerDoc() map[string]string {
+	return map_AzureDiskEncryptionSet
+}
+
 var map_CSIDriverConfigSpec = map[string]string{
 	"":           "CSIDriverConfigSpec defines configuration spec that can be used to optionally configure a specific CSI Driver.",
-	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to.\n\nValid values are:\n\n* vSphere\n\nAllows configuration of vsphere CSI driver topology.",
+	"driverType": "driverType indicates type of CSI driver for which the driverConfig is being applied to. Valid values are: AWS, Azure, GCP, vSphere and omitted. Consumers should treat unknown values as a NO-OP.",
+	"aws":        "aws is used to configure the AWS CSI driver.",
+	"azure":      "azure is used to configure the Azure CSI driver.",
+	"gcp":        "gcp is used to configure the GCP CSI driver.",
 	"vSphere":    "vsphere is used to configure the vsphere CSI driver.",
 }
 
@@ -424,6 +456,27 @@ var map_ClusterCSIDriverStatus = map[string]string{
 
 func (ClusterCSIDriverStatus) SwaggerDoc() map[string]string {
 	return map_ClusterCSIDriverStatus
+}
+
+var map_GCPCSIDriverConfigSpec = map[string]string{
+	"":       "GCPCSIDriverConfigSpec defines properties that can be configured for the GCP CSI driver.",
+	"kmsKey": "kmsKey sets the cluster default storage class to encrypt volumes with customer-supplied encryption keys, rather than the default keys managed by GCP.",
+}
+
+func (GCPCSIDriverConfigSpec) SwaggerDoc() map[string]string {
+	return map_GCPCSIDriverConfigSpec
+}
+
+var map_GCPKMSKeyReference = map[string]string{
+	"":          "GCPKMSKeyReference gathers required fields for looking up a GCP KMS Key",
+	"name":      "name is the name of the customer-managed encryption key to be used for disk encryption. The value should correspond to an existing KMS key and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.",
+	"keyRing":   "keyRing is the name of the KMS Key Ring which the KMS Key belongs to. The value should correspond to an existing KMS key ring and should consist of only alphanumeric characters, hyphens (-) and underscores (_), and be at most 63 characters in length.",
+	"projectID": "projectID is the ID of the Project in which the KMS Key Ring exists. It must be 6 to 30 lowercase letters, digits, or hyphens. It must start with a letter. Trailing hyphens are prohibited.",
+	"location":  "location is the GCP location in which the Key Ring exists. The value must match an existing GCP location, or \"global\". Defaults to global, if not set.",
+}
+
+func (GCPKMSKeyReference) SwaggerDoc() map[string]string {
+	return map_GCPKMSKeyReference
 }
 
 var map_VSphereCSIDriverConfigSpec = map[string]string{
@@ -1219,7 +1272,7 @@ var map_KuryrConfig = map[string]string{
 	"poolMaxPorts":                 "poolMaxPorts sets a maximum number of free ports that are being kept in a port pool. If the number of ports exceeds this setting, free ports will get deleted. Setting 0 will disable this upper bound, effectively preventing pools from shrinking and this is the default value. For more information about port pools see enablePortPoolsPrepopulation setting.",
 	"poolMinPorts":                 "poolMinPorts sets a minimum number of free ports that should be kept in a port pool. If the number of ports is lower than this setting, new ports will get created and added to pool. The default is 1. For more information about port pools see enablePortPoolsPrepopulation setting.",
 	"poolBatchPorts":               "poolBatchPorts sets a number of ports that should be created in a single batch request to extend the port pool. The default is 3. For more information about port pools see enablePortPoolsPrepopulation setting.",
-	"mtu":                          "mtu is the MTU that Kuryr should use when creating pod networks in Neutron. The value has to be lower or equal to the MTU of the nodes network and Neutron has to allow creation of tenant networks with such MTU. If unset Pod networks will be created with the same MTU as the nodes network has.",
+	"mtu":                          "mtu is the MTU that Kuryr should use when creating pod networks in Neutron. The value has to be lower or equal to the MTU of the nodes network and Neutron has to allow creation of tenant networks with such MTU. If unset Pod networks will be created with the same MTU as the nodes network has. This also affects the services network created by cluster-network-operator.",
 }
 
 func (KuryrConfig) SwaggerDoc() map[string]string {

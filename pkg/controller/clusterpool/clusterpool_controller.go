@@ -7,6 +7,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strings"
 
 	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
@@ -57,6 +58,7 @@ var (
 		hivev1.ClusterPoolCapacityAvailableCondition,
 		hivev1.ClusterPoolAllClustersCurrentCondition,
 		hivev1.ClusterPoolInventoryValidCondition,
+		hivev1.ClusterPoolDeletionPossibleCondition,
 	}
 )
 
@@ -982,17 +984,51 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if err != nil {
 		return err
 	}
+
+	// Adhere to MaxConcurrent when cleaning up.
+	availableConcurrent := math.MaxInt32
+	if pool.Spec.MaxConcurrent != nil {
+		availableConcurrent = int(*pool.Spec.MaxConcurrent) - len(cds.Installing()) - len(cds.Deleting())
+	}
+
+	// Clean up marked-for-deletion claimed clusters first. It really doesn't matter; the tie-breaker I'm using
+	// is that claimed clusters are more likely to be running than those still in the pool (I'm not going to
+	// bother checking runningCount) and are therefore more costly to keep running.
+	for _, cd := range cds.MarkedForDeletion() {
+		if availableConcurrent <= 0 {
+			break
+		}
+		if err := cds.Delete(r.Client, cd.Name); err != nil {
+			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete claimed ClusterDeployment")
+			return errors.Wrap(err, "could not delete claimed ClusterDeployment")
+		}
+		availableConcurrent--
+	}
 	for _, cd := range cds.Unassigned(true) {
 		if cd.DeletionTimestamp != nil {
 			continue
 		}
-		if err := cds.Delete(r.Client, cd.Name); err != nil {
-			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete ClusterDeployment")
-			return errors.Wrap(err, "could not delete ClusterDeployment")
+		if availableConcurrent <= 0 {
+			break
 		}
+		if err := cds.Delete(r.Client, cd.Name); err != nil {
+			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete unassigned ClusterDeployment")
+			return errors.Wrap(err, "could not delete unassigned ClusterDeployment")
+		}
+		availableConcurrent--
 	}
 
-	// TODO: Wait to remove finalizer until all (unclaimed??) clusters are gone.
+	if err := r.setDeletionPossibleCondition(pool, cds); err != nil {
+		logger.WithError(err).Error("error setting DeletionPossible condition")
+		return err
+	}
+
+	if cds.Total() != 0 {
+		logger.Infof("Keeping ClusterPool alive, waiting for %d ClusterDeployment(s) to be deleted.", cds.Total())
+		return nil
+	}
+
+	logger.Debug("All pool clusters deleted; removing finalizer")
 	controllerutils.DeleteFinalizer(pool, finalizer)
 	if err := r.Update(context.Background(), pool); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer from ClusterPool")
@@ -1079,6 +1115,34 @@ func (r *ReconcileClusterPool) setAvailableCapacityCondition(pool *hivev1.Cluste
 		pool.Status.Conditions = conds
 		if err := r.Status().Update(context.Background(), pool); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool conditions")
+			return errors.Wrap(err, "could not update ClusterPool conditions")
+		}
+	}
+	return nil
+}
+
+func (r *ReconcileClusterPool) setDeletionPossibleCondition(pool *hivev1.ClusterPool, cds *cdCollection) error {
+	status := corev1.ConditionTrue
+	reason := "DeletionPossible"
+	message := "No ClusterDeployments pending cleanup"
+	updateConditionCheck := controllerutils.UpdateConditionNever
+	if cds.Total() > 0 {
+		status = corev1.ConditionFalse
+		reason = "ClusterDeploymentsPendingCleanup"
+		message = fmt.Sprintf("The following ClusterDeployments are pending cleanup: %s", strings.Join(cds.Names(), ", "))
+		updateConditionCheck = controllerutils.UpdateConditionIfReasonOrMessageChange
+	}
+	conds, changed := controllerutils.SetClusterPoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.ClusterPoolDeletionPossibleCondition,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), pool); err != nil {
 			return errors.Wrap(err, "could not update ClusterPool conditions")
 		}
 	}

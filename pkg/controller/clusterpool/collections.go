@@ -428,6 +428,16 @@ func (cds *cdCollection) Total() int {
 	return len(cds.byCDName)
 }
 
+// Names returns a lexicographically sorted list of the names of all the ClusterDeployments in the cdCollection.
+func (cds *cdCollection) Names() []string {
+	ret := []string{}
+	for cdName := range cds.byCDName {
+		ret = append(ret, cdName)
+	}
+	sort.Strings(ret)
+	return ret
+}
+
 // NumAssigned returns the number of ClusterDeployments assigned to claims.
 func (cds *cdCollection) NumAssigned() int {
 	return len(cds.byClaimName)

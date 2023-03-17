@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -81,6 +80,10 @@ func TestReconcileClusterPool(t *testing.T) {
 			Status: corev1.ConditionUnknown,
 			Type:   hivev1.ClusterPoolInventoryValidCondition,
 		}),
+		testcp.WithCondition(hivev1.ClusterPoolCondition{
+			Status: corev1.ConditionUnknown,
+			Type:   hivev1.ClusterPoolDeletionPossibleCondition,
+		}),
 	)
 
 	inventoryPoolVersion := "e0bc44f74a546c63"
@@ -126,6 +129,7 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedCDCurrentStatus            corev1.ConditionStatus
 		expectedInventoryValidStatus       corev1.ConditionStatus
 		expectedInventoryMessage           map[string][]string
+		expectedDeletionPossibleCondition  *hivev1.ClusterPoolCondition
 		expectedCDCFinalizers              map[string][]string
 		expectedCDCReason                  map[string]string
 		expectedPoolVersion                string
@@ -152,6 +156,9 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedCapacityStatus:            corev1.ConditionUnknown,
 			expectedCDCurrentStatus:           corev1.ConditionUnknown,
 			expectedInventoryValidStatus:      corev1.ConditionUnknown,
+			expectedDeletionPossibleCondition: &hivev1.ClusterPoolCondition{
+				Status: corev1.ConditionUnknown,
+			},
 		},
 		{
 			name: "copyover fields",
@@ -280,38 +287,10 @@ func TestReconcileClusterPool(t *testing.T) {
 			name: "finalizer will be added to cdc if missing",
 			existing: []runtime.Object{
 				inventoryPoolBuilder().Build(testcp.WithSize(1)),
-				testcp.FullBuilder(testNamespace, "test-cp-2", scheme).
-					GenericOptions(
-						testgeneric.WithFinalizer(finalizer),
-					).
-					Options(
-						testcp.ForAWS(credsSecretName, "us-east-1"),
-						testcp.WithBaseDomain("test-domain"),
-						testcp.WithImageSet(imageSetName),
-					).
-					Build(
-						testcp.WithCondition(hivev1.ClusterPoolCondition{
-							Status: corev1.ConditionUnknown,
-							Type:   hivev1.ClusterPoolMissingDependenciesCondition,
-						}),
-						testcp.WithCondition(hivev1.ClusterPoolCondition{
-							Status: corev1.ConditionUnknown,
-							Type:   hivev1.ClusterPoolCapacityAvailableCondition,
-						}),
-						testcp.WithCondition(hivev1.ClusterPoolCondition{
-							Status: corev1.ConditionUnknown,
-							Type:   hivev1.ClusterPoolAllClustersCurrentCondition,
-						}),
-						testcp.WithCondition(hivev1.ClusterPoolCondition{
-							Status: corev1.ConditionUnknown,
-							Type:   hivev1.ClusterPoolInventoryValidCondition,
-						}),
-						testcp.WithInventory([]string{"test-cdc-2"}),
-						testcp.WithCondition(hivev1.ClusterPoolCondition{
-							Status: corev1.ConditionUnknown,
-							Type:   hivev1.ClusterPoolInventoryValidCondition,
-						}),
-					),
+				initializedPoolBuilder.Build(
+					testcp.Generic(testgeneric.WithName("test-cp-2")),
+					testcp.WithInventory([]string{"test-cdc-2"}),
+				),
 				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(),
 				testcdc.FullBuilder(testNamespace, "test-cdc-2", scheme).Build(),
 			},
@@ -1034,7 +1013,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedDeletedClusters: []string{"c2", "c3", "c6"},
 		},
 		{
-			name: "clusters deleted when clusterpool deleted",
+			name: "deleted pool: clusters deleted, pool held while clusters pending deletion",
 			existing: []runtime.Object{
 				initializedPoolBuilder.GenericOptions(testgeneric.Deleted()).Build(testcp.WithSize(3)),
 				unclaimedCDBuilder("c1").Build(),
@@ -1042,8 +1021,98 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c3").Build(testcd.Installed()),
 			},
 			expectedTotalClusters:   0,
+			expectedCDCurrentStatus: corev1.ConditionUnknown,
+			expectedDeletionPossibleCondition: &hivev1.ClusterPoolCondition{
+				Status: corev1.ConditionFalse,
+				Reason: "ClusterDeploymentsPendingCleanup",
+				// This message gets set while we're issuing Delete()s
+				Message: "The following ClusterDeployments are pending cleanup: c1, c2, c3",
+			},
+		},
+		{
+			name: "deleted pool: cluster deletions adhere to MaxConcurrent",
+			existing: []runtime.Object{
+				initializedPoolBuilder.GenericOptions(testgeneric.Deleted()).Build(testcp.WithSize(4), testcp.WithMaxConcurrent(3)),
+				unclaimedCDBuilder("c0").Build(testcd.Installed()),
+				unclaimedCDBuilder("c1").Build(testcd.Installed()),
+				// Already deleting -- will count against MaxConcurrent
+				cdBuilder("c2").GenericOptions(
+					testgeneric.Deleted()).Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+				),
+				// This one is "Installing" so it will count against MaxConcurrent
+				unclaimedCDBuilder("c3").Build(),
+			},
+			// This is the "Installing" one and one of the "Installed" ones -- the other "Installed" one gets
+			// deleted to make up MaxConcurrent=3.
+			// TODO: Due to https://github.com/kubernetes-sigs/controller-runtime/issues/2184 c2, which starts with a
+			// DeletionTimestamp, isn't getting garbage collected by the fake client. This is the expected result once
+			// the issue is fixed:
+			// expectedTotalClusters: 2,
+			expectedTotalClusters:   3,
+			expectedCDCurrentStatus: corev1.ConditionUnknown,
+			expectedDeletionPossibleCondition: &hivev1.ClusterPoolCondition{
+				Status:  corev1.ConditionFalse,
+				Reason:  "ClusterDeploymentsPendingCleanup",
+				Message: "The following ClusterDeployments are pending cleanup: c0, c1, c2, c3",
+			},
+		},
+		{
+			name: "deleted pool: claimed clusters not deleted",
+			existing: []runtime.Object{
+				initializedPoolBuilder.GenericOptions(testgeneric.Deleted()).Build(testcp.WithSize(3)),
+				cdBuilder("c1").Build(
+					testcd.Installed(),
+					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test"),
+				),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+			},
+			expectedTotalClusters:   1,
+			expectedAssignedCDs:     1,
+			expectedCDCurrentStatus: corev1.ConditionUnknown,
+			expectedDeletionPossibleCondition: &hivev1.ClusterPoolCondition{
+				Status:  corev1.ConditionFalse,
+				Reason:  "ClusterDeploymentsPendingCleanup",
+				Message: "The following ClusterDeployments are pending cleanup: c1, c2, c3",
+			},
+		},
+		{
+			name: "deleted pool: claimed clusters deleted if marked for deletion",
+			existing: []runtime.Object{
+				initializedPoolBuilder.GenericOptions(testgeneric.Deleted()).Build(testcp.WithSize(3)),
+				cdBuilder("c1").
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
+					Build(
+						testcd.Installed(),
+						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test"),
+					),
+				unclaimedCDBuilder("c2").Build(testcd.Installed()),
+				unclaimedCDBuilder("c3").Build(testcd.Installed()),
+			},
+			expectedCDCurrentStatus: corev1.ConditionUnknown,
+			expectedDeletionPossibleCondition: &hivev1.ClusterPoolCondition{
+				Status:  corev1.ConditionFalse,
+				Reason:  "ClusterDeploymentsPendingCleanup",
+				Message: "The following ClusterDeployments are pending cleanup: c1, c2, c3",
+			},
+		},
+		{
+			name: "deleted pool: DeletionPossible condition True when no clusters pending deletion",
+			existing: []runtime.Object{
+				initializedPoolBuilder.GenericOptions(
+					testgeneric.Deleted(),
+					testgeneric.WithFinalizer("something-to-hold-the-pool"),
+				).Build(),
+			},
+			expectedTotalClusters:   0,
 			expectFinalizerRemoved:  true,
 			expectedCDCurrentStatus: corev1.ConditionUnknown,
+			expectedDeletionPossibleCondition: &hivev1.ClusterPoolCondition{
+				Status:  corev1.ConditionTrue,
+				Reason:  "DeletionPossible",
+				Message: "No ClusterDeployments pending cleanup",
+			},
 		},
 		{
 			name: "finalizer added to clusterpool",
@@ -1108,9 +1177,15 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Running()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
-				cdBuilder("c4").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
-				cdBuilder("c5").GenericOptions(testgeneric.Deleted()).Build(testcd.Running()),
-				cdBuilder("c6").GenericOptions(testgeneric.Deleted()).Build(),
+				cdBuilder("c4").GenericOptions(testgeneric.Deleted()).Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.Installed()),
+				cdBuilder("c5").GenericOptions(testgeneric.Deleted()).Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+					testcd.Running()),
+				cdBuilder("c6").GenericOptions(testgeneric.Deleted()).Build(
+					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
+				),
 			},
 			expectedTotalClusters: 6,
 			expectedObservedSize:  3,
@@ -1815,9 +1890,6 @@ func TestReconcileClusterPool(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if test.name != "copyover fields" {
-			continue
-		}
 		t.Run(test.name, func(t *testing.T) {
 			if !test.noClusterImageSet {
 				test.existing = append(
@@ -1878,27 +1950,27 @@ func TestReconcileClusterPool(t *testing.T) {
 			pool := &hivev1.ClusterPool{}
 			err := fakeClient.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: testLeasePoolName}, pool)
 
+			assert.NoError(t, err, "unexpected error getting clusterpool")
 			if test.expectFinalizerRemoved {
-				assert.True(t, apierrors.IsNotFound(err), "expected pool to be deleted")
+				assert.NotContains(t, pool.Finalizers, finalizer, "did not expect finalizer on clusterpool")
 			} else {
-				assert.NoError(t, err, "unexpected error getting clusterpool")
-				assert.Contains(t, pool.Finalizers, finalizer, "expect finalizer on clusterpool")
-				assert.Equal(t, test.expectedObservedSize, pool.Status.Size, "unexpected observed size")
-				assert.Equal(t, test.expectedObservedReady, pool.Status.Ready, "unexpected observed ready count")
-				currentPoolVersion := calculatePoolVersion(pool)
-				assert.Equal(
-					t, test.expectPoolVersionChanged, currentPoolVersion != expectedPoolVersion,
-					"expectPoolVersionChanged is %t\ninitial %q\nfinal   %q",
-					test.expectPoolVersionChanged, expectedPoolVersion, currentPoolVersion)
-				expectedCDCurrentStatus := test.expectedCDCurrentStatus
-				if expectedCDCurrentStatus == "" {
-					expectedCDCurrentStatus = corev1.ConditionTrue
-				}
-				cdCurrentCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolAllClustersCurrentCondition)
-				if assert.NotNil(t, cdCurrentCondition, "did not find ClusterDeploymentsCurrent condition") {
-					assert.Equal(t, expectedCDCurrentStatus, cdCurrentCondition.Status,
-						"unexpected ClusterDeploymentsCurrent condition")
-				}
+				assert.Contains(t, pool.Finalizers, finalizer, "expected finalizer on clusterpool")
+			}
+			assert.Equal(t, test.expectedObservedSize, pool.Status.Size, "unexpected observed size")
+			assert.Equal(t, test.expectedObservedReady, pool.Status.Ready, "unexpected observed ready count")
+			currentPoolVersion := calculatePoolVersion(pool)
+			assert.Equal(
+				t, test.expectPoolVersionChanged, currentPoolVersion != expectedPoolVersion,
+				"expectPoolVersionChanged is %t\ninitial %q\nfinal   %q",
+				test.expectPoolVersionChanged, expectedPoolVersion, currentPoolVersion)
+			expectedCDCurrentStatus := test.expectedCDCurrentStatus
+			if expectedCDCurrentStatus == "" {
+				expectedCDCurrentStatus = corev1.ConditionTrue
+			}
+			cdCurrentCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolAllClustersCurrentCondition)
+			if assert.NotNil(t, cdCurrentCondition, "did not find ClusterDeploymentsCurrent condition") {
+				assert.Equal(t, expectedCDCurrentStatus, cdCurrentCondition.Status,
+					"unexpected ClusterDeploymentsCurrent condition")
 			}
 
 			if test.expectedMissingDependenciesStatus != "" {
@@ -1924,7 +1996,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				inventoryValidCondition := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolInventoryValidCondition)
 				if assert.NotNil(t, inventoryValidCondition, "did not find InventoryValid condition") {
 					assert.Equal(t, test.expectedInventoryValidStatus, inventoryValidCondition.Status,
-						"unexpcted InventoryValid condition status %s", inventoryValidCondition.Message)
+						"unexpected InventoryValid condition status %s", inventoryValidCondition.Status)
 				}
 			}
 
@@ -1942,6 +2014,21 @@ func TestReconcileClusterPool(t *testing.T) {
 						} else {
 							assert.Fail(t, "expected inventory message to contain key %s: %s", key, inventoryValidCondition.Message)
 						}
+					}
+				}
+			}
+
+			if edpc := test.expectedDeletionPossibleCondition; edpc != nil {
+				adpc := controllerutils.FindCondition(pool.Status.Conditions, hivev1.ClusterPoolDeletionPossibleCondition)
+				if assert.NotNil(t, adpc, "did not find DeletionPossible condition") {
+					if edpc.Status != "" {
+						assert.Equal(t, edpc.Status, adpc.Status, "unexpected DeletionPossible condition status")
+					}
+					if edpc.Reason != "" {
+						assert.Equal(t, edpc.Reason, adpc.Reason, "unexpected DeletionPossible condition reason")
+					}
+					if edpc.Message != "" {
+						assert.Equal(t, edpc.Message, adpc.Message, "unexpected DeletionPossible condition message")
 					}
 				}
 			}

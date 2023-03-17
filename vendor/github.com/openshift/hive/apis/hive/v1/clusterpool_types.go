@@ -218,8 +218,11 @@ const (
 	// ClusterPoolAllClustersCurrentCondition indicates whether all unassigned (installing or ready)
 	// ClusterDeployments in the pool match the current configuration of the ClusterPool.
 	ClusterPoolAllClustersCurrentCondition ClusterPoolConditionType = "AllClustersCurrent"
-	// ClusterPoolInventoryValidCondition is set to provide information on whether the cluster pool inventory is valid
+	// ClusterPoolInventoryValidCondition is set to provide information on whether the cluster pool inventory is valid.
 	ClusterPoolInventoryValidCondition ClusterPoolConditionType = "InventoryValid"
+	// ClusterPoolDeletionPossibleCondition gives information about a deleted ClusterPool which is pending cleanup.
+	// Note that it is normal for this condition to remain Initialized/Unknown until the ClusterPool is deleted.
+	ClusterPoolDeletionPossibleCondition ClusterPoolConditionType = "DeletionPossible"
 )
 
 const (

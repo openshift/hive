@@ -115,7 +115,7 @@ def get_params():
                                 commits leading up to the requested commit; and $sha is the first seven
                                 digits of the SHA of the requested commit.
                                 No image will be built. No package file will be generated. The CSV will not
-                                have any graph directives (`replaces`, `skipRange`, etc.)."""
+                                have any graph directives (`replaces`, `skipRange`, etc.).""",
     )
     mutex_group.add_argument(
         "--image-only",
@@ -126,7 +126,7 @@ def get_params():
                                 The $version will be computed as '0.0.$count-$sha', where
                                 $count is the number of commits leading up to the requested commit; and
                                 $sha is the first seven digits of the commit SHA corresponding to the requested commit.
-                                No bundle or OperatorHub PRs will be generated."""
+                                No bundle or OperatorHub PRs will be generated.""",
     )
     args = parser.parse_args()
 
@@ -519,8 +519,7 @@ if __name__ == "__main__":
             print(
                 """Error: branch arg {} is not a valid tip of mce-* branch or master branch\n
                 Consider using the `--commit {}` argument if this commit is an ancestor of a valid
-                mce-* or master branch"""
-                .format(
+                mce-* or master branch""".format(
                     args.dummy_bundle or args.image_only, branch_sha
                 )
             )
@@ -587,7 +586,9 @@ if __name__ == "__main__":
         copy_bundle(orig_wd, version_dir, image_tag)
     else:
         generate_package(
-            os.path.join(bundle_dir.name, "hive.package.yaml"), CHANNEL_DEFAULT, hive_version
+            os.path.join(bundle_dir.name, "hive.package.yaml"),
+            CHANNEL_DEFAULT,
+            hive_version,
         )
         # redhat-openshift-ecosystem/community-operators-prod
         open_pr(

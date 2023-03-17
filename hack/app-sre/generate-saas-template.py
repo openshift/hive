@@ -4,7 +4,7 @@ import os
 import sys
 import yaml
 
-usage="""
+usage = """
 Usage: %s saas_template_stub saas_object_file out_file
 
 Collate `saas_object_file` into the objects list in `saas_template_stub` and
@@ -19,7 +19,7 @@ Parameters:
         will be overwritten.
 """
 
-if len(sys.argv) != 4 or any('-h' in x for x in sys.argv[1:]):
+if len(sys.argv) != 4 or any("-h" in x for x in sys.argv[1:]):
     print(usage % sys.argv[0])
     sys.exit(-1)
 
@@ -35,17 +35,17 @@ if os.path.exists(out_file) and not os.path.isfile(out_file):
     print("%s: Not a file" % out_file)
     sys.exit(1)
 
-with open(saas_object_file, 'r') as objf:
+with open(saas_object_file, "r") as objf:
     objects = list(yaml.load_all(objf, Loader=yaml.SafeLoader))
     print("Loaded %d objects from %s" % (len(objects), saas_object_file))
 
-with open(saas_template_stub, 'r') as stubf:
+with open(saas_template_stub, "r") as stubf:
     template = yaml.load(stubf, Loader=yaml.SafeLoader)
 
-template['objects'] = objects
+template["objects"] = objects
 
 msg = "Overwriting existing" if os.path.exists(out_file) else "Writing"
 print(msg + " output file %s" % out_file)
 
-with open(out_file, 'w') as outf:
+with open(out_file, "w") as outf:
     yaml.dump(template, outf, default_flow_style=False)

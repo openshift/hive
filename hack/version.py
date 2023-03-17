@@ -46,6 +46,7 @@ def parse_branch_name(branch_name):
         return True, m.group(1), HIVE_VERSION_PREFIX
     return False, "", ""
 
+
 def origin_branch_info(hive_repo):
     """Find remote references in origin/ repository
 
@@ -90,6 +91,7 @@ def find_branch(hive_repo, branch_arg):
         sys.exit(1)
     return commit
 
+
 def process_master_branch(hive_repo, branch_arg):
 
     # This will raise an exception if there's no such commit-ish
@@ -100,11 +102,11 @@ def process_master_branch(hive_repo, branch_arg):
     if not hive_repo.is_ancestor(commit, master_commit):
         log(
             "Commit {} is not equal to or an ancestor of the master branch".format(
-            commit.hexsha)
+                commit.hexsha
+            )
         )
         sys.exit(1)
     return commit.hexsha, HIVE_VERSION_PREFIX
-
 
 
 def process_current_branch(hive_repo):

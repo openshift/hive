@@ -4086,6 +4086,10 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 					Type:   hivev1.DNSNotReadyCondition,
 					Status: corev1.ConditionUnknown,
 				}),
+				testclusterdeployment.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionUnknown,
+				}),
 			),
 			expectedUpdated: true,
 			expectedResult:  reconcile.Result{Requeue: true, RequeueAfter: defaultDNSNotReadyTimeout},
@@ -4127,6 +4131,10 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 					LastProbeTime:      metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
 					LastTransitionTime: metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
 				}),
+				testclusterdeployment.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionUnknown,
+				}),
 			),
 			expectedUpdated: true,
 			expectedResult:  reconcile.Result{Requeue: true},
@@ -4147,6 +4155,10 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 					Type:   hivev1.DNSNotReadyCondition,
 					Status: corev1.ConditionTrue,
 					Reason: dnsNotReadyTimedoutReason,
+				}),
+				testclusterdeployment.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.ProvisionStoppedCondition,
+					Status: corev1.ConditionUnknown,
 				}),
 			),
 			expectedDNSNotReadyCondition: &hivev1.ClusterDeploymentCondition{

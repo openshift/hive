@@ -52,7 +52,7 @@ var (
 	metricProvisionFailedTerminal hivemetrics.CounterVecWithDynamicLabels
 )
 
-func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment, log log.FieldLogger) {
+func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment) {
 	poolNSName := ""
 	if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
 		poolNSName = poolRef.Namespace + "/" + poolRef.PoolName

@@ -1603,6 +1603,8 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	authenticationFailureCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.AuthenticationFailureCondition)
 	apiOptInRequiredCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.APIOptInRequiredCondition)
 	dnsErrorCondition := controllerutils.FindCondition(dnsZone.Status.Conditions, hivev1.GenericDNSErrorsCondition)
+	// Cache ProvisionStoppedCondition status, so later we can decide if ProvisionFailedTerminal metric needs to be observed.
+	provisionStoppedConditionStatus := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition).Status
 	var (
 		status                 corev1.ConditionStatus
 		reason, message        string
@@ -1675,6 +1677,12 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update DNSNotReadyCondition")
 			return false, reconcile.Result{}, err
 		}
+	}
+
+	// Observe ProvisionFailedTerminal metric if we have set ProvisionStopped.
+	if controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition).Status == corev1.ConditionTrue &&
+		provisionStoppedConditionStatus != corev1.ConditionTrue {
+		incProvisionFailedTerminal(cd)
 	}
 
 	// Only attempt to record the delay metric if the DNSZone is ready

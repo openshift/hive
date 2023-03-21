@@ -988,8 +988,9 @@ objects:
                             of all resources in the resource group. Destroying the
                             cluster using installer will delete this resource group.
                             This resource group must be empty with no other resources
-                            when trying to use it for creating a cluster. If empty,
-                            a new resource group will created for the cluster.
+                            when trying to use it for creating a cluster. If this
+                            field is empty/omitted, a new resource group will created
+                            for the cluster.
                           type: string
                       required:
                       - credentialsSecretRef
@@ -1771,12 +1772,12 @@ objects:
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceGroupName:
-                          description: ResourceGroupName is the name of an already
-                            existing resource group where the cluster was installed.
-                            This resource group should only be used for this specific
-                            cluster and the cluster components will assume ownership
-                            of all resources in the resource group. Destroying the
-                            cluster using installer will delete this resource group.
+                          description: ResourceGroupName is the name of the resource
+                            group where the cluster was installed. Required if the
+                            cluster was created using a pre-existing resource group
+                            rather than having allowed the installer to create one.
+                            This resource group will be deleted when the cluster is
+                            destroyed.
                           type: string
                       type: object
                     gcp:
@@ -2420,8 +2421,9 @@ objects:
                             of all resources in the resource group. Destroying the
                             cluster using installer will delete this resource group.
                             This resource group must be empty with no other resources
-                            when trying to use it for creating a cluster. If empty,
-                            a new resource group will created for the cluster.
+                            when trying to use it for creating a cluster. If this
+                            field is empty/omitted, a new resource group will created
+                            for the cluster.
                           type: string
                       required:
                       - credentialsSecretRef

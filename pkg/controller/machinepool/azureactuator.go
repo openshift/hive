@@ -111,9 +111,9 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		// to determine if we should allow resultant machinesets to consume a "gen2" image.
 		gen2ImageExists, err := a.gen2ImageExists(cd.Spec.ClusterMetadata.InfraID, ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
 		if err != nil {
-			return nil, false, errors.Wrap(err, `error listing images in resource group, set resourceGroupName
-				                                 within ClusterDeployment platform (cd.Spec.Platform.Azure.ResourceGroupName)
-				                                 if custom resource group specified in install config`)
+			return nil, false, errors.Wrap(err, "error listing images in resource group, set resourceGroupName "+
+				"within ClusterDeployment platform (cd.Spec.Platform.Azure.ResourceGroupName) "+
+				"if custom resource group specified in install config")
 		}
 		if !gen2ImageExists {
 			// Modify capabilities to ensure that a V1 image is chosen by installazure.MachineSets()

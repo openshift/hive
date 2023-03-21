@@ -89,10 +89,10 @@ type AzureClusterDeprovision struct {
 	// If empty, the value is equal to "AzurePublicCloud".
 	// +optional
 	CloudName *azure.CloudEnvironment `json:"cloudName,omitempty"`
-	// ResourceGroupName is the name of an already existing resource group where the cluster was installed.
-	// This resource group should only be used for this specific cluster and the cluster components will assume
-	// ownership of all resources in the resource group. Destroying the cluster using installer will delete this
-	// resource group.
+	// ResourceGroupName is the name of the resource group where the cluster was installed.
+	// Required if the cluster was created using a pre-existing resource group rather than having
+	// allowed the installer to create one.
+	// This resource group will be deleted when the cluster is destroyed.
 	// +optional
 	ResourceGroupName string `json:"resourceGroupName,omitempty"`
 }

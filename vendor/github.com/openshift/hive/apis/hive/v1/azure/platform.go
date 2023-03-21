@@ -30,7 +30,7 @@ type Platform struct {
 	// ownership of all resources in the resource group. Destroying the cluster using installer will delete this
 	// resource group.
 	// This resource group must be empty with no other resources when trying to use it for creating a cluster.
-	// If empty, a new resource group will created for the cluster.
+	// If this field is empty/omitted, a new resource group will created for the cluster.
 	//
 	// +optional
 	ResourceGroupName string `json:"resourceGroupName,omitempty"`

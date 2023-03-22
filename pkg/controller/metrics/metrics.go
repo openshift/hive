@@ -284,7 +284,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 						cd.Name,
 						cd.Namespace,
 						clusterType).Set(
-						time.Since(cd.CreationTimestamp.Time).Seconds())
+						time.Since(cd.DeletionTimestamp.Time).Seconds())
 				}
 
 				if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -64,7 +63,9 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []s
 
 	client, err := utils.GetClient()
 	if err != nil {
-		return errors.Wrap(err, "failed to get client")
+		o.Logger.Warnf("Failed to get client: %v\n"+
+			"This is expected when in standalone mode. "+
+			"We expect to find your AWS credentials in one of the usual places.", err)
 	}
 	awsutils.ConfigureCreds(client)
 

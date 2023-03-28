@@ -598,7 +598,11 @@ func (r *ReconcileClusterProvision) getWorkers(cd hivev1.ClusterDeployment) stri
 		r.logger.WithError(err).Error("could not unmarshal InstallConfig")
 		return "unknown"
 	}
-	return strconv.FormatInt(*ic.WorkerMachinePool().Replicas, 10)
+	mp := ic.WorkerMachinePool()
+	if mp == nil || mp.Replicas == nil {
+		return "0"
+	}
+	return strconv.FormatInt(*mp.Replicas, 10)
 }
 
 func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(

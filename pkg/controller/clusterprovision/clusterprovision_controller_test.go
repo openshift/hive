@@ -6,22 +6,6 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/hive/apis"
@@ -29,9 +13,23 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
+	tcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	tcp "github.com/openshift/hive/pkg/test/clusterprovision"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testjob "github.com/openshift/hive/pkg/test/job"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -479,4 +477,96 @@ func assertConditionReason(t *testing.T, cd *hivev1.ClusterProvision, condType h
 		}
 	}
 	t.Errorf("did not find expected condition type: %v", condType)
+}
+
+func Test_getWorkers(t *testing.T) {
+	testScheme := scheme.Scheme
+	apis.AddToScheme(testScheme)
+	icSecretName := "ic-secret"
+	tests := []struct {
+		name          string
+		installConfig string
+		want          string
+	}{
+		// TODO: Test the path where Get()ting the Secret fails
+		{
+			name:          "unmarshal failure",
+			installConfig: "something that doesn't unmarshal",
+			want:          "unknown",
+		},
+		{
+			name: "green path",
+			installConfig: `
+controlPlane:
+  name: master
+  replicas: 5
+compute:
+  - name: worker
+    replicas: 3
+`,
+			want: "3",
+		},
+		{
+			name: "no compute section",
+			installConfig: `
+controlPlane:
+  name: master
+  replicas: 5
+`,
+			want: "0",
+		},
+		{
+			name: "no compute section named 'worker'",
+			installConfig: `
+controlPlane:
+  name: master
+  replicas: 5
+compute:
+  - name: notworker
+    replicas: 3
+`,
+			want: "0",
+		},
+		{
+			name: "no replicas specified",
+			installConfig: `
+controlPlane:
+  name: master
+  replicas: 5
+compute:
+  - name: worker
+`,
+			want: "0",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger := log.WithField("controller", "clusterProvision")
+			icSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      icSecretName,
+					Namespace: testNamespace,
+				},
+				Data: map[string][]byte{
+					"install-config.yaml": []byte(test.installConfig),
+				},
+			}
+			// A simple ClusterDeployment that's only used for its namespace and install-config reference
+			cd := tcd.FullBuilder(testNamespace, testDeploymentName, testScheme).Build()
+			cd.Spec.Provisioning = &hivev1.Provisioning{
+				InstallConfigSecretRef: &corev1.LocalObjectReference{
+					Name: icSecretName,
+				},
+			}
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(icSecret).Build()
+			rcp := &ReconcileClusterProvision{
+				Client: fakeClient,
+				logger: logger,
+			}
+
+			if got := rcp.getWorkers(*cd); got != test.want {
+				t.Errorf("ReconcileClusterProvision.getWorkers() = %v, want %v", got, test.want)
+			}
+		})
+	}
 }

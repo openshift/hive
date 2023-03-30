@@ -6,9 +6,14 @@ type MachinePoolPlatform struct {
 	// Zones is list of availability zones that can be used.
 	Zones []string `json:"zones,omitempty"`
 
-	// Subnets is the list of subnets to which to attach the machines.
-	// There must be exactly one private subnet for each availability zone used.
-	// If public subnets are specified, there must be exactly one private and one public subnet specified for each availability zone.
+	// Subnets is the list of IDs of subnets to which to attach the machines.
+	// There must be exactly one subnet for each availability zone used.
+	// These subnets may be public or private.
+	// As a special case, for consistency with install-config, you may specify exactly one
+	// private and one public subnet for each availability zone. In this case, the public
+	// subnets will be filtered out and only the private subnets will be used.
+	// If empty/omitted, we will look for subnets in each availability zone tagged with
+	// Name=<clusterID>-private-<az>.
 	Subnets []string `json:"subnets,omitempty"`
 
 	// InstanceType defines the ec2 instance type.

@@ -42,8 +42,8 @@ type AWSActuator struct {
 var (
 	_ Actuator = &AWSActuator{}
 
-	// reg is a regex used to fetch condition message from error when subnets specified in the MachinePool are invalid
-	reg = regexp.MustCompile(`^InvalidSubnetID\.NotFound:\s+([^\t]+)\t`)
+	// noSuchSubnetRegex is a regex used to fetch condition message from error when subnets specified in the MachinePool are invalid
+	noSuchSubnetRegex = regexp.MustCompile(`^InvalidSubnetID\.NotFound:\s+([^\t]+)\t`)
 
 	versionsSupportingSpotInstances = semver.MustParseRange(">=4.5.0")
 )
@@ -166,14 +166,11 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		computePool.Platform.AWS.Zones = zones
 	}
 
-	subnets := map[string]string{}
-	// Fetching private subnets from the machinepool and then mapping availability zones to subnets
-	if len(pool.Spec.Platform.AWS.Subnets) > 0 {
-		subnetsByAvailabilityZone, err := a.getPrivateSubnetsByAvailabilityZone(pool)
-		if err != nil {
-			return nil, false, errors.Wrap(err, "describing subnets")
-		}
-		subnets = subnetsByAvailabilityZone
+	// A map, keyed by availability zone, of subnets. By the time we pass this to MachineSets(), it
+	// must either be empty or contain exactly one entry per AZ.
+	subnets, err := a.getSubnetsByAvailabilityZone(pool)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "processing subnets")
 	}
 	// userTags are settings available in the installconfig that we are choosing
 	// to ignore for the timebeing. These empty settings should be updated to feed
@@ -352,8 +349,42 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 	}
 }
 
-// getPrivateSubnetsByAvailabilityZones maps availability zones to private subnet
-func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (map[string]string, error) {
+// getSubnetsByAvailabilityZone maps availability zones to subnets. If the number of subnets in the pool
+// spec matches the number of AZs, we will not check whether they are public or private. However, if there
+// are two subnets per AZ, we will filter out the public ones, leaving only the private ones. If the pool
+// specifies no subnets, an empty map is returned (this is a valid configuration, not an error).
+func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (map[string]string, error) {
+	// Preflight
+	numZones := len(pool.Spec.Platform.AWS.Zones)
+	numSubnets := len(pool.Spec.Platform.AWS.Subnets)
+	switch numSubnets {
+	case 0:
+		// Zero subnets is legal.
+		return map[string]string{}, nil
+	case numZones, 2 * numZones:
+		// One per zone, or one public and one private per zone, is legal, and will be validated later.
+		break
+	default:
+		// Any other number is bad.
+		msg := fmt.Sprintf("Unexpected number of subnets (%d) versus availability zones (%d). "+
+			"We expect zero, one per AZ, or one public and one private per AZ.", numSubnets, numZones)
+		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+			pool.Status.Conditions,
+			hivev1.InvalidSubnetsMachinePoolCondition,
+			corev1.ConditionTrue,
+			"WrongNumberOfSubnets",
+			msg,
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		if changed {
+			pool.Status.Conditions = conds
+			if err := a.client.Status().Update(context.Background(), pool); err != nil {
+				return nil, err
+			}
+		}
+		return nil, errors.New(msg)
+	}
+
 	idPointers := make([]*string, len(pool.Spec.Platform.AWS.Subnets))
 	for i, id := range pool.Spec.Platform.AWS.Subnets {
 		idPointers[i] = aws.String(id)
@@ -363,7 +394,7 @@ func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePo
 	if err != nil || len(results.Subnets) == 0 {
 		if strings.Contains(err.Error(), "InvalidSubnet") {
 			conditionMessage := err.Error()
-			if submatches := reg.FindStringSubmatch(err.Error()); submatches != nil {
+			if submatches := noSuchSubnetRegex.FindStringSubmatch(err.Error()); submatches != nil {
 				// formatting error message before adding it to condition when
 				// sample error message: InvalidSubnetID.NotFound: The subnet ID 'subnet-1,subnet-2' does not exist\tstatus code: 400, request id: ea8b3bb7-de56-405f-9345-e5690a3ea8b2
 				// message after formatting: The subnet ID 'subnet-1,subnet-2' does not exist
@@ -387,9 +418,23 @@ func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePo
 		return nil, err
 	}
 
-	vpc := *results.Subnets[0].VpcId
+	var subnets []*ec2.Subnet
+	if numSubnets == numZones {
+		subnets = results.Subnets
+	} else {
+		subnets, err = a.filterPublicSubnets(results.Subnets, pool)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return a.validateSubnets(subnets, pool)
+}
+
+func (a *AWSActuator) filterPublicSubnets(subnets []*ec2.Subnet, pool *hivev1.MachinePool) ([]*ec2.Subnet, error) {
+
+	vpc := *subnets[0].VpcId
 	if vpc == "" {
-		return nil, errors.Errorf("%s has no VPC", *results.Subnets[0].SubnetId)
+		return nil, errors.Errorf("%s has no VPC", *subnets[0].SubnetId)
 	}
 
 	routeTables, err := a.awsClient.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
@@ -402,50 +447,28 @@ func (a *AWSActuator) getPrivateSubnetsByAvailabilityZone(pool *hivev1.MachinePo
 		return nil, errors.Wrap(err, "error describing route tables")
 	}
 
-	var privateSubnets, publicSubnets = map[string]ec2.Subnet{}, map[string]ec2.Subnet{}
-	for _, subnet := range results.Subnets {
+	var privateSubnets, publicSubnets = []*ec2.Subnet{}, []*ec2.Subnet{}
+	for _, subnet := range subnets {
 		isPublic, err := isSubnetPublic(routeTables.RouteTables, subnet, a.logger)
 		if err != nil {
 			return nil, errors.Wrap(err, "error describing route tables")
 		}
 		if isPublic {
-			publicSubnets[*subnet.SubnetId] = *subnet
+			publicSubnets = append(publicSubnets, subnet)
 		} else {
-			privateSubnets[*subnet.SubnetId] = *subnet
+			privateSubnets = append(privateSubnets, subnet)
 		}
 	}
 
 	if len(publicSubnets) > 0 {
+		// This enforces that we got one public subnet per AZ, even though we're not going to use them.
 		_, err := a.validateSubnets(publicSubnets, pool)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	subnetsByAvailabilityZone, err := a.validateSubnets(privateSubnets, pool)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(publicSubnets) > 0 && len(publicSubnets) < len(privateSubnets) {
-		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
-			pool.Status.Conditions,
-			hivev1.InvalidSubnetsMachinePoolCondition,
-			corev1.ConditionTrue,
-			"InsufficientPublicSubnets",
-			"Public subnet does not exist for each zone with a private subnet",
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		)
-		if changed {
-			pool.Status.Conditions = conds
-			if err := a.client.Status().Update(context.Background(), pool); err != nil {
-				return nil, err
-			}
-			return nil, errors.Errorf("insufficient public subnets for availability zones and private subnets")
-		}
-	}
-
-	return subnetsByAvailabilityZone, nil
+	return privateSubnets, nil
 }
 
 func isUsingUnsupportedSpotMarketOptions(pool *hivev1.MachinePool, clusterVersion string, logger log.FieldLogger) bool {
@@ -535,9 +558,9 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 	return "", false
 }
 
-// validateSubnets ensures there's only one public or private subnet per availability zone, and returns
+// validateSubnets ensures there's exactly one subnet per availability zone, and returns
 // the mapping of subnets by availability zone
-func (a *AWSActuator) validateSubnets(subnets map[string]ec2.Subnet, pool *hivev1.MachinePool) (map[string]string, error) {
+func (a *AWSActuator) validateSubnets(subnets []*ec2.Subnet, pool *hivev1.MachinePool) (map[string]string, error) {
 	conflictingSubnets := sets.NewString()
 	subnetsByAvailabilityZone := make(map[string]string, len(subnets))
 	for _, subnet := range subnets {
@@ -549,25 +572,37 @@ func (a *AWSActuator) validateSubnets(subnets map[string]ec2.Subnet, pool *hivev
 		subnetsByAvailabilityZone[*subnet.AvailabilityZone] = *subnet.SubnetId
 	}
 
-	if len(conflictingSubnets) > 0 {
-		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
-			pool.Status.Conditions,
-			hivev1.InvalidSubnetsMachinePoolCondition,
-			corev1.ConditionTrue,
-			"MoreThanOneSubnetForZone",
-			fmt.Sprintf("more than one subnet found for some availability zones, conflicting subnets: %s", strings.Join(conflictingSubnets.List(), ", ")),
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
-		)
-		if changed {
-			pool.Status.Conditions = conds
-			if err := a.client.Status().Update(context.Background(), pool); err != nil {
-				return nil, err
-			}
-		}
-
-		return nil, errors.Errorf("more than one subnet found for some availability zones, conflicting subnets: %s", strings.Join(conflictingSubnets.List(), ", "))
+	var msg, reason string
+	switch {
+	case len(conflictingSubnets) > 0:
+		msg = fmt.Sprintf("more than one subnet found for some availability zones, conflicting subnets: %s",
+			strings.Join(conflictingSubnets.List(), ", "))
+		reason = "MoreThanOneSubnetForZone"
+	case len(subnetsByAvailabilityZone) < len(pool.Spec.Platform.AWS.Zones):
+		msg = fmt.Sprintf("not enough subnets (%d) found for the number of availability zones (%d)",
+			len(subnetsByAvailabilityZone), len(pool.Spec.Platform.AWS.Zones))
+		reason = "NotEnoughSubnetsForZones"
+	default:
+		// All good, we're done
+		return subnetsByAvailabilityZone, nil
 	}
-	return subnetsByAvailabilityZone, nil
+
+	// If we get here, we've detected an error.
+	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.InvalidSubnetsMachinePoolCondition,
+		corev1.ConditionTrue,
+		reason,
+		msg,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		if err := a.client.Status().Update(context.Background(), pool); err != nil {
+			return nil, err
+		}
+	}
+	return nil, errors.New(msg)
 }
 
 // GetVPCIDForMachinePool retrieves the VPC ID of the first subnet configured in pool.Spec.Platform.AWS.Subnets

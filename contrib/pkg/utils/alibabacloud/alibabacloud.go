@@ -56,4 +56,5 @@ func ConfigureCreds(c client.Client) {
 	if secret := string(credsSecret.Data[constants.AlibabaCloudAccessKeySecretSecretKey]); secret != "" {
 		os.Setenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", secret)
 	}
+	utils.InstallClusterwideProxyCerts(c)
 }

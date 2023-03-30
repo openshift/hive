@@ -957,6 +957,8 @@ rules:
   resources:
   - roles
   - rolebindings
+  - clusterroles
+  - clusterrolebindings
   verbs:
   - get
   - list
@@ -983,6 +985,14 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - proxies
+  verbs:
+  - get
+  - list
+  - watch
 `)
 
 func configControllersHive_controllers_roleYamlBytes() ([]byte, error) {

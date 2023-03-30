@@ -27,4 +27,5 @@ func ConfigureCreds(c client.Client) {
 		utils.ProjectToDir(certsSecret, constants.VSphereCertificatesDir)
 		utils.InstallCerts(constants.VSphereCertificatesDir)
 	}
+	utils.InstallClusterwideProxyCerts(c)
 }

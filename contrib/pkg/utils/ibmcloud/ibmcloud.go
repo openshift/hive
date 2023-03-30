@@ -16,4 +16,5 @@ func ConfigureCreds(c client.Client) {
 			os.Setenv(constants.IBMCloudAPIKeyEnvVar, key)
 		}
 	}
+	utils.InstallClusterwideProxyCerts(c)
 }

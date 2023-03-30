@@ -30,6 +30,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
+	"github.com/openshift/hive/pkg/controller/utils"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -339,6 +340,10 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 
 	// Uninstall job exists, check its status and if successful, set the deprovision request status to complete
 	if controllerutils.IsSuccessful(existingJob) {
+		if err := utils.DisableClusterUninstallServiceAccount(r.Client, uninstallJob.Namespace, rLog); err != nil {
+			return reconcile.Result{}, err
+		}
+
 		rLog.Infof("uninstall job successful, setting completed status")
 		conditions, _ := controllerutils.SetClusterDeprovisionConditionWithChangeCheck(
 			instance.Status.Conditions,

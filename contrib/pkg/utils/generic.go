@@ -11,9 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	configv1 "github.com/openshift/api/config/v1"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/util/slice"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -211,4 +213,30 @@ func InstallCerts(sourceDir string) {
 		logger.WithError(err).WithField("output", string(b)).Fatal("failed to update CA trust")
 	}
 	logger.WithField("output", string(b)).Info("updated CA trust")
+}
+
+// Finds the cluster proxy object, if any, and installs the cert it references.
+func InstallClusterwideProxyCerts(c client.Client) {
+	configv1.AddToScheme(scheme.Scheme)
+	// Get the clusterwide proxy object
+	caCM, err := utils.GetClusterwideProxyCACM(c)
+	if err != nil {
+		log.WithError(err).Fatal("Failed to retrieve clusterwide proxy trusted CA ConfigMap")
+	}
+	if caCM == nil {
+		log.Debug("No clusterwide proxy found")
+		return
+	}
+
+	// Put the cert in a temp directory
+	tmpdir, err := os.MkdirTemp("", "clusterwide-proxy-ca-bundle")
+	if err != nil {
+		log.WithError(err).Fatal("Failed to create temporary directory for cluster proxy trusted CA bundle")
+	}
+	// This is best effort; it's not really a problem if this can't be removed for some reason.
+	defer os.RemoveAll(tmpdir)
+	ProjectToDir(caCM, tmpdir, "ca-bundle.crt")
+
+	// Install it
+	InstallCerts(tmpdir)
 }

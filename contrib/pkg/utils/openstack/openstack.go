@@ -45,4 +45,5 @@ func ConfigureCreds(c client.Client) {
 		utils.ProjectToDir(certsSecret, constants.OpenStackCertificatesDir)
 		utils.InstallCerts(constants.OpenStackCertificatesDir)
 	}
+	utils.InstallClusterwideProxyCerts(c)
 }

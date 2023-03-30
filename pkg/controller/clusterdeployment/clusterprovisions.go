@@ -443,6 +443,10 @@ func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.Cluster
 func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
 	cdLog.Info("provision completed successfully")
 
+	if err := controllerutils.DisableClusterInstallServiceAccount(r.Client, cd.Namespace, cdLog); err != nil {
+		return reconcile.Result{}, err
+	}
+
 	statusChange := false
 	if cd.Status.InstalledTimestamp == nil {
 		statusChange = true

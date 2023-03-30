@@ -67,4 +67,6 @@ func ConfigureCreds(c client.Client) {
 	}
 	// Allow credential_process in the config file
 	os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
+
+	utils.InstallClusterwideProxyCerts(c)
 }

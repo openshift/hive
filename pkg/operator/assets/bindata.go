@@ -1713,12 +1713,6 @@ data:
       - "InvalidClientTokenId: The security token included in the request is invalid."
       installFailingReason: InvalidCredentials
       installFailingMessage: Credentials are invalid
-    # cf. GCPNoWorkerNodes
-    - name: AWSNoWorkerNodes
-      searchRegexStrings:
-      - "(?s)terraform-provider-aws.*Got 0 worker nodes, \\d+ master nodes"
-      installFailingReason: AWSNoWorkerNodes
-      installFailingMessage: No worker nodes could be created. Check the machine-api logs.
     - name: InvalidAWSTags
       searchRegexStrings:
       - "platform\\.aws\\.userTags.*: Invalid value:.*value contains invalid characters"
@@ -1832,12 +1826,6 @@ data:
       - "iam\\.googleapis\\.com/quota/service-account-count is not available in global because the required number of resources \\([0-9]*\\) is more than remaining quota"
       installFailingReason: GCPServiceAccountQuotaExceeded
       installFailingMessage: GCP Service Account quota exceeded
-    # cf. AWSNoWorkerNodes
-    - name: GCPNoWorkerNodes
-      searchRegexStrings:
-      - "(?s)terraform-provider-gcp.*Got 0 worker nodes, \\d+ master nodes"
-      installFailingReason: GCPNoWorkerNodes
-      installFailingMessage: No worker nodes could be created. Check the machine-api logs.
 
 
     # Bare Metal
@@ -1895,6 +1883,11 @@ data:
       - "failed to initialize the cluster: Cluster operator monitoring is still updating"
       installFailingReason: MonitoringOperatorStillUpdating
       installFailingMessage: Timeout waiting for the monitoring operator to become ready
+    - name: NoWorkerNodesReady
+      searchRegexStrings:
+      - "Got 0 worker nodes, \\d+ master nodes.*none are schedulable or ready for ingress pods"
+      installFailingReason: NoWorkerNodesReady
+      installFailingMessage: 0 worker nodes have joined the cluster
     - name: AuthenticationOperatorDegraded
       searchRegexStrings:
       - "Cluster operator authentication Degraded is True"

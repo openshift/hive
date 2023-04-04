@@ -616,6 +616,7 @@ func (cds *cdCollection) Delete(c client.Client, cdName string) error {
 	cds.deleting = append(cds.deleting, cd)
 	// Remove from any of the other lists it might be in
 	removeCDsFromSlice(&cds.assignable, cdName)
+	removeCDsFromSlice(&cds.standby, cdName)
 	removeCDsFromSlice(&cds.installing, cdName)
 	removeCDsFromSlice(&cds.broken, cdName)
 	removeCDsFromSlice(&cds.unknownPoolVersion, cdName)

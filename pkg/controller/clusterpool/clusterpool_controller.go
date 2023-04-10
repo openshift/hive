@@ -367,11 +367,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	origStatus := clp.Status.DeepCopy()
-	clp.Status.Size = int32(len(cds.Unassigned(true)))
-	clp.Status.Standby = int32(len(cds.Standby()))
-	clp.Status.Ready = int32(len(cds.Assignable()))
-	if !reflect.DeepEqual(origStatus, &clp.Status) {
+	if setStatusCounts(clp, cds) {
 		if err := r.Status().Update(context.Background(), clp); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool status")
 			return reconcile.Result{}, errors.Wrap(err, "could not update ClusterPool status")
@@ -1022,9 +1018,12 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 		availableConcurrent--
 	}
 
-	if err := r.setDeletionPossibleCondition(pool, cds); err != nil {
-		logger.WithError(err).Error("error setting DeletionPossible condition")
-		return err
+	changedCond := setDeletionPossibleCondition(pool, cds)
+	changedCounts := setStatusCounts(pool, cds)
+	if changedCond || changedCounts {
+		if err := r.Status().Update(context.Background(), pool); err != nil {
+			return errors.Wrap(err, "could not update ClusterPool status")
+		}
 	}
 
 	if cds.Total() != 0 {
@@ -1125,7 +1124,9 @@ func (r *ReconcileClusterPool) setAvailableCapacityCondition(pool *hivev1.Cluste
 	return nil
 }
 
-func (r *ReconcileClusterPool) setDeletionPossibleCondition(pool *hivev1.ClusterPool, cds *cdCollection) error {
+// setDeletionPossibleCondition updates the DeletionPossible condition on the pool and returns whether it
+// changed. The caller is responsible for pushing the update to the server.
+func setDeletionPossibleCondition(pool *hivev1.ClusterPool, cds *cdCollection) bool {
 	status := corev1.ConditionTrue
 	reason := "DeletionPossible"
 	message := "No ClusterDeployments pending cleanup"
@@ -1144,13 +1145,19 @@ func (r *ReconcileClusterPool) setDeletionPossibleCondition(pool *hivev1.Cluster
 		message,
 		updateConditionCheck,
 	)
-	if changed {
-		pool.Status.Conditions = conds
-		if err := r.Status().Update(context.Background(), pool); err != nil {
-			return errors.Wrap(err, "could not update ClusterPool conditions")
-		}
-	}
-	return nil
+	pool.Status.Conditions = conds
+	return changed
+}
+
+// setStatusCounts sets the Size, Standby, and Ready status fields in clp according to cds.
+// The caller is responsible for pushing the changes back to the server.
+// The return indicates whether anything changed.
+func setStatusCounts(clp *hivev1.ClusterPool, cds *cdCollection) bool {
+	origStatus := clp.Status.DeepCopy()
+	clp.Status.Size = int32(len(cds.Unassigned(true)))
+	clp.Status.Standby = int32(len(cds.Standby()))
+	clp.Status.Ready = int32(len(cds.Assignable()))
+	return !reflect.DeepEqual(origStatus, &clp.Status)
 }
 
 func (r *ReconcileClusterPool) verifyClusterImageSet(pool *hivev1.ClusterPool, logger log.FieldLogger) error {

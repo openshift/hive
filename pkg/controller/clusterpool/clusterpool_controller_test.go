@@ -1107,7 +1107,9 @@ func TestReconcileClusterPool(t *testing.T) {
 			// DeletionTimestamp, isn't getting garbage collected by the fake client. This is the expected result once
 			// the issue is fixed:
 			// expectedTotalClusters: 2,
-			expectedTotalClusters:   3,
+			expectedTotalClusters: 3,
+			// But this one is right
+			expectedObservedSize:    2,
 			expectedCDCurrentStatus: corev1.ConditionUnknown,
 			expectedDeletionPossibleCondition: &hivev1.ClusterPoolCondition{
 				Status:  corev1.ConditionFalse,

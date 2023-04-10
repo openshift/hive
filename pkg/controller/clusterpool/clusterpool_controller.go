@@ -7,6 +7,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strings"
 
 	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
@@ -57,6 +58,7 @@ var (
 		hivev1.ClusterPoolCapacityAvailableCondition,
 		hivev1.ClusterPoolAllClustersCurrentCondition,
 		hivev1.ClusterPoolInventoryValidCondition,
+		hivev1.ClusterPoolDeletionPossibleCondition,
 	}
 )
 
@@ -365,11 +367,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	origStatus := clp.Status.DeepCopy()
-	clp.Status.Size = int32(len(cds.Unassigned(true)))
-	clp.Status.Standby = int32(len(cds.Standby()))
-	clp.Status.Ready = int32(len(cds.Assignable()))
-	if !reflect.DeepEqual(origStatus, &clp.Status) {
+	if setStatusCounts(clp, cds) {
 		if err := r.Status().Update(context.Background(), clp); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update ClusterPool status")
 			return reconcile.Result{}, errors.Wrap(err, "could not update ClusterPool status")
@@ -982,17 +980,54 @@ func (r *ReconcileClusterPool) reconcileDeletedPool(pool *hivev1.ClusterPool, lo
 	if err != nil {
 		return err
 	}
+
+	// Adhere to MaxConcurrent when cleaning up.
+	availableConcurrent := math.MaxInt32
+	if pool.Spec.MaxConcurrent != nil {
+		availableConcurrent = int(*pool.Spec.MaxConcurrent) - len(cds.Installing()) - len(cds.Deleting())
+	}
+
+	// Clean up marked-for-deletion claimed clusters first. It really doesn't matter; the tie-breaker I'm using
+	// is that claimed clusters are more likely to be running than those still in the pool (I'm not going to
+	// bother checking runningCount) and are therefore more costly to keep running.
+	for _, cd := range cds.MarkedForDeletion() {
+		if availableConcurrent <= 0 {
+			break
+		}
+		if err := cds.Delete(r.Client, cd.Name); err != nil {
+			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete claimed ClusterDeployment")
+			return errors.Wrap(err, "could not delete claimed ClusterDeployment")
+		}
+		availableConcurrent--
+	}
 	for _, cd := range cds.Unassigned(true) {
 		if cd.DeletionTimestamp != nil {
 			continue
 		}
+		if availableConcurrent <= 0 {
+			break
+		}
 		if err := cds.Delete(r.Client, cd.Name); err != nil {
-			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete ClusterDeployment")
-			return errors.Wrap(err, "could not delete ClusterDeployment")
+			logger.WithError(err).WithField("cluster", cd.Name).Log(controllerutils.LogLevel(err), "could not delete unassigned ClusterDeployment")
+			return errors.Wrap(err, "could not delete unassigned ClusterDeployment")
+		}
+		availableConcurrent--
+	}
+
+	changedCond := setDeletionPossibleCondition(pool, cds)
+	changedCounts := setStatusCounts(pool, cds)
+	if changedCond || changedCounts {
+		if err := r.Status().Update(context.Background(), pool); err != nil {
+			return errors.Wrap(err, "could not update ClusterPool status")
 		}
 	}
 
-	// TODO: Wait to remove finalizer until all (unclaimed??) clusters are gone.
+	if cds.Total() != 0 {
+		logger.Infof("Keeping ClusterPool alive, waiting for %d ClusterDeployment(s) to be deleted.", cds.Total())
+		return nil
+	}
+
+	logger.Debug("All pool clusters deleted; removing finalizer")
 	controllerutils.DeleteFinalizer(pool, finalizer)
 	if err := r.Update(context.Background(), pool); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not remove finalizer from ClusterPool")
@@ -1083,6 +1118,42 @@ func (r *ReconcileClusterPool) setAvailableCapacityCondition(pool *hivev1.Cluste
 		}
 	}
 	return nil
+}
+
+// setDeletionPossibleCondition updates the DeletionPossible condition on the pool and returns whether it
+// changed. The caller is responsible for pushing the update to the server.
+func setDeletionPossibleCondition(pool *hivev1.ClusterPool, cds *cdCollection) bool {
+	status := corev1.ConditionTrue
+	reason := "DeletionPossible"
+	message := "No ClusterDeployments pending cleanup"
+	updateConditionCheck := controllerutils.UpdateConditionNever
+	if cds.Total() > 0 {
+		status = corev1.ConditionFalse
+		reason = "ClusterDeploymentsPendingCleanup"
+		message = fmt.Sprintf("The following ClusterDeployments are pending cleanup: %s", strings.Join(cds.Names(), ", "))
+		updateConditionCheck = controllerutils.UpdateConditionIfReasonOrMessageChange
+	}
+	conds, changed := controllerutils.SetClusterPoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.ClusterPoolDeletionPossibleCondition,
+		status,
+		reason,
+		message,
+		updateConditionCheck,
+	)
+	pool.Status.Conditions = conds
+	return changed
+}
+
+// setStatusCounts sets the Size, Standby, and Ready status fields in clp according to cds.
+// The caller is responsible for pushing the changes back to the server.
+// The return indicates whether anything changed.
+func setStatusCounts(clp *hivev1.ClusterPool, cds *cdCollection) bool {
+	origStatus := clp.Status.DeepCopy()
+	clp.Status.Size = int32(len(cds.Unassigned(true)))
+	clp.Status.Standby = int32(len(cds.Standby()))
+	clp.Status.Ready = int32(len(cds.Assignable()))
+	return !reflect.DeepEqual(origStatus, &clp.Status)
 }
 
 func (r *ReconcileClusterPool) verifyClusterImageSet(pool *hivev1.ClusterPool, logger log.FieldLogger) error {

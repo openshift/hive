@@ -1695,6 +1695,11 @@ data:
       - "validate AWS credentials: checking install permissions: error simulating policy: Throttling: Rate exceeded"
       installFailingReason: AWSAPIRateLimitExceeded
       installFailingMessage: AWS API rate limit exceeded while simulating policy
+    - name: S3AccessControlListNotSupported
+      searchRegexStrings:
+      - "error creating S3 bucket ACL for.*AccessControlListNotSupported: The bucket does not allow ACLs"
+      installFailingReason: S3AccessControlListNotSupported
+      installFailingMessage: S3AccessControlListNotSupported
     - name: GeneralThrottling
       searchRegexStrings:
       - "Throttling: Rate exceeded"

@@ -64,6 +64,7 @@ const (
 	gp3VolumeLimitExceeded                  = "Error launching source instance: VolumeLimitExceeded: You have exceeded your maximum gp3 storage limit of 50 TiB in this region. Please contact AWS Support to request an Elastic Block Store service limit increase."
 	defaultEbsKmsKeyInsufficientPermissions = "level=error msg=Error: Error waiting for instance (i-abcdefg01234) to become ready: Failed to reach target state. Reason: Client.InternalError: Client error on launch"
 	noWorkerNodesReady                      = "ReadyIngressNodesAvailable: Authentication requires functional ingress which requires at least one schedulable and ready node. Got 0 worker nodes, 3 master nodes, 0 custom target nodes (none are schedulable or ready for ingress pods)."
+	s3AccessControlListNotSupported         = "time=\"2023-04-11T08:22:52Z\" level=error msg=\"Error: error creating S3 bucket ACL for rosa-6lr7x-flcmj-bootstrap: AccessControlListNotSupported: The bucket does not allow ACLs\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -75,6 +76,11 @@ func TestParseInstallLog(t *testing.T) {
 		expectedReason  string
 		expectedMessage *string
 	}{
+		{
+			name:           "S3AccessControlListNotSupported",
+			log:            pointer.String(s3AccessControlListNotSupported),
+			expectedReason: "S3AccessControlListNotSupported",
+		},
 		{
 			name:           "NoWorkerNodesReady",
 			log:            pointer.String(noWorkerNodesReady),

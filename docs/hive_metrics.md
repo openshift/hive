@@ -8,6 +8,7 @@
       - [Metrics with Optional Cluster Deployment labels](#metrics-with-optional-cluster-deployment-labels)
     - [List of all Hive metrics](#list-of-all-hive-metrics)
       - [Hive Operator metrics](#hive-operator-metrics)
+      - [Metrics reported by all controllers](#metrics-reported-by-all-controllers)
       - [ClusterDeployment controller metrics](#clusterdeployment-controller-metrics)
       - [ClusterProvision controller metrics](#clusterprovision-controller-metrics)
       - [ClusterPool controller metrics](#clusterpool-controller-metrics)
@@ -34,6 +35,7 @@ Most metrics are not observed per cluster deployment name or namespace, so Hive 
 
 Opt into them via `HiveConfig.Spec.MetricsConfig.AdditionalClusterDeploymentLabels`, which accepts a map of the label you would want on your metrics, to the label found on ClusterDeployment.
 For example, including `{"ocp_major_version": "hive.openshift.io/version-major"}` will cause affected metrics to include a label key ocp_major_version with the value from the `hive.openshift.io/version-major` ClusterDeployment label -- e.g. "4".
+Every metric that allows optional labels will always have all the labels mentioned present. If the corresponding Cluster Deployment label is not present then the metric label will report its value as "unspecified".
 
 Note: It is up to the cluster admins to be mindful of cardinality and ensure these labels are not too specific, like cluster id, otherwise it can negatively impact your observability system's performance
 
@@ -46,6 +48,15 @@ These metrics are observed by the Hive Operator. None of these are optional.
 |:-------------------------------:|:----------------------:|
 |   hive_hiveconfig_conditions    |           N            |
 | hive_operator_reconcile_seconds |           N            |
+
+#### Metrics reported by all controllers
+These metrics are observed by all Hive Controllers. None of these are optional.
+
+|                Metric Name                | Optional Label Support |
+|:-----------------------------------------:|:----------------------:|
+|      hive_kube_client_requests_total      |           N            |
+|     hive_kube_client_request_seconds      |           N            |
+| hive_kube_client_requests_cancelled_total |           N            |
 
 #### ClusterDeployment controller metrics
 These metrics are observed while processing ClusterDeployments. None of these are optional.

@@ -300,6 +300,16 @@ type ClusterMetadata struct {
 	// AdminPasswordSecretRef references the secret containing the admin username/password which can be used to login to this cluster.
 	// +optional
 	AdminPasswordSecretRef *corev1.LocalObjectReference `json:"adminPasswordSecretRef,omitempty"`
+
+	// Platform holds platform-specific cluster metadata
+	// +optional
+	Platform *ClusterPlatformMetadata `json:"platform,omitempty"`
+}
+
+type ClusterPlatformMetadata struct {
+	// Azure holds azure-specific cluster metadata
+	// +optional
+	Azure *azure.Metadata `json:"azure,omitempty"`
 }
 
 // ClusterDeploymentStatus defines the observed state of ClusterDeployment

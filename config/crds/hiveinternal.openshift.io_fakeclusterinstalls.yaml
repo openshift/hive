@@ -84,6 +84,20 @@ spec:
                       during installation and used for tagging/naming resources in
                       cloud providers.
                     type: string
+                  platform:
+                    description: Platform holds platform-specific cluster metadata
+                    properties:
+                      azure:
+                        description: Azure holds azure-specific cluster metadata
+                        properties:
+                          resourceGroupName:
+                            description: ResourceGroupName is the name of the resource
+                              group in which the cluster resources were created.
+                            type: string
+                        required:
+                        - resourceGroupName
+                        type: object
+                    type: object
                 required:
                 - adminKubeconfigSecretRef
                 - clusterID

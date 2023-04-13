@@ -46,7 +46,7 @@ type Client interface {
 	GetVirtualMachineSku(ctx context.Context, name, region string) (*compute.ResourceSku, error)
 
 	// Images
-	ListImagesByResourceGroup(ctx context.Context, resourgeGroupName string) (ImageListResultPage, error)
+	ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (ImageListResultPage, error)
 }
 
 // ResourceSKUsPage is a page of results from listing resource SKUs.

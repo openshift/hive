@@ -2,7 +2,6 @@ package hibernation
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
@@ -66,10 +65,14 @@ func (a *azureActuator) StopMachines(cd *hivev1.ClusterDeployment, c client.Clie
 		logger.Warning("No machines were found to stop")
 		return nil
 	}
+	rg, err := controllerutils.AzureResourceGroup(cd)
+	if err != nil {
+		return err
+	}
 	var errs []error
 	for _, machineName := range azureMachineNames(machines) {
 		logger.WithField("machine", machineName).Info("Stopping cluster machine")
-		_, err = azureClient.DeallocateVirtualMachine(context.TODO(), clusterDeploymentResourceGroup(cd), machineName)
+		_, err = azureClient.DeallocateVirtualMachine(context.TODO(), rg, machineName)
 		if err != nil {
 			errs = append(errs, err)
 			logger.WithError(err).WithField("machine", machineName).Error("Failed to stop machine")
@@ -93,10 +96,14 @@ func (a *azureActuator) StartMachines(cd *hivev1.ClusterDeployment, c client.Cli
 		logger.Info("No machines were found to start")
 		return nil
 	}
+	rg, err := controllerutils.AzureResourceGroup(cd)
+	if err != nil {
+		return err
+	}
 	var errs []error
 	for _, machineName := range azureMachineNames(machines) {
 		logger.WithField("machine", machineName).Info("Starting cluster machine")
-		_, err = azureClient.StartVirtualMachine(context.TODO(), clusterDeploymentResourceGroup(cd), machineName)
+		_, err = azureClient.StartVirtualMachine(context.TODO(), rg, machineName)
 		if err != nil {
 			errs = append(errs, err)
 			logger.WithError(err).WithField("machine", machineName).Error("Failed to start machine")
@@ -142,9 +149,13 @@ func listAzureMachines(cd *hivev1.ClusterDeployment, azureClient azureclient.Cli
 	if err != nil {
 		return nil, err
 	}
+	rg, err := controllerutils.AzureResourceGroup(cd)
+	if err != nil {
+		return nil, err
+	}
 	var result []compute.VirtualMachine
 	for page.NotDone() {
-		result = append(result, filterByResourceGroupAndState(page.Values(), clusterDeploymentResourceGroup(cd), states, logger)...)
+		result = append(result, filterByResourceGroupAndState(page.Values(), rg, states, logger)...)
 		if err = page.Next(); err != nil {
 			return nil, err
 		}
@@ -186,15 +197,6 @@ func azureMachinePowerState(vm compute.VirtualMachine) string {
 		}
 	}
 	return azureUnknownPowerState
-}
-
-func clusterDeploymentResourceGroup(cd *hivev1.ClusterDeployment) string {
-	// TODO: Fix this to use explicit resource group name when we
-	// collect that from the installer.
-	if cd.Spec.ClusterMetadata == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s-rg", cd.Spec.ClusterMetadata.InfraID)
 }
 
 func azureMachineNames(machines []compute.VirtualMachine) []string {

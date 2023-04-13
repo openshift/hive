@@ -1191,7 +1191,9 @@ spec:
     name: pull-secret
 ```
 
-If the cluster you are looking to adopt is on AWS and leverages Privatelink, you'll also need to include that setting under `spec.platform.aws` to ensure the VPC Endpoint Service for the cluster is tracked in the ClusterDeployment
+If the cluster you are looking to adopt is on Azure and was created in a custom resource group, you'll also need to include its name in `spec.clusterMetadata.platform.azure.resourceGroupName` to ensure that the installer can find your resources when deprovisioning the cluster.
+
+If the cluster you are looking to adopt is on AWS and leverages Privatelink, you'll also need to include that setting under `spec.platform.aws` to ensure the VPC Endpoint Service for the cluster is tracked in the ClusterDeployment.
 
 ```yaml
   platform:
@@ -1201,7 +1203,7 @@ If the cluster you are looking to adopt is on AWS and leverages Privatelink, you
       privateLink:
         enabled: true
       region: us-east-1
-```      
+```
 
 ### Adopting with hiveutil
 

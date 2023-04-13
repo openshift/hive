@@ -145,3 +145,15 @@ func IsClusterDeploymentErrorUpdateEvent(evt event.UpdateEvent) bool {
 
 	return false
 }
+
+func AzureResourceGroup(cd *hivev1.ClusterDeployment) (string, error) {
+	// If the ResourceGroupName is unset, fail
+	if cd.Spec.ClusterMetadata == nil ||
+		cd.Spec.ClusterMetadata.Platform == nil ||
+		cd.Spec.ClusterMetadata.Platform.Azure == nil ||
+		cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName == nil ||
+		*cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName == "" {
+		return "", errors.New("Azure ResourceGroupName is unset! You may need to set it manually (ClusterDeployment.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName)")
+	}
+	return *cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName, nil
+}

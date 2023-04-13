@@ -543,6 +543,20 @@ objects:
                         during installation and used for tagging/naming resources
                         in cloud providers.
                       type: string
+                    platform:
+                      description: Platform holds platform-specific cluster metadata
+                      properties:
+                        azure:
+                          description: Azure holds azure-specific cluster metadata
+                          properties:
+                            resourceGroupName:
+                              description: ResourceGroupName is the name of the resource
+                                group in which the cluster resources were created.
+                              type: string
+                          required:
+                          - resourceGroupName
+                          type: object
+                      type: object
                   required:
                   - adminKubeconfigSecretRef
                   - clusterID
@@ -1759,6 +1773,11 @@ objects:
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
+                        resourceGroupName:
+                          description: ResourceGroupName is the name of the resource
+                            group where the cluster was installed. Required for new
+                            deprovisions (schema notwithstanding).
+                          type: string
                       type: object
                     gcp:
                       description: GCP contains GCP-specific deprovision settings
@@ -3753,6 +3772,20 @@ objects:
                         during installation and used for tagging/naming resources
                         in cloud providers.
                       type: string
+                    platform:
+                      description: Platform holds platform-specific cluster metadata
+                      properties:
+                        azure:
+                          description: Azure holds azure-specific cluster metadata
+                          properties:
+                            resourceGroupName:
+                              description: ResourceGroupName is the name of the resource
+                                group in which the cluster resources were created.
+                              type: string
+                          required:
+                          - resourceGroupName
+                          type: object
+                      type: object
                   required:
                   - adminKubeconfigSecretRef
                   - clusterID

@@ -20,6 +20,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/azureclient"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 var versionsSupportingAzureImageGallery = semver.MustParseRange(">=4.12.0")
@@ -60,10 +61,17 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		return nil, false, errors.New("MachinePool is not for Azure")
 	}
 
+	// If we haven't discovered the ResourceGroupName yet, fail
+	rg, err := controllerutils.AzureResourceGroup(cd)
+	if err != nil {
+		return nil, false, err
+	}
+
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			Azure: &installertypesazure.Platform{
-				Region: cd.Spec.Platform.Azure.Region,
+				Region:            cd.Spec.Platform.Azure.Region,
+				ResourceGroupName: rg,
 			},
 		},
 	}

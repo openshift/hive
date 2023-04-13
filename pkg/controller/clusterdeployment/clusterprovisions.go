@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/workqueue"
@@ -24,8 +25,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	installertypes "github.com/openshift/installer/pkg/types"
+
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -279,6 +283,43 @@ func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev
 	return false, nil
 }
 
+// setAzureResourceGroupFromMetadata unmarshals `pm.Raw`, a representation of the installer ClusterMetadata type,
+// and looks for the Azure ResourceGroupName therein. If found, the value is copied into the Azure platform-specific
+// section of `cm`, hive's representation of the cluster metadata. The `cd` is only used to validate that we're
+// operating on an Azure cluster.
+// The caller is responsible for copying `cm` back into `cd` and Update()ing if/as necessary.
+func setAzureResourceGroupFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pm *runtime.RawExtension, logger log.FieldLogger) {
+	if pm == nil {
+		return
+	}
+	if cd.Spec.Platform.Azure == nil {
+		return
+	}
+	im := new(installertypes.ClusterMetadata)
+	if err := json.Unmarshal(pm.Raw, &im); err != nil {
+		logger.WithError(err).Error("Could not unmarshal ClusterMetadata!")
+		return
+	}
+
+	if im.Azure == nil {
+		logger.Warn("ClusterMetadata unexpectedly has no Azure section")
+		return
+	}
+	rg := im.Azure.ResourceGroupName
+	if rg == "" {
+		logger.Warn("ClusterMetadata unexpectedly contains no Azure ResourceGroupName")
+		return
+	}
+	logger.Debug("Setting ResourceGroupName in ClusterMetadata")
+	if cm.Platform == nil {
+		cm.Platform = &hivev1.ClusterPlatformMetadata{}
+	}
+	if cm.Platform.Azure == nil {
+		cm.Platform.Azure = &azure.Metadata{}
+	}
+	cm.Platform.Azure.ResourceGroupName = &rg
+}
+
 func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (result reconcile.Result, returnedErr error) {
 	logger = logger.WithField("provision", cd.Status.ProvisionRef.Name)
 	logger.Debug("reconciling existing provision")
@@ -307,6 +348,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		if provision.Spec.AdminPasswordSecretRef != nil {
 			clusterMetadata.AdminPasswordSecretRef = provision.Spec.AdminPasswordSecretRef
 		}
+		setAzureResourceGroupFromMetadata(cd, clusterMetadata, provision.Spec.Metadata, logger)
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata
 			logger.Infof("Saving infra ID %q for cluster", cd.Spec.ClusterMetadata.InfraID)

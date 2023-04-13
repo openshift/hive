@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	configv1 "github.com/openshift/api/config/v1"
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 	"github.com/openshift/library-go/pkg/manifest"
@@ -41,6 +42,7 @@ import (
 	"github.com/openshift/library-go/pkg/verify/store/sigstore"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/azure"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -526,6 +528,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
+	// Discover Azure ResourceGroup if applicable
+	if r.discoverAzureResourceGroup(cd, cdLog) {
+		return reconcile.Result{}, r.Update(context.TODO(), cd)
+	}
+
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			// Make sure we have no deprovision underway metric even though this was probably cleared when we
@@ -776,7 +783,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			return reconcile.Result{}, err
 		}
 
-		err = ValidateInstallConfig(cd, icSecret.Data["install-config.yaml"])
+		_, err = ValidateInstallConfig(cd, icSecret)
 		if err != nil {
 			cdLog.WithError(err).Info("install config validation failed")
 			conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
@@ -1808,9 +1815,15 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CredentialsAssumeRole: cd.Spec.Platform.AWS.CredentialsAssumeRole,
 		}
 	case cd.Spec.Platform.Azure != nil:
+		// If we haven't discovered the ResourceGroupName yet, fail
+		rg, err := controllerutils.AzureResourceGroup(cd)
+		if err != nil {
+			return nil, err
+		}
 		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{
 			CredentialsSecretRef: &cd.Spec.Platform.Azure.CredentialsSecretRef,
 			CloudName:            &cd.Spec.Platform.Azure.CloudName,
+			ResourceGroupName:    &rg,
 		}
 	case cd.Spec.Platform.GCP != nil:
 		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{
@@ -2220,7 +2233,7 @@ func (r *ReconcileClusterDeployment) addOwnershipToSecret(cd *hivev1.ClusterDepl
 		Kind:               cd.Kind,
 		Name:               cd.Name,
 		UID:                cd.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: pointer.Bool(true),
 	}
 
 	cdRefChanged := librarygocontroller.EnsureOwnerRef(secret, cdRef)
@@ -2235,6 +2248,147 @@ func (r *ReconcileClusterDeployment) addOwnershipToSecret(cd *hivev1.ClusterDepl
 		}
 	}
 	return nil
+}
+
+// discoverAzureResourceGroup is intended to retrofit Azure clusters which were a) adopted, or b) created before
+// support for custom resource groups was added. It attempts to discover the resource group for the cluster by
+// - querying the Infrastructure object in the target cluster; and if that goes wrong
+// - parsing the install-config
+// No op if platform is not Azure.
+// No op if the field is already set (we don't validate that it is correct).
+// This is best effort. If things go wrong, we do not use the default value. (Note that a parseable install-config
+// with the resource group unset is not "wrong" -- we do default in this case.) Consumers of the ResourceGroupName
+// are expected to error if it is not set.
+// The return indicates whether the field was modified. If `true`, the caller is responsible for pushing
+// an Update() back to the server.
+func (r *ReconcileClusterDeployment) discoverAzureResourceGroup(cd *hivev1.ClusterDeployment, log log.FieldLogger) bool {
+	log = log.WithField("subtask", "discoverAzureResourceGroup")
+
+	// 1) Do we need to do this at all?
+	if getClusterPlatform(cd) != constants.PlatformAzure {
+		return false
+	}
+	if !cd.Spec.Installed {
+		// Provisioner should set the field when installation finishes; no-op for now.
+		return false
+	}
+	rg, _ := controllerutils.AzureResourceGroup(cd)
+	if rg != "" {
+		// Already set, nothing to do
+		return false
+	}
+
+	// Initialize structs as necessary
+	if cd.Spec.ClusterMetadata == nil {
+		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform == nil {
+		cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform.Azure == nil {
+		cd.Spec.ClusterMetadata.Platform.Azure = &azure.Metadata{}
+	}
+
+	// 2) Try the infrastructure object in the remote cluster
+	// This little lambda looks up the Infrastructure object in the remote cluster.
+	// It returns true iff it successfully set the ResourceGroupName, false otherwise.
+	if func() bool {
+		remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
+			cd,
+			r.remoteClusterAPIClientBuilder(cd),
+			r.Client,
+			log,
+		)
+		if unreachable || requeue || remoteClient == nil {
+			// ConnectToRemoteCluster already logged
+			return false
+		}
+
+		infraObj := &configv1.Infrastructure{}
+		if err := remoteClient.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infraObj); err != nil {
+			log.WithError(err).Error("Failed to retrieve infrastructure object from remote cluster")
+			return false
+		}
+		if infraObj.Status.PlatformStatus == nil {
+			log.Error("Infrastructure object did not contain PlatformStatus!")
+			return false
+		}
+		if infraObj.Status.PlatformStatus.Azure == nil {
+			log.Error("Infrastructure did not contain Azure in PlatformStatus!")
+			return false
+		}
+		rg := infraObj.Status.PlatformStatus.Azure.ResourceGroupName
+		if rg == "" {
+			log.Error("ResourceGroupName not found in Infrastructure!")
+			return false
+		}
+
+		log.WithField("resourceGroupName", rg).Info("Found Azure ResourceGroupName in remote cluster's Infrastructure.")
+		cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = &rg
+		return true
+	}() {
+		return true
+	}
+	log.Warning("Failed to discover Azure ResourceGroupName from the remote cluster's Infrastructure object!")
+
+	// 3) If that didn't work for any reason, try the install-config
+	if cd.Spec.Provisioning == nil {
+		log.Warn("No ClusterDeployment.Spec.Provisioning section")
+		// Probably an adopted CD.
+		return false
+	}
+	if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+		log.Warn("No InstallConfigSecretRef")
+		// Also probably an adopted CD (though why would it have Provisioning but not InstallConfigSecretRef?).
+		return false
+	}
+	secretName := cd.Spec.Provisioning.InstallConfigSecretRef.Name
+	log = log.WithField("installconfig-secret", secretName)
+	icSecret := &corev1.Secret{}
+	if err := r.Get(context.Background(),
+		types.NamespacedName{
+			Namespace: cd.Namespace,
+			Name:      secretName,
+		},
+		icSecret); err != nil {
+		log.WithError(err).Error("Failed to load install-config secret. We'll try again later.")
+		return false
+	}
+	ic, err := ValidateInstallConfig(cd, icSecret)
+	if err != nil {
+		log.WithError(err).Warn("Couldn't validate install-config")
+		// This doesn't necessarily mean we didn't unmarshall it, though. Carry on...
+	}
+	if ic == nil {
+		// Today this only happens if unmarshalling fails. Otherwise we've got *something* for an install-config.
+		log.Warn("Did not get an install-config from the secret, but also got no error. This should not happen.")
+		return false
+	}
+	if ic.Platform.Azure == nil {
+		// This log might be redundant with one from ValidateInstallConfig
+		log.Warn("No Azure platform section in install-config")
+		return false
+	}
+
+	rg = ic.Platform.Azure.ResourceGroupName
+	if rg != "" {
+		log.WithField("resourceGroupName", rg).Info("Found Azure ResourceGroupName in install-config")
+	} else {
+		// Default it if possible
+		if cd.Spec.ClusterMetadata.InfraID == "" {
+			// This shouldn't be possible. InfraID is set during provisioning; and is required
+			// for adopted CDs.
+			log.Warn("Can't set default Azure ResourceGroup yet: no InfraID set. This should not happen.")
+			return false
+		}
+		// This is the default set by the installer
+		rg = fmt.Sprintf("%s-rg", cd.Spec.ClusterMetadata.InfraID)
+		log.WithField("resourceGroupName", rg).Info("Azure ResourceGroupName unset in install-config; defaulting")
+	}
+
+	// If we get here, rg is nonempty. Use it.
+	cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = &rg
+	return true
 }
 
 // getClusterPlatform returns the platform of a given ClusterDeployment

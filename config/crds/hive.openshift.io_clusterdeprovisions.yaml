@@ -151,6 +151,11 @@ spec:
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
+                      resourceGroupName:
+                        description: ResourceGroupName is the name of the resource
+                          group where the cluster was installed. Required for new
+                          deprovisions (schema notwithstanding).
+                        type: string
                     type: object
                   gcp:
                     description: GCP contains GCP-specific deprovision settings

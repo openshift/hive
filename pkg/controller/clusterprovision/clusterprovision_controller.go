@@ -3,7 +3,6 @@ package clusterprovision
 import (
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"strconv"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sigs.k8s.io/yaml"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"

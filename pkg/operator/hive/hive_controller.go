@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/resource"
 
@@ -206,15 +207,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Monitor CRDs so that we can keep latest list of supported contracts
-	err = c.Watch(&source.Kind{Type: &apiextv1.CustomResourceDefinition{}},
-		handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
+	mapToHiveConfig := func(src string) func(client.Object) []reconcile.Request {
+		return func(_ client.Object) []reconcile.Request {
 			retval := []reconcile.Request{}
 
 			configList := &hivev1.HiveConfigList{}
 			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList, "", metav1.ListOptions{}) // reconcile all HiveConfigs
 			if err != nil {
-				log.WithError(err).Errorf("error listing hive configs for CRD reconcile")
+				log.WithError(err).Errorf("error listing hive configs for %s reconcile", src)
 				return retval
 			}
 
@@ -223,9 +223,23 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 					Name: config.Name,
 				}})
 			}
-			log.WithField("configs", retval).Debug("reconciled for change in CRD")
+			log.WithField("configs", retval).Debugf("reconciled for change in %s", src)
 			return retval
-		}))
+		}
+	}
+
+	// Monitor CRDs so that we can keep latest list of supported contracts
+	err = c.Watch(&source.Kind{Type: &apiextv1.CustomResourceDefinition{}},
+		handler.EnqueueRequestsFromMapFunc(mapToHiveConfig("CRD")))
+	if err != nil {
+		return err
+	}
+
+	// If the cluster proxy changes, we'll redeploy with the new values in the controllers' envs.
+	// There's just one Proxy object; and there's just one HiveConfig -- map any activity on the
+	// former to the latter.
+	err = c.Watch(&source.Kind{Type: &configv1.Proxy{}},
+		handler.EnqueueRequestsFromMapFunc(mapToHiveConfig("Proxy")))
 	if err != nil {
 		return err
 	}

@@ -45,4 +45,6 @@ func ConfigureCreds(c client.Client) {
 		utils.ProjectToDir(certsSecret, constants.OpenStackCertificatesDir)
 		utils.InstallCerts(constants.OpenStackCertificatesDir)
 	}
+	// Install cluster proxy trusted CA bundle
+	utils.InstallCerts(constants.TrustedCABundleDir)
 }

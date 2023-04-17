@@ -2,7 +2,6 @@ package hive
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -126,9 +125,15 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	hiveAdmDeployment.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[aggregatorClientCAHashAnnotation] = instance.Status.AggregatorClientCAHash
 
-	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[inputHashAnnotation] = computeHash("", additionalHashes...)
-	controllerutils.SetProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec,
-		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
+	httpProxy, httpsProxy, noProxy, err := r.discoverProxyVars()
+	if err != nil {
+		return err
+	}
+	controllerutils.SetProxyEnvVars(&hiveAdmDeployment.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
+
+	// Include the proxy vars in the hash so we redeploy if they change
+	hiveAdmDeployment.Spec.Template.ObjectMeta.Annotations[inputHashAnnotation] = computeHash(
+		httpProxy+httpsProxy+noProxy, additionalHashes...)
 
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, managedDomainsConfigMapInfo, hiveAdmContainer)
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, awsPrivateLinkConfigMapInfo, hiveAdmContainer)

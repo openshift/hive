@@ -502,6 +502,13 @@ const (
 	// there is a risk for the metric to be defined with fewer labels than expected. Set this constant as the default
 	// value when the value is unknown
 	MetricLabelDefaultValue = "unspecified"
+
+	// TrustedCAConfigMapName is the name of the ConfigMap containing the merged CA bundle including the trustedCA from the
+	// cluster proxy object. We'll use this to name the mount also.
+	TrustedCAConfigMapName = "hive-trusted-cabundle"
+
+	// TrustedCABundleDir is the path into which the merged CA bundle will be mounted.
+	TrustedCABundleDir = "/hive-trusted-cabundle"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

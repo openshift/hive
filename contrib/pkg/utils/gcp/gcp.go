@@ -39,4 +39,6 @@ func ConfigureCreds(c client.Client) {
 	}
 	utils.ProjectToDir(credsSecret, constants.GCPCredentialsDir)
 	os.Setenv("GOOGLE_CREDENTIALS", constants.GCPCredentialsDir+"/"+constants.GCPCredentialsName)
+	// Install cluster proxy trusted CA bundle
+	utils.InstallCerts(constants.TrustedCABundleDir)
 }

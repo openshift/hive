@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
+	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
@@ -35,6 +36,8 @@ func (r *ReconcileHiveConfig) clientFor(blankObj runtime.Object, namespace strin
 		c = dc.Resource(corev1.SchemeGroupVersion.WithResource("configmaps"))
 	case *corev1.NamespaceList, *corev1.Namespace:
 		c = dc.Resource(corev1.SchemeGroupVersion.WithResource("namespaces"))
+	case *configv1.ProxyList, *configv1.Proxy:
+		c = dc.Resource(configv1.SchemeGroupVersion.WithResource("proxies"))
 	}
 	if c == nil {
 		panic(fmt.Sprintf("You forgot to make a case for clients of type %T", blankObj))

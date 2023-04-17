@@ -2,7 +2,6 @@ package hive
 
 import (
 	"context"
-	"os"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -88,11 +87,6 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 
 	hiveNSName := getHiveNamespace(hiveconfig)
 
-	if newClusterSyncStatefulSet.Spec.Template.Annotations == nil {
-		newClusterSyncStatefulSet.Spec.Template.Annotations = make(map[string]string, 1)
-	}
-	newClusterSyncStatefulSet.Spec.Template.Annotations[hiveConfigHashAnnotation] = hiveControllersConfigHash
-
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
 		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, hiveconfig); err != nil {
@@ -130,8 +124,18 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	}
 	newClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation] = newClusterSyncStatefulSetSpecHash
 
-	controllerutils.SetProxyEnvVars(&newClusterSyncStatefulSet.Spec.Template.Spec,
-		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
+	httpProxy, httpsProxy, noProxy, err := r.discoverProxyVars()
+	if err != nil {
+		return err
+	}
+	controllerutils.SetProxyEnvVars(&newClusterSyncStatefulSet.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
+
+	if newClusterSyncStatefulSet.Spec.Template.Annotations == nil {
+		newClusterSyncStatefulSet.Spec.Template.Annotations = make(map[string]string, 1)
+	}
+	// Include the proxy vars in the hash so we redeploy if they change
+	newClusterSyncStatefulSet.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash(
+		httpProxy+httpsProxy+noProxy, hiveControllersConfigHash)
 
 	existingClusterSyncStatefulSet := &appsv1.StatefulSet{}
 	existingClusterSyncStatefulSetNamespacedName := apitypes.NamespacedName{Name: newClusterSyncStatefulSet.Name, Namespace: newClusterSyncStatefulSet.Namespace}

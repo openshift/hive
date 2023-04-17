@@ -16,4 +16,6 @@ func ConfigureCreds(c client.Client) {
 			os.Setenv(constants.IBMCloudAPIKeyEnvVar, key)
 		}
 	}
+	// Install cluster proxy trusted CA bundle
+	utils.InstallCerts(constants.TrustedCABundleDir)
 }

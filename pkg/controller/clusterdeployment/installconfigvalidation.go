@@ -2,7 +2,7 @@ package clusterdeployment
 
 import (
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	installertypes "github.com/openshift/installer/pkg/types"
 

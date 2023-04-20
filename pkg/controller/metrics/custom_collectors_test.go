@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -11,11 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testcs "github.com/openshift/hive/pkg/test/clustersync"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 )
 
@@ -249,7 +253,7 @@ func TestProvisioningUnderwayCollector(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			collect := newProvisioningUnderwaySecondsCollector(c, test.min)
-
+			// TODO: Determine whether collect.Describe() is necessary in test cases
 			descCh := make(chan *prometheus.Desc)
 			go func() {
 				for range descCh {
@@ -542,7 +546,7 @@ func TestProvisioningUnderwayInstallRestartsCollector(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
 			collect := newProvisioningUnderwayInstallRestartsCollector(c, test.min)
-
+			// TODO: Determine whether collect.Describe() is necessary in test cases
 			descCh := make(chan *prometheus.Desc)
 			go func() {
 				for range descCh {
@@ -566,6 +570,209 @@ func TestProvisioningUnderwayInstallRestartsCollector(t *testing.T) {
 		})
 	}
 }
+
+func TestDeprovisioningUnderwayCollector(t *testing.T) {
+	scheme := runtime.NewScheme()
+	hivev1.AddToScheme(scheme)
+
+	cdBuilder := func(name string) testcd.Builder {
+		return testcd.FullBuilder(name, name, scheme).
+			GenericOptions(testgeneric.WithFinalizer("test-finalizer"))
+	}
+
+	cases := []struct {
+		name string
+
+		existing []runtime.Object
+
+		expected1 []string
+		expected2 []string
+	}{
+		{
+			name: "all cluster deployment deletion timestamps set",
+			existing: []runtime.Object{
+				cdBuilder("cd-1").GenericOptions(testgeneric.Deleted()).Build(),
+				cdBuilder("cd-2").GenericOptions(testgeneric.Deleted()).Build(),
+				cdBuilder("cd-3").GenericOptions(testgeneric.Deleted()).Build(),
+			},
+			expected1: []string{
+				"cluster_deployment = cd-1 cluster_type = unspecified namespace = cd-1",
+				"cluster_deployment = cd-2 cluster_type = unspecified namespace = cd-2",
+				"cluster_deployment = cd-3 cluster_type = unspecified namespace = cd-3",
+			},
+			expected2: []string(nil),
+		},
+		{
+			name:      "no cluster deployments",
+			existing:  nil,
+			expected1: []string(nil),
+			expected2: []string(nil),
+		},
+		{
+			name: "some cluster deployment deletion timestamps set",
+			existing: []runtime.Object{
+				cdBuilder("cd-1").GenericOptions(testgeneric.Deleted()).Build(),
+				cdBuilder("cd-2").Build(),
+				cdBuilder("cd-3").GenericOptions(testgeneric.Deleted()).Build(),
+			},
+			expected1: []string{
+				"cluster_deployment = cd-1 cluster_type = unspecified namespace = cd-1",
+				"cluster_deployment = cd-3 cluster_type = unspecified namespace = cd-3",
+			},
+			expected2: []string(nil),
+		},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
+			collect := newDeprovisioningUnderwaySecondsCollector(c)
+			// TODO: Determine whether collect.Describe() is necessary in test cases
+			descCh := make(chan *prometheus.Desc)
+			go func() {
+				for range descCh {
+				}
+			}()
+			collect.Describe(descCh)
+			close(descCh)
+
+			ch1 := make(chan prometheus.Metric)
+			go func() {
+				collect.Collect(ch1)
+				close(ch1)
+			}()
+
+			var got1 []string
+			for sample := range ch1 {
+				var d dto.Metric
+				require.NoError(t, sample.Write(&d))
+				got1 = append(got1, metricPretty(d))
+			}
+			assert.Equal(t, test.expected1, got1)
+
+			cdList := &hivev1.ClusterDeploymentList{}
+			require.NoError(t, c.List(context.TODO(), cdList))
+			for _, cd := range cdList.Items {
+				cd.ObjectMeta.Finalizers = nil
+				require.NoError(t, c.Update(context.TODO(), &cd))
+			}
+
+			ch2 := make(chan prometheus.Metric)
+			go func() {
+				collect.Collect(ch2)
+				close(ch2)
+			}()
+			var got2 []string
+			for sample := range ch2 {
+				var d dto.Metric
+				require.NoError(t, sample.Write(&d))
+				got2 = append(got2, metricPretty(d))
+			}
+			assert.Equal(t, test.expected2, got2)
+		})
+	}
+}
+
+func TestClusterSyncCollector(t *testing.T) {
+	scheme := runtime.NewScheme()
+	hiveintv1alpha1.AddToScheme(scheme)
+
+	cases := []struct {
+		name string
+
+		existing []runtime.Object
+		min      time.Duration
+
+		expected1 []string
+		expected2 []string
+	}{
+		{
+			name: "clustersync did not pass threshold",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+			},
+			min:       1 * time.Hour,
+			expected1: []string(nil),
+			expected2: []string(nil),
+		},
+		{
+			name: "clustersync passed threshold",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+			},
+			min:       0 * time.Hour,
+			expected1: []string{"namespaced_name = test-namespace/test-name"},
+			expected2: []string(nil),
+		},
+		{
+			name:      "no clustersync",
+			existing:  nil,
+			min:       1 * time.Hour,
+			expected1: []string(nil),
+			expected2: []string(nil),
+		},
+	}
+	for _, test := range cases {
+		t.Run("test", func(t *testing.T) {
+			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
+
+			collect := newClusterSyncFailingCollector(c, test.min)
+			// TODO: Determine whether collect.Describe() is necessary in test cases
+			descCh := make(chan *prometheus.Desc)
+			go func() {
+				for range descCh {
+				}
+			}()
+			collect.Describe(descCh)
+			close(descCh)
+
+			ch1 := make(chan prometheus.Metric)
+			go func() {
+				collect.Collect(ch1)
+				close(ch1)
+			}()
+
+			var got1 []string
+			for sample := range ch1 {
+				var d dto.Metric
+				require.NoError(t, sample.Write(&d))
+				got1 = append(got1, metricPretty(d))
+			}
+			assert.Equal(t, test.expected1, got1)
+
+			csList := &hiveintv1alpha1.ClusterSyncList{}
+			require.NoError(t, c.List(context.TODO(), csList))
+			for _, cs := range csList.Items {
+				require.NoError(t, c.Delete(context.TODO(), &cs))
+			}
+
+			ch2 := make(chan prometheus.Metric)
+
+			var got2 []string
+			go func() {
+				collect.Collect(ch2)
+				close(ch2)
+			}()
+			for sample := range ch2 {
+				var d dto.Metric
+				require.NoError(t, sample.Write(&d))
+				got2 = append(got2, metricPretty(d))
+			}
+			assert.Equal(t, test.expected2, got2)
+
+		})
+	}
+}
+
+func FailingSince(t time.Time) testcs.Option {
+	return testcs.WithCondition(hiveintv1alpha1.ClusterSyncCondition{
+		Type:               hiveintv1alpha1.ClusterSyncFailed,
+		Status:             corev1.ConditionTrue,
+		Reason:             "foo",
+		Message:            "bar",
+		LastTransitionTime: metav1.NewTime(t),
+	})
+}
+
 func metricPretty(d dto.Metric) string {
 	labels := make([]string, len(d.Label))
 	for _, label := range d.Label {

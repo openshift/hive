@@ -11,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,27 +81,8 @@ var (
 		Help: "Total number of SyncSetsInstances referencing non-selector SyncSets that have not successfully applied all resources/patches/secrets.",
 	})
 
-	// MetricClusterDeploymentDeprovisioningUnderwaySeconds is a prometheus metric for the number of seconds
-	// between when a still deprovisioning cluster was created and now.
-	MetricClusterDeploymentDeprovisioningUnderwaySeconds = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "hive_cluster_deployment_deprovision_underway_seconds",
-			// Will clear once hive restarts.
-			Help: "Length of time a cluster has been deprovisioning.",
-		},
-		[]string{"cluster_deployment", "namespace", "cluster_type"},
-	)
-	// MetricClusterSyncFailingSeconds is a prometheus metric that tracks the number of seconds for which a
-	// clustersync has been in failing state
-	MetricClusterSyncFailingSeconds = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "hive_clustersync_failing_seconds",
-			Help: "Length of time a clustersync has been failing",
-		},
-		// namespaced_name would be logged as $namespace/$name
-		// TODO: convert all metrics with both namespace and name as labels to namespaced_name
-		[]string{"namespaced_name"},
-	)
+	// TODO: convert all metrics with both namespace and name as labels to namespaced_name (logged as $namespace/$name)
+
 	// MetricClusterHibernationTransitionSeconds is a prometheus metric that tracks the number of seconds it takes for
 	// clusters to transition to hibernated powerstate
 	MetricClusterHibernationTransitionSeconds = prometheus.NewHistogramVec(
@@ -205,8 +185,6 @@ func init() {
 	metrics.Registry.MustRegister(metricSyncSetsTotal)
 	metrics.Registry.MustRegister(metricSyncSetsUnappliedTotal)
 	metrics.Registry.MustRegister(metricControllerReconcileTime)
-
-	metrics.Registry.MustRegister(MetricClusterDeploymentDeprovisioningUnderwaySeconds)
 	metrics.Registry.MustRegister(metricClusterDeploymentSyncsetPaused)
 }
 
@@ -219,12 +197,10 @@ func Add(mgr manager.Manager) error {
 	// TODO: Make these optional & configurable via HiveConfig.Spec.MetricsConfig
 	metrics.Registry.MustRegister(newProvisioningUnderwaySecondsCollector(mgr.GetClient(), 1*time.Hour))
 	metrics.Registry.MustRegister(newProvisioningUnderwayInstallRestartsCollector(mgr.GetClient(), 1))
+	// TODO: Add deprovisioning underway metric to set of optional duration-based metrics
+	metrics.Registry.MustRegister(newDeprovisioningUnderwaySecondsCollector(mgr.GetClient()))
 
-	err := mgr.Add(mc)
-	if err != nil {
-		return err
-	}
-	return nil
+	return mgr.Add(mc)
 }
 
 // Calculator runs in a goroutine and periodically calculates and publishes
@@ -251,7 +227,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 	}
 	// Register optional metrics and update them in their corresponding maps, so controllers logging them can access
 	// the information
-	registerOptionalMetrics(mConfig)
+	mc.registerOptionalMetrics(mConfig)
 
 	// Run forever, sleep at the end:
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
@@ -274,18 +250,6 @@ func (mc *Calculator) Start(ctx context.Context) error {
 			for _, cd := range clusterDeployments.Items {
 				clusterType := GetLabelValue(&cd, hivev1.HiveClusterTypeLabel)
 				accumulator.processCluster(&cd)
-
-				if cd.DeletionTimestamp != nil {
-
-					// For deprovisioning clusters we report the seconds since
-					// cluster was deleted. clusterdeployment_controller should delete this
-					// when removing the finalizer.
-					MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
-						cd.Name,
-						cd.Namespace,
-						clusterType).Set(
-						time.Since(cd.DeletionTimestamp.Time).Seconds())
-				}
 
 				if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused {
 					metricClusterDeploymentSyncsetPaused.WithLabelValues(
@@ -420,7 +384,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 }
 
 // registerOptionalMetrics registers the metrics, and stores their configs in the corresponding maps
-func registerOptionalMetrics(mConfig *metricsconfig.MetricsConfig) {
+func (mc *Calculator) registerOptionalMetrics(mConfig *metricsconfig.MetricsConfig) {
 	mapMetricToDurationHistograms = make(map[*prometheus.HistogramVec]time.Duration)
 	mapMetricToDurationGauges = make(map[*prometheus.GaugeVec]time.Duration)
 	for _, metric := range mConfig.MetricsWithDuration {
@@ -443,8 +407,7 @@ func registerOptionalMetrics(mConfig *metricsconfig.MetricsConfig) {
 			mapMetricToDurationHistograms[MetricClusterReadyTransitionSeconds] = metric.Duration.Duration
 		// Gauges
 		case metricsconfig.CurrentClusterSyncFailing:
-			metrics.Registry.MustRegister(MetricClusterSyncFailingSeconds)
-			mapMetricToDurationGauges[MetricClusterSyncFailingSeconds] = metric.Duration.Duration
+			metrics.Registry.MustRegister(newClusterSyncFailingCollector(mc.Client, metric.Duration.Duration))
 		}
 	}
 }
@@ -454,22 +417,6 @@ func registerOptionalMetrics(mConfig *metricsconfig.MetricsConfig) {
 func ShouldLogHistogramDurationMetric(metricToLog *prometheus.HistogramVec, timeToLog float64) bool {
 	duration, ok := mapMetricToDurationHistograms[metricToLog]
 	return ok && duration.Seconds() <= timeToLog
-}
-
-// ShouldLogGaugeDurationMetric decides whether the corresponding duration metric of type gauge should be logged. It
-// first checks if that optional metric has been opted into for logging, and the duration has crossed the threshold set.
-func ShouldLogGaugeDurationMetric(metricToLog *prometheus.GaugeVec, timeToLog float64) bool {
-	duration, ok := mapMetricToDurationGauges[metricToLog]
-	return ok && duration.Seconds() <= timeToLog
-}
-
-func ClearClusterSyncFailingSecondsMetric(namespace string, name string, log log.FieldLogger) {
-	cleared := MetricClusterSyncFailingSeconds.Delete(map[string]string{
-		"namespaced_name": GetNameSpacedName(namespace, name),
-	})
-	if cleared {
-		log.Debug("cleared metric: %v", MetricClusterSyncFailingSeconds)
-	}
 }
 
 func (mc *Calculator) calculateSyncSetMetrics(mcLog log.FieldLogger) {
@@ -487,16 +434,7 @@ func (mc *Calculator) calculateSyncSetMetrics(mcLog log.FieldLogger) {
 	ssInstancesTotal := 0
 	ssInstancesUnappliedTotal := 0
 	for _, cs := range clusterSyncList.Items {
-		// Failing cluster syncs
-		cond := controllerutils.FindCondition(cs.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
-		if cond != nil && cond.Status == corev1.ConditionTrue {
-			seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
-			if ShouldLogGaugeDurationMetric(MetricClusterSyncFailingSeconds, seconds) {
-				MetricClusterSyncFailingSeconds.WithLabelValues(GetNameSpacedName(cs.Namespace, cs.Name)).Set(seconds)
-			}
-		} else {
-			ClearClusterSyncFailingSecondsMetric(cs.Namespace, cs.Name, mcLog)
-		}
+
 		for _, sss := range cs.Status.SelectorSyncSets {
 			sssInstancesTotal[sss.Name]++
 			if sss.Result != hiveintv1alpha1.SuccessSyncSetResult {
@@ -833,10 +771,6 @@ func logHistogramDurationMetric(metric *prometheus.HistogramVec, cd *hivev1.Clus
 		cd.Labels[hivev1.HiveClusterPlatformLabel],
 		cd.Labels[constants.VersionMajorMinorPatchLabel],
 		poolNS).Observe(time)
-}
-
-func GetNameSpacedName(namespace string, name string) string {
-	return namespace + "/" + name
 }
 
 var elapsedDurationBuckets = []time.Duration{2 * time.Minute, time.Minute, 30 * time.Second, 10 * time.Second, 5 * time.Second, time.Second, 0}

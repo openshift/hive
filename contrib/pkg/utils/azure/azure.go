@@ -38,4 +38,6 @@ func ConfigureCreds(c client.Client) {
 	}
 	utils.ProjectToDir(credsSecret, constants.AzureCredentialsDir)
 	os.Setenv(constants.AzureCredentialsEnvVar, constants.AzureCredentialsDir+"/"+constants.AzureCredentialsName)
+	// Install cluster proxy trusted CA bundle
+	utils.InstallCerts(constants.TrustedCABundleDir)
 }

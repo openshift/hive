@@ -2239,7 +2239,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 1
-					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -2256,6 +2256,51 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					Reason:  hivev1.ProvisionedReasonProvisioning,
 					Message: "Cluster provision created",
 				}})
+				// HIVE-2198:
+				// 1) Ensure the magic trusted CA bundle configmap was created
+				// 2) Ensure the provision pod spec in the ClusterProvision has the volume & mount for same
+				cacm := &corev1.ConfigMap{}
+				if assert.Nil(t, c.Get(context.TODO(),
+					types.NamespacedName{Namespace: cd.Namespace, Name: constants.TrustedCAConfigMapName},
+					cacm),
+					"expected to find ConfigMap %s", constants.TrustedCAConfigMapName) {
+					assert.Equal(t, "true", cacm.Labels[injectCABundleKey], "expected label %s to be \"true\"", injectCABundleKey)
+				}
+				provs := getProvisions(c)
+				if assert.Len(t, provs, 1, "expected 1 ClusterProvision to exist") {
+					vols := provs[0].Spec.PodSpec.Volumes
+					// Find the trusted CA ConfigMap volume
+					found := false
+					for _, vol := range vols {
+						if vol.Name == constants.TrustedCAConfigMapName {
+							found = true
+							assert.Equal(t, corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: constants.TrustedCAConfigMapName,
+									},
+									Items: []corev1.KeyToPath{
+										{
+											Key:  "ca-bundle.crt",
+											Path: "ca-bundle.crt",
+										},
+									},
+								},
+							}, vol.VolumeSource, "mismatched VolumeSource")
+						}
+					}
+					assert.True(t, found, "did not find the trusted CA ConfigMap Volume")
+					for i, container := range provs[0].Spec.PodSpec.Containers {
+						found = false
+						for _, mount := range container.VolumeMounts {
+							if mount.Name == constants.TrustedCAConfigMapName {
+								found = true
+								assert.Equal(t, constants.TrustedCABundleDir, mount.MountPath, "unexpected MountPath in trusted CA Bundle VolumeMount for container %d", i)
+							}
+						}
+						assert.True(t, found, "did not find the trusted CA ConfigMap VolumeMount in container %d", i)
+					}
+				}
 			},
 		},
 		{
@@ -2291,7 +2336,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 2
-					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -2322,7 +2367,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 3
-					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -2826,7 +2871,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 2
-					cd.Spec.InstallAttemptsLimit = pointer.Int32Ptr(2)
+					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
 					return cd
 				}(),
 				testProvision(tcp.WithFailureReason("aReason")),

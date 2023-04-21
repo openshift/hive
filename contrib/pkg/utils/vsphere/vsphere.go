@@ -27,4 +27,6 @@ func ConfigureCreds(c client.Client) {
 		utils.ProjectToDir(certsSecret, constants.VSphereCertificatesDir)
 		utils.InstallCerts(constants.VSphereCertificatesDir)
 	}
+	// Install cluster proxy trusted CA bundle
+	utils.InstallCerts(constants.TrustedCABundleDir)
 }

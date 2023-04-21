@@ -23,6 +23,7 @@ import (
 
 	oappsv1 "github.com/openshift/api/apps/v1"
 	orbacv1 "github.com/openshift/api/authorization/v1"
+	oconfigv1 "github.com/openshift/api/config/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
 	"github.com/openshift/hive/apis"
@@ -114,6 +115,10 @@ func newRootCommand() *cobra.Command {
 				}
 
 				if err := orbacv1.Install(mgr.GetScheme()); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := oconfigv1.Install(mgr.GetScheme()); err != nil {
 					log.Fatal(err)
 				}
 

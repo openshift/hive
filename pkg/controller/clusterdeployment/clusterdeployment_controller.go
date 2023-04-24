@@ -521,6 +521,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 	}
 
+	if err := r.ensureTrustedCABundleConfigMap(cd.Namespace); err != nil {
+		cdLog.WithError(err).Error("Failed to create or verify the trusted CA bundle ConfigMap")
+		return reconcile.Result{}, err
+	}
+
 	if cd.DeletionTimestamp != nil {
 		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
 			// Make sure we have no deprovision underway metric even though this was probably cleared when we
@@ -707,11 +712,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		// The controller will not automatically requeue the cluster deployment
 		// since the controller is not watching for secrets. So, requeue manually.
 		return reconcile.Result{Requeue: true}, nil
-	}
-
-	if err := r.ensureTrustedCABundleConfigMap(cd.Namespace); err != nil {
-		cdLog.WithError(err).Error("Failed to create or verify the trusted CA bundle ConfigMap")
-		return reconcile.Result{}, err
 	}
 
 	// let's verify the release image before using it here.

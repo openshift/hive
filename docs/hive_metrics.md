@@ -13,6 +13,7 @@
       - [ClusterProvision controller metrics](#clusterprovision-controller-metrics)
       - [ClusterPool controller metrics](#clusterpool-controller-metrics)
       - [Metrics controller metrics](#metrics-controller-metrics)
+    - [Example: Configure metricsConfig](#example-configure-metricsconfig)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -26,7 +27,7 @@ Hive publishes metrics, which can help admins to monitor the Hive operations. Mo
 
 Certain duration metrics use labels whose values are by nature unbounded (e.g. ClusterDeployment name and namespace).
 These are not logged by default as this can overwhelm the prometheus database (see https://prometheus.io/docs/practices/naming/#labels).
-Admins can use `HiveConfig.Spec.MetricsConfig.MetricsWithDuration` to opt for logging such metrics only when the duration exceeds the configured threshold.
+Admins can use `HiveConfig.Spec.MetricsConfig.MetricsWithDuration` to opt for logging such metrics only when the duration exceeds the configured threshold. An example of this can be found [here](#example-configure-metricsconfig).
 Check the metrics labelled as `Optional` in the [list below](#optional-metrics) to see affected metrics. 
 
 #### Metrics with Optional Cluster Deployment labels
@@ -118,7 +119,7 @@ Some of these metrics are optional and the admin can opt for logging them via `H
 |                      hive_syncsets_total                       |           N            |    N     |
 |                 hive_syncsets_unapplied_total                  |           N            |    N     |
 |      hive_cluster_deployment_deprovision_underway_seconds      |           N            |    N     |
-|                hive_clustersync_failing_seconds                |           N            |    N     |
+|                hive_clustersync_failing_seconds                |           N            |    Y     |
 |    hive_cluster_deployments_hibernation_transition_seconds     |           N            |    Y     |
 |      hive_cluster_deployments_running_transition_seconds       |           N            |    Y     |
 |           hive_cluster_deployments_stopping_seconds            |           N            |    Y     |
@@ -128,3 +129,36 @@ Some of these metrics are optional and the admin can opt for logging them via `H
 |             hive_cluster_deployment_syncset_paused             |           N            |    N     |
 |       hive_cluster_deployment_provision_underway_seconds       |           N            |    N     |
 |  hive_cluster_deployment_provision_underway_install_restarts   |           N            |    N     |
+
+### Example: Configure metricsConfig
+
+```sh
+oc edit hiveconfig -n hive
+```
+
+```yaml
+spec:
+  metricsConfig:
+    metricsWithDuration:
+      - name: <duration metric type>
+        duration: <min duration>
+```
+
+Ex. Register a hive_clustersync_failing_seconds metric.
+
+```yaml
+spec:
+  metricsConfig:
+    metricsWithDuration:
+      - name: currentClusterSyncFailing
+        duration: 1h
+```
+
+|                           Metric name                          |    Duration metric type   |
+|:--------------------------------------------------------------:|:-------------------------:|
+|            hive_cluster_deployments_stopping_seconds           |      currentStopping      |
+|            hive_cluster_deployments_resuming_seconds           |      currentResuming      |
+| hive_cluster_deployments_waiting_for_cluster_operators_seconds |    currentWaitingForCO    |
+|                hive_clustersync_failing_seconds                | currentClusterSyncFailing |
+|     hive_cluster_deployments_hibernation_transition_seconds    |    cumulativeHibernated   |
+|       hive_cluster_deployments_running_transition_seconds      |     cumulativeResumed     |

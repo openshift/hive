@@ -228,6 +228,11 @@ type Provisioning struct {
 	// +optional
 	InstallerImageOverride string `json:"installerImageOverride,omitempty"`
 
+	// InstallerImagePullPolicyOverride allows specifying a pull policy for the installer image,
+	// normally set to PullIfNotPresent
+	// +optional
+	InstallerImagePullPolicyOverride string `json:"installerImagePullPolicyOverride,omitempty"`
+
 	// ImageSetRef is a reference to a ClusterImageSet. If a value is specified for ReleaseImage,
 	// that will take precedence over the one from the ClusterImageSet.
 	ImageSetRef *ClusterImageSetReference `json:"imageSetRef,omitempty"`
@@ -327,6 +332,10 @@ type ClusterDeploymentStatus struct {
 	// InstallerImage is the name of the installer image to use when installing the target cluster
 	// +optional
 	InstallerImage *string `json:"installerImage,omitempty"`
+
+	// InstallerImagePullPolicy is pull policy used on the installer image when installing the target cluster
+	// +optional
+	InstallerImagePullPolicy *string `json:"installerImagePullPolicy,omitempty"`
 
 	// InstallVersion is the version of OpenShift as reported by the release image
 	// resolved for the installation.

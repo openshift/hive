@@ -1008,6 +1008,10 @@ spec:
                       the installer image, normally gleaned from the metadata within
                       the ReleaseImage.
                     type: string
+                  installerImagePullPolicyOverride:
+                    description: InstallerImagePullPolicyOverride allows specifying
+                      a pull policy for the installer image, normally set to PullIfNotPresent
+                    type: string
                   manifestsConfigMapRef:
                     description: ManifestsConfigMapRef is a reference to user-provided
                       manifests to add to or replace manifests that are generated
@@ -1163,6 +1167,10 @@ spec:
               installerImage:
                 description: InstallerImage is the name of the installer image to
                   use when installing the target cluster
+                type: string
+              installerImagePullPolicy:
+                description: InstallerImagePullPolicy is pull policy used on the installer
+                  image when installing the target cluster
                 type: string
               platformStatus:
                 description: Platform contains the observed state for the specific

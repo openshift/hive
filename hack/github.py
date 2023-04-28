@@ -2,6 +2,7 @@ import json
 import os
 import requests
 
+
 class GitHubClient:
     def __init__(self, user, repo, token=""):
         gh_token = ""
@@ -20,12 +21,12 @@ class GitHubClient:
         self.user = user
         self.repo = repo
         self.headers = {
-            'Authorization': 'token ' + gh_token,
-            'Accept': 'application/vnd.github.v3+json',
+            "Authorization": "token " + gh_token,
+            "Accept": "application/vnd.github.v3+json",
         }
 
     def _create_request(self, rest_path):
-        return 'https://api.github.com' + rest_path
+        return "https://api.github.com" + rest_path
 
     def create_annotated_tag(self, tag, tag_msg, commit_hash):
         data = {
@@ -35,7 +36,7 @@ class GitHubClient:
             "type": "commit",
         }
 
-        create_tag_rest_path = '/repos/{}/{}/git/tags'.format(self.user, self.repo)
+        create_tag_rest_path = "/repos/{}/{}/git/tags".format(self.user, self.repo)
         req = self._create_request(create_tag_rest_path)
 
         return requests.post(req, headers=self.headers, data=json.dumps(data))
@@ -46,7 +47,7 @@ class GitHubClient:
             "sha": sha,
         }
 
-        create_ref_rest_path = '/repos/{}/{}/git/refs'.format(self.user, self.repo)
+        create_ref_rest_path = "/repos/{}/{}/git/refs".format(self.user, self.repo)
         req = self._create_request(create_ref_rest_path)
 
         return requests.post(req, headers=self.headers, data=json.dumps(data))
@@ -59,6 +60,6 @@ class GitHubClient:
             "body": body,
         }
 
-        create_pr_rest_path = '/repos/{}/{}/pulls'.format(self.user, self.repo)
+        create_pr_rest_path = "/repos/{}/{}/pulls".format(self.user, self.repo)
         req = self._create_request(create_pr_rest_path)
         return requests.post(req, headers=self.headers, data=json.dumps(data))

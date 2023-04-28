@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -235,4 +236,136 @@ func getConditionAndReason(conditions []hivev1.ClusterDeploymentCondition) (cond
 		}
 	}
 	return condition, reason, skip
+}
+
+// deprovisioning underway metric collected through a custom prometheus collector
+type deprovisioningUnderwayCollector struct {
+	client client.Client
+
+	// TODO: Make metric optional and allow for a minDuration to be specified by user.
+
+	// metricClusterDeploymentDeprovisionUnderwaySeconds is a prometheus metric for the number of seconds
+	// between when a deprovisioning cluster DeletionTimestamp was set and now.
+	metricClusterDeploymentDeprovisionUnderwaySeconds *prometheus.Desc
+}
+
+// collects the metrics for deprovisioningUnderwayCollector
+func (cc deprovisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
+	ccLog := log.WithField("controller", "metrics")
+	ccLog.Info("calculating deprovisioning underway metrics across all ClusterDeployments")
+
+	// Load all ClusterDeployments so we can accumulate facts about them.
+	clusterDeployments := &hivev1.ClusterDeploymentList{}
+	err := cc.client.List(context.Background(), clusterDeployments)
+	if err != nil {
+		log.WithError(err).Error("error listing cluster deployments")
+		return
+	}
+	for _, cd := range clusterDeployments.Items {
+		if cd.DeletionTimestamp == nil {
+			continue
+		}
+
+		elapsedDuration := time.Since(cd.DeletionTimestamp.Time)
+
+		// For installing clusters we report the seconds since the cluster was created.
+		ch <- prometheus.MustNewConstMetric(
+			cc.metricClusterDeploymentDeprovisionUnderwaySeconds,
+			prometheus.GaugeValue,
+			elapsedDuration.Seconds(),
+			cd.Name,
+			cd.Namespace,
+			GetLabelValue(&cd, hivev1.HiveClusterTypeLabel),
+		)
+
+	}
+
+}
+
+func (cc deprovisioningUnderwayCollector) Describe(ch chan<- *prometheus.Desc) {
+	prometheus.DescribeByCollect(cc, ch)
+}
+
+var (
+	metricClusterDeploymentDeprovisionUnderwaySecondsDesc = prometheus.NewDesc(
+		"hive_cluster_deployment_deprovision_underway_seconds",
+		"Length of time a cluster has been deprovisioning.",
+		[]string{"cluster_deployment", "namespace", "cluster_type"},
+		nil,
+	)
+)
+
+func newDeprovisioningUnderwaySecondsCollector(client client.Client) prometheus.Collector {
+	return deprovisioningUnderwayCollector{
+		client: client,
+		metricClusterDeploymentDeprovisionUnderwaySeconds: metricClusterDeploymentDeprovisionUnderwaySecondsDesc,
+	}
+}
+
+// clustersync failing metric collected through a custom prometheus collector
+type clusterSyncFailingCollector struct {
+	client client.Client
+
+	// minDuration, when non-zero, is the minimum duration afer which clustersync failure
+	// will start becoming part of this metric. When set to zero, all clustersync failures
+	// will be included in the metric.
+	minDuration time.Duration
+
+	// metricClusterSyncFailingSeconds is a prometheus metric for the number of seconds
+	// between the start of a failing clustersync and now.
+	metricClusterSyncFailingSeconds *prometheus.Desc
+}
+
+// collects the metrics for custerSyncFailingCollector
+func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
+	ccLog := log.WithField("controller", "metrics")
+	ccLog.Info("calculating cluster sync failing seconds metrics")
+
+	clusterSyncList := &hiveintv1alpha1.ClusterSyncList{}
+	err := cc.client.List(context.Background(), clusterSyncList)
+	if err != nil {
+		log.WithError(err).Error("error listing all ClusterSyncs")
+		return
+	}
+
+	for _, cs := range clusterSyncList.Items {
+		// Failing cluster syncs
+		cond := controllerutils.FindCondition(cs.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
+		if cond != nil && cond.Status == corev1.ConditionTrue {
+			seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
+			// check if duration crosses the threshold
+			if cc.minDuration.Seconds() <= seconds {
+				ch <- prometheus.MustNewConstMetric(
+					cc.metricClusterSyncFailingSeconds,
+					prometheus.GaugeValue,
+					seconds,
+					cs.Namespace+"/"+cs.Name,
+				)
+			}
+		}
+	}
+}
+
+func (cc clusterSyncFailingCollector) Describe(ch chan<- *prometheus.Desc) {
+	prometheus.DescribeByCollect(cc, ch)
+}
+
+// MetricClusterSyncFailingSeconds is a prometheus metric that tracks the number of seconds for which a
+// clustersync has been in failing state
+var (
+	metricClusterSyncFailingSecondsDesc = prometheus.NewDesc(
+		"hive_clustersync_failing_seconds",
+		"Length of time a clustersync has been failing",
+		// namespaced_name would be logged as $namespace/$name
+		[]string{"namespaced_name"},
+		nil,
+	)
+)
+
+func newClusterSyncFailingCollector(client client.Client, minimum time.Duration) prometheus.Collector {
+	return clusterSyncFailingCollector{
+		client:                          client,
+		metricClusterSyncFailingSeconds: metricClusterSyncFailingSecondsDesc,
+		minDuration:                     minimum,
+	}
 }

@@ -527,22 +527,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.DeletionTimestamp != nil {
-		if !controllerutils.HasFinalizer(cd, hivev1.FinalizerDeprovision) {
-			// Make sure we have no deprovision underway metric even though this was probably cleared when we
-			// removed the finalizer.
-			clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
-			// Clear ClusterSyncFailing metric
-			hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
-
-			return reconcile.Result{}, nil
-		}
-
-		// Deprovision still underway, report metric for this cluster.
-		hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.WithLabelValues(
-			cd.Name,
-			cd.Namespace,
-			hivemetrics.GetLabelValue(cd, hivev1.HiveClusterTypeLabel)).Set(
-			time.Since(cd.DeletionTimestamp.Time).Seconds())
 
 		return r.syncDeletedClusterDeployment(cd, cdLog)
 	}
@@ -1438,10 +1422,6 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 		return err
 	}
 
-	clearDeprovisionUnderwaySecondsMetric(cd, cdLog)
-	// Clear ClusterSyncFailing metric
-	hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
-
 	// Increment the clusters deleted counter:
 	metricClustersDeleted.Observe(cd, nil, 1)
 	return nil
@@ -1871,17 +1851,6 @@ func generatePullSecretObj(pullSecret string, pullSecretName string, cd *hivev1.
 	}
 }
 
-func clearDeprovisionUnderwaySecondsMetric(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) {
-	cleared := hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds.Delete(map[string]string{
-		"cluster_deployment": cd.Name,
-		"namespace":          cd.Namespace,
-		"cluster_type":       hivemetrics.GetLabelValue(cd, hivev1.HiveClusterTypeLabel),
-	})
-	if cleared {
-		cdLog.Debug("cleared metric: %v", hivemetrics.MetricClusterDeploymentDeprovisioningUnderwaySeconds)
-	}
-}
-
 // initializeAnnotations() initializes the annotations if it is not already
 func initializeAnnotations(cd *hivev1.ClusterDeployment) {
 	if cd.Annotations == nil {
@@ -2151,8 +2120,6 @@ func (r *ReconcileClusterDeployment) setSyncSetFailedCondition(cd *hivev1.Cluste
 			reason = "MissingClusterSync"
 			message = "ClusterSync has not yet been created"
 		}
-		// In case the clusterSync has been deleted at this point, clear the clusterSyncFailing metric
-		hivemetrics.ClearClusterSyncFailingSecondsMetric(cd.Namespace, cd.Name, cdLog)
 	case err != nil:
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not get ClusterSync")
 		return err

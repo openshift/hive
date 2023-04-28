@@ -21,6 +21,10 @@ type MachinePoolPlatform struct {
 	// SpotMarketOptions allows users to configure instances to be run using AWS Spot instances.
 	// +optional
 	SpotMarketOptions *SpotMarketOptions `json:"spotMarketOptions,omitempty"`
+
+	// EC2MetadataOptions defines metadata service interaction options for EC2 instances in the machine pool.
+	// +optional
+	EC2Metadata *EC2Metadata `json:"metadataService,omitempty"`
 }
 
 // SpotMarketOptions defines the options available to a user when configuring
@@ -47,4 +51,17 @@ type EC2RootVolume struct {
 	// https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_GetEbsDefaultKmsKeyId.html
 	// +optional
 	KMSKeyARN string `json:"kmsKeyARN,omitempty"`
+}
+
+// EC2Metadata defines the metadata service interaction options for an ec2 instance.
+// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
+type EC2Metadata struct {
+	// Authentication determines whether or not the host requires the use of authentication when interacting with the metadata service.
+	// When using authentication, this enforces v2 interaction method (IMDSv2) with the metadata service.
+	// When omitted, this means the user has no opinion and the value is left to the platform to choose a good
+	// default, which is subject to change over time. The current default is optional.
+	// At this point this field represents `HttpTokens` parameter from `InstanceMetadataOptionsRequest` structure in AWS EC2 API
+	// https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceMetadataOptionsRequest.html
+	// +optional
+	Authentication string `json:"authentication,omitempty"`
 }

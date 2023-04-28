@@ -151,6 +151,10 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		Zones: pool.Spec.Platform.AWS.Zones,
 	}
 
+	if pool.Spec.Platform.AWS.EC2Metadata != nil {
+		computePool.Platform.AWS.EC2Metadata.Authentication = pool.Spec.Platform.AWS.EC2Metadata.Authentication
+	}
+
 	if len(computePool.Platform.AWS.Zones) == 0 {
 		zones, err := a.fetchAvailabilityZones()
 		if err != nil {

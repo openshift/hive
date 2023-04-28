@@ -49,6 +49,7 @@ func TestAWSActuator(t *testing.T) {
 		expectedErr                  bool
 		expectedCondition            *hivev1.MachinePoolCondition
 		expectedKMSKey               string
+		expectedEC2MetadataAuth      string
 		expectedAMI                  *machineapi.AWSResourceReference
 		expectedSGFilters            []machineapi.Filter
 	}{
@@ -356,6 +357,22 @@ func TestAWSActuator(t *testing.T) {
 			},
 		},
 		{
+			name:              "ec2 metadata",
+			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
+			machinePool:       withEC2Metadata(testMachinePool(), "Optional"),
+			masterMachine:     testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeAvailabilityZones(client, []string{"zone1"})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 3,
+			},
+			expectedEC2MetadataAuth: "Optional",
+			expectedAMI: &machineapi.AWSResourceReference{
+				ID: pointer.String(testAMI),
+			},
+		},
+		{
 			name:              "kms key disk encryption",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
 			machinePool:       withKMSKey(testMachinePool()),
@@ -568,7 +585,7 @@ func TestAWSActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey, test.expectedAMI, test.expectedSGFilters)
+				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey, test.expectedAMI, test.expectedSGFilters, test.expectedEC2MetadataAuth)
 			}
 			if test.expectedCondition != nil {
 				cond := controllerutils.FindCondition(pool.Status.Conditions, test.expectedCondition.Type)
@@ -617,7 +634,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 }
 
-func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *machineapi.AWSResourceReference, expectedSGFilters []machineapi.Filter) {
+func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *machineapi.AWSResourceReference, expectedSGFilters []machineapi.Filter, expectedEC2MetadataAuth string) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -649,6 +666,11 @@ func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 		}
 		if expectedSGFilters != nil {
 			assert.Equal(t, awsProvider.SecurityGroups[0].Filters, expectedSGFilters, "unexpected security group filters")
+		}
+
+		if expectedEC2MetadataAuth != "" {
+			assert.NotNil(t, awsProvider.MetadataServiceOptions, "Missing ec2metadata")
+			assert.Equal(t, expectedEC2MetadataAuth, string(awsProvider.MetadataServiceOptions.Authentication))
 		}
 	}
 }
@@ -791,6 +813,11 @@ func encodeAWSMachineProviderSpec(awsProviderSpec *machineapi.AWSMachineProvider
 
 func withSpotMarketOptions(pool *hivev1.MachinePool) *hivev1.MachinePool {
 	pool.Spec.Platform.AWS.SpotMarketOptions = &awshivev1.SpotMarketOptions{}
+	return pool
+}
+
+func withEC2Metadata(pool *hivev1.MachinePool, metadataAuth string) *hivev1.MachinePool {
+	pool.Spec.Platform.AWS.EC2Metadata = &awshivev1.EC2Metadata{Authentication: "Optional"}
 	return pool
 }
 

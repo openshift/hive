@@ -14,7 +14,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/workqueue"
@@ -288,15 +287,16 @@ func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev
 // section of `cm`, hive's representation of the cluster metadata. The `cd` is only used to validate that we're
 // operating on an Azure cluster.
 // The caller is responsible for copying `cm` back into `cd` and Update()ing if/as necessary.
-func setAzureResourceGroupFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pm *runtime.RawExtension, logger log.FieldLogger) {
-	if pm == nil {
+func setAzureResourceGroupFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pmjson []byte, logger log.FieldLogger) {
+	if pmjson == nil {
 		return
 	}
 	if cd.Spec.Platform.Azure == nil {
 		return
 	}
+
 	im := new(installertypes.ClusterMetadata)
-	if err := json.Unmarshal(pm.Raw, &im); err != nil {
+	if err := json.Unmarshal(pmjson, &im); err != nil {
 		logger.WithError(err).Error("Could not unmarshal ClusterMetadata!")
 		return
 	}
@@ -306,11 +306,20 @@ func setAzureResourceGroupFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.
 		return
 	}
 	rg := im.Azure.ResourceGroupName
-	if rg == "" {
-		logger.Warn("ClusterMetadata unexpectedly contains no Azure ResourceGroupName")
-		return
+	if rg != "" {
+		log.WithField("resourceGroupName", rg).Info("Found Azure ResourceGroupName in ClusterMetadata")
+	} else {
+		// Default it if possible
+		if im.InfraID == "" {
+			// This shouldn't be possible.
+			log.Warn("Can't set default Azure ResourceGroup yet: no InfraID set. This should not happen.")
+			return
+		}
+		// This is the default set by the installer
+		rg = fmt.Sprintf("%s-rg", im.InfraID)
+		log.WithField("resourceGroupName", rg).Info("Azure ResourceGroupName unset in ClusterMetadata; defaulting")
 	}
-	logger.Debug("Setting ResourceGroupName in ClusterMetadata")
+
 	if cm.Platform == nil {
 		cm.Platform = &hivev1.ClusterPlatformMetadata{}
 	}
@@ -348,7 +357,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		if provision.Spec.AdminPasswordSecretRef != nil {
 			clusterMetadata.AdminPasswordSecretRef = provision.Spec.AdminPasswordSecretRef
 		}
-		setAzureResourceGroupFromMetadata(cd, clusterMetadata, provision.Spec.Metadata, logger)
+		setAzureResourceGroupFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata
 			logger.Infof("Saving infra ID %q for cluster", cd.Spec.ClusterMetadata.InfraID)

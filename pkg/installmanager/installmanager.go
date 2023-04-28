@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -449,7 +448,7 @@ func (m *InstallManager) Run() error {
 	if err := m.updateClusterProvision(
 		m,
 		func(provision *hivev1.ClusterProvision) {
-			provision.Spec.Metadata = &runtime.RawExtension{Raw: metadataBytes}
+			provision.Spec.MetadataJSON = metadataBytes
 			provision.Spec.InfraID = pointer.String(metadata.InfraID)
 			provision.Spec.ClusterID = pointer.String(metadata.ClusterID)
 

@@ -387,7 +387,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.Metadata = &runtime.RawExtension{Raw: []byte("\"new-metadata\"")}
+				p.Spec.MetadataJSON = []byte("\"new-metadata\"")
 				return p
 			}(),
 			expectAllowed: true,
@@ -397,7 +397,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.Metadata = &runtime.RawExtension{Raw: []byte("\"new-metadata\"")}
+				p.Spec.MetadataJSON = []byte("\"new-metadata\"")
 				return p
 			}(),
 			expectAllowed: true,
@@ -601,7 +601,7 @@ func testCompletedClusterProvision() *hivev1.ClusterProvision {
 	provision.Spec.ClusterID = pointer.String("test-cluster-id")
 	provision.Spec.InfraID = pointer.String("test-infra-id")
 	provision.Spec.InstallLog = pointer.String("test-install-log")
-	provision.Spec.Metadata = &runtime.RawExtension{Raw: []byte("\"test-metadata\"")}
+	provision.Spec.MetadataJSON = []byte("\"test-metadata\"")
 	provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"}
 	provision.Spec.AdminPasswordSecretRef = &corev1.LocalObjectReference{Name: "test-admin-password"}
 	provision.Spec.PrevClusterID = pointer.String("test-prev-cluster-id")

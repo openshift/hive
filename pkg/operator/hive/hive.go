@@ -315,11 +315,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/rbac/hive_admin_role_binding.yaml",
 		"config/rbac/hive_reader_role_binding.yaml",
 	}
-	isOpenShift, err := r.runningOnOpenShift(hLog)
-	if err != nil {
-		return err
-	}
-	if isOpenShift {
+	if r.isOpenShift {
 		hLog.Info("deploying OpenShift specific assets")
 		for _, a := range openshiftSpecificAssets {
 			err = util.ApplyAssetWithGC(h, a, instance, hLog)
@@ -444,15 +440,15 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h re
 	hiveContainer.Env = append(hiveContainer.Env, globalPullSecretEnvVar)
 }
 
-func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) (bool, error) {
+func (r *ReconcileHiveConfig) runningOnOpenShift() (bool, error) {
 	deploymentConfigGroupVersion := oappsv1.GroupVersion.String()
 	list, err := r.discoveryClient.ServerResourcesForGroupVersion(deploymentConfigGroupVersion)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			hLog.WithError(err).Debug("DeploymentConfig objects not found, not running on OpenShift")
+			log.WithError(err).Debug("DeploymentConfig objects not found, not running on OpenShift")
 			return false, nil
 		}
-		hLog.WithError(err).Error("Error determining whether running on OpenShift")
+		log.WithError(err).Error("Error determining whether running on OpenShift")
 		return false, err
 	}
 

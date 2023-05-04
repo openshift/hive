@@ -157,11 +157,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	// the cluster CA and inject into the webhooks.
 	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
 	// secret, see hack/hiveadmission-dev-cert.sh. (TODO: automate -- see HIVE-1449.)
-	isOpenShift, err := r.runningOnOpenShift(hLog)
-	if err != nil {
-		return err
-	}
-	if !isOpenShift {
+	if !r.isOpenShift {
 		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
 		err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
 		if err != nil {

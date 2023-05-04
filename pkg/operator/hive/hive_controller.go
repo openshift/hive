@@ -115,6 +115,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	r.(*ReconcileHiveConfig).isOpenShift, err = r.(*ReconcileHiveConfig).runningOnOpenShift()
+	if err != nil {
+		return err
+	}
+
 	// Regular manager client is not fully initialized here, create our own for some
 	// initialization API communication:
 	tempClient, err := client.New(mgr.GetConfig(), client.Options{Scheme: mgr.GetScheme()})
@@ -338,6 +343,7 @@ type ReconcileHiveConfig struct {
 	hiveSecretLister                  corev1listers.SecretLister
 	secretWatchEstablishedInNamespace string
 	mgr                               manager.Manager
+	isOpenShift                       bool
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read

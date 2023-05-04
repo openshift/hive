@@ -242,11 +242,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// If the cluster proxy changes, we'll redeploy with the new values in the controllers' envs.
 	// There's just one Proxy object; and there's just one HiveConfig -- map any activity on the
-	// former to the latter.
-	err = c.Watch(&source.Kind{Type: &configv1.Proxy{}},
-		handler.EnqueueRequestsFromMapFunc(mapToHiveConfig("Proxy")))
-	if err != nil {
-		return err
+	// former to the latter. Note that Proxy is Openshift-specific.
+	if r.(*ReconcileHiveConfig).isOpenShift {
+		err = c.Watch(&source.Kind{Type: &configv1.Proxy{}},
+			handler.EnqueueRequestsFromMapFunc(mapToHiveConfig("Proxy")))
+		if err != nil {
+			return err
+		}
 	}
 
 	// Monitor the hive namespace so we can reconcile labels for monitoring. We do this with a map

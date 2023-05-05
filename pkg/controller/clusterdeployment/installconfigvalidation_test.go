@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/openshift/hive/apis"
@@ -162,6 +163,7 @@ func TestInstallConfigValidation(t *testing.T) {
 		ic            string
 		cd            *hivev1.ClusterDeployment
 		expectedError string
+		expectNilIC   bool
 	}{
 		{
 			name: "test aws install config valid",
@@ -256,17 +258,34 @@ func TestInstallConfigValidation(t *testing.T) {
 			ic:            testvSphereIC,
 			expectedError: missingvSphereCredentialsErr,
 		},
+		{
+			name: "un-unmarshallable install-config",
+			cd: cdBuilder.Build(
+				testcd.WithAzurePlatform(&hivev1azure.Platform{Region: "centralus"}),
+			),
+			ic:            `this is not yaml`,
+			expectedError: "could not unmarshal InstallConfig",
+			expectNilIC:   true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, "foo", "foo")
-			err := ValidateInstallConfig(test.cd, []byte(test.ic))
+			icSecret := &corev1.Secret{
+				Data: map[string][]byte{"install-config.yaml": []byte(test.ic)},
+			}
+			gotIC, err := ValidateInstallConfig(test.cd, icSecret)
 			if test.expectedError == "" {
 				assert.NoError(t, err)
 			} else {
 				if assert.Error(t, err, test.expectedError) {
 					assert.Contains(t, err.Error(), test.expectedError)
 				}
+			}
+			if test.expectNilIC {
+				assert.Nil(t, gotIC)
+			} else {
+				// We could validate the contents here, but it's not worth it.
+				assert.NotNil(t, gotIC)
 			}
 		})
 	}

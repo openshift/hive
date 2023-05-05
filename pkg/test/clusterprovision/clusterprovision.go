@@ -171,3 +171,9 @@ func WithJob(jobName string) Option {
 		}
 	}
 }
+
+func WithMetadata(md string) Option {
+	return func(clusterProvision *hivev1.ClusterProvision) {
+		clusterProvision.Spec.MetadataJSON = ([]byte)(md)
+	}
+}

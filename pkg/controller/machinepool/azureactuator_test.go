@@ -585,6 +585,11 @@ func testAzureClusterDeployment() *hivev1.ClusterDeployment {
 			Region: testRegion,
 		},
 	}
+	cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{
+		Azure: &hivev1azure.Metadata{
+			ResourceGroupName: pointer.String("foo-12345-rg"),
+		},
+	}
 	return cd
 }
 

@@ -171,18 +171,18 @@ func (mr *MockClientMockRecorder) ListAllVirtualMachines(ctx, statusOnly interfa
 }
 
 // ListImagesByResourceGroup mocks base method.
-func (m *MockClient) ListImagesByResourceGroup(ctx context.Context, resourgeGroupName string) (azureclient.ImageListResultPage, error) {
+func (m *MockClient) ListImagesByResourceGroup(ctx context.Context, resourceGroupName string) (azureclient.ImageListResultPage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListImagesByResourceGroup", ctx, resourgeGroupName)
+	ret := m.ctrl.Call(m, "ListImagesByResourceGroup", ctx, resourceGroupName)
 	ret0, _ := ret[0].(azureclient.ImageListResultPage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListImagesByResourceGroup indicates an expected call of ListImagesByResourceGroup.
-func (mr *MockClientMockRecorder) ListImagesByResourceGroup(ctx, resourgeGroupName interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListImagesByResourceGroup(ctx, resourceGroupName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImagesByResourceGroup", reflect.TypeOf((*MockClient)(nil).ListImagesByResourceGroup), ctx, resourgeGroupName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImagesByResourceGroup", reflect.TypeOf((*MockClient)(nil).ListImagesByResourceGroup), ctx, resourceGroupName)
 }
 
 // ListRecordSetsByZone mocks base method.

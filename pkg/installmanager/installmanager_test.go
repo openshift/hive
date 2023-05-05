@@ -322,7 +322,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			if test.expectProvisionMetadataUpdate {
-				assert.NotNil(t, provision.Spec.Metadata, "expected metadata to be set")
+				assert.NotNil(t, provision.Spec.MetadataJSON, "expected metadata to be set")
 				if assert.NotNil(t, provision.Spec.AdminKubeconfigSecretRef, "expected kubeconfig secret reference to be set") {
 					assert.Equal(t, "test-provision-admin-kubeconfig", provision.Spec.AdminKubeconfigSecretRef.Name, "unexpected name for kubeconfig secret reference")
 				}
@@ -330,7 +330,7 @@ func TestInstallManager(t *testing.T) {
 					assert.Equal(t, "test-provision-admin-password", provision.Spec.AdminPasswordSecretRef.Name, "unexpected name for password secret reference")
 				}
 			} else {
-				assert.Nil(t, provision.Spec.Metadata, "expected metadata to be empty")
+				assert.Nil(t, provision.Spec.MetadataJSON, "expected metadata to be empty")
 				assert.Nil(t, provision.Spec.AdminKubeconfigSecretRef, "expected kubeconfig secret reference to be empty")
 				assert.Nil(t, provision.Spec.AdminPasswordSecretRef, "expected password secret reference to be empty")
 			}

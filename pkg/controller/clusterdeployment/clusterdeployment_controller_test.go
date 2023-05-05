@@ -5,40 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/openpgp" //lint:ignore SA1019 only used in unit test
-
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/pointer"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	openshiftapiv1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
-	"github.com/openshift/library-go/pkg/verify"
-	"github.com/openshift/library-go/pkg/verify/store"
-
+	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
@@ -55,6 +30,27 @@ import (
 	testclusterdeprovision "github.com/openshift/hive/pkg/test/clusterdeprovision"
 	tcp "github.com/openshift/hive/pkg/test/clusterprovision"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+	"github.com/openshift/library-go/pkg/verify"
+	"github.com/openshift/library-go/pkg/verify/store"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/openpgp"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -108,7 +104,7 @@ func fakeReadFile(content string) func(string) ([]byte, error) {
 
 func TestClusterDeploymentReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
-	openshiftapiv1.Install(scheme.Scheme)
+	configv1.Install(scheme.Scheme)
 	routev1.Install(scheme.Scheme)
 
 	// Fake out readProvisionFailedConfig
@@ -199,7 +195,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Create provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
@@ -239,7 +235,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Adopt provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeployment()),
 				testProvision(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -264,7 +260,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Initializing provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())),
 				testProvision(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -352,7 +348,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Completed provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testSuccessfulProvision(),
 				testMetadataConfigMap(),
@@ -377,7 +373,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Completed provision with protected delete",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testSuccessfulProvision(),
 				testMetadataConfigMap(),
@@ -704,7 +700,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "clear InstallImagesNotResolved condition on success",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallerImage = pointer.String("test-installer-image")
@@ -728,7 +724,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Delete imageset job when complete",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallerImage = pointer.String("test-installer-image")
@@ -781,7 +777,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Ensure release image from clusterimageset is used as override image in install job",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallerImage = pointer.String("test-installer-image:latest")
@@ -841,6 +837,68 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Get Azure ResourceGroupName from provision metadata",
+			existing: []runtime.Object{
+				testInstallConfigSecret(`
+platform:
+  azure:
+    region: az-region
+`),
+				func() *hivev1.ClusterDeployment {
+					baseCD := testClusterDeploymentWithProvision()
+					baseCD.Labels[hivev1.HiveClusterPlatformLabel] = "azure"
+					baseCD.Labels[hivev1.HiveClusterRegionLabel] = "az-region"
+					baseCD.Spec.Platform.AWS = nil
+					baseCD.Spec.Platform.Azure = &azure.Platform{
+						Region: "az-region",
+					}
+					return testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(baseCD))
+				}(),
+				testSuccessfulProvision(tcp.WithMetadata(`{"azure": {"resourceGroupName": "infra-id-rg"}}`)),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "missing clusterdeployment") {
+					rg, err := controllerutils.AzureResourceGroup(cd)
+					if assert.Nil(t, err, "expected to find Azure resource group in CD") {
+						assert.Equal(t, "infra-id-rg", rg, "mismatched resource group name")
+					}
+				}
+			},
+		},
+		{
+			name: "Default Azure ResourceGroupName from provision metadata",
+			existing: []runtime.Object{
+				testInstallConfigSecret(`
+platform:
+  azure:
+    region: az-region
+`),
+				func() *hivev1.ClusterDeployment {
+					baseCD := testClusterDeploymentWithProvision()
+					baseCD.Labels[hivev1.HiveClusterPlatformLabel] = "azure"
+					baseCD.Labels[hivev1.HiveClusterRegionLabel] = "az-region"
+					baseCD.Spec.Platform.AWS = nil
+					baseCD.Spec.Platform.Azure = &azure.Platform{
+						Region: "az-region",
+					}
+					return testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(baseCD))
+				}(),
+				testSuccessfulProvision(tcp.WithMetadata(`{"infraID": "the-infra-id", "azure": {}}`)),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "missing clusterdeployment") {
+					rg, err := controllerutils.AzureResourceGroup(cd)
+					if assert.Nil(t, err, "expected to find Azure resource group in CD") {
+						assert.Equal(t, "the-infra-id-rg", rg, "mismatched resource group name")
+					}
+				}
+			},
+		},
+		{
 			name: "Create DNSZone with Azure CloudName",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
@@ -858,6 +916,14 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					}
 					baseCD.Spec.ManageDNS = true
 					baseCD.Spec.PreserveOnDelete = true
+					// Pre-set the Azure resource group so the Reconcile doesn't short out setting it
+					baseCD.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						Platform: &hivev1.ClusterPlatformMetadata{
+							Azure: &azure.Metadata{
+								ResourceGroupName: pointer.String("infra-id-rg"),
+							},
+						},
+					}
 					return testClusterDeploymentWithInitializedConditions(baseCD)
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -886,6 +952,14 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					}
 					baseCD.Spec.ManageDNS = true
 					baseCD.Spec.PreserveOnDelete = true
+					// Pre-set the Azure resource group so the Reconcile doesn't short out setting it
+					baseCD.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						Platform: &hivev1.ClusterPlatformMetadata{
+							Azure: &azure.Metadata{
+								ResourceGroupName: pointer.String("infra-id-rg"),
+							},
+						},
+					}
 					return testClusterDeploymentWithInitializedConditions(baseCD)
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1345,7 +1419,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Create provision when DNSZone is ready",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(
 						testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
@@ -1432,7 +1506,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Delete old provisions",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 4
@@ -1458,7 +1532,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Do not adopt failed provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
@@ -1482,7 +1556,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Delete-after requeue",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.CreationTimestamp = metav1.Now()
@@ -1502,7 +1576,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Wait after failed provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.CreationTimestamp = metav1.Now()
@@ -1537,7 +1611,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Clear out provision after wait time",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testProvision(tcp.WithFailureTime(time.Now().Add(-2 * time.Minute))),
 				testMetadataConfigMap(),
@@ -1754,7 +1828,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Ensure cluster metadata set from provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.Spec.ClusterMetadata = nil
@@ -1779,7 +1853,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "Ensure cluster metadata overwrites from provision",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
 					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
@@ -1809,7 +1883,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "set ClusterImageSet missing condition",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: "doesntexist"}
@@ -1833,7 +1907,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "do not set ClusterImageSet missing condition for installed cluster",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithInitializedConditions(
 						testInstalledClusterDeployment(time.Now()))
@@ -1858,7 +1932,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "clear ClusterImageSet missing condition",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
@@ -1885,7 +1959,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "clear legacy conditions",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testInstalledClusterDeployment(time.Now())))
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
@@ -2207,7 +2281,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "set InstallLaunchErrorCondition when install pod is stuck in pending phase",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
 				testProvision(tcp.WithStuckInstallPod()),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -2235,7 +2309,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "install attempts is less than the limit",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 1
@@ -2306,7 +2380,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "ProvisionStopped already",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
@@ -2332,7 +2406,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "install attempts is equal to the limit",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 2
@@ -2363,7 +2437,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 		{
 			name: "install attempts is greater than the limit",
 			existing: []runtime.Object{
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 3
@@ -2847,7 +2921,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testProvision(tcp.WithFailureReason("aReason")),
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2875,7 +2949,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					return cd
 				}(),
 				testProvision(tcp.WithFailureReason("aReason")),
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2900,7 +2974,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testProvision(tcp.WithFailureReason("aReason"), tcp.Attempt(0), tcp.WithCreationTimestamp(time.Now().Add(-2*time.Hour))),
 				testProvision(tcp.WithFailureReason("bReason"), tcp.Attempt(1), tcp.WithCreationTimestamp(time.Now().Add(-1*time.Hour))),
 				testProvision(tcp.WithFailureReason("cReason"), tcp.Attempt(2), tcp.WithCreationTimestamp(time.Now())),
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2925,7 +2999,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testProvision(tcp.WithFailureReason("aReason"), tcp.Attempt(0), tcp.WithCreationTimestamp(time.Now().Add(-2*time.Hour))),
 				testProvision(tcp.WithFailureReason("bReason"), tcp.Attempt(1), tcp.WithCreationTimestamp(time.Now().Add(-1*time.Hour))),
 				testProvision(tcp.WithFailureReason("cReason"), tcp.Attempt(2), tcp.WithCreationTimestamp(time.Now())),
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2948,7 +3022,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testProvision(tcp.WithFailureReason("aReason")),
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2970,7 +3044,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			name: "RetryReasons: no provision yet: list ignored, provision created",
 			existing: []runtime.Object{
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2993,7 +3067,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment())),
 				testProvision(tcp.WithFailureReason("aReason")),
-				testInstallConfigSecret(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -3321,14 +3395,18 @@ func testEmptyClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
-func testInstallConfigSecret() *corev1.Secret {
+func testInstallConfigSecretAWS() *corev1.Secret {
+	return testInstallConfigSecret(testAWSIC)
+}
+
+func testInstallConfigSecret(icData string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testNamespace,
 			Name:      installConfigSecretName,
 		},
 		Data: map[string][]byte{
-			"install-config.yaml": []byte(testAWSIC),
+			"install-config.yaml": []byte(icData),
 		},
 	}
 }
@@ -3560,9 +3638,10 @@ func testProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
 	return provision
 }
 
-func testSuccessfulProvision() *hivev1.ClusterProvision {
-	return testProvision(tcp.Successful(
+func testSuccessfulProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
+	opts = append(opts, tcp.Successful(
 		testClusterID, testInfraID, adminKubeconfigSecret, adminPasswordSecret))
+	return testProvision(opts...)
 }
 
 func testMetadataConfigMap() *corev1.ConfigMap {
@@ -4264,6 +4343,282 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 				actualDNSNotReadyCondition.Message = ""                       // zero out so it won't be checked.
 			}
 			assert.Equal(t, test.expectedDNSNotReadyCondition, actualDNSNotReadyCondition, "Expected DNSZone DNSNotReady condition doesn't match returned condition")
+		})
+	}
+}
+
+func Test_discoverAzureResourceGroup(t *testing.T) {
+	logger := log.WithField("controller", "clusterDeployment")
+	hivev1.AddToScheme(scheme.Scheme)
+	configv1.AddToScheme(scheme.Scheme)
+	azureCD := func(installed bool, cm *hivev1.ClusterMetadata) *hivev1.ClusterDeployment {
+		cd := testEmptyClusterDeployment()
+		cd.ObjectMeta = metav1.ObjectMeta{
+			Name:      testName,
+			Namespace: testNamespace,
+		}
+		// Cluster must be "reachable" for (good) remote client builder
+		cd.Status = hivev1.ClusterDeploymentStatus{
+			Conditions: []hivev1.ClusterDeploymentCondition{
+				{
+					Type:   hivev1.UnreachableCondition,
+					Status: corev1.ConditionFalse,
+				},
+			},
+		}
+		cd.Spec = hivev1.ClusterDeploymentSpec{
+			Platform: hivev1.Platform{
+				Azure: &azure.Platform{
+					Region: "az-region",
+				},
+			},
+			Provisioning: &hivev1.Provisioning{
+				InstallConfigSecretRef: &corev1.LocalObjectReference{
+					Name: installConfigSecretName,
+				},
+			},
+		}
+		if installed {
+			cd.Spec.Installed = true
+		}
+		if cm != nil {
+			cd.Spec.ClusterMetadata = cm
+		}
+		return cd
+	}
+	tests := []struct {
+		name     string
+		cd       *hivev1.ClusterDeployment
+		icSecret *corev1.Secret
+		// This is a tad silly, but:
+		// - "true": Configure the remote client (to contain infraObj, if set)
+		// - "false" (or unset): Expect remote client builder not to be called at all
+		// - "error": Remote client builder is invoked, but errors
+		configureRemoteClient string
+		// ignored if configureRemoteClient is false
+		infraObj   *configv1.Infrastructure
+		wantReturn bool
+		// Empty means we expect AzureResourceGroup() to error
+		wantResourceGroup string
+	}{
+		{
+			name: "no-op: non-Azure platform",
+			// This has AWS platform
+			cd: testClusterDeployment(),
+		},
+		{
+			name: "no-op: cluster not installed",
+			cd:   azureCD(false, nil),
+		},
+		{
+			name: "no-op: already set",
+			cd: azureCD(
+				true,
+				&hivev1.ClusterMetadata{
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &azure.Metadata{
+							ResourceGroupName: pointer.String("some-rg"),
+						},
+					},
+				},
+			),
+			wantResourceGroup: "some-rg",
+		},
+		{
+			name: "green path: infrastructure object",
+			// absent ClusterMetadata gets created & populated
+			cd:                    azureCD(true, nil),
+			configureRemoteClient: "true",
+			infraObj: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Azure: &configv1.AzurePlatformStatus{
+							ResourceGroupName: "some-rg",
+						},
+					},
+				},
+			},
+			wantReturn:        true,
+			wantResourceGroup: "some-rg",
+		},
+		{
+			name: "green path: set in install-config",
+			// partially configured ClusterMetadata gets populated
+			cd: azureCD(true, &hivev1.ClusterMetadata{}),
+			icSecret: testInstallConfigSecret(`
+platform:
+  azure:
+    region: az-region
+    resourceGroupName: some-rg
+`),
+			// Make the Infrastructure attempt fail
+			configureRemoteClient: "error",
+			wantReturn:            true,
+			wantResourceGroup:     "some-rg",
+		},
+		{
+			name: "green path: unset in install-config (use default)",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := azureCD(true, &hivev1.ClusterMetadata{
+					InfraID: testInfraID,
+					// empty Platform gets populated
+					Platform: &hivev1.ClusterPlatformMetadata{},
+				})
+				return cd
+			}(),
+			icSecret: testInstallConfigSecret(`
+platform:
+  azure:
+    region: az-region
+`),
+			configureRemoteClient: "error",
+			wantReturn:            true,
+			wantResourceGroup:     testInfraID + "-rg",
+		},
+		{
+			name: "no infra obj, no Provisioning in CD",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := azureCD(true, nil)
+				cd.Spec.Provisioning = nil
+				return cd
+			}(),
+			configureRemoteClient: "true",
+		},
+		{
+			name: "no PlatformStatus in infra; no InstallConfigSecretRef in CD",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := azureCD(true, nil)
+				cd.Spec.Provisioning = &hivev1.Provisioning{}
+				return cd
+			}(),
+			configureRemoteClient: "true",
+			infraObj: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{},
+			},
+		},
+		{
+			name: "no PlatformStatus.Azure in infra; empty InstallConfigSecretRef in CD",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := azureCD(true, nil)
+				cd.Spec.Provisioning = &hivev1.Provisioning{InstallConfigSecretRef: &corev1.LocalObjectReference{}}
+				return cd
+			}(),
+			configureRemoteClient: "true",
+			infraObj: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						// Not Azure
+						AWS: &configv1.AWSPlatformStatus{},
+					},
+				},
+			},
+		},
+		{
+			name:                  "no ResourceGroupName in infra; no install-config secret",
+			cd:                    azureCD(true, nil),
+			configureRemoteClient: "true",
+			infraObj: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Azure: &configv1.AzurePlatformStatus{},
+					},
+				},
+			},
+		},
+		{
+			name:                  "invalid install-config: bad format",
+			cd:                    azureCD(true, nil),
+			configureRemoteClient: "error",
+			icSecret:              testInstallConfigSecret("not valid yaml"),
+		},
+		{
+			name:                  "invalid install-config: platform mismatch",
+			cd:                    azureCD(true, nil),
+			configureRemoteClient: "error",
+			// Platform mismatch between CD and install-config
+			icSecret: testInstallConfigSecretAWS(),
+		},
+		{
+			name:                  "unset in install-config, but no infra ID in CD",
+			cd:                    azureCD(true, nil),
+			configureRemoteClient: "error",
+			icSecret: testInstallConfigSecret(`
+platform:
+  azure:
+    region: az-region
+`),
+		},
+	}
+
+	filterNils := func(objs ...runtime.Object) (filtered []runtime.Object) {
+		for _, obj := range objs {
+			if !reflect.ValueOf(obj).IsNil() {
+				filtered = append(filtered, obj)
+			}
+		}
+		return
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(filterNils(test.cd, test.icSecret)...).Build()
+			mockCtrl := gomock.NewController(t)
+			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
+			switch test.configureRemoteClient {
+			case "true":
+				mockRemoteClientBuilder.EXPECT().Build().Return(
+					fake.NewClientBuilder().WithRuntimeObjects(filterNils(test.infraObj)...).Build(),
+					nil,
+				)
+			case "error":
+				mockRemoteClientBuilder.EXPECT().Build().Return(nil, errors.New("couldn't build remote client"))
+			}
+
+			r := &ReconcileClusterDeployment{
+				Client:                        fakeClient,
+				scheme:                        scheme.Scheme,
+				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
+			}
+
+			if gotReturn := r.discoverAzureResourceGroup(test.cd, logger); gotReturn != test.wantReturn {
+				t.Errorf("ReconcileClusterDeployment.discoverAzureResourceGroup() = %v, want %v", gotReturn, test.wantReturn)
+			}
+
+			// Note that we're *not* getting this from the server -- the func updates the local obj, but the
+			// caller is responsible for Update()ing.
+			if gotResourceGroup, err := controllerutils.AzureResourceGroup(test.cd); test.wantResourceGroup == "" {
+				assert.Error(t, err, "expected AzureResourceGroup() to error")
+			} else {
+				if assert.NoError(t, err, "expected AzureResourceGroup() to succeed") {
+					assert.Equal(t, test.wantResourceGroup, gotResourceGroup, "resource group mismatch")
+				}
+			}
+
+			// If the remote client builder errored, expect the cd to be updated with the unreachable condition set
+			if test.configureRemoteClient == "error" {
+				if cd := getCDFromClient(fakeClient); assert.NotNil(t, cd, "expected to find the ClusterDeployment on the server") {
+					found := false
+					for _, cond := range cd.Status.Conditions {
+						if cond.Type == hivev1.UnreachableCondition {
+							found = true
+							assert.Equal(t, corev1.ConditionTrue, cond.Status, "expected unreachable condition to be true")
+							break
+						}
+					}
+					assert.True(t, found, "expected to find the unreachable condition")
+				}
+			}
 		})
 	}
 }

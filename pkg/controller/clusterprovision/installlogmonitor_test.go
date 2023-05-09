@@ -65,6 +65,7 @@ const (
 	defaultEbsKmsKeyInsufficientPermissions = "level=error msg=Error: Error waiting for instance (i-abcdefg01234) to become ready: Failed to reach target state. Reason: Client.InternalError: Client error on launch"
 	noWorkerNodesReady                      = "ReadyIngressNodesAvailable: Authentication requires functional ingress which requires at least one schedulable and ready node. Got 0 worker nodes, 3 master nodes, 0 custom target nodes (none are schedulable or ready for ingress pods)."
 	s3AccessControlListNotSupported         = "time=\"2023-04-11T08:22:52Z\" level=error msg=\"Error: error creating S3 bucket ACL for rosa-6lr7x-flcmj-bootstrap: AccessControlListNotSupported: The bucket does not allow ACLs\""
+	awsAccountBlocked                       = "Error: creating EC2 Instance: Blocked: This account is currently blocked and not recognized as a valid account. Please contact aws-verification@amazon.com if you have questions."
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -431,6 +432,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "ErrorDestroyingBootstrapResources",
 			log:            pointer.String(terraformFailedDelete),
 			expectedReason: "InstallerFailedToDestroyResources",
+		},
+		{
+			name:           "AWSAccountBlocked",
+			log:            pointer.String(awsAccountBlocked),
+			expectedReason: "AWSAccountIsBlocked",
 		},
 	}
 

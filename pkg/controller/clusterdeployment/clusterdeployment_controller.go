@@ -1990,6 +1990,9 @@ func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(namespace st
 				cm.Labels = make(map[string]string)
 			}
 			cm.Labels[injectCABundleKey] = "true"
+			// In case we're not running on OpenShift, we don't want the mount to fail because the expected key is missing,
+			// so populate it.
+			cm.Data = map[string]string{constants.TrustedCABundleFile: ""}
 			if err := r.Create(context.TODO(), cm); err != nil {
 				return errors.Wrap(err, "Failed to create the trusted CA bundle ConfigMap")
 			}
@@ -1997,8 +2000,16 @@ func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(namespace st
 			return errors.Wrap(err, "Failed to retrieve trusted CA bundle ConfigMap")
 		}
 	}
+	var modified bool
 	if cm.Labels[injectCABundleKey] != "true" {
 		cm.Labels[injectCABundleKey] = "true"
+		modified = true
+	}
+	if _, ok := cm.Data[constants.TrustedCABundleFile]; !ok {
+		cm.Data[constants.TrustedCABundleFile] = ""
+		modified = true
+	}
+	if modified {
 		if err := r.Update(context.TODO(), cm); err != nil {
 			return errors.Wrap(err, "Failed to update the trusted CA bundle ConfigMap")
 		}

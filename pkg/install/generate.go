@@ -37,8 +37,6 @@ const (
 	// deprovisionJobDeadline is the maximum time that deprovision job will be allowed to run.
 	// when this deadline is reached, the deprovision attempt will be marked failed.
 	deprovisionJobDeadline = 1 * time.Hour
-	// Data key within the trusted CA bundle ConfigMap containing the certificate data.
-	caBundleKey = "ca-bundle.crt"
 )
 
 func AWSAssumeRoleSecretName(secretPrefix string) string {
@@ -497,8 +495,8 @@ func baseVolumesAndMounts() ([]corev1.Volume, []corev1.VolumeMount) {
 					},
 					Items: []corev1.KeyToPath{
 						{
-							Key:  caBundleKey,
-							Path: caBundleKey,
+							Key:  constants.TrustedCABundleFile,
+							Path: constants.TrustedCABundleFile,
 						},
 					},
 				},

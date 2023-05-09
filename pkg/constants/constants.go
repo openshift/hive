@@ -509,6 +509,9 @@ const (
 
 	// TrustedCABundleDir is the path into which the merged CA bundle will be mounted.
 	TrustedCABundleDir = "/hive-trusted-cabundle"
+
+	// TrustedCABundleFile is the name of the file (and corresponding ConfigMap key) containing the merged CA bundle.
+	TrustedCABundleFile = "ca-bundle.crt"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

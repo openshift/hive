@@ -54,6 +54,11 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	namespacedAssets := []string{
 		"config/hiveadmission/service.yaml",
 		"config/hiveadmission/service-account.yaml",
+		// This secret was automatically generated prior to k8s 1.24. We're including it to cover later versions.
+		// Note that overwriting it should have no effect as k8s will still populate it for us.
+		// Also note that this secret will be deleted automatically when the serviceaccount is deleted; our deletion
+		// is redundant, but harmless.
+		"config/hiveadmission/sa-token-secret.yaml",
 	}
 	// Delete the assets from previous target namespaces
 	assetsToClean := append(namespacedAssets, deploymentAsset)

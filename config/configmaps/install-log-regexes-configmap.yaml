@@ -200,6 +200,11 @@ data:
         - "terraform destroy: failed to destroy using Terraform"
       installFailingReason: InstallerFailedToDestroyResources
       installFailingMessage: The installer failed to destroy installation resources
+    - name: AWSAccountBlocked
+      searchRegexStrings:
+        - "Blocked: This account is currently blocked and not recognized as a valid account."
+      installFailingReason: AWSAccountIsBlocked
+      installFailingMessage: "AWS account is currently blocked and not recognized as a valid account. Please contact aws-verification@amazon.com if you have questions."
 
 
     # GCP Specific

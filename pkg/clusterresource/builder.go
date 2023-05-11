@@ -6,6 +6,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	yamlpatch "github.com/krishicks/yaml-patch"
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/validate"
@@ -109,6 +110,9 @@ type Builder struct {
 	// AdoptAdminPassword is the admin password for an adopted cluster, typically written to disk
 	// after openshift-install create-cluster. This field is optional when adopting.
 	AdoptAdminPassword string
+
+	// FeatureSet defines the featureSet for the install-config.
+	FeatureSet string
 
 	// InstallerManifests is a map of filename strings to bytes for files to inject into the installers
 	// manifests dir before launching create-cluster.
@@ -399,6 +403,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 		},
 		AdditionalTrustBundle: o.AdditionalTrustBundle,
 		Publish:               installertypes.PublishingStrategy(o.PublishStrategy),
+		FeatureSet:            configv1.FeatureSet(o.FeatureSet),
 	}
 
 	if o.CredentialsMode != "" {

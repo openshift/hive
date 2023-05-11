@@ -35,6 +35,9 @@ type AzureCloudBuilder struct {
 
 	// CloudName is the name of the Azure cloud environment which will be used for the cluster.
 	CloudName hivev1azure.CloudEnvironment
+
+	// ResourceGroupName is the resource group where the cluster will be installed.
+	ResourceGroupName string
 }
 
 func NewAzureCloudBuilderFromSecret(credsSecret *corev1.Secret) *AzureCloudBuilder {
@@ -91,6 +94,7 @@ func (p *AzureCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installerty
 			Region:                      p.Region,
 			BaseDomainResourceGroupName: p.BaseDomainResourceGroupName,
 			CloudName:                   azureinstallertypes.CloudEnvironment(p.CloudName),
+			ResourceGroupName:           p.ResourceGroupName,
 		},
 	}
 

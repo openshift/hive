@@ -36,6 +36,7 @@ spec:
         - "--audit-log-path=-"
         - "--tls-cert-file=/var/serving-cert/tls.crt"
         - "--tls-private-key-file=/var/serving-cert/tls.key"
+        - "--tls-min-version=VersionTLS13"
         ports:
         - containerPort: 9443
           protocol: TCP

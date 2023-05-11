@@ -3445,8 +3445,9 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd.Labels[hivev1.HiveClusterRegionLabel] = "us-east-1"
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
-		InstallerImage: pointer.String("installer-image:latest"),
-		CLIImage:       pointer.String("cli:latest"),
+		InstallerImage:           pointer.String("installer-image:latest"),
+		InstallerImagePullPolicy: pointer.String("IfNotPresent"),
+		CLIImage:                 pointer.String("cli:latest"),
 	}
 
 	return cd

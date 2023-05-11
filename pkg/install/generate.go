@@ -297,6 +297,11 @@ func InstallerPodSpec(
 	}
 	installerImage := *cd.Status.InstallerImage
 
+	if cd.Status.InstallerImagePullPolicy == nil {
+		return nil, fmt.Errorf("installer pull policy not resolved")
+	}
+	installerImagePullPolicy := *cd.Status.InstallerImagePullPolicy
+
 	if cd.Status.CLIImage == nil {
 		return nil, fmt.Errorf("cli image not resolved")
 	}
@@ -312,7 +317,7 @@ func InstallerPodSpec(
 		{
 			Name:            "installer",
 			Image:           installerImage,
-			ImagePullPolicy: corev1.PullIfNotPresent,
+			ImagePullPolicy: corev1.PullPolicy(installerImagePullPolicy),
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for

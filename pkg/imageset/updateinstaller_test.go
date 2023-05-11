@@ -29,9 +29,11 @@ import (
 
 const (
 	testInstallerImage          = "registry.io/test-installer-image:latest"
+	testImagePullPolicy         = "IfNotPresent"
 	testCLIImage                = "registry.io/test-cli-image:latest"
 	testReleaseVersion          = "v0.0.0-test-version"
 	installerImageOverride      = "quay.io/foo/bar:baz"
+	installerPullPolicyOverride = "Always"
 	cliImageWithDifferentDomain = "some-other-domain.com/foo/cli:blah"
 )
 
@@ -54,7 +56,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testImagePullPolicy, testCLIImage, ""),
 		},
 		{
 			name:                      "failure execution missing cli",
@@ -72,7 +74,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, installerImageResolvedReason),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testImagePullPolicy, testCLIImage, installerImageResolvedReason),
 		},
 		{
 			name: "successful execution baremetal platform",
@@ -85,7 +87,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"baremetal-installer": testInstallerImage,
 				"cli":                 testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testImagePullPolicy, testCLIImage, ""),
 		},
 		{
 			name:                      "successful execution with version in release metadata",
@@ -95,7 +97,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"cli":       testCLIImage,
 			},
 			version:                   testReleaseVersion,
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testImagePullPolicy, testCLIImage, ""),
 		},
 		{
 			name:                      "installer image override",
@@ -104,7 +106,16 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(installerImageOverride, testCLIImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(installerImageOverride, testImagePullPolicy, testCLIImage, ""),
+		},
+		{
+			name:                      "installer image pull policy override",
+			existingClusterDeployment: testClusterDeploymentWithInstallerPullPolicyOverride(installerPullPolicyOverride),
+			images: map[string]string{
+				"installer": testInstallerImage,
+				"cli":       testCLIImage,
+			},
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, installerPullPolicyOverride, testCLIImage, ""),
 		},
 		{
 			name:                      "CLI image domain copied from installer image",
@@ -113,7 +124,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 				"installer": testInstallerImage,
 				"cli":       cliImageWithDifferentDomain,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, "registry.io/foo/cli:blah", ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testImagePullPolicy, "registry.io/foo/cli:blah", ""),
 		},
 		{
 			name:                      "copy requested, invalid installer image",
@@ -192,6 +203,14 @@ func testClusterDeploymentWithInstallerImageOverride(override string) *hivev1.Cl
 	return cd
 }
 
+func testClusterDeploymentWithInstallerPullPolicyOverride(override string) *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Spec.Provisioning = &hivev1.Provisioning{
+		InstallerImagePullPolicyOverride: override,
+	}
+	return cd
+}
+
 func testClusterDeploymentWithCLIDomainCopy() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	if cd.Annotations == nil {
@@ -202,10 +221,13 @@ func testClusterDeploymentWithCLIDomainCopy() *hivev1.ClusterDeployment {
 }
 
 // If expectedReason is empty, we won't check it.
-func validateSuccessfulExecution(expectedInstallerImage, expectedCLIImage, expectedReason string) func(*testing.T, *hivev1.ClusterDeployment) {
+func validateSuccessfulExecution(expectedInstallerImage, expectedInstallerImagePullPolicy, expectedCLIImage, expectedReason string) func(*testing.T, *hivev1.ClusterDeployment) {
 	return func(t *testing.T, clusterDeployment *hivev1.ClusterDeployment) {
 		if assert.NotNil(t, clusterDeployment.Status.InstallerImage, "did not get an installer image in status") {
 			assert.Equal(t, expectedInstallerImage, *clusterDeployment.Status.InstallerImage, "did not get expected installer image in status")
+		}
+		if assert.NotNil(t, clusterDeployment.Status.InstallerImagePullPolicy, "did not get an installer image pull policy in status") {
+			assert.Equal(t, expectedInstallerImagePullPolicy, *clusterDeployment.Status.InstallerImagePullPolicy, "did not get expected installer image pull policy in status")
 		}
 		if assert.NotNil(t, clusterDeployment.Status.CLIImage, "did not get a CLI image in status") {
 			assert.Equal(t, expectedCLIImage, *clusterDeployment.Status.CLIImage, "did not get expected CLI image in status")

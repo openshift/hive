@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	installerImage = "fakeinstallerimage"
-	cliImage       = "fakecliimage"
+	installerImage      = "fakeinstallerimage"
+	installerPullPolicy = "IfNotPresent"
+	cliImage            = "fakecliimage"
 )
 
 const (
@@ -79,8 +80,9 @@ func TestInstallerPodSpec(t *testing.T) {
 					},
 				},
 				Status: hivev1.ClusterDeploymentStatus{
-					InstallerImage: &installerImage,
-					CLIImage:       &cliImage,
+					InstallerImage:           &installerImage,
+					InstallerImagePullPolicy: &installerPullPolicy,
+					CLIImage:                 &cliImage,
 				},
 			},
 			provisionName:  "testprovision",

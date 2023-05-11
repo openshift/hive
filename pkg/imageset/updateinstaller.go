@@ -182,6 +182,12 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		o.log.WithField("installerImage", installerImage).Info("installer image found")
 	}
 
+	installerImagePullPolicy := string(corev1.PullIfNotPresent)
+	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.InstallerImagePullPolicyOverride != "" {
+		installerImagePullPolicy = cd.Spec.Provisioning.InstallerImagePullPolicyOverride
+		o.log.WithField("installer image pull policy", installerImagePullPolicy).Info("installer image pull policy overridden")
+	}
+
 	cliImage, err := findImageSpec(is, "cli")
 	if err != nil {
 		return errors.Wrap(err, "could not get cli image")
@@ -221,6 +227,7 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 	cd.Status.InstallerImage = &installerImage
 	cd.Status.CLIImage = &cliImage
 	cd.Status.InstallVersion = &releaseVersion
+	cd.Status.InstallerImagePullPolicy = &installerImagePullPolicy
 	// Set InstallerImageResolutionFailedCondition to false
 	cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
 		cd.Status.Conditions,

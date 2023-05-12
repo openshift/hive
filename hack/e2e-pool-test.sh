@@ -229,9 +229,11 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
 
 # Add customization to REAL POOL
 # NOTE: Use the cdcci- prefix for this cluster name so it gets caught by our leak detector.
+# NOTE: We do this after the fake pool creation so the fake pool doesn't pick up the same inventory.
 NEW_CLUSTER_NAME=cdcci-${CLUSTER_NAME#*-}
 create_customization "cdc-test" "${CLUSTER_NAMESPACE}" "${NEW_CLUSTER_NAME}"
 oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
+
 
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
 
@@ -242,21 +244,34 @@ verify_pool_cd_imagesets $FAKE_POOL_NAME $IMAGESET_NAME
 create_imageset fake-cis
 # Modify the clusterpool and watch CDs get replaced
 oc patch clusterpool $FAKE_POOL_NAME --type=merge -p '{"spec":{"imageSetRef": {"name": "fake-cis"}}}'
-expect_all_clusters_current $FAKE_POOL_NAME False
+oc wait --for=condition=AllClustersCurrent=false --timeout=1m clusterpool/$FAKE_POOL_NAME
 oc wait --for=condition=AllClustersCurrent --timeout=10m clusterpool/$FAKE_POOL_NAME
 # The wait returns as soon as we delete the last stale cluster. Wait for its replacement to be ready.
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
 # At this point all CDs should ref the new imageset
 verify_pool_cd_imagesets $FAKE_POOL_NAME fake-cis
 
-# Grab the name (which is also the namespace) of a cd from our pool
-cd=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'${FAKE_POOL_NAME}'") | .metadata.name' | head -1)
+echo "Claiming fake cluster"
+CLAIM_NAME=fake-claim
+go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool claim -n $CLUSTER_NAMESPACE $FAKE_POOL_NAME $CLAIM_NAME
+# Wait for the claim to be fulfilled
+oc wait --for=condition=Pending=false --timeout=2m clusterclaim/$CLAIM_NAME
+
+# Grab the namespace (which is also the name) of the claimed cd
+cd=$(oc get clusterclaim -n $CLUSTER_NAMESPACE $CLAIM_NAME -o jsonpath={.spec.namespace})
 if [[ -z "$cd" ]]; then
-  echo "Failed to retrieve a ClusterDeployment from pool $FAKE_POOL_NAME"
+  echo "Failed to glean ClusterDeployment name(space) from claim $CLAIM_NAME"
   exit 1
 fi
 
-## Test hibernating fake cluster
+# Cluster should be Running when claim is fulfilled
+pState=$(oc get cd -n $cd $cd -o jsonpath={.status.powerState})
+if [[ "$pState" != "Running" ]]; then
+  echo "Expected claimed cluster to be Running, but it was '$pState'"
+  exit 1
+fi
+
+## Test hibernating/resuming fake cluster
 echo "Hibernating fake cluster"
 set_power_state $cd Hibernating
 wait_for_hibernation_state $cd Hibernating
@@ -268,8 +283,17 @@ if [[ $delta_seconds -gt $((10*60)) ]]; then
   echo "Took longer than 10m to hibernate!"
   exit 9
 fi
+echo "Resuming fake cluster"
+set_power_state $cd Running
+wait_for_hibernation_state $cd Running
+
+## Deleting the claim should delete the CD
+oc delete cd -n $cd $cd
+oc wait --for=delete cd/$cd -n $cd --timeout=5m
 
 ## Test broken cluster replacement (HIVE-1615)
+# Grab the name (which is also the namespace) of a cd from our pool
+cd=$(oc get cd -A -o json | jq -r '.items[] | select(.spec.clusterPoolRef.poolName=="'${FAKE_POOL_NAME}'") | .metadata.name' | head -1)
 # Patch the CD's ProvisionStopped status condition to make it look "broken".
 # This should cause the clusterpool controller to replace it.
 i=0

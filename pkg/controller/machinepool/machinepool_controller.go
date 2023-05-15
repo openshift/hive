@@ -820,6 +820,13 @@ func (r *ReconcileMachinePool) syncClusterAutoscaler(
 		}
 	}
 	if defaultClusterAutoscaler != nil {
+		// NOTE: Do not make any more changes to how this controller manages autoscaler settings.
+		// - Since the autoscaler is a singleton, it doesn't make sense to try to manage it from
+		//   what may be disparate MachinePools.
+		// - We need to leave the consumer the ability to perform configuration. With the limitation
+		//   that ScaleDown is always enabled, this can be done in-cluster, or from the hub via
+		//   syncsets -- as long as no further defaulting/hardcoding is done below.
+		// See https://issues.redhat.com/browse/HIVE-2220 for details.
 		spec := &defaultClusterAutoscaler.Spec
 		changed := false
 		if spec.ScaleDown == nil {

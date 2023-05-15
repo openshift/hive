@@ -171,6 +171,7 @@ type Options struct {
 	SkipMachinePools                  bool
 	AdditionalTrustBundle             string
 	Internal                          bool
+	FeatureSet                        string
 
 	// AWS
 	AWSUserTags    []string
@@ -315,6 +316,7 @@ This option is redundant (but permitted) for following clouds, which always use 
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
 	flags.BoolVar(&opt.Internal, "internal", false, `When set, it configures the install-config.yaml's publish field to Internal.
 OpenShift Installer publishes all the services of the cluster like API server and ingress to internal network and not the Internet.`)
+	flags.StringVar(&opt.FeatureSet, "featureset", "", "FeatureSet to pass to the installer.")
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -596,6 +598,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		MachineNetwork:        o.MachineNetwork,
 		SkipMachinePools:      o.SkipMachinePools,
 		AdditionalTrustBundle: additionalTrustBundle,
+		FeatureSet:            o.FeatureSet,
 	}
 	if o.Adopt {
 		kubeconfigBytes, err := os.ReadFile(o.AdoptAdminKubeConfig)

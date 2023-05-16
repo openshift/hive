@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1agent "github.com/openshift/hive/apis/hive/v1/agent"
@@ -689,6 +690,132 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAzureClusterDeployment()
 				cd.Spec.Platform.Azure.Region = ""
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name: "Azure set resource group name: installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &hivev1azure.Metadata{
+							ResourceGroupName: pointer.String("my-rg"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Azure set resource group name: not installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &hivev1azure.Metadata{
+							ResourceGroupName: pointer.String("my-rg"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Azure set resource group name: while setting installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &hivev1azure.Metadata{
+							ResourceGroupName: pointer.String("my-rg"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Azure update resource group name",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &hivev1azure.Metadata{
+							ResourceGroupName: pointer.String("my-rg"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Azure unset resource group name",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAzureClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &hivev1azure.Metadata{
+							ResourceGroupName: pointer.String("my-rg"),
+						},
+					},
+				}
 				return cd
 			}(),
 			operation:       admissionv1beta1.Update,

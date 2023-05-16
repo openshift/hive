@@ -813,53 +813,30 @@ func (r *ReconcileMachinePool) syncClusterAutoscaler(
 	}
 	logger.Infof("found %v remote cluster autoscalers", len(remoteClusterAutoscalers.Items))
 	var defaultClusterAutoscaler *autoscalingv1.ClusterAutoscaler
-	for i, rCA := range remoteClusterAutoscalers.Items {
+	for _, rCA := range remoteClusterAutoscalers.Items {
 		if rCA.Name == "default" {
-			defaultClusterAutoscaler = &remoteClusterAutoscalers.Items[i]
-			break
+			// If an existing ClusterAutoscaler object found - leave it untouched
+			return nil
 		}
 	}
-	if defaultClusterAutoscaler != nil {
-		spec := &defaultClusterAutoscaler.Spec
-		changed := false
-		if spec.ScaleDown == nil {
-			spec.ScaleDown = &autoscalingv1.ScaleDownConfig{}
-		}
-		// Ensure spec.ScaleDown.Enabled = true
-		if !spec.ScaleDown.Enabled {
-			spec.ScaleDown.Enabled = true
-			changed = true
-		}
-		// Default spec.BalanceSimilarNodeGroups to true if unset.
-		if spec.BalanceSimilarNodeGroups == nil {
-			spec.BalanceSimilarNodeGroups = pointer.BoolPtr(true)
-			changed = true
-		}
-		if changed {
-			logger.Info("updaing cluster autoscaler")
-			if err := remoteClusterAPIClient.Update(context.Background(), defaultClusterAutoscaler); err != nil {
-				logger.WithError(err).Error("could not update cluster autoscaler")
-				return err
-			}
-		}
-	} else {
-		logger.Info("creating cluster autoscaler")
-		defaultClusterAutoscaler = &autoscalingv1.ClusterAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "default",
+
+	logger.Info("creating cluster autoscaler")
+	defaultClusterAutoscaler = &autoscalingv1.ClusterAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+		Spec: autoscalingv1.ClusterAutoscalerSpec{
+			ScaleDown: &autoscalingv1.ScaleDownConfig{
+				Enabled: true,
 			},
-			Spec: autoscalingv1.ClusterAutoscalerSpec{
-				ScaleDown: &autoscalingv1.ScaleDownConfig{
-					Enabled: true,
-				},
-				BalanceSimilarNodeGroups: pointer.BoolPtr(true),
-			},
-		}
-		if err := remoteClusterAPIClient.Create(context.Background(), defaultClusterAutoscaler); err != nil {
-			logger.WithError(err).Error("could not create cluster autoscaler")
-			return err
-		}
+			BalanceSimilarNodeGroups: pointer.BoolPtr(true),
+		},
 	}
+	if err := remoteClusterAPIClient.Create(context.Background(), defaultClusterAutoscaler); err != nil {
+		logger.WithError(err).Error("could not create cluster autoscaler")
+		return err
+	}
+
 	return nil
 }
 

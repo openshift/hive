@@ -56,4 +56,6 @@ func ConfigureCreds(c client.Client) {
 	if secret := string(credsSecret.Data[constants.AlibabaCloudAccessKeySecretSecretKey]); secret != "" {
 		os.Setenv("ALIBABA_CLOUD_ACCESS_KEY_SECRET", secret)
 	}
+	// Install cluster proxy trusted CA bundle
+	utils.InstallCerts(constants.TrustedCABundleDir)
 }

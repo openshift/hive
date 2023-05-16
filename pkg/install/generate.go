@@ -270,8 +270,7 @@ func InstallerPodSpec(
 	}
 
 	// Create all the empty directories we need
-	volumes := []corev1.Volume{}
-	volumeMounts := []corev1.VolumeMount{}
+	volumes, volumeMounts := baseVolumesAndMounts()
 	for volname, dir := range emptyDirs {
 		volumes = append(volumes, corev1.Volume{
 			Name: volname,
@@ -483,6 +482,36 @@ func GenerateUninstallerJobForDeprovision(
 	return job, nil
 }
 
+func baseVolumesAndMounts() ([]corev1.Volume, []corev1.VolumeMount) {
+	// All prov/deprov pods get the clusterwide certificate bundle, which includes
+	// the proxy trustedCA if configured. See https://docs.openshift.com/container-platform/4.12/networking/configuring-a-custom-pki.html#certificate-injection-using-operators_configuring-a-custom-pki
+	volumes := []corev1.Volume{
+		{
+			Name: constants.TrustedCAConfigMapName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: constants.TrustedCAConfigMapName,
+					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  constants.TrustedCABundleFile,
+							Path: constants.TrustedCABundleFile,
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      constants.TrustedCAConfigMapName,
+			MountPath: constants.TrustedCABundleDir,
+		},
+	}
+	return volumes, volumeMounts
+}
+
 // envAndVolumes creates lists of EnvVar, Volume, and VolumeMount suitable for including in a Pod spec
 // that's going to run a hiveutil deprovision command (including aws-tag-deprovision).
 // Args:
@@ -495,8 +524,7 @@ func GenerateUninstallerJobForDeprovision(
 //     "CREDS_SECRET_NAME" EnvVar; otherwise no such env var is included.
 //   - certsVolName, certsDir, certsName: Same as their creds* counterparts, but for certificates.
 func envAndVolumes(ns, credsVolName, credsDir, credsName, certsVolName, certsDir, certsName string) ([]corev1.EnvVar, []corev1.Volume, []corev1.VolumeMount) {
-	volumes := []corev1.Volume{}
-	volumeMounts := []corev1.VolumeMount{}
+	volumes, volumeMounts := baseVolumesAndMounts()
 	env := []corev1.EnvVar{
 		{
 			Name:  "CLUSTERDEPLOYMENT_NAMESPACE",

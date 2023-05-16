@@ -12,11 +12,13 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	configv1 "github.com/openshift/api/config/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
@@ -256,10 +258,16 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if hiveDeployment.Spec.Template.Annotations == nil {
 		hiveDeployment.Spec.Template.Annotations = make(map[string]string, 1)
 	}
-	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash("", configHashes...)
 
-	utils.SetProxyEnvVars(&hiveDeployment.Spec.Template.Spec,
-		os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY"))
+	httpProxy, httpsProxy, noProxy, err := r.discoverProxyVars()
+	if err != nil {
+		return err
+	}
+	utils.SetProxyEnvVars(&hiveDeployment.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
+
+	// Include the proxy vars in the hash so we redeploy if they change
+	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash(
+		httpProxy+httpsProxy+noProxy, configHashes...)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
@@ -307,11 +315,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/rbac/hive_admin_role_binding.yaml",
 		"config/rbac/hive_reader_role_binding.yaml",
 	}
-	isOpenShift, err := r.runningOnOpenShift(hLog)
-	if err != nil {
-		return err
-	}
-	if isOpenShift {
+	if r.isOpenShift {
 		hLog.Info("deploying OpenShift specific assets")
 		for _, a := range openshiftSpecificAssets {
 			err = util.ApplyAssetWithGC(h, a, instance, hLog)
@@ -436,15 +440,15 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h re
 	hiveContainer.Env = append(hiveContainer.Env, globalPullSecretEnvVar)
 }
 
-func (r *ReconcileHiveConfig) runningOnOpenShift(hLog log.FieldLogger) (bool, error) {
+func (r *ReconcileHiveConfig) runningOnOpenShift() (bool, error) {
 	deploymentConfigGroupVersion := oappsv1.GroupVersion.String()
 	list, err := r.discoveryClient.ServerResourcesForGroupVersion(deploymentConfigGroupVersion)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			hLog.WithError(err).Debug("DeploymentConfig objects not found, not running on OpenShift")
+			log.WithError(err).Debug("DeploymentConfig objects not found, not running on OpenShift")
 			return false, nil
 		}
-		hLog.WithError(err).Error("Error determining whether running on OpenShift")
+		log.WithError(err).Error("Error determining whether running on OpenShift")
 		return false, err
 	}
 
@@ -540,4 +544,23 @@ func (r *ReconcileHiveConfig) deleteAllSyncSetInstances(hLog log.FieldLogger) (n
 		listOptions.Continue = cont
 	}
 	return
+}
+
+func (r *ReconcileHiveConfig) discoverProxyVars() (string, string, string, error) {
+	httpProxy, httpsProxy, noProxy := os.Getenv("HTTP_PROXY"), os.Getenv("HTTPS_PROXY"), os.Getenv("NO_PROXY")
+
+	// We'll assume that if *any* of these are set, we don't need to read the cluster proxy object
+	if httpProxy+httpsProxy+noProxy != "" {
+		return httpProxy, httpsProxy, noProxy, nil
+	}
+
+	proxy := &configv1.Proxy{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, proxy); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("No cluster proxy found")
+			return "", "", "", nil
+		}
+		return "", "", "", errors.Wrap(err, "Failed to load cluster proxy object")
+	}
+	return proxy.Status.HTTPProxy, proxy.Status.HTTPSProxy, proxy.Status.NoProxy, nil
 }

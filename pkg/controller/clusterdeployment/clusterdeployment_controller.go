@@ -106,7 +106,8 @@ const (
 	deleteAfterAnnotation    = "hive.openshift.io/delete-after" // contains a duration after which the cluster should be cleaned up.
 	tryInstallOnceAnnotation = "hive.openshift.io/try-install-once"
 
-	regionUnknown = "unknown"
+	regionUnknown     = "unknown"
+	injectCABundleKey = "config.openshift.io/inject-trusted-cabundle"
 )
 
 // Add creates a new ClusterDeployment controller and adds it to the manager with default RBAC.
@@ -518,6 +519,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		if changed {
 			return reconcile.Result{}, nil
 		}
+	}
+
+	if err := r.ensureTrustedCABundleConfigMap(cd.Namespace); err != nil {
+		cdLog.WithError(err).Error("Failed to create or verify the trusted CA bundle ConfigMap")
+		return reconcile.Result{}, err
 	}
 
 	if cd.DeletionTimestamp != nil {
@@ -1986,6 +1992,47 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 		cdLog.WithField("secretName", mergedSecretName).Info("Created the merged pull secret object successfully")
 	}
 	return true, nil
+}
+
+// ensureTrustedCABundleConfigMap makes sure there is a ConfigMap in the CD's namespace with the magical
+// config.opesnhift.io/inject-trusted-cabundle="true" label, which causes the Cluster Network Operator to
+// populate it with a merged CA bundle including the cluster proxy's trustedCA if configured. We'll mount
+// this ConfigMap on all prov/deprov pods. See https://docs.openshift.com/container-platform/4.12/networking/configuring-a-custom-pki.html#certificate-injection-using-operators_configuring-a-custom-pki
+func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(namespace string) error {
+	cm := &corev1.ConfigMap{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: constants.TrustedCAConfigMapName}, cm); err != nil {
+		if apierrors.IsNotFound(err) {
+			cm.Name = constants.TrustedCAConfigMapName
+			cm.Namespace = namespace
+			if cm.Labels == nil {
+				cm.Labels = make(map[string]string)
+			}
+			cm.Labels[injectCABundleKey] = "true"
+			// In case we're not running on OpenShift, we don't want the mount to fail because the expected key is missing,
+			// so populate it.
+			cm.Data = map[string]string{constants.TrustedCABundleFile: ""}
+			if err := r.Create(context.TODO(), cm); err != nil {
+				return errors.Wrap(err, "Failed to create the trusted CA bundle ConfigMap")
+			}
+		} else {
+			return errors.Wrap(err, "Failed to retrieve trusted CA bundle ConfigMap")
+		}
+	}
+	var modified bool
+	if cm.Labels[injectCABundleKey] != "true" {
+		cm.Labels[injectCABundleKey] = "true"
+		modified = true
+	}
+	if _, ok := cm.Data[constants.TrustedCABundleFile]; !ok {
+		cm.Data[constants.TrustedCABundleFile] = ""
+		modified = true
+	}
+	if modified {
+		if err := r.Update(context.TODO(), cm); err != nil {
+			return errors.Wrap(err, "Failed to update the trusted CA bundle ConfigMap")
+		}
+	}
+	return nil
 }
 
 func calculateNextProvisionTime(failureTime time.Time, retries int, cdLog log.FieldLogger) time.Time {

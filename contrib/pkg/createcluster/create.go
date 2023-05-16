@@ -180,6 +180,7 @@ type Options struct {
 	// Azure
 	AzureBaseDomainResourceGroupName string
 	AzureCloudName                   string
+	AzureResourceGroupName           string
 
 	// OpenStack
 	OpenStackCloud             string
@@ -333,6 +334,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
 	flags.StringVar(&opt.AzureCloudName, "azure-cloud-name", "AzurePublicCloud", "Azure Cloud in which cluster will be created")
+	flags.StringVar(&opt.AzureResourceGroupName, "azure-resource-group-name", "", "Resource group where the cluster will be installed")
 
 	// OpenStack flags
 	flags.StringVar(&opt.OpenStackCloud, "openstack-cloud", "openstack", "Section of clouds.yaml to use for API/auth")
@@ -673,6 +675,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 			Region:                      o.Region,
 			CloudName:                   hivev1azure.CloudEnvironment(o.AzureCloudName),
+			ResourceGroupName:           o.AzureResourceGroupName,
 		}
 		builder.CloudBuilder = azureProvider
 	case cloudGCP:

@@ -96,7 +96,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentRecon
 
 	// Watch for changes to the hive-claim-owner RoleBinding
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.Role{}},
+		&source.Kind{Type: &rbacv1.RoleBinding{}},
 		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleBindingName, r.logger))); err != nil {
 		return err
 	}

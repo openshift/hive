@@ -186,17 +186,47 @@ func TestAWSActuator(t *testing.T) {
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone1", "zone2"},
 					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}, []string{}, "vpc-1")
-				mockDescribeRouteTables(client, map[string]bool{
-					"subnet-zone1": false,
-					"subnet-zone2": false,
-					"subnet-zone3": false,
-				}, "vpc-1")
 			},
 			expectedErr: true,
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
 				Status: corev1.ConditionTrue,
 				Reason: "MoreThanOneSubnetForZone",
+			},
+			expectedAMI: &machineapi.AWSResourceReference{
+				ID: pointer.String(testAMI),
+			},
+		},
+		{
+			// This test exists to hit the NotEnoughSubnetsForZones error path. Because of our simple
+			// preflight checks (number of subnets has to be 0, numZones, or 2*numZones) the only way
+			// we can do it is by giving 2*numZones subnets, but an uneven number of each. Specifically,
+			// since public subnets are checked first in this case, we have to give more private than
+			// public; otherwise we'll catch MoreThanOneSubnetForZone as above.
+			name:              "improper mix of public and private subnets",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"priv1-zone1", "priv2-zone2", "priv3-zone2", "pub-zone1"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone2", "zone1"},
+					[]string{"priv1-zone1", "priv2-zone2", "priv3-zone2"}, []string{"pub-zone1"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"priv1-zone1": false,
+					"priv2-zone2": false,
+					"priv3-zone2": false,
+					"pub-zone1":   true,
+				}, "vpc-1")
+			},
+			expectedErr: true,
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
+				Status: corev1.ConditionTrue,
+				Reason: "NotEnoughSubnetsForZones",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
@@ -212,19 +242,11 @@ func TestAWSActuator(t *testing.T) {
 				return pool
 			}(),
 			masterMachine: testMachine("master0", "master"),
-			mockAWSClient: func(client *mockaws.MockClient) {
-				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"},
-					[]string{"subnet-zone1", "subnet-zone2"}, []string{}, "vpc-1")
-				mockDescribeRouteTables(client, map[string]bool{
-					"subnet-zone1": false,
-					"subnet-zone2": false,
-				}, "vpc-1")
-			},
-			expectedErr: true,
+			expectedErr:   true,
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
 				Status: corev1.ConditionTrue,
-				Reason: "NoSubnetForAvailabilityZone",
+				Reason: "WrongNumberOfSubnets",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
@@ -240,20 +262,11 @@ func TestAWSActuator(t *testing.T) {
 				return pool
 			}(),
 			masterMachine: testMachine("master0", "master"),
-			mockAWSClient: func(client *mockaws.MockClient) {
-				mockDescribeSubnets(client, []string{"zone1", "zone2"},
-					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1"}, "vpc-1")
-				mockDescribeRouteTables(client, map[string]bool{
-					"subnet-zone1":    false,
-					"subnet-zone2":    false,
-					"pubSubnet-zone1": true,
-				}, "vpc-1")
-			},
-			expectedErr: true,
+			expectedErr:   true,
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
 				Status: corev1.ConditionTrue,
-				Reason: "InsufficientPublicSubnets",
+				Reason: "WrongNumberOfSubnets",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),

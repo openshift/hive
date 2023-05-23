@@ -6,6 +6,7 @@ import git
 import github as gh
 import json
 import os
+import requests
 import shutil
 import subprocess
 import sys
@@ -240,6 +241,36 @@ def generate_csv_base(
     return version_dir
 
 
+def validate_image(image_repo, image_tag):
+    """Ensure the image exists.
+
+    This is currently non-blocking; it just prints an advisory message.
+
+    We only attempt to validate quay.io images.
+
+    :param image_repo: The `host/org/repo` of the image.
+    :param image_tag: The tag of the image.
+    """
+    parsed = urllib3.util.parse_url(image_repo)
+    if parsed.host != "quay.io":
+        print(f"Skipping validation of non-quay image in repo {image_repo}")
+        return
+    url = f"https://{parsed.host}/api/v1/repository{parsed.path}/tag/?specificTag={image_tag}"
+    resp = requests.get(url)
+    if not resp.ok:
+        print(
+            f"WARNING: Couldn't query quay API for {url}\n\tstatus_code={resp.status_code}"
+        )
+        return
+    j = resp.json()
+    if not j.get("tags"):
+        print(
+            f"WARNING: Failed to validate image at {image_repo}:{image_tag}:\n\texpected one tag, got none.\n\t{j}"
+        )
+        return
+    print("Image validated successfully")
+
+
 def generate_package(package_file, channel, v: version2.Version):
     document_template = """
       channels:
@@ -432,6 +463,8 @@ if __name__ == "__main__":
     ver = version2.Version(
         hive_repo_dir.name, branch_name=args.dummy_bundle, commit_ish=args.commit
     )
+    image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
+    validate_image(args.image_repo, image_tag)
 
     print("Checking out {}".format(ver.shortsha))
     try:
@@ -448,7 +481,6 @@ if __name__ == "__main__":
         if ver.semver == prev_version:
             raise ValueError("Version {} already exists upstream".format(ver.semver))
 
-    image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
     version_dir = generate_csv_base(
         bundle_dir.name, args.image_repo, ver, prev_version, image_tag
     )

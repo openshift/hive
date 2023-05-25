@@ -6,6 +6,7 @@ import git
 import github as gh
 import json
 import os
+import requests
 import shutil
 import subprocess
 import sys
@@ -111,6 +112,14 @@ def get_params():
             version2.MASTER_BRANCH_PREFIX,
             HIVE_BRANCH_DEFAULT,
         ),
+    )
+    parser.add_argument(
+        "--skip-image-validation",
+        default=False,
+        help="""By default, we will check to make sure the image described by --image-repo and --image-tag-override (both
+                                of which may be defaulted/computed) exists. Provide this flag to skip that validation.
+                                Also note that we will currently only validate quay.io/* images.""",
+        action="store_true",
     )
     args = parser.parse_args()
 
@@ -238,6 +247,37 @@ def generate_csv_base(
     print("Wrote ClusterServiceVersion: %s" % csv_file)
 
     return version_dir
+
+
+def validate_image(image_repo, image_tag, skip):
+    """Ensure the image exists.
+
+    We only attempt to validate quay.io images.
+
+    :param image_repo: The `host/org/repo` of the image.
+    :param image_tag: The tag of the image.
+    :param skip: If True, we'll skip validation.
+    """
+    if skip:
+        print(f"Skipping validation of image {image_repo}:{image_tag}")
+        return
+    parsed = urllib3.util.parse_url(image_repo)
+    if parsed.host != "quay.io":
+        print(f"Skipping validation of non-quay image in repo {image_repo}")
+        return
+    url = f"https://{parsed.host}/api/v1/repository{parsed.path}/tag/?specificTag={image_tag}"
+    resp = requests.get(url)
+    if not resp.ok:
+        print(
+            f"Failed to validate image {image_repo}:{image_tag}!\nCouldn't query quay API for {url}\n\tstatus_code={resp.status_code}"
+        )
+        sys.exit(1)
+    j = resp.json()
+    if not j.get("tags"):
+        print(f"No image at {image_repo}:{image_tag}!")
+        sys.exit(1)
+
+    print("Image validated successfully")
 
 
 def generate_package(package_file, channel, v: version2.Version):
@@ -432,6 +472,8 @@ if __name__ == "__main__":
     ver = version2.Version(
         hive_repo_dir.name, branch_name=args.dummy_bundle, commit_ish=args.commit
     )
+    image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
+    validate_image(args.image_repo, image_tag, args.skip_image_validation)
 
     print("Checking out {}".format(ver.shortsha))
     try:
@@ -448,7 +490,6 @@ if __name__ == "__main__":
         if ver.semver == prev_version:
             raise ValueError("Version {} already exists upstream".format(ver.semver))
 
-    image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
     version_dir = generate_csv_base(
         bundle_dir.name, args.image_repo, ver, prev_version, image_tag
     )

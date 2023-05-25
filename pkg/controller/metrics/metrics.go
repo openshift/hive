@@ -152,9 +152,6 @@ var (
 	// mapMetricToDurationHistograms is a map of optional durationMetrics of type Histogram to their specific duration,
 	// if mentioned
 	mapMetricToDurationHistograms map[*prometheus.HistogramVec]time.Duration
-	// mapMetricToDurationGauges is a map of optional durationMetrics of type Gauge to their specific duration, if
-	// mentioned
-	mapMetricToDurationGauges map[*prometheus.GaugeVec]time.Duration
 )
 
 // ReconcileOutcome is used in controller "reconcile complete" log entries, and the metricControllerReconcileTime
@@ -282,12 +279,9 @@ func (mc *Calculator) Start(ctx context.Context) error {
 						logHistogramDurationMetric(MetricResumingClustersSeconds, &cd,
 							time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
 					}
-					// While logging for WaitingForClusterOperators, account for the hard coded pause while waiting
-					// after nodes are ready, before we could query status of cluster operators
 					if readyCond.Reason == hivev1.ReadyReasonWaitingForClusterOperators {
 						logHistogramDurationMetric(MetricWaitingForCOClustersSeconds, &cd,
-							(time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())+
-								constants.ClusterOperatorSettlePause.Seconds())
+							time.Since(hibernatingCond.LastTransitionTime.Time).Seconds())
 					}
 				}
 			}
@@ -386,7 +380,6 @@ func (mc *Calculator) Start(ctx context.Context) error {
 // registerOptionalMetrics registers the metrics, and stores their configs in the corresponding maps
 func (mc *Calculator) registerOptionalMetrics(mConfig *metricsconfig.MetricsConfig) {
 	mapMetricToDurationHistograms = make(map[*prometheus.HistogramVec]time.Duration)
-	mapMetricToDurationGauges = make(map[*prometheus.GaugeVec]time.Duration)
 	for _, metric := range mConfig.MetricsWithDuration {
 		switch metric.Name {
 		// Histograms

@@ -74,6 +74,10 @@ const (
 	// ClusterPowerStateFailedToStartMachines
 	ClusterPowerStateFailedToStartMachines ClusterPowerState = "FailedToStartMachines"
 
+	// ClusterPowerStatePreppingClusterOperators indicates we are updating ClusterOperator
+	// statuses so we can tell when they have been refreshed on resume.
+	ClusterPowerStatePreppingClusterOperators ClusterPowerState = "PreparingClusterOperators"
+
 	// ClusterPowerStateStopping indicates the cluster is transitioning
 	// from a Running state to a Hibernating state.
 	ClusterPowerStateStopping ClusterPowerState = "Stopping"
@@ -90,9 +94,6 @@ const (
 
 	// ClusterPowerStateWaitingForNodes is used when waiting for nodes to become Ready.
 	ClusterPowerStateWaitingForNodes ClusterPowerState = "WaitingForNodes"
-
-	// ClusterPowerStatePausingForClusterOperatorsToSettle is used when pausing to let ClusterOperators start and post new status before we check it.
-	ClusterPowerStatePausingForClusterOperatorsToSettle ClusterPowerState = "PausingForClusterOperatorsToSettle"
 
 	// ClusterPowerStateWaitingForClusterOperators is used when waiting for ClusterOperators to
 	// get to a good state. (Available=True, Processing=False, Degraded=False)
@@ -507,6 +508,9 @@ const (
 	// HibernatingReasonResumingOrRunning is used as the reason for the Hibernating condition when the cluster
 	// is resuming or running. Precise details are available in the Ready condition.
 	HibernatingReasonResumingOrRunning = "ResumingOrRunning"
+	// HibernatingReasonPreppingClusterOperators indicates we are about to update CO statuses to help us determine
+	// when they have been checked on resume.
+	HibernatingReasonPreppingClusterOperators = "PreparingClusterOperators"
 	// HibernatingReasonStopping is used as the reason when the cluster is transitioning
 	// from a Running state to a Hibernating state.
 	HibernatingReasonStopping = string(ClusterPowerStateStopping)
@@ -548,8 +552,6 @@ const (
 	ReadyReasonWaitingForMachines = string(ClusterPowerStateWaitingForMachines)
 	// ReadyReasonWaitingForNodes is used on the Ready condition when waiting for nodes to become Ready.
 	ReadyReasonWaitingForNodes = string(ClusterPowerStateWaitingForNodes)
-	// ReadyReasonPausingForClusterOperatorsToSettle is used on the Ready condition when pausing to let ClusterOperators start and post new status before we check it.
-	ReadyReasonPausingForClusterOperatorsToSettle = string(ClusterPowerStatePausingForClusterOperatorsToSettle)
 	// ReadyReasonWaitingForClusterOperators is used on the Ready condition when waiting for ClusterOperators to
 	// get to a good state. (Available=True, Processing=False, Degraded=False)
 	ReadyReasonWaitingForClusterOperators = string(ClusterPowerStateWaitingForClusterOperators)

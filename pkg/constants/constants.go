@@ -1,8 +1,6 @@
 package constants
 
 import (
-	"time"
-
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
@@ -472,11 +470,6 @@ const (
 
 	// AlibabaCloudAccessKeySecretSecretKey is the key we use in a Kubernetes Secret containing Alibaba Cloud credentials for the access key secret.
 	AlibabaCloudAccessKeySecretSecretKey = "alibaba_cloud_access_key_secret"
-
-	// ClusterOperatorSettlePause is the time interval we wait after Nodes are reporting ready, before
-	// actually checking if ClusterOperators are in a good state. This is to allow them time to start
-	// their pods and report accurate status so we avoid reading good state from before hibernation.
-	ClusterOperatorSettlePause = 2 * time.Minute
 
 	// AdditionalLogFieldsAnnotation keys an annotation containing a JSON-encoded map of key/value pairs. If specified,
 	// nonempty, and parseable into such a map, the key/value pairs are blindly included in log lines for any controller

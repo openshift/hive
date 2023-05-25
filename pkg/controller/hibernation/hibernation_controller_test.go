@@ -380,12 +380,12 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForClusterOperators, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Minute * 2,
 		},
 		{
-			name: "proceed to pausing for cluster operators from starting machines",
+			name: "proceed to waiting for cluster operators from starting machines",
 			cd: cdBuilder.Options(o.shouldRun).Build(
 				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
 					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
@@ -402,12 +402,12 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForClusterOperators, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Minute * 2,
 		},
 		{
-			name: "proceed to pausing for cluster operators from waiting for machines",
+			name: "proceed to waiting for cluster operators from waiting for machines",
 			cd: cdBuilder.Options(o.shouldRun).Build(
 				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
 					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
@@ -424,12 +424,12 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForClusterOperators, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Minute * 2,
 		},
 		{
-			name: "proceed to pausing for cluster operators from waiting for nodes",
+			name: "proceed to waiting for cluster operators from waiting for nodes",
 			cd: cdBuilder.Options(o.shouldRun).Build(
 				testcd.WithCondition(hibernatingCondition(corev1.ConditionFalse,
 					hivev1.HibernatingReasonResumingOrRunning, 6*time.Hour)),
@@ -446,7 +446,7 @@ func TestReconcile(t *testing.T) {
 				builder.EXPECT().Build().Times(1).Return(c, nil)
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, hivev1.ClusterPowerStatePausingForClusterOperatorsToSettle, cd.Status.PowerState)
+				assert.Equal(t, hivev1.ClusterPowerStateWaitingForClusterOperators, cd.Status.PowerState)
 			},
 			expectRequeueAfter: time.Minute * 2,
 		},

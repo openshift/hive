@@ -1,5 +1,14 @@
 # Cluster Pools
 
+- [Overview](#overview)
+- [Supported Cloud Platforms](#supported-cloud-platforms)
+- [Sample Cluster Pool](#sample-cluster-pool)
+- [Sample Cluster Claim](#sample-cluster-claim)
+- [Managing admins for Cluster Pools](#managing-admins-for-cluster-pools)
+- [Install Config Template](#install-config-template)
+- [Time-based scaling of Cluster Pool](#time-based-scaling-of-cluster-pool)
+- [ClusterPool Deletion](#clusterpool-deletion)
+
 ## Overview
 
 Hive exposes a `ClusterPool` API which allows users to maintain a pool of "hot"
@@ -8,8 +17,8 @@ can be configured and Hive will attempt to maintain that set number of
 clusters.
 
 When a user needs a cluster they create a `ClusterClaim` resource which will be
-filled immediately with details on where to find their cluster.  (or as soon as
-a cluster is available in the pool if none were presently available). Once
+filled with details on where to find their cluster as soon as
+one is available from the pool and running. Once
 claimed, a cluster is removed from the pool and a new one will be created to
 replace it. Claimed clusters never return to the pool, they are intended to be
 destroyed when no longer needed. The `ClusterClaim.Spec.Namespace` will be
@@ -21,7 +30,7 @@ by using a namespace limited to a team via Kubernetes RBAC. All clusters in the
 pool will use the same set of cloud credentials specified in the platform for
 the pool. `ClusterClaims` must be created in the same namespace as their
 `ClusterPool`, but each actual `ClusterDeployment` is given its own namespace.
-The user who claims a cluster can be given RBAC to their clusters namespace to
+The user who claims a cluster can be given RBAC to their cluster's namespace to
 prevent anyone else from being able to access it.
 
 By default once a `ClusterDeployment` is ready, it will be
@@ -251,3 +260,9 @@ spec:
 CronJob’s spec.schedule field can be used to set the exact time when you want to scale the clusterpool. The syntax of the schedule expects a [cron](https://en.wikipedia.org/wiki/Cron) expression made of five fields - minute (0 - 59), hour (0 - 23), day of the month (1 - 31), month (1 - 12) and day of the week (0 - 6) in that order. In our example CronJob to scale up a clusterpool, the schedule is set to `0 6 * * *` which is 6:00 AM everyday. The cron job controller uses the time set for the kube-controller-manager container.
 
 CronJob’s spec.containers[].image is the image with the `oc` binary. We have tested with the [quay.io/openshift/origin-cli](https://quay.io/repository/openshift/origin-cli) image. You can also create your own image.
+
+## ClusterPool Deletion
+A `ClusterPool` can be deleted in the usual way (`oc delete` or the API equivalent).
+When a `ClusterPool` is deleted, hive will automatically initiate deletion of all *unclaimed* clusters in the pool.
+No new clusters will be created, and any new `ClusterClaim`s will not be fulfilled.
+However, *existing claimed* clusters will not be affected; and the `ClusterPool` itself will be held extant until those clusters have been deprovisioned through the normal means -- i.e. by deleting their `ClusterClaim`s.

@@ -113,6 +113,14 @@ def get_params():
             HIVE_BRANCH_DEFAULT,
         ),
     )
+    parser.add_argument(
+        "--skip-image-validation",
+        default=False,
+        help="""By default, we will check to make sure the image described by --image-repo and --image-tag-override (both
+                                of which may be defaulted/computed) exists. Provide this flag to skip that validation.
+                                Also note that we will currently only validate quay.io/* images.""",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     if args.verbose:
@@ -241,16 +249,18 @@ def generate_csv_base(
     return version_dir
 
 
-def validate_image(image_repo, image_tag):
+def validate_image(image_repo, image_tag, skip):
     """Ensure the image exists.
-
-    This is currently non-blocking; it just prints an advisory message.
 
     We only attempt to validate quay.io images.
 
     :param image_repo: The `host/org/repo` of the image.
     :param image_tag: The tag of the image.
+    :param skip: If True, we'll skip validation.
     """
+    if skip:
+        print(f"Skipping validation of image {image_repo}:{image_tag}")
+        return
     parsed = urllib3.util.parse_url(image_repo)
     if parsed.host != "quay.io":
         print(f"Skipping validation of non-quay image in repo {image_repo}")
@@ -259,15 +269,14 @@ def validate_image(image_repo, image_tag):
     resp = requests.get(url)
     if not resp.ok:
         print(
-            f"WARNING: Couldn't query quay API for {url}\n\tstatus_code={resp.status_code}"
+            f"Failed to validate image {image_repo}:{image_tag}!\nCouldn't query quay API for {url}\n\tstatus_code={resp.status_code}"
         )
-        return
+        sys.exit(1)
     j = resp.json()
     if not j.get("tags"):
-        print(
-            f"WARNING: Failed to validate image at {image_repo}:{image_tag}:\n\texpected one tag, got none.\n\t{j}"
-        )
-        return
+        print(f"No image at {image_repo}:{image_tag}!")
+        sys.exit(1)
+
     print("Image validated successfully")
 
 
@@ -464,7 +473,7 @@ if __name__ == "__main__":
         hive_repo_dir.name, branch_name=args.dummy_bundle, commit_ish=args.commit
     )
     image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
-    validate_image(args.image_repo, image_tag)
+    validate_image(args.image_repo, image_tag, args.skip_image_validation)
 
     print("Checking out {}".format(ver.shortsha))
     try:

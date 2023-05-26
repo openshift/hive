@@ -1,3 +1,7 @@
+# Add timestamps to our output
+shopt -s expand_aliases
+alias echo='/bin/echo -n `date -Ins --universal`"  "; /bin/echo'
+
 ###
 # TEMPORARY workaround for https://issues.redhat.com/browse/DPTP-2871
 # The configured job timeout after isn't signaling the test script like it

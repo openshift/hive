@@ -6,6 +6,7 @@ import git
 import github as gh
 import json
 import os
+import requests
 import shutil
 import subprocess
 import sys
@@ -13,7 +14,7 @@ import tempfile
 import urllib3
 import yaml
 
-import version
+import version2
 
 HIVE_REPO_DEFAULT = "git@github.com:openshift/hive.git"
 
@@ -22,17 +23,15 @@ HIVE_REPO_DEFAULT = "git@github.com:openshift/hive.git"
 # https://github.com/k8s-operatorhub/community-operators
 HIVE_SUB_DIR = "operators/hive-operator"
 
-OPERATORHUB_HIVE_IMAGE_DEFAULT = "quay.io/openshift-hive/hive"
-
-REGISTRY_AUTH_FILE_DEFAULT = "{}/.docker/config.json".format(os.environ["HOME"])
+OPERATORHUB_HIVE_IMAGE_DEFAULT = "quay.io/app-sre/hive"
 
 COMMUNITY_OPERATORS_HIVE_PKG_URL = "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-prod/main/operators/hive-operator/hive.package.yaml"
 
 SUBPROCESS_REDIRECT = subprocess.DEVNULL
 
-HIVE_BRANCH_DEFAULT = version.HIVE_BRANCH_DEFAULT
+HIVE_BRANCH_DEFAULT = "master"
 
-CHANNEL_DEFAULT = version.CHANNEL_DEFAULT
+CHANNEL_DEFAULT = "alpha"
 
 
 def get_params():
@@ -50,11 +49,6 @@ def get_params():
         default=False,
         help="Test run that skips pushing branches and submitting PRs",
         action="store_true",
-    )
-    parser.add_argument(
-        "--registry-auth-file",
-        default=REGISTRY_AUTH_FILE_DEFAULT,
-        help="Path to registry auth file",
     )
     # TODO: Validate this early! As written, if this is wrong you won't bounce until open_pr.
     parser.add_argument(
@@ -81,129 +75,59 @@ def get_params():
     )
     parser.add_argument(
         "--image-tag-override",
-        help="""String to use for the image tag and CSV name (but not the CSV `version`!). By default this is generated as
-                                `v$X.$Y.$count-$sha, e.g. v1.2-3456-789abcd, where $X is the major version; $Y is the minor
-                                version; $count is the number of commits leading up to the requested COMMIT-ISH; and $sha is
-                                the first seven digits of the commit SHA corresponding to COMMIT-ISH.""",
+        help="""String to use for the image tag. By default we use the first ten digits of the sha corresponding
+                                to the requested COMMIT-ISH.""",
     )
-    mutex_group = parser.add_mutually_exclusive_group()
     parser.add_argument(
         "--commit",
         metavar="COMMIT-ISH",
         help="""The commit-ish from which to build and push the image.
-                                This argument may be used on its own or in conjunction with --dummy-bundle
-                                or --image-only. If used as a standalone option, we generate a bundle version
+                                This argument may be used on its own or in conjunction with --dummy-bundle.
+                                If used as a standalone option, we generate a bundle version
                                 for `{}` starting on the commit-ish provided. If --commit is not specified,
-                                we assume the tip of the {} branch. If used alongside --dummy-bundle or --image-only,
-                                we generate bundle files or operator image for the `mce-X.Y` branch specified,
+                                we assume the tip of the {} branch. If used alongside --dummy-bundle,
+                                we generate bundle files for the `mce-X.Y` branch specified,
                                 at the commit-ish specified. For example, `--dummy-bundle mce-2.1 --commit $sha
-                                will result in a dummy-bundle 0.0.$count-$sha for mce-2.1. For more information,
-                                see the --dummy-bundle and --image-only descriptions.
+                                will result in a dummy-bundle 2.1.$count-$sha for mce-2.1. For more information,
+                                see the --dummy-bundle description.
                                 """.format(
             HIVE_BRANCH_DEFAULT,
             HIVE_BRANCH_DEFAULT,
         ),
     )
-    mutex_group.add_argument(
+    parser.add_argument(
         "--dummy-bundle",
         metavar="BRANCH-NAME",
         help="""Only generate bundle files at a specific commit, as provided by the `--commit`
                                 parameter, defaulting to the commit corresponding to BRANCH-NAME,
-                                which must be `master` or a valid `mce-*` branch. The bundle files will
+                                which must be `{}` or a valid `mce-*` branch. The bundle files will
                                 be placed in a subdirectory of your PWD named hive-operator-bundle-$version,
-                                where $version is computed as '0.0.$count-$sha'; $count is the number of
-                                commits leading up to the requested commit; and $sha is the first seven
-                                digits of the SHA of the requested commit.
-                                No image will be built. No package file will be generated. The CSV will not
-                                have any graph directives (`replaces`, `skipRange`, etc.).""",
+                                where $version is computed as 'X.Y.$count-$sha'; X.Y is the MCE version
+                                number, or `{}` for {}; $count is the number of commits leading up to the
+                                requested commit; and $sha is the first seven digits of the SHA of the requested
+                                commit. No package file will be generated. The CSV will not have any graph
+                                directives (`replaces`, `skipRange`, etc.).
+                                """.format(
+            HIVE_BRANCH_DEFAULT,
+            version2.MASTER_BRANCH_PREFIX,
+            HIVE_BRANCH_DEFAULT,
+        ),
     )
-    mutex_group.add_argument(
-        "--image-only",
-        metavar="BRANCH-NAME",
-        help="""Only build and push the operator image at a specific commit, as provided by the `--commit`
-                                parameter, defaulting to the commit corresponding to BRANCH-NAME,
-                                which must be a `master` or a valid `mce-*` branch.
-                                The $version will be computed as '0.0.$count-$sha', where
-                                $count is the number of commits leading up to the requested commit; and
-                                $sha is the first seven digits of the commit SHA corresponding to the requested commit.
-                                No bundle or OperatorHub PRs will be generated.""",
+    parser.add_argument(
+        "--skip-image-validation",
+        default=False,
+        help="""By default, we will check to make sure the image described by --image-repo and --image-tag-override (both
+                                of which may be defaulted/computed) exists. Provide this flag to skip that validation.
+                                Also note that we will currently only validate quay.io/* images.""",
+        action="store_true",
     )
     args = parser.parse_args()
-
-    if shutil.which("buildah"):
-        args.build_engine = "buildah"
-    elif shutil.which("docker"):
-        args.build_engine = "docker"
-    else:
-        print("neither buildah nor docker found, please install one or the other.")
-        sys.exit(1)
-
-    if not os.path.isfile(args.registry_auth_file):
-        parser.error(
-            "--registry-auth-file ({}) does not exist, provide --registry-auth-file".format(
-                args.registry_auth_file
-            )
-        )
 
     if args.verbose:
         global SUBPROCESS_REDIRECT
         SUBPROCESS_REDIRECT = None
 
     return args
-
-
-# build_and_push_image uses buildah or docker to build the HIVE image from the current
-# working directory (tagged with "v{hive_version}" eg. "v1.2.3187-18827f6" by default,
-# or the value passed to --image-tag-override if specified) and then pushes the image
-# to quay.
-def build_and_push_image(
-    registry_auth_file, image_repo, image_tag, dry_run, build_engine
-):
-    container_name = "{}:{}".format(image_repo, image_tag)
-
-    if dry_run:
-        print("Skipping build of container {}".format(container_name))
-        return
-
-    if build_engine == "buildah":
-        build = dict(
-            query="buildah images -nq {}",
-            build="buildah bud --ulimit nofile=10239:10240 --tag {} -f ./Dockerfile",
-            push="buildah push --authfile={} {}",
-        )
-        registry_auth_arg = registry_auth_file
-    elif build_engine == "docker":
-        build = dict(
-            query="docker image inspect {}",
-            build="docker build --tag {} -f ./Dockerfile .",
-            push="docker --config {} push {}",
-        )
-        registry_auth_arg = os.path.dirname(registry_auth_file)
-
-    # Did we already build it locally?
-    cp = subprocess.run(
-        build["query"].format(container_name).split(),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    if cp.returncode == 0:
-        print(
-            "Container {} already exists locally; not rebuilding.".format(
-                container_name
-            )
-        )
-    else:
-        # build/push the thing
-        print("Building container {}".format(container_name))
-
-        cmd = build["build"].format(container_name).split()
-        subprocess.run(cmd, check=True)
-
-    print("Pushing container")
-    subprocess.run(
-        build["push"].format(registry_auth_arg, container_name).split(),
-        check=True,
-    )
 
 
 # get_previous_version grabs the previous hive version (without the leading `v`) from
@@ -230,9 +154,11 @@ def get_previous_version(channel_name):
 # generate_csv_base generates a hive bundle from the current working directory
 # and deposits all artifacts in the specified bundle_dir.
 # If prev_version is not None/empty, the CSV will include it as `replaces`.
-def generate_csv_base(bundle_dir, image_repo, version, prev_version, image_tag):
+def generate_csv_base(
+    bundle_dir, image_repo, v: version2.Version, prev_version, image_tag
+):
     print("Writing bundle files to directory: %s" % bundle_dir)
-    print("Generating CSV for version: %s" % version)
+    print("Generating CSV for version: %s" % v)
 
     crds_dir = "config/crds"
     csv_template = "config/templates/hive-csv-template.yaml"
@@ -240,7 +166,7 @@ def generate_csv_base(bundle_dir, image_repo, version, prev_version, image_tag):
     deployment_spec = "config/operator/operator_deployment.yaml"
 
     # The bundle directory doesn't have the 'v'
-    version_dir = os.path.join(bundle_dir, version)
+    version_dir = os.path.join(bundle_dir, v.semver)
     if not os.path.exists(version_dir):
         os.mkdir(version_dir)
 
@@ -297,8 +223,8 @@ def generate_csv_base(bundle_dir, image_repo, version, prev_version, image_tag):
         ]
 
     # Update the versions to include git hash:
-    csv["metadata"]["name"] = "hive-operator.%s" % image_tag
-    csv["spec"]["version"] = version
+    csv["metadata"]["name"] = "hive-operator.%s" % v
+    csv["spec"]["version"] = v.semver
     if prev_version:
         csv["spec"]["replaces"] = "hive-operator.v%s" % prev_version
 
@@ -314,7 +240,7 @@ def generate_csv_base(bundle_dir, image_repo, version, prev_version, image_tag):
     csv["metadata"]["annotations"]["createdAt"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Write the CSV to disk:
-    csv_filename = "hive-operator.%s.clusterserviceversion.yaml" % image_tag
+    csv_filename = "hive-operator.%s.clusterserviceversion.yaml" % v
     csv_file = os.path.join(version_dir, csv_filename)
     with open(csv_file, "w") as outfile:
         yaml.dump(csv, outfile, default_flow_style=False)
@@ -323,7 +249,38 @@ def generate_csv_base(bundle_dir, image_repo, version, prev_version, image_tag):
     return version_dir
 
 
-def generate_package(package_file, channel, image_tag):
+def validate_image(image_repo, image_tag, skip):
+    """Ensure the image exists.
+
+    We only attempt to validate quay.io images.
+
+    :param image_repo: The `host/org/repo` of the image.
+    :param image_tag: The tag of the image.
+    :param skip: If True, we'll skip validation.
+    """
+    if skip:
+        print(f"Skipping validation of image {image_repo}:{image_tag}")
+        return
+    parsed = urllib3.util.parse_url(image_repo)
+    if parsed.host != "quay.io":
+        print(f"Skipping validation of non-quay image in repo {image_repo}")
+        return
+    url = f"https://{parsed.host}/api/v1/repository{parsed.path}/tag/?specificTag={image_tag}"
+    resp = requests.get(url)
+    if not resp.ok:
+        print(
+            f"Failed to validate image {image_repo}:{image_tag}!\nCouldn't query quay API for {url}\n\tstatus_code={resp.status_code}"
+        )
+        sys.exit(1)
+    j = resp.json()
+    if not j.get("tags"):
+        print(f"No image at {image_repo}:{image_tag}!")
+        sys.exit(1)
+
+    print("Image validated successfully")
+
+
+def generate_package(package_file, channel, v: version2.Version):
     document_template = """
       channels:
       - currentCSV: %s
@@ -331,7 +288,7 @@ def generate_package(package_file, channel, image_tag):
       defaultChannel: %s
       packageName: hive-operator
 """
-    name = "hive-operator.%s" % image_tag
+    name = "hive-operator.%s" % v
     document = document_template % (name, channel, channel)
 
     with open(package_file, "w") as outfile:
@@ -343,8 +300,8 @@ def generate_package(package_file, channel, image_tag):
     print("Wrote package: %s" % package_file)
 
 
-def copy_bundle(orig_wd, bundle_source_dir, image_tag):
-    bundle_dest_dir = os.path.join(orig_wd, "hive-operator-bundle-{}".format(image_tag))
+def copy_bundle(orig_wd, bundle_source_dir, v: version2.Version):
+    bundle_dest_dir = os.path.join(orig_wd, "hive-operator-bundle-{}".format(str(v)))
     shutil.copytree(bundle_source_dir, bundle_dest_dir)
     print("Wrote bundle to {}".format(bundle_dest_dir))
 
@@ -355,13 +312,10 @@ def open_pr(
     upstream_repo,
     gh_username,
     bundle_source_dir,
-    new_version,
-    prev_version,
-    image_tag,
+    v: version2.Version,
     hold,
     dry_run,
 ):
-
     dir_name = fork_repo.split("/")[1][:-4]
 
     dest_github_org = upstream_repo.split(":")[1].split("/")[0]
@@ -406,7 +360,7 @@ def open_pr(
         print("Failed to checkout upstream/main")
         raise
 
-    branch_name = "update-hive-{}".format(new_version)
+    branch_name = "update-hive-{}".format(v.semver)
 
     print("Create branch {}".format(branch_name))
     try:
@@ -417,8 +371,8 @@ def open_pr(
 
     # copy bundle directory
     print("Copying bundle directory")
-    bundle_files = os.path.join(bundle_source_dir, new_version)
-    hive_dir = os.path.join(repo_full_path, HIVE_SUB_DIR, new_version)
+    bundle_files = os.path.join(bundle_source_dir, v.semver)
+    hive_dir = os.path.join(repo_full_path, HIVE_SUB_DIR, v.semver)
     shutil.copytree(bundle_files, hive_dir)
 
     # update bundle manifest
@@ -434,13 +388,13 @@ def open_pr(
     for channel in bundle["channels"]:
         if channel["name"] == CHANNEL_DEFAULT:
             found = True
-            channel["currentCSV"] = "hive-operator.{}".format(image_tag)
+            channel["currentCSV"] = "hive-operator.{}".format(str(v))
 
     if not found:
         print("did not find a CSV channel to update")
         sys.exit(1)
     pr_title = "Update Hive community operator channel {} to {}".format(
-        CHANNEL_DEFAULT, new_version
+        CHANNEL_DEFAULT, v.semver
     )
 
     with open(bundle_manifests_file, "w") as outfile:
@@ -508,42 +462,6 @@ if __name__ == "__main__":
         )
         raise
 
-    hive_repo = git.Repo(hive_repo_dir.name)
-
-    if args.dummy_bundle or args.image_only:
-
-        branch_sha = version.find_branch(
-            hive_repo, args.dummy_bundle or args.image_only
-        ).hexsha
-        if not version.is_origin_branch(hive_repo, branch_sha):
-            print(
-                """Error: branch arg {} is not a valid tip of mce-* branch or master branch\n
-                Consider using the `--commit {}` argument if this commit is an ancestor of a valid
-                mce-* or master branch""".format(
-                    args.dummy_bundle or args.image_only, branch_sha
-                )
-            )
-            sys.exit(1)
-        if args.commit:
-            hive_commit = hive_repo.rev_parse(args.commit).hexsha
-            if not hive_repo.is_ancestor(hive_commit, branch_sha):
-                print(
-                    "Commit SHA {} is not equal to or an ancestor of branch {}".format(
-                        args.commit, args.dummy_bundle or args.image_only
-                    )
-                )
-                sys.exit(1)
-        else:
-            hive_commit = branch_sha
-
-        hive_version_prefix = "0.0"
-    else:
-        if not args.commit:
-            args.commit = HIVE_BRANCH_DEFAULT
-        hive_commit, hive_version_prefix = version.process_master_branch(
-            hive_repo, args.commit
-        )
-
     bundle_dir = tempfile.TemporaryDirectory(prefix="hive-operator-bundle-")
     work_dir = tempfile.TemporaryDirectory(prefix="operatorhub-push-")
 
@@ -551,44 +469,38 @@ if __name__ == "__main__":
     print("Working in {}".format(hive_repo_dir.name))
     os.chdir(hive_repo_dir.name)
 
-    print("Checking out {}".format(hive_commit))
+    ver = version2.Version(
+        hive_repo_dir.name, branch_name=args.dummy_bundle, commit_ish=args.commit
+    )
+    image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
+    validate_image(args.image_repo, image_tag, args.skip_image_validation)
+
+    print("Checking out {}".format(ver.shortsha))
     try:
-        hive_repo.git.checkout(hive_commit)
+        ver.repo.git.checkout(ver.commit)
     except:
-        print("Failed to checkout {}".format(hive_commit))
+        print("Failed to checkout {}".format(ver.shortsha))
         raise
 
-    hive_version = version.gen_hive_version(hive_repo, hive_commit, hive_version_prefix)
-    if args.dummy_bundle or args.image_only:
+    if args.dummy_bundle:
         # Omit version graph stuff
         prev_version = None
     else:
         prev_version = get_previous_version(CHANNEL_DEFAULT)
-        if hive_version == prev_version:
-            raise ValueError("Version {} already exists upstream".format(hive_version))
-
-    image_tag = args.image_tag_override or "v{}".format(hive_version)
-    build_and_push_image(
-        args.registry_auth_file,
-        args.image_repo,
-        image_tag,
-        args.dry_run or args.dummy_bundle,
-        args.build_engine,
-    )
-    if args.image_only:
-        sys.exit(0)
+        if ver.semver == prev_version:
+            raise ValueError("Version {} already exists upstream".format(ver.semver))
 
     version_dir = generate_csv_base(
-        bundle_dir.name, args.image_repo, hive_version, prev_version, image_tag
+        bundle_dir.name, args.image_repo, ver, prev_version, image_tag
     )
 
     if args.dummy_bundle:
-        copy_bundle(orig_wd, version_dir, image_tag)
+        copy_bundle(orig_wd, version_dir, ver)
     else:
         generate_package(
             os.path.join(bundle_dir.name, "hive.package.yaml"),
             CHANNEL_DEFAULT,
-            hive_version,
+            ver,
         )
         # redhat-openshift-ecosystem/community-operators-prod
         open_pr(
@@ -597,9 +509,7 @@ if __name__ == "__main__":
             "git@github.com:redhat-openshift-ecosystem/community-operators-prod.git",
             args.github_user,
             bundle_dir.name,
-            hive_version,
-            prev_version,
-            image_tag,
+            ver,
             args.hold,
             args.dry_run,
         )
@@ -610,9 +520,7 @@ if __name__ == "__main__":
             "git@github.com:k8s-operatorhub/community-operators.git",
             args.github_user,
             bundle_dir.name,
-            hive_version,
-            prev_version,
-            image_tag,
+            ver,
             args.hold,
             args.dry_run,
         )

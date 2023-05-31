@@ -27,10 +27,14 @@ spec:
     For provisioning OpenShift, Hive uses the [OpenShift installer](https://github.com/openshift/installer).
 
     ### Supported cloud providers
+    * Alibaba Cloud
     * AWS
     * Azure
     * Google Cloud Platform
+    * IBM Cloud
     * Red Hat OpenStack
+    * oVirt
+    * vSphere
 
     In the future Hive will support more cloud providers.
 
@@ -40,6 +44,7 @@ spec:
     * [Using Hive](https://github.com/openshift/hive/blob/master/docs/using-hive.md)
     * [Hiveutil CLI](https://github.com/openshift/hive/blob/master/docs/hiveutil.md)
     * [Frequently Asked Questions](https://github.com/openshift/hive/blob/master/docs/FAQs.md)
+    * [Troubleshooting](https://github.com/openshift/hive/blob/master/docs/troubleshooting.md)
     * [Architecture](https://github.com/openshift/hive/blob/master/docs/architecture.md)
 
     See the [project README](https://github.com/openshift/hive#documentation) for more documentation.
@@ -63,6 +68,8 @@ spec:
               name: my-route53-creds
           domains:
           - my-base-domain.example.com
+        logLevel: debug
+        targetNamespace: hive
     ```
 
     ## Create a cluster

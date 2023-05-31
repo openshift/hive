@@ -191,6 +191,70 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Update machine set ProviderSpec",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Annotations = map[string]string{constants.OverrideMachinePoolPlatformAnnotation: "true"}
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0, replaceProviderSpec(
+					func() *machineapi.AWSMachineProviderConfig {
+						pc := testAWSProviderSpec()
+						pc.AMI.ID = aws.String("ami-different")
+						return pc
+					}(),
+				)),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+		},
+		{
+			name:              "Update machine set ProviderSpec -- ignored lacking annotation",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0, replaceProviderSpec(
+					func() *machineapi.AWSMachineProviderConfig {
+						pc := testAWSProviderSpec()
+						pc.AMI.ID = aws.String("ami-different")
+						return pc
+					}(),
+				)),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0, replaceProviderSpec(
+					func() *machineapi.AWSMachineProviderConfig {
+						pc := testAWSProviderSpec()
+						pc.AMI.ID = aws.String("ami-different")
+						return pc
+					}(),
+				)),
+				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+			},
+		},
+		{
 			name:              "Create missing machine set",
 			clusterDeployment: testClusterDeployment(),
 			machinePool:       testMachinePool(),
@@ -473,7 +537,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
 				func() runtime.Object {
 					a := testClusterAutoscaler("1")
-					a.Spec.BalanceSimilarNodeGroups = pointer.BoolPtr(false)
+					a.Spec.BalanceSimilarNodeGroups = pointer.Bool(false)
 					return a
 				}(),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -497,7 +561,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 			expectedRemoteClusterAutoscalers: func() []autoscalingv1.ClusterAutoscaler {
 				a := testClusterAutoscaler("1")
-				a.Spec.BalanceSimilarNodeGroups = pointer.BoolPtr(false)
+				a.Spec.BalanceSimilarNodeGroups = pointer.Bool(false)
 				return []autoscalingv1.ClusterAutoscaler{*a}
 			}(),
 		},
@@ -911,7 +975,7 @@ func testMachinePool() *hivev1.MachinePool {
 				Name: testName,
 			},
 			Name:     testPoolName,
-			Replicas: pointer.Int64Ptr(3),
+			Replicas: pointer.Int64(3),
 			Platform: hivev1.MachinePoolPlatform{
 				AWS: &hivev1aws.MachinePoolPlatform{
 					InstanceType: testInstanceType,
@@ -983,6 +1047,16 @@ func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
 	}
 }
 
+func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machineapi.MachineSet) {
+	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.Scheme)
+	if err != nil {
+		log.WithError(err).Fatal("error encoding custom machine provider spec")
+	}
+	return func(ms *machineapi.MachineSet) {
+		ms.Spec.Template.Spec.ProviderSpec.Value = rawAWSProviderSpec
+	}
+}
+
 func testMachineSpec(machineType string) machineapi.MachineSpec {
 	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.Scheme)
 	if err != nil {
@@ -1029,7 +1103,7 @@ func testMachineSetMachine(name string, machineType string, machineSetName strin
 	return m
 }
 
-func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *machineapi.MachineSet {
+func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, mutators ...func(*machineapi.MachineSet)) *machineapi.MachineSet {
 	msReplicas := int32(replicas)
 	ms := machineapi.MachineSet{
 		TypeMeta: metav1.TypeMeta{
@@ -1071,6 +1145,9 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 			"hive.openshift.io/unstomped": "true",
 		}
 	}
+	for _, mutator := range mutators {
+		mutator(&ms)
+	}
 	return &ms
 }
 
@@ -1106,7 +1183,7 @@ func testClusterAutoscaler(resourceVersion string) *autoscalingv1.ClusterAutosca
 			ScaleDown: &autoscalingv1.ScaleDownConfig{
 				Enabled: true,
 			},
-			BalanceSimilarNodeGroups: pointer.BoolPtr(true),
+			BalanceSimilarNodeGroups: pointer.Bool(true),
 		},
 	}
 }

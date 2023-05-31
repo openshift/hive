@@ -3,6 +3,7 @@ package machinepool
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -814,13 +815,17 @@ func generateAWSMachineSetName(zone string) string {
 
 func encodeAWSMachineProviderSpec(awsProviderSpec *machineapi.AWSMachineProviderConfig, scheme *runtime.Scheme) (*runtime.RawExtension, error) {
 	serializer := jsonserializer.NewSerializer(jsonserializer.DefaultMetaFactory, scheme, scheme, false)
-	var buffer bytes.Buffer
-	err := serializer.Encode(awsProviderSpec, &buffer)
-	if err != nil {
+	var buf1, buf2 bytes.Buffer
+	if err := serializer.Encode(awsProviderSpec, &buf1); err != nil {
+		return nil, err
+	}
+	// HACK: Trim whitespace, which the fake client seems to do internally, resulting in technically-unequal values
+	// and spurious updates.
+	if err := json.Compact(&buf2, buf1.Bytes()); err != nil {
 		return nil, err
 	}
 	return &runtime.RawExtension{
-		Raw: buffer.Bytes(),
+		Raw: buf2.Bytes(),
 	}, nil
 }
 

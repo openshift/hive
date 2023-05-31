@@ -512,6 +512,12 @@ const (
 
 	// TrustedCABundleFile is the name of the file (and corresponding ConfigMap key) containing the merged CA bundle.
 	TrustedCABundleFile = "ca-bundle.crt"
+
+	// OverrideMachinePoolPlatformAnnotation can be set to "true" on a MachinePool to bypass the validating admission
+	// hook that normally forbids modifying its Spec.Platform. By setting this annotation, you are taking responsibility
+	// for forcing rollout of such changes on the target cluster -- e.g. by deleting the Machines -- as the machine
+	// config operator will not do so.
+	OverrideMachinePoolPlatformAnnotation = "hive.openshift.io/override-machinepool-platform"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -18,6 +18,7 @@ import (
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 func Test_MachinePoolAdmission_Validate_Kind(t *testing.T) {
@@ -170,7 +171,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "zero replicas",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64Ptr(0)
+				pool.Spec.Replicas = pointer.Int64(0)
 				return pool
 			}(),
 			expectAllowed: true,
@@ -179,7 +180,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "positive replicas",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64Ptr(1)
+				pool.Spec.Replicas = pointer.Int64(1)
 				return pool
 			}(),
 			expectAllowed: true,
@@ -188,7 +189,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "negative replicas",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64Ptr(-1)
+				pool.Spec.Replicas = pointer.Int64(-1)
 				return pool
 			}(),
 		},
@@ -196,7 +197,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "replicas and autoscaling",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64Ptr(1)
+				pool.Spec.Replicas = pointer.Int64(1)
 				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{}
 				return pool
 			}(),
@@ -549,7 +550,7 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 			old:  testMachinePool(),
 			new: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64Ptr(5)
+				pool.Spec.Replicas = pointer.Int64(5)
 				return pool
 			}(),
 			expectAllowed: true,
@@ -582,6 +583,16 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 			name: "platform changed",
 			old:  testMachinePool(),
 			new:  testGCPMachinePool(),
+		},
+		{
+			name: "platform changed with override",
+			old:  testMachinePool(),
+			new: func() *hivev1.MachinePool {
+				mp := testGCPMachinePool()
+				mp.Annotations = map[string]string{constants.OverrideMachinePoolPlatformAnnotation: "true"}
+				return mp
+			}(),
+			expectAllowed: true,
 		},
 		{
 			name: "instance type changed",

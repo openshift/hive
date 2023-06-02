@@ -79,8 +79,8 @@ make test-e2e-postdeploy
 rc=0
 for resource in secret configmap role rolebinding serviceaccount deployment replicaset statefulset pod; do
   echo "Checking for stale $resource resources in original namespace $ORIG_NS"
-  if oc get $resource -n $ORIG_NS | grep hive; then
-    echo "FAIL: found stale $resource in original namespace $ORIG_NS"
+  if R=$(oc get $resource -n $ORIG_NS | grep hive); then
+    echo "FAIL: found stale $resource $R in original namespace $ORIG_NS"
     rc=1
   fi
 done

@@ -581,23 +581,19 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					}
 				}
 
-				// Merge the labels on the remote machineset, if different from the labels on the generated machineset.
+				// Update if the labels on the remote machineset are different than the labels on the generated machineset.
 				// If the length of both labels is zero, then they match, even if one is a nil map and the other is an empty map.
-				if rl, l := rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels; !reflect.DeepEqual(rl, l) {
+				if rl, l := rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels; (len(rl) != 0 || len(l) != 0) && !reflect.DeepEqual(rl, l) {
 					msLog.WithField("desired", l).WithField("observed", rl).Info("labels out of sync")
-					for key, value := range l {
-						rMS.Spec.Template.Spec.Labels[key] = value
-					}
+					rMS.Spec.Template.Spec.Labels = l
 					objectModified = true
 				}
 
-				// Merge the taints on the remote machineset, if different from the taints on the generated machineset.
+				// Update if the taints on the remote machineset are different than the taints on the generated machineset.
 				// If the length of both taints is zero, then they match, even if one is a nil slice and the other is an empty slice.
-				if rt, t := rMS.Spec.Template.Spec.Taints, ms.Spec.Template.Spec.Taints; !reflect.DeepEqual(rt, t) {
+				if rt, t := rMS.Spec.Template.Spec.Taints, ms.Spec.Template.Spec.Taints; (len(rt) != 0 || len(t) != 0) && !reflect.DeepEqual(rt, t) {
 					msLog.WithField("desired", t).WithField("observed", rt).Info("taints out of sync")
-					for key, value := range t {
-						rMS.Spec.Template.Spec.Taints[key] = value
-					}
+					rMS.Spec.Template.Spec.Taints = t
 					objectModified = true
 				}
 

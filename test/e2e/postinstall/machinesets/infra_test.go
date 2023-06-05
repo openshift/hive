@@ -60,7 +60,7 @@ func TestScaleMachinePool(t *testing.T) {
 	logger.Infof("expected Machine name prefix: %s", machinePrefix)
 
 	logger.Info("scaling pool to 1 replicas")
-	pool.Spec.Replicas = pointer.Int64Ptr(1)
+	pool.Spec.Replicas = pointer.Int64(1)
 	err = c.Update(context.TODO(), pool)
 	require.NoError(t, err, "cannot update worker machine pool to reduce replicas")
 
@@ -75,7 +75,7 @@ func TestScaleMachinePool(t *testing.T) {
 	require.NotNilf(t, pool, "worker machine pool does not exist: %s", workerMachinePoolName)
 
 	logger.Info("scaling pool back to 3 replicas")
-	pool.Spec.Replicas = pointer.Int64Ptr(3)
+	pool.Spec.Replicas = pointer.Int64(3)
 	err = c.Update(context.TODO(), pool)
 	require.NoError(t, err, "cannot update worker machine pool to increase replicas")
 
@@ -104,7 +104,7 @@ func TestNewMachinePool(t *testing.T) {
 		Spec: hivev1.MachinePoolSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{Name: cd.Name},
 			Name:                 infraMachinePoolName,
-			Replicas:             pointer.Int64Ptr(3),
+			Replicas:             pointer.Int64(3),
 			Labels: map[string]string{
 				"openshift.io/machine-type": infraMachinePoolName,
 			},
@@ -304,7 +304,7 @@ func TestAutoscalingMachinePool(t *testing.T) {
 			Name:      "busybox",
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32Ptr(100),
+			Replicas: pointer.Int32(100),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"scaling-app": "busybox",
@@ -332,7 +332,19 @@ func TestAutoscalingMachinePool(t *testing.T) {
 								}(),
 							},
 						},
+						SecurityContext: &corev1.SecurityContext{
+							AllowPrivilegeEscalation: pointer.Bool(false),
+							Capabilities: &corev1.Capabilities{
+								Drop: []corev1.Capability{"ALL"},
+							},
+						},
 					}},
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsNonRoot: pointer.Bool(true),
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
+					},
 				},
 			},
 		},
@@ -361,7 +373,7 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	pool = common.GetMachinePool(cd, "worker")
 	require.NotNil(t, pool, "worker machine pool does not exist")
 
-	pool.Spec.Replicas = pointer.Int64Ptr(3)
+	pool.Spec.Replicas = pointer.Int64(3)
 	pool.Spec.Autoscaling = nil
 	err = c.Update(context.TODO(), pool)
 	require.NoError(t, err, "cannot update worker machine pool to turn off auto-scaling")

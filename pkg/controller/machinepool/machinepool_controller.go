@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -597,6 +598,18 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					objectModified = true
 				}
 
+				// Platform updates will be blocked by webhook, unless they're not.
+				if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value) {
+					msg := "ProviderSpec out of sync"
+					if mutable, err := strconv.ParseBool(pool.Annotations[constants.OverrideMachinePoolPlatformAnnotation]); err != nil || !mutable {
+						msLog.Warning(msg)
+					} else {
+						msLog.Info(msg)
+						rMS.Spec.Template.Spec.ProviderSpec.Value = ms.Spec.Template.Spec.ProviderSpec.Value
+						objectModified = true
+					}
+				}
+
 				if objectMetaModified || objectModified {
 					rMS.Generation++
 					machineSetsToUpdate = append(machineSetsToUpdate, &rMS)
@@ -829,7 +842,7 @@ func (r *ReconcileMachinePool) syncClusterAutoscaler(
 			ScaleDown: &autoscalingv1.ScaleDownConfig{
 				Enabled: true,
 			},
-			BalanceSimilarNodeGroups: pointer.BoolPtr(true),
+			BalanceSimilarNodeGroups: pointer.Bool(true),
 		},
 	}
 	if err := remoteClusterAPIClient.Create(context.Background(), defaultClusterAutoscaler); err != nil {

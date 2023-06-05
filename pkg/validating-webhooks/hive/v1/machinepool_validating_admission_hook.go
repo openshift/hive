@@ -3,6 +3,7 @@ package v1
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	log "github.com/sirupsen/logrus"
 
@@ -26,6 +27,7 @@ import (
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
+	"github.com/openshift/hive/pkg/constants"
 )
 
 const (
@@ -226,7 +228,9 @@ func validateMachinePoolUpdate(old, new *hivev1.MachinePool) field.ErrorList {
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.ClusterDeploymentRef, old.Spec.ClusterDeploymentRef, specPath.Child("clusterDeploymentRef"))...)
 	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Name, old.Spec.Name, specPath.Child("name"))...)
-	allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Platform, old.Spec.Platform, specPath.Child("platform"))...)
+	if mutable, err := strconv.ParseBool(new.Annotations[constants.OverrideMachinePoolPlatformAnnotation]); err != nil || !mutable {
+		allErrs = append(allErrs, validation.ValidateImmutableField(new.Spec.Platform, old.Spec.Platform, specPath.Child("platform"))...)
+	}
 	return allErrs
 }
 

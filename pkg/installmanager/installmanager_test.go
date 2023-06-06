@@ -747,7 +747,7 @@ spec:
           - ebs:
               encrypted: true
               volumeSize: 120
-              volumeType: gp2
+              volumeType: gp3
           credentialsSecret:
             name: aws-cloud-credentials
           iamInstanceProfile:

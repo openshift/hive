@@ -75,6 +75,7 @@ metadata:
     app: sise
   name: sise-deploy
   namespace: default
+spec:
   replicas: 2
   xxxxxxx
 ```

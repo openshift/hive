@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
 	scheme "github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type SyncSetInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.SyncSetList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.SyncSet, err error)
+	Apply(ctx context.Context, syncSet *hivev1.SyncSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncSet, err error)
+	ApplyStatus(ctx context.Context, syncSet *hivev1.SyncSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncSet, err error)
 	SyncSetExpansion
 }
 
@@ -172,6 +177,62 @@ func (c *syncSets) Patch(ctx context.Context, name string, pt types.PatchType, d
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied syncSet.
+func (c *syncSets) Apply(ctx context.Context, syncSet *hivev1.SyncSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncSet, err error) {
+	if syncSet == nil {
+		return nil, fmt.Errorf("syncSet provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(syncSet)
+	if err != nil {
+		return nil, err
+	}
+	name := syncSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("syncSet.Name must be provided to Apply")
+	}
+	result = &v1.SyncSet{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("syncsets").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *syncSets) ApplyStatus(ctx context.Context, syncSet *hivev1.SyncSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncSet, err error) {
+	if syncSet == nil {
+		return nil, fmt.Errorf("syncSet provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(syncSet)
+	if err != nil {
+		return nil, err
+	}
+
+	name := syncSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("syncSet.Name must be provided to Apply")
+	}
+
+	result = &v1.SyncSet{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("syncsets").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

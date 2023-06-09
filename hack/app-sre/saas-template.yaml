@@ -4226,7 +4226,7 @@ objects:
                               \ in spec.resourceClaims, that are used by this container.\
                               \ \n This is an alpha field and requires enabling the\
                               \ DynamicResourceAllocation feature gate. \n This field\
-                              \ is immutable."
+                              \ is immutable. It can only be set for containers."
                             items:
                               description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                               properties:
@@ -4264,7 +4264,7 @@ objects:
                               compute resources required. If Requests is omitted for
                               a container, it defaults to Limits if that is explicitly
                               specified, otherwise to an implementation-defined value.
-                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                              Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                             type: object
                         type: object
                     required:

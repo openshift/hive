@@ -19,6 +19,7 @@ type REST struct {
 var _ rest.Creater = &REST{}
 var _ rest.Scoper = &REST{}
 var _ rest.GroupVersionKindProvider = &REST{}
+var _ rest.SingularNameProvider = &REST{}
 
 func NewREST(hookFn AdmissionHookFunc) *REST {
 	return &REST{
@@ -46,4 +47,8 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, _ rest.ValidateOb
 	admissionReview := obj.(*admissionv1beta1.AdmissionReview)
 	admissionReview.Response = r.hookFn(admissionReview.Request)
 	return admissionReview, nil
+}
+
+func (r *REST) GetSingularName() string {
+	return "admissionreview"
 }

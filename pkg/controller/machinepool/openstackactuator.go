@@ -85,7 +85,9 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	if pool.Spec.Platform.OpenStack.RootVolume != nil {
 		computePool.Platform.OpenStack.RootVolume = &installertypesosp.RootVolume{
 			Size: pool.Spec.Platform.OpenStack.RootVolume.Size,
-			Type: pool.Spec.Platform.OpenStack.RootVolume.Type,
+			Types: []string{
+				pool.Spec.Platform.OpenStack.RootVolume.Type,
+			},
 		}
 	}
 

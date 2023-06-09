@@ -32,7 +32,10 @@ import (
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 type IngressController struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec is the specification of the desired behavior of the IngressController.
@@ -1019,14 +1022,16 @@ type SyslogLoggingDestinationParameters struct {
 	// +optional
 	Facility string `json:"facility,omitempty"`
 
-	// maxLength is the maximum length of the syslog message
+	// maxLength is the maximum length of the log message.
 	//
-	// If this field is empty, the maxLength is set to "1024".
+	// Valid values are integers in the range 480 to 4096, inclusive.
 	//
-	// +kubebuilder:validation:Optional
+	// When omitted, the default value is 1024.
+	//
 	// +kubebuilder:validation:Maximum=4096
 	// +kubebuilder:validation:Minimum=480
 	// +kubebuilder:default=1024
+	// +default:=1024
 	// +optional
 	MaxLength uint32 `json:"maxLength,omitempty"`
 }
@@ -1034,6 +1039,18 @@ type SyslogLoggingDestinationParameters struct {
 // ContainerLoggingDestinationParameters describes parameters for the Container
 // logging destination type.
 type ContainerLoggingDestinationParameters struct {
+	// maxLength is the maximum length of the log message.
+	//
+	// Valid values are integers in the range 480 to 8192, inclusive.
+	//
+	// When omitted, the default value is 1024.
+	//
+	// +kubebuilder:validation:Maximum=8192
+	// +kubebuilder:validation:Minimum=480
+	// +kubebuilder:default=1024
+	// +default:=1024
+	// +optional
+	MaxLength int32 `json:"maxLength,omitempty"`
 }
 
 // LoggingDestination describes a destination for log messages.
@@ -1717,6 +1734,10 @@ type IngressControllerStatus struct {
 // +openshift:compatibility-gen:level=1
 type IngressControllerList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the standard list's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []IngressController `json:"items"`
+
+	Items []IngressController `json:"items"`
 }

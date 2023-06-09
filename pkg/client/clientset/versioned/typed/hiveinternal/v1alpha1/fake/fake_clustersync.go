@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
+	hiveinternalv1alpha1 "github.com/openshift/hive/pkg/client/applyconfiguration/hiveinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,9 +22,9 @@ type FakeClusterSyncs struct {
 	ns   string
 }
 
-var clustersyncsResource = schema.GroupVersionResource{Group: "hiveinternal.openshift.io", Version: "v1alpha1", Resource: "clustersyncs"}
+var clustersyncsResource = v1alpha1.SchemeGroupVersion.WithResource("clustersyncs")
 
-var clustersyncsKind = schema.GroupVersionKind{Group: "hiveinternal.openshift.io", Version: "v1alpha1", Kind: "ClusterSync"}
+var clustersyncsKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterSync")
 
 // Get takes name of the clusterSync, and returns the corresponding clusterSync object, and an error if there is any.
 func (c *FakeClusterSyncs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterSync, err error) {
@@ -118,6 +120,51 @@ func (c *FakeClusterSyncs) DeleteCollection(ctx context.Context, opts v1.DeleteO
 func (c *FakeClusterSyncs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterSync, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(clustersyncsResource, c.ns, name, pt, data, subresources...), &v1alpha1.ClusterSync{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ClusterSync), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterSync.
+func (c *FakeClusterSyncs) Apply(ctx context.Context, clusterSync *hiveinternalv1alpha1.ClusterSyncApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterSync, err error) {
+	if clusterSync == nil {
+		return nil, fmt.Errorf("clusterSync provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterSync)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterSync.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterSync.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clustersyncsResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha1.ClusterSync{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ClusterSync), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterSyncs) ApplyStatus(ctx context.Context, clusterSync *hiveinternalv1alpha1.ClusterSyncApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterSync, err error) {
+	if clusterSync == nil {
+		return nil, fmt.Errorf("clusterSync provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterSync)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterSync.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterSync.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clustersyncsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1alpha1.ClusterSync{})
 
 	if obj == nil {
 		return nil, err

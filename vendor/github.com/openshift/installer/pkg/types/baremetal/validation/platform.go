@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/apparentlymart/go-cidr/cidr"
-	"github.com/ghodss/yaml"
 	"github.com/go-playground/validator/v10"
 	"github.com/metal3-io/baremetal-operator/pkg/hardwareutils/bmc"
 	"github.com/pkg/errors"
@@ -18,7 +17,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/yaml"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/baremetal"
@@ -365,6 +366,38 @@ func validateBootMode(hosts []*baremetal.Host, fldPath *field.Path) (errors fiel
 	return
 }
 
+// ValidateHostRootDeviceHints checks that a rootDeviceHints field contains no
+// invalid values.
+func ValidateHostRootDeviceHints(rdh *baremetal.RootDeviceHints, fldPath *field.Path) (errors field.ErrorList) {
+	if rdh == nil || rdh.DeviceName == "" {
+		return
+	}
+	devField := fldPath.Child("deviceName")
+	subpath := strings.TrimPrefix(rdh.DeviceName, "/dev/")
+	if rdh.DeviceName == subpath {
+		errors = append(errors, field.Invalid(devField, rdh.DeviceName,
+			"Device Name of root device hint must be a /dev/ path"))
+	}
+
+	subpath = strings.TrimPrefix(subpath, "disk/by-path/")
+	if strings.Contains(subpath, "/") {
+		errors = append(errors, field.Invalid(devField, rdh.DeviceName,
+			"Device Name of root device hint must be path in /dev/ or /dev/disk/by-path/"))
+	}
+	return
+}
+
+// ensure that none of the rootDeviceHints fields contain invalid values.
+func validateRootDeviceHints(hosts []*baremetal.Host, fldPath *field.Path) (errors field.ErrorList) {
+	for idx, host := range hosts {
+		if host == nil || host.RootDeviceHints == nil {
+			continue
+		}
+		errors = append(errors, ValidateHostRootDeviceHints(host.RootDeviceHints, fldPath.Index(idx).Child("rootDeviceHints"))...)
+	}
+	return
+}
+
 // validateProvisioningNetworkDisabledSupported validates hosts bmc address support provisioning network is disabled
 func validateProvisioningNetworkDisabledSupported(hosts []*baremetal.Host, fldPath *field.Path) (errors field.ErrorList) {
 	for idx, host := range hosts {
@@ -381,7 +414,7 @@ func validateProvisioningNetworkDisabledSupported(hosts []*baremetal.Host, fldPa
 }
 
 // ValidatePlatform checks that the specified platform is valid.
-func ValidatePlatform(p *baremetal.Platform, n *types.Networking, fldPath *field.Path, c *types.InstallConfig) field.ErrorList {
+func ValidatePlatform(p *baremetal.Platform, agentBasedInstallation bool, n *types.Networking, fldPath *field.Path, c *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	provisioningNetwork := sets.NewString(string(baremetal.ManagedProvisioningNetwork),
@@ -404,8 +437,6 @@ func ValidatePlatform(p *baremetal.Platform, n *types.Networking, fldPath *field
 		}
 	}
 
-	agentBasedInstallation := validate.IsAgentBasedInstallation()
-
 	if !agentBasedInstallation && p.Hosts == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hosts"), p.Hosts, "bare metal hosts are missing"))
 	}
@@ -420,12 +451,36 @@ func ValidatePlatform(p *baremetal.Platform, n *types.Networking, fldPath *field
 		}
 		allErrs = append(allErrs, validateHostsWithoutBMC(p.Hosts, fldPath)...)
 		allErrs = append(allErrs, validateBootMode(p.Hosts, fldPath.Child("Hosts"))...)
+		allErrs = append(allErrs, validateRootDeviceHints(p.Hosts, fldPath.Child("Hosts"))...)
 		allErrs = append(allErrs, validateNetworkConfig(p.Hosts, fldPath.Child("Hosts"))...)
 
 		allErrs = append(allErrs, validateHostsName(p.Hosts, fldPath.Child("Hosts"))...)
 	}
 
+	// Platform fields only allowed in TechPreviewNoUpgrade
+	if c.FeatureSet != configv1.TechPreviewNoUpgrade {
+		if c.BareMetal.LoadBalancer != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("loadBalancer"), "load balancer is not supported in this feature set"))
+		}
+	}
+
+	if c.BareMetal.LoadBalancer != nil {
+		if !validateLoadBalancer(c.BareMetal.LoadBalancer.Type) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("loadBalancer", "type"), c.BareMetal.LoadBalancer.Type, "invalid load balancer type"))
+		}
+	}
+
 	return allErrs
+}
+
+// validateLoadBalancer returns an error if the load balancer is not valid.
+func validateLoadBalancer(lbType configv1.PlatformLoadBalancerType) bool {
+	switch lbType {
+	case configv1.LoadBalancerTypeOpenShiftManagedDefault, configv1.LoadBalancerTypeUserManaged:
+		return true
+	default:
+		return false
+	}
 }
 
 // ValidateProvisioning checks that provisioning network requirements specified is valid.

@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,25 +22,25 @@ type FakeCheckpoints struct {
 	ns   string
 }
 
-var checkpointsResource = schema.GroupVersionResource{Group: "hive.openshift.io", Version: "v1", Resource: "checkpoints"}
+var checkpointsResource = v1.SchemeGroupVersion.WithResource("checkpoints")
 
-var checkpointsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "Checkpoint"}
+var checkpointsKind = v1.SchemeGroupVersion.WithKind("Checkpoint")
 
 // Get takes name of the checkpoint, and returns the corresponding checkpoint object, and an error if there is any.
-func (c *FakeCheckpoints) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.Checkpoint, err error) {
+func (c *FakeCheckpoints) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Checkpoint, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(checkpointsResource, c.ns, name), &hivev1.Checkpoint{})
+		Invokes(testing.NewGetAction(checkpointsResource, c.ns, name), &v1.Checkpoint{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.Checkpoint), err
+	return obj.(*v1.Checkpoint), err
 }
 
 // List takes label and field selectors, and returns the list of Checkpoints that match those selectors.
-func (c *FakeCheckpoints) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.CheckpointList, err error) {
+func (c *FakeCheckpoints) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CheckpointList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(checkpointsResource, checkpointsKind, c.ns, opts), &hivev1.CheckpointList{})
+		Invokes(testing.NewListAction(checkpointsResource, checkpointsKind, c.ns, opts), &v1.CheckpointList{})
 
 	if obj == nil {
 		return nil, err
@@ -48,8 +50,8 @@ func (c *FakeCheckpoints) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &hivev1.CheckpointList{ListMeta: obj.(*hivev1.CheckpointList).ListMeta}
-	for _, item := range obj.(*hivev1.CheckpointList).Items {
+	list := &v1.CheckpointList{ListMeta: obj.(*v1.CheckpointList).ListMeta}
+	for _, item := range obj.(*v1.CheckpointList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +60,114 @@ func (c *FakeCheckpoints) List(ctx context.Context, opts v1.ListOptions) (result
 }
 
 // Watch returns a watch.Interface that watches the requested checkpoints.
-func (c *FakeCheckpoints) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeCheckpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(checkpointsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a checkpoint and creates it.  Returns the server's representation of the checkpoint, and an error, if there is any.
-func (c *FakeCheckpoints) Create(ctx context.Context, checkpoint *hivev1.Checkpoint, opts v1.CreateOptions) (result *hivev1.Checkpoint, err error) {
+func (c *FakeCheckpoints) Create(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.CreateOptions) (result *v1.Checkpoint, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(checkpointsResource, c.ns, checkpoint), &hivev1.Checkpoint{})
+		Invokes(testing.NewCreateAction(checkpointsResource, c.ns, checkpoint), &v1.Checkpoint{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.Checkpoint), err
+	return obj.(*v1.Checkpoint), err
 }
 
 // Update takes the representation of a checkpoint and updates it. Returns the server's representation of the checkpoint, and an error, if there is any.
-func (c *FakeCheckpoints) Update(ctx context.Context, checkpoint *hivev1.Checkpoint, opts v1.UpdateOptions) (result *hivev1.Checkpoint, err error) {
+func (c *FakeCheckpoints) Update(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.UpdateOptions) (result *v1.Checkpoint, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(checkpointsResource, c.ns, checkpoint), &hivev1.Checkpoint{})
+		Invokes(testing.NewUpdateAction(checkpointsResource, c.ns, checkpoint), &v1.Checkpoint{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.Checkpoint), err
+	return obj.(*v1.Checkpoint), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCheckpoints) UpdateStatus(ctx context.Context, checkpoint *hivev1.Checkpoint, opts v1.UpdateOptions) (*hivev1.Checkpoint, error) {
+func (c *FakeCheckpoints) UpdateStatus(ctx context.Context, checkpoint *v1.Checkpoint, opts metav1.UpdateOptions) (*v1.Checkpoint, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(checkpointsResource, "status", c.ns, checkpoint), &hivev1.Checkpoint{})
+		Invokes(testing.NewUpdateSubresourceAction(checkpointsResource, "status", c.ns, checkpoint), &v1.Checkpoint{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.Checkpoint), err
+	return obj.(*v1.Checkpoint), err
 }
 
 // Delete takes name of the checkpoint and deletes it. Returns an error if one occurs.
-func (c *FakeCheckpoints) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeCheckpoints) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(checkpointsResource, c.ns, name, opts), &hivev1.Checkpoint{})
+		Invokes(testing.NewDeleteActionWithOptions(checkpointsResource, c.ns, name, opts), &v1.Checkpoint{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeCheckpoints) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeCheckpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(checkpointsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &hivev1.CheckpointList{})
+	_, err := c.Fake.Invokes(action, &v1.CheckpointList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched checkpoint.
-func (c *FakeCheckpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.Checkpoint, err error) {
+func (c *FakeCheckpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Checkpoint, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(checkpointsResource, c.ns, name, pt, data, subresources...), &hivev1.Checkpoint{})
+		Invokes(testing.NewPatchSubresourceAction(checkpointsResource, c.ns, name, pt, data, subresources...), &v1.Checkpoint{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.Checkpoint), err
+	return obj.(*v1.Checkpoint), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied checkpoint.
+func (c *FakeCheckpoints) Apply(ctx context.Context, checkpoint *hivev1.CheckpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Checkpoint, err error) {
+	if checkpoint == nil {
+		return nil, fmt.Errorf("checkpoint provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(checkpoint)
+	if err != nil {
+		return nil, err
+	}
+	name := checkpoint.Name
+	if name == nil {
+		return nil, fmt.Errorf("checkpoint.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(checkpointsResource, c.ns, *name, types.ApplyPatchType, data), &v1.Checkpoint{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Checkpoint), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeCheckpoints) ApplyStatus(ctx context.Context, checkpoint *hivev1.CheckpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Checkpoint, err error) {
+	if checkpoint == nil {
+		return nil, fmt.Errorf("checkpoint provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(checkpoint)
+	if err != nil {
+		return nil, err
+	}
+	name := checkpoint.Name
+	if name == nil {
+		return nil, fmt.Errorf("checkpoint.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(checkpointsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.Checkpoint{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Checkpoint), err
 }

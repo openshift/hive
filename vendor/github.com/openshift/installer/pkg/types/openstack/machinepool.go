@@ -48,7 +48,15 @@ func (o *MachinePool) Set(required *MachinePool) {
 			o.RootVolume = new(RootVolume)
 		}
 		o.RootVolume.Size = required.RootVolume.Size
-		o.RootVolume.Type = required.RootVolume.Type
+		o.RootVolume.DeprecatedType = required.RootVolume.DeprecatedType
+
+		if required.RootVolume.DeprecatedType != "" {
+			o.RootVolume.DeprecatedType = ""
+			o.RootVolume.Types = []string{required.RootVolume.DeprecatedType}
+		} else if len(required.RootVolume.Types) > 0 {
+			o.RootVolume.Types = required.RootVolume.Types
+		}
+
 		if len(required.RootVolume.Zones) > 0 {
 			o.RootVolume.Zones = required.RootVolume.Zones
 		}
@@ -77,11 +85,43 @@ type RootVolume struct {
 	// Required
 	Size int `json:"size"`
 	// Type defines the type of the volume.
-	// Required
-	Type string `json:"type"`
+	// Deprecated: Use Types instead.
+	// +optional
+	DeprecatedType string `json:"type,omitempty"`
+
+	// Types is the list of the volume types of the root volumes.
+	// This is mutually exclusive with Type.
+	// +required
+	Types []string `json:"types"`
 
 	// Zones is the list of availability zones where the root volumes should be deployed.
 	// If no zones are provided, all instances will be deployed on OpenStack Cinder default availability zone
 	// +optional
 	Zones []string `json:"zones,omitempty"`
+}
+
+// PortTarget defines, directly or indirectly, one or more subnets where to attach a port.
+type PortTarget struct {
+	// Network is a query for an openstack network that the port will be discovered on.
+	// This will fail if the query returns more than one network.
+	Network NetworkFilter `json:"network,omitempty"`
+	// Specify subnets of the network where control plane port will be discovered.
+	FixedIPs []FixedIP `json:"fixedIPs"`
+}
+
+// NetworkFilter defines a network by name and/or ID.
+type NetworkFilter struct {
+	Name string `json:"name,omitempty"`
+	ID   string `json:"id,omitempty"`
+}
+
+// FixedIP identifies a subnet defined by a subnet filter.
+type FixedIP struct {
+	Subnet SubnetFilter `json:"subnet"`
+}
+
+// SubnetFilter defines a subnet by ID and/or name.
+type SubnetFilter struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
 }

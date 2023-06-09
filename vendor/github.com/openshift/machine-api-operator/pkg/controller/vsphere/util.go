@@ -14,6 +14,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -251,4 +252,48 @@ func ProviderStatusFromRawExtension(rawExtension *runtime.RawExtension) (*machin
 // vSphere api client does not expose error type, so we can rely only on error message
 func isNotFoundErr(err error) bool {
 	return err != nil && strings.HasSuffix(err.Error(), http.StatusText(http.StatusNotFound))
+}
+
+// podPredicate is a predicate function for filtering PodList
+type podPredicate func(corev1.Pod) bool
+
+// isTerminating is a predicate for determine pods in 'Terminating' state
+func isTerminating(p corev1.Pod) bool {
+	return p.DeletionTimestamp != nil
+}
+
+// filterPods filters a podList and returns a PodList matching passed predicates
+func filterPods(podList *corev1.PodList, predicates ...podPredicate) *corev1.PodList {
+	filteredPods := &corev1.PodList{}
+	for _, pod := range podList.Items {
+		var match = true
+		for _, p := range predicates {
+			if !p(pod) {
+				match = false
+				break
+			}
+		}
+		if match {
+			filteredPods.Items = append(filteredPods.Items, pod)
+		}
+	}
+
+	return filteredPods
+}
+
+// getPodList returns pod list on a given node matching pod predicates
+func getPodList(ctx context.Context, apiReader runtimeclient.Reader, n *corev1.Node, filters []podPredicate) (*corev1.PodList, error) {
+	fieldSelector, err := fields.ParseSelector("spec.nodeName=" + n.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	allPods := &corev1.PodList{}
+	if err := apiReader.List(ctx, allPods, &runtimeclient.ListOptions{
+		FieldSelector: fieldSelector,
+	}); err != nil {
+		return nil, err
+	}
+
+	return filterPods(allPods, filters...), nil
 }

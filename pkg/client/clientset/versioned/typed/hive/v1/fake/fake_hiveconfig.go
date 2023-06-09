@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -19,24 +21,24 @@ type FakeHiveConfigs struct {
 	Fake *FakeHiveV1
 }
 
-var hiveconfigsResource = schema.GroupVersionResource{Group: "hive.openshift.io", Version: "v1", Resource: "hiveconfigs"}
+var hiveconfigsResource = v1.SchemeGroupVersion.WithResource("hiveconfigs")
 
-var hiveconfigsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "HiveConfig"}
+var hiveconfigsKind = v1.SchemeGroupVersion.WithKind("HiveConfig")
 
 // Get takes name of the hiveConfig, and returns the corresponding hiveConfig object, and an error if there is any.
-func (c *FakeHiveConfigs) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.HiveConfig, err error) {
+func (c *FakeHiveConfigs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.HiveConfig, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(hiveconfigsResource, name), &hivev1.HiveConfig{})
+		Invokes(testing.NewRootGetAction(hiveconfigsResource, name), &v1.HiveConfig{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.HiveConfig), err
+	return obj.(*v1.HiveConfig), err
 }
 
 // List takes label and field selectors, and returns the list of HiveConfigs that match those selectors.
-func (c *FakeHiveConfigs) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.HiveConfigList, err error) {
+func (c *FakeHiveConfigs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.HiveConfigList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(hiveconfigsResource, hiveconfigsKind, opts), &hivev1.HiveConfigList{})
+		Invokes(testing.NewRootListAction(hiveconfigsResource, hiveconfigsKind, opts), &v1.HiveConfigList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -45,8 +47,8 @@ func (c *FakeHiveConfigs) List(ctx context.Context, opts v1.ListOptions) (result
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &hivev1.HiveConfigList{ListMeta: obj.(*hivev1.HiveConfigList).ListMeta}
-	for _, item := range obj.(*hivev1.HiveConfigList).Items {
+	list := &v1.HiveConfigList{ListMeta: obj.(*v1.HiveConfigList).ListMeta}
+	for _, item := range obj.(*v1.HiveConfigList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -55,63 +57,106 @@ func (c *FakeHiveConfigs) List(ctx context.Context, opts v1.ListOptions) (result
 }
 
 // Watch returns a watch.Interface that watches the requested hiveConfigs.
-func (c *FakeHiveConfigs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeHiveConfigs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(hiveconfigsResource, opts))
 }
 
 // Create takes the representation of a hiveConfig and creates it.  Returns the server's representation of the hiveConfig, and an error, if there is any.
-func (c *FakeHiveConfigs) Create(ctx context.Context, hiveConfig *hivev1.HiveConfig, opts v1.CreateOptions) (result *hivev1.HiveConfig, err error) {
+func (c *FakeHiveConfigs) Create(ctx context.Context, hiveConfig *v1.HiveConfig, opts metav1.CreateOptions) (result *v1.HiveConfig, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(hiveconfigsResource, hiveConfig), &hivev1.HiveConfig{})
+		Invokes(testing.NewRootCreateAction(hiveconfigsResource, hiveConfig), &v1.HiveConfig{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.HiveConfig), err
+	return obj.(*v1.HiveConfig), err
 }
 
 // Update takes the representation of a hiveConfig and updates it. Returns the server's representation of the hiveConfig, and an error, if there is any.
-func (c *FakeHiveConfigs) Update(ctx context.Context, hiveConfig *hivev1.HiveConfig, opts v1.UpdateOptions) (result *hivev1.HiveConfig, err error) {
+func (c *FakeHiveConfigs) Update(ctx context.Context, hiveConfig *v1.HiveConfig, opts metav1.UpdateOptions) (result *v1.HiveConfig, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(hiveconfigsResource, hiveConfig), &hivev1.HiveConfig{})
+		Invokes(testing.NewRootUpdateAction(hiveconfigsResource, hiveConfig), &v1.HiveConfig{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.HiveConfig), err
+	return obj.(*v1.HiveConfig), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeHiveConfigs) UpdateStatus(ctx context.Context, hiveConfig *hivev1.HiveConfig, opts v1.UpdateOptions) (*hivev1.HiveConfig, error) {
+func (c *FakeHiveConfigs) UpdateStatus(ctx context.Context, hiveConfig *v1.HiveConfig, opts metav1.UpdateOptions) (*v1.HiveConfig, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(hiveconfigsResource, "status", hiveConfig), &hivev1.HiveConfig{})
+		Invokes(testing.NewRootUpdateSubresourceAction(hiveconfigsResource, "status", hiveConfig), &v1.HiveConfig{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.HiveConfig), err
+	return obj.(*v1.HiveConfig), err
 }
 
 // Delete takes name of the hiveConfig and deletes it. Returns an error if one occurs.
-func (c *FakeHiveConfigs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeHiveConfigs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(hiveconfigsResource, name, opts), &hivev1.HiveConfig{})
+		Invokes(testing.NewRootDeleteActionWithOptions(hiveconfigsResource, name, opts), &v1.HiveConfig{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeHiveConfigs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeHiveConfigs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(hiveconfigsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &hivev1.HiveConfigList{})
+	_, err := c.Fake.Invokes(action, &v1.HiveConfigList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched hiveConfig.
-func (c *FakeHiveConfigs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.HiveConfig, err error) {
+func (c *FakeHiveConfigs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.HiveConfig, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(hiveconfigsResource, name, pt, data, subresources...), &hivev1.HiveConfig{})
+		Invokes(testing.NewRootPatchSubresourceAction(hiveconfigsResource, name, pt, data, subresources...), &v1.HiveConfig{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.HiveConfig), err
+	return obj.(*v1.HiveConfig), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied hiveConfig.
+func (c *FakeHiveConfigs) Apply(ctx context.Context, hiveConfig *hivev1.HiveConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.HiveConfig, err error) {
+	if hiveConfig == nil {
+		return nil, fmt.Errorf("hiveConfig provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(hiveConfig)
+	if err != nil {
+		return nil, err
+	}
+	name := hiveConfig.Name
+	if name == nil {
+		return nil, fmt.Errorf("hiveConfig.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(hiveconfigsResource, *name, types.ApplyPatchType, data), &v1.HiveConfig{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.HiveConfig), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeHiveConfigs) ApplyStatus(ctx context.Context, hiveConfig *hivev1.HiveConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.HiveConfig, err error) {
+	if hiveConfig == nil {
+		return nil, fmt.Errorf("hiveConfig provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(hiveConfig)
+	if err != nil {
+		return nil, err
+	}
+	name := hiveConfig.Name
+	if name == nil {
+		return nil, fmt.Errorf("hiveConfig.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(hiveconfigsResource, *name, types.ApplyPatchType, data, "status"), &v1.HiveConfig{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.HiveConfig), err
 }

@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	machinev1 "github.com/openshift/api/machine/v1beta1"
-	machineapierros "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/controller/vsphere/session"
 	apicorev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
+	apimachineryutilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -59,12 +59,12 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 
 	providerSpec, err := ProviderSpecFromRawExtension(params.machine.Spec.ProviderSpec.Value)
 	if err != nil {
-		return nil, machineapierros.InvalidMachineConfiguration("failed to get machine config: %v", err)
+		return nil, machinecontroller.InvalidMachineConfiguration("failed to get machine config: %v", err)
 	}
 
 	providerStatus, err := ProviderStatusFromRawExtension(params.machine.Status.ProviderStatus)
 	if err != nil {
-		return nil, machineapierros.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
+		return nil, machinecontroller.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
 	}
 
 	user, password, err := getCredentialsSecret(params.client, params.machine.GetNamespace(), *providerSpec)
@@ -102,7 +102,7 @@ func (s *machineScope) PatchMachine() error {
 
 	providerStatus, err := RawExtensionFromProviderStatus(s.providerStatus)
 	if err != nil {
-		return machineapierros.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
+		return machinecontroller.InvalidMachineConfiguration("failed to get machine provider status: %v", err.Error())
 	}
 	s.machine.Status.ProviderStatus = providerStatus
 
@@ -163,12 +163,58 @@ func (s *machineScope) checkNodeReachable() (bool, error) {
 		}
 		return false, err
 	}
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == apicorev1.NodeReady && condition.Status == apicorev1.ConditionUnknown {
-			return false, nil
+	return nodeReachable(node), nil
+}
+
+// deleteUnevictedPods checks respective node for reachability,
+// if the node is not reachable it tries to remove pods in the 'Terminating' state.
+// Returns the number of deleted pods and errors if there were any.
+// Returns error, if the node is operational.
+func (s *machineScope) deleteUnevictedPods() (int, error) {
+	node, err := s.getNode()
+	if err != nil {
+		// do not return error if node object not found, treat it as unreachable
+		if apimachineryerrors.IsNotFound(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	if nodeReachable(node) {
+		return 0, fmt.Errorf("node is in operational state, won't proceed with pods deletion")
+	}
+
+	terminatingPods, err := getPodList(s.Context, s.apiReader, node, []podPredicate{isTerminating})
+	if err != nil {
+		return 0, err
+	}
+
+	gracePeriodSeconds := int64(0)
+	deleteOptions := &runtimeclient.DeleteOptions{
+		GracePeriodSeconds: &gracePeriodSeconds,
+	}
+	deletedPods := 0
+	var deleteErrList []error
+	for _, pod := range terminatingPods.Items {
+		err := s.client.Delete(s.Context, &pod, deleteOptions)
+		if err != nil {
+			deleteErrList = append(deleteErrList, err)
+		} else {
+			deletedPods += 1
 		}
 	}
-	return true, nil
+	if len(deleteErrList) > 0 {
+		return deletedPods, apimachineryutilerrors.NewAggregate(deleteErrList)
+	}
+	return deletedPods, nil
+}
+
+func nodeReachable(node *apicorev1.Node) bool {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == apicorev1.NodeReady && condition.Status == apicorev1.ConditionUnknown {
+			return false
+		}
+	}
+	return true
 }
 
 // GetUserData fetches the user-data from the secret referenced in the Machine's
@@ -203,15 +249,16 @@ func (s *machineScope) GetUserData() ([]byte, error) {
 //
 // Assuming the vcenter is our dev server vcsa.vmware.devcluster.openshift.com,
 // the secret would be in this format:
-//apiVersion: v1
-//kind: Secret
-//metadata:
-//  name: vsphere
-//  namespace: openshift-machine-api
-//type: Opaque
-//data:
-//  vcsa.vmware.devcluster.openshift.com.username: base64 string
-//  vcsa.vmware.devcluster.openshift.com.password: base64 string
+//
+//	apiVersion: v1
+//	kind: Secret
+//	metadata:
+//	  name: vsphere
+//	  namespace: openshift-machine-api
+//	type: Opaque
+//	data:
+//	  vcsa.vmware.devcluster.openshift.com.username: base64 string
+//	  vcsa.vmware.devcluster.openshift.com.password: base64 string
 func getCredentialsSecret(client runtimeclient.Client, namespace string, spec machinev1.VSphereMachineProviderSpec) (string, string, error) {
 	if spec.CredentialsSecret == nil {
 		return "", "", nil
@@ -223,7 +270,7 @@ func getCredentialsSecret(client runtimeclient.Client, namespace string, spec ma
 		&credentialsSecret); err != nil {
 
 		if apimachineryerrors.IsNotFound(err) {
-			return "", "", machineapierros.InvalidMachineConfiguration("credentials secret %v/%v not found: %v", namespace, spec.CredentialsSecret.Name, err.Error())
+			return "", "", machinecontroller.InvalidMachineConfiguration("credentials secret %v/%v not found: %v", namespace, spec.CredentialsSecret.Name, err.Error())
 		}
 		return "", "", fmt.Errorf("error getting credentials secret %v/%v: %v", namespace, spec.CredentialsSecret.Name, err)
 	}
@@ -238,12 +285,12 @@ func getCredentialsSecret(client runtimeclient.Client, namespace string, spec ma
 
 	user, exists := credentialsSecret.Data[credentialsSecretUser]
 	if !exists {
-		return "", "", machineapierros.InvalidMachineConfiguration("secret %v/%v does not have %q field set", namespace, spec.CredentialsSecret.Name, credentialsSecretUser)
+		return "", "", machinecontroller.InvalidMachineConfiguration("secret %v/%v does not have %q field set", namespace, spec.CredentialsSecret.Name, credentialsSecretUser)
 	}
 
 	password, exists := credentialsSecret.Data[credentialsSecretPassword]
 	if !exists {
-		return "", "", machineapierros.InvalidMachineConfiguration("secret %v/%v does not have %q field set", namespace, spec.CredentialsSecret.Name, credentialsSecretPassword)
+		return "", "", machinecontroller.InvalidMachineConfiguration("secret %v/%v does not have %q field set", namespace, spec.CredentialsSecret.Name, credentialsSecretPassword)
 	}
 
 	return string(user), string(password), nil

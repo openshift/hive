@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,25 +22,25 @@ type FakeClusterStates struct {
 	ns   string
 }
 
-var clusterstatesResource = schema.GroupVersionResource{Group: "hive.openshift.io", Version: "v1", Resource: "clusterstates"}
+var clusterstatesResource = v1.SchemeGroupVersion.WithResource("clusterstates")
 
-var clusterstatesKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "ClusterState"}
+var clusterstatesKind = v1.SchemeGroupVersion.WithKind("ClusterState")
 
 // Get takes name of the clusterState, and returns the corresponding clusterState object, and an error if there is any.
-func (c *FakeClusterStates) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.ClusterState, err error) {
+func (c *FakeClusterStates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterState, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(clusterstatesResource, c.ns, name), &hivev1.ClusterState{})
+		Invokes(testing.NewGetAction(clusterstatesResource, c.ns, name), &v1.ClusterState{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterState), err
+	return obj.(*v1.ClusterState), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterStates that match those selectors.
-func (c *FakeClusterStates) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.ClusterStateList, err error) {
+func (c *FakeClusterStates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterStateList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(clusterstatesResource, clusterstatesKind, c.ns, opts), &hivev1.ClusterStateList{})
+		Invokes(testing.NewListAction(clusterstatesResource, clusterstatesKind, c.ns, opts), &v1.ClusterStateList{})
 
 	if obj == nil {
 		return nil, err
@@ -48,8 +50,8 @@ func (c *FakeClusterStates) List(ctx context.Context, opts v1.ListOptions) (resu
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &hivev1.ClusterStateList{ListMeta: obj.(*hivev1.ClusterStateList).ListMeta}
-	for _, item := range obj.(*hivev1.ClusterStateList).Items {
+	list := &v1.ClusterStateList{ListMeta: obj.(*v1.ClusterStateList).ListMeta}
+	for _, item := range obj.(*v1.ClusterStateList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +60,114 @@ func (c *FakeClusterStates) List(ctx context.Context, opts v1.ListOptions) (resu
 }
 
 // Watch returns a watch.Interface that watches the requested clusterStates.
-func (c *FakeClusterStates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterStates) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(clusterstatesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a clusterState and creates it.  Returns the server's representation of the clusterState, and an error, if there is any.
-func (c *FakeClusterStates) Create(ctx context.Context, clusterState *hivev1.ClusterState, opts v1.CreateOptions) (result *hivev1.ClusterState, err error) {
+func (c *FakeClusterStates) Create(ctx context.Context, clusterState *v1.ClusterState, opts metav1.CreateOptions) (result *v1.ClusterState, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(clusterstatesResource, c.ns, clusterState), &hivev1.ClusterState{})
+		Invokes(testing.NewCreateAction(clusterstatesResource, c.ns, clusterState), &v1.ClusterState{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterState), err
+	return obj.(*v1.ClusterState), err
 }
 
 // Update takes the representation of a clusterState and updates it. Returns the server's representation of the clusterState, and an error, if there is any.
-func (c *FakeClusterStates) Update(ctx context.Context, clusterState *hivev1.ClusterState, opts v1.UpdateOptions) (result *hivev1.ClusterState, err error) {
+func (c *FakeClusterStates) Update(ctx context.Context, clusterState *v1.ClusterState, opts metav1.UpdateOptions) (result *v1.ClusterState, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(clusterstatesResource, c.ns, clusterState), &hivev1.ClusterState{})
+		Invokes(testing.NewUpdateAction(clusterstatesResource, c.ns, clusterState), &v1.ClusterState{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterState), err
+	return obj.(*v1.ClusterState), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterStates) UpdateStatus(ctx context.Context, clusterState *hivev1.ClusterState, opts v1.UpdateOptions) (*hivev1.ClusterState, error) {
+func (c *FakeClusterStates) UpdateStatus(ctx context.Context, clusterState *v1.ClusterState, opts metav1.UpdateOptions) (*v1.ClusterState, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(clusterstatesResource, "status", c.ns, clusterState), &hivev1.ClusterState{})
+		Invokes(testing.NewUpdateSubresourceAction(clusterstatesResource, "status", c.ns, clusterState), &v1.ClusterState{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterState), err
+	return obj.(*v1.ClusterState), err
 }
 
 // Delete takes name of the clusterState and deletes it. Returns an error if one occurs.
-func (c *FakeClusterStates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterStates) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(clusterstatesResource, c.ns, name, opts), &hivev1.ClusterState{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterstatesResource, c.ns, name, opts), &v1.ClusterState{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterStates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterStates) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(clusterstatesResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &hivev1.ClusterStateList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterStateList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterState.
-func (c *FakeClusterStates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.ClusterState, err error) {
+func (c *FakeClusterStates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterState, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clusterstatesResource, c.ns, name, pt, data, subresources...), &hivev1.ClusterState{})
+		Invokes(testing.NewPatchSubresourceAction(clusterstatesResource, c.ns, name, pt, data, subresources...), &v1.ClusterState{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterState), err
+	return obj.(*v1.ClusterState), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterState.
+func (c *FakeClusterStates) Apply(ctx context.Context, clusterState *hivev1.ClusterStateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterState, err error) {
+	if clusterState == nil {
+		return nil, fmt.Errorf("clusterState provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterState)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterState.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterState.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterstatesResource, c.ns, *name, types.ApplyPatchType, data), &v1.ClusterState{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterState), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterStates) ApplyStatus(ctx context.Context, clusterState *hivev1.ClusterStateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterState, err error) {
+	if clusterState == nil {
+		return nil, fmt.Errorf("clusterState provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterState)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterState.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterState.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterstatesResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ClusterState{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterState), err
 }

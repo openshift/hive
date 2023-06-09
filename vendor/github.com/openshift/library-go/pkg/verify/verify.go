@@ -359,21 +359,21 @@ func verifySignatureWithKeyring(r io.Reader, keyring openpgp.EntityList) ([]byte
 
 // An atomic container signature has the following schema:
 //
-// {
-// 	"critical": {
-// 			"type": "atomic container signature",
-// 			"image": {
-// 					"docker-manifest-digest": "sha256:817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e"
-// 			},
-// 			"identity": {
-// 					"docker-reference": "docker.io/library/busybox:latest"
-// 			}
-// 	},
-// 	"optional": {
-// 			"creator": "some software package v1.0.1-35",
-// 			"timestamp": 1483228800,
-// 	}
-// }
+//	{
+//		"critical": {
+//				"type": "atomic container signature",
+//				"image": {
+//						"docker-manifest-digest": "sha256:817a12c32a39bbe394944ba49de563e085f1d3c5266eb8e9723256bc4448680e"
+//				},
+//				"identity": {
+//						"docker-reference": "docker.io/library/busybox:latest"
+//				}
+//		},
+//		"optional": {
+//				"creator": "some software package v1.0.1-35",
+//				"timestamp": 1483228800,
+//		}
+//	}
 type signature struct {
 	Critical criticalSignature `json:"critical"`
 	Optional optionalSignature `json:"optional"`

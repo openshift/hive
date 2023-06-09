@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,25 +22,25 @@ type FakeClusterDeploymentCustomizations struct {
 	ns   string
 }
 
-var clusterdeploymentcustomizationsResource = schema.GroupVersionResource{Group: "hive.openshift.io", Version: "v1", Resource: "clusterdeploymentcustomizations"}
+var clusterdeploymentcustomizationsResource = v1.SchemeGroupVersion.WithResource("clusterdeploymentcustomizations")
 
-var clusterdeploymentcustomizationsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "ClusterDeploymentCustomization"}
+var clusterdeploymentcustomizationsKind = v1.SchemeGroupVersion.WithKind("ClusterDeploymentCustomization")
 
 // Get takes name of the clusterDeploymentCustomization, and returns the corresponding clusterDeploymentCustomization object, and an error if there is any.
-func (c *FakeClusterDeploymentCustomizations) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.ClusterDeploymentCustomization, err error) {
+func (c *FakeClusterDeploymentCustomizations) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterDeploymentCustomization, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(clusterdeploymentcustomizationsResource, c.ns, name), &hivev1.ClusterDeploymentCustomization{})
+		Invokes(testing.NewGetAction(clusterdeploymentcustomizationsResource, c.ns, name), &v1.ClusterDeploymentCustomization{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeploymentCustomization), err
+	return obj.(*v1.ClusterDeploymentCustomization), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterDeploymentCustomizations that match those selectors.
-func (c *FakeClusterDeploymentCustomizations) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.ClusterDeploymentCustomizationList, err error) {
+func (c *FakeClusterDeploymentCustomizations) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterDeploymentCustomizationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(clusterdeploymentcustomizationsResource, clusterdeploymentcustomizationsKind, c.ns, opts), &hivev1.ClusterDeploymentCustomizationList{})
+		Invokes(testing.NewListAction(clusterdeploymentcustomizationsResource, clusterdeploymentcustomizationsKind, c.ns, opts), &v1.ClusterDeploymentCustomizationList{})
 
 	if obj == nil {
 		return nil, err
@@ -48,8 +50,8 @@ func (c *FakeClusterDeploymentCustomizations) List(ctx context.Context, opts v1.
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &hivev1.ClusterDeploymentCustomizationList{ListMeta: obj.(*hivev1.ClusterDeploymentCustomizationList).ListMeta}
-	for _, item := range obj.(*hivev1.ClusterDeploymentCustomizationList).Items {
+	list := &v1.ClusterDeploymentCustomizationList{ListMeta: obj.(*v1.ClusterDeploymentCustomizationList).ListMeta}
+	for _, item := range obj.(*v1.ClusterDeploymentCustomizationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +60,114 @@ func (c *FakeClusterDeploymentCustomizations) List(ctx context.Context, opts v1.
 }
 
 // Watch returns a watch.Interface that watches the requested clusterDeploymentCustomizations.
-func (c *FakeClusterDeploymentCustomizations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterDeploymentCustomizations) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(clusterdeploymentcustomizationsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a clusterDeploymentCustomization and creates it.  Returns the server's representation of the clusterDeploymentCustomization, and an error, if there is any.
-func (c *FakeClusterDeploymentCustomizations) Create(ctx context.Context, clusterDeploymentCustomization *hivev1.ClusterDeploymentCustomization, opts v1.CreateOptions) (result *hivev1.ClusterDeploymentCustomization, err error) {
+func (c *FakeClusterDeploymentCustomizations) Create(ctx context.Context, clusterDeploymentCustomization *v1.ClusterDeploymentCustomization, opts metav1.CreateOptions) (result *v1.ClusterDeploymentCustomization, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(clusterdeploymentcustomizationsResource, c.ns, clusterDeploymentCustomization), &hivev1.ClusterDeploymentCustomization{})
+		Invokes(testing.NewCreateAction(clusterdeploymentcustomizationsResource, c.ns, clusterDeploymentCustomization), &v1.ClusterDeploymentCustomization{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeploymentCustomization), err
+	return obj.(*v1.ClusterDeploymentCustomization), err
 }
 
 // Update takes the representation of a clusterDeploymentCustomization and updates it. Returns the server's representation of the clusterDeploymentCustomization, and an error, if there is any.
-func (c *FakeClusterDeploymentCustomizations) Update(ctx context.Context, clusterDeploymentCustomization *hivev1.ClusterDeploymentCustomization, opts v1.UpdateOptions) (result *hivev1.ClusterDeploymentCustomization, err error) {
+func (c *FakeClusterDeploymentCustomizations) Update(ctx context.Context, clusterDeploymentCustomization *v1.ClusterDeploymentCustomization, opts metav1.UpdateOptions) (result *v1.ClusterDeploymentCustomization, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(clusterdeploymentcustomizationsResource, c.ns, clusterDeploymentCustomization), &hivev1.ClusterDeploymentCustomization{})
+		Invokes(testing.NewUpdateAction(clusterdeploymentcustomizationsResource, c.ns, clusterDeploymentCustomization), &v1.ClusterDeploymentCustomization{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeploymentCustomization), err
+	return obj.(*v1.ClusterDeploymentCustomization), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterDeploymentCustomizations) UpdateStatus(ctx context.Context, clusterDeploymentCustomization *hivev1.ClusterDeploymentCustomization, opts v1.UpdateOptions) (*hivev1.ClusterDeploymentCustomization, error) {
+func (c *FakeClusterDeploymentCustomizations) UpdateStatus(ctx context.Context, clusterDeploymentCustomization *v1.ClusterDeploymentCustomization, opts metav1.UpdateOptions) (*v1.ClusterDeploymentCustomization, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(clusterdeploymentcustomizationsResource, "status", c.ns, clusterDeploymentCustomization), &hivev1.ClusterDeploymentCustomization{})
+		Invokes(testing.NewUpdateSubresourceAction(clusterdeploymentcustomizationsResource, "status", c.ns, clusterDeploymentCustomization), &v1.ClusterDeploymentCustomization{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeploymentCustomization), err
+	return obj.(*v1.ClusterDeploymentCustomization), err
 }
 
 // Delete takes name of the clusterDeploymentCustomization and deletes it. Returns an error if one occurs.
-func (c *FakeClusterDeploymentCustomizations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterDeploymentCustomizations) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(clusterdeploymentcustomizationsResource, c.ns, name, opts), &hivev1.ClusterDeploymentCustomization{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterdeploymentcustomizationsResource, c.ns, name, opts), &v1.ClusterDeploymentCustomization{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterDeploymentCustomizations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterDeploymentCustomizations) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(clusterdeploymentcustomizationsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &hivev1.ClusterDeploymentCustomizationList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterDeploymentCustomizationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterDeploymentCustomization.
-func (c *FakeClusterDeploymentCustomizations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.ClusterDeploymentCustomization, err error) {
+func (c *FakeClusterDeploymentCustomizations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterDeploymentCustomization, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clusterdeploymentcustomizationsResource, c.ns, name, pt, data, subresources...), &hivev1.ClusterDeploymentCustomization{})
+		Invokes(testing.NewPatchSubresourceAction(clusterdeploymentcustomizationsResource, c.ns, name, pt, data, subresources...), &v1.ClusterDeploymentCustomization{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeploymentCustomization), err
+	return obj.(*v1.ClusterDeploymentCustomization), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterDeploymentCustomization.
+func (c *FakeClusterDeploymentCustomizations) Apply(ctx context.Context, clusterDeploymentCustomization *hivev1.ClusterDeploymentCustomizationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterDeploymentCustomization, err error) {
+	if clusterDeploymentCustomization == nil {
+		return nil, fmt.Errorf("clusterDeploymentCustomization provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterDeploymentCustomization)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterDeploymentCustomization.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterDeploymentCustomization.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterdeploymentcustomizationsResource, c.ns, *name, types.ApplyPatchType, data), &v1.ClusterDeploymentCustomization{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterDeploymentCustomization), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterDeploymentCustomizations) ApplyStatus(ctx context.Context, clusterDeploymentCustomization *hivev1.ClusterDeploymentCustomizationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterDeploymentCustomization, err error) {
+	if clusterDeploymentCustomization == nil {
+		return nil, fmt.Errorf("clusterDeploymentCustomization provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterDeploymentCustomization)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterDeploymentCustomization.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterDeploymentCustomization.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterdeploymentcustomizationsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ClusterDeploymentCustomization{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterDeploymentCustomization), err
 }

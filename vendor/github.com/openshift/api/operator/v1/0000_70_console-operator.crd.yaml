@@ -53,7 +53,20 @@ spec:
                     brand:
                       description: brand is the default branding of the web console which can be overridden by providing the brand field.  There is a limited set of specific brand options. This field controls elements of the console such as the logo. Invalid value will prevent a console rollout.
                       type: string
-                      pattern: ^$|^(ocp|origin|okd|dedicated|online|azure)$
+                      enum:
+                        - openshift
+                        - okd
+                        - online
+                        - ocp
+                        - dedicated
+                        - azure
+                        - OpenShift
+                        - OKD
+                        - Online
+                        - OCP
+                        - Dedicated
+                        - Azure
+                        - ROSA
                     customLogoFile:
                       description: 'customLogoFile replaces the default OpenShift logo in the masthead and about dialog. It is a reference to a ConfigMap in the openshift-config namespace. This can be created with a command like ''oc create configmap custom-logo --from-file=/path/to/file -n openshift-config''. Image size must be less than 1 MB due to constraints on the ConfigMap size. The ConfigMap key should include a file extension so that the console serves the file with the correct MIME type. Recommended logo specifications: Dimensions: Max height of 68px and max width of 200px SVG format preferred'
                       type: object
@@ -356,7 +369,7 @@ spec:
                           description: name is the metadata.name of the referenced secret
                           type: string
                 unsupportedConfigOverrides:
-                  description: 'unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override it will end up overlaying in the following order: 1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
+                  description: unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
                   type: object
                   nullable: true
                   x-kubernetes-preserve-unknown-fields: true

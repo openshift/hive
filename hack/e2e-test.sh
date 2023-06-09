@@ -8,7 +8,7 @@ source ${0%/*}/e2e-common.sh
 
 function teardown() {
   echo "!EXIT TRAP!"
-  capture_manifests
+  capture_manifests EXIT
   # Let's save the logs now in case any of the following never finish
   echo "Saving hive logs before cleanup"
   save_hive_logs
@@ -209,11 +209,11 @@ case "${INSTALL_RESULT}" in
         ;;
 esac
 
-capture_manifests
-capture_cluster_logs $CLUSTER_NAME $CLUSTER_NAMESPACE $INSTALL_RESULT
-
 echo "Running post-install tests"
 make test-e2e-postinstall
+
+capture_manifests 1
+capture_cluster_logs $CLUSTER_NAME $CLUSTER_NAMESPACE $INSTALL_RESULT
 
 echo "Running destroy test"
 make test-e2e-destroycluster

@@ -96,7 +96,7 @@ REAL_POOL_NAME=$CLUSTER_NAME
 
 function cleanup() {
   echo "!EXIT TRAP!"
-  capture_manifests
+  capture_manifests EXIT
   # Let's save the logs now in case any of the following never finish
   echo "Saving hive logs before cleanup"
   save_hive_logs

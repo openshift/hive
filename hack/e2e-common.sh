@@ -237,16 +237,17 @@ echo "Using cluster base domain: ${CLUSTER_DOMAIN}"
 oc get clusterdeployment > /dev/null
 
 function capture_manifests() {
-    oc get clusterdeployment -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterdeployment.yaml" || true
-    oc get clusterimageset -o yaml &> "${ARTIFACT_DIR}/hive_clusterimagesets.yaml" || true
-    oc get clusterprovision -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterprovision.yaml" || true
-    oc get clusterstate -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterstate.yaml" || true
-    oc get dnszone -A -o yaml &> "${ARTIFACT_DIR}/hive_dnszones.yaml" || true
-    oc get machinepool -A -o yaml &> "${ARTIFACT_DIR}/hive_machinepools.yaml" || true
-    oc get clusterdeploymentcustomization -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterdeploymentcustomization.yaml" || true
-    oc get clusterpool -A -o yaml &> "${ARTIFACT_DIR}/hive_clusterpool.yaml" || true
+    local prefix=$1
+    oc get clusterdeployment -A -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_clusterdeployment.yaml" || true
+    oc get clusterimageset -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_clusterimagesets.yaml" || true
+    oc get clusterprovision -A -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_clusterprovision.yaml" || true
+    oc get clusterstate -A -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_clusterstate.yaml" || true
+    oc get dnszone -A -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_dnszones.yaml" || true
+    oc get machinepool -A -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_machinepools.yaml" || true
+    oc get clusterdeploymentcustomization -A -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_clusterdeploymentcustomization.yaml" || true
+    oc get clusterpool -A -o yaml &> "${ARTIFACT_DIR}/${prefix}_hive_clusterpool.yaml" || true
     # Don't get the contents of the secrets, since they're sensitive; hopefully just listing them will be helpful.
-    oc get secrets -A &> "${ARTIFACT_DIR}/secret_list.txt" || true
+    oc get secrets -A &> "${ARTIFACT_DIR}/${prefix}_secret_list.txt" || true
 }
 
 function capture_cluster_logs() {

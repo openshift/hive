@@ -268,7 +268,7 @@ func (r *ReconcileHiveConfig) deployConfigMap(hLog log.FieldLogger, h resource.H
 
 	cm := &corev1.ConfigMap{}
 	cm.Name = cmInfo.name
-	cm.Namespace = getHiveNamespace(instance)
+	cm.Namespace = GetHiveNamespace(instance)
 	cm.Data = make(map[string]string)
 
 	if cmInfo.setData != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/adm"
+	"github.com/openshift/hive/contrib/pkg/awsprivatelink"
 	"github.com/openshift/hive/contrib/pkg/certificate"
 	"github.com/openshift/hive/contrib/pkg/clusterpool"
 	"github.com/openshift/hive/contrib/pkg/createcluster"
@@ -54,6 +55,7 @@ func newHiveutilCommand() *cobra.Command {
 	cmd.AddCommand(adm.NewAdmCommand())
 	cmd.AddCommand(version.NewVersionCommand())
 	cmd.AddCommand(clusterpool.NewClusterPoolCommand())
+	cmd.AddCommand(awsprivatelink.NewAWSPrivateLinkCommand())
 
 	return cmd
 }

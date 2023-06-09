@@ -72,7 +72,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		}
 	}
 
-	hiveNSName := getHiveNamespace(instance)
+	hiveNSName := GetHiveNamespace(instance)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {

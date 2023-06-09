@@ -151,6 +151,90 @@ Claim a ClusterDeployment from a [ClusterPool](./clusterpools.md):
 bin/hiveutil clusterpool claim -n hive test-pool username-claim
 ```
 
+### AWS PrivateLink
+
+To create an AWS cluster using [PrivateLink](./awsprivatelink.md), the following steps could be followed:
+
+Initialize AWS PrivateLink settings for Hive:
+
+```bash
+bin/hiveutil awsprivatelink enable --dns-record-type Alias
+```
+
+Explanation:
+1) This command creates a Secret with AWS hub account credentials extracted from the environment.
+2) It adds a reference to the Secret in `HiveConfig.spec.awsPrivateLink.credentialsSecretRef`. 
+3) The active cluster's VPC is added to `HiveConfig.spec.awsPrivateLink.associatedVPCs`.
+4) `HiveConfig.spec.awsPrivateLink.dnsRecordType` is set to Alias.
+
+Create an endpoint VPC with private subnets:
+
+```bash
+# Could be different from the active cluster's region
+export REGION=us-east-1
+export STACK=my-stack-name
+export TEMPLATE=file://hack/awsprivatelink/vpc.cf.yaml
+export AZCOUNT=3
+# Should not overlap with the CIDR of the active cluster's VPC
+export CIDR=10.1.0.0/16
+
+aws --region $REGION cloudformation create-stack --stack-name $STACK --template-body $TEMPLATE --parameters ParameterKey=AvailabilityZoneCount,ParameterValue=$AZCOUNT ParameterKey=VpcCidr,ParameterValue=$CIDR
+aws --region $REGION cloudformation wait stack-create-complete --stack-name $STACK
+export PRIVSUBNETIDS=$(aws cloudformation describe-stacks --region $REGION --stack-name $STACK --query 'Stacks[0].Outputs[?OutputKey==`PrivateSubnetIds`].OutputValue | [0]' --output text)
+export VPCID=$(aws cloudformation describe-stacks --region $REGION --stack-name $STACK --query 'Stacks[0].Outputs[?OutputKey==`VpcId`].OutputValue | [0]' --output text)
+```
+
+Set up the endpoint VPC for PrivateLink:
+
+```bash
+bin/hiveutil awsprivatelink endpointvpc add $VPCID --subnet-ids $PRIVSUBNETIDS --region $REGION
+```
+
+Explanation:
+1) This command sets up networking elements on AWS to allow traffic between the endpoint VPC and each associated VPC.
+2) It adds the endpoint VPC to `HiveConfig.spec.awsPrivateLink.endpointVPCInventory`.
+
+Create an AWS cluster using PrivateLink:
+
+```bash
+export CLUSTERNAME=my-cluster-name
+export BASEDOMAIN=my.base.domain.com
+
+bin/hiveutil create-cluster $CLUSTERNAME --base-domain $BASEDOMAIN --region $REGION --aws-private-link --internal
+```
+
+Remove the cluster after usage:
+
+```bash
+oc delete cd $CLUSTERNAME
+```
+
+Remove the endpoint VPC after the CD is gone:
+
+```bash
+bin/hiveutil awsprivatelink endpointvpc remove $VPCID
+```
+
+Explanation:
+1) This command tears down the networking elements that were set up using `bin/hiveutil awsprivatelink endpointvpc add`.
+2) It also removes the endpoint VPC from `HiveConfig.spec.awsPrivateLink.endpointVPCInventory`.
+
+Delete the CloudFormation stack:
+
+```bash
+aws --region $REGION cloudformation delete-stack --stack-name $STACK
+```
+
+Disable AWS PrivateLink in HiveConfig:
+
+```bash
+bin/hiveutil awsprivatelink disable
+```
+
+Explanation:
+1) This command removes the AWS hub account credentials Secret created with `bin/hiveutil awsprivatelink enable` from Hive's namespace.
+2) It empties `HiveConfig.spec.awsPrivateLink`, restoring HiveConfig to its state before configuring PrivateLink.
+
 ### Other Commands
 
 To see other commands offered by `hiveutil`, run `hiveutil --help`.

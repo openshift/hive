@@ -30,7 +30,7 @@
   - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
 - [Running the e2e test locally](#running-the-e2e-test-locally)
 - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
-- [Hive Controllers CPU Profiling](#hive-controllers-cpu-profiling)
+- [Hive Controllers Profiling](#hive-controllers-profiling)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -483,29 +483,33 @@ Note that this prometheus uses an emptyDir volume and all data is lost on pod re
 oc apply -f config/prometheus/prometheus-deployment-with-pvc.yaml
 ```
 
-## Hive Controllers CPU Profiling
+## Hive Controllers Profiling
 
-Enable CPU profiling by importing the pprof module in cmd/manager/main.go:
+[Profiling](https://go.dev/doc/diagnostics#profiling) is enabled by default for hive-controllers and hive-clustersync at port 6060.
 
-```golang
-_ "net/http/pprof"
-```
-
-Launch an http server to expose the data in the main method of cmd/manager/main.go:
-
-```golang
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-```
-
-Port 6060 is already exposed in the hive-controllers service, forward it locally:
+Port 6060 is already exposed in the Service for both of these controllers.
+You can forward it locally and the Service will pick a replica for you:
 
 ```bash
 $ oc port-forward svc/hive-controllers -n hive 6060
 ```
 
-Visit [the webUI](http://localhost:6060/debug/pprof/) to view available profiles and some live data.
+If you wish to profile a specific replica, you can forward just that pod:
+
+```bash
+$ oc port-forward pod/hive-clustersync-0 6060
+```
+
+If you wish to profile multiple pods at once, you will need to choose a different local port for each:
+
+```bash
+$ oc port-forward pod/hive-clustersync-0 6060:6060
+$ oc port-forward pod/hive-clustersync-1 6061:6060
+```
+
+See `oc port-forward --help` for more options.
+
+Visit the web UI (e.g. http://localhost:6060/debug/pprof/) to view available profiles and some live data.
 
 Grab a profile snapshot with curl:
 

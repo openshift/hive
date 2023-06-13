@@ -6,6 +6,7 @@ import (
 	golog "log"
 	"math/rand"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -62,6 +63,8 @@ import (
 const (
 	defaultLogLevel        = "info"
 	leaderElectionLockName = "hive-controllers-leader"
+	// Matches the `port` in config/{controllers|clustersync}/service.yaml
+	pprofHostPort = "localhost:6060"
 )
 
 type controllerSetupFunc func(manager.Manager) error
@@ -272,6 +275,10 @@ func (writer klogWriter) Write(data []byte) (n int, err error) {
 
 func main() {
 	defer klog.Flush()
+	go func() {
+		log.WithField("pprof_host_port", pprofHostPort).Info("Enabling pprof")
+		log.Println(http.ListenAndServe(pprofHostPort, nil))
+	}()
 	rand.Seed(time.Now().UnixNano())
 	cmd := newRootCommand()
 	err := cmd.Execute()

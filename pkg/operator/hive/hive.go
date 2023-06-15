@@ -372,7 +372,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 	if additionalCA.Len() == 0 {
 		caSecret, err := r.hiveSecretLister.Secrets(hiveNS).Get(hiveAdditionalCASecret)
 		if err == nil {
-			err = h.Delete(caSecret.APIVersion, caSecret.Kind, caSecret.Namespace, caSecret.Name)
+			err = h.Delete("v1", "Secret", caSecret.Namespace, caSecret.Name)
 			if err != nil {
 				hLog.WithError(err).WithField("secret", fmt.Sprintf("%s/%s", hiveNS, hiveAdditionalCASecret)).
 					Error("cannot delete hive additional ca secret")

@@ -28,9 +28,9 @@ compute:
     aws:
       rootVolume:
         iops: 100
-        size: 22
-        type: gp2
-      type: m4.xlarge
+        size: 120
+        type: gp3
+      type: m5.xlarge
   replicas: 3
 controlPlane:
   name: master
@@ -38,9 +38,9 @@ controlPlane:
     aws:
       rootVolume:
         iops: 100
-        size: 22
-        type: gp2
-      type: m4.xlarge
+        size: 120
+        type: gp3
+      type: m5.xlarge
   replicas: 3
 networking:
   clusterNetwork:

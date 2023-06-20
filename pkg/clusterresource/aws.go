@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	awsInstanceType = "m4.xlarge"
-	volumeSize      = 22
-	volumeType      = "gp2"
+	awsInstanceType = "m5.xlarge"
+	volumeSize      = 120
+	volumeType      = "gp3"
 )
 
 var _ CloudBuilder = (*AWSCloudBuilder)(nil)

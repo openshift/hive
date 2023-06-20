@@ -275,6 +275,145 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Merge labels and taints",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Labels["test-label-2"] = "test-value-2"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:   "test-taint-2",
+					Value: "test-value-2",
+				})
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "test-value",
+					})
+					return ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "test-value",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint-2",
+						Value: "test-value-2",
+					})
+					return ms
+				}(),
+			},
+		},
+		{
+			name:              "Copy over labels and taints from MachinePool, label map nil on remote MachineSet",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					//ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					msReplicas := int32(1)
+					rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.Scheme)
+					if err != nil {
+						log.WithError(err).Fatal("error encoding AWS machine provider spec")
+					}
+					ms := machineapi.MachineSet{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: machineapi.SchemeGroupVersion.String(),
+							Kind:       "MachineSet",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "foo-12345-worker-us-east-1a",
+							Namespace:  machineAPINamespace,
+							Generation: int64(0),
+						},
+						Spec: machineapi.MachineSetSpec{
+							Replicas: &msReplicas,
+							Selector: metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"machine.openshift.io/cluster-api-machineset": "foo-12345-worker-us-east-1a",
+									"machine.openshift.io/cluster-api-cluster":    testInfraID,
+								},
+							},
+							Template: machineapi.MachineTemplateSpec{
+								Spec: machineapi.MachineSpec{
+									ProviderSpec: machineapi.ProviderSpec{
+										Value: rawAWSProviderSpec,
+									},
+								},
+							},
+						},
+					}
+					return &ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 1)
+					return ms
+				}(),
+			},
+		},
+		{
+			name:              "Don't call update if labels or taints on remote MachineSet already exist",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Labels["test-label-2"] = "test-value-2"
+				mp.Spec.Labels["test-label-1"] = "test-value-1"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:   "test-taint",
+					Value: "test-value",
+				})
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.Labels["test-label-1"] = "test-value-1"
+					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "test-value",
+					})
+					return ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.Labels["test-label-1"] = "test-value-1"
+					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "test-value",
+					})
+					return ms
+				}(),
+			},
+		},
+		{
 			name: "Skip create missing machine set when clusterDeployment has annotation hive.openshift.io/syncset-pause: true ",
 			clusterDeployment: func() *hivev1.ClusterDeployment {
 				cd := testClusterDeployment()

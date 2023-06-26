@@ -7,6 +7,7 @@ import github as gh
 import json
 import os
 import requests
+import semver
 import shutil
 import subprocess
 import sys
@@ -25,7 +26,7 @@ HIVE_SUB_DIR = "operators/hive-operator"
 
 OPERATORHUB_HIVE_IMAGE_DEFAULT = "quay.io/app-sre/hive"
 
-COMMUNITY_OPERATORS_HIVE_PKG_URL = "https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-prod/main/operators/hive-operator/hive.package.yaml"
+COMMUNITY_OPERATORS_UPSTREAM_REPO = "git@github.com:redhat-openshift-ecosystem/community-operators-prod.git"
 
 SUBPROCESS_REDIRECT = subprocess.DEVNULL
 
@@ -129,26 +130,66 @@ def get_params():
 
     return args
 
+# Traverse through version directories to detect highest version
+def get_previous_version(work_dir, channel_name):
+    upstream_branch = "main"
+    dir_name = "community-operators-prod"
 
-# get_previous_version grabs the previous hive version (without the leading `v`) from
-# COMMUNITY_OPERATORS_HIVE_PKG_URL package yaml for the provided channel_name.
-def get_previous_version(channel_name):
-    http = urllib3.PoolManager()
-    r = http.request("GET", COMMUNITY_OPERATORS_HIVE_PKG_URL)
-    pkg_yaml = yaml.load(r.data.decode("utf-8"), Loader=yaml.FullLoader)
+    repo_full_path = os.path.join(work_dir, dir_name)
+    # clone git repo
     try:
-        for channel in pkg_yaml["channels"]:
-            if channel["name"] == channel_name:
-                return channel["currentCSV"].replace("hive-operator.v", "")
+        git.Repo.clone_from(COMMUNITY_OPERATORS_UPSTREAM_REPO, repo_full_path)
+    except:
+        print("Failed to clone repo {} to {}".format(COMMUNITY_OPERATORS_UPSTREAM_REPO, repo_full_path))
+        raise
+
+    # get to the right place on the filesystem
+    print("Working in %s" % repo_full_path)
+    os.chdir(repo_full_path)
+
+    repo = git.Repo(repo_full_path)
+
+    # Starting branch
+    print("Checkout latest {}".format(upstream_branch))
+    try:
+        repo.git.checkout(upstream_branch)
+    except:
+        print("Failed to checkout {}".format(upstream_branch))
+        raise
+
+    highest_version = "0.0.0"
+    try:
+        hive_dir = os.path.join(repo_full_path, HIVE_SUB_DIR)
+        for version in os.listdir(hive_dir):
+            annotation_yaml_path = os.path.join(hive_dir, version, "metadata", "annotations.yaml")
+            try:
+                with open(annotation_yaml_path, "r") as stream:
+                    annotation_yaml = yaml.load(stream, Loader=yaml.SafeLoader)
+                    version_channel = annotation_yaml["annotations"]["operators.operatorframework.io.bundle.channel.default.v1"]
+                    if version_channel == channel_name:
+                        if semver.compare(version, highest_version) > 0:
+                            highest_version = version
+            except (NotADirectoryError, FileNotFoundError):
+                print("Skipping %s -- not a version", version)
+                continue
     except:
         print(
             "Unable to determine previous hive version from {}",
-            COMMUNITY_OPERATORS_HIVE_PKG_URL,
+            COMMUNITY_OPERATORS_UPSTREAM_REPO,
         )
         raise
 
-    # Channel not found -- no previous version.
-    return None
+    if highest_version == "0.0.0":
+        # Channel not found -- no previous version.
+        # NOTE: If a new channel is introduced, finding a prev_version will fail and require a manual edit of the CSV with the prev_version.
+        # Keeping this condition fatal in order to ensure that a failure to find prev_version is noticed.
+        print(
+            "Channel not found. Unable to calculate determine version {}",
+            COMMUNITY_OPERATORS_UPSTREAM_REPO,
+        )
+        sys.exit(1)
+
+    return highest_version
 
 
 # generate_csv_base generates a hive bundle from the current working directory
@@ -165,19 +206,43 @@ def generate_csv_base(
     operator_role = "config/operator/operator_role.yaml"
     deployment_spec = "config/operator/operator_deployment.yaml"
 
+
     # The bundle directory doesn't have the 'v'
     version_dir = os.path.join(bundle_dir, v.semver)
     if not os.path.exists(version_dir):
         os.mkdir(version_dir)
+    manifests_dir = os.path.join(version_dir, "manifests")
+    if not os.path.exists(manifests_dir):
+        os.mkdir(manifests_dir)
+
+    # Create annotations.yaml file
+    metadata_dir = os.path.join(version_dir, "metadata")
+    if not os.path.exists(metadata_dir):
+        os.mkdir(metadata_dir)
+    file_path = os.path.join(metadata_dir, "annotations.yaml")
+    with open(file_path, 'w') as file:
+        yaml_annotations =  {
+                'annotations' : {
+                    'operators.operatorframework.io.bundle.channel.default.v1': CHANNEL_DEFAULT,
+                    'operators.operatorframework.io.bundle.channels.v1': CHANNEL_DEFAULT,
+                    'operators.operatorframework.io.bundle.manifests.v1': 'manifests/',
+                    'operators.operatorframework.io.bundle.mediatype.v1': 'registry+v1',
+                    'operators.operatorframework.io.bundle.metadata.v1': 'metadata/',
+                    'operators.operatorframework.io.bundle.package.v1': 'hive-operator',
+                }
+            }
+        
+        yaml_string = yaml.dump(yaml_annotations)
+        file.write(yaml_string)
 
     owned_crds = []
 
-    # Copy all CSV files over to the bundle output dir:
+    # Copy all CSV files over to the manifests dir:
     crd_files = sorted(os.listdir(crds_dir))
     for file_name in crd_files:
         full_path = os.path.join(crds_dir, file_name)
         if os.path.isfile(os.path.join(crds_dir, file_name)):
-            dest_path = os.path.join(version_dir, file_name)
+            dest_path = os.path.join(manifests_dir, file_name)
             shutil.copy(full_path, dest_path)
             # Read the CRD yaml to add to owned CRDs list
             with open(dest_path, "r") as stream:
@@ -241,7 +306,7 @@ def generate_csv_base(
 
     # Write the CSV to disk:
     csv_filename = "hive-operator.%s.clusterserviceversion.yaml" % v
-    csv_file = os.path.join(version_dir, csv_filename)
+    csv_file = os.path.join(manifests_dir, csv_filename)
     with open(csv_file, "w") as outfile:
         yaml.dump(csv, outfile, default_flow_style=False)
     print("Wrote ClusterServiceVersion: %s" % csv_file)
@@ -325,14 +390,20 @@ def open_pr(
 
     print()
     print()
-    print("Cloning %s" % fork_repo)
     repo_full_path = os.path.join(work_dir, dir_name)
-    # clone git repo
-    try:
-        git.Repo.clone_from(fork_repo, repo_full_path)
-    except:
-        print("Failed to clone repo {} to {}".format(fork_repo, repo_full_path))
-        raise
+    # The get_previous_version function clones the upstream RH directory
+    # into community-operators-prod repo.
+    # If this repo already exists, skip cloning it a second time.
+    if not os.path.exists(repo_full_path):
+        # clone git repo
+        print("Cloning %s" % fork_repo)
+        try:
+            git.Repo.clone_from(fork_repo, repo_full_path)
+        except:
+            print("Failed to clone repo {} to {}".format(fork_repo, repo_full_path))
+            raise
+    else:
+        print("Skipping cloning of %s. Repo already exists" % fork_repo)
 
     # get to the right place on the filesystem
     print("Working in %s" % repo_full_path)
@@ -375,34 +446,7 @@ def open_pr(
     hive_dir = os.path.join(repo_full_path, HIVE_SUB_DIR, v.semver)
     shutil.copytree(bundle_files, hive_dir)
 
-    # update bundle manifest
-    print("Updating bundle manfiest")
-    bundle_manifests_file = os.path.join(
-        repo_full_path, HIVE_SUB_DIR, "hive.package.yaml"
-    )
-    bundle = {}
-    with open(bundle_manifests_file, "r") as a_file:
-        bundle = yaml.load(a_file, Loader=yaml.SafeLoader)
-
-    found = False
-    for channel in bundle["channels"]:
-        if channel["name"] == CHANNEL_DEFAULT:
-            found = True
-            channel["currentCSV"] = "hive-operator.{}".format(str(v))
-
-    if not found:
-        print("did not find a CSV channel to update")
-        sys.exit(1)
-    pr_title = "Update Hive community operator channel {} to {}".format(
-        CHANNEL_DEFAULT, v.semver
-    )
-
-    with open(bundle_manifests_file, "w") as outfile:
-        yaml.dump(bundle, outfile, default_flow_style=False)
-    print("\nUpdated bundle package:\n\n")
-    cmd = ("cat %s" % bundle_manifests_file).split()
-    subprocess.run(cmd)
-    print()
+    pr_title = "operator hive-operator ({})".format(v.semver)
 
     # commit files
     print("Adding file")
@@ -486,7 +530,8 @@ if __name__ == "__main__":
         # Omit version graph stuff
         prev_version = None
     else:
-        prev_version = get_previous_version(CHANNEL_DEFAULT)
+        prev_version = get_previous_version(work_dir.name, CHANNEL_DEFAULT)
+        os.chdir(hive_repo_dir.name)
         if ver.semver == prev_version:
             raise ValueError("Version {} already exists upstream".format(ver.semver))
 
@@ -497,11 +542,6 @@ if __name__ == "__main__":
     if args.dummy_bundle:
         copy_bundle(orig_wd, version_dir, ver)
     else:
-        generate_package(
-            os.path.join(bundle_dir.name, "hive.package.yaml"),
-            CHANNEL_DEFAULT,
-            ver,
-        )
         # redhat-openshift-ecosystem/community-operators-prod
         open_pr(
             work_dir.name,

@@ -332,7 +332,7 @@ func (m *InstallManager) Run() error {
 
 	m.ClusterName = cd.Spec.ClusterName
 
-	if err := m.waitForAndCopyInstallerBinaries(); err != nil {
+	if err := m.copyInstallerBinaries(); err != nil {
 		m.log.WithError(err).Error("error waiting for/copying binaries")
 		return err
 	}
@@ -614,12 +614,11 @@ func (m *InstallManager) waitForFiles(files []string) {
 	m.log.Infof("all files found, ready to proceed")
 }
 
-func (m *InstallManager) waitForAndCopyInstallerBinaries() error {
+func (m *InstallManager) copyInstallerBinaries() error {
 	fileList := []string{
 		filepath.Join(m.WorkDir, "openshift-install"),
 		filepath.Join(m.WorkDir, "oc"),
 	}
-	m.waitForFiles(fileList)
 
 	// copy each binary to our container user's home dir to avoid situations
 	// where the /output workdir may be mounted with noexec. (surfaced when using kind

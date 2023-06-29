@@ -19,7 +19,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
-func getHiveNamespace(config *hivev1.HiveConfig) string {
+func GetHiveNamespace(config *hivev1.HiveConfig) string {
 	if config.Spec.TargetNamespace == "" {
 		return constants.DefaultHiveNamespace
 	}

@@ -30,6 +30,17 @@ pair to create an Private Link to cluster's internal NLB for k8s API server,
 allowing Hive to access the API without forcing the cluster to publish it on
 the Internet.
 
+## Setting up AWS Private Link with hiveutil
+
+The `hiveutil awsprivatelink` command provides multiple subcommands for managing AWS PrivateLink configuration. 
+It automates tasks such as managing `HiveConfig.spec.awsPrivateLink` and setting up
+or tearing down networking between associated VPCs and endpoint VPCs.
+For detailed information about these subcommands and their usage,
+please refer to the [hiveutil documentation](./hiveutil.md#aws-privatelink).
+
+Disclaimer: `hiveutil` is an internal utility for use by hive developers and
+hive itself. It is not supported for general use.
+
 ## Configuring Hive to enable AWS Private Link
 
 To configure Hive to support Private Link in a specific region,

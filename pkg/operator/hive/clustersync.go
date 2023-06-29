@@ -85,7 +85,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
 
-	hiveNSName := getHiveNamespace(hiveconfig)
+	hiveNSName := GetHiveNamespace(hiveconfig)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {

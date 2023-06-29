@@ -61,11 +61,25 @@ type Client interface {
 	// EC2
 	DescribeAvailabilityZones(*ec2.DescribeAvailabilityZonesInput) (*ec2.DescribeAvailabilityZonesOutput, error)
 	DescribeSubnets(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error)
+	DescribeSubnetsPages(*ec2.DescribeSubnetsInput, func(*ec2.DescribeSubnetsOutput, bool) bool) error
 	DescribeRouteTables(*ec2.DescribeRouteTablesInput) (*ec2.DescribeRouteTablesOutput, error)
+	DescribeRouteTablesPages(*ec2.DescribeRouteTablesInput, func(*ec2.DescribeRouteTablesOutput, bool) bool) error
+	CreateRoute(*ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error)
+	DeleteRoute(*ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error)
 	DescribeInstances(*ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error)
 	StopInstances(*ec2.StopInstancesInput) (*ec2.StopInstancesOutput, error)
 	TerminateInstances(*ec2.TerminateInstancesInput) (*ec2.TerminateInstancesOutput, error)
 	StartInstances(*ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error)
+	DescribeSecurityGroups(*ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error)
+	AuthorizeSecurityGroupIngress(*ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error)
+	RevokeSecurityGroupIngress(*ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error)
+	DescribeVpcs(*ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
+	CreateVpcPeeringConnection(*ec2.CreateVpcPeeringConnectionInput) (*ec2.CreateVpcPeeringConnectionOutput, error)
+	DescribeVpcPeeringConnections(*ec2.DescribeVpcPeeringConnectionsInput) (*ec2.DescribeVpcPeeringConnectionsOutput, error)
+	AcceptVpcPeeringConnection(*ec2.AcceptVpcPeeringConnectionInput) (*ec2.AcceptVpcPeeringConnectionOutput, error)
+	DeleteVpcPeeringConnection(*ec2.DeleteVpcPeeringConnectionInput) (*ec2.DeleteVpcPeeringConnectionOutput, error)
+	WaitUntilVpcPeeringConnectionExists(*ec2.DescribeVpcPeeringConnectionsInput) error
+	WaitUntilVpcPeeringConnectionDeleted(*ec2.DescribeVpcPeeringConnectionsInput) error
 	CreateVpcEndpointServiceConfiguration(*ec2.CreateVpcEndpointServiceConfigurationInput) (*ec2.CreateVpcEndpointServiceConfigurationOutput, error)
 	DescribeVpcEndpointServiceConfigurations(*ec2.DescribeVpcEndpointServiceConfigurationsInput) (*ec2.DescribeVpcEndpointServiceConfigurationsOutput, error)
 	ModifyVpcEndpointServiceConfiguration(*ec2.ModifyVpcEndpointServiceConfigurationInput) (*ec2.ModifyVpcEndpointServiceConfigurationOutput, error)
@@ -131,9 +145,29 @@ func (c *awsClient) DescribeSubnets(input *ec2.DescribeSubnetsInput) (*ec2.Descr
 	return c.ec2Client.DescribeSubnets(input)
 }
 
+func (c *awsClient) DescribeSubnetsPages(input *ec2.DescribeSubnetsInput, fn func(*ec2.DescribeSubnetsOutput, bool) bool) error {
+	metricAWSAPICalls.WithLabelValues("DescribeSubnetsPages").Inc()
+	return c.ec2Client.DescribeSubnetsPages(input, fn)
+}
+
 func (c *awsClient) DescribeRouteTables(input *ec2.DescribeRouteTablesInput) (*ec2.DescribeRouteTablesOutput, error) {
 	metricAWSAPICalls.WithLabelValues("DescribeRouteTables").Inc()
 	return c.ec2Client.DescribeRouteTables(input)
+}
+
+func (c *awsClient) DescribeRouteTablesPages(input *ec2.DescribeRouteTablesInput, fn func(*ec2.DescribeRouteTablesOutput, bool) bool) error {
+	metricAWSAPICalls.WithLabelValues("DescribeRouteTablesPages").Inc()
+	return c.ec2Client.DescribeRouteTablesPages(input, fn)
+}
+
+func (c *awsClient) CreateRoute(input *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
+	metricAWSAPICalls.WithLabelValues("CreateRoute").Inc()
+	return c.ec2Client.CreateRoute(input)
+}
+
+func (c *awsClient) DeleteRoute(input *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
+	metricAWSAPICalls.WithLabelValues("DeleteRoute").Inc()
+	return c.ec2Client.DeleteRoute(input)
 }
 
 func (c *awsClient) DescribeInstances(input *ec2.DescribeInstancesInput) (*ec2.DescribeInstancesOutput, error) {
@@ -154,6 +188,51 @@ func (c *awsClient) TerminateInstances(input *ec2.TerminateInstancesInput) (*ec2
 func (c *awsClient) StartInstances(input *ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error) {
 	metricAWSAPICalls.WithLabelValues("StartInstances").Inc()
 	return c.ec2Client.StartInstances(input)
+}
+
+func (c *awsClient) DescribeSecurityGroups(input *ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error) {
+	metricAWSAPICalls.WithLabelValues("DescribeSecurityGroups").Inc()
+	return c.ec2Client.DescribeSecurityGroups(input)
+}
+
+func (c *awsClient) AuthorizeSecurityGroupIngress(input *ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+	metricAWSAPICalls.WithLabelValues("AuthorizeSecurityGroupIngress").Inc()
+	return c.ec2Client.AuthorizeSecurityGroupIngress(input)
+}
+
+func (c *awsClient) RevokeSecurityGroupIngress(input *ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error) {
+	metricAWSAPICalls.WithLabelValues("RevokeSecurityGroupIngress").Inc()
+	return c.ec2Client.RevokeSecurityGroupIngress(input)
+}
+
+func (c *awsClient) CreateVpcPeeringConnection(input *ec2.CreateVpcPeeringConnectionInput) (*ec2.CreateVpcPeeringConnectionOutput, error) {
+	metricAWSAPICalls.WithLabelValues("CreateVpcPeeringConnection").Inc()
+	return c.ec2Client.CreateVpcPeeringConnection(input)
+}
+
+func (c *awsClient) DescribeVpcPeeringConnections(input *ec2.DescribeVpcPeeringConnectionsInput) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	metricAWSAPICalls.WithLabelValues("DescribeVpcPeeringConnections").Inc()
+	return c.ec2Client.DescribeVpcPeeringConnections(input)
+}
+
+func (c *awsClient) AcceptVpcPeeringConnection(input *ec2.AcceptVpcPeeringConnectionInput) (*ec2.AcceptVpcPeeringConnectionOutput, error) {
+	metricAWSAPICalls.WithLabelValues("AcceptVpcPeeringConnection").Inc()
+	return c.ec2Client.AcceptVpcPeeringConnection(input)
+}
+
+func (c *awsClient) DeleteVpcPeeringConnection(input *ec2.DeleteVpcPeeringConnectionInput) (*ec2.DeleteVpcPeeringConnectionOutput, error) {
+	metricAWSAPICalls.WithLabelValues("DeleteVpcPeeringConnection").Inc()
+	return c.ec2Client.DeleteVpcPeeringConnection(input)
+}
+
+func (c *awsClient) WaitUntilVpcPeeringConnectionExists(input *ec2.DescribeVpcPeeringConnectionsInput) error {
+	metricAWSAPICalls.WithLabelValues("WaitUntilVpcPeeringConnectionExists").Inc()
+	return c.ec2Client.WaitUntilVpcPeeringConnectionExists(input)
+}
+
+func (c *awsClient) WaitUntilVpcPeeringConnectionDeleted(input *ec2.DescribeVpcPeeringConnectionsInput) error {
+	metricAWSAPICalls.WithLabelValues("WaitUntilVpcPeeringConnectionDeleted").Inc()
+	return c.ec2Client.WaitUntilVpcPeeringConnectionDeleted(input)
 }
 
 func (c *awsClient) CreateVpcEndpointServiceConfiguration(input *ec2.CreateVpcEndpointServiceConfigurationInput) (*ec2.CreateVpcEndpointServiceConfigurationOutput, error) {
@@ -214,6 +293,11 @@ func (c *awsClient) CreateVpcEndpoint(input *ec2.CreateVpcEndpointInput) (*ec2.C
 func (c *awsClient) DeleteVpcEndpoints(input *ec2.DeleteVpcEndpointsInput) (*ec2.DeleteVpcEndpointsOutput, error) {
 	metricAWSAPICalls.WithLabelValues("DeleteVpcEndpoints").Inc()
 	return c.ec2Client.DeleteVpcEndpoints(input)
+}
+
+func (c *awsClient) DescribeVpcs(input *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error) {
+	metricAWSAPICalls.WithLabelValues("DescribeVpcs").Inc()
+	return c.ec2Client.DescribeVpcs(input)
 }
 
 func (c *awsClient) DescribeLoadBalancers(input *elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error) {

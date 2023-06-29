@@ -40,6 +40,21 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
+// AcceptVpcPeeringConnection mocks base method.
+func (m *MockClient) AcceptVpcPeeringConnection(arg0 *ec2.AcceptVpcPeeringConnectionInput) (*ec2.AcceptVpcPeeringConnectionOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AcceptVpcPeeringConnection", arg0)
+	ret0, _ := ret[0].(*ec2.AcceptVpcPeeringConnectionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AcceptVpcPeeringConnection indicates an expected call of AcceptVpcPeeringConnection.
+func (mr *MockClientMockRecorder) AcceptVpcPeeringConnection(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcceptVpcPeeringConnection", reflect.TypeOf((*MockClient)(nil).AcceptVpcPeeringConnection), arg0)
+}
+
 // AssociateVPCWithHostedZone mocks base method.
 func (m *MockClient) AssociateVPCWithHostedZone(arg0 *route53.AssociateVPCWithHostedZoneInput) (*route53.AssociateVPCWithHostedZoneOutput, error) {
 	m.ctrl.T.Helper()
@@ -53,6 +68,21 @@ func (m *MockClient) AssociateVPCWithHostedZone(arg0 *route53.AssociateVPCWithHo
 func (mr *MockClientMockRecorder) AssociateVPCWithHostedZone(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssociateVPCWithHostedZone", reflect.TypeOf((*MockClient)(nil).AssociateVPCWithHostedZone), arg0)
+}
+
+// AuthorizeSecurityGroupIngress mocks base method.
+func (m *MockClient) AuthorizeSecurityGroupIngress(arg0 *ec2.AuthorizeSecurityGroupIngressInput) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AuthorizeSecurityGroupIngress", arg0)
+	ret0, _ := ret[0].(*ec2.AuthorizeSecurityGroupIngressOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AuthorizeSecurityGroupIngress indicates an expected call of AuthorizeSecurityGroupIngress.
+func (mr *MockClientMockRecorder) AuthorizeSecurityGroupIngress(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthorizeSecurityGroupIngress", reflect.TypeOf((*MockClient)(nil).AuthorizeSecurityGroupIngress), arg0)
 }
 
 // ChangeResourceRecordSets mocks base method.
@@ -100,6 +130,21 @@ func (mr *MockClientMockRecorder) CreateHostedZone(input interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHostedZone", reflect.TypeOf((*MockClient)(nil).CreateHostedZone), input)
 }
 
+// CreateRoute mocks base method.
+func (m *MockClient) CreateRoute(arg0 *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRoute", arg0)
+	ret0, _ := ret[0].(*ec2.CreateRouteOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRoute indicates an expected call of CreateRoute.
+func (mr *MockClientMockRecorder) CreateRoute(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRoute", reflect.TypeOf((*MockClient)(nil).CreateRoute), arg0)
+}
+
 // CreateVPCAssociationAuthorization mocks base method.
 func (m *MockClient) CreateVPCAssociationAuthorization(arg0 *route53.CreateVPCAssociationAuthorizationInput) (*route53.CreateVPCAssociationAuthorizationOutput, error) {
 	m.ctrl.T.Helper()
@@ -145,6 +190,21 @@ func (mr *MockClientMockRecorder) CreateVpcEndpointServiceConfiguration(arg0 int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVpcEndpointServiceConfiguration", reflect.TypeOf((*MockClient)(nil).CreateVpcEndpointServiceConfiguration), arg0)
 }
 
+// CreateVpcPeeringConnection mocks base method.
+func (m *MockClient) CreateVpcPeeringConnection(arg0 *ec2.CreateVpcPeeringConnectionInput) (*ec2.CreateVpcPeeringConnectionOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateVpcPeeringConnection", arg0)
+	ret0, _ := ret[0].(*ec2.CreateVpcPeeringConnectionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateVpcPeeringConnection indicates an expected call of CreateVpcPeeringConnection.
+func (mr *MockClientMockRecorder) CreateVpcPeeringConnection(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVpcPeeringConnection", reflect.TypeOf((*MockClient)(nil).CreateVpcPeeringConnection), arg0)
+}
+
 // DeleteHostedZone mocks base method.
 func (m *MockClient) DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*route53.DeleteHostedZoneOutput, error) {
 	m.ctrl.T.Helper()
@@ -158,6 +218,21 @@ func (m *MockClient) DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*ro
 func (mr *MockClientMockRecorder) DeleteHostedZone(input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteHostedZone", reflect.TypeOf((*MockClient)(nil).DeleteHostedZone), input)
+}
+
+// DeleteRoute mocks base method.
+func (m *MockClient) DeleteRoute(arg0 *ec2.DeleteRouteInput) (*ec2.DeleteRouteOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRoute", arg0)
+	ret0, _ := ret[0].(*ec2.DeleteRouteOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteRoute indicates an expected call of DeleteRoute.
+func (mr *MockClientMockRecorder) DeleteRoute(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRoute", reflect.TypeOf((*MockClient)(nil).DeleteRoute), arg0)
 }
 
 // DeleteVPCAssociationAuthorization mocks base method.
@@ -203,6 +278,21 @@ func (m *MockClient) DeleteVpcEndpoints(arg0 *ec2.DeleteVpcEndpointsInput) (*ec2
 func (mr *MockClientMockRecorder) DeleteVpcEndpoints(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVpcEndpoints", reflect.TypeOf((*MockClient)(nil).DeleteVpcEndpoints), arg0)
+}
+
+// DeleteVpcPeeringConnection mocks base method.
+func (m *MockClient) DeleteVpcPeeringConnection(arg0 *ec2.DeleteVpcPeeringConnectionInput) (*ec2.DeleteVpcPeeringConnectionOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteVpcPeeringConnection", arg0)
+	ret0, _ := ret[0].(*ec2.DeleteVpcPeeringConnectionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteVpcPeeringConnection indicates an expected call of DeleteVpcPeeringConnection.
+func (mr *MockClientMockRecorder) DeleteVpcPeeringConnection(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVpcPeeringConnection", reflect.TypeOf((*MockClient)(nil).DeleteVpcPeeringConnection), arg0)
 }
 
 // DescribeAvailabilityZones mocks base method.
@@ -280,6 +370,35 @@ func (mr *MockClientMockRecorder) DescribeRouteTables(arg0 interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeRouteTables", reflect.TypeOf((*MockClient)(nil).DescribeRouteTables), arg0)
 }
 
+// DescribeRouteTablesPages mocks base method.
+func (m *MockClient) DescribeRouteTablesPages(arg0 *ec2.DescribeRouteTablesInput, arg1 func(*ec2.DescribeRouteTablesOutput, bool) bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeRouteTablesPages", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DescribeRouteTablesPages indicates an expected call of DescribeRouteTablesPages.
+func (mr *MockClientMockRecorder) DescribeRouteTablesPages(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeRouteTablesPages", reflect.TypeOf((*MockClient)(nil).DescribeRouteTablesPages), arg0, arg1)
+}
+
+// DescribeSecurityGroups mocks base method.
+func (m *MockClient) DescribeSecurityGroups(arg0 *ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeSecurityGroups", arg0)
+	ret0, _ := ret[0].(*ec2.DescribeSecurityGroupsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeSecurityGroups indicates an expected call of DescribeSecurityGroups.
+func (mr *MockClientMockRecorder) DescribeSecurityGroups(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSecurityGroups", reflect.TypeOf((*MockClient)(nil).DescribeSecurityGroups), arg0)
+}
+
 // DescribeSubnets mocks base method.
 func (m *MockClient) DescribeSubnets(arg0 *ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error) {
 	m.ctrl.T.Helper()
@@ -293,6 +412,20 @@ func (m *MockClient) DescribeSubnets(arg0 *ec2.DescribeSubnetsInput) (*ec2.Descr
 func (mr *MockClientMockRecorder) DescribeSubnets(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSubnets", reflect.TypeOf((*MockClient)(nil).DescribeSubnets), arg0)
+}
+
+// DescribeSubnetsPages mocks base method.
+func (m *MockClient) DescribeSubnetsPages(arg0 *ec2.DescribeSubnetsInput, arg1 func(*ec2.DescribeSubnetsOutput, bool) bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeSubnetsPages", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DescribeSubnetsPages indicates an expected call of DescribeSubnetsPages.
+func (mr *MockClientMockRecorder) DescribeSubnetsPages(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeSubnetsPages", reflect.TypeOf((*MockClient)(nil).DescribeSubnetsPages), arg0, arg1)
 }
 
 // DescribeVpcEndpointServiceConfigurations mocks base method.
@@ -367,6 +500,36 @@ func (m *MockClient) DescribeVpcEndpointsPages(arg0 *ec2.DescribeVpcEndpointsInp
 func (mr *MockClientMockRecorder) DescribeVpcEndpointsPages(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVpcEndpointsPages", reflect.TypeOf((*MockClient)(nil).DescribeVpcEndpointsPages), arg0, arg1)
+}
+
+// DescribeVpcPeeringConnections mocks base method.
+func (m *MockClient) DescribeVpcPeeringConnections(arg0 *ec2.DescribeVpcPeeringConnectionsInput) (*ec2.DescribeVpcPeeringConnectionsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeVpcPeeringConnections", arg0)
+	ret0, _ := ret[0].(*ec2.DescribeVpcPeeringConnectionsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeVpcPeeringConnections indicates an expected call of DescribeVpcPeeringConnections.
+func (mr *MockClientMockRecorder) DescribeVpcPeeringConnections(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVpcPeeringConnections", reflect.TypeOf((*MockClient)(nil).DescribeVpcPeeringConnections), arg0)
+}
+
+// DescribeVpcs mocks base method.
+func (m *MockClient) DescribeVpcs(arg0 *ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribeVpcs", arg0)
+	ret0, _ := ret[0].(*ec2.DescribeVpcsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribeVpcs indicates an expected call of DescribeVpcs.
+func (mr *MockClientMockRecorder) DescribeVpcs(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeVpcs", reflect.TypeOf((*MockClient)(nil).DescribeVpcs), arg0)
 }
 
 // DisassociateVPCFromHostedZone mocks base method.
@@ -532,6 +695,21 @@ func (mr *MockClientMockRecorder) ModifyVpcEndpointServicePermissions(arg0 inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModifyVpcEndpointServicePermissions", reflect.TypeOf((*MockClient)(nil).ModifyVpcEndpointServicePermissions), arg0)
 }
 
+// RevokeSecurityGroupIngress mocks base method.
+func (m *MockClient) RevokeSecurityGroupIngress(arg0 *ec2.RevokeSecurityGroupIngressInput) (*ec2.RevokeSecurityGroupIngressOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeSecurityGroupIngress", arg0)
+	ret0, _ := ret[0].(*ec2.RevokeSecurityGroupIngressOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RevokeSecurityGroupIngress indicates an expected call of RevokeSecurityGroupIngress.
+func (mr *MockClientMockRecorder) RevokeSecurityGroupIngress(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeSecurityGroupIngress", reflect.TypeOf((*MockClient)(nil).RevokeSecurityGroupIngress), arg0)
+}
+
 // StartInstances mocks base method.
 func (m *MockClient) StartInstances(arg0 *ec2.StartInstancesInput) (*ec2.StartInstancesOutput, error) {
 	m.ctrl.T.Helper()
@@ -590,4 +768,32 @@ func (m *MockClient) Upload(arg0 *s3manager.UploadInput) (*s3manager.UploadOutpu
 func (mr *MockClientMockRecorder) Upload(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockClient)(nil).Upload), arg0)
+}
+
+// WaitUntilVpcPeeringConnectionDeleted mocks base method.
+func (m *MockClient) WaitUntilVpcPeeringConnectionDeleted(arg0 *ec2.DescribeVpcPeeringConnectionsInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitUntilVpcPeeringConnectionDeleted", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitUntilVpcPeeringConnectionDeleted indicates an expected call of WaitUntilVpcPeeringConnectionDeleted.
+func (mr *MockClientMockRecorder) WaitUntilVpcPeeringConnectionDeleted(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitUntilVpcPeeringConnectionDeleted", reflect.TypeOf((*MockClient)(nil).WaitUntilVpcPeeringConnectionDeleted), arg0)
+}
+
+// WaitUntilVpcPeeringConnectionExists mocks base method.
+func (m *MockClient) WaitUntilVpcPeeringConnectionExists(arg0 *ec2.DescribeVpcPeeringConnectionsInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitUntilVpcPeeringConnectionExists", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitUntilVpcPeeringConnectionExists indicates an expected call of WaitUntilVpcPeeringConnectionExists.
+func (mr *MockClientMockRecorder) WaitUntilVpcPeeringConnectionExists(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitUntilVpcPeeringConnectionExists", reflect.TypeOf((*MockClient)(nil).WaitUntilVpcPeeringConnectionExists), arg0)
 }

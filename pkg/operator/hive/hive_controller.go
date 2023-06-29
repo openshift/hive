@@ -384,7 +384,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	origHiveConfig := instance.DeepCopy()
-	hiveNSName := getHiveNamespace(instance)
+	hiveNSName := GetHiveNamespace(instance)
 
 	// Initialize HiveConfig conditions if not present
 	newConditions, changed := util.InitializeHiveConfigConditions(instance.Status.Conditions, HiveConfigConditions)

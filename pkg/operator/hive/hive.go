@@ -153,7 +153,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		})
 	}
 
-	hiveNSName := getHiveNamespace(instance)
+	hiveNSName := GetHiveNamespace(instance)
 
 	if awssp := instance.Spec.ServiceProviderCredentialsConfig.AWS; awssp != nil && awssp.CredentialsSecretRef.Name != "" {
 		hiveContainer.Env = append(hiveContainer.Env, corev1.EnvVar{
@@ -354,7 +354,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 		}
 	}
 
-	hiveNS := getHiveNamespace(instance)
+	hiveNS := GetHiveNamespace(instance)
 	additionalCA := &bytes.Buffer{}
 	for _, clientCARef := range instance.Spec.AdditionalCertificateAuthoritiesSecretRef {
 		caSecret, err := r.hiveSecretLister.Secrets(hiveNS).Get(clientCARef.Name)
@@ -384,7 +384,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 
 	caSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: getHiveNamespace(instance),
+			Namespace: GetHiveNamespace(instance),
 			Name:      hiveAdditionalCASecret,
 		},
 		Data: map[string][]byte{

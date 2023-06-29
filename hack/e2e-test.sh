@@ -100,7 +100,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \
 	--uninstall-once=true \
-	--region us-east-2 \
+	${REGION_ARG} \
 	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS}
 

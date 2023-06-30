@@ -308,7 +308,7 @@ func InstallerPodSpec(
 
 	// This container just needs to copy the required install binaries to the shared emptyDir volume,
 	// where our container will run them. This is effectively downloading the all-in-one installer.
-	containers := []corev1.Container{
+	initContainers := []corev1.Container{
 		{
 			Name:            "installer",
 			Image:           installerImage,
@@ -331,6 +331,8 @@ func InstallerPodSpec(
 			Args:         []string{"cp -v /usr/bin/oc /output/oc.tmp && mv -v /output/oc.tmp /output/oc && ls -la /output"},
 			VolumeMounts: volumeMounts,
 		},
+	}
+	containers := []corev1.Container{
 		{
 			Name:            "hive",
 			Image:           images.GetHiveImage(),
@@ -355,6 +357,7 @@ func InstallerPodSpec(
 	podSpec := &corev1.PodSpec{
 		DNSPolicy:          corev1.DNSClusterFirst,
 		RestartPolicy:      corev1.RestartPolicyNever,
+		InitContainers:     initContainers,
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,

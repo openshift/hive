@@ -93,11 +93,11 @@ func TestInstallerPodSpec(t *testing.T) {
 			},
 			validate: func(t *testing.T, actualPodSpec *corev1.PodSpec, actualError error) {
 				expectedPodMemoryRequest := resource.MustParse("800Mi")
-				actualPodMemoryRequest := actualPodSpec.Containers[2].Resources.Requests[corev1.ResourceMemory]
+				actualPodMemoryRequest := actualPodSpec.Containers[0].Resources.Requests[corev1.ResourceMemory]
 
 				assert.Equal(t, expectedPodMemoryRequest, actualPodMemoryRequest, "Incorrect pod memory request")
 
-				for _, container := range actualPodSpec.Containers {
+				for _, container := range append(actualPodSpec.Containers, actualPodSpec.InitContainers...) {
 					assert.Contains(t, container.Env, corev1.EnvVar{Name: "TESTVAR", Value: "TESTVAL"})
 				}
 				assert.NoError(t, actualError)

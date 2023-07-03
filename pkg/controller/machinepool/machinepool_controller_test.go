@@ -32,6 +32,7 @@ import (
 	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	"github.com/openshift/hive/apis/hive/v1/vsphere"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -900,6 +901,90 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				*testClusterAutoscaler("1"),
 			},
 		},
+		{
+			name: "VSphere: generated without suffix, remate without suffix",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform = hivev1.Platform{
+					VSphere: &vsphere.Platform{},
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
+			},
+		},
+		{
+			name: "VSphere: generated with suffix, remate with suffix",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform = hivev1.Platform{
+					VSphere: &vsphere.Platform{},
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-0", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
+			},
+		},
+		{
+			name: "VSphere: generated without suffix, remate with suffix",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform = hivev1.Platform{
+					VSphere: &vsphere.Platform{},
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
+			},
+		},
+		{
+			name: "VSphere: generated with suffix, remate without suffix",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform = hivev1.Platform{
+					VSphere: &vsphere.Platform{},
+				}
+				return cd
+			}(),
+			machinePool: testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-0", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -981,8 +1066,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					for _, rMS := range rMSL.Items {
 						if eMS.Name == rMS.Name {
 							found = true
-							assert.Equal(t, *eMS.Spec.Replicas, *rMS.Spec.Replicas)
-							assert.Equal(t, eMS.Generation, rMS.Generation)
+							assert.Equal(t, *eMS.Spec.Replicas, *rMS.Spec.Replicas, "Replicas")
+							assert.Equal(t, eMS.Generation, rMS.Generation, "Generation")
 							if !reflect.DeepEqual(eMS.ObjectMeta.Labels, rMS.ObjectMeta.Labels) {
 								t.Errorf("machineset %v has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Labels, rMS.Labels)
 							}

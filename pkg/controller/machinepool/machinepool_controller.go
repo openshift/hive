@@ -524,6 +524,26 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 	return nil, nil
 }
 
+// matchAndMutate decides whether gMS ("generated MachineSet") and rMS ("remote MachineSet" -- the one already extant
+// on the spoke cluster) are talking about the same machines. In certain edge cases (vsphere) this may be true when
+// the names don't match, in which case this func will mutate gMS to make the names match. HIVE-2254.
+func matchAndMutate(pool *hivev1.MachinePool, cd *hivev1.ClusterDeployment, gMS *machineapi.MachineSet, rMS machineapi.MachineSet) bool {
+	// HACK: For vsphere, the default worker pool may or may not have a `-0` suffix.
+	// - If the cluster was created on 4.12 or earlier, it won't.
+	// - If the cluster was created on 4.13 or later, it will.
+	// - If we are vendoring installer code from 4.12 or earlier, our locally-generated MachineSets won't have the suffix.
+	// - If we are vendoring 4.13+ installer code, they will.
+	// TODO: When we implement support for zonal, we may need to get cleverer than hardcoding "-0".
+	if cd.Spec.Platform.VSphere == nil || pool.Spec.Name != "worker" || !(strings.HasSuffix(rMS.Name, "-worker") || strings.HasSuffix(rMS.Name, "-worker-0")) {
+		// This hack only applies to the default worker pool on vsphere; otherwise the name (mis)match is sufficient.
+		return gMS.Name == rMS.Name
+	}
+	// If we get here, we know it's vsphere, and both gMS and rMS are talking about the default worker pool.
+	// Make gMS's name match so we don't end up with a separate MachineSet
+	gMS.Name = rMS.Name
+	return true
+}
+
 func (r *ReconcileMachinePool) syncMachineSets(
 	pool *hivev1.MachinePool,
 	cd *hivev1.ClusterDeployment,
@@ -542,7 +562,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	for i, ms := range generatedMachineSets {
 		found := false
 		for _, rMS := range remoteMachineSets.Items {
-			if ms.Name == rMS.Name {
+			if matchAndMutate(pool, cd, ms, rMS) {
 				found = true
 				objectModified := false
 				objectMetaModified := false

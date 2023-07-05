@@ -11,6 +11,7 @@
       - [Metrics reported by all controllers](#metrics-reported-by-all-controllers)
       - [ClusterDeployment controller metrics](#clusterdeployment-controller-metrics)
       - [ClusterProvision controller metrics](#clusterprovision-controller-metrics)
+      - [ClusterDeprovision controller metrics](#clusterdeprovision-controller-metrics)
       - [ClusterPool controller metrics](#clusterpool-controller-metrics)
       - [Metrics controller metrics](#metrics-controller-metrics)
     - [Example: Configure metricsConfig](#example-configure-metricsconfig)
@@ -83,6 +84,13 @@ These metrics are observed while processing ClusterProvisions. None of these are
 |              hive_install_errors              |           Y            |
 | hive_cluster_deployment_install_failure_total |           Y            |
 | hive_cluster_deployment_install_success_total |           Y            |
+
+#### ClusterDeprovision controller metrics
+These metrics are observed while processing ClusterDeprovisions. None of these are optional.
+
+|                      Metric Name                       | Optional Label Support |
+|:------------------------------------------------------:|:----------------------:|
+| hive_cluster_deployment_uninstall_job_duration_seconds |           N            |
 
 #### ClusterPool controller metrics
 These metrics are observed while processing ClusterPools. None of these are optional.

@@ -523,7 +523,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 	}
 
-	if err := r.ensureTrustedCABundleConfigMap(cd.Namespace); err != nil {
+	if err := r.ensureTrustedCABundleConfigMap(cd, cdLog); err != nil {
 		cdLog.WithError(err).Error("Failed to create or verify the trusted CA bundle ConfigMap")
 		return reconcile.Result{}, err
 	}
@@ -1222,6 +1222,19 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZoneDeleted(cd *hivev1.Clus
 	return false, nil
 }
 
+// namespaceTerminated checks whether the namespace named `nsName` is marked for deletion.
+// Note that we are *not* checking whether the namespace has been deleted. The caller has
+// the option to check IsNotFound(err) if that is needed.
+func (r *ReconcileClusterDeployment) namespaceTerminated(nsName string) (bool, error) {
+	ns := &corev1.Namespace{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: nsName}, ns); err != nil {
+		// You may think we should be checking IsNotFound here and reporting true; but that's
+		// not what the caller is expecting.
+		return false, err
+	}
+	return ns.DeletionTimestamp != nil, nil
+}
+
 func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (deprovisioned bool, returnErr error) {
 	// Skips/terminates deprovision if PreserveOnDelete is true. If there is ongoing deprovision we abandon it
 	if cd.Spec.PreserveOnDelete {
@@ -1273,13 +1286,12 @@ func (r *ReconcileClusterDeployment) ensureClusterDeprovisioned(cd *hivev1.Clust
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error creating deprovision request")
 			// Check if namespace is terminated, if so we can give up, remove the finalizer, and let
 			// the cluster go away.
-			ns := &corev1.Namespace{}
-			err = r.Get(context.TODO(), types.NamespacedName{Name: cd.Namespace}, ns)
+			deleted, err := r.namespaceTerminated(cd.Namespace)
 			if err != nil {
 				cdLog.WithError(err).Error("error checking for deletionTimestamp on namespace")
 				return false, err
 			}
-			if ns.DeletionTimestamp != nil {
+			if deleted {
 				cdLog.Warn("detected a namespace deleted before deprovision request could be created, giving up on deprovision and removing finalizer")
 				return true, err
 			}
@@ -1976,40 +1988,59 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 	return true, nil
 }
 
-// ensureTrustedCABundleConfigMap makes sure there is a ConfigMap in the CD's namespace with the magical
-// config.opesnhift.io/inject-trusted-cabundle="true" label, which causes the Cluster Network Operator to
-// populate it with a merged CA bundle including the cluster proxy's trustedCA if configured. We'll mount
-// this ConfigMap on all prov/deprov pods. See https://docs.openshift.com/container-platform/4.12/networking/configuring-a-custom-pki.html#certificate-injection-using-operators_configuring-a-custom-pki
-func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(namespace string) error {
-	cm := &corev1.ConfigMap{}
-	if err := r.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: constants.TrustedCAConfigMapName}, cm); err != nil {
-		if apierrors.IsNotFound(err) {
-			cm.Name = constants.TrustedCAConfigMapName
-			cm.Namespace = namespace
-			if cm.Labels == nil {
-				cm.Labels = make(map[string]string)
-			}
-			cm.Labels[injectCABundleKey] = "true"
-			// In case we're not running on OpenShift, we don't want the mount to fail because the expected key is missing,
-			// so populate it.
-			cm.Data = map[string]string{constants.TrustedCABundleFile: ""}
-			if err := r.Create(context.TODO(), cm); err != nil {
-				return errors.Wrap(err, "Failed to create the trusted CA bundle ConfigMap")
-			}
-		} else {
-			return errors.Wrap(err, "Failed to retrieve trusted CA bundle ConfigMap")
-		}
+func configureTrustedCABundleConfigMap(cm *corev1.ConfigMap, cd *hivev1.ClusterDeployment) bool {
+	modified := false
+	if cm.Labels == nil {
+		cm.Labels = make(map[string]string)
 	}
-	var modified bool
 	if cm.Labels[injectCABundleKey] != "true" {
 		cm.Labels[injectCABundleKey] = "true"
 		modified = true
+	}
+	if cm.Data == nil {
+		cm.Data = make(map[string]string)
 	}
 	if _, ok := cm.Data[constants.TrustedCABundleFile]; !ok {
 		cm.Data[constants.TrustedCABundleFile] = ""
 		modified = true
 	}
-	if modified {
+
+	return modified
+}
+
+// ensureTrustedCABundleConfigMap makes sure there is a ConfigMap in the cd's namespace with the magical
+// config.opesnhift.io/inject-trusted-cabundle="true" label, which causes the Cluster Network Operator to
+// populate it with a merged CA bundle including the cluster proxy's trustedCA if configured. We'll mount
+// this ConfigMap on all prov/deprov pods. See https://docs.openshift.com/container-platform/4.12/networking/configuring-a-custom-pki.html#certificate-injection-using-operators_configuring-a-custom-pki
+func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+	cm := &corev1.ConfigMap{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Namespace: cd.Namespace, Name: constants.TrustedCAConfigMapName}, cm); err != nil {
+		if apierrors.IsNotFound(err) {
+			cm.Name = constants.TrustedCAConfigMapName
+			cm.Namespace = cd.Namespace
+			if cm.Labels == nil {
+				cm.Labels = make(map[string]string)
+			}
+			configureTrustedCABundleConfigMap(cm, cd)
+			if err := r.Create(context.TODO(), cm); err != nil {
+				deleted, err2 := r.namespaceTerminated(cd.Namespace)
+				if deleted {
+					cdLog.Warn("detected deleted namespace; skipping creation of CA bundle ConfigMap")
+					// Pretend this is not an error
+					return nil
+				}
+				msg := "Failed to create the trusted CA bundle ConfigMap"
+				if err2 != nil {
+					cdLog.WithError(err).Warn(msg)
+					return errors.Wrapf(err2, "Failed to discover whether namespace %s is marked for deletion", cd.Namespace)
+				}
+				return errors.Wrap(err, msg)
+			}
+		} else {
+			return errors.Wrap(err, "Failed to retrieve trusted CA bundle ConfigMap")
+		}
+	}
+	if configureTrustedCABundleConfigMap(cm, cd) {
 		if err := r.Update(context.TODO(), cm); err != nil {
 			return errors.Wrap(err, "Failed to update the trusted CA bundle ConfigMap")
 		}

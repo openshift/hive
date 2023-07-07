@@ -410,6 +410,13 @@ def open_pr(
     os.chdir(repo_full_path)
 
     repo = git.Repo(repo_full_path)
+
+    try:
+        repo.remotes.origin.set_url(fork_repo)
+    except:
+        print("Failed to set origin remote")
+        raise
+
     try:
         repo.create_remote("upstream", upstream_repo)
     except:

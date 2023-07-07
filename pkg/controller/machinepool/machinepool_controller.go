@@ -587,7 +587,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					rMS.Spec.Template.Spec.Labels = make(map[string]string)
 				}
 				for key, value := range ms.Spec.Template.Spec.Labels {
-					if rMS.Spec.Template.Spec.Labels[key] != value {
+					if val, ok := rMS.Spec.Template.Spec.Labels[key]; !ok || val != value {
 						rMS.Spec.Template.Spec.Labels[key] = value
 						objectModified = true
 					}

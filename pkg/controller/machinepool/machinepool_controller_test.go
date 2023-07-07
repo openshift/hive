@@ -321,7 +321,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		{
 			name:              "Copy over labels and taints from MachinePool, label map nil on remote MachineSet",
 			clusterDeployment: testClusterDeployment(),
-			machinePool:       testMachinePool(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Labels["test-label-2"] = ""
+				mp.Spec.Labels["test-label-1"] = "test-value-1"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:   "test-taint",
+					Value: "test-value",
+				})
+				return mp
+			}(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
 				func() *machineapi.MachineSet {
@@ -367,6 +376,12 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
 				func() *machineapi.MachineSet {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 1)
+					ms.Spec.Template.Spec.ObjectMeta.Labels["test-label-1"] = "test-value-1"
+					ms.Spec.Template.Spec.ObjectMeta.Labels["test-label-2"] = ""
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "test-value",
+					})
 					return ms
 				}(),
 			},

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hiveutils "github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	operatorutils "github.com/openshift/hive/pkg/operator/hive"
 
@@ -16,9 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type disableOptions struct {
-	dynamicClient client.Client
-}
+type disableOptions struct{}
 
 func NewDisableAWSPrivateLinkCommand() *cobra.Command {
 	opt := &disableOptions{}
@@ -45,13 +43,6 @@ func NewDisableAWSPrivateLinkCommand() *cobra.Command {
 }
 
 func (o *disableOptions) Complete(cmd *cobra.Command, args []string) error {
-	// Get controller-runtime dynamic client
-	dynamicClient, err := hiveutils.GetClient()
-	if err != nil {
-		log.WithError(err).Fatal("Failed to create controller-runtime client")
-	}
-	o.dynamicClient = dynamicClient
-
 	return nil
 }
 
@@ -62,7 +53,7 @@ func (o *disableOptions) Validate(cmd *cobra.Command, args []string) error {
 func (o *disableOptions) Run(cmd *cobra.Command, args []string) error {
 	// Get HiveConfig
 	hiveConfig := &hivev1.HiveConfig{}
-	if err := o.dynamicClient.Get(context.Background(), types.NamespacedName{Name: "hive"}, hiveConfig); err != nil {
+	if err := common.DynamicClient.Get(context.Background(), types.NamespacedName{Name: "hive"}, hiveConfig); err != nil {
 		log.WithError(err).Fatal("Failed to get HiveConfig/hive")
 	}
 	if hiveConfig.Spec.AWSPrivateLink == nil {
@@ -84,7 +75,7 @@ func (o *disableOptions) Run(cmd *cobra.Command, args []string) error {
 	// Delete Hub account secret(s) if present
 	hiveNS := operatorutils.GetHiveNamespace(hiveConfig)
 	hubAcctSecrets := &corev1.SecretList{}
-	if err := o.dynamicClient.List(
+	if err := common.DynamicClient.List(
 		context.Background(),
 		hubAcctSecrets,
 		client.MatchingFields{"metadata.name": awsutils.PrivateLinkHubAcctCredsName},
@@ -95,7 +86,7 @@ func (o *disableOptions) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, hubAcctSecret := range hubAcctSecrets.Items {
-		if err := o.dynamicClient.Delete(context.Background(), &hubAcctSecret); err != nil {
+		if err := common.DynamicClient.Delete(context.Background(), &hubAcctSecret); err != nil {
 			log.WithError(err).Errorf("Failed to delete Hub account credentials Secret %v", hubAcctSecret.Name)
 		} else {
 			log.Infof("Hub account credentials Secret %v deleted", hubAcctSecret.Name)
@@ -104,7 +95,7 @@ func (o *disableOptions) Run(cmd *cobra.Command, args []string) error {
 
 	// Empty HiveConfig.spec.awsPrivateLink
 	hiveConfig.Spec.AWSPrivateLink = nil
-	if err := o.dynamicClient.Update(context.Background(), hiveConfig); err != nil {
+	if err := common.DynamicClient.Update(context.Background(), hiveConfig); err != nil {
 		log.WithError(err).Fatal("Failed to update HiveConfig")
 	}
 	log.Info("HiveConfig updated")

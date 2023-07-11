@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hiveutils "github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 
@@ -20,7 +20,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type endpointVPCAddOptions struct {
@@ -30,7 +29,6 @@ type endpointVPCAddOptions struct {
 	endpointVpcRegion string
 	endpointSubnetIds []string
 
-	dynamicClient      client.Client
 	endpointVpcClients awsclient.Client
 	awsClientsByRegion map[string]awsclient.Client
 }
@@ -76,15 +74,8 @@ specified in HiveConfig.spec.awsPrivateLink.associatedVPCs:
 func (o *endpointVPCAddOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.endpointVpcId = args[0]
 
-	// Get controller-runtime dynamic client
-	dynamicClient, err := hiveutils.GetClient()
-	if err != nil {
-		log.WithError(err).Fatal("Failed to create controller-runtime client")
-	}
-	o.dynamicClient = dynamicClient
-
 	// Get HiveConfig
-	if err = o.dynamicClient.Get(context.Background(), types.NamespacedName{Name: "hive"}, &o.hiveConfig); err != nil {
+	if err := common.DynamicClient.Get(context.Background(), types.NamespacedName{Name: "hive"}, &o.hiveConfig); err != nil {
 		log.WithError(err).Fatal("Failed to get HiveConfig/hive")
 	}
 	if o.hiveConfig.Spec.AWSPrivateLink == nil {
@@ -102,10 +93,12 @@ func (o *endpointVPCAddOptions) Complete(cmd *cobra.Command, args []string) erro
 	for _, associatedVpc := range o.associatedVpcs {
 		regions.Insert(associatedVpc.AWSPrivateLinkVPC.Region)
 	}
-	o.awsClientsByRegion, err = awsutils.GetAWSClientsByRegion(regions)
+	// Use the passed-in credsSecret if possible
+	awsClientsByRegion, err := awsutils.GetAWSClientsByRegion(common.CredsSecret, regions)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to get AWS clients")
 	}
+	o.awsClientsByRegion = awsClientsByRegion
 	// A shortcut to AWS clients of the endpoint VPC
 	o.endpointVpcClients = o.awsClientsByRegion[o.endpointVpcRegion]
 
@@ -335,7 +328,7 @@ func (o *endpointVPCAddOptions) addEndpointVpcToHiveConfig() {
 		log.Debugf("Endpoint VPC added to HiveConfig")
 	}
 
-	if err := o.dynamicClient.Update(context.Background(), &o.hiveConfig); err != nil {
+	if err := common.DynamicClient.Update(context.Background(), &o.hiveConfig); err != nil {
 		log.WithError(err).Fatal("Failed to update HiveConfig/hive")
 	}
 }

@@ -11,7 +11,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hiveutils "github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 	operatorutils "github.com/openshift/hive/pkg/operator/hive"
@@ -23,8 +23,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type enableOptions struct {
@@ -34,7 +32,6 @@ type enableOptions struct {
 	infraId       string
 	dnsRecordType string
 
-	dynamicClient client.Client
 	// AWS clients in Hive cluster's region
 	awsClients awsclient.Client
 }
@@ -46,10 +43,15 @@ func NewEnableAWSPrivateLinkCommand() *cobra.Command {
 		Use:   "enable",
 		Short: "Enable AWS PrivateLink",
 		Long: `Enable AWS PrivateLink:
-1) Extract AWS Hub account credentials from the environment where this command is called
-2) Create a Secret with the above credential.
-3) Add a reference to the Secret in HiveConfig.spec.awsPrivateLink.credentialsSecretRef.
-4) Add the active cluster's VPC to the list of HiveConfig.spec.awsPrivateLink.associatedVPCs`,
+Depending on whether --creds-secret is specified, this command either:
+1-1) Extract AWS Hub account credentials from the environment where this command is called
+1-2) Create a Secret with the above credential
+Or
+1-1) Copy the passed-in Secret to Hive's namespace
+
+And then
+2-1) Add a reference to the newly-created Secret in HiveConfig.spec.awsPrivateLink.credentialsSecretRef
+2-2) Add the active cluster's VPC to the list of HiveConfig.spec.awsPrivateLink.associatedVPCs`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := opt.Complete(cmd, args); err != nil {
 				return
@@ -69,16 +71,6 @@ func NewEnableAWSPrivateLinkCommand() *cobra.Command {
 }
 
 func (o *enableOptions) Complete(cmd *cobra.Command, args []string) error {
-	// Get controller-runtime dynamic client
-	if err := configv1.Install(scheme.Scheme); err != nil {
-		log.WithError(err).Fatal("Failed to add Openshift configv1 types to the default scheme")
-	}
-	dynamicClient, err := hiveutils.GetClient()
-	if err != nil {
-		log.WithError(err).Fatal("Failed to create controller-runtime client")
-	}
-	o.dynamicClient = dynamicClient
-
 	// Get current user's home directory
 	o.homeDir = "."
 	u, err := user.Current()
@@ -93,7 +85,7 @@ func (o *enableOptions) Complete(cmd *cobra.Command, args []string) error {
 		log.WithError(err).Fatal("Failed to get region and infraID from Infrastructure/cluster")
 	}
 	log.Debugf("Found region = %v, infraId = %v", o.region, o.infraId)
-	awsClients, err := awsclient.NewClientFromSecret(nil, o.region)
+	awsClients, err := awsclient.NewClientFromSecret(common.CredsSecret, o.region)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to create AWS clients")
 	}
@@ -115,7 +107,7 @@ func (o *enableOptions) Validate(cmd *cobra.Command, args []string) error {
 func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 	// Get HiveConfig
 	hiveConfig := &hivev1.HiveConfig{}
-	if err := o.dynamicClient.Get(context.Background(), types.NamespacedName{Name: "hive"}, hiveConfig); err != nil {
+	if err := common.DynamicClient.Get(context.Background(), types.NamespacedName{Name: "hive"}, hiveConfig); err != nil {
 		log.WithError(err).Fatal("Failed to get HiveConfig/hive")
 	}
 	if hiveConfig.Spec.AWSPrivateLink != nil {
@@ -145,13 +137,13 @@ func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 	vpcID := *describeVPCsOutput.Vpcs[0].VpcId
 	log.Debugf("Found VPC ID = %v for the active cluster", vpcID)
 
-	// Create Hub account credentials Secret
 	hiveNS := operatorutils.GetHiveNamespace(hiveConfig)
-	hubCredentialsSecret, err := o.generateAWSCredentialsSecret(hiveNS)
+	credsSecretInHiveNS, err := o.getOrCopyCredsSecret(common.CredsSecret, hiveNS)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to generate Secret with AWS credentials")
 	}
-	switch err = o.dynamicClient.Create(context.Background(), hubCredentialsSecret); {
+
+	switch err = common.DynamicClient.Create(context.Background(), credsSecretInHiveNS); {
 	case err == nil:
 		log.Infof("Secret/%s created in namespace %s", awsutils.PrivateLinkHubAcctCredsName, hiveNS)
 	case apierrors.IsAlreadyExists(err):
@@ -167,10 +159,10 @@ func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 				AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{VPCID: vpcID, Region: o.region},
 			},
 		},
-		CredentialsSecretRef: corev1.LocalObjectReference{Name: hubCredentialsSecret.Name},
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecretInHiveNS.Name},
 		DNSRecordType:        hivev1.AWSPrivateLinkDNSRecordType(o.dnsRecordType),
 	}
-	if err = o.dynamicClient.Update(context.Background(), hiveConfig); err != nil {
+	if err = common.DynamicClient.Update(context.Background(), hiveConfig); err != nil {
 		log.WithError(err).Fatal("Failed to update HiveConfig")
 	}
 	log.Info("HiveConfig updated")
@@ -180,7 +172,7 @@ func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 
 func (o *enableOptions) getRegionAndInfraId() (string, string, error) {
 	infrastructure := &configv1.Infrastructure{}
-	if err := o.dynamicClient.Get(context.Background(), types.NamespacedName{Name: "cluster"}, infrastructure); err != nil {
+	if err := common.DynamicClient.Get(context.Background(), types.NamespacedName{Name: "cluster"}, infrastructure); err != nil {
 		return "", "", err
 	}
 	if infrastructure.Status.PlatformStatus == nil {
@@ -193,14 +185,8 @@ func (o *enableOptions) getRegionAndInfraId() (string, string, error) {
 	return infrastructure.Status.PlatformStatus.AWS.Region, infrastructure.Status.InfrastructureName, nil
 }
 
-// Adapted from contrib/pkg/adm/managedns/enable.go:generateAWSCredentialsSecret()
-func (o *enableOptions) generateAWSCredentialsSecret(namespace string) (*corev1.Secret, error) {
-	defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
-	accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds("", defaultCredsFilePath)
-	if err != nil {
-		return nil, err
-	}
-	return &corev1.Secret{
+func (o *enableOptions) getOrCopyCredsSecret(source *corev1.Secret, namespace string) (*corev1.Secret, error) {
+	out := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -208,14 +194,28 @@ func (o *enableOptions) generateAWSCredentialsSecret(namespace string) (*corev1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      awsutils.PrivateLinkHubAcctCredsName,
 			Namespace: namespace,
-			// Secrets without this label (e.g. the ones created and configured manually) won't be deleted
+			// Secrets without this label (e.g., the ones created and configured manually) won't be deleted
 			// when calling "hiveutil awsprivatelink disable".
 			Labels: map[string]string{awsutils.PrivateLinkHubAcctCredsLabel: "true"},
 		},
 		Type: corev1.SecretTypeOpaque,
-		StringData: map[string]string{
+	}
+
+	switch {
+	// Copy source
+	case source != nil:
+		out.Data = source.Data
+	// Get creds from environment
+	default:
+		defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
+		accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds("", defaultCredsFilePath)
+		if err != nil {
+			return nil, err
+		}
+		out.StringData = map[string]string{
 			"aws_access_key_id":     accessKeyID,
 			"aws_secret_access_key": secretAccessKey,
-		},
-	}, nil
+		}
+	}
+	return out, nil
 }

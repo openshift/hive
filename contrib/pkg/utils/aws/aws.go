@@ -2,6 +2,7 @@ package aws
 
 import (
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,10 +32,10 @@ const (
 	PrivateLinkHubAcctCredsLabel = "hive.openshift.io/awsprivatelink-hub-acct-credentials"
 )
 
-func GetAWSClientsByRegion(regions sets.Set[string]) (map[string]awsclient.Client, error) {
+func GetAWSClientsByRegion(secret *corev1.Secret, regions sets.Set[string]) (map[string]awsclient.Client, error) {
 	awsClientsByRegion := make(map[string]awsclient.Client)
 	for region := range regions {
-		awsClients, err := awsclient.NewClientFromSecret(nil, region)
+		awsClients, err := awsclient.NewClientFromSecret(secret, region)
 		if err != nil {
 			return awsClientsByRegion, err
 		}

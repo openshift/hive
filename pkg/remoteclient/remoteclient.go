@@ -5,11 +5,13 @@ package remoteclient
 import (
 	"context"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
+	machnet "k8s.io/apimachinery/pkg/util/net"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
@@ -296,6 +298,10 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 			KeepAlive: 30 * time.Second,
 		}
 		cfg.Dial = createDialContext(dialer, override)
+		// HIVE-2272: Work around upstream memory leak per
+		// https://github.com/kubernetes/kubernetes/issues/118703#issuecomment-1595072383
+		// TODO: Revert or adapt when upstream fix is available
+		cfg.Proxy = machnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 
 	return cfg, nil

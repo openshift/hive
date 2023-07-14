@@ -165,8 +165,8 @@ def get_previous_version(work_dir, channel_name):
             try:
                 with open(annotation_yaml_path, "r") as stream:
                     annotation_yaml = yaml.load(stream, Loader=yaml.SafeLoader)
-                    version_channel = annotation_yaml["annotations"]["operators.operatorframework.io.bundle.channel.default.v1"]
-                    if version_channel == channel_name:
+                    version_channels = annotation_yaml["annotations"]["operators.operatorframework.io.bundle.channels.v1"]
+                    if channel_name in version_channels.split(","):
                         if semver.compare(version, highest_version) > 0:
                             highest_version = version
             except (NotADirectoryError, FileNotFoundError):

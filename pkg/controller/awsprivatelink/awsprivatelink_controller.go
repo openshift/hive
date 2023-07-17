@@ -1353,7 +1353,7 @@ func awsErrCodeEquals(err error, code string) bool {
 
 // ReadAWSPrivateLinkControllerConfigFile reads the configuration from the env
 // and unmarshals. If the env is set to a file but that file doesn't exist it returns
-// a zeo value configuration.
+// a zero-value configuration.
 func ReadAWSPrivateLinkControllerConfigFile() (*hivev1.AWSPrivateLinkConfig, error) {
 	fPath := os.Getenv(constants.AWSPrivateLinkControllerConfigFileEnvVar)
 	if len(fPath) == 0 {

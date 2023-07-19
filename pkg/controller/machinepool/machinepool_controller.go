@@ -597,25 +597,21 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				if rMS.Spec.Template.Spec.Taints == nil {
 					rMS.Spec.Template.Spec.Taints = []corev1.Taint{}
 				}
-				// Make a temporary map of generated MachineSet's taints for easy lookup
-				gTaintsByKey := make(map[string]*corev1.Taint)
-				for gIndex, gTaint := range ms.Spec.Template.Spec.Taints {
-					gTaintsByKey[gTaint.Key] = &ms.Spec.Template.Spec.Taints[gIndex]
-				}
-				// Go through the remote MachineSet's taints, replacing overlaps with the generated MachineSet
-				for rIndex, rTaint := range rMS.Spec.Template.Spec.Taints {
-					if gTaint, foundTaint := gTaintsByKey[rTaint.Key]; foundTaint {
-						if gTaint.Value != rTaint.Value || gTaint.Effect != rTaint.Effect {
-							rMS.Spec.Template.Spec.Taints[rIndex] = *gTaint
-							objectModified = true
+				for _, gTaint := range ms.Spec.Template.Spec.Taints {
+					foundTaint := false
+					for rIndex, rTaint := range rMS.Spec.Template.Spec.Taints {
+						if gTaint.Key == rTaint.Key {
+							foundTaint = true
+							if gTaint.Value != rTaint.Value || gTaint.Effect != rTaint.Effect {
+								rMS.Spec.Template.Spec.Taints[rIndex] = gTaint
+								objectModified = true
+							}
 						}
-						delete(gTaintsByKey, rTaint.Key)
 					}
-				}
-				// Any remaining taints from the temporary map are new and need to be added
-				for _, gTaint := range gTaintsByKey {
-					rMS.Spec.Template.Spec.Taints = append(rMS.Spec.Template.Spec.Taints, *gTaint)
-					objectModified = true
+					if !foundTaint {
+						rMS.Spec.Template.Spec.Taints = append(rMS.Spec.Template.Spec.Taints, gTaint)
+						objectModified = true
+					}
 				}
 
 				// Platform updates will be blocked by webhook, unless they're not.

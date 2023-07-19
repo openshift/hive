@@ -387,6 +387,50 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Copy over taints from Machinepool, account for duplicate taints",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:   "test-taint",
+					Value: "new-value",
+				})
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0)
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "test-value-1",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "test-value-2",
+					})
+					return ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 1)
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "new-value",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:   "test-taint",
+						Value: "new-value",
+					})
+					return ms
+				}(),
+			},
+		},
+		{
 			name:              "Don't call update if labels or taints on remote MachineSet already exist",
 			clusterDeployment: testClusterDeployment(),
 			machinePool: func() *hivev1.MachinePool {

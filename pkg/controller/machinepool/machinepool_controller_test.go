@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -392,8 +393,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool: func() *hivev1.MachinePool {
 				mp := testMachinePool()
 				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
-					Key:   "test-taint",
-					Value: "new-value",
+					Key:    "test-taint",
+					Value:  "new-value",
+					Effect: "new-effect",
 				})
 				return mp
 			}(),
@@ -402,12 +404,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				func() *machineapi.MachineSet {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0)
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "test-value-1",
+						Key:    "test-taint",
+						Value:  "test-value-1",
+						Effect: "test-effect-1",
 					})
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "test-value-2",
+						Key:    "test-taint",
+						Value:  "test-value-2",
+						Effect: "test-effect-2",
 					})
 					return ms
 				}(),
@@ -419,12 +423,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				func() *machineapi.MachineSet {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 1)
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "new-value",
+						Key:    "test-taint",
+						Value:  "new-value",
+						Effect: "new-effect",
 					})
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "new-value",
+						Key:    "test-taint",
+						Value:  "new-value",
+						Effect: "new-effect",
 					})
 					return ms
 				}(),
@@ -1036,7 +1042,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 							if !reflect.DeepEqual(eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels) {
 								t.Errorf("machineset %v machinespec has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels)
 							}
-							if !reflect.DeepEqual(eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints) {
+							// Taints are stored as a list, so sort them before comparing.
+							if !reflect.DeepEqual(sortedTaints(eMS.Spec.Template.Spec.Taints), sortedTaints(rMS.Spec.Template.Spec.Taints)) {
 								t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
 							}
 
@@ -1077,6 +1084,20 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			}
 		})
 	}
+}
+
+// sortedTaints sorts and returns the provided list of taints based on the ascending order of taint key, effect and value - in that order.
+func sortedTaints(taints []corev1.Taint) []corev1.Taint {
+	sort.SliceStable(taints, func(i, j int) bool {
+		if taints[i].Key != taints[j].Key {
+			return taints[i].Key < taints[j].Key
+		}
+		if taints[i].Effect != taints[j].Effect {
+			return taints[i].Effect < taints[j].Effect
+		}
+		return taints[i].Value < taints[j].Value
+	})
+	return taints
 }
 
 func Test_summarizeMachinesError(t *testing.T) {

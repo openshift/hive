@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
@@ -545,6 +547,17 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	machineSetsToCreate := []*machineapi.MachineSet{}
 	machineSetsToUpdate := []*machineapi.MachineSet{}
 
+	labelsToDelete := sets.Set[string]{}
+	labelsToDelete.Insert(pool.Status.OwnedLabels...)
+	for labelKey := range pool.Spec.Labels {
+		labelsToDelete.Delete(labelKey)
+	}
+	taintsToDelete := sets.Set[hivev1.TaintIdentifier]{}
+	taintsToDelete.Insert(pool.Status.OwnedTaints...)
+	for _, taint := range pool.Spec.Taints {
+		taintsToDelete.Delete(identifierForTaint(&taint))
+	}
+
 	// Find MachineSets that need updating/creating
 	for i, ms := range generatedMachineSets {
 		found := false
@@ -593,6 +606,13 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				if rMS.Spec.Template.Spec.Labels == nil {
 					rMS.Spec.Template.Spec.Labels = make(map[string]string)
 				}
+				for key := range rMS.Spec.Template.Spec.Labels {
+					if labelsToDelete.Has(key) {
+						// Safe to delete while iterating as long as we're deleting the key for this iteration.
+						delete(rMS.Spec.Template.Spec.Labels, key)
+						objectMetaModified = true
+					}
+				}
 				for key, value := range ms.Spec.Template.Spec.Labels {
 					if val, ok := rMS.Spec.Template.Spec.Labels[key]; !ok || val != value {
 						rMS.Spec.Template.Spec.Labels[key] = value
@@ -605,25 +625,51 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					rMS.Spec.Template.Spec.Taints = []corev1.Taint{}
 				}
 				// Make a temporary map of generated MachineSet's taints for easy lookup
-				gTaintsByKey := make(map[string]*corev1.Taint)
+				gTaintsByID := make(map[hivev1.TaintIdentifier]*corev1.Taint)
 				for gIndex, gTaint := range ms.Spec.Template.Spec.Taints {
-					gTaintsByKey[gTaint.Key] = &ms.Spec.Template.Spec.Taints[gIndex]
+					gTaintsByID[identifierForTaint(&gTaint)] = &ms.Spec.Template.Spec.Taints[gIndex]
 				}
-				// Go through the remote MachineSet's taints, replacing overlaps with the generated MachineSet
-				for rIndex, rTaint := range rMS.Spec.Template.Spec.Taints {
-					if gTaint, foundTaint := gTaintsByKey[rTaint.Key]; foundTaint {
-						if gTaint.Value != rTaint.Value || gTaint.Effect != rTaint.Effect {
-							rMS.Spec.Template.Spec.Taints[rIndex] = *gTaint
-							objectModified = true
-						}
-						delete(gTaintsByKey, rTaint.Key)
+				// Build the list of taints for the remote MachineSet from scratch
+				taints := make([]corev1.Taint, 0)
+				// Go through the remote MachineSet's taints, adding/replacing matches from the generated MachineSet
+				for _, rTaint := range rMS.Spec.Template.Spec.Taints {
+					tid := identifierForTaint(&rTaint)
+
+					// If we need to "delete" this one, skip it, but mark modified
+					if taintsToDelete.Has(tid) {
+						objectModified = true
+						continue
 					}
+
+					if gTaint, foundTaint := gTaintsByID[tid]; foundTaint && gTaint.Value != rTaint.Value {
+						// Existing taint is modified
+						rTaint = *gTaint
+						objectModified = true
+					}
+
+					// If we get here, one of the following is true:
+					// - The taint was in the generated MachineSet. Whether it was modified or not, it must be included.
+					// - The taint was in the remote MachineSet but not the generated one. However, it wasn't in our
+					//   "owned" list, i.e. it is "remote only". Preserve it.
+					taints = append(taints, rTaint)
+					// We'll want to include any "extras" from the generated MachineSet
+					delete(gTaintsByID, tid)
 				}
-				// Any remaining taints from the temporary map are new and need to be added
-				for _, gTaint := range gTaintsByKey {
-					rMS.Spec.Template.Spec.Taints = append(rMS.Spec.Template.Spec.Taints, *gTaint)
-					objectModified = true
+				// Anything remaining from the generated MachineSet is new
+				for _, taint := range gTaintsByID {
+					taints = append(taints, *taint)
 				}
+				sort.SliceStable(taints, func(i, j int) bool {
+					if taints[i].Key != taints[j].Key {
+						return taints[i].Key < taints[j].Key
+					}
+					if taints[i].Effect != taints[j].Effect {
+						return taints[i].Effect < taints[j].Effect
+					}
+					// We should never get here, as taints with the same key+effect should be replaced
+					return taints[i].Value < taints[j].Value
+				})
+				rMS.Spec.Template.Spec.Taints = taints
 
 				// Platform updates will be blocked by webhook, unless they're not.
 				if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value) {
@@ -927,6 +973,27 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 			break
 		}
 	}
+
+	// Update our tracked labels...
+	pool.Status.OwnedLabels = make([]string, len(pool.Spec.Labels))
+	i := 0
+	for labelKey := range pool.Spec.Labels {
+		pool.Status.OwnedLabels[i] = labelKey
+		i++
+	}
+	sort.Strings(pool.Status.OwnedLabels)
+
+	// ...and taints
+	pool.Status.OwnedTaints = make([]hivev1.TaintIdentifier, len(pool.Spec.Taints))
+	for i, taint := range pool.Spec.Taints {
+		pool.Status.OwnedTaints[i] = identifierForTaint(&taint)
+	}
+	sort.SliceStable(pool.Status.OwnedTaints, func(i, j int) bool {
+		if pool.Status.OwnedTaints[i].Key != pool.Status.OwnedTaints[j].Key {
+			return pool.Status.OwnedTaints[i].Key < pool.Status.OwnedTaints[j].Key
+		}
+		return pool.Status.OwnedTaints[i].Effect < pool.Status.OwnedTaints[j].Effect
+	})
 
 	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
 		reflect.DeepEqual(origPool.Status, pool.Status) {
@@ -1272,4 +1339,12 @@ func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 	}
 
 	return false
+}
+
+func identifierForTaint(taint *corev1.Taint) hivev1.TaintIdentifier {
+	// Let a nil `taint` panic
+	return hivev1.TaintIdentifier{
+		Key:    taint.Key,
+		Effect: taint.Effect,
+	}
 }

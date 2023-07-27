@@ -339,6 +339,11 @@ func (r *ReconcileClusterSync) isSyncAssignedToMe(sts *appsv1.StatefulSet, cd *h
 
 	logger.Debug("calculating replicas")
 	replicas := int64(*sts.Spec.Replicas)
+	// For test purposes, if we've scaled down clustersync so we can run locally, this will be zero; spoof it to one:
+	if replicas == 0 {
+		logger.Warning("ClusterSync StatefulSet has zero replicas! Hope you're running locally!")
+		replicas = 1
+	}
 
 	logger.Debug("determining who is assigned to sync this cluster")
 	ordinalIDOfAssignee := uidAsBigInt.Mod(&uidAsBigInt, big.NewInt(replicas)).Int64()

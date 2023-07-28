@@ -16,7 +16,7 @@ import (
 
 const (
 	// MachinePoolImageIDOverrideAnnotation can be applied to MachinePools to control the precise image ID to be used
-	// for the MachineSets we reconcile for this pool. This feature is presently only implemented for AWS, and
+	// for the MachineSets we reconcile for this pool. This feature is presently only implemented for AWS and GCP, and
 	// is intended for very limited use cases we do not recommend pursuing regularly. As such it is not currently
 	// part of our official API.
 	MachinePoolImageIDOverrideAnnotation = "hive.openshift.io/image-id-override"

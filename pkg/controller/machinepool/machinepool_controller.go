@@ -1059,7 +1059,7 @@ func (r *ReconcileMachinePool) createActuator(
 		if err != nil {
 			return nil, err
 		}
-		return NewGCPActuator(r.Client, creds, clusterVersion, masterMachine, remoteMachineSets, r.scheme, r.expectations, logger)
+		return NewGCPActuator(r.Client, creds, pool, clusterVersion, masterMachine, remoteMachineSets, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.Azure != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(

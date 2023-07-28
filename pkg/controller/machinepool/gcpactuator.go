@@ -65,6 +65,7 @@ var _ Actuator = &GCPActuator{}
 func NewGCPActuator(
 	client client.Client,
 	gcpCreds *corev1.Secret,
+	pool *hivev1.MachinePool,
 	clusterVersion string,
 	masterMachine *machineapi.Machine,
 	remoteMachineSets []machineapi.MachineSet,
@@ -84,7 +85,7 @@ func NewGCPActuator(
 		return nil, err
 	}
 
-	imageID, err := getGCPImageID(masterMachine, scheme, logger)
+	imageID, err := getGCPImageID(masterMachine, pool, scheme, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting image ID from master machine")
 		return nil, err
@@ -441,8 +442,16 @@ func requireLeases(clusterVersion string, remoteMachineSets []machineapi.Machine
 	return false
 }
 
-// Get the image ID from an existing master machine.
-func getGCPImageID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+// Get the image ID from an existing master machine *or* the override annotation.
+func getGCPImageID(masterMachine *machineapi.Machine, pool *hivev1.MachinePool, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+	imageID, ok := pool.Annotations[hivev1.MachinePoolImageIDOverrideAnnotation]
+	if ok && imageID != "" {
+		logger.
+			WithField("annotation", hivev1.MachinePoolImageIDOverrideAnnotation).
+			WithField("imageID", imageID).
+			Info("Using imageID override")
+		return imageID, nil
+	}
 	providerSpec, err := gcpprovider.ProviderSpecFromRawExtension(masterMachine.Spec.ProviderSpec.Value)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode GCPMachineProviderSpec from master machine")
@@ -452,7 +461,7 @@ func getGCPImageID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, lo
 		logger.Warn("master machine does not have any disks")
 		return "", errors.New("master machine does not have any disks")
 	}
-	imageID := providerSpec.Disks[0].Image
+	imageID = providerSpec.Disks[0].Image
 	logger.WithField("image", imageID).Debug("resolved image to use for new machinesets")
 	return imageID, nil
 }

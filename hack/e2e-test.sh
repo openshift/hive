@@ -93,7 +93,7 @@ export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]'
 echo "Creating cluster deployment"
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
 	--cloud="${CLOUD}" \
-	--creds-file="${CREDS_FILE}" \
+	${CREDS_FILE_ARG} \
 	--ssh-public-key-file="${SSH_PUBLIC_KEY_FILE}" \
 	--pull-secret-file="${PULL_SECRET_FILE}" \
 	--base-domain="${CLUSTER_DOMAIN}" \

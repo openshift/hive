@@ -210,7 +210,7 @@ POOL_SIZE=1
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   -n "${CLUSTER_NAMESPACE}" \
   --cloud="${CLOUD}" \
-	--creds-file="${CREDS_FILE}" \
+	${CREDS_FILE_ARG} \
 	--pull-secret-file="${PULL_SECRET_FILE}" \
   --image-set "${IMAGESET_NAME}" \
   --region us-east-1 \

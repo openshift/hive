@@ -181,27 +181,23 @@ USE_MANAGED_DNS=${USE_MANAGED_DNS:-true}
 case "${CLOUD}" in
 "aws")
 	CREDS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-        # Accept creds from the env if the file doesn't exist.
-        if ! [[ -f $CREDS_FILE ]] && [[ -n "${AWS_ACCESS_KEY_ID}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
-            # TODO: Refactor contrib/pkg/adm/managedns/enable::generateAWSCredentialsSecret to
-            # use contrib/pkg/utils/aws/aws::GetAWSCreds, which knows how to look for the env
-            # vars if the file isn't specified; and use this condition to generate (or not)
-            # the whole CREDS_FILE_ARG="--creds-file=${CREDS_FILE}".
-            printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > $CREDS_FILE
-        fi
+  # Only use --creds-file if not overridden by the env
+  if [ -s $CREDS_FILE ] && ! [ "${AWS_ACCESS_KEY_ID}" ] && ! [ "${AWS_SECRET_ACCESS_KEY}" ]; then
+    CREDS_FILE_ARG="--creds-file=${CREDS_FILE}"
+  fi
 	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
 	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 	REGION_ARG="--region us-east-2"
 	;;
 "azure")
-	CREDS_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+	CREDS_FILE_ARG="--creds-file=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-ci.azure.devcluster.openshift.com}"
 	# For azure we set managedDNS=false as we are facing issues with this feature currently.
 	# This is a temporary workaround to fix the e2e
 	USE_MANAGED_DNS=false
 	;;
 "gcp")
-	CREDS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
+	CREDS_FILE_ARG="--creds-file=${CLUSTER_PROFILE_DIR}/gce.json"
 	BASE_DOMAIN="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
 	;;
 *)
@@ -220,7 +216,7 @@ if $USE_MANAGED_DNS; then
 	echo "enabling managed DNS"
 	for i in 1 2 3; do
 	  go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" adm manage-dns enable ${BASE_DOMAIN} \
-	    --creds-file="${CREDS_FILE}" --cloud="${CLOUD}" && break
+	    ${CREDS_FILE_ARG} --cloud="${CLOUD}" && break
 	  if [[ $i -eq 3 ]]; then
 	    echo "Failed after $i attempts!"
 	    exit 1

@@ -187,7 +187,13 @@ case "${CLOUD}" in
   fi
 	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
 	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
-	REGION_ARG="--region us-east-2"
+  if [ "$REGION" ]; then
+    REGION_ARG="--region $REGION"
+  else
+    # Default to us-east-2 for testing, because us-east-1 doesn't have all instance types in all AZs
+    # and this makes our autoscaling tests fail.
+    REGION_ARG="--region us-east-2"
+  fi
 	;;
 "azure")
 	CREDS_FILE_ARG="--creds-file=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"

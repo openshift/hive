@@ -26,6 +26,7 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -122,7 +123,7 @@ func TestNewMachinePool(t *testing.T) {
 	case p.AWS != nil:
 		infraMachinePool.Spec.Platform = hivev1.MachinePoolPlatform{
 			AWS: &hivev1aws.MachinePoolPlatform{
-				InstanceType: "m4.large",
+				InstanceType: clusterresource.AWSInstanceTypeDefault,
 				EC2RootVolume: hivev1aws.EC2RootVolume{
 					IOPS: 100,
 					Size: 22,
@@ -295,9 +296,9 @@ func TestAutoscalingMachinePool(t *testing.T) {
 
 	// busyboxDeployment creates a large number of pods to place CPU pressure
 	// on the machine pool. With 100 replicas and a CPU request for each pod of
-	// 1, the total CPU request from the deployment is 100. For AWS using m4.xlarge,
-	// each machine has a CPU limit of 4. For the max replicas of 12, the total
-	// CPU limit is 48.
+	// 1, the total CPU request from the deployment is 100. For AWS using m6i.xlarge,
+	// each machine has a CPU limit of 6. For the max replicas of 12, the total
+	// CPU limit is 72.
 	busyboxDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",

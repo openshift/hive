@@ -1229,6 +1229,8 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		}
 
 		cloudBuilder.Region = platform.AWS.Region
+		// TODO: Plumb in an option for this
+		cloudBuilder.InstanceType = clusterresource.AWSInstanceTypeDefault
 		return cloudBuilder, nil
 	case platform.GCP != nil:
 		credsSecret, err := r.getCredentialsSecret(pool, platform.GCP.CredentialsSecretRef.Name, logger)

@@ -174,8 +174,9 @@ type Options struct {
 	FeatureSet                        string
 
 	// AWS
-	AWSUserTags    []string
-	AWSPrivateLink bool
+	AWSUserTags     []string
+	AWSPrivateLink  bool
+	AWSInstanceType string
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -330,6 +331,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	// AWS flags
 	flags.StringSliceVar(&opt.AWSUserTags, "aws-user-tags", nil, "Additional tags to add to resources. Must be in the form \"key=value\"")
 	flags.BoolVar(&opt.AWSPrivateLink, "aws-private-link", false, "Enables access to cluster using AWS PrivateLink")
+	flags.StringVar(&opt.AWSInstanceType, "aws-instance-type", clusterresource.AWSInstanceTypeDefault, "AWS cloud instance type")
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
@@ -660,6 +662,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			SecretAccessKey: secretAccessKey,
 			UserTags:        userTags,
 			Region:          o.Region,
+			InstanceType:    o.AWSInstanceType,
 			PrivateLink:     o.AWSPrivateLink,
 		}
 		builder.CloudBuilder = awsProvider

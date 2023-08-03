@@ -271,6 +271,16 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 		BaseDomain: o.BaseDomain,
 	}
 
+	var awsBuilder *clusterresource.AWSCloudBuilder
+	if o.Cloud == cloudAWS {
+		awsBuilder = &clusterresource.AWSCloudBuilder{
+			Region: o.Region,
+			// TODO: CLI option for this
+			InstanceType: clusterresource.AWSInstanceTypeDefault,
+		}
+		builder.CloudBuilder = awsBuilder
+	}
+
 	if o.createCloudSecret {
 		switch o.Cloud {
 		case cloudAWS:
@@ -280,11 +290,9 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 				o.log.WithError(err).Error("Failed to get AWS credentials")
 				return nil, err
 			}
-			builder.CloudBuilder = &clusterresource.AWSCloudBuilder{
-				AccessKeyID:     accessKeyID,
-				SecretAccessKey: secretAccessKey,
-				Region:          o.Region,
-			}
+			// Update AWS cloud builder with creds
+			awsBuilder.AccessKeyID = accessKeyID
+			awsBuilder.SecretAccessKey = secretAccessKey
 		case cloudAzure:
 			creds, err := azureutils.GetCreds(o.CredsFile)
 			if err != nil {

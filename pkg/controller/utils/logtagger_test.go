@@ -279,7 +279,7 @@ func TestCopyLogAnnotation(t *testing.T) {
 				alfa:  `{"HELLO": "WORLD"}`,
 			},
 			expectChanged:          true,
-			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD}`),
+			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD"}`),
 		},
 		{
 			name: "add: present, empty",
@@ -289,7 +289,7 @@ func TestCopyLogAnnotation(t *testing.T) {
 			},
 			toa:                    map[string]string{},
 			expectChanged:          true,
-			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD}`),
+			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD"}`),
 		},
 		{
 			name: "add: present, unrelated",
@@ -299,7 +299,7 @@ func TestCopyLogAnnotation(t *testing.T) {
 			},
 			toa:                    map[string]string{"foo": "baz"},
 			expectChanged:          true,
-			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD}`),
+			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD"}`),
 		},
 		{
 			name: "replace: present, different",
@@ -311,7 +311,7 @@ func TestCopyLogAnnotation(t *testing.T) {
 				alfa: `{"GOODBYE": "CRUEL WORLD"}`,
 			},
 			expectChanged:          true,
-			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD}`),
+			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD"}`),
 		},
 		{
 			name: "no op: present, same",
@@ -322,13 +322,10 @@ func TestCopyLogAnnotation(t *testing.T) {
 			toa: map[string]string{
 				alfa: `{"HELLO": "WORLD"}`,
 			},
-			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD}`),
+			expectTargetAnnotation: strPtr(`{"HELLO": "WORLD"}`),
 		},
 	}
 	for _, tt := range tests {
-		if tt.name != "delete: none, present" {
-			continue
-		}
 		t.Run(tt.name, func(t *testing.T) {
 			from := testcd.BasicBuilder().Build()
 			if tt.froma != nil {

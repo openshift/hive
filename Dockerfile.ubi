@@ -16,6 +16,9 @@ RUN if ! rpm -q openssh-clients; then $DNF install -y openssh-clients && $DNF cl
 # libvirt libraries required for running bare metal installer.
 RUN if ! rpm -q libvirt-libs; then $DNF install -y libvirt-libs && $DNF clean all && rm -rf /var/cache/dnf/*; fi
 
+# tar is needed to package must-gathers on install failure
+RUN if ! which tar; then $DNF install -y tar && $DNF clean all && rm -rf /var/cache/dnf/*; fi
+
 COPY --from=builder /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
 COPY --from=builder /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin

@@ -185,7 +185,7 @@ case "${CLOUD}" in
   if [ -s $CREDS_FILE ] && ! [ "${AWS_ACCESS_KEY_ID}" ] && ! [ "${AWS_SECRET_ACCESS_KEY}" ]; then
     CREDS_FILE_ARG="--creds-file=${CREDS_FILE}"
   fi
-	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
+	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.devcluster.openshift.com}"
 	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
   if [ "$REGION" ]; then
     REGION_ARG="--region $REGION"

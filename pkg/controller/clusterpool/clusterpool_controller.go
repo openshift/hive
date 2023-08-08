@@ -505,9 +505,10 @@ func (r *ReconcileClusterPool) reconcileRunningClusters(
 	sort.Slice(
 		cdList,
 		func(i, j int) bool {
-			return cdList[i].CreationTimestamp.Before(&cdList[j].CreationTimestamp) ||
-				cdList[i].Namespace < cdList[j].Namespace ||
-				cdList[i].Name < cdList[j].Name
+			if !cdList[i].CreationTimestamp.Equal(&cdList[j].CreationTimestamp) {
+				return cdList[i].CreationTimestamp.Before(&cdList[j].CreationTimestamp)
+			}
+			return cdList[i].Namespace < cdList[j].Namespace
 		},
 	)
 	for i := 0; i < len(cdList); i++ {

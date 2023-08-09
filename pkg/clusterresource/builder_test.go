@@ -108,6 +108,7 @@ func createAWSClusterBuilder() *Builder {
 	b.CloudBuilder = &AWSCloudBuilder{
 		AccessKeyID:     fakeAWSAccessKeyID,
 		SecretAccessKey: fakeAWSSecretAccessKey,
+		InstanceType:    AWSInstanceTypeDefault,
 	}
 	return b
 }
@@ -174,7 +175,7 @@ func TestBuildClusterResources(t *testing.T) {
 				require.NotNil(t, credsSecret)
 				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.AWS.CredentialsSecretRef.Name)
 
-				assert.Equal(t, awsInstanceType, workerPool.Spec.Platform.AWS.InstanceType)
+				assert.Equal(t, AWSInstanceTypeDefault, workerPool.Spec.Platform.AWS.InstanceType)
 			},
 		},
 		{

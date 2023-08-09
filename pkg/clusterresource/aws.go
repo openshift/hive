@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	awsInstanceType = "m5.xlarge"
-	volumeSize      = 120
-	volumeType      = "gp3"
+	AWSInstanceTypeDefault = "m6i.xlarge"
+	volumeSize             = 120
+	volumeType             = "gp3"
 )
 
 var _ CloudBuilder = (*AWSCloudBuilder)(nil)
@@ -36,6 +36,8 @@ type AWSCloudBuilder struct {
 	UserTags map[string]string
 	// Region is the AWS region to which to install the cluster
 	Region string
+
+	InstanceType string
 
 	PrivateLink bool
 }
@@ -96,7 +98,7 @@ func (p *AWSCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
 
 func (p *AWSCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.AWS = &hivev1aws.MachinePoolPlatform{
-		InstanceType: awsInstanceType,
+		InstanceType: p.InstanceType,
 		EC2RootVolume: hivev1aws.EC2RootVolume{
 			Size: volumeSize,
 			Type: volumeType,
@@ -115,7 +117,7 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 
 	// Used for both control plane and workers.
 	mpp := &awsinstallertypes.MachinePool{
-		InstanceType: awsInstanceType,
+		InstanceType: p.InstanceType,
 		EC2RootVolume: awsinstallertypes.EC2RootVolume{
 			Size: volumeSize,
 			Type: volumeType,

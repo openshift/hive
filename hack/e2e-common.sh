@@ -194,6 +194,10 @@ case "${CLOUD}" in
     # and this makes our autoscaling tests fail.
     REGION_ARG="--region us-east-2"
   fi
+  if [ "$AWS_INSTANCE_TYPE" ]; then
+    # NOTE: Only observed by hiveutil create-cluster, not clusterpool at this time.
+    INSTANCE_TYPE_ARG="--aws-instance-type $AWS_INSTANCE_TYPE"
+  fi
 	;;
 "azure")
 	CREDS_FILE_ARG="--creds-file=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"

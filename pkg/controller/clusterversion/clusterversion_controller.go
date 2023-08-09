@@ -161,26 +161,32 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 
 func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
 	changed := false
-	if version, err := semver.ParseTolerant(clusterVersion.Status.Desired.Version); err == nil {
-		if cd.Labels == nil {
-			cd.Labels = make(map[string]string, 3)
-		}
+	cvoVersion := clusterVersion.Status.Desired.Version
+	if cd.Labels == nil {
+		cd.Labels = map[string]string{}
+	}
+	if cd.Labels[constants.VersionLabel] != cvoVersion {
+		cd.Labels[constants.VersionLabel] = cvoVersion
+		changed = true
+	}
+	if version, err := semver.ParseTolerant(cvoVersion); err == nil {
 		major := fmt.Sprintf("%d", version.Major)
 		majorMinor := fmt.Sprintf("%s.%d", major, version.Minor)
 		majorMinorPatch := fmt.Sprintf("%s.%d", majorMinor, version.Patch)
-		changed = cd.Labels[constants.VersionMajorLabel] != major ||
+		changed = changed ||
+			cd.Labels[constants.VersionMajorLabel] != major ||
 			cd.Labels[constants.VersionMajorMinorLabel] != majorMinor ||
 			cd.Labels[constants.VersionMajorMinorPatchLabel] != majorMinorPatch
 		cd.Labels[constants.VersionMajorLabel] = major
 		cd.Labels[constants.VersionMajorMinorLabel] = majorMinor
 		cd.Labels[constants.VersionMajorMinorPatchLabel] = majorMinorPatch
 	} else {
-		cdLog.WithField("version", clusterVersion.Status.Desired.Version).WithError(err).Warn("could not parse the cluster version")
+		cdLog.WithField("version", cvoVersion).WithError(err).Warn("could not parse the cluster version")
 		origLen := len(cd.Labels)
 		delete(cd.Labels, constants.VersionMajorLabel)
 		delete(cd.Labels, constants.VersionMajorMinorLabel)
 		delete(cd.Labels, constants.VersionMajorMinorPatchLabel)
-		changed = origLen != len(cd.Labels)
+		changed = changed || origLen != len(cd.Labels)
 	}
 
 	if !changed {

@@ -73,6 +73,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				testKubeconfigSecret(),
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "2.3.4+somebuild", cd.Labels[constants.VersionLabel], "unexpected version label")
 				assert.Equal(t, "2", cd.Labels[constants.VersionMajorLabel], "unexpected version major label")
 				assert.Equal(t, "2.3", cd.Labels[constants.VersionMajorMinorLabel], "unexpected version major-minor label")
 				assert.Equal(t, "2.3.4", cd.Labels[constants.VersionMajorMinorPatchLabel], "unexpected version major-minor-patch label")

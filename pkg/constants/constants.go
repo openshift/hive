@@ -335,6 +335,11 @@ const (
 	// VSphereCertificatesDir is the directory containing VSphere certificate files.
 	VSphereCertificatesDir = "/vsphere-certificates"
 
+	// VersionLabel is a label applied to ClusterDeployments to show the full version of the cluster
+	// per ClusterVersion.status.desired.version. This should differ from VersionMajorMinorPatchLabel
+	// only for pre-release versions.
+	VersionLabel = "hive.openshift.io/version"
+
 	// VersionMajorLabel is a label applied to ClusterDeployments to show the version of the cluster
 	// in the form "[MAJOR]".
 	VersionMajorLabel = "hive.openshift.io/version-major"

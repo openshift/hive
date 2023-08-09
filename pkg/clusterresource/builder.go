@@ -377,7 +377,6 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 		SSHKey:     o.SSHPublicKey,
 		BaseDomain: o.BaseDomain,
 		Networking: &installertypes.Networking{
-			NetworkType:    "OpenShiftSDN",
 			ServiceNetwork: []ipnet.IPNet{*ipnet.MustParseCIDR("172.30.0.0/16")},
 			ClusterNetwork: []installertypes.ClusterNetworkEntry{
 				{

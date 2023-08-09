@@ -547,6 +547,8 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	machineSetsToCreate := []*machineapi.MachineSet{}
 	machineSetsToUpdate := []*machineapi.MachineSet{}
 
+	// Compile a set of labels and taints that were owned by MachinePool but have now been removed from MachinePool.Spec.
+	// These would need to be deleted from the remoteMachineSet if present.
 	labelsToDelete := sets.Set[string]{}
 	labelsToDelete.Insert(pool.Status.OwnedLabels...)
 	for labelKey := range pool.Spec.Labels {
@@ -606,6 +608,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				if rMS.Spec.Template.Spec.Labels == nil {
 					rMS.Spec.Template.Spec.Labels = make(map[string]string)
 				}
+				// First delete the labels that need to be deleted, then sync the remoteMachineSet labels with that of the generatedMachineSet.
 				for key := range rMS.Spec.Template.Spec.Labels {
 					if labelsToDelete.Has(key) {
 						// Safe to delete while iterating as long as we're deleting the key for this iteration.
@@ -624,52 +627,36 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				if rMS.Spec.Template.Spec.Taints == nil {
 					rMS.Spec.Template.Spec.Taints = []corev1.Taint{}
 				}
-				// Make a temporary map of generated MachineSet's taints for easy lookup
-				gTaintsByID := make(map[hivev1.TaintIdentifier]*corev1.Taint)
-				for gIndex, gTaint := range ms.Spec.Template.Spec.Taints {
-					gTaintsByID[identifierForTaint(&gTaint)] = &ms.Spec.Template.Spec.Taints[gIndex]
-				}
-				// Build the list of taints for the remote MachineSet from scratch
+				// First, build a list of remote MachineSet taints that do not have taints needing to be deleted
 				taints := make([]corev1.Taint, 0)
-				// Go through the remote MachineSet's taints, adding/replacing matches from the generated MachineSet
 				for _, rTaint := range rMS.Spec.Template.Spec.Taints {
-					tid := identifierForTaint(&rTaint)
-
-					// If we need to "delete" this one, skip it, but mark modified
-					if taintsToDelete.Has(tid) {
+					if taintsToDelete.Has(identifierForTaint(&rTaint)) {
+						// This entry would be deleted from the final list
 						objectModified = true
 						continue
 					}
+					taints = append(taints, rTaint)
+				}
+				rMS.Spec.Template.Spec.Taints = taints
 
-					if gTaint, foundTaint := gTaintsByID[tid]; foundTaint && gTaint.Value != rTaint.Value {
-						// Existing taint is modified
-						rTaint = *gTaint
+				for _, gTaint := range ms.Spec.Template.Spec.Taints {
+					// Taints are provided as a list, so duplicate entries are possible.
+					// Use a flag to indicate if a taint was found, append if not.
+					foundTaint := false
+					for rIndex, rTaint := range rMS.Spec.Template.Spec.Taints {
+						if reflect.DeepEqual(identifierForTaint(&gTaint), identifierForTaint(&rTaint)) {
+							foundTaint = true
+							if gTaint.Value != rTaint.Value {
+								rMS.Spec.Template.Spec.Taints[rIndex].Value = gTaint.Value
+								objectModified = true
+							}
+						}
+					}
+					if !foundTaint {
+						rMS.Spec.Template.Spec.Taints = append(rMS.Spec.Template.Spec.Taints, gTaint)
 						objectModified = true
 					}
-
-					// If we get here, one of the following is true:
-					// - The taint was in the generated MachineSet. Whether it was modified or not, it must be included.
-					// - The taint was in the remote MachineSet but not the generated one. However, it wasn't in our
-					//   "owned" list, i.e. it is "remote only". Preserve it.
-					taints = append(taints, rTaint)
-					// We'll want to include any "extras" from the generated MachineSet
-					delete(gTaintsByID, tid)
 				}
-				// Anything remaining from the generated MachineSet is new
-				for _, taint := range gTaintsByID {
-					taints = append(taints, *taint)
-				}
-				sort.SliceStable(taints, func(i, j int) bool {
-					if taints[i].Key != taints[j].Key {
-						return taints[i].Key < taints[j].Key
-					}
-					if taints[i].Effect != taints[j].Effect {
-						return taints[i].Effect < taints[j].Effect
-					}
-					// We should never get here, as taints with the same key+effect should be replaced
-					return taints[i].Value < taints[j].Value
-				})
-				rMS.Spec.Template.Spec.Taints = taints
 
 				// Platform updates will be blocked by webhook, unless they're not.
 				if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value) {

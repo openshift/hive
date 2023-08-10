@@ -96,25 +96,32 @@ REAL_POOL_NAME=$CLUSTER_NAME
 
 function cleanup() {
   echo "!EXIT TRAP!"
-  capture_manifests EXIT
-  # Let's save the logs now in case any of the following never finish
+  capture_manifests CLEANUP_000
+  # Let's save the logs now in case any of the following fail
   echo "Saving hive logs before cleanup"
   save_hive_logs
-  oc delete clusterclaim --all
-  oc delete clusterpool --all
+  # Do these asynchronously so we can keep polling the logs
+  oc delete clusterclaim --all &
+  oc delete clusterpool --all &
   # Wait indefinitely for all CDs to disappear. If we exceed the test timeout,
   # we'll get killed, and resources will leak.
+  i=0
   while true; do
     sleep ${sleep_between_tries}
+    i=$((i+1))
+    # re-capture logs so we can debug if things aren't deleting properly
+    echo "Re-capturing hive logs during cleanup"
+    save_hive_logs
+    # re-capture manifests, likewise, but not *too* often as these get added, not overwritten.
+    # This will fire every 100s.
+    [[ $((i%10)) -eq 0 ]] && capture_manifests CLEANUP_$(printf "%03d" $i)
     NUM_CDS=$(count_cds)
     if [[ $NUM_CDS == "0" ]]; then
       break
     fi
     echo "Waiting for $NUM_CDS ClusterDeployment(s) to be cleaned up"
   done
-  # And if we get this far, overwrite the logs with the latest
-  echo "Saving hive logs after cleanup"
-  save_hive_logs
+  echo "Cleanup complete"
 }
 trap 'kill %1; cleanup' EXIT
 

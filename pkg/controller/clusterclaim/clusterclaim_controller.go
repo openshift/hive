@@ -498,6 +498,7 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
 	logger.Info("claim assigned a cluster that has already been claimed by another ClusterClaim")
 	claim.Spec.Namespace = ""
+	// TODO: Update status handling https://issues.redhat.com/browse/HIVE-2274
 	claim.Status.Conditions = controllerutils.SetClusterClaimCondition(
 		claim.Status.Conditions,
 		hivev1.ClusterClaimPendingCondition,
@@ -507,7 +508,7 @@ func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.Clu
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 	if err := r.Update(context.Background(), claim); err != nil {
-		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update spec of ClusterClaim")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil

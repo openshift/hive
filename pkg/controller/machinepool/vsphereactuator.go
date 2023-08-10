@@ -1,6 +1,9 @@
 package machinepool
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -67,12 +70,31 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			VSphere: &installertypesvsphere.Platform{
-				VCenter:          cd.Spec.Platform.VSphere.VCenter,
-				Datacenter:       cd.Spec.Platform.VSphere.Datacenter,
-				DefaultDatastore: cd.Spec.Platform.VSphere.DefaultDatastore,
-				Folder:           cd.Spec.Platform.VSphere.Folder,
-				Cluster:          cd.Spec.Platform.VSphere.Cluster,
-				Network:          cd.Spec.Platform.VSphere.Network,
+				VCenters: []installertypesvsphere.VCenter{
+					{
+						Server:      cd.Spec.Platform.VSphere.VCenter,
+						Port:        443,
+						Username:    "",
+						Password:    "",
+						Datacenters: []string{cd.Spec.Platform.VSphere.Datacenter},
+					},
+				},
+				FailureDomains: []installertypesvsphere.FailureDomain{
+					{
+						Name:   "generated-failure-domain",
+						Region: "generated-region",
+						Zone:   "generated-zone",
+						Server: cd.Spec.Platform.VSphere.VCenter,
+						Topology: installertypesvsphere.Topology{
+							Datacenter:     cd.Spec.Platform.VSphere.Datacenter,
+							Datastore:      setDatastorePath(cd.Spec.Platform.VSphere.DefaultDatastore, cd.Spec.Platform.VSphere.Datacenter, logger),
+							Folder:         setFolderPath(cd.Spec.Platform.VSphere.Folder, cd.Spec.Platform.VSphere.Datacenter, logger),
+							ComputeCluster: setComputeClusterPath(cd.Spec.Platform.VSphere.Cluster, cd.Spec.Platform.VSphere.Datacenter, logger),
+							Networks:       []string{cd.Spec.Platform.VSphere.Network},
+							Template:       a.osImage,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -81,7 +103,8 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,
-		a.osImage,
+		// With FailureDomains[0].Topology.Template set, this param is ignored.
+		"HIVE_BUG!",
 		workerRole,
 		workerUserDataName,
 	)
@@ -102,4 +125,30 @@ func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme
 	osImage := providerSpec.Template
 	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
 	return osImage, nil
+}
+
+// Copied from https://github.com/openshift/installer/blob/f7731922a0f17a8339a3e837f72898ac77643611/pkg/types/vsphere/conversion/installconfig.go#L75-L97
+
+func setComputeClusterPath(cluster, datacenter string, logger log.FieldLogger) string {
+	if cluster != "" && !strings.HasPrefix(cluster, "/") {
+		logger.Warn("computeCluster as a non-path is now depreciated please use the form: /%s/host/%s", datacenter, cluster)
+		return fmt.Sprintf("/%s/host/%s", datacenter, cluster)
+	}
+	return cluster
+}
+
+func setDatastorePath(datastore, datacenter string, logger log.FieldLogger) string {
+	if datastore != "" && !strings.HasPrefix(datastore, "/") {
+		logger.Warn("datastore as a non-path is now depreciated please use the form: /%s/datastore/%s", datacenter, datastore)
+		return fmt.Sprintf("/%s/datastore/%s", datacenter, datastore)
+	}
+	return datastore
+}
+
+func setFolderPath(folder, datacenter string, logger log.FieldLogger) string {
+	if folder != "" && !strings.HasPrefix(folder, "/") {
+		logger.Warn("folder as a non-path is now depreciated please use the form: /%s/vm/%s", datacenter, folder)
+		return fmt.Sprintf("/%s/vm/%s", datacenter, folder)
+	}
+	return folder
 }

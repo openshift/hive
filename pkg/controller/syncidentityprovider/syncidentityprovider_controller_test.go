@@ -13,12 +13,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 
 	"github.com/openshift/hive/pkg/constants"
 )
@@ -206,7 +205,6 @@ func TestSyncIdentityProviderWatchHandler(t *testing.T) {
 }
 
 func TestSelectorSyncIdentityProviderWatchHandler(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                         string
@@ -247,15 +245,16 @@ func TestSelectorSyncIdentityProviderWatchHandler(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+
 			// Arrange
 			r := &ReconcileSyncIdentityProviders{
-				Client: fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build(),
-				scheme: scheme.Scheme,
+				Client: testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build(),
+				scheme: scheme.GetScheme(),
 				logger: log.WithField("controller", "syncidentityprovider"),
 			}
 
 			// Act
-			actualRequestList := r.selectorSyncIdentityProviderWatchHandler(test.selectorSyncIdentityProvider)
+			actualRequestList := r.selectorSyncIdentityProviderWatchHandler(context.TODO(), test.selectorSyncIdentityProvider)
 
 			// Assert
 			assert.True(t, reflect.DeepEqual(test.expectedRequestList, actualRequestList))
@@ -264,7 +263,6 @@ func TestSelectorSyncIdentityProviderWatchHandler(t *testing.T) {
 }
 
 func TestReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                   string
@@ -452,10 +450,12 @@ func TestReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			scheme := scheme.GetScheme()
+
 			// Arrange
 			r := &ReconcileSyncIdentityProviders{
-				Client: fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build(),
-				scheme: scheme.Scheme,
+				Client: testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build(),
+				scheme: scheme,
 				logger: log.WithField("controller", "syncidentityprovider"),
 			}
 

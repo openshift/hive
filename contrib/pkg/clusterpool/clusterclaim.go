@@ -9,11 +9,10 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 type ClusterClaimOptions struct {
@@ -52,10 +51,7 @@ func NewClaimClusterPoolCommand() *cobra.Command {
 }
 
 func (o ClusterClaimOptions) run() error {
-	scheme := runtime.NewScheme()
-	if err := apis.AddToScheme(scheme); err != nil {
-		return err
-	}
+	scheme := scheme.GetScheme()
 	claim := o.generateClaim()
 
 	rh, err := utils.GetResourceHelper(o.log)

@@ -5,12 +5,12 @@ import (
 
 	"github.com/golang/mock/gomock"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	fakekubeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
@@ -24,7 +24,7 @@ type mocks struct {
 // setupDefaultMocks is an easy way to setup all of the default mocks
 func setupDefaultMocks(t *testing.T, initObjs ...runtime.Object) *mocks {
 	mocks := &mocks{
-		fakeKubeClient: fakekubeclient.NewClientBuilder().WithRuntimeObjects(initObjs...).Build(),
+		fakeKubeClient: testfake.NewFakeClientBuilder().WithRuntimeObjects(initObjs...).Build(),
 		mockCtrl:       gomock.NewController(t),
 	}
 

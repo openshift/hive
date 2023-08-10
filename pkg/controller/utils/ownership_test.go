@@ -5,12 +5,13 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	"github.com/openshift/hive/pkg/test/generic"
+	"github.com/openshift/hive/pkg/util/scheme"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -18,9 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const (
@@ -80,7 +79,9 @@ func buildClusterDeployment(options ...testclusterdeployment.Option) *hivev1.Clu
 		options...,
 	)
 
-	return testclusterdeployment.FullBuilder(testNamespace, testName, scheme.Scheme).Build(options...)
+	scheme := scheme.GetScheme()
+
+	return testclusterdeployment.FullBuilder(testNamespace, testName, scheme).Build(options...)
 }
 
 func buildDNSZone(options ...testdnszone.Option) *hivev1.DNSZone {
@@ -117,8 +118,6 @@ func buildDNSZone(options ...testdnszone.Option) *hivev1.DNSZone {
 }
 
 func TestReconcile(t *testing.T) {
-	testscheme := scheme.Scheme
-	apis.AddToScheme(testscheme)
 
 	tests := []struct {
 		name                                 string
@@ -343,11 +342,12 @@ func TestReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
-			fakeKubeClient := fake.NewClientBuilder().WithScheme(testscheme).WithRuntimeObjects(test.existingObjects...).Build()
+			scheme := scheme.GetScheme()
+			fakeKubeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existingObjects...).Build()
 			logger := log.WithField("fake", "fake")
 
 			// Act
-			err := ReconcileOwnerReferences(test.owner, test.ownershipUniqueKeys, fakeKubeClient, testscheme, logger)
+			err := ReconcileOwnerReferences(test.owner, test.ownershipUniqueKeys, fakeKubeClient, scheme, logger)
 			actualObjects, listErr := ListRuntimeObjects(fakeKubeClient, []client.ObjectList{test.listRuntimeObjectsOwnershipUniqueKey.TypeToList}, client.MatchingLabels(test.listRuntimeObjectsOwnershipUniqueKey.LabelSelector))
 
 			// Assert

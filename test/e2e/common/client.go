@@ -6,33 +6,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/dynamic"
 	kclient "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	apiregv1client "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
-	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
-
-	hiveapis "github.com/openshift/hive/apis"
 	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
-
-func init() {
-	apiextv1.AddToScheme(scheme.Scheme)
-	hiveapis.AddToScheme(scheme.Scheme)
-	admissionv1beta1.AddToScheme(scheme.Scheme)
-	autoscalingv1.SchemeBuilder.AddToScheme(scheme.Scheme)
-}
 
 func MustGetClient() client.Client {
 	return MustGetClientFromConfig(MustGetConfig())
 }
 
 func MustGetClientFromConfig(cfg *rest.Config) client.Client {
-	c, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	c, err := client.New(cfg, client.Options{Scheme: scheme.GetScheme()})
 	if err != nil {
 		log.Fatalf("Error obtaining client: %v", err)
 	}

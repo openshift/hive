@@ -18,9 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
-	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/contrib/pkg/utils"
@@ -33,6 +31,7 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
+	"github.com/openshift/hive/pkg/util/scheme"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/validate"
 )
@@ -497,9 +496,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 // Run executes the command
 func (o *Options) Run() error {
-	if err := apis.AddToScheme(scheme.Scheme); err != nil {
-		return err
-	}
+	scheme := scheme.GetScheme()
 
 	objs, err := o.GenerateObjects()
 	if err != nil {
@@ -512,7 +509,7 @@ func (o *Options) Run() error {
 		} else {
 			printer = &printers.JSONPrinter{}
 		}
-		printObjects(objs, scheme.Scheme, printer)
+		printObjects(objs, scheme, printer)
 		return err
 	}
 	rh, err := utils.GetResourceHelper(o.log)
@@ -533,7 +530,7 @@ func (o *Options) Run() error {
 			return err
 		}
 		accessor.SetNamespace(o.Namespace)
-		if _, err := rh.ApplyRuntimeObject(obj, scheme.Scheme); err != nil {
+		if _, err := rh.ApplyRuntimeObject(obj, scheme); err != nil {
 			return err
 		}
 

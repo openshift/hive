@@ -18,10 +18,10 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
-	"github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	"github.com/openshift/hive/pkg/ibmclient"
 	mockibmclient "github.com/openshift/hive/pkg/ibmclient/mock"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func TestIBMCloudCanHandle(t *testing.T) {
@@ -260,7 +260,8 @@ func setupIBMCloudClientInstances(ibmCloudClient *mockibmclient.MockAPI, statuse
 }
 
 func testIBMCloudClusterDeployment() *hivev1.ClusterDeployment {
-	cdBuilder := testcd.FullBuilder("testns", "testibmcluster", scheme.Scheme)
+	scheme := scheme.GetScheme()
+	cdBuilder := testcd.FullBuilder("testns", "testibmcluster", scheme)
 	return cdBuilder.Build(
 		testcd.WithIBMCloudPlatform(&hivev1ibmcloud.Platform{Region: "us-south"}),
 		testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: "testibmcluster-foobarbaz"}),

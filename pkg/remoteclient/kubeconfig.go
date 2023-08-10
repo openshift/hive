@@ -1,14 +1,12 @@
 package remoteclient
 
 import (
+	"github.com/openshift/hive/pkg/util/scheme"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
 func NewBuilderFromKubeconfig(c client.Client, secret *corev1.Secret) Builder {
@@ -29,12 +27,8 @@ func (b *kubeconfigBuilder) Build() (client.Client, error) {
 		return nil, err
 	}
 
-	scheme := runtime.NewScheme()
-	corev1.SchemeBuilder.AddToScheme(scheme)
-	hivev1.SchemeBuilder.AddToScheme(scheme)
-
 	return client.New(cfg, client.Options{
-		Scheme: scheme,
+		Scheme: scheme.GetScheme(),
 	})
 }
 

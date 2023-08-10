@@ -9,12 +9,10 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -63,9 +61,11 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.NotNil(t, zone.Status.AWS)
-				assert.NotNil(t, zone.Status.AWS.ZoneID)
-				assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+				if assert.NotNil(t, zone.Status.AWS) {
+					if assert.NotNil(t, zone.Status.AWS.ZoneID) {
+						assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+					}
+				}
 				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
 			},
 		},
@@ -78,9 +78,11 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.NotNil(t, zone.Status.AWS)
-				assert.NotNil(t, zone.Status.AWS.ZoneID)
-				assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+				if assert.NotNil(t, zone.Status.AWS) {
+					if assert.NotNil(t, zone.Status.AWS.ZoneID) {
+						assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+					}
+				}
 				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
 			},
 		},
@@ -96,9 +98,11 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 				mockAWSGetNSRecord(expect)
 			},
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
-				assert.NotNil(t, zone.Status.AWS)
-				assert.NotNil(t, zone.Status.AWS.ZoneID)
-				assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+				if assert.NotNil(t, zone.Status.AWS) {
+					if assert.NotNil(t, zone.Status.AWS.ZoneID) {
+						assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+					}
+				}
 				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
 			},
 		},
@@ -175,7 +179,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			mocks := setupDefaultMocks(t)
+			mocks := setupDefaultMocks(t, tc.dnsZone)
 
 			zr, _ := NewAWSActuator(
 				log.WithField("controller", ControllerName),
@@ -188,7 +192,6 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			r := ReconcileDNSZone{
 				Client: mocks.fakeKubeClient,
 				logger: zr.logger,
-				scheme: scheme.Scheme,
 			}
 
 			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
@@ -196,8 +199,6 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-
-			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
 			if tc.setupAWSMock != nil {
 				tc.setupAWSMock(mocks.mockAWSClient.EXPECT())
@@ -291,6 +292,7 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 					testgeneric.WithNamespace("testNamespace"),
 					testgeneric.WithName("testDNSZone"),
 					testgeneric.Deleted(),
+					testgeneric.WithFinalizer("test-finalizer"),
 				).
 				Build(),
 			setupGCPMock: func(expect *gcpmock.MockClientMockRecorder) {
@@ -326,7 +328,7 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			mocks := setupDefaultMocks(t)
+			mocks := setupDefaultMocks(t, tc.dnsZone)
 
 			zr, _ := NewGCPActuator(
 				log.WithField("controller", ControllerName),
@@ -338,7 +340,6 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 			r := ReconcileDNSZone{
 				Client: mocks.fakeKubeClient,
 				logger: zr.logger,
-				scheme: scheme.Scheme,
 			}
 
 			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
@@ -347,15 +348,12 @@ func TestReconcileDNSProviderForGCP(t *testing.T) {
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
 
-			err := setFakeDNSZoneInKube(mocks, tc.dnsZone)
-			require.NoError(t, err, "failed to create DNSZone into fake client")
-
 			if tc.setupGCPMock != nil {
 				tc.setupGCPMock(mocks.mockGCPClient.EXPECT())
 			}
 
 			// Act
-			_, err = r.reconcileDNSProvider(zr, tc.dnsZone, zr.logger)
+			_, err := r.reconcileDNSProvider(zr, tc.dnsZone, zr.logger)
 
 			// Assert
 			if tc.errorExpected {
@@ -460,7 +458,7 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			mocks := setupDefaultMocks(t)
+			mocks := setupDefaultMocks(t, tc.dnsZone)
 
 			zr, _ := NewAzureActuator(
 				log.WithField("controller", ControllerName),
@@ -472,7 +470,6 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			r := ReconcileDNSZone{
 				Client: mocks.fakeKubeClient,
 				logger: zr.logger,
-				scheme: scheme.Scheme,
 			}
 
 			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
@@ -480,8 +477,6 @@ func TestReconcileDNSProviderForAzure(t *testing.T) {
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-
-			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
 			if tc.setupAzureMock != nil {
 				tc.setupAzureMock(mocks.mockCtrl, mocks.mockAzureClient.EXPECT())
@@ -574,7 +569,7 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			mocks := setupDefaultMocks(t)
+			mocks := setupDefaultMocks(t, tc.dnsZone)
 
 			zr, _ := NewAWSActuator(
 				log.WithField("controller", ControllerName),
@@ -587,12 +582,9 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 			r := ReconcileDNSZone{
 				Client: mocks.fakeKubeClient,
 				logger: zr.logger,
-				scheme: scheme.Scheme,
 			}
 
 			// This is necessary for the mocks to report failures like methods not being called an expected number of times.
-
-			setFakeDNSZoneInKube(mocks, tc.dnsZone)
 
 			r.soaLookup = func(string, log.FieldLogger) (bool, error) {
 				return tc.soaLookupResult, nil

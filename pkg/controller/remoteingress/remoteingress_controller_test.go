@@ -15,19 +15,18 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ingresscontroller "github.com/openshift/api/operator/v1"
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
 	testassert "github.com/openshift/hive/pkg/test/assert"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -53,9 +52,6 @@ type SyncSetIngressEntry struct {
 }
 
 func TestRemoteClusterIngressReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	ingresscontroller.AddToScheme(scheme.Scheme)
-
 	tests := []struct {
 		name                          string
 		localObjects                  []runtime.Object
@@ -389,7 +385,8 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.localObjects...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.localObjects...).Build()
 
 			helper := &fakeKubeCLI{
 				t: t,
@@ -397,7 +394,7 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 
 			rcd := &ReconcileRemoteClusterIngress{
 				Client:  fakeClient,
-				scheme:  scheme.Scheme,
+				scheme:  scheme,
 				logger:  log.WithField("controller", ControllerName),
 				kubeCLI: helper,
 			}
@@ -418,8 +415,6 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 }
 
 func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	ingresscontroller.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                      string
@@ -518,7 +513,8 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.localObjects...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.localObjects...).Build()
 
 			helper := &fakeKubeCLI{
 				t: t,
@@ -526,7 +522,7 @@ func TestRemoteClusterIngressReconcileConditions(t *testing.T) {
 
 			rcd := &ReconcileRemoteClusterIngress{
 				Client:  fakeClient,
-				scheme:  scheme.Scheme,
+				scheme:  scheme,
 				logger:  log.WithField("controller", ControllerName),
 				kubeCLI: helper,
 			}

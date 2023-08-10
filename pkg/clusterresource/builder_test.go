@@ -6,14 +6,12 @@ import (
 	"testing"
 
 	"github.com/ghodss/yaml"
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -312,7 +310,6 @@ metadata:
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 			require.NoError(t, test.builder.Validate())
 			allObjects, err := test.builder.Build()

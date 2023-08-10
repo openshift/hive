@@ -28,9 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -38,6 +36,8 @@ import (
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 	testassert "github.com/openshift/hive/pkg/test/assert"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -233,9 +233,8 @@ func TestReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			scheme := runtime.NewScheme()
-			hivev1.AddToScheme(scheme)
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.cd).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.cd).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			if test.errorConnecting != nil {

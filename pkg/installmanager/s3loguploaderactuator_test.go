@@ -11,9 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/openshift/hive/apis"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 )
@@ -23,7 +21,6 @@ func init() {
 }
 
 func TestUploadLogs(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
 		name                    string
 		existing                []runtime.Object

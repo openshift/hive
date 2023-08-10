@@ -13,22 +13,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
-	routev1 "github.com/openshift/api/route/v1"
-
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -62,9 +58,6 @@ func init() {
 }
 
 func TestArgoCDRegisterReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	openshiftapiv1.Install(scheme.Scheme)
-	routev1.Install(scheme.Scheme)
 
 	getCD := func(c client.Client) *hivev1.ClusterDeployment {
 		cd := &hivev1.ClusterDeployment{}
@@ -199,7 +192,8 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "argocdregister")
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			if test.argoCDEnabled {
 				os.Setenv(constants.ArgoCDEnvVar, "true")
@@ -210,7 +204,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 
 			rcd := &ArgoCDRegisterController{
 				Client:     fakeClient,
-				scheme:     scheme.Scheme,
+				scheme:     scheme,
 				logger:     logger,
 				restConfig: &rest.Config{},
 				tlsClientConfigBuilder: func(kubeConfig clientcmd.ClientConfig, _ log.FieldLogger) (TLSClientConfig, error) {

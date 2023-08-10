@@ -21,23 +21,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/config/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver/mock"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -58,7 +57,6 @@ type conditionExpectations struct {
 }
 
 func TestDNSEndpointReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	objectKey := client.ObjectKey{Namespace: testNamespace, Name: testName}
 
@@ -339,7 +337,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			name: "deleted with no finalizer",
 			dnsZone: func() *hivev1.DNSZone {
 				z := testDeletedDNSZone()
-				z.Finalizers = nil
+				z.Finalizers = []string{"test-finalizer"}
 				return z
 			}(),
 			nameServers: rootDomainsMap{
@@ -410,7 +408,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			logger := log.WithField("controller", ControllerName)
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(tc.dnsZone).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.dnsZone).Build()
 			mockQuery := mock.NewMockQuery(mockCtrl)
 			if tc.configureQuery != nil {
 				tc.configureQuery(mockQuery)
@@ -424,7 +422,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 
 			cut := &ReconcileDNSEndpoint{
 				Client: fakeClient,
-				scheme: scheme.Scheme,
+				scheme: scheme.GetScheme(),
 				logger: logger,
 				nameServerTools: []nameServerTool{
 					{
@@ -497,6 +495,7 @@ func (fm *fakeManager) Add(mgr manager.Runnable) error {
 	}
 	return nil
 }
+
 func (*fakeManager) Elected() <-chan struct{} {
 	panic("not implemented")
 }
@@ -534,13 +533,14 @@ func (*fakeManager) GetCache() cache.Cache {
 func (*fakeManager) GetEventRecorderFor(string) record.EventRecorder {
 	panic("not implemented")
 }
+
 func (*fakeManager) GetRESTMapper() meta.RESTMapper {
 	panic("not implemented")
 }
 func (*fakeManager) GetAPIReader() client.Reader {
 	panic("not implemented")
 }
-func (*fakeManager) GetWebhookServer() *webhook.Server {
+func (*fakeManager) GetWebhookServer() webhook.Server {
 	panic("not implemented")
 }
 
@@ -548,7 +548,11 @@ func (*fakeManager) GetLogger() logr.Logger {
 	panic("not implemented")
 }
 
-func (*fakeManager) GetControllerOptions() v1alpha1.ControllerConfigurationSpec {
+func (*fakeManager) GetControllerOptions() config.Controller {
+	panic("not implemented")
+}
+
+func (*fakeManager) GetHTTPClient() *http.Client {
 	panic("not implemented")
 }
 
@@ -655,7 +659,7 @@ func TestMultiCloudDNSSetup(t *testing.T) {
 			}
 
 			// Run/set up reconciler
-			fakeClient := fake.NewClientBuilder().Build()
+			fakeClient := testfake.NewFakeClientBuilder().Build()
 			fakeMgr := &fakeManager{
 				watchedDomains: map[string]bool{},
 			}

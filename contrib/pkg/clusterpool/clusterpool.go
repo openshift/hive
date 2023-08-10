@@ -18,13 +18,13 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/homedir"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/clusterresource"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -213,10 +213,7 @@ func (o *ClusterPoolOptions) validate(cmd *cobra.Command) error {
 
 // run executes the command
 func (o *ClusterPoolOptions) run() error {
-	scheme := runtime.NewScheme()
-	if err := apis.AddToScheme(scheme); err != nil {
-		return err
-	}
+	scheme := scheme.GetScheme()
 
 	objs, err := o.generateObjects()
 	if err != nil {

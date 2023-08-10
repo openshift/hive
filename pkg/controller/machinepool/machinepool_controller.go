@@ -43,6 +43,7 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -70,21 +71,7 @@ var (
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
 
-	scheme := mgr.GetScheme()
-	if err := addAlibabaCloudProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add Alibaba provider to scheme")
-	}
-	if err := addOpenStackProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add OpenStack provider to scheme")
-	}
-	if err := addOvirtProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add OVirt provider to scheme")
-	}
-	// AWS, GCP, VSphere, and IBMCloud are added via the machineapi
-	err := machineapi.AddToScheme(scheme)
-	if err != nil {
-		return errors.Wrap(err, "cannot add Machine API to scheme")
-	}
+	scheme := scheme.GetScheme()
 
 	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
 	if err != nil {
@@ -94,7 +81,7 @@ func Add(mgr manager.Manager) error {
 
 	r := &ReconcileMachinePool{
 		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
-		scheme:       mgr.GetScheme(),
+		scheme:       scheme,
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}

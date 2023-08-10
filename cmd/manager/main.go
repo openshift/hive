@@ -10,25 +10,20 @@ import (
 	"os"
 	"time"
 
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	cmdutil "github.com/openshift/hive/cmd/util"
 	"github.com/openshift/hive/pkg/constants"
@@ -57,6 +52,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/controller/velerobackup"
 	utillogrus "github.com/openshift/hive/pkg/util/logrus"
+	"github.com/openshift/hive/pkg/util/scheme"
 	"github.com/openshift/hive/pkg/version"
 )
 
@@ -159,6 +155,7 @@ func newRootCommand() *cobra.Command {
 			run := func(ctx context.Context) {
 				// Create a new Cmd to provide shared dependencies and start components
 				mgr, err := manager.New(cfg, manager.Options{
+					Scheme:             scheme.GetScheme(),
 					MetricsBindAddress: ":2112",
 					Logger:             utillogrus.NewLogr(log.StandardLogger()),
 				})
@@ -169,27 +166,6 @@ func newRootCommand() *cobra.Command {
 				log.Info("Registering Components.")
 
 				if err := utils.SetupAdditionalCA(); err != nil {
-					log.Fatal(err)
-				}
-
-				// Setup Scheme for all resources
-				if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := openshiftapiv1.Install(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := apiextv1.AddToScheme(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := crv1alpha1.AddToScheme(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := velerov1.AddToScheme(mgr.GetScheme()); err != nil {
 					log.Fatal(err)
 				}
 

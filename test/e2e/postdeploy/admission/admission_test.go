@@ -10,8 +10,8 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/kubernetes/scheme"
 
+	"github.com/openshift/hive/pkg/util/scheme"
 	webhook "github.com/openshift/hive/pkg/validating-webhooks/hive/v1"
 	"github.com/openshift/hive/test/e2e/common"
 )
@@ -91,7 +91,8 @@ func TestAdmission(t *testing.T) {
 				t.Fatalf("Unexpected create error: %v", err)
 			}
 			reviewResult := &admissionv1beta1.AdmissionReview{}
-			err = scheme.Scheme.Convert(result, reviewResult, nil)
+			scheme := scheme.GetScheme()
+			err = scheme.Convert(result, reviewResult, nil)
 			if err != nil {
 				t.Fatalf("Unexpected conversion error: %v", err)
 			}

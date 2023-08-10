@@ -28,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
@@ -77,6 +77,7 @@ import (
 	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/hive/pkg/resource"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
+	"github.com/openshift/hive/pkg/util/scheme"
 	yamlutils "github.com/openshift/hive/pkg/util/yaml"
 )
 
@@ -1464,7 +1465,7 @@ func uploadAdminKubeconfig(m *InstallManager) (*corev1.Secret, error) {
 	kubeconfigSecret.Labels = k8slabels.AddLabel(kubeconfigSecret.Labels, constants.ClusterProvisionNameLabel, m.ClusterProvision.Name)
 	kubeconfigSecret.Labels = k8slabels.AddLabel(kubeconfigSecret.Labels, constants.SecretTypeLabel, constants.SecretTypeKubeConfig)
 
-	provisionGVK, err := apiutil.GVKForObject(m.ClusterProvision, scheme.Scheme)
+	provisionGVK, err := apiutil.GVKForObject(m.ClusterProvision, scheme.GetScheme())
 	if err != nil {
 		m.log.WithError(err).Errorf("error getting GVK for provision")
 		return nil, err
@@ -1531,7 +1532,7 @@ func uploadAdminPassword(m *InstallManager) (*corev1.Secret, error) {
 	s.Labels = k8slabels.AddLabel(s.Labels, constants.ClusterProvisionNameLabel, m.ClusterProvision.Name)
 	s.Labels = k8slabels.AddLabel(s.Labels, constants.SecretTypeLabel, constants.SecretTypeKubeAdminCreds)
 
-	provisionGVK, err := apiutil.GVKForObject(m.ClusterProvision, scheme.Scheme)
+	provisionGVK, err := apiutil.GVKForObject(m.ClusterProvision, scheme.GetScheme())
 	if err != nil {
 		m.log.WithError(err).Errorf("error getting GVK for provision")
 		return nil, err
@@ -1621,11 +1622,14 @@ func waitForProvisioningStage(m *InstallManager) error {
 	waitContext, cancel := context.WithTimeout(context.Background(), provisioningTransitionTimeout)
 	defer cancel()
 
+	scheme := scheme.GetScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return errors.Wrap(err, "could not get in-cluster REST config")
 	}
-	gvk, err := apiutil.GVKForObject(&hivev1.ClusterProvision{}, scheme.Scheme)
+	gvk, err := apiutil.GVKForObject(&hivev1.ClusterProvision{}, scheme)
 	if err != nil {
 		return errors.Wrap(err, "could not get the GVK for clusterprovisions")
 	}
@@ -1633,7 +1637,7 @@ func waitForProvisioningStage(m *InstallManager) error {
 	if err != nil {
 		return errors.Wrap(err, "could not generate http client for config")
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, scheme.Codecs, hc)
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, codecs, hc)
 	if err != nil {
 		return errors.Wrap(err, "could not create REST client")
 	}

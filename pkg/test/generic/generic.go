@@ -10,12 +10,12 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
+	"github.com/openshift/hive/pkg/util/scheme"
 
 	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -72,7 +72,7 @@ func WithAnnotation(key, value string) Option {
 // WithControllerOwnerReference sets the controller owner reference to the supplied object.
 func WithControllerOwnerReference(owner metav1.Object) Option {
 	return func(meta hivev1.MetaRuntimeObject) {
-		controllerutil.SetControllerReference(owner, meta, scheme.Scheme)
+		controllerutil.SetControllerReference(owner, meta, scheme.GetScheme())
 	}
 }
 
@@ -124,7 +124,7 @@ func WithUID(uid string) Option {
 // WithTypeMeta populates the type meta for the object.
 func WithTypeMeta(typers ...runtime.ObjectTyper) Option {
 	return func(meta hivev1.MetaRuntimeObject) {
-		for _, typer := range append(typers, scheme.Scheme) {
+		for _, typer := range append(typers, scheme.GetScheme()) {
 			gvks, _, err := typer.ObjectKinds(meta)
 			if err != nil {
 				continue

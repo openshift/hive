@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
@@ -33,8 +32,10 @@ import (
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcdc "github.com/openshift/hive/pkg/test/clusterdeploymentcustomization"
 	testcp "github.com/openshift/hive/pkg/test/clusterpool"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testsecret "github.com/openshift/hive/pkg/test/secret"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -42,13 +43,11 @@ const (
 	testLeasePoolName = "aws-us-east-1"
 	credsSecretName   = "aws-creds"
 	imageSetName      = "test-image-set"
+	testFinalizer     = "test-finalizer"
 )
 
 func TestReconcileClusterPool(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	rbacv1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	// See calculatePoolVersion. If this changes, the easiest way to figure out the new value is
 	// to pull it from the test failure :)
@@ -218,7 +217,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedAssignedCDCs:         map[string]string{"test-cdc-1": testLeasePoolName},
 			expectedCDCReason:            map[string]string{"test-cdc-1": hivev1.CustomizationApplyReasonInstallationPending},
 		},
-		{
+		// TODO: Revise once https://issues.redhat.com/browse/HIVE-2284 solved
+		/*{
 			name: "cp with inventory and available cdc deleted without hold",
 			existing: []runtime.Object{
 				inventoryPoolBuilder().Build(testcp.WithSize(1)),
@@ -232,7 +232,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedPoolVersion:     inventoryPoolVersion,
 			expectError:             true,
 			expectedCDCurrentStatus: corev1.ConditionUnknown,
-		},
+		},*/
 		{
 			name: "cp with inventory and available cdc with finalizer deleted without hold",
 			existing: []runtime.Object{
@@ -941,7 +941,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			name: "no scale up with max concurrent and some deleting",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
-				unclaimedCDBuilder("c1").GenericOptions(testgeneric.Deleted()).Build(testcd.Running()),
+				unclaimedCDBuilder("c1").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(testcd.Running()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 			},
@@ -956,7 +956,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(2)),
 				testclaim.FullBuilder(testNamespace, "test-claim", scheme).Build(testclaim.WithPool(testLeasePoolName)),
-				cdBuilder("c1").GenericOptions(testgeneric.Deleted()).Build(
+				cdBuilder("c1").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(
 					testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 				),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
@@ -971,7 +971,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			name: "scale up with max concurrent and some deleting",
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(5), testcp.WithMaxConcurrent(3)),
-				unclaimedCDBuilder("c1").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c1").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
 				unclaimedCDBuilder("c3").Build(),
 			},
@@ -1090,12 +1090,12 @@ func TestReconcileClusterPool(t *testing.T) {
 		{
 			name: "deleted pool: cluster deletions adhere to MaxConcurrent",
 			existing: []runtime.Object{
-				initializedPoolBuilder.GenericOptions(testgeneric.Deleted()).Build(testcp.WithSize(4), testcp.WithMaxConcurrent(3)),
+				initializedPoolBuilder.GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(testcp.WithSize(4), testcp.WithMaxConcurrent(3)),
 				unclaimedCDBuilder("c0").Build(testcd.Installed()),
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				// Already deleting -- will count against MaxConcurrent
 				cdBuilder("c2").GenericOptions(
-					testgeneric.Deleted()).Build(
+					testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(
 					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
 				),
 				// This one is "Installing" so it will count against MaxConcurrent
@@ -1237,13 +1237,13 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c1").Build(testcd.Running()),
 				unclaimedCDBuilder("c2").Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
-				cdBuilder("c4").GenericOptions(testgeneric.Deleted()).Build(
+				cdBuilder("c4").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(
 					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
 					testcd.Installed()),
-				cdBuilder("c5").GenericOptions(testgeneric.Deleted()).Build(
+				cdBuilder("c5").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(
 					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
 					testcd.Running()),
-				cdBuilder("c6").GenericOptions(testgeneric.Deleted()).Build(
+				cdBuilder("c6").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(
 					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
 				),
 			},
@@ -1317,7 +1317,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				),
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
-				unclaimedCDBuilder("c3").GenericOptions(testgeneric.Deleted()).Build(testcd.Running()),
+				unclaimedCDBuilder("c3").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(testcd.Running()),
 			},
 			expectedTotalClusters:  3,
 			expectedObservedSize:   2,
@@ -1526,7 +1526,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				unclaimedCDBuilder("c2").Build(testcd.Running()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
-					GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
+					GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
 					Build(
 						testcd.WithClusterPoolReference(testNamespace, testLeasePoolName, "test-claim"),
 					),
@@ -1576,7 +1576,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(3), testcp.WithMaxConcurrent(2)),
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
-				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
 					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
@@ -1593,7 +1593,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				initializedPoolBuilder.Build(testcp.WithSize(3), testcp.WithMaxConcurrent(3)),
 				unclaimedCDBuilder("c1").Build(testcd.Installed()),
-				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted()).Build(testcd.Installed()),
+				unclaimedCDBuilder("c2").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(testcd.Installed()),
 				unclaimedCDBuilder("c3").Build(),
 				cdBuilder("c4").
 					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).
@@ -1867,7 +1867,7 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcp.WithSize(4),
 					testcp.WithRunningCount(2),
 				),
-				unclaimedCDBuilder("c1").Build(testcd.Generic(testgeneric.Deleted()), testcd.WithPowerState(hivev1.ClusterPowerStateRunning)),
+				unclaimedCDBuilder("c1").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning)),
 				unclaimedCDBuilder("c2").Build(testcd.WithPowerState(hivev1.ClusterPowerStateRunning)),
 				unclaimedCDBuilder("c3").Build(),
 				unclaimedCDBuilder("c4").Build(),
@@ -1971,8 +1971,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				expectedPoolVersion = test.expectedPoolVersion
 			}
 
-			fakeClient := fake.NewClientBuilder().
-				WithScheme(scheme).
+			fakeClient := testfake.NewFakeClientBuilder().
 				WithIndex(&hivev1.ClusterDeployment{}, cdClusterPoolIndex, indexClusterDeploymentsByClusterPool).
 				WithIndex(&hivev1.ClusterClaim{}, claimClusterPoolIndex, indexClusterClaimsByClusterPool).
 				WithRuntimeObjects(test.existing...).
@@ -2213,11 +2212,6 @@ func TestReconcileClusterPool(t *testing.T) {
 }
 
 func TestReconcileRBAC(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	rbacv1.AddToScheme(scheme)
-
 	tests := []struct {
 		name string
 
@@ -2926,7 +2920,7 @@ func TestReconcileRBAC(t *testing.T) {
 	}}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			controllerExpectations := controllerutils.NewExpectations(logger)

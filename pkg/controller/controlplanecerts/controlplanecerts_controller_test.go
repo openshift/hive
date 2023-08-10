@@ -15,20 +15,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
-
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	testsecret "github.com/openshift/hive/pkg/test/secret"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -55,8 +52,6 @@ func init() {
 }
 
 func TestReconcileControlPlaneCerts(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	openshiftapiv1.Install(scheme.Scheme)
 
 	tests := []struct {
 		name     string
@@ -167,12 +162,13 @@ func TestReconcileControlPlaneCerts(t *testing.T) {
 					testsecret.WithDataKeyValue(constants.KubeconfigSecretKey, []byte(adminKubeconfig)),
 				),
 			)
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			applier := &fakeApplier{}
 			r := &ReconcileControlPlaneCerts{
 				Client:  fakeClient,
-				scheme:  scheme.Scheme,
+				scheme:  scheme,
 				applier: applier,
 			}
 

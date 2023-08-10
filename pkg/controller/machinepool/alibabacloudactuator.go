@@ -2,12 +2,11 @@ package machinepool
 
 import (
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-
-	"k8s.io/apimachinery/pkg/runtime"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	alibabacloudprovider "github.com/openshift/cluster-api-provider-alibaba/pkg/apis/alibabacloudprovider/v1"
@@ -28,10 +27,6 @@ type AlibabaCloudActuator struct {
 }
 
 var _ Actuator = &AlibabaCloudActuator{}
-
-func addAlibabaCloudProviderToScheme(scheme *runtime.Scheme) error {
-	return machineapi.AddToScheme(scheme)
-}
 
 // NewAlibabaCloudActuator is the constructor for building an AlibabaCloudActuator
 func NewAlibabaCloudActuator(alibabaCreds *corev1.Secret, region string, masterMachine *machineapi.Machine, logger log.FieldLogger) (*AlibabaCloudActuator, error) {

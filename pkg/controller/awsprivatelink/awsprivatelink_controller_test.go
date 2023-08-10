@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -37,7 +36,9 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testassert "github.com/openshift/hive/pkg/test/assert"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	"github.com/openshift/hive/pkg/test/generic"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -45,8 +46,7 @@ const (
 )
 
 func Test_setErrCondition(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 	cases := []struct {
 		name string
 
@@ -116,7 +116,7 @@ func Test_setErrCondition(t *testing.T) {
 			cd := testcd.FullBuilder(testNS, "test", scheme).Build()
 			cd.Status.Conditions = test.conditions
 
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(cd).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(cd).Build()
 			reconciler := &ReconcileAWSPrivateLink{
 				Client: fakeClient,
 			}
@@ -141,8 +141,7 @@ func Test_setErrCondition(t *testing.T) {
 }
 
 func Test_setProgressCondition(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 	cases := []struct {
 		name string
 
@@ -296,7 +295,7 @@ func Test_setProgressCondition(t *testing.T) {
 			cd := testcd.FullBuilder(testNS, "test", scheme).Build()
 			cd.Status.Conditions = test.conditions
 
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(cd).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(cd).Build()
 			reconciler := &ReconcileAWSPrivateLink{
 				Client: fakeClient,
 			}
@@ -321,10 +320,6 @@ func Test_setProgressCondition(t *testing.T) {
 }
 
 func TestInitialURL(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-
 	tests := []struct {
 		name string
 
@@ -416,7 +411,7 @@ users:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := testSecret("test", tt.existing)
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(s).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(s).Build()
 
 			got, err := initialURL(fakeClient, client.ObjectKey{Namespace: testNS, Name: "test"})
 			require.NoError(t, err)
@@ -462,9 +457,7 @@ func (m createVpcEndpointInputMatcher) String() string {
 }
 
 func TestReconcile(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	key := client.ObjectKey{Name: "test-cd", Namespace: testNS}
 	cdBuilder := testcd.FullBuilder(testNS, "test-cd", scheme)
@@ -1898,7 +1891,7 @@ users:
 				test.configureAWSClient(mockedAWSClient)
 			}
 
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			log.SetLevel(log.DebugLevel)
 			reconciler := &ReconcileAWSPrivateLink{
 				Client: fakeClient,
@@ -2098,9 +2091,7 @@ func getExpectedConditions(failed bool, reason string, message string) []hivev1.
 }
 
 func Test_shouldSync(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	cdBuilder := testcd.FullBuilder(testNS, "test-cd", scheme)
 

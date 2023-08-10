@@ -17,23 +17,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
 	testName      = "deprovision-request"
 	testNamespace = "default"
+	testFinalizer = "test-finalizer"
 )
 
 func init() {
@@ -41,7 +41,6 @@ func init() {
 }
 
 func TestClusterDeprovisionReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                  string
@@ -65,6 +64,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				req := testClusterDeprovision()
 				now := metav1.Now()
 				req.DeletionTimestamp = &now
+				req.Finalizers = []string{testFinalizer}
 				return req
 			}(),
 			deployment: testDeletedClusterDeployment(),
@@ -271,9 +271,10 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
+			scheme := scheme.GetScheme()
 			if test.deployment != nil {
 				// Associate the cluster deployment as the owner of the provision to match real world:
-				err := controllerutil.SetControllerReference(test.deployment, test.deprovision, scheme.Scheme)
+				err := controllerutil.SetControllerReference(test.deployment, test.deprovision, scheme)
 				if err != nil {
 					t.Errorf("unable to set owner reference on deprovision: %v", err)
 					return
@@ -293,7 +294,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 
 			r := &ReconcileClusterDeprovision{
 				Client:               mocks.fakeKubeClient,
-				scheme:               scheme.Scheme,
+				scheme:               scheme,
 				deprovisionsDisabled: test.deprovisionsDisabled,
 			}
 
@@ -352,6 +353,7 @@ func testDeletedClusterDeployment() *hivev1.ClusterDeployment {
 	now := metav1.Now()
 	cd := testClusterDeployment()
 	cd.ObjectMeta.DeletionTimestamp = &now
+	cd.ObjectMeta.Finalizers = []string{testFinalizer}
 	return cd
 }
 
@@ -432,7 +434,7 @@ func validateCondition(t *testing.T, c client.Client, expectedConditions []hivev
 	assert.NoError(t, err, "unexpected error getting ClusterDeprovision")
 
 	if len(req.Status.Conditions) != len(expectedConditions) {
-		t.Errorf("request is expected to have specific")
+		t.Errorf("request condition length %v does not match expected condition length %v", len(req.Status.Conditions), len(expectedConditions))
 	}
 
 	for i, expectedCondition := range expectedConditions {

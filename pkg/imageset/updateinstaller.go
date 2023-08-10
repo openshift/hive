@@ -14,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
@@ -25,11 +24,11 @@ import (
 
 	imageapi "github.com/openshift/api/image/v1"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -263,11 +262,10 @@ func (o *UpdateInstallerImageOptions) setImageResolutionErrorCondition(cd *hivev
 }
 
 func getClient(kubeConfig *rest.Config) (client.Client, error) {
-	clientScheme := scheme.Scheme
-	apis.AddToScheme(clientScheme)
+	scheme := scheme.GetScheme()
 
 	managerOptions := manager.Options{
-		Scheme:         clientScheme,
+		Scheme:         scheme,
 		MapperProvider: apiutil.NewDiscoveryRESTMapper,
 	}
 	httpClient, err := rest.HTTPClientFor(kubeConfig)
@@ -279,7 +277,7 @@ func getClient(kubeConfig *rest.Config) (client.Client, error) {
 		return nil, fmt.Errorf("failed to get API Group-Resources")
 	}
 	kubeClient, err := client.New(kubeConfig, client.Options{
-		Scheme: clientScheme,
+		Scheme: scheme,
 		Mapper: mapper,
 	})
 	if err != nil {

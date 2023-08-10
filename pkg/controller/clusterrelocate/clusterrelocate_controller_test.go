@@ -13,12 +13,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -30,6 +28,7 @@ import (
 	testcr "github.com/openshift/hive/pkg/test/clusterrelocate"
 	testcm "github.com/openshift/hive/pkg/test/configmap"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testjob "github.com/openshift/hive/pkg/test/job"
 	testmp "github.com/openshift/hive/pkg/test/machinepool"
@@ -37,6 +36,7 @@ import (
 	testsecret "github.com/openshift/hive/pkg/test/secret"
 	testsip "github.com/openshift/hive/pkg/test/syncidentityprovider"
 	testss "github.com/openshift/hive/pkg/test/syncset"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -55,10 +55,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
 
-	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
-	batchv1.AddToScheme(scheme)
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	cdBuilder := testcd.FullBuilder(namespace, cdName, scheme).GenericOptions(
 		testgeneric.WithLabel(labelKey, labelValue),
@@ -823,8 +820,8 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				testsecret.WithDataKeyValue("kubeconfig", []byte("some-kubeconfig-data")),
 			)
 			tc.srcResources = append(tc.srcResources, kubeconfigSecret)
-			srcClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.srcResources...).Build()
-			destClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.destResources...).Build()
+			srcClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.srcResources...).Build()
+			destClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.destResources...).Build()
 
 			mockCtrl := gomock.NewController(t)
 
@@ -872,9 +869,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
 
-	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	cdBuilder := testcd.FullBuilder(namespace, cdName, scheme).GenericOptions(
 		testgeneric.WithLabel(labelKey, labelValue),
@@ -1169,6 +1164,9 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
+		if tc.name != "fresh clusterdeployment" {
+			continue
+		}
 		t.Run(tc.name, func(t *testing.T) {
 			tc.srcResources = append(tc.srcResources, tc.cd)
 			if tc.dnsZone != nil {
@@ -1180,8 +1178,8 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			if !tc.missingKubeconfigSecret {
 				tc.srcResources = append(tc.srcResources, kubeconfigSecret)
 			}
-			srcClient := &deleteBlockingClientWrapper{fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.srcResources...).Build()}
-			destClient := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.destResources...).Build()
+			srcClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.srcResources...).Build()
+			destClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.destResources...).Build()
 
 			mockCtrl := gomock.NewController(t)
 

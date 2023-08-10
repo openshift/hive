@@ -20,8 +20,8 @@ import (
 	hivev1alibabacloud "github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	"github.com/openshift/hive/pkg/alibabaclient"
 	mockalibabacloud "github.com/openshift/hive/pkg/alibabaclient/mock"
-	"github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func TestAlibabaCloudCanHandle(t *testing.T) {
@@ -250,7 +250,8 @@ func setupAlibabaCloudClientInstances(alibabaCloudClient *mockalibabacloud.MockA
 }
 
 func testAlibabaCloudClusterDeployment() *hivev1.ClusterDeployment {
-	cdBuilder := testcd.FullBuilder("testns", "testalibabacluster", scheme.Scheme)
+	scheme := scheme.GetScheme()
+	cdBuilder := testcd.FullBuilder("testns", "testalibabacluster", scheme)
 	return cdBuilder.Build(
 		testcd.WithAlibabaCloudPlatform(&hivev1alibabacloud.Platform{Region: "cn-hangzhou"}),
 		testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: "testalibabacluster-foobarbaz"}),

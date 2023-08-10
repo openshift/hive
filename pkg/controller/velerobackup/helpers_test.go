@@ -12,7 +12,9 @@ import (
 	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	testsyncset "github.com/openshift/hive/pkg/test/syncset"
+	"github.com/openshift/hive/pkg/util/scheme"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -20,9 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/kubernetes/scheme"
-
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const (
@@ -120,8 +119,8 @@ func clusterDeploymentBase() testclusterdeployment.Option {
 
 func fakeClientReconcileBackup(existingObjects []runtime.Object) *ReconcileBackup {
 	return &ReconcileBackup{
-		Client:                     fake.NewClientBuilder().WithRuntimeObjects(existingObjects...).Build(),
-		scheme:                     scheme.Scheme,
+		Client:                     testfake.NewFakeClientBuilder().WithRuntimeObjects(existingObjects...).Build(),
+		scheme:                     scheme.GetScheme(),
 		reconcileRateLimitDuration: defaultReconcileRateLimitDuration,
 		logger:                     log.WithField("controller", ControllerName),
 		veleroNamespace:            "velero",

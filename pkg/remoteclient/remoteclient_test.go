@@ -12,12 +12,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 )
 
 const (
@@ -226,14 +227,20 @@ func Test_builder_Build(t *testing.T) {
 			builder := NewBuilder(c, cd, "test-controller-name")
 			var err error
 			if !tc.dynamic {
-				_, err = builder.Build()
+				rc, buildErr := builder.Build()
+				assert.NoError(t, buildErr, "unexpected error building client")
+				namespaced_name := types.NamespacedName{
+					Name:      "bad-name",
+					Namespace: "bad-namespace",
+				}
+				err = rc.Get(context.Background(), namespaced_name, &hivev1.ClusterDeployment{})
 			} else {
 				rc, buildErr := builder.BuildDynamic()
 				assert.NoError(t, buildErr, "unexpected error building dynamic client")
 				_, err = rc.Resource(hivev1.Resource("ClusterDeployment").WithVersion("v1")).
 					Get(context.Background(), "bad-name", metav1.GetOptions{})
 			}
-			if assert.Error(t, err, "expected error building") {
+			if assert.Error(t, err, "expected error") {
 				assert.Contains(t, err.Error(), tc.expectedHost, "expected to find host in error")
 				assert.Contains(t, err.Error(), "no such host", "expected to find \"no such host\" in error")
 			}
@@ -242,10 +249,7 @@ func Test_builder_Build(t *testing.T) {
 }
 
 func fakeClient(objects ...runtime.Object) client.Client {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).Build()
+	return testfake.NewFakeClientBuilder().WithRuntimeObjects(objects...).Build()
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

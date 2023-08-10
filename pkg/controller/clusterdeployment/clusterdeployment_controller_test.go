@@ -14,7 +14,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
@@ -30,6 +29,8 @@ import (
 	testclusterdeprovision "github.com/openshift/hive/pkg/test/clusterdeprovision"
 	tcp "github.com/openshift/hive/pkg/test/clusterprovision"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 	"github.com/openshift/library-go/pkg/verify"
 	"github.com/openshift/library-go/pkg/verify/store"
 	"github.com/pkg/errors"
@@ -45,10 +46,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -58,6 +57,7 @@ const (
 	testClusterName         = "bar"
 	testClusterID           = "testFooClusterUUID"
 	testInfraID             = "testFooInfraID"
+	testFinalizer           = "test-finalizer"
 	installConfigSecretName = "install-config-secret"
 	provisionName           = "foo-lqmsh-random"
 	imageSetJobName         = "foo-lqmsh-imageset"
@@ -103,10 +103,6 @@ func fakeReadFile(content string) func(string) ([]byte, error) {
 }
 
 func TestClusterDeploymentReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
-	routev1.Install(scheme.Scheme)
-
 	// Fake out readProvisionFailedConfig
 	os.Setenv(constants.FailedProvisionConfigFileEnvVar, "fake")
 
@@ -421,9 +417,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "No-op deleted cluster without finalizer",
+			name: "No-op deleted cluster was garbage collected",
 			existing: []runtime.Object{
-				testDeletedClusterDeploymentWithoutFinalizer(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2165,7 +2160,7 @@ platform:
 			name: "wait for deprovision to complete",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
 					cd.Spec.Installed = true
 					now := metav1.Now()
@@ -2192,7 +2187,7 @@ platform:
 					Type:    hivev1.ProvisionedCondition,
 					Status:  corev1.ConditionFalse,
 					Reason:  hivev1.ProvisionedReasonDeprovisioning,
-					Message: "Cluster is being deprovisioned",
+					Message: "Cluster is deprovisioning",
 				}})
 			},
 		},
@@ -2200,7 +2195,7 @@ platform:
 			name: "wait for dnszone to be gone",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
 					cd.Spec.Installed = true
 					now := metav1.Now()
@@ -2216,6 +2211,7 @@ platform:
 					dnsZone := testDNSZone()
 					now := metav1.Now()
 					dnsZone.DeletionTimestamp = &now
+					dnsZone.Finalizers = []string{testFinalizer}
 					return dnsZone
 				}(),
 			},
@@ -2245,6 +2241,7 @@ platform:
 					dnsZone := testDNSZone()
 					now := metav1.Now()
 					dnsZone.DeletionTimestamp = &now
+					dnsZone.ObjectMeta.Finalizers = []string{testFinalizer}
 					return dnsZone
 				}(),
 			},
@@ -2257,7 +2254,7 @@ platform:
 			name: "wait for dnszone to be gone when install failed early",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {
-					cd := testClusterDeployment()
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Spec.ManageDNS = true
 					now := metav1.Now()
 					cd.DeletionTimestamp = &now
@@ -2268,6 +2265,7 @@ platform:
 					dnsZone := testDNSZone()
 					now := metav1.Now()
 					dnsZone.DeletionTimestamp = &now
+					dnsZone.ObjectMeta.Finalizers = []string{testFinalizer}
 					return dnsZone
 				}(),
 			},
@@ -3101,7 +3099,8 @@ platform:
 				}
 				`, string(b)))
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 
@@ -3114,7 +3113,7 @@ platform:
 			}
 			rcd := &ReconcileClusterDeployment{
 				Client:                                  fakeClient,
-				scheme:                                  scheme.Scheme,
+				scheme:                                  scheme,
 				logger:                                  logger,
 				expectations:                            controllerExpectations,
 				remoteClusterAPIClientBuilder:           func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
@@ -3171,8 +3170,6 @@ platform:
 }
 
 func TestClusterDeploymentReconcileResults(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-
 	tests := []struct {
 		name                     string
 		existing                 []runtime.Object
@@ -3190,13 +3187,14 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        logger,
 				expectations:                  controllerExpectations,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
@@ -3275,7 +3273,6 @@ func TestCalculateNextProvisionTime(t *testing.T) {
 }
 
 func TestDeleteStaleProvisions(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 	cases := []struct {
 		name             string
 		existingAttempts []int
@@ -3316,10 +3313,10 @@ func TestDeleteStaleProvisions(t *testing.T) {
 			for i, a := range tc.existingAttempts {
 				provisions[i] = testProvision(tcp.Failed(), tcp.Attempt(a))
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
-				scheme: scheme.Scheme,
+				scheme: scheme.GetScheme(),
 			}
 			rcd.deleteStaleProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteStaleProvisions"))
 			actualAttempts := []int{}
@@ -3332,7 +3329,6 @@ func TestDeleteStaleProvisions(t *testing.T) {
 }
 
 func TestDeleteOldFailedProvisions(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 	cases := []struct {
 		name                                    string
 		totalProvisions                         int
@@ -3368,10 +3364,11 @@ func TestDeleteOldFailedProvisions(t *testing.T) {
 						tcp.Attempt(i))
 				}
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(provisions...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
 				Client: fakeClient,
-				scheme: scheme.Scheme,
+				scheme: scheme,
 			}
 			rcd.deleteOldFailedProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteOldFailedProvisions"))
 			assert.Len(t, getProvisions(fakeClient), tc.expectedNumberOfProvisionsAfterDeletion, "unexpected provisions kept")
@@ -3629,7 +3626,7 @@ func testProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
 	cd := testClusterDeployment()
 	provision := tcp.FullBuilder(testNamespace, provisionName).Build(tcp.WithClusterDeploymentRef(testName))
 
-	controllerutil.SetControllerReference(cd, provision, scheme.Scheme)
+	controllerutil.SetControllerReference(cd, provision, scheme.GetScheme())
 
 	for _, opt := range opts {
 		opt(provision)
@@ -3683,8 +3680,7 @@ func testRemoteClusterAPIClient() client.Client {
 		},
 	}
 	remoteClusterRouteObject.Spec.Host = "bar-api.clusters.example.com:6443/console"
-
-	return fake.NewClientBuilder().WithRuntimeObjects(remoteClusterRouteObject).Build()
+	return testfake.NewFakeClientBuilder().WithRuntimeObjects(remoteClusterRouteObject).Build()
 }
 
 func testClusterImageSet() *hivev1.ClusterImageSet {
@@ -3838,7 +3834,6 @@ func getJob(c client.Client, name string) *batchv1.Job {
 }
 
 func TestUpdatePullSecretInfo(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 	testPullSecret1 := `{"auths": {"registry.svc.ci.okd.org": {"auth": "dXNljlfjldsfSDD"}}}`
 
 	tests := []struct {
@@ -3886,12 +3881,13 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingCD...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existingCD...).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				validateCredentialsForClusterDeployment: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
@@ -3971,7 +3967,6 @@ func createGlobalPullSecretObj(secretType corev1.SecretType, name, key, value st
 }
 
 func TestMergePullSecrets(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                    string
@@ -4049,12 +4044,13 @@ func TestMergePullSecrets(t *testing.T) {
 				localSecretObject := testSecret(corev1.SecretTypeDockercfg, pullSecretSecret, corev1.DockerConfigJsonKey, test.localPullSecret)
 				test.existingObjs = append(test.existingObjs, localSecretObject)
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
@@ -4079,7 +4075,6 @@ func TestMergePullSecrets(t *testing.T) {
 }
 
 func TestCopyInstallLogSecret(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                    string
@@ -4115,12 +4110,13 @@ func TestCopyInstallLogSecret(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
@@ -4154,7 +4150,6 @@ func TestCopyInstallLogSecret(t *testing.T) {
 }
 
 func TestEnsureManagedDNSZone(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	goodDNSZone := func() *hivev1.DNSZone {
 		return testdnszone.Build(
@@ -4297,12 +4292,13 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			existingObjs := append(test.existingObjs, test.clusterDeployment)
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existingObjs...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(existingObjs...).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			rcd := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
@@ -4349,8 +4345,6 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 
 func Test_discoverAzureResourceGroup(t *testing.T) {
 	logger := log.WithField("controller", "clusterDeployment")
-	hivev1.AddToScheme(scheme.Scheme)
-	configv1.AddToScheme(scheme.Scheme)
 	azureCD := func(installed bool, cm *hivev1.ClusterMetadata) *hivev1.ClusterDeployment {
 		cd := testEmptyClusterDeployment()
 		cd.ObjectMeta = metav1.ObjectMeta{
@@ -4572,13 +4566,14 @@ platform:
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(filterNils(test.cd, test.icSecret)...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(filterNils(test.cd, test.icSecret)...).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			switch test.configureRemoteClient {
 			case "true":
 				mockRemoteClientBuilder.EXPECT().Build().Return(
-					fake.NewClientBuilder().WithRuntimeObjects(filterNils(test.infraObj)...).Build(),
+					testfake.NewFakeClientBuilder().WithRuntimeObjects(filterNils(test.infraObj)...).Build(),
 					nil,
 				)
 			case "error":
@@ -4587,7 +4582,7 @@ platform:
 
 			r := &ReconcileClusterDeployment{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 

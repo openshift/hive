@@ -39,6 +39,11 @@ var validTestManagedDomains = []string{
 
 func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
+		// TODO: Remove TypeMeta field once https://github.com/kubernetes-sigs/controller-runtime/issues/2429 is fixed
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: hivev1.SchemeGroupVersion.String(),
+			Kind:       "ClusterDeployment",
+		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			BaseDomain:  "example.com",
 			ClusterName: "SameClusterName",

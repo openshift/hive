@@ -4,10 +4,9 @@ import (
 	admissionCmd "github.com/openshift/generic-admission-server/pkg/cmd"
 	log "github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/util/scheme"
 	hivevalidatingwebhooks "github.com/openshift/hive/pkg/validating-webhooks/hive/v1"
 	"github.com/openshift/hive/pkg/version"
 )
@@ -35,8 +34,7 @@ func main() {
 }
 
 func createDecoder() *admission.Decoder {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 	decoder := admission.NewDecoder(scheme)
 	return decoder
 }

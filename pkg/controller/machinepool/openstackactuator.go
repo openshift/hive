@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	openstackprovider "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis"
 	openstackproviderv1alpha1 "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -37,10 +36,6 @@ type OpenStackActuator struct {
 }
 
 var _ Actuator = &OpenStackActuator{}
-
-func addOpenStackProviderToScheme(scheme *runtime.Scheme) error {
-	return openstackprovider.AddToScheme(scheme)
-}
 
 // NewOpenStackActuator is the constructor for building a OpenStackActuator
 func NewOpenStackActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, kubeClient client.Client, logger log.FieldLogger) (*OpenStackActuator, error) {

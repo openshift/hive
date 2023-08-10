@@ -191,7 +191,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment")
@@ -199,42 +199,33 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for provisions
-	if err := cdReconciler.watchClusterProvisions(c); err != nil {
+	if err := cdReconciler.watchClusterProvisions(mgr, c); err != nil {
 		return err
 	}
 
 	// Watch for jobs created by a ClusterDeployment:
-	err = c.Watch(&source.Kind{Type: &batchv1.Job{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment job")
 		return err
 	}
 
 	// Watch for pods created by an install job
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(selectorPodWatchHandler))
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), handler.EnqueueRequestsFromMapFunc(selectorPodWatchHandler))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment pods")
 		return err
 	}
 
 	// Watch for deprovision requests created by a ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeprovision{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeprovision{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		logger.WithError(err).Error("Error watching deprovision request created by cluster deployment")
 		return err
 	}
 
 	// Watch for dnszones created by a ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &hivev1.ClusterDeployment{},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.DNSZone{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment dnszones")
 		return err
@@ -242,8 +233,8 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 	// Watch for changes to ClusterSyncs
 	if err := c.Watch(
-		&source.Kind{Type: &hiveintv1alpha1.ClusterSync{}},
-		&handler.EnqueueRequestForOwner{OwnerType: &hivev1.ClusterDeployment{}},
+		source.Kind(mgr.GetCache(), &hiveintv1alpha1.ClusterSync{}),
+		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}),
 	); err != nil {
 		return errors.Wrap(err, "cannot start watch on ClusterSyncs")
 	}
@@ -255,6 +246,7 @@ var _ reconcile.Reconciler = &ReconcileClusterDeployment{}
 
 // ReconcileClusterDeployment reconciles a ClusterDeployment object
 type ReconcileClusterDeployment struct {
+	manager.Manager
 	client.Client
 	scheme *runtime.Scheme
 	logger log.FieldLogger
@@ -1762,7 +1754,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 	return nil
 }
 
-func selectorPodWatchHandler(a client.Object) []reconcile.Request {
+func selectorPodWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
 	pod := a.(*corev1.Pod)

@@ -64,16 +64,12 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName hivev1.ControllerN
 	options := client.Options{
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
-	}
-	c, err := client.New(cfg, options)
-	if err != nil {
-		log.WithError(err).Fatal("unable to initialize metrics wrapped client")
+		Cache: &client.CacheOptions{
+			Reader: mgr.GetCache(),
+		},
 	}
 
-	dc, err := client.NewDelegatingClient(client.NewDelegatingClientInput{
-		CacheReader: mgr.GetCache(),
-		Client:      c,
-	})
+	dc, err := client.New(cfg, options)
 	if err != nil {
 		log.WithError(err).Fatal("unable to initialize metrics wrapped client")
 	}

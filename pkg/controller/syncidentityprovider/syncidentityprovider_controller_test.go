@@ -197,7 +197,7 @@ func TestSyncIdentityProviderWatchHandler(t *testing.T) {
 			}
 
 			// Act
-			actualRequestList := reconciler.syncIdentityProviderWatchHandler(test.syncIdentityProvider)
+			actualRequestList := reconciler.syncIdentityProviderWatchHandler(context.TODO(), test.syncIdentityProvider)
 
 			// Assert
 			assert.True(t, reflect.DeepEqual(test.expectedRequestList, actualRequestList))

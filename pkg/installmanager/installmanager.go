@@ -1629,7 +1629,11 @@ func waitForProvisioningStage(m *InstallManager) error {
 	if err != nil {
 		return errors.Wrap(err, "could not get the GVK for clusterprovisions")
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, scheme.Codecs)
+	hc, err := rest.HTTPClientFor(config)
+	if err != nil {
+		return errors.Wrap(err, "could not generate http client for config")
+	}
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, config, scheme.Codecs, hc)
 	if err != nil {
 		return errors.Wrap(err, "could not create REST client")
 	}

@@ -102,13 +102,13 @@ func add(mgr manager.Manager, r *ReconcileDNSZone, concurrentReconciles int, rat
 	}
 
 	// Watch for changes to DNSZone
-	if err := c.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent)); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.DNSZone{}), controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent)); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(
 			controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(r, r.logger),
 			controllerutils.IsClusterDeploymentErrorUpdateEvent,

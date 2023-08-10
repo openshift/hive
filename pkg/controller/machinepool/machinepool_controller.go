@@ -116,19 +116,19 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to MachinePools
-	err = c.Watch(&source.Kind{Type: &hivev1.MachinePool{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePool{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent))
 	if err != nil {
 		return err
 	}
 
 	// Watch for MachinePoolNameLeases created for some MachinePools (currently just GCP):
-	if err := r.watchMachinePoolNameLeases(c); err != nil {
+	if err := r.watchMachinePoolNameLeases(mgr, c); err != nil {
 		return errors.Wrap(err, "could not watch MachinePoolNameLeases")
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(
 			handler.EnqueueRequestsFromMapFunc(r.clusterDeploymentWatchHandler),
 			controllerutils.IsClusterDeploymentErrorUpdateEvent))
@@ -145,7 +145,7 @@ func Add(mgr manager.Manager) error {
 	return nil
 }
 
-func (r *ReconcileMachinePool) clusterDeploymentWatchHandler(a client.Object) []reconcile.Request {
+func (r *ReconcileMachinePool) clusterDeploymentWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
 	cd := a.(*hivev1.ClusterDeployment)
@@ -1236,7 +1236,7 @@ func (ps *periodicSource) syncFunc(handler handler.EventHandler,
 			}
 
 			if shouldHandle {
-				handler.Generic(evt, queue)
+				handler.Generic(ctx, evt, queue)
 			}
 		}
 	}

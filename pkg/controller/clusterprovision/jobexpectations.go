@@ -10,34 +10,32 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
-func (r *ReconcileClusterProvision) watchJobs(c controller.Controller) error {
+func (r *ReconcileClusterProvision) watchJobs(mgr manager.Manager, c controller.Controller) error {
 	handler := &jobEventHandler{
-		EnqueueRequestForOwner: handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &hivev1.ClusterProvision{},
-		},
-		reconciler: r,
+		EventHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterProvision{}, handler.OnlyControllerOwner()),
+		reconciler:   r,
 	}
-	return c.Watch(&source.Kind{Type: &batchv1.Job{}}, handler)
+	return c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), handler)
 }
 
 var _ handler.EventHandler = &jobEventHandler{}
 
 type jobEventHandler struct {
-	handler.EnqueueRequestForOwner
+	handler.EventHandler
 	reconciler *ReconcileClusterProvision
 }
 
 // Create implements handler.EventHandler
-func (h *jobEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *jobEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("Job created")
 	h.reconciler.trackJobAdd(e.Object)
-	h.EnqueueRequestForOwner.Create(e, q)
+	h.EventHandler.Create(ctx, e, q)
 }
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,

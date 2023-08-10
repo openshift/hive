@@ -270,8 +270,11 @@ func getClient(kubeConfig *rest.Config) (client.Client, error) {
 		Scheme:         clientScheme,
 		MapperProvider: apiutil.NewDiscoveryRESTMapper,
 	}
-
-	mapper, err := managerOptions.MapperProvider(kubeConfig)
+	httpClient, err := rest.HTTPClientFor(kubeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http client")
+	}
+	mapper, err := managerOptions.MapperProvider(kubeConfig, httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API Group-Resources")
 	}

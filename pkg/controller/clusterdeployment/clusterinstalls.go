@@ -320,7 +320,7 @@ func (r *ReconcileClusterDeployment) watchClusterInstall(gvk schema.GroupVersion
 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(gvk)
-	err := r.watcher.Watch(&source.Kind{Type: obj}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+	err := r.watcher.Watch(source.Kind(r.Manager.GetCache(), obj), handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 		retval := []reconcile.Request{}
 
 		cdList := &hivev1.ClusterDeploymentList{}

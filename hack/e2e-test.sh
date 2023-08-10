@@ -42,7 +42,7 @@ function teardown() {
   echo "Saving hive logs after cleanup"
   save_hive_logs
 }
-trap 'kill %1; teardown' EXIT
+trap 'set +e; kill %1; teardown' EXIT
 
 echo "Running post-deploy tests in original namespace $HIVE_NS"
 make test-e2e-postdeploy

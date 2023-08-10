@@ -75,9 +75,10 @@ func (o *enableOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.homeDir = "."
 	u, err := user.Current()
 	if err != nil {
-		log.WithError(err).Fatal("Failed to get the current user")
+		log.WithError(err).Warn("Failed to get the current user, is hiveutil running in Openshift ?")
+	} else {
+		o.homeDir = u.HomeDir
 	}
-	o.homeDir = u.HomeDir
 
 	// Get AWS clients
 	o.region, o.infraId, err = o.getRegionAndInfraId()

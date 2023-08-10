@@ -7,6 +7,8 @@ source ${0%/*}/e2e-common.sh
 
 echo "Waiting for the operator deployment to settle"
 oc wait --for=condition=Available --timeout=2m deploy/hive-operator -n $HIVE_OPERATOR_NS
+echo "Waiting for operator to deploy controllers"
+oc wait --for=condition=Ready --timeout=2m hiveconfig/hive
 echo "Waiting for the controllers and admission deployments to settle"
 for deployment in hive-controllers hiveadmission; do
   oc wait --for=condition=Available --timeout=2m deploy/$deployment -n $HIVE_NS

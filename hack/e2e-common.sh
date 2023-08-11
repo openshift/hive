@@ -161,7 +161,7 @@ function save_hive_logs() {
 }
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.
-trap 'kill %1; save_hive_logs' EXIT
+trap 'set +e; kill %1; save_hive_logs' EXIT
 
 # Install Hive
 IMG="${HIVE_IMAGE}" make deploy

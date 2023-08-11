@@ -125,7 +125,7 @@ function cleanup() {
   done
   echo "Cleanup complete"
 }
-trap 'kill %1; cleanup' EXIT
+trap 'set +e; kill %1; cleanup' EXIT
 
 function wait_for_pool_to_be_ready() {
   local poolname=$1

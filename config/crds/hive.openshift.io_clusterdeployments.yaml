@@ -26,7 +26,7 @@ spec:
     - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-region
       name: Region
       type: string
-    - jsonPath: .metadata.labels.hive\.openshift\.io/version-major-minor-patch
+    - jsonPath: .metadata.labels.hive\.openshift\.io/version
       name: Version
       type: string
     - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-type

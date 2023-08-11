@@ -183,7 +183,7 @@ func InstallRestarts(restarts int) Option {
 }
 
 func WithClusterVersion(version string) Option {
-	return Generic(generic.WithLabel(constants.VersionMajorMinorPatchLabel, version))
+	return Generic(generic.WithLabel(constants.VersionLabel, version))
 }
 
 func WithPowerState(powerState hivev1.ClusterPowerState) Option {

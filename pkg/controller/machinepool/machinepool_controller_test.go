@@ -1439,7 +1439,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Finalizers: []string{hivev1.FinalizerDeprovision},
 			UID:        types.UID("1234"),
 			Labels: map[string]string{
-				constants.VersionMajorMinorPatchLabel: "4.4.0",
+				constants.VersionLabel: "4.4.0",
 			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
@@ -1480,6 +1480,6 @@ func withClusterVersion(cd *hivev1.ClusterDeployment, version string) *hivev1.Cl
 	if cd.Labels == nil {
 		cd.Labels = make(map[string]string, 1)
 	}
-	cd.Labels[constants.VersionMajorMinorPatchLabel] = version
+	cd.Labels[constants.VersionLabel] = version
 	return cd
 }

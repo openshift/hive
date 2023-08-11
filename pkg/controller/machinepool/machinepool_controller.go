@@ -1139,7 +1139,7 @@ func getMinMaxReplicasForMachineSet(pool *hivev1.MachinePool, machineSets []*mac
 }
 
 func getClusterVersion(cd *hivev1.ClusterDeployment) (string, error) {
-	version, versionPresent := cd.Labels[constants.VersionMajorMinorPatchLabel]
+	version, versionPresent := cd.Labels[constants.VersionLabel]
 	if !versionPresent {
 		return "", errors.New("cluster version not set in clusterdeployment")
 	}
@@ -1154,13 +1154,13 @@ func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool
 
 	// Since 4.7, OpenStack allows zero-sized minReplicas for autoscaling
 	if cd.Spec.Platform.OpenStack != nil {
-		majorMinorPatch, ok := cd.Labels[constants.VersionMajorMinorPatchLabel]
+		version, ok := cd.Labels[constants.VersionLabel]
 		if !ok {
 			// can't determine whether to allow zero minReplicas
 			return false
 		}
 
-		currentVersion, err := semver.Make(majorMinorPatch)
+		currentVersion, err := semver.Make(version)
 		if err != nil {
 			// assume we can't set minReplicas to zero
 			return false

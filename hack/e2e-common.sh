@@ -189,7 +189,7 @@ case "${CLOUD}" in
             # the whole CREDS_FILE_ARG="--creds-file=${CREDS_FILE}".
             printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > $CREDS_FILE
         fi
-	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
+	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.devcluster.openshift.com}"
 	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 	;;
 "azure")

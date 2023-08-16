@@ -209,14 +209,20 @@ echo "Creating real cluster pool"
 # TODO: This can't be changed yet -- see other TODOs (search for 'variable POOL_SIZE')
 POOL_SIZE=1
 # TODO: This is aws-specific at the moment.
+# NOTE: We start with a zero-size pool and scale it up after we add the inventory.
+# Otherwise, adding the inventory immediately makes the already-provisioning cluster
+# stale, BUT it doesn't get purged until it's done provisioning. (Intentional
+# architectural decision to prefer presenting a stale claimable cluster early vs.
+# delaying until a non-stale one is available.)
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   -n "${CLUSTER_NAMESPACE}" \
   --cloud="${CLOUD}" \
 	--creds-file="${CREDS_FILE}" \
 	--pull-secret-file="${PULL_SECRET_FILE}" \
+	--base-domain="${CLUSTER_DOMAIN}" \
   --image-set "${IMAGESET_NAME}" \
   --region us-east-1 \
-  --size "${POOL_SIZE}" \
+  --size 0 \
   ${REAL_POOL_NAME}
 
 ### INTERLUDE: FAKE POOL
@@ -235,7 +241,8 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
 NEW_CLUSTER_NAME=cdcci-${CLUSTER_NAME#*-}
 create_customization "cdc-test" "${CLUSTER_NAMESPACE}" "${NEW_CLUSTER_NAME}"
 oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
-
+# Now we can scale up the pool so it starts creating clusters
+oc scale cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --replicas=$POOL_SIZE
 
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
 

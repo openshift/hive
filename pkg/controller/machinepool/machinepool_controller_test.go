@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/util/scheme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/golang/mock/gomock"
@@ -19,17 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -37,6 +35,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/machinepool/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 )
 
 const (
@@ -56,8 +55,6 @@ func init() {
 }
 
 func TestRemoteMachineSetReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	machineapi.AddToScheme(scheme.Scheme)
 
 	getPool := func(c client.Client, poolName string) *hivev1.MachinePool {
 		pool := &hivev1.MachinePool{}
@@ -337,7 +334,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				func() *machineapi.MachineSet {
 					//ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
 					msReplicas := int32(1)
-					rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.Scheme)
+					rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.GetScheme())
 					if err != nil {
 						log.WithError(err).Fatal("error encoding AWS machine provider spec")
 					}
@@ -988,10 +985,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
-		machineapi.AddToScheme(scheme.Scheme)
-		autoscalingv1.SchemeBuilder.AddToScheme(scheme.Scheme)
-		autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 			localExisting := []runtime.Object{}
 			if test.clusterDeployment != nil {
@@ -1000,8 +993,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			if test.machinePool != nil {
 				localExisting = append(localExisting, test.machinePool)
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(localExisting...).Build()
-			remoteFakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(localExisting...).Build()
+			remoteFakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
 
 			mockCtrl := gomock.NewController(t)
 
@@ -1020,7 +1014,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 
 			rcd := &ReconcileMachinePool{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        logger,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				actuatorBuilder: func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
@@ -1182,10 +1176,9 @@ Machine machine-3 failed (InsufficientResources): No available quota,
 `,
 	}}
 
-	machineapi.AddToScheme(scheme.Scheme)
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			fake := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			fake := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			ms := &machineapi.MachineSet{}
 			err := fake.Get(context.TODO(), types.NamespacedName{Namespace: machineAPINamespace, Name: testName}, ms)
@@ -1287,7 +1280,7 @@ func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
 }
 
 func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machineapi.MachineSet) {
-	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.Scheme)
+	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.GetScheme())
 	if err != nil {
 		log.WithError(err).Fatal("error encoding custom machine provider spec")
 	}
@@ -1297,7 +1290,7 @@ func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machinea
 }
 
 func testMachineSpec(machineType string) machineapi.MachineSpec {
-	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.Scheme)
+	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.GetScheme())
 	if err != nil {
 		log.WithError(err).Fatal("error encoding AWS machine provider spec")
 	}

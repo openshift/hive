@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,25 +22,25 @@ type FakeClusterClaims struct {
 	ns   string
 }
 
-var clusterclaimsResource = schema.GroupVersionResource{Group: "hive.openshift.io", Version: "v1", Resource: "clusterclaims"}
+var clusterclaimsResource = v1.SchemeGroupVersion.WithResource("clusterclaims")
 
-var clusterclaimsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "ClusterClaim"}
+var clusterclaimsKind = v1.SchemeGroupVersion.WithKind("ClusterClaim")
 
 // Get takes name of the clusterClaim, and returns the corresponding clusterClaim object, and an error if there is any.
-func (c *FakeClusterClaims) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.ClusterClaim, err error) {
+func (c *FakeClusterClaims) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(clusterclaimsResource, c.ns, name), &hivev1.ClusterClaim{})
+		Invokes(testing.NewGetAction(clusterclaimsResource, c.ns, name), &v1.ClusterClaim{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterClaim), err
+	return obj.(*v1.ClusterClaim), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterClaims that match those selectors.
-func (c *FakeClusterClaims) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.ClusterClaimList, err error) {
+func (c *FakeClusterClaims) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterClaimList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(clusterclaimsResource, clusterclaimsKind, c.ns, opts), &hivev1.ClusterClaimList{})
+		Invokes(testing.NewListAction(clusterclaimsResource, clusterclaimsKind, c.ns, opts), &v1.ClusterClaimList{})
 
 	if obj == nil {
 		return nil, err
@@ -48,8 +50,8 @@ func (c *FakeClusterClaims) List(ctx context.Context, opts v1.ListOptions) (resu
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &hivev1.ClusterClaimList{ListMeta: obj.(*hivev1.ClusterClaimList).ListMeta}
-	for _, item := range obj.(*hivev1.ClusterClaimList).Items {
+	list := &v1.ClusterClaimList{ListMeta: obj.(*v1.ClusterClaimList).ListMeta}
+	for _, item := range obj.(*v1.ClusterClaimList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +60,114 @@ func (c *FakeClusterClaims) List(ctx context.Context, opts v1.ListOptions) (resu
 }
 
 // Watch returns a watch.Interface that watches the requested clusterClaims.
-func (c *FakeClusterClaims) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterClaims) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(clusterclaimsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a clusterClaim and creates it.  Returns the server's representation of the clusterClaim, and an error, if there is any.
-func (c *FakeClusterClaims) Create(ctx context.Context, clusterClaim *hivev1.ClusterClaim, opts v1.CreateOptions) (result *hivev1.ClusterClaim, err error) {
+func (c *FakeClusterClaims) Create(ctx context.Context, clusterClaim *v1.ClusterClaim, opts metav1.CreateOptions) (result *v1.ClusterClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(clusterclaimsResource, c.ns, clusterClaim), &hivev1.ClusterClaim{})
+		Invokes(testing.NewCreateAction(clusterclaimsResource, c.ns, clusterClaim), &v1.ClusterClaim{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterClaim), err
+	return obj.(*v1.ClusterClaim), err
 }
 
 // Update takes the representation of a clusterClaim and updates it. Returns the server's representation of the clusterClaim, and an error, if there is any.
-func (c *FakeClusterClaims) Update(ctx context.Context, clusterClaim *hivev1.ClusterClaim, opts v1.UpdateOptions) (result *hivev1.ClusterClaim, err error) {
+func (c *FakeClusterClaims) Update(ctx context.Context, clusterClaim *v1.ClusterClaim, opts metav1.UpdateOptions) (result *v1.ClusterClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(clusterclaimsResource, c.ns, clusterClaim), &hivev1.ClusterClaim{})
+		Invokes(testing.NewUpdateAction(clusterclaimsResource, c.ns, clusterClaim), &v1.ClusterClaim{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterClaim), err
+	return obj.(*v1.ClusterClaim), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterClaims) UpdateStatus(ctx context.Context, clusterClaim *hivev1.ClusterClaim, opts v1.UpdateOptions) (*hivev1.ClusterClaim, error) {
+func (c *FakeClusterClaims) UpdateStatus(ctx context.Context, clusterClaim *v1.ClusterClaim, opts metav1.UpdateOptions) (*v1.ClusterClaim, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(clusterclaimsResource, "status", c.ns, clusterClaim), &hivev1.ClusterClaim{})
+		Invokes(testing.NewUpdateSubresourceAction(clusterclaimsResource, "status", c.ns, clusterClaim), &v1.ClusterClaim{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterClaim), err
+	return obj.(*v1.ClusterClaim), err
 }
 
 // Delete takes name of the clusterClaim and deletes it. Returns an error if one occurs.
-func (c *FakeClusterClaims) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterClaims) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(clusterclaimsResource, c.ns, name, opts), &hivev1.ClusterClaim{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterclaimsResource, c.ns, name, opts), &v1.ClusterClaim{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterClaims) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterClaims) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(clusterclaimsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &hivev1.ClusterClaimList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterClaimList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterClaim.
-func (c *FakeClusterClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.ClusterClaim, err error) {
+func (c *FakeClusterClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterClaim, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clusterclaimsResource, c.ns, name, pt, data, subresources...), &hivev1.ClusterClaim{})
+		Invokes(testing.NewPatchSubresourceAction(clusterclaimsResource, c.ns, name, pt, data, subresources...), &v1.ClusterClaim{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterClaim), err
+	return obj.(*v1.ClusterClaim), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterClaim.
+func (c *FakeClusterClaims) Apply(ctx context.Context, clusterClaim *hivev1.ClusterClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterClaim, err error) {
+	if clusterClaim == nil {
+		return nil, fmt.Errorf("clusterClaim provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterClaim)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterClaim.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterClaim.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterclaimsResource, c.ns, *name, types.ApplyPatchType, data), &v1.ClusterClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterClaim), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterClaims) ApplyStatus(ctx context.Context, clusterClaim *hivev1.ClusterClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterClaim, err error) {
+	if clusterClaim == nil {
+		return nil, fmt.Errorf("clusterClaim provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterClaim)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterClaim.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterClaim.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterclaimsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ClusterClaim{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterClaim), err
 }

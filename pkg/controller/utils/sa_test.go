@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -13,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 const (
@@ -93,7 +93,7 @@ func TestSetupClusterInstallServiceAccount(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(tc.existing...).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.existing...).Build()
 			err := SetupClusterInstallServiceAccount(fakeClient, testNamespace, log.StandardLogger())
 			if !assert.NoError(t, err, "unexpected error setting up service account") {
 				return

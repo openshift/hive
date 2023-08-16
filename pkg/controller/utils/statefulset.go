@@ -4,21 +4,16 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 
+	"github.com/openshift/hive/pkg/util/scheme"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 var (
-	appsScheme = runtime.NewScheme()
+	appsScheme = scheme.GetScheme()
 	appsCodecs = serializer.NewCodecFactory(appsScheme)
 )
-
-func init() {
-	if err := appsv1.AddToScheme(appsScheme); err != nil {
-		panic(err)
-	}
-}
 
 // ReadStatefulsetOrDie converts a statefulset asset into an actual instance of a statefulset.
 func ReadStatefulsetOrDie(objBytes []byte) *appsv1.StatefulSet {

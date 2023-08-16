@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,25 +22,25 @@ type FakeClusterDeprovisions struct {
 	ns   string
 }
 
-var clusterdeprovisionsResource = schema.GroupVersionResource{Group: "hive.openshift.io", Version: "v1", Resource: "clusterdeprovisions"}
+var clusterdeprovisionsResource = v1.SchemeGroupVersion.WithResource("clusterdeprovisions")
 
-var clusterdeprovisionsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "ClusterDeprovision"}
+var clusterdeprovisionsKind = v1.SchemeGroupVersion.WithKind("ClusterDeprovision")
 
 // Get takes name of the clusterDeprovision, and returns the corresponding clusterDeprovision object, and an error if there is any.
-func (c *FakeClusterDeprovisions) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.ClusterDeprovision, err error) {
+func (c *FakeClusterDeprovisions) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterDeprovision, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(clusterdeprovisionsResource, c.ns, name), &hivev1.ClusterDeprovision{})
+		Invokes(testing.NewGetAction(clusterdeprovisionsResource, c.ns, name), &v1.ClusterDeprovision{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeprovision), err
+	return obj.(*v1.ClusterDeprovision), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterDeprovisions that match those selectors.
-func (c *FakeClusterDeprovisions) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.ClusterDeprovisionList, err error) {
+func (c *FakeClusterDeprovisions) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterDeprovisionList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(clusterdeprovisionsResource, clusterdeprovisionsKind, c.ns, opts), &hivev1.ClusterDeprovisionList{})
+		Invokes(testing.NewListAction(clusterdeprovisionsResource, clusterdeprovisionsKind, c.ns, opts), &v1.ClusterDeprovisionList{})
 
 	if obj == nil {
 		return nil, err
@@ -48,8 +50,8 @@ func (c *FakeClusterDeprovisions) List(ctx context.Context, opts v1.ListOptions)
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &hivev1.ClusterDeprovisionList{ListMeta: obj.(*hivev1.ClusterDeprovisionList).ListMeta}
-	for _, item := range obj.(*hivev1.ClusterDeprovisionList).Items {
+	list := &v1.ClusterDeprovisionList{ListMeta: obj.(*v1.ClusterDeprovisionList).ListMeta}
+	for _, item := range obj.(*v1.ClusterDeprovisionList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +60,114 @@ func (c *FakeClusterDeprovisions) List(ctx context.Context, opts v1.ListOptions)
 }
 
 // Watch returns a watch.Interface that watches the requested clusterDeprovisions.
-func (c *FakeClusterDeprovisions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterDeprovisions) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(clusterdeprovisionsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a clusterDeprovision and creates it.  Returns the server's representation of the clusterDeprovision, and an error, if there is any.
-func (c *FakeClusterDeprovisions) Create(ctx context.Context, clusterDeprovision *hivev1.ClusterDeprovision, opts v1.CreateOptions) (result *hivev1.ClusterDeprovision, err error) {
+func (c *FakeClusterDeprovisions) Create(ctx context.Context, clusterDeprovision *v1.ClusterDeprovision, opts metav1.CreateOptions) (result *v1.ClusterDeprovision, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(clusterdeprovisionsResource, c.ns, clusterDeprovision), &hivev1.ClusterDeprovision{})
+		Invokes(testing.NewCreateAction(clusterdeprovisionsResource, c.ns, clusterDeprovision), &v1.ClusterDeprovision{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeprovision), err
+	return obj.(*v1.ClusterDeprovision), err
 }
 
 // Update takes the representation of a clusterDeprovision and updates it. Returns the server's representation of the clusterDeprovision, and an error, if there is any.
-func (c *FakeClusterDeprovisions) Update(ctx context.Context, clusterDeprovision *hivev1.ClusterDeprovision, opts v1.UpdateOptions) (result *hivev1.ClusterDeprovision, err error) {
+func (c *FakeClusterDeprovisions) Update(ctx context.Context, clusterDeprovision *v1.ClusterDeprovision, opts metav1.UpdateOptions) (result *v1.ClusterDeprovision, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(clusterdeprovisionsResource, c.ns, clusterDeprovision), &hivev1.ClusterDeprovision{})
+		Invokes(testing.NewUpdateAction(clusterdeprovisionsResource, c.ns, clusterDeprovision), &v1.ClusterDeprovision{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeprovision), err
+	return obj.(*v1.ClusterDeprovision), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterDeprovisions) UpdateStatus(ctx context.Context, clusterDeprovision *hivev1.ClusterDeprovision, opts v1.UpdateOptions) (*hivev1.ClusterDeprovision, error) {
+func (c *FakeClusterDeprovisions) UpdateStatus(ctx context.Context, clusterDeprovision *v1.ClusterDeprovision, opts metav1.UpdateOptions) (*v1.ClusterDeprovision, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(clusterdeprovisionsResource, "status", c.ns, clusterDeprovision), &hivev1.ClusterDeprovision{})
+		Invokes(testing.NewUpdateSubresourceAction(clusterdeprovisionsResource, "status", c.ns, clusterDeprovision), &v1.ClusterDeprovision{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeprovision), err
+	return obj.(*v1.ClusterDeprovision), err
 }
 
 // Delete takes name of the clusterDeprovision and deletes it. Returns an error if one occurs.
-func (c *FakeClusterDeprovisions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterDeprovisions) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(clusterdeprovisionsResource, c.ns, name, opts), &hivev1.ClusterDeprovision{})
+		Invokes(testing.NewDeleteActionWithOptions(clusterdeprovisionsResource, c.ns, name, opts), &v1.ClusterDeprovision{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterDeprovisions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterDeprovisions) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(clusterdeprovisionsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &hivev1.ClusterDeprovisionList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterDeprovisionList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterDeprovision.
-func (c *FakeClusterDeprovisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.ClusterDeprovision, err error) {
+func (c *FakeClusterDeprovisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterDeprovision, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clusterdeprovisionsResource, c.ns, name, pt, data, subresources...), &hivev1.ClusterDeprovision{})
+		Invokes(testing.NewPatchSubresourceAction(clusterdeprovisionsResource, c.ns, name, pt, data, subresources...), &v1.ClusterDeprovision{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterDeprovision), err
+	return obj.(*v1.ClusterDeprovision), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterDeprovision.
+func (c *FakeClusterDeprovisions) Apply(ctx context.Context, clusterDeprovision *hivev1.ClusterDeprovisionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterDeprovision, err error) {
+	if clusterDeprovision == nil {
+		return nil, fmt.Errorf("clusterDeprovision provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterDeprovision)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterDeprovision.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterDeprovision.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterdeprovisionsResource, c.ns, *name, types.ApplyPatchType, data), &v1.ClusterDeprovision{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterDeprovision), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterDeprovisions) ApplyStatus(ctx context.Context, clusterDeprovision *hivev1.ClusterDeprovisionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterDeprovision, err error) {
+	if clusterDeprovision == nil {
+		return nil, fmt.Errorf("clusterDeprovision provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterDeprovision)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterDeprovision.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterDeprovision.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clusterdeprovisionsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.ClusterDeprovision{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterDeprovision), err
 }

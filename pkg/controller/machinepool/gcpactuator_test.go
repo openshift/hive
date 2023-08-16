@@ -16,18 +16,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 	mockgcp "github.com/openshift/hive/pkg/gcpclient/mock"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -173,7 +172,6 @@ func TestGCPActuator(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
@@ -191,7 +189,8 @@ func TestGCPActuator(t *testing.T) {
 			}
 
 			test.existing = append(test.existing, clusterDeployment)
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			// set up mock expectations
 			if test.mockGCPClient != nil {
@@ -202,7 +201,7 @@ func TestGCPActuator(t *testing.T) {
 				gcpClient:      gClient,
 				logger:         logger,
 				client:         fakeClient,
-				scheme:         scheme.Scheme,
+				scheme:         scheme,
 				expectations:   controllerExpectations,
 				projectID:      testProjectID,
 				leasesRequired: test.requireLeases,
@@ -329,14 +328,13 @@ func TestFindAvailableLeaseChars(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
-
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			ga := &GCPActuator{
 				logger: log.WithField("actuator", "gcpactuator"),
 				client: fakeClient,
-				scheme: scheme.Scheme,
+				scheme: scheme,
 			}
 
 			cd := &hivev1.ClusterDeployment{}
@@ -538,10 +536,10 @@ func TestObtainLeaseChar(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			logger := log.WithField("actuator", "gcpactuator")
 			controllerExpectations := controllerutils.NewExpectations(logger)
@@ -557,7 +555,7 @@ func TestObtainLeaseChar(t *testing.T) {
 			ga := &GCPActuator{
 				logger:       log.WithField("actuator", "gcpactuator"),
 				client:       fakeClient,
-				scheme:       scheme.Scheme,
+				scheme:       scheme,
 				expectations: controllerExpectations,
 			}
 
@@ -703,8 +701,7 @@ func TestGetNetwork(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			scheme := runtime.NewScheme()
-			machineapi.AddToScheme(scheme)
+			scheme := scheme.GetScheme()
 			network, subnet, actualErr := getNetwork(tc.remoteMachineSets, scheme, log.StandardLogger())
 			if tc.expectError {
 				assert.Error(t, actualErr, "expected an error")
@@ -753,7 +750,7 @@ func mockMachineSet(name string, machineType string, unstompedAnnotation bool, r
 }
 
 func mockMachineSpec(machineType string) machineapi.MachineSpec {
-	rawGCPProviderSpec, err := encodeGCPMachineProviderSpec(testGCPProviderSpec(), scheme.Scheme)
+	rawGCPProviderSpec, err := encodeGCPMachineProviderSpec(testGCPProviderSpec(), scheme.GetScheme())
 	if err != nil {
 		log.WithError(err).Fatal("error encoding GCP machine provider spec")
 	}

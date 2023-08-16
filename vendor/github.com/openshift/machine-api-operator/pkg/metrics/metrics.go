@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -135,7 +136,7 @@ func (mc MachineCollector) collectMachineMetrics(ch chan<- prometheus.Metric) {
 		}
 		// Only gather metrics for machines with a phase.  This indicates
 		// That the machine-controller is running on this cluster.
-		phase := stringPointerDeref(machine.Status.Phase)
+		phase := pointer.StringDeref(machine.Status.Phase, "")
 		if phase != "" {
 			ch <- prometheus.MustNewConstMetric(
 				MachineInfoDesc,
@@ -143,7 +144,7 @@ func (mc MachineCollector) collectMachineMetrics(ch chan<- prometheus.Metric) {
 				float64(machine.ObjectMeta.GetCreationTimestamp().Time.Unix()),
 				machine.ObjectMeta.Name,
 				machine.ObjectMeta.Namespace,
-				stringPointerDeref(machine.Spec.ProviderID),
+				pointer.StringDeref(machine.Spec.ProviderID, ""),
 				nodeName,
 				machine.TypeMeta.APIVersion,
 				phase,
@@ -153,13 +154,6 @@ func (mc MachineCollector) collectMachineMetrics(ch chan<- prometheus.Metric) {
 
 	ch <- prometheus.MustNewConstMetric(MachineCountDesc, prometheus.GaugeValue, float64(len(machineList)))
 	klog.V(4).Infof("collectmachineMetrics exit")
-}
-
-func stringPointerDeref(stringPointer *string) string {
-	if stringPointer != nil {
-		return *stringPointer
-	}
-	return ""
 }
 
 // collectMachineSetMetrics is method to collect machineSet related metrics.

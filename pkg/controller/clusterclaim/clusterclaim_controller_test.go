@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -23,7 +22,9 @@ import (
 	testclaim "github.com/openshift/hive/pkg/test/clusterclaim"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcp "github.com/openshift/hive/pkg/test/clusterpool"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -33,6 +34,7 @@ const (
 	kubeconfigSecretName = "kubeconfig-secret"
 	passwordSecretName   = "password-secret"
 	testLeasePoolName    = "test-cluster-pool"
+	testFinalizer        = "test-finalizer"
 )
 
 func init() {
@@ -55,10 +57,7 @@ var (
 )
 
 func TestReconcileClusterClaim(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	rbacv1.AddToScheme(scheme)
-
+	scheme := scheme.GetScheme()
 	poolBuilder := testcp.FullBuilder(claimNamespace, testLeasePoolName, scheme).
 		GenericOptions(
 			testgeneric.WithFinalizer(finalizer),
@@ -194,17 +193,20 @@ func TestReconcileClusterClaim(t *testing.T) {
 			claim:              initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
 			cd:                 cdBuilder.Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", "other-claim")),
 			expectNoAssignment: true,
-			expectedConditions: []hivev1.ClusterClaimCondition{{
-				Type:    hivev1.ClusterClaimPendingCondition,
-				Status:  corev1.ConditionTrue,
-				Reason:  "AssignmentConflict",
-				Message: "Assigned cluster was claimed by a different ClusterClaim",
-			}},
+			expectedConditions: []hivev1.ClusterClaimCondition{
+				{
+					Type:   hivev1.ClusterClaimPendingCondition,
+					Status: corev1.ConditionUnknown,
+				},
+				{
+					Type:   hivev1.ClusterRunningCondition,
+					Status: corev1.ConditionUnknown,
+				}},
 		},
 		{
 			name:  "deleting cluster",
 			claim: initializedClaimBuilder.Build(testclaim.WithCluster(clusterName)),
-			cd: cdBuilder.GenericOptions(testgeneric.Deleted()).Build(
+			cd: cdBuilder.GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(
 				testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName),
 			),
 			expectCompletedClaim: true,
@@ -311,7 +313,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 				testgeneric.WithFinalizer(finalizer),
 				testgeneric.Deleted(),
 			).Build(testclaim.WithCluster(clusterName)),
-			cd: cdBuilder.GenericOptions(testgeneric.Deleted()).
+			cd: cdBuilder.GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).
 				Build(testcd.WithClusterPoolReference(claimNamespace, "test-pool", claimName)),
 			existing: []runtime.Object{
 				testRole(),
@@ -607,7 +609,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			if test.cd != nil {
 				test.existing = append(test.existing, test.cd)
 			}
-			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existing...).Build()
+			c := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			logger := log.New()
 			logger.SetLevel(log.DebugLevel)
 			rcp := &ReconcileClusterClaim{

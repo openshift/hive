@@ -104,17 +104,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, 
 	}
 
 	// Watch for changes to ClusterProvision
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterProvision{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterProvision{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return errors.Wrap(err, "could not watch clusterprovisions")
 	}
 
 	// Watch for install jobs created for ClusterProvision
-	if err := provisionReconciler.watchJobs(c); err != nil {
+	if err := provisionReconciler.watchJobs(mgr, c); err != nil {
 		return errors.Wrap(err, "could not watch jobs")
 	}
 
 	// Watch for changes to ClusterDeployment
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, handler.EnqueueRequestsFromMapFunc(clusterDeploymentWatchHandler)); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}), handler.EnqueueRequestsFromMapFunc(clusterDeploymentWatchHandler)); err != nil {
 		return errors.Wrap(err, "could not watch clusterdeployments")
 	}
 
@@ -502,7 +502,7 @@ func (r *ReconcileClusterProvision) existingJobs(provision *hivev1.ClusterProvis
 	return jobs, nil
 }
 
-func clusterDeploymentWatchHandler(a client.Object) []reconcile.Request {
+func clusterDeploymentWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
 	cd := a.(*hivev1.ClusterDeployment)
 	if cd == nil {
 		// Wasn't a ClusterDeployment, bail out. This should not happen.

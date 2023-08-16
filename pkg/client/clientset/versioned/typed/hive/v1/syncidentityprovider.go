@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
 	scheme "github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type SyncIdentityProviderInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.SyncIdentityProviderList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.SyncIdentityProvider, err error)
+	Apply(ctx context.Context, syncIdentityProvider *hivev1.SyncIdentityProviderApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncIdentityProvider, err error)
+	ApplyStatus(ctx context.Context, syncIdentityProvider *hivev1.SyncIdentityProviderApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncIdentityProvider, err error)
 	SyncIdentityProviderExpansion
 }
 
@@ -172,6 +177,62 @@ func (c *syncIdentityProviders) Patch(ctx context.Context, name string, pt types
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied syncIdentityProvider.
+func (c *syncIdentityProviders) Apply(ctx context.Context, syncIdentityProvider *hivev1.SyncIdentityProviderApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncIdentityProvider, err error) {
+	if syncIdentityProvider == nil {
+		return nil, fmt.Errorf("syncIdentityProvider provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(syncIdentityProvider)
+	if err != nil {
+		return nil, err
+	}
+	name := syncIdentityProvider.Name
+	if name == nil {
+		return nil, fmt.Errorf("syncIdentityProvider.Name must be provided to Apply")
+	}
+	result = &v1.SyncIdentityProvider{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("syncidentityproviders").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *syncIdentityProviders) ApplyStatus(ctx context.Context, syncIdentityProvider *hivev1.SyncIdentityProviderApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SyncIdentityProvider, err error) {
+	if syncIdentityProvider == nil {
+		return nil, fmt.Errorf("syncIdentityProvider provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(syncIdentityProvider)
+	if err != nil {
+		return nil, err
+	}
+
+	name := syncIdentityProvider.Name
+	if name == nil {
+		return nil, fmt.Errorf("syncIdentityProvider.Name must be provided to Apply")
+	}
+
+	result = &v1.SyncIdentityProvider{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("syncidentityproviders").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

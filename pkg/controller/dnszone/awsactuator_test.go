@@ -15,15 +15,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/client-go/kubernetes/scheme"
-
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
-
-func init() {
-	apis.AddToScheme(scheme.Scheme)
-}
 
 // TestNewAWSActuator tests that a new AWSActuator object can be created.
 func TestNewAWSActuator(t *testing.T) {

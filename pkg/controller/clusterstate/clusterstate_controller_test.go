@@ -15,18 +15,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -36,8 +35,6 @@ const (
 )
 
 func TestClusterStateReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
 
 	log.SetLevel(log.DebugLevel)
 
@@ -159,16 +156,17 @@ func TestClusterStateReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			if !test.noRemoteCall {
-				mockRemoteClientBuilder.EXPECT().Build().Return(fake.NewClientBuilder().WithRuntimeObjects(test.remote...).Build(), nil)
+				mockRemoteClientBuilder.EXPECT().Build().Return(testfake.NewFakeClientBuilder().WithRuntimeObjects(test.remote...).Build(), nil)
 			}
 			updateCalled := false
 			rcd := &ReconcileClusterState{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterState"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				updateStatus: func(c client.Client, st *hivev1.ClusterState) error {

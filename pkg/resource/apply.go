@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -206,11 +207,11 @@ func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 
 func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
 	r.logger.Debug("setting up apply command")
-	flags := kcmdapply.NewApplyFlags(f, ioStreams)
+	flags := kcmdapply.NewApplyFlags(ioStreams)
 	o := &kcmdapply.ApplyOptions{
 		IOStreams:         ioStreams,
-		VisitedUids:       sets.NewString(),
-		VisitedNamespaces: sets.NewString(),
+		VisitedUids:       sets.Set[types.UID]{},
+		VisitedNamespaces: sets.Set[string]{},
 		Recorder:          genericclioptions.NoopRecorder{},
 		PrintFlags:        flags.PrintFlags,
 		Overwrite:         true,
@@ -228,7 +229,7 @@ func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams gene
 	}
 	// Re-use the openAPISchema that should have been initialized in the constructor.
 	o.OpenAPISchema = r.openAPISchema
-	o.Validator, err = f.Validator(metav1.FieldValidationIgnore, nil)
+	o.Validator, err = f.Validator(metav1.FieldValidationIgnore)
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain schema to validate objects from factory")
 		return nil, nil, err

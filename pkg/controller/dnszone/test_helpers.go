@@ -4,12 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	fakekubeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
@@ -21,6 +20,7 @@ import (
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 	mockgcp "github.com/openshift/hive/pkg/gcpclient/mock"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 )
 
 var (
@@ -184,9 +184,9 @@ type mocks struct {
 }
 
 // setupDefaultMocks is an easy way to setup all of the default mocks
-func setupDefaultMocks(t *testing.T) *mocks {
+func setupDefaultMocks(t *testing.T, existing ...runtime.Object) *mocks {
 	mocks := &mocks{
-		fakeKubeClient: fakekubeclient.NewClientBuilder().Build(),
+		fakeKubeClient: testfake.NewFakeClientBuilder().WithRuntimeObjects(existing...).Build(),
 		mockCtrl:       gomock.NewController(t),
 	}
 
@@ -213,9 +213,4 @@ func fakeAzureClientBuilder(mockAzureClient *mockazure.MockClient) azureClientBu
 	return func(secret *corev1.Secret, cloudName string) (azureclient.Client, error) {
 		return mockAzureClient, nil
 	}
-}
-
-// setFakeDNSZoneInKube is an easy way to register a dns zone object with kube.
-func setFakeDNSZoneInKube(mocks *mocks, dnsZone *hivev1.DNSZone) error {
-	return mocks.fakeKubeClient.Create(context.TODO(), dnsZone)
 }

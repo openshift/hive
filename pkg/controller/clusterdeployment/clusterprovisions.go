@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -704,29 +705,26 @@ func (r *ReconcileClusterDeployment) setupAWSCredentialForAssumeRole(cd *hivev1.
 	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
 }
 
-func (r *ReconcileClusterDeployment) watchClusterProvisions(c controller.Controller) error {
+func (r *ReconcileClusterDeployment) watchClusterProvisions(mgr manager.Manager, c controller.Controller) error {
 	handler := &clusterProvisionEventHandler{
-		EnqueueRequestForOwner: handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &hivev1.ClusterDeployment{},
-		},
-		reconciler: r,
+		EventHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()),
+		reconciler:   r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.ClusterProvision{}}, handler)
+	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterProvision{}), handler)
 }
 
 var _ handler.EventHandler = &clusterProvisionEventHandler{}
 
 type clusterProvisionEventHandler struct {
-	handler.EnqueueRequestForOwner
+	handler.EventHandler
 	reconciler *ReconcileClusterDeployment
 }
 
 // Create implements handler.EventHandler
-func (h *clusterProvisionEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *clusterProvisionEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("ClusterProvision created")
 	h.reconciler.trackClusterProvisionAdd(e.Object)
-	h.EnqueueRequestForOwner.Create(e, q)
+	h.EventHandler.Create(ctx, e, q)
 }
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,

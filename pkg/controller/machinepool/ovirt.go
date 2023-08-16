@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
-	ovirtprovider "github.com/openshift/cluster-api-provider-ovirt/pkg/apis"
 	ovirtproviderv1beta1 "github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1"
 	installovirt "github.com/openshift/installer/pkg/asset/machines/ovirt"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -27,10 +26,6 @@ type OvirtActuator struct {
 }
 
 var _ Actuator = &OvirtActuator{}
-
-func addOvirtProviderToScheme(scheme *runtime.Scheme) error {
-	return ovirtprovider.AddToScheme(scheme)
-}
 
 // NewOvirtActuator is the constructor for building a OvirtActuator
 func NewOvirtActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (*OvirtActuator, error) {

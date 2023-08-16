@@ -8,28 +8,16 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/utils/pointer"
 
-	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/resource"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
-
-var (
-	localSchemeBuilder = runtime.SchemeBuilder{
-		monitoringv1.AddToScheme,
-	}
-)
-
-func init() {
-	utilruntime.Must(localSchemeBuilder.AddToScheme(scheme.Scheme))
-}
 
 // ApplyAsset loads a path from our bindata assets and applies it to the cluster. This function does not apply
 // a HiveConfig owner reference for garbage collection, and should only be used for resources we explicitly want
@@ -128,11 +116,11 @@ func ApplyRuntimeObjectWithGC(h resource.Helper, runtimeObj runtime.Object, hc *
 	}
 	// This assumes we have full control of owner references for these resources the operator creates.
 	obj.SetOwnerReferences([]v1.OwnerReference{ownerRef})
-	return h.ApplyRuntimeObject(runtimeObj, scheme.Scheme)
+	return h.ApplyRuntimeObject(runtimeObj, scheme.GetScheme())
 }
 
 func readRuntimeObject(assetPath string) (runtime.Object, error) {
-	obj, _, err := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().
+	obj, _, err := serializer.NewCodecFactory(scheme.GetScheme()).UniversalDeserializer().
 		Decode(assets.MustAsset(assetPath), nil, nil)
 	return obj, err
 }

@@ -139,7 +139,7 @@ func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentRecon
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Log(controllerutils.LogLevel(err), "Error setting up a watch on ClusterDeployment")

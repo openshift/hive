@@ -16,15 +16,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 )
 
 const (
@@ -36,7 +33,6 @@ const (
 )
 
 func TestUpdateInstallerImageCommand(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name    string
@@ -139,7 +135,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewClientBuilder().WithRuntimeObjects(test.existingClusterDeployment).Build()
+			client := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existingClusterDeployment).Build()
 			workDir, err := os.MkdirTemp("", "test-update")
 			if err != nil {
 				t.Fatalf("error creating test directory: %v", err)

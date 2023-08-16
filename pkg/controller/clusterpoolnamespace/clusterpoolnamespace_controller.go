@@ -69,19 +69,19 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for changes to Namespaces
-	if err := c.Watch(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &corev1.Namespace{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
-	cdMapFn := func(a client.Object) []reconcile.Request {
+	cdMapFn := func(ctx context.Context, a client.Object) []reconcile.Request {
 		cd := a.(*hivev1.ClusterDeployment)
 		return []reconcile.Request{{
 			NamespacedName: types.NamespacedName{Name: cd.Namespace},
 		}}
 	}
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		handler.EnqueueRequestsFromMapFunc(cdMapFn)); err != nil {
 		return err
 	}

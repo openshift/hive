@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -19,24 +21,24 @@ type FakeClusterImageSets struct {
 	Fake *FakeHiveV1
 }
 
-var clusterimagesetsResource = schema.GroupVersionResource{Group: "hive.openshift.io", Version: "v1", Resource: "clusterimagesets"}
+var clusterimagesetsResource = v1.SchemeGroupVersion.WithResource("clusterimagesets")
 
-var clusterimagesetsKind = schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "ClusterImageSet"}
+var clusterimagesetsKind = v1.SchemeGroupVersion.WithKind("ClusterImageSet")
 
 // Get takes name of the clusterImageSet, and returns the corresponding clusterImageSet object, and an error if there is any.
-func (c *FakeClusterImageSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *hivev1.ClusterImageSet, err error) {
+func (c *FakeClusterImageSets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterImageSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterimagesetsResource, name), &hivev1.ClusterImageSet{})
+		Invokes(testing.NewRootGetAction(clusterimagesetsResource, name), &v1.ClusterImageSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterImageSet), err
+	return obj.(*v1.ClusterImageSet), err
 }
 
 // List takes label and field selectors, and returns the list of ClusterImageSets that match those selectors.
-func (c *FakeClusterImageSets) List(ctx context.Context, opts v1.ListOptions) (result *hivev1.ClusterImageSetList, err error) {
+func (c *FakeClusterImageSets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterImageSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterimagesetsResource, clusterimagesetsKind, opts), &hivev1.ClusterImageSetList{})
+		Invokes(testing.NewRootListAction(clusterimagesetsResource, clusterimagesetsKind, opts), &v1.ClusterImageSetList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -45,8 +47,8 @@ func (c *FakeClusterImageSets) List(ctx context.Context, opts v1.ListOptions) (r
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &hivev1.ClusterImageSetList{ListMeta: obj.(*hivev1.ClusterImageSetList).ListMeta}
-	for _, item := range obj.(*hivev1.ClusterImageSetList).Items {
+	list := &v1.ClusterImageSetList{ListMeta: obj.(*v1.ClusterImageSetList).ListMeta}
+	for _, item := range obj.(*v1.ClusterImageSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -55,63 +57,106 @@ func (c *FakeClusterImageSets) List(ctx context.Context, opts v1.ListOptions) (r
 }
 
 // Watch returns a watch.Interface that watches the requested clusterImageSets.
-func (c *FakeClusterImageSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClusterImageSets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(clusterimagesetsResource, opts))
 }
 
 // Create takes the representation of a clusterImageSet and creates it.  Returns the server's representation of the clusterImageSet, and an error, if there is any.
-func (c *FakeClusterImageSets) Create(ctx context.Context, clusterImageSet *hivev1.ClusterImageSet, opts v1.CreateOptions) (result *hivev1.ClusterImageSet, err error) {
+func (c *FakeClusterImageSets) Create(ctx context.Context, clusterImageSet *v1.ClusterImageSet, opts metav1.CreateOptions) (result *v1.ClusterImageSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterimagesetsResource, clusterImageSet), &hivev1.ClusterImageSet{})
+		Invokes(testing.NewRootCreateAction(clusterimagesetsResource, clusterImageSet), &v1.ClusterImageSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterImageSet), err
+	return obj.(*v1.ClusterImageSet), err
 }
 
 // Update takes the representation of a clusterImageSet and updates it. Returns the server's representation of the clusterImageSet, and an error, if there is any.
-func (c *FakeClusterImageSets) Update(ctx context.Context, clusterImageSet *hivev1.ClusterImageSet, opts v1.UpdateOptions) (result *hivev1.ClusterImageSet, err error) {
+func (c *FakeClusterImageSets) Update(ctx context.Context, clusterImageSet *v1.ClusterImageSet, opts metav1.UpdateOptions) (result *v1.ClusterImageSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterimagesetsResource, clusterImageSet), &hivev1.ClusterImageSet{})
+		Invokes(testing.NewRootUpdateAction(clusterimagesetsResource, clusterImageSet), &v1.ClusterImageSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterImageSet), err
+	return obj.(*v1.ClusterImageSet), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterImageSets) UpdateStatus(ctx context.Context, clusterImageSet *hivev1.ClusterImageSet, opts v1.UpdateOptions) (*hivev1.ClusterImageSet, error) {
+func (c *FakeClusterImageSets) UpdateStatus(ctx context.Context, clusterImageSet *v1.ClusterImageSet, opts metav1.UpdateOptions) (*v1.ClusterImageSet, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clusterimagesetsResource, "status", clusterImageSet), &hivev1.ClusterImageSet{})
+		Invokes(testing.NewRootUpdateSubresourceAction(clusterimagesetsResource, "status", clusterImageSet), &v1.ClusterImageSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterImageSet), err
+	return obj.(*v1.ClusterImageSet), err
 }
 
 // Delete takes name of the clusterImageSet and deletes it. Returns an error if one occurs.
-func (c *FakeClusterImageSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeClusterImageSets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clusterimagesetsResource, name, opts), &hivev1.ClusterImageSet{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterimagesetsResource, name, opts), &v1.ClusterImageSet{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClusterImageSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeClusterImageSets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(clusterimagesetsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &hivev1.ClusterImageSetList{})
+	_, err := c.Fake.Invokes(action, &v1.ClusterImageSetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clusterImageSet.
-func (c *FakeClusterImageSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *hivev1.ClusterImageSet, err error) {
+func (c *FakeClusterImageSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterImageSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterimagesetsResource, name, pt, data, subresources...), &hivev1.ClusterImageSet{})
+		Invokes(testing.NewRootPatchSubresourceAction(clusterimagesetsResource, name, pt, data, subresources...), &v1.ClusterImageSet{})
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*hivev1.ClusterImageSet), err
+	return obj.(*v1.ClusterImageSet), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterImageSet.
+func (c *FakeClusterImageSets) Apply(ctx context.Context, clusterImageSet *hivev1.ClusterImageSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterImageSet, err error) {
+	if clusterImageSet == nil {
+		return nil, fmt.Errorf("clusterImageSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterImageSet)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterImageSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterImageSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterimagesetsResource, *name, types.ApplyPatchType, data), &v1.ClusterImageSet{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterImageSet), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeClusterImageSets) ApplyStatus(ctx context.Context, clusterImageSet *hivev1.ClusterImageSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterImageSet, err error) {
+	if clusterImageSet == nil {
+		return nil, fmt.Errorf("clusterImageSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterImageSet)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterImageSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterImageSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(clusterimagesetsResource, *name, types.ApplyPatchType, data, "status"), &v1.ClusterImageSet{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.ClusterImageSet), err
 }

@@ -8,26 +8,25 @@ import (
 	"strconv"
 	"strings"
 
-	apimachineryutilerrors "k8s.io/apimachinery/pkg/util/errors"
-
 	"github.com/google/uuid"
-	machinev1 "github.com/openshift/api/machine/v1beta1"
+
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
-	"github.com/vmware/govmomi/vapi/rest"
-	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apimachinerytypes "k8s.io/apimachinery/pkg/types"
+	apimachineryutilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 
-	machineapierros "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
+
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/controller/vsphere/session"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
@@ -57,10 +56,6 @@ const (
 	cloneVmTaskDescriptionId    = "VirtualMachine.clone"
 	destroyVmTaskDescriptionId  = "VirtualMachine.destroy"
 	powerOffVmTaskDescriptionId = "VirtualMachine.powerOff"
-)
-
-const (
-	machinePhaseProvisioning = "Provisioning"
 )
 
 // Reconciler runs the logic to reconciles a machine resource towards its desired state
@@ -97,7 +92,7 @@ func (r *Reconciler) create() error {
 			conditionFailed.Message = err.Error()
 			statusError := setProviderStatus(task, conditionFailed, r.machineScope, nil)
 			if statusError != nil {
-				return fmt.Errorf("Failed to set provider status: %w", err)
+				return fmt.Errorf("failed to set provider status: %w", err)
 			}
 			return err
 		}
@@ -117,7 +112,7 @@ func (r *Reconciler) create() error {
 	if moTask == nil {
 		// Possible eventual consistency problem from vsphere
 		// TODO: change error message here to indicate this might be expected.
-		return fmt.Errorf("Unexpected moTask nil")
+		return fmt.Errorf("unexpected moTask nil")
 	}
 
 	if taskIsFinished, err := taskIsFinished(moTask); err != nil {
@@ -131,11 +126,11 @@ func (r *Reconciler) create() error {
 			conditionFailed.Message = err.Error()
 			statusError := setProviderStatus(moTask.Reference().Value, conditionFailed, r.machineScope, nil)
 			if statusError != nil {
-				return fmt.Errorf("Failed to set provider status: %w", statusError)
+				return fmt.Errorf("failed to set provider status: %w", statusError)
 			}
-			return machineapierros.CreateMachine(err.Error())
+			return machinecontroller.CreateMachine(err.Error())
 		} else {
-			return fmt.Errorf("Failed to check task status: %w", err)
+			return fmt.Errorf("failed to check task status: %w", err)
 		}
 	} else if !taskIsFinished {
 		return fmt.Errorf("%v task %v has not finished", moTask.Info.DescriptionId, moTask.Reference().Value)
@@ -155,7 +150,7 @@ func (r *Reconciler) create() error {
 			conditionFailed.Message = err.Error()
 			statusError := setProviderStatus(task, conditionFailed, r.machineScope, nil)
 			if statusError != nil {
-				return fmt.Errorf("Failed to set provider status: %w", err)
+				return fmt.Errorf("failed to set provider status: %w", err)
 			}
 			return err
 		}
@@ -264,9 +259,12 @@ func (r *Reconciler) exists() (bool, error) {
 			Ref:     vmRef,
 		}
 		powerState, err = vm.getPowerState()
+		if err != nil {
+			return false, fmt.Errorf("%v: failed checking machine's power state: %w", r.machine.GetName(), err)
+		}
 	}
 
-	if pointer.StringDeref(r.machine.Status.Phase, "") == machinePhaseProvisioning && powerState == types.VirtualMachinePowerStatePoweredOff {
+	if pointer.StringDeref(r.machine.Status.Phase, "") == machinev1.PhaseProvisioning && powerState == types.VirtualMachinePowerStatePoweredOff {
 		klog.Infof("%v: already exists, but was not powered on after clone, requeue ", r.machine.GetName())
 		return false, nil
 	}
@@ -327,28 +325,6 @@ func (r *Reconciler) delete() error {
 		Ref:     vmRef,
 	}
 
-	if r.machineScope.isNodeLinked() {
-		isNodeReachable, err := r.machineScope.checkNodeReachable()
-		if err != nil {
-			return fmt.Errorf("%v: Can't check node status before vm destroy: %w", r.machine.GetName(), err)
-		}
-		if !isNodeReachable {
-			klog.Infof("%v: node not ready, kubelet unreachable for some reason. Detaching disks before vm destroy.", r.machine.GetName())
-			if err := vm.detachPVDisks(); err != nil {
-				return fmt.Errorf("%v: Failed to detach virtual disks related to pvs: %w", r.machine.GetName(), err)
-			}
-		}
-
-		// After node draining, make sure volumes are detached before deleting the Node.
-		attached, err := r.nodeHasVolumesAttached(r.Context, r.machine.Status.NodeRef.Name, r.machine.Name)
-		if err != nil {
-			return fmt.Errorf("failed to determine if node %v has attached volumes: %w", r.machine.Status.NodeRef.Name, err)
-		}
-		if attached {
-			return fmt.Errorf("node %v has attached volumes, requeuing", r.machine.Status.NodeRef.Name)
-		}
-	}
-
 	powerState, err := vm.getPowerState()
 	if err != nil {
 		return fmt.Errorf("can not determine %v vm power state: %w", r.machine.GetName(), err)
@@ -364,6 +340,68 @@ func (r *Reconciler) delete() error {
 		return fmt.Errorf("powering off vm is in progress, requeuing")
 	}
 
+	// At this point node should be drained and vm powered off already.
+	// We need to check attached disks and ensure that all disks potentially related to PVs were detached
+	// to prevent possible data loss.
+	// Destroying a VM with attached disks might lead to data loss in case pvs are handled by the intree storage driver.
+
+	_, drainSkipped := r.machine.ObjectMeta.Annotations[machinecontroller.ExcludeNodeDrainingAnnotation]
+
+	// If node linked to the machine, and node was drained checking node status first
+	if r.machineScope.isNodeLinked() && !drainSkipped {
+		// After node draining, make sure volumes are detached before deleting the Node.
+		attached, err := r.nodeHasVolumesAttached(r.Context, r.machine.Status.NodeRef.Name, r.machine.Name)
+		if err != nil {
+			return fmt.Errorf("failed to determine if node %v has attached volumes: %w", r.machine.Status.NodeRef.Name, err)
+		}
+		if attached {
+			// If there are volumes still attached, it's possible that node draining did not fully finish,
+			// this might happen if the kubelet was non-functional during the draining procedure.
+			// Try forcefully deleting pods in the "Terminating" state to trigger persistent volumes detachment.
+			klog.Warningf(
+				"Attached volumes detected on a powered off node, node draining may not succeed. " +
+					"Attempting to delete unevicted pods",
+			)
+			numPodsDeleted, err := r.machineScope.deleteUnevictedPods()
+			klog.Warningf("Deleted %d pods", numPodsDeleted)
+			if err != nil {
+				return fmt.Errorf("unable to fully drain node, can not delete unevicted pods: %w", err)
+			}
+			return fmt.Errorf("node %v has attached volumes, requeuing", r.machine.Status.NodeRef.Name)
+		}
+	}
+
+	klog.V(3).Infof("Checking attached disks before vm destroy")
+	disks, err := vm.getAttachedDisks()
+	if err != nil {
+		return fmt.Errorf("%v: can not obtain virtual disks attached to the vm: %w", r.machine.GetName(), err)
+	}
+	// Currently, MAPI does not provide any API knobs to configure additional volumes for a VM.
+	// So, we are expecting the VM to have only one disk, which is OS disk.
+	if len(disks) > 1 {
+		// If node drain was skipped we need to detach disks forcefully to prevent possible data corruption.
+		if drainSkipped {
+			klog.V(1).Infof(
+				"%s: drain was skipped for the machine, detaching disks before vm destruction to prevent data loss",
+				r.machine.GetName(),
+			)
+			if err := vm.detachDisks(filterOutVmOsDisk(disks, r.machine)); err != nil {
+				return fmt.Errorf("failed to detach disks: %w", err)
+			}
+			klog.V(1).Infof(
+				"%s: disks were detached", r.machine.GetName(),
+			)
+			return errors.New(
+				"disks were detached, vm will be attempted to destroy in next reconciliation, requeuing",
+			)
+		}
+
+		// Block vm destruction till attach-detach controller has properly detached disks
+		return errors.New(
+			"additional attached disks detected, block vm destruction and wait for disks to be detached",
+		)
+	}
+
 	task, err := vm.Obj.Destroy(r.Context)
 	if err != nil {
 		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
@@ -375,7 +413,7 @@ func (r *Reconciler) delete() error {
 	}
 
 	if err := setProviderStatus(task.Reference().Value, conditionSuccess(), r.machineScope, vm); err != nil {
-		return fmt.Errorf("Failed to set provider status: %w", err)
+		return fmt.Errorf("failed to set provider status: %w", err)
 	}
 
 	// TODO: consider returning an error to specify retry time here
@@ -444,7 +482,7 @@ func (r *Reconciler) reconcileRegionAndZoneLabels(vm *virtualMachine) error {
 
 	var res map[string]string
 
-	err := r.session.WithRestClient(vm.Context, func(c *rest.Client) error {
+	err := r.session.WithCachingTagsManager(vm.Context, func(c *session.CachingTagsManager) error {
 		var err error
 		res, err = vm.getRegionAndZone(c, regionLabel, zoneLabel)
 
@@ -627,12 +665,12 @@ func clone(s *machineScope) (string, error) {
 
 	hwVersion, err := getHwVersion(s.Context, vmTemplate)
 	if err != nil {
-		return "", machineapierros.InvalidMachineConfiguration(
+		return "", machinecontroller.InvalidMachineConfiguration(
 			"Unable to detect machine template HW version for machine '%s': %v", s.machine.GetName(), err,
 		)
 	}
 	if hwVersion < minimumHWVersion {
-		return "", machineapierros.InvalidMachineConfiguration(
+		return "", machinecontroller.InvalidMachineConfiguration(
 			fmt.Sprintf(
 				"Hardware lower than %d is not supported, clone stopped. "+
 					"Detected machine template version is %d. "+
@@ -737,7 +775,7 @@ func clone(s *machineScope) (string, error) {
 	klog.V(3).Infof("Getting network devices")
 	networkDevices, err := getNetworkDevices(s, resourcepool, devices)
 	if err != nil {
-		return "", fmt.Errorf("error getting network specs: %v", err)
+		return "", fmt.Errorf("error getting network specs: %w", err)
 	}
 
 	deviceSpecs = append(deviceSpecs, networkDevices...)
@@ -827,7 +865,7 @@ func getDiskSpec(s *machineScope, devices object.VirtualDeviceList) (types.BaseV
 	disk := disks[0].(*types.VirtualDisk)
 	cloneCapacityKB := int64(s.providerSpec.DiskGiB) * 1024 * 1024
 	if disk.CapacityInKB > cloneCapacityKB {
-		return nil, machineapierros.InvalidMachineConfiguration(
+		return nil, machinecontroller.InvalidMachineConfiguration(
 			"can't resize template disk down, initial capacity is larger: %dKiB > %dKiB",
 			disk.CapacityInKB, cloneCapacityKB)
 	}
@@ -841,7 +879,6 @@ func getDiskSpec(s *machineScope, devices object.VirtualDeviceList) (types.BaseV
 
 func getNetworkDevices(s *machineScope, resourcepool *object.ResourcePool, devices object.VirtualDeviceList) ([]types.BaseVirtualDeviceConfigSpec, error) {
 	var networkDevices []types.BaseVirtualDeviceConfigSpec
-	var backing types.BaseVirtualDeviceBackingInfo
 	// Remove any existing NICs
 	for _, dev := range devices.SelectByType((*types.VirtualEthernetCard)(nil)) {
 		networkDevices = append(networkDevices, &types.VirtualDeviceConfigSpec{
@@ -853,6 +890,7 @@ func getNetworkDevices(s *machineScope, resourcepool *object.ResourcePool, devic
 	// Add new NICs based on the machine config.
 	for i := range s.providerSpec.Network.Devices {
 		var ccrMo mo.ClusterComputeResource
+		var backing types.BaseVirtualDeviceBackingInfo
 
 		netSpec := &s.providerSpec.Network.Devices[i]
 		klog.V(3).Infof("Adding device: %v", netSpec.NetworkName)
@@ -892,7 +930,7 @@ func getNetworkDevices(s *machineScope, resourcepool *object.ResourcePool, devic
 		}
 
 		if backing == nil {
-			return nil, fmt.Errorf("unable to get network for %q", netSpec.NetworkName)
+			return nil, machinecontroller.InvalidMachineConfiguration("unable to get network for %q", netSpec.NetworkName)
 		}
 
 		dev, err := object.EthernetCardTypes().CreateEthernetCard(ethCardType, backing)
@@ -993,20 +1031,26 @@ type virtualMachine struct {
 	Obj *object.VirtualMachine
 }
 
-func (vm *virtualMachine) getAncestors() ([]mo.ManagedEntity, error) {
+// getHostSystemAncestors looks up and returns vm's host system ancestors, such as "Cluster" and "Datacenter".
+// Host system is using there because in vCenter cluster is an ancestor of the hypervisor host but not the vm.
+func (vm *virtualMachine) getHostSystemAncestors() ([]mo.ManagedEntity, error) {
 	client := vm.Obj.Client()
 	pc := client.ServiceContent.PropertyCollector
 
-	return mo.Ancestors(vm.Context, client, pc, vm.Ref)
+	host, err := vm.Obj.HostSystem(vm.Context)
+	if err != nil {
+		return nil, err
+	}
+
+	return mo.Ancestors(vm.Context, client, pc, host.Reference())
 }
 
 // getRegionAndZone checks the virtual machine and each of its ancestors for the
 // given region and zone labels and returns their values if found.
-func (vm *virtualMachine) getRegionAndZone(c *rest.Client, regionLabel, zoneLabel string) (map[string]string, error) {
+func (vm *virtualMachine) getRegionAndZone(tagsMgr *session.CachingTagsManager, regionLabel, zoneLabel string) (map[string]string, error) {
 	result := make(map[string]string)
-	tagsMgr := tags.NewManager(c)
 
-	objects, err := vm.getAncestors()
+	objects, err := vm.getHostSystemAncestors()
 	if err != nil {
 		klog.Errorf("Failed to get ancestors for %s: %v", vm.Ref, err)
 		return nil, err
@@ -1243,6 +1287,22 @@ type attachedDisk struct {
 	diskMode string
 }
 
+// Filters out disks that look like vm OS disk.
+// VM os disks filename contains the machine name in it
+// and has the format like "[DATASTORE] path-within-datastore/machine-name.vmdk".
+// This is based on vSphere behavior, an OS disk file gets a name that equals the target VM name during the clone operation.
+func filterOutVmOsDisk(attachedDisks []attachedDisk, machine *machinev1.Machine) []attachedDisk {
+	var disks []attachedDisk
+
+	for _, disk := range attachedDisks {
+		if strings.HasSuffix(disk.fileName, fmt.Sprintf("/%s.vmdk", machine.GetName())) {
+			continue
+		}
+		disks = append(disks, disk)
+	}
+	return disks
+}
+
 func (vm *virtualMachine) getAttachedDisks() ([]attachedDisk, error) {
 	var attachedDiskList []attachedDisk
 	devices, err := vm.Obj.Device(vm.Context)
@@ -1262,22 +1322,16 @@ func (vm *virtualMachine) getAttachedDisks() ([]attachedDisk, error) {
 	return attachedDiskList, nil
 }
 
-func (vm *virtualMachine) detachPVDisks() error {
+func (vm *virtualMachine) detachDisks(disks []attachedDisk) error {
 	var errList []error
-	disks, err := vm.getAttachedDisks()
-	if err != nil {
-		return err
-	}
+
 	for _, disk := range disks {
-		// TODO (dmoiseev): should be enough, but maybe worth to check if its PV for sure
-		if disk.diskMode != string(types.VirtualDiskModePersistent) {
-			klog.V(3).Infof("Detaching disk associated with file %v", disk.fileName)
-			if err := vm.Obj.RemoveDevice(vm.Context, true, disk.device); err != nil {
-				errList = append(errList, err)
-				klog.Errorf("Failed to detach disk associated with file %v ", disk.fileName)
-			} else {
-				klog.V(3).Infof("Disk associated with file %v have been detached", disk.fileName)
-			}
+		klog.V(3).Infof("Detaching disk associated with file %v", disk.fileName)
+		if err := vm.Obj.RemoveDevice(vm.Context, true, disk.device); err != nil {
+			errList = append(errList, err)
+			klog.Errorf("Failed to detach disk associated with file %v ", disk.fileName)
+		} else {
+			klog.V(3).Infof("Disk associated with file %v has been detached", disk.fileName)
 		}
 	}
 	if len(errList) > 0 {

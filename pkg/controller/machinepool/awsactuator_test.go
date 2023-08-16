@@ -19,19 +19,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awshivev1 "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -462,7 +461,7 @@ func TestAWSActuator(t *testing.T) {
 						},
 					},
 				}
-				m.Spec.ProviderSpec.Value, _ = encodeAWSMachineProviderSpec(awsMachineProviderConfig, scheme.Scheme)
+				m.Spec.ProviderSpec.Value, _ = encodeAWSMachineProviderSpec(awsMachineProviderConfig, scheme.GetScheme())
 				return m
 			}(),
 			mockAWSClient: func(client *mockaws.MockClient) {
@@ -571,14 +570,12 @@ func TestAWSActuator(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
-		machineapi.AddToScheme(scheme.Scheme)
 
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
-
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.machinePool).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.machinePool).Build()
 			awsClient := mockaws.NewMockClient(mockCtrl)
 
 			// set up mock expectations
@@ -587,7 +584,7 @@ func TestAWSActuator(t *testing.T) {
 			}
 
 			logger := log.WithFields(log.Fields{"machinePool": test.machinePool.Name})
-			actuator, err := NewAWSActuator(fakeClient, awsclient.CredentialsSource{}, test.clusterDeployment.Spec.Platform.AWS.Region, test.machinePool, test.masterMachine, scheme.Scheme, logger)
+			actuator, err := NewAWSActuator(fakeClient, awsclient.CredentialsSource{}, test.clusterDeployment.Spec.Platform.AWS.Region, test.machinePool, test.masterMachine, scheme, logger)
 			require.NoError(t, err)
 			actuator.awsClient = awsClient
 
@@ -634,8 +631,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			scheme := runtime.NewScheme()
-			machineapi.AddToScheme(scheme)
+			scheme := scheme.GetScheme()
 			actualAMIID, actualErr := getAWSAMIID(tc.masterMachine, scheme, log.StandardLogger())
 			if tc.expectError {
 				assert.Error(t, actualErr, "expected an error")

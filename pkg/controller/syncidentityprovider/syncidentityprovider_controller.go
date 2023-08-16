@@ -81,25 +81,25 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	reconciler := r.(*ReconcileSyncIdentityProviders)
 
 	// Watch for changes to SyncIdentityProvider
-	err = c.Watch(&source.Kind{Type: &hivev1.SyncIdentityProvider{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.SyncIdentityProvider{}),
 		handler.EnqueueRequestsFromMapFunc(reconciler.syncIdentityProviderWatchHandler))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to SelectorSyncIdentityProvider
-	err = c.Watch(&source.Kind{Type: &hivev1.SelectorSyncIdentityProvider{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.SelectorSyncIdentityProvider{}),
 		handler.EnqueueRequestsFromMapFunc(reconciler.selectorSyncIdentityProviderWatchHandler))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment (easy case)
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}), &handler.EnqueueRequestForObject{})
 	return err
 }
 
-func (r *ReconcileSyncIdentityProviders) syncIdentityProviderWatchHandler(a client.Object) []reconcile.Request {
+func (r *ReconcileSyncIdentityProviders) syncIdentityProviderWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
 	syncIDP := a.(*hivev1.SyncIdentityProvider)
@@ -119,7 +119,7 @@ func (r *ReconcileSyncIdentityProviders) syncIdentityProviderWatchHandler(a clie
 	return retval
 }
 
-func (r *ReconcileSyncIdentityProviders) selectorSyncIdentityProviderWatchHandler(a client.Object) []reconcile.Request {
+func (r *ReconcileSyncIdentityProviders) selectorSyncIdentityProviderWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
 	ssidp := a.(*hivev1.SelectorSyncIdentityProvider)

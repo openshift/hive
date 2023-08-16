@@ -133,19 +133,19 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	}
 
 	// Watch for changes to ClusterPool
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterPool{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterPool{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployments originating from a pool:
-	if err := r.watchClusterDeployments(c); err != nil {
+	if err := r.watchClusterDeployments(mgr, c); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterClaims
 	enqueuePoolForClaim := handler.EnqueueRequestsFromMapFunc(
-		func(o client.Object) []reconcile.Request {
+		func(ctx context.Context, o client.Object) []reconcile.Request {
 			claim, ok := o.(*hivev1.ClusterClaim)
 			if !ok {
 				return nil
@@ -158,13 +158,13 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 			}}
 		},
 	)
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterClaim{}}, enqueuePoolForClaim); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterClaim{}), enqueuePoolForClaim); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive cluster pool admin RoleBindings
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.RoleBinding{}},
+		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}),
 		handler.EnqueueRequestsFromMapFunc(
 			requestsForRBACResources(r.Client, r.logger)),
 	); err != nil {
@@ -173,7 +173,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 
 	// Watch for changes to the hive-cluster-pool-admin-binding RoleBinding
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.RoleBinding{}},
+		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}),
 		handler.EnqueueRequestsFromMapFunc(
 			requestsForCDRBACResources(r.Client, clusterPoolAdminRoleBindingName, r.logger)),
 	); err != nil {
@@ -182,7 +182,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 
 	// Watch for changes to ClusterDeploymentCustomizations
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeploymentCustomization{}},
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeploymentCustomization{}),
 		handler.EnqueueRequestsFromMapFunc(
 			requestsForCDCResources(r.Client, r.logger)),
 	); err != nil {
@@ -193,7 +193,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 }
 
 func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
-	return func(o client.Object) []reconcile.Request {
+	return func(ctx context.Context, o client.Object) []reconcile.Request {
 		cdc, ok := o.(*hivev1.ClusterDeploymentCustomization)
 		if !ok {
 			return nil
@@ -229,7 +229,7 @@ func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.Ma
 }
 
 func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
-	return func(o client.Object) []reconcile.Request {
+	return func(ctx context.Context, o client.Object) []reconcile.Request {
 		if o.GetName() != resourceName {
 			return nil
 		}
@@ -248,7 +248,7 @@ func requestsForCDRBACResources(c client.Client, resourceName string, logger log
 }
 
 func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
-	return func(o client.Object) []reconcile.Request {
+	return func(ctx context.Context, o client.Object) []reconcile.Request {
 		binding, ok := o.(*rbacv1.RoleBinding)
 		if !ok {
 			return nil

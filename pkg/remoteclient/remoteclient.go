@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
 	machnet "k8s.io/apimachinery/pkg/util/net"
 
 	corev1 "k8s.io/api/core/v1"
@@ -20,15 +19,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
-	machineapi "github.com/openshift/api/machine/v1beta1"
-	routev1 "github.com/openshift/api/route/v1"
-	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
-	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
-
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 // Builder is used to build API clients to the remote cluster
@@ -198,41 +192,13 @@ const (
 	secondaryURL
 )
 
-func buildScheme() (*runtime.Scheme, error) {
-	scheme := runtime.NewScheme()
-
-	if err := machineapi.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-
-	if err := autoscalingv1.SchemeBuilder.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-	if err := autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-
-	if err := openshiftapiv1.Install(scheme); err != nil {
-		return nil, err
-	}
-
-	if err := routev1.Install(scheme); err != nil {
-		return nil, err
-	}
-
-	return scheme, nil
-}
-
 func (b *builder) Build() (client.Client, error) {
 	cfg, err := b.RESTConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	scheme, err := buildScheme()
-	if err != nil {
-		return nil, err
-	}
+	scheme := scheme.GetScheme()
 
 	return client.New(cfg, client.Options{
 		Scheme: scheme,

@@ -43,6 +43,7 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -70,21 +71,7 @@ var (
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
 
-	scheme := mgr.GetScheme()
-	if err := addAlibabaCloudProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add Alibaba provider to scheme")
-	}
-	if err := addOpenStackProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add OpenStack provider to scheme")
-	}
-	if err := addOvirtProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add OVirt provider to scheme")
-	}
-	// AWS, GCP, VSphere, and IBMCloud are added via the machineapi
-	err := machineapi.AddToScheme(scheme)
-	if err != nil {
-		return errors.Wrap(err, "cannot add Machine API to scheme")
-	}
+	scheme := scheme.GetScheme()
 
 	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
 	if err != nil {
@@ -94,7 +81,7 @@ func Add(mgr manager.Manager) error {
 
 	r := &ReconcileMachinePool{
 		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
-		scheme:       mgr.GetScheme(),
+		scheme:       scheme,
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
@@ -116,19 +103,19 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to MachinePools
-	err = c.Watch(&source.Kind{Type: &hivev1.MachinePool{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePool{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent))
 	if err != nil {
 		return err
 	}
 
 	// Watch for MachinePoolNameLeases created for some MachinePools (currently just GCP):
-	if err := r.watchMachinePoolNameLeases(c); err != nil {
+	if err := r.watchMachinePoolNameLeases(mgr, c); err != nil {
 		return errors.Wrap(err, "could not watch MachinePoolNameLeases")
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(
 			handler.EnqueueRequestsFromMapFunc(r.clusterDeploymentWatchHandler),
 			controllerutils.IsClusterDeploymentErrorUpdateEvent))
@@ -145,7 +132,7 @@ func Add(mgr manager.Manager) error {
 	return nil
 }
 
-func (r *ReconcileMachinePool) clusterDeploymentWatchHandler(a client.Object) []reconcile.Request {
+func (r *ReconcileMachinePool) clusterDeploymentWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
 	retval := []reconcile.Request{}
 
 	cd := a.(*hivev1.ClusterDeployment)
@@ -1236,7 +1223,7 @@ func (ps *periodicSource) syncFunc(handler handler.EventHandler,
 			}
 
 			if shouldHandle {
-				handler.Generic(evt, queue)
+				handler.Generic(ctx, evt, queue)
 			}
 		}
 	}

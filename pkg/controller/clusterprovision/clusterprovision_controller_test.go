@@ -6,9 +6,6 @@ import (
 	"testing"
 	"time"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
-	routev1 "github.com/openshift/api/route/v1"
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	"github.com/openshift/hive/pkg/constants"
@@ -16,8 +13,10 @@ import (
 	"github.com/openshift/hive/pkg/install"
 	tcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	tcp "github.com/openshift/hive/pkg/test/clusterprovision"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testjob "github.com/openshift/hive/pkg/test/job"
+	"github.com/openshift/hive/pkg/util/scheme"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,9 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -50,9 +47,6 @@ func init() {
 }
 
 func TestClusterProvisionReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	openshiftapiv1.Install(scheme.Scheme)
-	routev1.Install(scheme.Scheme)
 
 	tests := []struct {
 		name                  string
@@ -270,11 +264,12 @@ func TestClusterProvisionReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterProvision")
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcp := &ReconcileClusterProvision{
 				Client:       fakeClient,
-				scheme:       scheme.Scheme,
+				scheme:       scheme,
 				logger:       logger,
 				expectations: controllerExpectations,
 			}
@@ -361,8 +356,8 @@ func testJob(opts ...testjob.Option) *batchv1.Job {
 	job.Spec.Selector = &metav1.LabelSelector{
 		MatchLabels: map[string]string{controllerUidLabelKey: testControllerUid},
 	}
-
-	controllerutil.SetControllerReference(provision, job, scheme.Scheme)
+	scheme := scheme.GetScheme()
+	controllerutil.SetControllerReference(provision, job, scheme)
 
 	for _, o := range opts {
 		o(job)
@@ -484,8 +479,7 @@ func assertConditionReason(t *testing.T, cd *hivev1.ClusterProvision, condType h
 }
 
 func Test_getWorkers(t *testing.T) {
-	testScheme := scheme.Scheme
-	apis.AddToScheme(testScheme)
+	testScheme := scheme.GetScheme()
 	icSecretName := "ic-secret"
 	tests := []struct {
 		name          string
@@ -562,7 +556,7 @@ compute:
 					Name: icSecretName,
 				},
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(icSecret).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(icSecret).Build()
 			rcp := &ReconcileClusterProvision{
 				Client: fakeClient,
 				logger: logger,

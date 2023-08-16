@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -27,6 +27,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/util/scheme"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -442,14 +443,19 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 })
 
 func waitForSyncSetApplied(namespace, cdName, syncsetname, syncsettype string) error {
+	scheme := scheme.GetScheme()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
-	gvk, err := apiutil.GVKForObject(&hiveintv1alpha1.ClusterSync{}, scheme.Scheme)
+	gvk, err := apiutil.GVKForObject(&hiveintv1alpha1.ClusterSync{}, scheme)
 	if err != nil {
 		return err
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme.Scheme))
+	hc, err := rest.HTTPClientFor(cfg)
+	if err != nil {
+		return err
+	}
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme), hc)
 	if err != nil {
 		return err
 	}
@@ -484,14 +490,19 @@ func waitForSyncSetApplied(namespace, cdName, syncsetname, syncsettype string) e
 }
 
 func waitForSyncSetDeleted(namespace, syncsetname string) error {
+	scheme := scheme.GetScheme()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
-	gvk, err := apiutil.GVKForObject(&hivev1.SyncSet{}, scheme.Scheme)
+	gvk, err := apiutil.GVKForObject(&hivev1.SyncSet{}, scheme)
 	if err != nil {
 		return err
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme.Scheme))
+	hc, err := rest.HTTPClientFor(cfg)
+	if err != nil {
+		return err
+	}
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme), hc)
 	if err != nil {
 		return err
 	}
@@ -510,14 +521,19 @@ func waitForSyncSetDeleted(namespace, syncsetname string) error {
 }
 
 func waitForSyncSetDisassociated(namespace, cdName, syncsetname, syncsettype string) error {
+	scheme := scheme.GetScheme()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	cfg := common.MustGetConfig()
-	gvk, err := apiutil.GVKForObject(&hiveintv1alpha1.ClusterSync{}, scheme.Scheme)
+	gvk, err := apiutil.GVKForObject(&hiveintv1alpha1.ClusterSync{}, scheme)
 	if err != nil {
 		return err
 	}
-	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme.Scheme))
+	hc, err := rest.HTTPClientFor(cfg)
+	if err != nil {
+		return err
+	}
+	restClient, err := apiutil.RESTClientForGVK(gvk, false, cfg, serializer.NewCodecFactory(scheme), hc)
 	if err != nil {
 		return err
 	}

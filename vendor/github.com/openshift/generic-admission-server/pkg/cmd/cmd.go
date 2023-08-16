@@ -1,14 +1,11 @@
 package cmd
 
 import (
-	"flag"
 	"os"
 	"runtime"
 
-	"k8s.io/klog/v2"
-
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/component-base/logs"
+	"k8s.io/component-base/cli"
 
 	"github.com/openshift/generic-admission-server/pkg/apiserver"
 	"github.com/openshift/generic-admission-server/pkg/cmd/server"
@@ -22,9 +19,6 @@ type ValidatingAdmissionHook apiserver.ValidatingAdmissionHook
 type MutatingAdmissionHook apiserver.MutatingAdmissionHook
 
 func RunAdmissionServer(admissionHooks ...AdmissionHook) {
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
@@ -36,9 +30,7 @@ func RunAdmissionServer(admissionHooks ...AdmissionHook) {
 	for i := range admissionHooks {
 		castSlice = append(castSlice, admissionHooks[i])
 	}
-	cmd := server.NewCommandStartAdmissionServer(os.Stdout, os.Stderr, stopCh, castSlice...)
-	cmd.Flags().AddGoFlagSet(flag.CommandLine)
-	if err := cmd.Execute(); err != nil {
-		klog.Fatal(err)
-	}
+
+	code := cli.Run(server.NewCommandStartAdmissionServer(os.Stdout, os.Stderr, stopCh, castSlice...))
+	os.Exit(code)
 }

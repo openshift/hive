@@ -1,11 +1,9 @@
 package utils
 
 import (
-	"k8s.io/client-go/kubernetes/scheme"
+	"github.com/openshift/hive/pkg/util/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-
-	"github.com/openshift/hive/apis"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -17,8 +15,7 @@ func GetClient() (client.Client, error) {
 		return nil, err
 	}
 
-	apis.AddToScheme(scheme.Scheme)
-	dynamicClient, err := client.New(cfg, client.Options{})
+	dynamicClient, err := client.New(cfg, client.Options{Scheme: scheme.GetScheme()})
 	if err != nil {
 		return nil, err
 	}

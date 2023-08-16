@@ -16,7 +16,7 @@ import (
 
 func EnqueueDNSZonesOwnedByClusterDeployment(c client.Client, logger log.FieldLogger) handler.EventHandler {
 
-	return handler.EnqueueRequestsFromMapFunc(func(mapObj client.Object) []reconcile.Request {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, mapObj client.Object) []reconcile.Request {
 		dnsZones := &hivev1.DNSZoneList{}
 		if err := c.List(
 			context.TODO(),

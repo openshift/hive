@@ -12,30 +12,30 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcp "github.com/openshift/hive/pkg/test/clusterpool"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	testgeneric "github.com/openshift/hive/pkg/test/generic"
 	testnamespace "github.com/openshift/hive/pkg/test/namespace"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
 	namespaceName = "test-namespace"
 	cdName        = "test-cluster-deployment"
 	crName        = "test-cluster-relocator"
+	testFinalizer = "test-finalizer"
 )
 
 func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
 
-	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	namespaceWithoutLabelBuilder := testnamespace.FullBuilder(namespaceName, scheme)
 	namespaceBuilder := namespaceWithoutLabelBuilder.GenericOptions(
@@ -122,7 +122,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			namespaceBuilder: namespaceBuilder,
 			resources: []runtime.Object{
 				testcd.FullBuilder(namespaceName, "test-cd", scheme).
-					GenericOptions(testgeneric.Deleted()).
+					GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).
 					Build(),
 			},
 			expectDeleted:        false,
@@ -133,22 +133,11 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			namespaceBuilder: namespaceBuilder,
 			resources: []runtime.Object{
 				testcd.FullBuilder(namespaceName, "test-cd", scheme).
-					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true"), testgeneric.Deleted()).
+					GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true"), testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).
 					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim")),
 				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
-					GenericOptions(testgeneric.Deleted()).
+					GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).
 					Build(testcd.WithClusterPoolReference("test-pool-namespace", "test-cluster-pool", "test-claim-2")),
-			},
-			expectDeleted:        false,
-			validateRequeueAfter: validateWaitForCDGoneRequeueAfter,
-		},
-		{
-			name:             "deleted clusterdeployment with exist",
-			namespaceBuilder: namespaceBuilder,
-			resources: []runtime.Object{
-				testcd.FullBuilder(namespaceName, "test-cd", scheme).
-					GenericOptions(testgeneric.Deleted()).
-					Build(),
 			},
 			expectDeleted:        false,
 			validateRequeueAfter: validateWaitForCDGoneRequeueAfter,
@@ -159,7 +148,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 			resources: []runtime.Object{
 				testcd.FullBuilder(namespaceName, "test-cd-1", scheme).Build(),
 				testcd.FullBuilder(namespaceName, "test-cd-2", scheme).
-					GenericOptions(testgeneric.Deleted()).
+					GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).
 					Build(),
 			},
 			expectDeleted:        false,
@@ -167,7 +156,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 		},
 		{
 			name:                 "deleted namespace",
-			namespaceBuilder:     namespaceBuilder.GenericOptions(testgeneric.Deleted()),
+			namespaceBuilder:     namespaceBuilder.GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)),
 			expectDeleted:        false,
 			validateRequeueAfter: validateNoRequeueAfter,
 		},
@@ -205,7 +194,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 				}
 				tc.resources = append(tc.resources, builder.Build())
 			}
-			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(tc.resources...).Build()
+			c := testfake.NewFakeClientBuilder().WithRuntimeObjects(tc.resources...).Build()
 
 			reconciler := &ReconcileClusterPoolNamespace{
 				Client: c,
@@ -228,8 +217,7 @@ func TestReconcileClusterPoolNamespace_Reconcile_Movement(t *testing.T) {
 func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	poolBuilder := testcp.FullBuilder("test-namespace", "test-cluster-pool", scheme).
 		Options(
@@ -284,8 +272,8 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 	}, {
 		name: "no cleanup as all clusters already deleted",
 		resources: []runtime.Object{
-			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted()).Build(),
-			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted()).Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer)).Build(),
 		},
 		expectedErr:      "",
 		expectedCleanup:  false,
@@ -302,7 +290,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 	}, {
 		name: "no cleanup as clusters marked for removal already deleted",
 		resources: []runtime.Object{
-			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
 		},
 		expectedErr:      "",
@@ -321,7 +309,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 		name: "some cleanup 2",
 		resources: []runtime.Object{
 			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
-			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd2", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 		},
 		expectedErr:      "",
 		expectedCleanup:  true,
@@ -332,7 +320,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 			cdBuilderWithPool("cd1", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 			cdBuilderWithPool("cd2", "test-cluster-pool").Build(),
 			cdBuilderWithPool("cd3", "test-cluster-pool").GenericOptions(testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
-			cdBuilderWithPool("cd4", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
+			cdBuilderWithPool("cd4", "test-cluster-pool").GenericOptions(testgeneric.Deleted(), testgeneric.WithFinalizer(testFinalizer), testgeneric.WithAnnotation(constants.RemovePoolClusterAnnotation, "true")).Build(),
 		},
 		expectedErr:      "",
 		expectedCleanup:  true,
@@ -341,7 +329,7 @@ func Test_cleanupPreviouslyClaimedClusterDeployments(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.resources...).Build()
+			c := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.resources...).Build()
 			reconciler := &ReconcileClusterPoolNamespace{
 				Client: c,
 				logger: logger,

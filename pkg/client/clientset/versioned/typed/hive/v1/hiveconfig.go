@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
 	scheme "github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type HiveConfigInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.HiveConfigList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.HiveConfig, err error)
+	Apply(ctx context.Context, hiveConfig *hivev1.HiveConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.HiveConfig, err error)
+	ApplyStatus(ctx context.Context, hiveConfig *hivev1.HiveConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.HiveConfig, err error)
 	HiveConfigExpansion
 }
 
@@ -161,6 +166,60 @@ func (c *hiveConfigs) Patch(ctx context.Context, name string, pt types.PatchType
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied hiveConfig.
+func (c *hiveConfigs) Apply(ctx context.Context, hiveConfig *hivev1.HiveConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.HiveConfig, err error) {
+	if hiveConfig == nil {
+		return nil, fmt.Errorf("hiveConfig provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(hiveConfig)
+	if err != nil {
+		return nil, err
+	}
+	name := hiveConfig.Name
+	if name == nil {
+		return nil, fmt.Errorf("hiveConfig.Name must be provided to Apply")
+	}
+	result = &v1.HiveConfig{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("hiveconfigs").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *hiveConfigs) ApplyStatus(ctx context.Context, hiveConfig *hivev1.HiveConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.HiveConfig, err error) {
+	if hiveConfig == nil {
+		return nil, fmt.Errorf("hiveConfig provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(hiveConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	name := hiveConfig.Name
+	if name == nil {
+		return nil, fmt.Errorf("hiveConfig.Name must be provided to Apply")
+	}
+
+	result = &v1.HiveConfig{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("hiveconfigs").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -6,12 +6,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/test/generic"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 // Option defines a function signature for any function that wants to be passed into Build
@@ -40,8 +40,7 @@ func BasicBuilder() Builder {
 }
 
 func FullBuilder(namespace, name string) Builder {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 	b := &builder{}
 	return b.GenericOptions(
 		generic.WithTypeMeta(scheme),

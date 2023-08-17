@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -447,8 +446,8 @@ func (r *ReconcileMachinePool) generateMachineSets(
 			ms.Spec.Template.Spec.ObjectMeta.Labels[key] = value
 		}
 
-		// Apply hive MachinePool taints to MachineSet MachineSpec.
-		ms.Spec.Template.Spec.Taints = pool.Spec.Taints
+		// Apply hive MachinePool taints to MachineSet MachineSpec. Also collapse duplicates if present.
+		ms.Spec.Template.Spec.Taints = *controllerutils.GetUniqueTaints(&pool.Spec.Taints)
 	}
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
@@ -557,7 +556,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	taintsToDelete := sets.Set[hivev1.TaintIdentifier]{}
 	taintsToDelete.Insert(pool.Status.OwnedTaints...)
 	for _, taint := range pool.Spec.Taints {
-		taintsToDelete.Delete(identifierForTaint(&taint))
+		taintsToDelete.Delete(controllerutils.IdentifierForTaint(&taint))
 	}
 
 	// Find MachineSets that need updating/creating
@@ -624,39 +623,30 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				}
 
 				// Carry over the taints on the remote machineset from the generated machineset. Merging strategy preserves the unique taints of remote machineset.
-				if rMS.Spec.Template.Spec.Taints == nil {
-					rMS.Spec.Template.Spec.Taints = []corev1.Taint{}
-				}
-				// First, build a list of remote MachineSet taints that do not have taints needing to be deleted
-				taints := make([]corev1.Taint, 0)
+				// First, build a map of remote MachineSet taints, so we simultaneously collapse duplicate entries.
+				taintMap := make(map[hivev1.TaintIdentifier]corev1.Taint)
 				for _, rTaint := range rMS.Spec.Template.Spec.Taints {
-					if taintsToDelete.Has(identifierForTaint(&rTaint)) {
+					if taintsToDelete.Has(controllerutils.IdentifierForTaint(&rTaint)) {
 						// This entry would be deleted from the final list
 						objectModified = true
 						continue
 					}
-					taints = append(taints, rTaint)
-				}
-				rMS.Spec.Template.Spec.Taints = taints
-
-				for _, gTaint := range ms.Spec.Template.Spec.Taints {
-					// Taints are provided as a list, so duplicate entries are possible.
-					// Use a flag to indicate if a taint was found, append if not.
-					foundTaint := false
-					for rIndex, rTaint := range rMS.Spec.Template.Spec.Taints {
-						if reflect.DeepEqual(identifierForTaint(&gTaint), identifierForTaint(&rTaint)) {
-							foundTaint = true
-							if gTaint.Value != rTaint.Value {
-								rMS.Spec.Template.Spec.Taints[rIndex].Value = gTaint.Value
-								objectModified = true
-							}
-						}
-					}
-					if !foundTaint {
-						rMS.Spec.Template.Spec.Taints = append(rMS.Spec.Template.Spec.Taints, gTaint)
+					// Preserve the taint entry first encountered.
+					if !controllerutils.TaintExists(taintMap, &rTaint) {
+						taintMap[controllerutils.IdentifierForTaint(&rTaint)] = rTaint
+					} else {
+						// Skip this taint, which effectively means we're removing a duplicate.
 						objectModified = true
 					}
 				}
+				for _, gTaint := range ms.Spec.Template.Spec.Taints {
+					// Generated MachineSet will not have duplicate taints, because we have collapsed duplicates when we generated them.
+					if !controllerutils.TaintExists(taintMap, &gTaint) || taintMap[controllerutils.IdentifierForTaint(&gTaint)] != gTaint {
+						taintMap[controllerutils.IdentifierForTaint(&gTaint)] = gTaint
+						objectModified = true
+					}
+				}
+				rMS.Spec.Template.Spec.Taints = *controllerutils.ListFromTaintMap(&taintMap)
 
 				// Platform updates will be blocked by webhook, unless they're not.
 				if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value) {
@@ -968,19 +958,12 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 		pool.Status.OwnedLabels[i] = labelKey
 		i++
 	}
-	sort.Strings(pool.Status.OwnedLabels)
 
 	// ...and taints
 	pool.Status.OwnedTaints = make([]hivev1.TaintIdentifier, len(pool.Spec.Taints))
-	for i, taint := range pool.Spec.Taints {
-		pool.Status.OwnedTaints[i] = identifierForTaint(&taint)
+	for i, taint := range *controllerutils.GetUniqueTaints(&pool.Spec.Taints) {
+		pool.Status.OwnedTaints[i] = controllerutils.IdentifierForTaint(&taint)
 	}
-	sort.SliceStable(pool.Status.OwnedTaints, func(i, j int) bool {
-		if pool.Status.OwnedTaints[i].Key != pool.Status.OwnedTaints[j].Key {
-			return pool.Status.OwnedTaints[i].Key < pool.Status.OwnedTaints[j].Key
-		}
-		return pool.Status.OwnedTaints[i].Effect < pool.Status.OwnedTaints[j].Effect
-	})
 
 	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
 		reflect.DeepEqual(origPool.Status, pool.Status) {
@@ -1326,12 +1309,4 @@ func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 	}
 
 	return false
-}
-
-func identifierForTaint(taint *corev1.Taint) hivev1.TaintIdentifier {
-	// Let a nil `taint` panic
-	return hivev1.TaintIdentifier{
-		Key:    taint.Key,
-		Effect: taint.Effect,
-	}
 }

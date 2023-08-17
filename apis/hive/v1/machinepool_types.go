@@ -54,6 +54,9 @@ type MachinePoolSpec struct {
 
 	// List of taints that will be applied to the created MachineSet's MachineSpec.
 	// This list will overwrite any modifications made to Node taints on an ongoing basis.
+	// In case of duplicate entries, first encountered taint Value will be preserved,
+	// and the rest collapsed on the corresponding MachineSets.
+	// Note that taints are uniquely identified based on key+effect, not just key.
 	// +optional
 	Taints []corev1.Taint `json:"taints,omitempty"`
 }

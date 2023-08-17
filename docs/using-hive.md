@@ -703,7 +703,7 @@ openstack:
 
 A MachinePool for the worker machinesets is not required. If the user creates a MachinePool for the worker MachineSets, then Hive will manage the worker MachineSets.
 
-MachinePool reconciliation is limited to updating MachineSet replicas to match the replicas configured for the MachinePool. Additionally, any existing `Labels` or `Taints` on the MachineSets will be overridden if they clash with those on the MachinePool.
+MachinePool reconciliation is limited to updating MachineSet replicas to match the replicas configured for the MachinePool. Additionally, any existing `Labels` or `Taints` on the MachineSets will be overridden if they clash with those on the MachinePool. In case of duplicate taints, the taint encountered first will be preserved and the rest collapsed on the MachineSets.
 
 MachinePool platform is immutable and any changes made to `MachinePool.spec.platform` are blocked by a validating webhook. The Machine Config Operator does not support updating existing machines when platform details are changed in a MachineSet and consequently Hive does not support making such changes to MachinePool platform, see [HIVE-2024](https://issues.redhat.com/browse/HIVE-2024).
 

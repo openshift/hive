@@ -402,6 +402,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					Value:  "new-value",
 					Effect: "NoSchedule",
 				})
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "new-value-won't-be-added",
+					Effect: "NoSchedule",
+				})
 				return mp
 			}(),
 			remoteExisting: []runtime.Object{
@@ -432,11 +437,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 						Value:  "new-value",
 						Effect: "NoSchedule",
 					})
-					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:    "test-taint",
-						Value:  "new-value",
-						Effect: "NoSchedule",
-					})
 					return ms
 				}(),
 			},
@@ -450,6 +450,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
 					Key:    "test-taint",
 					Value:  "keep-me",
+					Effect: "NoSchedule",
+				})
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "collapse-me",
 					Effect: "NoSchedule",
 				})
 				mp.Status.OwnedLabels = []string{"test-label-2"}
@@ -478,6 +483,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint-3",
 						Value:  "preserve-me",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint-3",
+						Value:  "collapse-me",
 						Effect: "NoSchedule",
 					})
 					return ms
@@ -541,6 +551,54 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
 					ms.Spec.Template.Spec.Labels["test-label-1"] = "test-value-1"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+		},
+		{
+			name:              "Collapse of duplicate entries should result in an update",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Labels["test-label"] = "test-value"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
+				})
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",

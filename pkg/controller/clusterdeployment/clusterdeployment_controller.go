@@ -135,6 +135,7 @@ func Add(mgr manager.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
 	r := &ReconcileClusterDeployment{
+		Manager:                                 mgr,
 		Client:                                  controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
 		scheme:                                  mgr.GetScheme(),
 		logger:                                  logger,

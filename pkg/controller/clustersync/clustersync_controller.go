@@ -377,7 +377,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 			logger.Info("ClusterDeployment not found")
 			return reconcile.Result{}, nil
 		}
-		log.WithError(err).Error("failed to get ClusterDeployment")
+		logger.WithError(err).Error("failed to get ClusterDeployment")
 		return reconcile.Result{}, err
 	}
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, logger)
@@ -422,7 +422,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 	// If this cluster carries the fake annotation we will fake out all helper communication with it.
 	resourceHelper, err := r.resourceHelperBuilder(cd, r.remoteClusterAPIClientBuilder, logger)
 	if err != nil {
-		log.WithError(err).Error("cannot create helper")
+		logger.WithError(err).Error("cannot create helper")
 		return reconcile.Result{}, err
 	}
 

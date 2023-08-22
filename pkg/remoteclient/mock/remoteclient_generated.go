@@ -98,6 +98,20 @@ func (mr *MockBuilderMockRecorder) RESTConfig() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RESTConfig", reflect.TypeOf((*MockBuilder)(nil).RESTConfig))
 }
 
+// Reachable mocks base method.
+func (m *MockBuilder) Reachable() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Reachable")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Reachable indicates an expected call of Reachable.
+func (mr *MockBuilderMockRecorder) Reachable() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reachable", reflect.TypeOf((*MockBuilder)(nil).Reachable))
+}
+
 // UsePrimaryAPIURL mocks base method.
 func (m *MockBuilder) UsePrimaryAPIURL() remoteclient.Builder {
 	m.ctrl.T.Helper()

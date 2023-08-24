@@ -1,0 +1,1119 @@
+apiVersion: v1
+data:
+  Hive-SLO.json: |-
+    {
+      "__inputs": [
+        {
+          "name": "DS_APPSREP05UE1-PROMETHEUS",
+          "label": "appsrep05ue1-prometheus",
+          "description": "",
+          "type": "datasource",
+          "pluginId": "prometheus",
+          "pluginName": "Prometheus"
+        },
+        {
+          "name": "DS_DEPLOY-EVENTS-DB",
+          "label": "deploy-events-db",
+          "description": "",
+          "type": "datasource",
+          "pluginId": "postgres",
+          "pluginName": "PostgreSQL"
+        }
+      ],
+      "__elements": {},
+      "__requires": [
+        {
+          "type": "panel",
+          "id": "gauge",
+          "name": "Gauge",
+          "version": ""
+        },
+        {
+          "type": "grafana",
+          "id": "grafana",
+          "name": "Grafana",
+          "version": "9.3.8"
+        },
+        {
+          "type": "datasource",
+          "id": "postgres",
+          "name": "PostgreSQL",
+          "version": "1.0.0"
+        },
+        {
+          "type": "datasource",
+          "id": "prometheus",
+          "name": "Prometheus",
+          "version": "1.0.0"
+        },
+        {
+          "type": "panel",
+          "id": "timeseries",
+          "name": "Time series",
+          "version": ""
+        }
+      ],
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "target": {
+              "limit": 100,
+              "matchAny": false,
+              "tags": [],
+              "type": "dashboard"
+            },
+            "type": "dashboard"
+          },
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_DEPLOY-EVENTS-DB}"
+            },
+            "enable": false,
+            "iconColor": "blue",
+            "name": "Successful Hive Deployment",
+            "target": {
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT deployment_time as \"time\", CASE WHEN trigger_reason IS NOT NULL THEN 'deployed ' || app_name || ' to ' || env_name || ', reason: ' || trigger_reason ELSE 'deployed ' || app_name || ' to ' || env_name || ', reason: No trigger_reason available' END AS \"text\" FROM deployments WHERE app_name = 'saas-hive' AND env_name = '$env_name' AND succeeded = true;",
+              "refId": "Anno",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": false,
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 14,
+          "panels": [],
+          "title": "Hive",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 19,
+            "x": 0,
+            "y": 1
+          },
+          "id": 11,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(sum (rate(hive_cluster_deployment_install_job_delay_seconds_bucket{appsre_env=\"$env\",le=\"$hive_le\",shard_status=\"$shard_status\"}[$bucket])))/(sum (rate(hive_cluster_deployment_install_job_delay_seconds_count{appsre_env=\"$env\",shard_status=\"$shard_status\"}[$bucket])))",
+              "hide": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Hive $hive_le sec install delay $bucket bucket",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "percentage",
+                "steps": [
+                  {
+                    "color": "dark-red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0
+                  },
+                  {
+                    "color": "green",
+                    "value": 50
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 5,
+            "x": 19,
+            "y": 1
+          },
+          "id": 17,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "pluginVersion": "9.3.8",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "1-((1-((sum (rate(hive_cluster_deployment_install_job_delay_seconds_bucket{appsre_env=\"$env\",le=\"$hive_le\"}[$bucket])))/(sum (rate(hive_cluster_deployment_install_job_delay_seconds_count{appsre_env=\"$env\"}[$bucket])))))/(1-$hive_delay_slo))",
+              "hide": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Error Budget $hive_delay_slo % under $hive_le sec",
+          "type": "gauge"
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 11
+          },
+          "id": 16,
+          "panels": [],
+          "title": "Installer",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 19,
+            "x": 0,
+            "y": 12
+          },
+          "id": 12,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "(sum (rate(hive_cluster_deployment_install_job_duration_seconds_bucket{appsre_env=\"$env\",le=\"$install_le\"}[$bucket])))/(sum (rate(hive_cluster_deployment_install_job_duration_seconds_count{appsre_env=\"$env\"}[$bucket])))",
+              "hide": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Install $install_le sec duration $bucket bucket",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "percentage",
+                "steps": [
+                  {
+                    "color": "dark-red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0
+                  },
+                  {
+                    "color": "green",
+                    "value": 50
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 5,
+            "x": 19,
+            "y": 12
+          },
+          "id": 18,
+          "options": {
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "pluginVersion": "9.3.8",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+              },
+              "editorMode": "code",
+              "expr": "1-((1-((sum (rate(hive_cluster_deployment_install_job_duration_seconds_bucket{appsre_env=\"$env\",le=\"$install_le\"}[$bucket])))/(sum (rate(hive_cluster_deployment_install_job_duration_seconds_count{appsre_env=\"$env\"}[$bucket])))))/(1-$install_duration_slo))",
+              "hide": false,
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Error Budget $hive_delay_slo % under $hive_le sec",
+          "type": "gauge"
+        },
+        {
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 22
+          },
+          "id": 8,
+          "panels": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+              },
+              "description": "Detail of percentiles for a small bucket",
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "line+area"
+                    }
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      },
+                      {
+                        "color": "dark-red",
+                        "value": 300
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "50%"
+                    },
+                    "properties": [
+                      {
+                        "id": "color",
+                        "value": {
+                          "fixedColor": "red",
+                          "mode": "fixed"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "gridPos": {
+                "h": 10,
+                "w": 19,
+                "x": 0,
+                "y": 13
+              },
+              "id": 5,
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.99, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_delay_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.95, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_delay_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "B"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.90, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_delay_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "90%",
+                  "range": true,
+                  "refId": "C"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.85, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_delay_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "85%",
+                  "range": true,
+                  "refId": "D"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.5, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_delay_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "E"
+                }
+              ],
+              "title": "Hive Delay percentile 1d bucket",
+              "type": "timeseries"
+            }
+          ],
+          "title": "Hive Delay Percentiles",
+          "type": "row"
+        },
+        {
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 23
+          },
+          "id": 20,
+          "panels": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+              },
+              "description": "Detail of percentiles for a small bucket",
+              "fieldConfig": {
+                "defaults": {
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "line+area"
+                    }
+                  },
+                  "mappings": [],
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "color": "green"
+                      },
+                      {
+                        "color": "dark-red",
+                        "value": 3600
+                      }
+                    ]
+                  },
+                  "unit": "s"
+                },
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 10,
+                "w": 19,
+                "x": 0,
+                "y": 14
+              },
+              "id": 22,
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.99, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_duration_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "legendFormat": "99%",
+                  "range": true,
+                  "refId": "A"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.95, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_duration_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "95%",
+                  "range": true,
+                  "refId": "B"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.90, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_duration_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "90%",
+                  "range": true,
+                  "refId": "C"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.85, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_duration_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "85%",
+                  "range": true,
+                  "refId": "D"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+                  },
+                  "editorMode": "code",
+                  "expr": "histogram_quantile(0.5, (sum without(instance,pod,namespace,service,job)(rate(hive_cluster_deployment_install_job_duration_seconds_bucket{appsre_env=\"$env\",shard_status=\"$shard_status\"}[1d]))))",
+                  "hide": false,
+                  "legendFormat": "50%",
+                  "range": true,
+                  "refId": "E"
+                }
+              ],
+              "title": "Install Duration percentile 1d bucket",
+              "type": "timeseries"
+            }
+          ],
+          "title": "Installer Duration Percentiles",
+          "type": "row"
+        }
+      ],
+      "schemaVersion": 37,
+      "style": "dark",
+      "tags": [],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "selected": false,
+              "text": "appsrep05ue1-prometheus",
+              "value": "appsrep05ue1-prometheus"
+            },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "queryValue": "",
+            "refresh": 1,
+            "regex": "^(?!.*cluster)(?=.*(hive|app-sre-prod-01|appsrep05ue1))(.*)$",
+            "skipUrlSync": false,
+            "type": "datasource"
+          },
+          {
+            "current": {},
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+            },
+            "definition": "label_values(appsre_env)",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "env",
+            "options": [],
+            "query": {
+              "query": "label_values(appsre_env)",
+              "refId": "StandardVariableQuery"
+            },
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 0,
+            "type": "query"
+          },
+          {
+            "auto": false,
+            "auto_count": 30,
+            "auto_min": "10s",
+            "current": {
+              "selected": false,
+              "text": "30d",
+              "value": "30d"
+            },
+            "hide": 0,
+            "name": "bucket",
+            "options": [
+              {
+                "selected": false,
+                "text": "1m",
+                "value": "1m"
+              },
+              {
+                "selected": false,
+                "text": "10m",
+                "value": "10m"
+              },
+              {
+                "selected": false,
+                "text": "30m",
+                "value": "30m"
+              },
+              {
+                "selected": false,
+                "text": "1h",
+                "value": "1h"
+              },
+              {
+                "selected": false,
+                "text": "6h",
+                "value": "6h"
+              },
+              {
+                "selected": false,
+                "text": "12h",
+                "value": "12h"
+              },
+              {
+                "selected": false,
+                "text": "1d",
+                "value": "1d"
+              },
+              {
+                "selected": false,
+                "text": "7d",
+                "value": "7d"
+              },
+              {
+                "selected": false,
+                "text": "14d",
+                "value": "14d"
+              },
+              {
+                "selected": true,
+                "text": "30d",
+                "value": "30d"
+              }
+            ],
+            "query": "1m,10m,30m,1h,6h,12h,1d,7d,14d,30d",
+            "queryValue": "",
+            "refresh": 2,
+            "skipUrlSync": false,
+            "type": "interval"
+          },
+          {
+            "current": {},
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+            },
+            "definition": "label_values(le)",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "hive_le",
+            "options": [],
+            "query": {
+              "query": "label_values(le)",
+              "refId": "StandardVariableQuery"
+            },
+            "refresh": 1,
+            "regex": "/^30$|^60$|^120$|^180$|^240$|^300$|^600$|^1200$|^1800$|^2700$|^3600/",
+            "skipUrlSync": false,
+            "sort": 3,
+            "type": "query"
+          },
+          {
+            "current": {},
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+            },
+            "definition": "label_values(le)",
+            "description": "1800, 2400, 3000, 3600, 4500, 5400, 7200",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "install_le",
+            "options": [],
+            "query": {
+              "query": "label_values(le)",
+              "refId": "StandardVariableQuery"
+            },
+            "refresh": 1,
+            "regex": "/^1800$|^2400$|^3000$|^3600$|^4500$|^5400$|^7200/",
+            "skipUrlSync": false,
+            "sort": 3,
+            "type": "query"
+          },
+          {
+            "current": {},
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${DS_APPSREP05UE1-PROMETHEUS}"
+            },
+            "definition": "label_values(shard_status)",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "shard_status",
+            "options": [],
+            "query": {
+              "query": "label_values(shard_status)",
+              "refId": "StandardVariableQuery"
+            },
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 0,
+            "type": "query"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "0.98",
+              "value": "0.98"
+            },
+            "hide": 0,
+            "name": "hive_delay_slo",
+            "options": [
+              {
+                "selected": true,
+                "text": "0.985",
+                "value": "0.985"
+              }
+            ],
+            "query": "0.985",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {
+              "selected": true,
+              "text": "0.985",
+              "value": "0.985"
+            },
+            "hide": 0,
+            "name": "install_duration_slo",
+            "options": [
+              {
+                "selected": true,
+                "text": "0.985",
+                "value": "0.985"
+              }
+            ],
+            "query": "0.985",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {
+              "selected": true,
+              "text": "0.985",
+              "value": "0.985"
+            },
+            "hide": 0,
+            "name": "combined_slo",
+            "options": [
+              {
+                "selected": true,
+                "text": "0.985",
+                "value": "0.985"
+              }
+            ],
+            "query": "0.985",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {
+              "selected": true,
+              "text": "0.99",
+              "value": "0.99"
+            },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "percentile",
+            "options": [
+              {
+                "selected": true,
+                "text": "0.99",
+                "value": "0.99"
+              },
+              {
+                "selected": false,
+                "text": "0.95",
+                "value": "0.95"
+              },
+              {
+                "selected": false,
+                "text": "0.90",
+                "value": "0.90"
+              },
+              {
+                "selected": false,
+                "text": "0.85",
+                "value": "0.85"
+              },
+              {
+                "selected": false,
+                "text": "0.50",
+                "value": "0.50"
+              }
+            ],
+            "query": "0.99,0.95,0.90,0.85,0.50",
+            "queryValue": "",
+            "skipUrlSync": false,
+            "type": "custom"
+          },
+          {
+            "current": {},
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_DEPLOY-EVENTS-DB}"
+            },
+            "definition": "select env_name from deployments where env_name in ('osd-stage-01','osd-stage-hives02ue1','osd-integration-hivei01ue1',\n'osd-production-hivep01ue1','osd-production-hivep02ue1','osd-production-hivep03uw1','osd-production-hivep04ew2',\n'osd-production-hivep05ue1','osd-production-hivep06uw2','osd-production-hivep07ue2')",
+            "hide": 2,
+            "includeAll": false,
+            "label": "Deployment Environment",
+            "multi": false,
+            "name": "env_name",
+            "options": [],
+            "query": "select env_name from deployments where env_name in ('osd-stage-01','osd-stage-hives02ue1','osd-integration-hivei01ue1',\n'osd-production-hivep01ue1','osd-production-hivep02ue1','osd-production-hivep03uw1','osd-production-hivep04ew2',\n'osd-production-hivep05ue1','osd-production-hivep06uw2','osd-production-hivep07ue2')",
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-30d",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Hive SLO",
+      "uid": "r3dExJ24z",
+      "version": 30,
+      "weekStart": ""
+    }
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-hive-slo
+  labels:
+    grafana-dashboard: "true"
+  annotations:
+    # refers to the folder in which your dashboard is stored in the Grafana Dashboards UI
+    grafana-folder: /grafana-dashboard-definitions/Hive

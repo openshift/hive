@@ -1,5 +1,13 @@
 # SyncSet
 
+- [Overview](#overview)
+- [SyncSet Object Definition](#syncset-object-definition)
+  - [Example of SyncSet use](#example-of-syncset-use)
+- [SelectorSyncSet Object Definition](#selectorsyncset-object-definition)
+- [Ordering](#ordering)
+- [Diagnosing SyncSet Failures](#diagnosing-syncset-failures)
+- [Changing ResourceApplyMode](#changing-resourceapplymode)
+
 ## Overview
 
 `SyncSet` and `SelectorSyncSet` objects facilitate resource management (create, update, delete, patch) in hive-managed clusters.
@@ -139,6 +147,19 @@ spec:
 | Field | Usage |
 |-------|-------|
 | `clusterDeploymentSelector` | A key/value label pair which selects matching `ClusterDeployments` in any namespace. |
+
+## Ordering
+Hive will process [Selector]SyncSets and their resources in the following order:
+1. SyncSets are processed first.
+   1. Any necessary deletions are processed first.
+      The order in which deletions are processed is not guaranteed.
+   1. SyncSets are processed in alpha order by SyncSet name.
+      Resources within a SyncSet are processed in the order in which they are supplied in the SyncSet.
+1. SelectorSyncSets are processed next.
+   1. Any necessary deletions are processed first.
+      The order in which deletions are processed is not guaranteed.
+   1. SelectorSyncSets are processed in alpha order by SelectorSyncSet name.
+      Resources within a SelectorSyncSet are processed in the order in which they are supplied in the SelectorSyncSet.
 
 ## Diagnosing SyncSet Failures
 

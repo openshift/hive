@@ -5291,7 +5291,10 @@ objects:
                 taints:
                   description: List of taints that will be applied to the created
                     MachineSet's MachineSpec. This list will overwrite any modifications
-                    made to Node taints on an ongoing basis.
+                    made to Node taints on an ongoing basis. In case of duplicate
+                    entries, first encountered taint Value will be preserved, and
+                    the rest collapsed on the corresponding MachineSets. Note that
+                    taints are uniquely identified based on key+effect, not just key.
                   items:
                     description: The node this Taint is attached to has the "effect"
                       on any pod that does not tolerate the Taint.
@@ -5408,6 +5411,35 @@ objects:
                     - minReplicas
                     - name
                     - replicas
+                    type: object
+                  type: array
+                ownedLabels:
+                  description: OwnedLabels lists the keys of labels this MachinePool
+                    created on the remote MachineSet. Used to identify labels to remove
+                    from the remote MachineSet when they are absent from the MachinePool's
+                    spec.labels.
+                  items:
+                    type: string
+                  type: array
+                ownedTaints:
+                  description: OwnedTaints lists identifiers of taints this MachinePool
+                    created on the remote MachineSet. Used to identify taints to remove
+                    from the remote MachineSet when they are absent from the MachinePool's
+                    spec.taints.
+                  items:
+                    description: TaintIdentifier uniquely identifies a Taint. (It
+                      turns out taints are mutually exclusive by key+effect, not simply
+                      by key.)
+                    properties:
+                      effect:omitempty:
+                        description: Effect matches corev1.Taint.Effect.
+                        type: string
+                      key:omitempty:
+                        description: Key matches corev1.Taint.Key.
+                        type: string
+                    required:
+                    - effect:omitempty
+                    - key:omitempty
                     type: object
                   type: array
                 replicas:

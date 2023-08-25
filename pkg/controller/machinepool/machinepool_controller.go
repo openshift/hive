@@ -19,6 +19,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
@@ -445,8 +446,8 @@ func (r *ReconcileMachinePool) generateMachineSets(
 			ms.Spec.Template.Spec.ObjectMeta.Labels[key] = value
 		}
 
-		// Apply hive MachinePool taints to MachineSet MachineSpec.
-		ms.Spec.Template.Spec.Taints = pool.Spec.Taints
+		// Apply hive MachinePool taints to MachineSet MachineSpec. Also collapse duplicates if present.
+		ms.Spec.Template.Spec.Taints = *controllerutils.GetUniqueTaints(&pool.Spec.Taints)
 	}
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
@@ -545,6 +546,19 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	machineSetsToCreate := []*machineapi.MachineSet{}
 	machineSetsToUpdate := []*machineapi.MachineSet{}
 
+	// Compile a set of labels and taints that were owned by MachinePool but have now been removed from MachinePool.Spec.
+	// These would need to be deleted from the remoteMachineSet if present.
+	labelsToDelete := sets.Set[string]{}
+	labelsToDelete.Insert(pool.Status.OwnedLabels...)
+	for labelKey := range pool.Spec.Labels {
+		labelsToDelete.Delete(labelKey)
+	}
+	taintsToDelete := sets.Set[hivev1.TaintIdentifier]{}
+	taintsToDelete.Insert(pool.Status.OwnedTaints...)
+	for _, taint := range pool.Spec.Taints {
+		taintsToDelete.Delete(controllerutils.IdentifierForTaint(&taint))
+	}
+
 	// Find MachineSets that need updating/creating
 	for i, ms := range generatedMachineSets {
 		found := false
@@ -593,6 +607,14 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				if rMS.Spec.Template.Spec.Labels == nil {
 					rMS.Spec.Template.Spec.Labels = make(map[string]string)
 				}
+				// First delete the labels that need to be deleted, then sync the remoteMachineSet labels with that of the generatedMachineSet.
+				for key := range rMS.Spec.Template.Spec.Labels {
+					if labelsToDelete.Has(key) {
+						// Safe to delete while iterating as long as we're deleting the key for this iteration.
+						delete(rMS.Spec.Template.Spec.Labels, key)
+						objectMetaModified = true
+					}
+				}
 				for key, value := range ms.Spec.Template.Spec.Labels {
 					if val, ok := rMS.Spec.Template.Spec.Labels[key]; !ok || val != value {
 						rMS.Spec.Template.Spec.Labels[key] = value
@@ -601,29 +623,30 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				}
 
 				// Carry over the taints on the remote machineset from the generated machineset. Merging strategy preserves the unique taints of remote machineset.
-				if rMS.Spec.Template.Spec.Taints == nil {
-					rMS.Spec.Template.Spec.Taints = []corev1.Taint{}
-				}
-				// Make a temporary map of generated MachineSet's taints for easy lookup
-				gTaintsByKey := make(map[string]*corev1.Taint)
-				for gIndex, gTaint := range ms.Spec.Template.Spec.Taints {
-					gTaintsByKey[gTaint.Key] = &ms.Spec.Template.Spec.Taints[gIndex]
-				}
-				// Go through the remote MachineSet's taints, replacing overlaps with the generated MachineSet
-				for rIndex, rTaint := range rMS.Spec.Template.Spec.Taints {
-					if gTaint, foundTaint := gTaintsByKey[rTaint.Key]; foundTaint {
-						if gTaint.Value != rTaint.Value || gTaint.Effect != rTaint.Effect {
-							rMS.Spec.Template.Spec.Taints[rIndex] = *gTaint
-							objectModified = true
-						}
-						delete(gTaintsByKey, rTaint.Key)
+				// First, build a map of remote MachineSet taints, so we simultaneously collapse duplicate entries.
+				taintMap := make(map[hivev1.TaintIdentifier]corev1.Taint)
+				for _, rTaint := range rMS.Spec.Template.Spec.Taints {
+					if taintsToDelete.Has(controllerutils.IdentifierForTaint(&rTaint)) {
+						// This entry would be deleted from the final list
+						objectModified = true
+						continue
+					}
+					// Preserve the taint entry first encountered.
+					if !controllerutils.TaintExists(taintMap, &rTaint) {
+						taintMap[controllerutils.IdentifierForTaint(&rTaint)] = rTaint
+					} else {
+						// Skip this taint, which effectively means we're removing a duplicate.
+						objectModified = true
 					}
 				}
-				// Any remaining taints from the temporary map are new and need to be added
-				for _, gTaint := range gTaintsByKey {
-					rMS.Spec.Template.Spec.Taints = append(rMS.Spec.Template.Spec.Taints, *gTaint)
-					objectModified = true
+				for _, gTaint := range ms.Spec.Template.Spec.Taints {
+					// Generated MachineSet will not have duplicate taints, because we have collapsed duplicates when we generated them.
+					if !controllerutils.TaintExists(taintMap, &gTaint) || taintMap[controllerutils.IdentifierForTaint(&gTaint)] != gTaint {
+						taintMap[controllerutils.IdentifierForTaint(&gTaint)] = gTaint
+						objectModified = true
+					}
 				}
+				rMS.Spec.Template.Spec.Taints = *controllerutils.ListFromTaintMap(&taintMap)
 
 				// Platform updates will be blocked by webhook, unless they're not.
 				if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value) {
@@ -926,6 +949,20 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 			requeueAfter = 10 * time.Minute
 			break
 		}
+	}
+
+	// Update our tracked labels...
+	pool.Status.OwnedLabels = make([]string, len(pool.Spec.Labels))
+	i := 0
+	for labelKey := range pool.Spec.Labels {
+		pool.Status.OwnedLabels[i] = labelKey
+		i++
+	}
+
+	// ...and taints
+	pool.Status.OwnedTaints = make([]hivev1.TaintIdentifier, len(pool.Spec.Taints))
+	for i, taint := range *controllerutils.GetUniqueTaints(&pool.Spec.Taints) {
+		pool.Status.OwnedTaints[i] = controllerutils.IdentifierForTaint(&taint)
 	}
 
 	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||

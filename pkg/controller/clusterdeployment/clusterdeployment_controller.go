@@ -36,12 +36,14 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
+	installertypes "github.com/openshift/installer/pkg/types"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 	"github.com/openshift/library-go/pkg/manifest"
 	"github.com/openshift/library-go/pkg/verify"
 	"github.com/openshift/library-go/pkg/verify/store/sigstore"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
@@ -519,6 +521,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	if err := r.ensureTrustedCABundleConfigMap(cd, cdLog); err != nil {
 		cdLog.WithError(err).Error("Failed to create or verify the trusted CA bundle ConfigMap")
 		return reconcile.Result{}, err
+	}
+
+	// Discover AWS HostedZoneRole if applicable
+	if r.discoverAWSHostedZoneRole(cd, cdLog) {
+		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
 	// Discover Azure ResourceGroup if applicable
@@ -1794,10 +1801,16 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:
+		// If we haven't discovered the HostedZoneRole yet, fail
+		hzrp := controllerutils.AWSHostedZoneRole(cd)
+		if hzrp == nil {
+			return nil, errors.New("AWS HostedZoneRole unset in ClusterMetadata; refusing to deprovision.")
+		}
 		req.Spec.Platform.AWS = &hivev1.AWSClusterDeprovision{
 			Region:                cd.Spec.Platform.AWS.Region,
 			CredentialsSecretRef:  &cd.Spec.Platform.AWS.CredentialsSecretRef,
 			CredentialsAssumeRole: cd.Spec.Platform.AWS.CredentialsAssumeRole,
+			HostedZoneRole:        hzrp,
 		}
 	case cd.Spec.Platform.Azure != nil:
 		// If we haven't discovered the ResourceGroupName yet, fail
@@ -2241,6 +2254,99 @@ func (r *ReconcileClusterDeployment) addOwnershipToSecret(cd *hivev1.ClusterDepl
 	return nil
 }
 
+func (r *ReconcileClusterDeployment) getInstallConfig(cd *hivev1.ClusterDeployment, log log.FieldLogger) *installertypes.InstallConfig {
+	if cd.Spec.Provisioning == nil {
+		log.Warn("No ClusterDeployment.Spec.Provisioning section")
+		// Probably an adopted CD.
+		return nil
+	}
+	if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
+		log.Warn("No InstallConfigSecretRef")
+		// Also probably an adopted CD (though why would it have Provisioning but not InstallConfigSecretRef?).
+		return nil
+	}
+	secretName := cd.Spec.Provisioning.InstallConfigSecretRef.Name
+	log = log.WithField("installconfig-secret", secretName)
+	icSecret := &corev1.Secret{}
+	if err := r.Get(context.Background(),
+		types.NamespacedName{
+			Namespace: cd.Namespace,
+			Name:      secretName,
+		},
+		icSecret); err != nil {
+		log.WithError(err).Error("Failed to load install-config secret. We'll try again later.")
+		return nil
+	}
+	ic, err := ValidateInstallConfig(cd, icSecret)
+	if err != nil {
+		log.WithError(err).Warn("Couldn't validate install-config")
+		// This doesn't necessarily mean we didn't unmarshall it, though. Carry on...
+	}
+	if ic == nil {
+		// Today this only happens if unmarshalling fails. Otherwise we've got *something* for an install-config.
+		log.Warn("Did not get an install-config from the secret, but also got no error. This should not happen.")
+		return nil
+	}
+
+	return ic
+}
+
+// discoverAWSHostedZoneRole is intended to retrofit AWS clusters which were a) adopted, or b) created before
+// support for shared VPC was added. It attempts to discover the hosted zone role for the cluster by parsing
+// the install-config.
+// No op if platform is not AWS.
+// No op if the field is already set (we don't validate that it is correct).
+// This is best effort. If things go wrong, we log but do not fail out. THIS WILL BLOCK DEPROVISIONING. If
+// this happens, the field must be set manually.
+// The return indicates whether the field was modified. If `true`, the caller is responsible for pushing
+// an Update() back to the server.
+func (r *ReconcileClusterDeployment) discoverAWSHostedZoneRole(cd *hivev1.ClusterDeployment, log log.FieldLogger) bool {
+	log = log.WithField("subtask", "discoverAWSHostedZoneRole")
+
+	// Do we need to do this at all?
+	if getClusterPlatform(cd) != constants.PlatformAWS {
+		return false
+	}
+	if !cd.Spec.Installed {
+		// Provisioner should set the field when installation finishes; no-op for now.
+		return false
+	}
+	if controllerutils.AWSHostedZoneRole(cd) != nil {
+		// Already set, nothing to do
+		return false
+	}
+
+	// Initialize structs as necessary
+	if cd.Spec.ClusterMetadata == nil {
+		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform == nil {
+		cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform.AWS == nil {
+		cd.Spec.ClusterMetadata.Platform.AWS = &aws.Metadata{}
+	}
+
+	// Parse the install-config
+	ic := r.getInstallConfig(cd, log)
+	if ic == nil {
+		// getInstallConfig logged
+		return false
+	}
+
+	if ic.Platform.AWS == nil {
+		// This log might be redundant with one from ValidateInstallConfig
+		log.Warn("No AWS platform section in install-config")
+		return false
+	}
+
+	hzr := ic.Platform.AWS.HostedZoneRole
+	// It's okay if this is the empty string.
+	log.WithField("hostedZoneRole", hzr).Info("Found AWS HostedZoneRole in install-config")
+	cd.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole = &hzr
+	return true
+}
+
 // discoverAzureResourceGroup is intended to retrofit Azure clusters which were a) adopted, or b) created before
 // support for custom resource groups was added. It attempts to discover the resource group for the cluster by
 // - querying the Infrastructure object in the target cluster; and if that goes wrong
@@ -2323,38 +2429,12 @@ func (r *ReconcileClusterDeployment) discoverAzureResourceGroup(cd *hivev1.Clust
 	log.Warning("Failed to discover Azure ResourceGroupName from the remote cluster's Infrastructure object!")
 
 	// 3) If that didn't work for any reason, try the install-config
-	if cd.Spec.Provisioning == nil {
-		log.Warn("No ClusterDeployment.Spec.Provisioning section")
-		// Probably an adopted CD.
-		return false
-	}
-	if cd.Spec.Provisioning.InstallConfigSecretRef == nil || cd.Spec.Provisioning.InstallConfigSecretRef.Name == "" {
-		log.Warn("No InstallConfigSecretRef")
-		// Also probably an adopted CD (though why would it have Provisioning but not InstallConfigSecretRef?).
-		return false
-	}
-	secretName := cd.Spec.Provisioning.InstallConfigSecretRef.Name
-	log = log.WithField("installconfig-secret", secretName)
-	icSecret := &corev1.Secret{}
-	if err := r.Get(context.Background(),
-		types.NamespacedName{
-			Namespace: cd.Namespace,
-			Name:      secretName,
-		},
-		icSecret); err != nil {
-		log.WithError(err).Error("Failed to load install-config secret. We'll try again later.")
-		return false
-	}
-	ic, err := ValidateInstallConfig(cd, icSecret)
-	if err != nil {
-		log.WithError(err).Warn("Couldn't validate install-config")
-		// This doesn't necessarily mean we didn't unmarshall it, though. Carry on...
-	}
+	ic := r.getInstallConfig(cd, log)
 	if ic == nil {
-		// Today this only happens if unmarshalling fails. Otherwise we've got *something* for an install-config.
-		log.Warn("Did not get an install-config from the secret, but also got no error. This should not happen.")
+		// getInstallConfig logged
 		return false
 	}
+
 	if ic.Platform.Azure == nil {
 		// This log might be redundant with one from ValidateInstallConfig
 		log.Warn("No Azure platform section in install-config")

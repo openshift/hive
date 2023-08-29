@@ -346,7 +346,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
-				testSuccessfulProvision(),
+				testSuccessfulProvision(tcp.WithMetadata(`{"aws": {"hostedZoneRole": "account-b-role"}}`)),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -371,7 +371,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testInstallConfigSecretAWS(),
 				testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision()),
-				testSuccessfulProvision(),
+				testSuccessfulProvision(tcp.WithMetadata(`{"aws": {"hostedZoneRole": "account-b-role"}}`)),
 				testMetadataConfigMap(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -1829,7 +1829,7 @@ platform:
 					cd.Spec.ClusterMetadata = nil
 					return cd
 				}(),
-				testSuccessfulProvision(),
+				testSuccessfulProvision(tcp.WithMetadata(`{"aws": {"hostedZoneRole": "account-b-role"}}`)),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -1859,7 +1859,7 @@ platform:
 					}
 					return cd
 				}(),
-				testSuccessfulProvision(),
+				testSuccessfulProvision(tcp.WithMetadata(`{"aws": {"hostedZoneRole": "account-b-role"}}`)),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -3432,6 +3432,11 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			InfraID:                  testInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
+			Platform: &hivev1.ClusterPlatformMetadata{
+				AWS: &hivev1aws.Metadata{
+					HostedZoneRole: pointer.String("account-b-role"),
+				},
+			},
 		},
 	}
 

@@ -13,6 +13,7 @@ type AWSClusterDeprovisionApplyConfiguration struct {
 	Region                *string                  `json:"region,omitempty"`
 	CredentialsSecretRef  *v1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
 	CredentialsAssumeRole *aws.AssumeRole          `json:"credentialsAssumeRole,omitempty"`
+	HostedZoneRole        *string                  `json:"hostedZoneRole,omitempty"`
 }
 
 // AWSClusterDeprovisionApplyConfiguration constructs an declarative configuration of the AWSClusterDeprovision type for use with
@@ -42,5 +43,13 @@ func (b *AWSClusterDeprovisionApplyConfiguration) WithCredentialsSecretRef(value
 // If called multiple times, the CredentialsAssumeRole field is set to the value of the last call.
 func (b *AWSClusterDeprovisionApplyConfiguration) WithCredentialsAssumeRole(value aws.AssumeRole) *AWSClusterDeprovisionApplyConfiguration {
 	b.CredentialsAssumeRole = &value
+	return b
+}
+
+// WithHostedZoneRole sets the HostedZoneRole field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostedZoneRole field is set to the value of the last call.
+func (b *AWSClusterDeprovisionApplyConfiguration) WithHostedZoneRole(value string) *AWSClusterDeprovisionApplyConfiguration {
+	b.HostedZoneRole = &value
 	return b
 }

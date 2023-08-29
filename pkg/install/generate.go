@@ -582,6 +582,10 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		req.Namespace,
 		"aws-creds", constants.AWSCredsMount, credentialRef,
 		"", "", "")
+	hostedZoneRole := ""
+	if req.Spec.Platform.AWS.HostedZoneRole != nil {
+		hostedZoneRole = *req.Spec.Platform.AWS.HostedZoneRole
+	}
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -594,6 +598,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"--creds-dir", constants.AWSCredsMount,
 				"--loglevel", "debug",
 				"--region", req.Spec.Platform.AWS.Region,
+				"--hosted-zone-role", hostedZoneRole,
 				fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
 			},
 			VolumeMounts: mounts,

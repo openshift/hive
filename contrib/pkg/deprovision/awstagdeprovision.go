@@ -42,6 +42,7 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	flags.StringVar(&logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
 	flags.StringVar(&credsDir, "creds-dir", "", "directory of the creds. Changes in the creds will cause the program to terminate")
+	flags.StringVar(&opt.HostedZoneRole, "hosted-zone-role", "", "the role to assume when performing operations on a hosted zone owned by another account.")
 	return cmd
 }
 

@@ -3,12 +3,14 @@
 package v1
 
 import (
+	aws "github.com/openshift/hive/apis/hive/v1/aws"
 	azure "github.com/openshift/hive/apis/hive/v1/azure"
 )
 
 // ClusterPlatformMetadataApplyConfiguration represents an declarative configuration of the ClusterPlatformMetadata type for use
 // with apply.
 type ClusterPlatformMetadataApplyConfiguration struct {
+	AWS   *aws.Metadata   `json:"aws,omitempty"`
 	Azure *azure.Metadata `json:"azure,omitempty"`
 }
 
@@ -16,6 +18,14 @@ type ClusterPlatformMetadataApplyConfiguration struct {
 // apply.
 func ClusterPlatformMetadata() *ClusterPlatformMetadataApplyConfiguration {
 	return &ClusterPlatformMetadataApplyConfiguration{}
+}
+
+// WithAWS sets the AWS field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AWS field is set to the value of the last call.
+func (b *ClusterPlatformMetadataApplyConfiguration) WithAWS(value aws.Metadata) *ClusterPlatformMetadataApplyConfiguration {
+	b.AWS = &value
+	return b
 }
 
 // WithAzure sets the Azure field in the declarative configuration to the given value

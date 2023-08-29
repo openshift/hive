@@ -1113,7 +1113,7 @@ kind: ConfigMap
 metadata:
   name: grafana-dashboard-hive-slo
   labels:
-    grafana-dashboard: "true"
+    grafana_dashboard: "true"
   annotations:
     # refers to the folder in which your dashboard is stored in the Grafana Dashboards UI
     grafana-folder: /grafana-dashboard-definitions/Hive

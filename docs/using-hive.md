@@ -1203,19 +1203,6 @@ If the cluster you are looking to adopt is on AWS and leverages Privatelink, you
       region: us-east-1
 ```
 
-If the cluster you are looking to adopt is on AWS and uses a shared VPC, you will also need to include the name of the hosted zone role in `spec.clusterMetadata.platform.aws.hostedZoneRole`.
-
-```yaml
-  clusterMetadata:
-    adminKubeconfigSecretRef:
-      name: my-gcp-cluster-admin-kubeconfig
-    clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
-    infraID: my-gcp-cluster-wsvdn
-    platform:
-      aws:
-        hostedZoneRole: account-b-zone-role
-```
-
 ### Adopting with hiveutil
 
 [hiveutil](hiveutil.md) is a development focused CLI tool which can be built from the hive repo. To adopt a cluster specify the following flags:

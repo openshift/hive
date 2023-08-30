@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	"github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
@@ -674,29 +673,16 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	if cd.Spec.Installed {
 		if cd.Spec.ClusterMetadata != nil {
 			if oldObject.Spec.Installed {
-				if cd.Spec.ClusterMetadata.Platform != nil {
-					// Special case: allow setting or changing -- but not unsetting -- Azure resource group name.
-					if cd.Spec.ClusterMetadata.Platform.Azure != nil && cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName != nil {
-						if oldObject.Spec.ClusterMetadata.Platform == nil {
-							oldObject.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
-						}
-						if oldObject.Spec.ClusterMetadata.Platform.Azure == nil {
-							oldObject.Spec.ClusterMetadata.Platform.Azure = &azure.Metadata{}
-						}
-						// copy over the value to spoof the immutability checker
-						oldObject.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName
+				// Special case: allow setting or changing -- but not unsetting -- Azure resource group name.
+				if cd.Spec.ClusterMetadata.Platform != nil && cd.Spec.ClusterMetadata.Platform.Azure != nil && cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName != nil {
+					if oldObject.Spec.ClusterMetadata.Platform == nil {
+						oldObject.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
 					}
-					// Special case: allow setting or changing -- but not unsetting -- AWS hosted zone role.
-					if cd.Spec.ClusterMetadata.Platform.AWS != nil && cd.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole != nil {
-						if oldObject.Spec.ClusterMetadata.Platform == nil {
-							oldObject.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
-						}
-						if oldObject.Spec.ClusterMetadata.Platform.AWS == nil {
-							oldObject.Spec.ClusterMetadata.Platform.AWS = &aws.Metadata{}
-						}
-						// copy over the value to spoof the immutability checker
-						oldObject.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole = cd.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole
+					if oldObject.Spec.ClusterMetadata.Platform.Azure == nil {
+						oldObject.Spec.ClusterMetadata.Platform.Azure = &azure.Metadata{}
 					}
+					// copy over the value to spoof the immutability checker
+					oldObject.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName
 				}
 				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
 			}

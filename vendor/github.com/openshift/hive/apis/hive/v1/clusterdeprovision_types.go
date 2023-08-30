@@ -78,11 +78,6 @@ type AWSClusterDeprovision struct {
 	// AWS account access for deprovisioning the cluster.
 	// +optional
 	CredentialsAssumeRole *aws.AssumeRole `json:"credentialsAssumeRole,omitempty"`
-
-	// HostedZoneRole is the role to assume when performing operations
-	// on a hosted zone owned by another account.
-	// +optional
-	HostedZoneRole *string `json:"hostedZoneRole,omitempty"`
 }
 
 // AzureClusterDeprovision contains Azure-specific configuration for a ClusterDeprovision

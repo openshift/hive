@@ -146,16 +146,6 @@ func IsClusterDeploymentErrorUpdateEvent(evt event.UpdateEvent) bool {
 	return false
 }
 
-func AWSHostedZoneRole(cd *hivev1.ClusterDeployment) *string {
-	if cd.Spec.ClusterMetadata == nil ||
-		cd.Spec.ClusterMetadata.Platform == nil ||
-		cd.Spec.ClusterMetadata.Platform.AWS == nil {
-		return nil
-	}
-	// may still be nil
-	return cd.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole
-}
-
 func AzureResourceGroup(cd *hivev1.ClusterDeployment) (string, error) {
 	// If the ResourceGroupName is unset, fail
 	if cd.Spec.ClusterMetadata == nil ||

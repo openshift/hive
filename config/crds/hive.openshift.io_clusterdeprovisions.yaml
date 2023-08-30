@@ -121,10 +121,6 @@ spec:
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
-                      hostedZoneRole:
-                        description: HostedZoneRole is the role to assume when performing
-                          operations on a hosted zone owned by another account.
-                        type: string
                       region:
                         description: Region is the AWS region for this deprovisioning
                         type: string

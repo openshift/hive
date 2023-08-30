@@ -307,10 +307,6 @@ type ClusterMetadata struct {
 }
 
 type ClusterPlatformMetadata struct {
-	// AWS holds AWS-specific cluster metadata
-	// +optional
-	AWS *aws.Metadata `json:"aws,omitempty"`
-
 	// Azure holds azure-specific cluster metadata
 	// +optional
 	Azure *azure.Metadata `json:"azure,omitempty"`

@@ -698,7 +698,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 						oldObject.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole = cd.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole
 					}
 				}
-				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
+				// TEMPORARY! REVERT!
+				// allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
 			}
 		} else {
 			allErrs = append(allErrs, field.Required(specPath.Child("clusterMetadata"), "installed cluster must have cluster metadata"))

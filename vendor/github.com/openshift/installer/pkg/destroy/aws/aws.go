@@ -114,7 +114,6 @@ func (o *ClusterUninstaller) RunWithContext(ctx context.Context) ([]string, erro
 	if err != nil {
 		return nil, err
 	}
-	o.Logger.Infof("BUGGIN ClusterUninstaller: %#v", *o)
 
 	awsSession := o.Session
 	if awsSession == nil {
@@ -133,14 +132,12 @@ func (o *ClusterUninstaller) RunWithContext(ctx context.Context) ([]string, erro
 		resourcegroupstaggingapi.New(awsSession),
 	}
 
-	o.Logger.Infof("BUGGIN Checking if o.HostedZoneRole is set, o.HostedZoneRole: %s", o.HostedZoneRole)
 	if o.HostedZoneRole != "" {
 		cfg := awssession.GetR53ClientCfg(awsSession, o.HostedZoneRole)
 		// This client is specifically for finding route53 zones,
 		// so it needs to use the global us-east-1 region.
 		cfg.Region = aws.String(endpoints.UsEast1RegionID)
 		tagClients = append(tagClients, resourcegroupstaggingapi.New(awsSession, cfg))
-		o.Logger.Infof("BUGGIN Tag Client for Shared VPC Account Added")
 	}
 
 	switch o.Region {

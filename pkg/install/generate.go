@@ -586,6 +586,22 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 	if req.Spec.Platform.AWS.HostedZoneRole != nil {
 		hostedZoneRole = *req.Spec.Platform.AWS.HostedZoneRole
 	}
+	args := []string{
+		"aws-tag-deprovision",
+		"--creds-dir", constants.AWSCredsMount,
+		"--loglevel", "debug",
+		"--region", req.Spec.Platform.AWS.Region,
+		"--hosted-zone-role", hostedZoneRole,
+	}
+	// LEGACY: BaseDomain should always be set in new code. This conditional is only in case we're
+	// reconciling an old ClusterDeprovision created before we added the cluster-domain arg. Such
+	// deprovisions will leak DNS entries if they came from shared-VPC clusters.
+	if req.Spec.BaseDomain != "" {
+		args = append(args, "--cluster-domain", req.Spec.ClusterName+"."+req.Spec.BaseDomain)
+	}
+
+	args = append(args, fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID))
+
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -593,15 +609,8 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"aws-tag-deprovision",
-				"--creds-dir", constants.AWSCredsMount,
-				"--loglevel", "debug",
-				"--region", req.Spec.Platform.AWS.Region,
-				"--hosted-zone-role", hostedZoneRole,
-				fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
-			},
-			VolumeMounts: mounts,
+			Args:            args,
+			VolumeMounts:    mounts,
 		},
 	}
 	if len(req.Spec.ClusterID) > 0 {

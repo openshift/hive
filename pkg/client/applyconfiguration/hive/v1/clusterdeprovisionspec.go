@@ -8,6 +8,7 @@ type ClusterDeprovisionSpecApplyConfiguration struct {
 	InfraID     *string                                       `json:"infraID,omitempty"`
 	ClusterID   *string                                       `json:"clusterID,omitempty"`
 	ClusterName *string                                       `json:"clusterName,omitempty"`
+	BaseDomain  *string                                       `json:"baseDomain,omitempty"`
 	Platform    *ClusterDeprovisionPlatformApplyConfiguration `json:"platform,omitempty"`
 }
 
@@ -38,6 +39,14 @@ func (b *ClusterDeprovisionSpecApplyConfiguration) WithClusterID(value string) *
 // If called multiple times, the ClusterName field is set to the value of the last call.
 func (b *ClusterDeprovisionSpecApplyConfiguration) WithClusterName(value string) *ClusterDeprovisionSpecApplyConfiguration {
 	b.ClusterName = &value
+	return b
+}
+
+// WithBaseDomain sets the BaseDomain field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BaseDomain field is set to the value of the last call.
+func (b *ClusterDeprovisionSpecApplyConfiguration) WithBaseDomain(value string) *ClusterDeprovisionSpecApplyConfiguration {
+	b.BaseDomain = &value
 	return b
 }
 

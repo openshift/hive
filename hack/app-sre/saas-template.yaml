@@ -1680,6 +1680,9 @@ objects:
             spec:
               description: ClusterDeprovisionSpec defines the desired state of ClusterDeprovision
               properties:
+                baseDomain:
+                  description: BaseDomain is the DNS base domain.
+                  type: string
                 clusterID:
                   description: ClusterID is a globally unique identifier for the cluster
                     to deprovision. It will be used if specified.
@@ -1703,7 +1706,8 @@ objects:
                         settings
                       properties:
                         baseDomain:
-                          description: BaseDomain is the DNS base domain
+                          description: 'BaseDomain is the DNS base domain. TODO: Use
+                            the non-platform-specific BaseDomain field.'
                           type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef is the Alibaba account
@@ -1816,7 +1820,8 @@ objects:
                         settings
                       properties:
                         baseDomain:
-                          description: BaseDomain is the DNS base domain
+                          description: 'BaseDomain is the DNS base domain. TODO: Use
+                            the non-platform-specific BaseDomain field.'
                           type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef is the IBM Cloud credentials

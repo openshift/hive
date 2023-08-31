@@ -32,6 +32,7 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 				go terminateWhenFilesChange(credsDir)
 			}
 
+			log.Infof("Running destroyer with ClusterUninstall %#v", *opt)
 			// ClusterQuota stomped in return
 			if _, err := opt.Run(); err != nil {
 				log.WithError(err).Fatal("Runtime error")
@@ -43,6 +44,7 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	flags.StringVar(&opt.Region, "region", "us-east-1", "AWS region to use")
 	flags.StringVar(&credsDir, "creds-dir", "", "directory of the creds. Changes in the creds will cause the program to terminate")
 	flags.StringVar(&opt.HostedZoneRole, "hosted-zone-role", "", "the role to assume when performing operations on a hosted zone owned by another account.")
+	flags.StringVar(&opt.ClusterDomain, "cluster-domain", "", "the parent DNS domain of the cluster (e.g. the thing after `api.`).")
 	return cmd
 }
 

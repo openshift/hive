@@ -1795,6 +1795,7 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			InfraID:     cd.Spec.ClusterMetadata.InfraID,
 			ClusterID:   cd.Spec.ClusterMetadata.ClusterID,
 			ClusterName: cd.Spec.ClusterName,
+			BaseDomain:  cd.Spec.BaseDomain,
 		},
 	}
 	controllerutils.CopyLogAnnotation(cd, req)

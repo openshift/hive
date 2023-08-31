@@ -180,7 +180,6 @@ func (o *ClusterUninstaller) removeSharedTag(ctx context.Context, session *sessi
 }
 
 func (o *ClusterUninstaller) cleanSharedARN(ctx context.Context, session *session.Session, arn arn.ARN, logger logrus.FieldLogger) error {
-	logger.Debugf("BUGGIN found shared resource: %s", arn.String())
 	switch service := arn.Service; service {
 	case "route53":
 		return o.cleanSharedRoute53(ctx, session, arn, logger)
@@ -211,8 +210,6 @@ func (o *ClusterUninstaller) cleanSharedHostedZone(ctx context.Context, session 
 	// in which case we need a separate client.
 	publicZoneClient := route53.New(session)
 	privateZoneClient := route53.New(session)
-	o.Logger.Infof("BUGGIN Checking if o.HostedZoneRole is set to create privateZoneClient, o.HostedZoneRole: %s", o.HostedZoneRole)
-
 	if o.HostedZoneRole != "" {
 		creds := stscreds.NewCredentials(session, o.HostedZoneRole)
 		privateZoneClient = route53.New(session, &aws.Config{Credentials: creds})

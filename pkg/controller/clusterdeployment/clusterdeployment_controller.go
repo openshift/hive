@@ -2317,17 +2317,6 @@ func (r *ReconcileClusterDeployment) discoverAWSHostedZoneRole(cd *hivev1.Cluste
 		return false
 	}
 
-	// Initialize structs as necessary
-	if cd.Spec.ClusterMetadata == nil {
-		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
-	}
-	if cd.Spec.ClusterMetadata.Platform == nil {
-		cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
-	}
-	if cd.Spec.ClusterMetadata.Platform.AWS == nil {
-		cd.Spec.ClusterMetadata.Platform.AWS = &aws.Metadata{}
-	}
-
 	// Parse the install-config
 	ic := r.getInstallConfig(cd, log)
 	if ic == nil {
@@ -2344,6 +2333,17 @@ func (r *ReconcileClusterDeployment) discoverAWSHostedZoneRole(cd *hivev1.Cluste
 	hzr := ic.Platform.AWS.HostedZoneRole
 	// It's okay if this is the empty string.
 	log.WithField("hostedZoneRole", hzr).Info("Found AWS HostedZoneRole in install-config")
+
+	// Initialize structs as necessary
+	if cd.Spec.ClusterMetadata == nil {
+		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform == nil {
+		cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform.AWS == nil {
+		cd.Spec.ClusterMetadata.Platform.AWS = &aws.Metadata{}
+	}
 	cd.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole = &hzr
 	return true
 }
@@ -2376,15 +2376,18 @@ func (r *ReconcileClusterDeployment) discoverAzureResourceGroup(cd *hivev1.Clust
 		return false
 	}
 
-	// Initialize structs as necessary
-	if cd.Spec.ClusterMetadata == nil {
-		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
-	}
-	if cd.Spec.ClusterMetadata.Platform == nil {
-		cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
-	}
-	if cd.Spec.ClusterMetadata.Platform.Azure == nil {
-		cd.Spec.ClusterMetadata.Platform.Azure = &azure.Metadata{}
+	setrg := func(cd *hivev1.ClusterDeployment, rgp *string) {
+		// Initialize structs as necessary
+		if cd.Spec.ClusterMetadata == nil {
+			cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
+		}
+		if cd.Spec.ClusterMetadata.Platform == nil {
+			cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
+		}
+		if cd.Spec.ClusterMetadata.Platform.Azure == nil {
+			cd.Spec.ClusterMetadata.Platform.Azure = &azure.Metadata{}
+		}
+		cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = rgp
 	}
 
 	// 2) Try the infrastructure object in the remote cluster
@@ -2422,7 +2425,7 @@ func (r *ReconcileClusterDeployment) discoverAzureResourceGroup(cd *hivev1.Clust
 		}
 
 		log.WithField("resourceGroupName", rg).Info("Found Azure ResourceGroupName in remote cluster's Infrastructure.")
-		cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = &rg
+		setrg(cd, &rg)
 		return true
 	}() {
 		return true
@@ -2447,7 +2450,7 @@ func (r *ReconcileClusterDeployment) discoverAzureResourceGroup(cd *hivev1.Clust
 		log.WithField("resourceGroupName", rg).Info("Found Azure ResourceGroupName in install-config")
 	} else {
 		// Default it if possible
-		if cd.Spec.ClusterMetadata.InfraID == "" {
+		if cd.Spec.ClusterMetadata == nil || cd.Spec.ClusterMetadata.InfraID == "" {
 			// This shouldn't be possible. InfraID is set during provisioning; and is required
 			// for adopted CDs.
 			log.Warn("Can't set default Azure ResourceGroup yet: no InfraID set. This should not happen.")
@@ -2459,7 +2462,7 @@ func (r *ReconcileClusterDeployment) discoverAzureResourceGroup(cd *hivev1.Clust
 	}
 
 	// If we get here, rg is nonempty. Use it.
-	cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = &rg
+	setrg(cd, &rg)
 	return true
 }
 

@@ -832,6 +832,27 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Get AWS HostedZoneRole from provision metadata",
+			existing: []runtime.Object{
+				testInstallConfigSecret(`
+platform:
+  aws:
+    region: us-east-1
+`),
+				testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())),
+				testSuccessfulProvision(tcp.WithMetadata(`{"aws": {"hostedZoneRole": "some-role"}}`)),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "missing clusterdeployment") {
+					if hzr := controllerutils.AWSHostedZoneRole(cd); assert.NotNil(t, hzr, "expected HostedZoneRole not to be nil") {
+						assert.Equal(t, "some-role", *hzr, "incorrect value for AWS HostedZoneRole")
+					}
+				}
+			},
+		},
+		{
 			name: "Get Azure ResourceGroupName from provision metadata",
 			existing: []runtime.Object{
 				testInstallConfigSecret(`
@@ -3543,14 +3564,6 @@ func testDeletedClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
-func testDeletedClusterDeploymentWithoutFinalizer() *hivev1.ClusterDeployment {
-	cd := testClusterDeployment()
-	now := metav1.Now()
-	cd.DeletionTimestamp = &now
-	cd.Finalizers = []string{}
-	return cd
-}
-
 func testExpiredClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.CreationTimestamp = metav1.Time{Time: metav1.Now().Add(-60 * time.Minute)}
@@ -4348,6 +4361,189 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 	}
 }
 
+func filterNils(objs ...runtime.Object) (filtered []runtime.Object) {
+	for _, obj := range objs {
+		if !reflect.ValueOf(obj).IsNil() {
+			filtered = append(filtered, obj)
+		}
+	}
+	return
+}
+
+func Test_discoverAWSHostedZoneRole(t *testing.T) {
+	logger := log.WithField("controller", "clusterDeployment")
+	awsCD := func(installed bool, cm *hivev1.ClusterMetadata) *hivev1.ClusterDeployment {
+		cd := testEmptyClusterDeployment()
+		cd.ObjectMeta = metav1.ObjectMeta{
+			Name:      testName,
+			Namespace: testNamespace,
+		}
+		cd.Spec = hivev1.ClusterDeploymentSpec{
+			Platform: hivev1.Platform{
+				AWS: &hivev1aws.Platform{
+					Region: "us-east-1",
+				},
+			},
+			Provisioning: &hivev1.Provisioning{
+				InstallConfigSecretRef: &corev1.LocalObjectReference{
+					Name: installConfigSecretName,
+				},
+			},
+		}
+		if installed {
+			cd.Spec.Installed = true
+		}
+		if cm != nil {
+			cd.Spec.ClusterMetadata = cm
+		}
+		return cd
+	}
+	tests := []struct {
+		name               string
+		cd                 *hivev1.ClusterDeployment
+		icSecret           *corev1.Secret
+		wantReturn         bool
+		wantHostedZoneRole *string
+	}{
+		{
+			name: "no-op: non-AWS platform",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := awsCD(true, nil)
+				cd.Spec.Platform = hivev1.Platform{
+					Azure: &azure.Platform{},
+				}
+				return cd
+			}(),
+		},
+		{
+			name: "no-op: cluster not installed",
+			cd:   awsCD(false, nil),
+		},
+		{
+			name: "no-op: already set",
+			cd: awsCD(true, &hivev1.ClusterMetadata{
+				Platform: &hivev1.ClusterPlatformMetadata{
+					AWS: &hivev1aws.Metadata{
+						HostedZoneRole: pointer.String("my-hzr"),
+					},
+				},
+			},
+			),
+			wantHostedZoneRole: pointer.String("my-hzr"),
+		},
+		{
+			name: "no-op: already set, empty string acceptable",
+			cd: awsCD(true, &hivev1.ClusterMetadata{
+				Platform: &hivev1.ClusterPlatformMetadata{
+					AWS: &hivev1aws.Metadata{
+						HostedZoneRole: pointer.String(""),
+					},
+				},
+			},
+			),
+			wantHostedZoneRole: pointer.String(""),
+		},
+		{
+			name: "set from install-config: field absent",
+			cd:   awsCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+  aws:
+    region: us-east-1
+`),
+			wantReturn:         true,
+			wantHostedZoneRole: pointer.String(""),
+		},
+		{
+			name: "set from install-config: field empty",
+			cd:   awsCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+  aws:
+    region: us-east-1
+    hostedZoneRole: ""
+`),
+			wantReturn:         true,
+			wantHostedZoneRole: pointer.String(""),
+		},
+		{
+			name: "set from install-config: field populated",
+			cd:   awsCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+  aws:
+    region: us-east-1
+    hostedZoneRole: some-hzr
+`),
+			wantReturn:         true,
+			wantHostedZoneRole: pointer.String("some-hzr"),
+		},
+		{
+			name: "no cd provisioning",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := awsCD(true, nil)
+				cd.Spec.Provisioning = nil
+				return cd
+			}(),
+		},
+		{
+			name: "no installConfigSecretRef",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := awsCD(true, nil)
+				cd.Spec.Provisioning = &hivev1.Provisioning{}
+				return cd
+			}(),
+		},
+		{
+			name: "no cd installConfigSecretRef.name",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := awsCD(true, nil)
+				cd.Spec.Provisioning = &hivev1.Provisioning{
+					InstallConfigSecretRef: &corev1.LocalObjectReference{},
+				}
+				return cd
+			}(),
+		},
+		{
+			name: "no install-config secret",
+			cd:   awsCD(true, nil),
+		},
+		{
+			name: "invalid install-config",
+			cd:   awsCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+spacing problem!
+`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(filterNils(test.cd, test.icSecret)...).Build()
+			r := &ReconcileClusterDeployment{
+				Client: fakeClient,
+				scheme: scheme.GetScheme(),
+			}
+
+			if gotReturn := r.discoverAWSHostedZoneRole(test.cd, logger); gotReturn != test.wantReturn {
+				t.Errorf("ReconcileClusterDeployment.discoverAWSHostedZoneRole() = %v, want %v", gotReturn, test.wantReturn)
+			}
+
+			// Note that we're *not* getting this from the server -- the func updates the local obj, but the
+			// caller is responsible for Update()ing.
+			gotHZR := controllerutils.AWSHostedZoneRole(test.cd)
+			if test.wantHostedZoneRole == nil {
+				assert.Nil(t, gotHZR, "expected hosted zone role to be nil in cd")
+			} else {
+				if assert.NotNil(t, gotHZR, "expected hosted zone role to be non-nil on cd") {
+					assert.Equal(t, *test.wantHostedZoneRole, *gotHZR, "wrong value for hosted zone role on cd")
+				}
+			}
+		})
+	}
+}
+
 func Test_discoverAzureResourceGroup(t *testing.T) {
 	logger := log.WithField("controller", "clusterDeployment")
 	azureCD := func(installed bool, cm *hivev1.ClusterMetadata) *hivev1.ClusterDeployment {
@@ -4561,14 +4757,6 @@ platform:
 		},
 	}
 
-	filterNils := func(objs ...runtime.Object) (filtered []runtime.Object) {
-		for _, obj := range objs {
-			if !reflect.ValueOf(obj).IsNil() {
-				filtered = append(filtered, obj)
-			}
-		}
-		return
-	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			scheme := scheme.GetScheme()

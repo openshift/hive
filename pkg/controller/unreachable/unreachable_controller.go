@@ -198,7 +198,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 	updateUnreachable := true
 	var primaryErr error
 	// Attempt to connect to the remote cluster using the preferred API URL.
-	primaryErr = remoteClientBuilder.UsePrimaryAPIURL().Reachable()
+	_, primaryErr = remoteClientBuilder.UsePrimaryAPIURL().Build()
 	if primaryErr != nil {
 		// If the remote cluster is not accessible via the preferred API URL, check if there is a fallback API URL to use.
 		if hasOverride(cd) {
@@ -209,7 +209,7 @@ func (r *ReconcileRemoteMachineSet) Reconcile(ctx context.Context, request recon
 			// become accessible, the controller should not recheck connectivity via the fallback API URL more often
 			// than once every 2 hours.
 			if connectivityRecheckNeeded || wasPrimaryActive {
-				if secondaryErr := remoteClientBuilder.UseSecondaryAPIURL().Reachable(); secondaryErr != nil {
+				if _, secondaryErr := remoteClientBuilder.UseSecondaryAPIURL().Build(); secondaryErr != nil {
 					cdLog.WithError(secondaryErr).Warn("unable to create remote API client with either the initial API URL or the API URL override, marking cluster unreachable")
 					unreachableError = utilerrors.NewAggregate([]error{primaryErr, secondaryErr})
 				}

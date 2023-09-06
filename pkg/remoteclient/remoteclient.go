@@ -13,11 +13,9 @@ import (
 	machnet "k8s.io/apimachinery/pkg/util/net"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -48,9 +46,6 @@ type Builder interface {
 	// UseSecondaryAPIURL will use the secondary API URL. If there is an API URL override, then the initial API URL
 	// is the secondary.
 	UseSecondaryAPIURL() Builder
-
-	// Reachable internally builds a client and runs a query to make sure it is healthy.
-	Reachable() error
 }
 
 // NewBuilder creates a new Builder for creating a client to connect to the remote cluster associated with the specified
@@ -208,19 +203,6 @@ func (b *builder) Build() (client.Client, error) {
 	return client.New(cfg, client.Options{
 		Scheme: scheme,
 	})
-}
-
-func (b *builder) Reachable() error {
-	cfg, err := b.RESTConfig()
-	if err != nil {
-		return err
-	}
-	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return err
-	}
-	_, err = restmapper.GetAPIGroupResources(dc)
-	return err
 }
 
 func (b *builder) BuildDynamic() (dynamic.Interface, error) {

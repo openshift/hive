@@ -3,9 +3,11 @@ package remoteclient
 import (
 	"github.com/openshift/hive/pkg/util/scheme"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -21,12 +23,22 @@ type kubeconfigBuilder struct {
 	secret *corev1.Secret
 }
 
+// Build is also responsible for verifying reachability of client
 func (b *kubeconfigBuilder) Build() (client.Client, error) {
 	cfg, err := b.RESTConfig()
 	if err != nil {
 		return nil, err
 	}
 
+	// Verify reachability of client
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	_, err = restmapper.GetAPIGroupResources(dc)
+	if err != nil {
+		return nil, err
+	}
 	return client.New(cfg, client.Options{
 		Scheme: scheme.GetScheme(),
 	})

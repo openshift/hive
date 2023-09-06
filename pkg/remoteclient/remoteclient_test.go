@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -227,13 +226,9 @@ func Test_builder_Build(t *testing.T) {
 			builder := NewBuilder(c, cd, "test-controller-name")
 			var err error
 			if !tc.dynamic {
-				rc, buildErr := builder.Build()
-				assert.NoError(t, buildErr, "unexpected error building client")
-				namespaced_name := types.NamespacedName{
-					Name:      "bad-name",
-					Namespace: "bad-namespace",
-				}
-				err = rc.Get(context.Background(), namespaced_name, &hivev1.ClusterDeployment{})
+				// Build is expected to fail due to "no such host" error, as the Build() method
+				// is responsible for testing reachability.
+				_, err = builder.Build()
 			} else {
 				rc, buildErr := builder.BuildDynamic()
 				assert.NoError(t, buildErr, "unexpected error building dynamic client")

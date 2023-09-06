@@ -13,9 +13,11 @@ import (
 	machnet "k8s.io/apimachinery/pkg/util/net"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -28,6 +30,7 @@ import (
 // Builder is used to build API clients to the remote cluster
 type Builder interface {
 	// Build will return a static controller-runtime client for the remote cluster.
+	// It is also responsible for verifying reachability of client, and will fail if unreachable.
 	Build() (client.Client, error)
 
 	// BuildDynamic will return a dynamic kubeclient for the remote cluster.
@@ -197,11 +200,17 @@ func (b *builder) Build() (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	scheme := scheme.GetScheme()
-
+	// Verify reachability of client
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	_, err = restmapper.GetAPIGroupResources(dc)
+	if err != nil {
+		return nil, err
+	}
 	return client.New(cfg, client.Options{
-		Scheme: scheme,
+		Scheme: scheme.GetScheme(),
 	})
 }
 

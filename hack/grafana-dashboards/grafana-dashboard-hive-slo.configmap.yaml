@@ -183,6 +183,7 @@ data:
                 "mode": "thresholds"
               },
               "mappings": [],
+              "max": 1,
               "min": 0,
               "thresholds": {
                 "mode": "percentage",
@@ -193,7 +194,7 @@ data:
                   },
                   {
                     "color": "orange",
-                    "value": 0
+                    "value": 10
                   },
                   {
                     "color": "green",
@@ -360,6 +361,7 @@ data:
                 "mode": "thresholds"
               },
               "mappings": [],
+              "max": 1,
               "min": 0,
               "thresholds": {
                 "mode": "percentage",
@@ -370,7 +372,7 @@ data:
                   },
                   {
                     "color": "orange",
-                    "value": 0
+                    "value": 10
                   },
                   {
                     "color": "green",

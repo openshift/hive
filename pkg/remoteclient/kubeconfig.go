@@ -23,12 +23,22 @@ type kubeconfigBuilder struct {
 	secret *corev1.Secret
 }
 
+// Build is also responsible for verifying reachability of client
 func (b *kubeconfigBuilder) Build() (client.Client, error) {
 	cfg, err := b.RESTConfig()
 	if err != nil {
 		return nil, err
 	}
 
+	// Verify reachability of client
+	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	_, err = restmapper.GetAPIGroupResources(dc)
+	if err != nil {
+		return nil, err
+	}
 	return client.New(cfg, client.Options{
 		Scheme: scheme.GetScheme(),
 	})
@@ -72,17 +82,4 @@ func (b *kubeconfigBuilder) UseSecondaryAPIURL() Builder {
 
 func (b *kubeconfigBuilder) RESTConfig() (*rest.Config, error) {
 	return restConfigFromSecret(b.secret)
-}
-
-func (b *kubeconfigBuilder) Reachable() error {
-	cfg, err := b.RESTConfig()
-	if err != nil {
-		return err
-	}
-	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
-	if err != nil {
-		return err
-	}
-	_, err = restmapper.GetAPIGroupResources(dc)
-	return err
 }

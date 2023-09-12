@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -310,15 +311,17 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				ctx := context.TODO()
 				By("Get the pull secret name of clusterdeployment")
 				cd := &hivev1.ClusterDeployment{}
-				err := hiveClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: clusterNamespace}, cd)
-				Ω(err).ShouldNot(HaveOccurred())
-				pullSecret := cd.Spec.PullSecretRef.Name
+				var cdLabels map[string]string
+				err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					err := hiveClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: clusterNamespace}, cd)
+					Ω(err).ShouldNot(HaveOccurred())
 
-				By(`Set a label "cluster-group: hivecluster" to clusterdeployment`)
-				cdLabels := cd.ObjectMeta.GetLabels()
-				cdLabels["cluster-group"] = "hivecluster"
-				cd.ObjectMeta.SetLabels(cdLabels)
-				err = hiveClient.Update(ctx, cd)
+					By(`Set a label "cluster-group: hivecluster" to clusterdeployment`)
+					cdLabels = cd.ObjectMeta.GetLabels()
+					cdLabels["cluster-group"] = "hivecluster"
+					cd.ObjectMeta.SetLabels(cdLabels)
+					return hiveClient.Update(ctx, cd)
+				})
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(cd.ObjectMeta.Labels).Should(Equal(cdLabels))
 
@@ -372,7 +375,7 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 							Secrets: []hivev1.SecretMapping{
 								{
 									SourceRef: hivev1.SecretReference{
-										Name:      pullSecret,
+										Name:      cd.Spec.PullSecretRef.Name,
 										Namespace: clusterNamespace,
 									},
 									TargetRef: hivev1.SecretReference{
@@ -417,10 +420,14 @@ var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
 				Ω(err).ShouldNot(HaveOccurred())
 
 				By(`Delete the label "cluster-group: hivecluster" of clusterdeployment`)
-				cdLabels = cd.ObjectMeta.GetLabels()
-				delete(cdLabels, "cluster-group")
-				cd.ObjectMeta.SetLabels(cdLabels)
-				err = hiveClient.Update(ctx, cd)
+				err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					err := hiveClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: clusterNamespace}, cd)
+					Ω(err).ShouldNot(HaveOccurred())
+					cdLabels = cd.ObjectMeta.GetLabels()
+					delete(cdLabels, "cluster-group")
+					cd.ObjectMeta.SetLabels(cdLabels)
+					return hiveClient.Update(ctx, cd)
+				})
 				Ω(err).ShouldNot(HaveOccurred())
 				Ω(cd.ObjectMeta.Labels).Should(Equal(cdLabels))
 

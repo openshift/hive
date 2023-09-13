@@ -38,7 +38,7 @@ const (
 )
 
 func TestAWSActuator(t *testing.T) {
-	tests := []struct {
+	type ttype struct {
 		name                         string
 		mockAWSClient                func(*mockaws.MockClient)
 		clusterDeployment            *hivev1.ClusterDeployment
@@ -52,7 +52,11 @@ func TestAWSActuator(t *testing.T) {
 		expectedEC2MetadataAuth      string
 		expectedAMI                  *machineapi.AWSResourceReference
 		expectedSGFilters            []machineapi.Filter
-	}{
+		// Security groups identified by ID start with the *second* SecurityGroup ([1])
+		// and do not use Filters.
+		expectedSGIDs []string
+	}
+	tests := []ttype{
 		{
 			name:              "generate single machineset for single zone",
 			clusterDeployment: testClusterDeployment(),
@@ -567,10 +571,116 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedErr: true,
 		},
+		{
+			name:              "machinepool has AdditionalSecurityGroupIDs",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.AdditionalSecurityGroupIDs = []string{
+					"sg-one", "sg-two",
+				}
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				gomock.InOrder(
+					mockDescribeSubnets(client, []string{"zone1", "zone2"},
+						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1"),
+				)
+				mockDescribeRouteTables(client,
+					map[string]bool{
+						"subnet-zone1":    false,
+						"subnet-zone2":    false,
+						"pubSubnet-zone1": true,
+						"pubSubnet-zone2": true,
+					},
+					"vpc-1")
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 2,
+				generateAWSMachineSetName("zone2"): 1,
+			},
+			expectedAMI: &machineapi.AWSResourceReference{
+				ID: pointer.String(testAMI),
+			},
+			expectedSGFilters: []machineapi.Filter{
+				{
+					Name:   "tag:Name",
+					Values: []string{"foo-12345-worker-sg"},
+				},
+			},
+			expectedSGIDs: []string{"sg-one", "sg-two"},
+		}, {
+			name:              "ExtraWorkerSecurityGroup and AdditionalSecurityGroupIDs are mutually exclusive",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Annotations = map[string]string{
+					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+				}
+				pool.Spec.Platform.AWS.AdditionalSecurityGroupIDs = []string{"additional-security-group"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			expectedCondition: &hivev1.MachinePoolCondition{
+				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
+				Status: corev1.ConditionTrue,
+				Reason: "SecurityGroupOptionConflict",
+			},
+		},
+	}
+
+	validateAWSMachineSets := func(t *testing.T, mSets []*machineapi.MachineSet, test ttype) {
+		assert.Equal(t, len(test.expectedMachineSetReplicas), len(mSets), "different number of machine sets generated than expected")
+
+		for _, ms := range mSets {
+			expectedReplicas, ok := test.expectedMachineSetReplicas[ms.Name]
+			if assert.True(t, ok, "unexpected machine set", ms.Name) {
+				assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch", ms.Name)
+			}
+
+			awsProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
+			assert.True(t, ok, "failed to convert to AWSMachineProviderConfig")
+
+			assert.Equal(t, testInstanceType, awsProvider.InstanceType, "unexpected instance type")
+
+			if assert.NotNil(t, awsProvider.AMI, "missing AMI") {
+				if test.expectedAMI.ID != nil {
+					assert.Equal(t, *test.expectedAMI.ID, *awsProvider.AMI.ID, "unexpected AMI ID")
+				}
+				if len(test.expectedAMI.Filters) > 0 {
+					assert.Equal(t, test.expectedAMI.Filters, awsProvider.AMI.Filters, "unexpected AMI filter")
+				}
+			}
+
+			assert.Equal(t, test.expectedKMSKey, *awsProvider.BlockDevices[0].EBS.KMSKey.ARN)
+
+			if test.expectedSubnetIDInMachineSet {
+				providerConfig := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
+				assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID")
+				assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
+			}
+			if test.expectedSGFilters != nil {
+				assert.Equal(t, awsProvider.SecurityGroups[0].Filters, test.expectedSGFilters, "unexpected security group filters")
+			}
+
+			if test.expectedSGIDs != nil {
+				if assert.Equal(t, len(test.expectedSGIDs), len(awsProvider.SecurityGroups)-1, "expected n-1 SecurityGroups holding IDs") {
+					for i := 0; i < len(test.expectedSGIDs); i++ {
+						assert.Equal(t, test.expectedSGIDs[i], *awsProvider.SecurityGroups[i+1].ID, "mismatched security group ID")
+					}
+				}
+			}
+			if test.expectedEC2MetadataAuth != "" {
+				assert.NotNil(t, awsProvider.MetadataServiceOptions, "Missing ec2metadata")
+				assert.Equal(t, test.expectedEC2MetadataAuth, string(awsProvider.MetadataServiceOptions.Authentication))
+			}
+		}
 	}
 
 	for _, test := range tests {
-
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
@@ -596,7 +706,7 @@ func TestAWSActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				validateAWSMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedSubnetIDInMachineSet, test.expectedKMSKey, test.expectedAMI, test.expectedSGFilters, test.expectedEC2MetadataAuth)
+				validateAWSMachineSets(t, generatedMachineSets, test)
 			}
 			if test.expectedCondition != nil {
 				cond := controllerutils.FindCondition(pool.Status.Conditions, test.expectedCondition.Type)
@@ -641,47 +751,6 @@ func TestGetAWSAMIID(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func validateAWSMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedSubnetID bool, expectedKMSKey string, expectedAMI *machineapi.AWSResourceReference, expectedSGFilters []machineapi.Filter, expectedEC2MetadataAuth string) {
-	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
-
-	for _, ms := range mSets {
-		expectedReplicas, ok := expectedMSReplicas[ms.Name]
-		if assert.True(t, ok, "unexpected machine set", ms.Name) {
-			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch", ms.Name)
-		}
-
-		awsProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
-		assert.True(t, ok, "failed to convert to AWSMachineProviderConfig")
-
-		assert.Equal(t, testInstanceType, awsProvider.InstanceType, "unexpected instance type")
-
-		if assert.NotNil(t, awsProvider.AMI, "missing AMI") {
-			if expectedAMI.ID != nil {
-				assert.Equal(t, *expectedAMI.ID, *awsProvider.AMI.ID, "unexpected AMI ID")
-			}
-			if len(expectedAMI.Filters) > 0 {
-				assert.Equal(t, expectedAMI.Filters, awsProvider.AMI.Filters, "unexpected AMI filter")
-			}
-		}
-
-		assert.Equal(t, expectedKMSKey, *awsProvider.BlockDevices[0].EBS.KMSKey.ARN)
-
-		if expectedSubnetID {
-			providerConfig := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AWSMachineProviderConfig)
-			assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID")
-			assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
-		}
-		if expectedSGFilters != nil {
-			assert.Equal(t, awsProvider.SecurityGroups[0].Filters, expectedSGFilters, "unexpected security group filters")
-		}
-
-		if expectedEC2MetadataAuth != "" {
-			assert.NotNil(t, awsProvider.MetadataServiceOptions, "Missing ec2metadata")
-			assert.Equal(t, expectedEC2MetadataAuth, string(awsProvider.MetadataServiceOptions.Authentication))
-		}
 	}
 }
 

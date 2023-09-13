@@ -30,6 +30,12 @@ type MachinePoolPlatform struct {
 	// EC2MetadataOptions defines metadata service interaction options for EC2 instances in the machine pool.
 	// +optional
 	EC2Metadata *EC2Metadata `json:"metadataService,omitempty"`
+
+	// AdditionalSecurityGroupIDs contains IDs of additional security groups for machines, where each ID
+	// is presented in the format sg-xxxx.
+	//
+	// +optional
+	AdditionalSecurityGroupIDs []string `json:"additionalSecurityGroupIDs,omitempty"`
 }
 
 // SpotMarketOptions defines the options available to a user when configuring

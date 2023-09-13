@@ -960,8 +960,9 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 	}
 
 	// ...and taints
-	pool.Status.OwnedTaints = make([]hivev1.TaintIdentifier, len(pool.Spec.Taints))
-	for i, taint := range *controllerutils.GetUniqueTaints(&pool.Spec.Taints) {
+	uniqueTaints := *controllerutils.GetUniqueTaints(&pool.Spec.Taints)
+	pool.Status.OwnedTaints = make([]hivev1.TaintIdentifier, len(uniqueTaints))
+	for i, taint := range uniqueTaints {
 		pool.Status.OwnedTaints[i] = controllerutils.IdentifierForTaint(&taint)
 	}
 

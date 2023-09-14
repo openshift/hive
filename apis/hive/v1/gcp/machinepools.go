@@ -13,6 +13,11 @@ type MachinePool struct {
 	//
 	// +optional
 	OSDisk OSDisk `json:"osDisk"`
+
+	// NetworkProjectID specifies which project the network and subnets exist in when
+	// they are not in the main ProjectID.
+	// +optional
+	NetworkProjectID string `json:"networkProjectID,omitempty"`
 }
 
 // OSDisk defines the disk for machines on GCP.

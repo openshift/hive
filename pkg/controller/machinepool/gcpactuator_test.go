@@ -169,6 +169,20 @@ func TestGCPActuator(t *testing.T) {
 				generateGCPMachineSetName("worker", "zone1"): 3,
 			},
 		},
+		{
+			name: "generate machinesets with NetworkProjectID",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.NetworkProjectID = "some-project-id"
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -231,9 +245,11 @@ func TestGCPActuator(t *testing.T) {
 					assert.Equal(t, ga.network, gcpProvider.NetworkInterfaces[0].Network)
 					assert.Equal(t, ga.subnet, gcpProvider.NetworkInterfaces[0].Subnetwork)
 
+					platform := test.pool.Spec.Platform.GCP
+
 					// Ensure GCP disk type and size was correctly set or defaulted and made it to the resulting MachineSets:
-					expectedDiskType := test.pool.Spec.Platform.GCP.OSDisk.DiskType
-					expectedDiskSizeGB := test.pool.Spec.Platform.GCP.OSDisk.DiskSizeGB
+					expectedDiskType := platform.OSDisk.DiskType
+					expectedDiskSizeGB := platform.OSDisk.DiskSizeGB
 					if expectedDiskType == "" {
 						expectedDiskType = defaultGCPDiskType
 					}
@@ -244,7 +260,7 @@ func TestGCPActuator(t *testing.T) {
 					assert.Equal(t, expectedDiskSizeGB, gcpProvider.Disks[0].SizeGB)
 
 					// Ensure GCP disk encryption settings made it to the resulting MachineSet (if specified):
-					encKey := test.pool.Spec.Platform.GCP.OSDisk.EncryptionKey
+					encKey := platform.OSDisk.EncryptionKey
 					if encKey != nil {
 						assert.Equal(t, encKey.KMSKeyServiceAccount, gcpProvider.Disks[0].EncryptionKey.KMSKeyServiceAccount)
 						assert.Equal(t, encKey.KMSKey.Name, gcpProvider.Disks[0].EncryptionKey.KMSKey.Name)
@@ -253,6 +269,10 @@ func TestGCPActuator(t *testing.T) {
 						assert.Equal(t, encKey.KMSKey.Location, gcpProvider.Disks[0].EncryptionKey.KMSKey.Location)
 					}
 
+					// NetworkProjectID
+					if npid := platform.NetworkProjectID; npid != "" {
+						assert.Equal(t, npid, gcpProvider.NetworkInterfaces[0].ProjectID)
+					}
 				}
 			}
 		})

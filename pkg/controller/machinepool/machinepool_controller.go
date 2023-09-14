@@ -951,6 +951,18 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 		}
 	}
 
+	pool.Status = updateOwnedLabelsAndTaints(pool)
+
+	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
+		reflect.DeepEqual(origPool.Status, pool.Status) {
+		return reconcile.Result{RequeueAfter: requeueAfter}, nil
+	}
+
+	return reconcile.Result{RequeueAfter: requeueAfter}, errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
+}
+
+// updateOwnedLabelsAndTaints updates OwnedLabels and OwnedTaints in the MachinePool.Status, by fetching the relevant entries sans duplicates from MachinePool.Spec.
+func updateOwnedLabelsAndTaints(pool *hivev1.MachinePool) hivev1.MachinePoolStatus {
 	// Update our tracked labels...
 	pool.Status.OwnedLabels = make([]string, len(pool.Spec.Labels))
 	i := 0
@@ -965,13 +977,7 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 	for i, taint := range uniqueTaints {
 		pool.Status.OwnedTaints[i] = controllerutils.IdentifierForTaint(&taint)
 	}
-
-	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
-		reflect.DeepEqual(origPool.Status, pool.Status) {
-		return reconcile.Result{RequeueAfter: requeueAfter}, nil
-	}
-
-	return reconcile.Result{RequeueAfter: requeueAfter}, errors.Wrap(r.Status().Update(context.Background(), pool), "failed to update pool status")
+	return pool.Status
 }
 
 // summarizeMachinesError returns reason and message for error state of machineSets by

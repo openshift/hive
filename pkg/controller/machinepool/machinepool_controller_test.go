@@ -1311,6 +1311,87 @@ func sortedTaints(taints []corev1.Taint) []corev1.Taint {
 	return taints
 }
 
+func TestUpdateOwnedLabelsTaints(t *testing.T) {
+	tests := []struct {
+		name                string
+		machinePool         *hivev1.MachinePool
+		expectedOwnedLabels []string
+		expectedOwnedTaints []hivev1.TaintIdentifier
+	}{
+		{
+			name: "Carry over labels from spec",
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePoolWithoutLabelsTaints()
+				mp.Spec.Labels = make(map[string]string)
+				mp.Spec.Labels["test-label"] = "test-value"
+				return mp
+			}(),
+			expectedOwnedLabels: []string{"test-label"},
+		},
+		{
+			name: "Carry over taints from spec",
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePoolWithoutLabelsTaints()
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
+				})
+				return mp
+			}(),
+			expectedOwnedTaints: []hivev1.TaintIdentifier{
+				{
+					Key:    "test-taint",
+					Effect: "NoSchedule",
+				},
+			},
+		},
+		{
+			name: "Remove duplicate taints",
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePoolWithoutLabelsTaints()
+				mp.Spec.Labels = make(map[string]string)
+				mp.Spec.Labels["test-label"] = "test-value"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
+				})
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "Value doesn't matter during comparison",
+					Effect: "NoSchedule",
+				})
+				return mp
+			}(),
+			expectedOwnedLabels: []string{"test-label"},
+			expectedOwnedTaints: []hivev1.TaintIdentifier{
+				{
+					Key:    "test-taint",
+					Effect: "NoSchedule",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualMachinePoolStatus := updateOwnedLabelsAndTaints(test.machinePool)
+			// Explicitly check the length to ensure there aren't any empty entries
+			if assert.Equal(t, len(test.expectedOwnedLabels), len(actualMachinePoolStatus.OwnedLabels)) && len(actualMachinePoolStatus.OwnedLabels) > 0 {
+				if !reflect.DeepEqual(test.expectedOwnedLabels, actualMachinePoolStatus.OwnedLabels) {
+					t.Errorf("expected labels: %v, actual labels: %v", test.expectedOwnedLabels, actualMachinePoolStatus.OwnedLabels)
+				}
+			}
+			if assert.Equal(t, len(test.expectedOwnedTaints), len(actualMachinePoolStatus.OwnedTaints)) && len(actualMachinePoolStatus.OwnedTaints) > 0 {
+				if !reflect.DeepEqual(test.expectedOwnedTaints, actualMachinePoolStatus.OwnedTaints) {
+					t.Errorf("expected taints: %v, actual taints: %v", test.expectedOwnedTaints, actualMachinePoolStatus.OwnedTaints)
+				}
+			}
+		})
+	}
+}
+
 func Test_summarizeMachinesError(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -1388,7 +1469,7 @@ Machine machine-3 failed (InsufficientResources): No available quota,
 	}
 }
 
-func testMachinePool() *hivev1.MachinePool {
+func testMachinePoolWithoutLabelsTaints() *hivev1.MachinePool {
 	return &hivev1.MachinePool{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: hivev1.SchemeGroupVersion.String(),
@@ -1408,18 +1489,6 @@ func testMachinePool() *hivev1.MachinePool {
 			Platform: hivev1.MachinePoolPlatform{
 				AWS: &hivev1aws.MachinePoolPlatform{
 					InstanceType: testInstanceType,
-				},
-			},
-			Labels: map[string]string{
-				"machine.openshift.io/cluster-api-cluster":      testInfraID,
-				"machine.openshift.io/cluster-api-machine-role": testPoolName,
-				"machine.openshift.io/cluster-api-machine-type": testPoolName,
-			},
-			Taints: []corev1.Taint{
-				{
-					Key:    "foo",
-					Value:  "bar",
-					Effect: corev1.TaintEffectNoSchedule,
 				},
 			},
 		},
@@ -1444,6 +1513,23 @@ func testMachinePool() *hivev1.MachinePool {
 			},
 		},
 	}
+}
+
+func testMachinePool() *hivev1.MachinePool {
+	p := testMachinePoolWithoutLabelsTaints()
+	p.Spec.Labels = map[string]string{
+		"machine.openshift.io/cluster-api-cluster":      testInfraID,
+		"machine.openshift.io/cluster-api-machine-role": testPoolName,
+		"machine.openshift.io/cluster-api-machine-type": testPoolName,
+	}
+	p.Spec.Taints = []corev1.Taint{
+		{
+			Key:    "foo",
+			Value:  "bar",
+			Effect: corev1.TaintEffectNoSchedule,
+		},
+	}
+	return p
 }
 
 func testAutoscalingMachinePool(min, max int) *hivev1.MachinePool {

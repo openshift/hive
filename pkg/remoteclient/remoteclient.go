@@ -58,8 +58,13 @@ type Builder interface {
 // runtime.Objects we need to query for in all our controllers.
 func NewBuilder(c client.Client, cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) Builder {
 	if utils.IsFakeCluster(cd) {
+		clusterVersion := ""
+		if cd.Status.InstallVersion != nil {
+			clusterVersion = *cd.Status.InstallVersion
+		}
 		return &fakeBuilder{
-			urlToUse: activeURL,
+			urlToUse:       activeURL,
+			clusterVersion: clusterVersion,
 		}
 	}
 	return &builder{

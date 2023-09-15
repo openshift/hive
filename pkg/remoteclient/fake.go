@@ -19,7 +19,8 @@ import (
 // fakeBuilder builds fake clients for fake clusters. Used to simulate communication with a cluster
 // that doesn't actually exist in scale testing.
 type fakeBuilder struct {
-	urlToUse int
+	urlToUse       int
+	clusterVersion string
 }
 
 // Build returns a fake controller-runtime test client populated with the resources we expect to query for a
@@ -43,7 +44,7 @@ func (b *fakeBuilder) Build() (client.Client, error) {
 			},
 			Status: configv1.ClusterVersionStatus{
 				Desired: configv1.Release{
-					Version: "4.6.8",
+					Version: b.clusterVersion,
 				},
 			},
 		},

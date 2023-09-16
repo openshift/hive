@@ -120,9 +120,9 @@ type MachinePoolStatus struct {
 // key+effect, not simply by key.)
 type TaintIdentifier struct {
 	// Key matches corev1.Taint.Key.
-	Key string `json:"key:omitempty"`
+	Key string `json:"key,omitempty"`
 	// Effect matches corev1.Taint.Effect.
-	Effect corev1.TaintEffect `json:"effect:omitempty"`
+	Effect corev1.TaintEffect `json:"effect,omitempty"`
 }
 
 // MachineSetStatus is the status of a machineset in the remote cluster.

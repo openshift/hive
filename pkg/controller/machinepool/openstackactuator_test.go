@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
-	ospprovider "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
 
-	machineapi "github.com/openshift/api/machine/v1beta1"
+	machinev1alpha1 "github.com/openshift/api/machine/v1alpha1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1osp "github.com/openshift/hive/apis/hive/v1/openstack"
@@ -54,7 +54,7 @@ func BROKEN__TestOpenStackActuator(t *testing.T) {
 	}
 }
 
-func validateOSPMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64) {
+func validateOSPMachineSets(t *testing.T, mSets []*machinev1beta1.MachineSet, expectedMSReplicas map[string]int64) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -63,7 +63,7 @@ func validateOSPMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expect
 			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
 		}
 
-		ospProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*ospprovider.OpenstackProviderSpec)
+		ospProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machinev1alpha1.OpenstackProviderSpec)
 		if assert.True(t, ok, "failed to convert to openstack provider spec") {
 			assert.Equal(t, "Flav", ospProvider.Flavor, "unexpected instance type")
 		}

@@ -14,10 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	openstackproviderv1alpha1 "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	machineapi "github.com/openshift/api/machine/v1beta1"
+	machinev1alpha1 "github.com/openshift/api/machine/v1alpha1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	installosp "github.com/openshift/installer/pkg/asset/machines/openstack"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesosp "github.com/openshift/installer/pkg/types/openstack"
@@ -38,7 +38,7 @@ type OpenStackActuator struct {
 var _ Actuator = &OpenStackActuator{}
 
 // NewOpenStackActuator is the constructor for building a OpenStackActuator
-func NewOpenStackActuator(masterMachine *machineapi.Machine, scheme *runtime.Scheme, kubeClient client.Client, logger log.FieldLogger) (*OpenStackActuator, error) {
+func NewOpenStackActuator(masterMachine *machinev1beta1.Machine, scheme *runtime.Scheme, kubeClient client.Client, logger log.FieldLogger) (*OpenStackActuator, error) {
 	osImage, err := getOpenStackOSImage(masterMachine, scheme, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting os image from master machine")
@@ -54,7 +54,7 @@ func NewOpenStackActuator(masterMachine *machineapi.Machine, scheme *runtime.Sch
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
 // to sync to the remote cluster.
-func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
+func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machinev1beta1.MachineSet, bool, error) {
 	if cd.Spec.ClusterMetadata == nil {
 		return nil, false, errors.New("ClusterDeployment does not have cluster metadata")
 	}
@@ -139,7 +139,7 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 }
 
 // Get the OS image from an existing master machine.
-func getOpenStackOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+func getOpenStackOSImage(masterMachine *machinev1beta1.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
 	providerSpec, err := decodeOpenStackMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode OpenstackProviderSpec from master machine")
@@ -155,9 +155,9 @@ func getOpenStackOSImage(masterMachine *machineapi.Machine, scheme *runtime.Sche
 	return osImage, nil
 }
 
-func decodeOpenStackMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*openstackproviderv1alpha1.OpenstackProviderSpec, error) {
+func decodeOpenStackMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*machinev1alpha1.OpenstackProviderSpec, error) {
 	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(openstackproviderv1alpha1.SchemeGroupVersion)
+	decoder := codecFactory.UniversalDecoder(machinev1alpha1.GroupVersion)
 	if rawExt == nil {
 		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
 	}
@@ -165,7 +165,7 @@ func decodeOpenStackMachineProviderSpec(rawExt *runtime.RawExtension, scheme *ru
 	if err != nil {
 		return nil, fmt.Errorf("could not decode OpenStack ProviderSpec: %v", err)
 	}
-	spec, ok := obj.(*openstackproviderv1alpha1.OpenstackProviderSpec)
+	spec, ok := obj.(*machinev1alpha1.OpenstackProviderSpec)
 	if !ok {
 		return nil, fmt.Errorf("unexpected object: %#v", gvk)
 	}

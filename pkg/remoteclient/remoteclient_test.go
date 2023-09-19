@@ -13,11 +13,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 )
 
 const (
@@ -226,6 +226,8 @@ func Test_builder_Build(t *testing.T) {
 			builder := NewBuilder(c, cd, "test-controller-name")
 			var err error
 			if !tc.dynamic {
+				// Build is expected to fail due to "no such host" error, as the Build() method
+				// is responsible for testing reachability.
 				_, err = builder.Build()
 			} else {
 				rc, buildErr := builder.BuildDynamic()
@@ -233,7 +235,7 @@ func Test_builder_Build(t *testing.T) {
 				_, err = rc.Resource(hivev1.Resource("ClusterDeployment").WithVersion("v1")).
 					Get(context.Background(), "bad-name", metav1.GetOptions{})
 			}
-			if assert.Error(t, err, "expected error building") {
+			if assert.Error(t, err, "expected error") {
 				assert.Contains(t, err.Error(), tc.expectedHost, "expected to find host in error")
 				assert.Contains(t, err.Error(), "no such host", "expected to find \"no such host\" in error")
 			}
@@ -242,10 +244,7 @@ func Test_builder_Build(t *testing.T) {
 }
 
 func fakeClient(objects ...runtime.Object) client.Client {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).Build()
+	return testfake.NewFakeClientBuilder().WithRuntimeObjects(objects...).Build()
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {

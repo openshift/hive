@@ -12,25 +12,20 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/klog"
-	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 
-	oappsv1 "github.com/openshift/api/apps/v1"
-	orbacv1 "github.com/openshift/api/authorization/v1"
-	oconfigv1 "github.com/openshift/api/config/v1"
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
-	"github.com/openshift/hive/apis"
 	cmdutil "github.com/openshift/hive/cmd/util"
 	"github.com/openshift/hive/pkg/operator"
 	"github.com/openshift/hive/pkg/operator/hive"
 	utillogrus "github.com/openshift/hive/pkg/util/logrus"
+	"github.com/openshift/hive/pkg/util/scheme"
 	"github.com/openshift/hive/pkg/version"
 )
 
@@ -88,6 +83,7 @@ func newRootCommand() *cobra.Command {
 			run := func(ctx context.Context) {
 				// Create a new Cmd to provide shared dependencies and start components
 				mgr, err := manager.New(cfg, manager.Options{
+					Scheme:             scheme.GetScheme(),
 					MetricsBindAddress: ":2112",
 					Logger:             utillogrus.NewLogr(log.StandardLogger()),
 				})
@@ -96,31 +92,6 @@ func newRootCommand() *cobra.Command {
 				}
 
 				log.Info("Registering Components.")
-
-				// Setup Scheme for all resources
-				if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := apiregistrationv1.AddToScheme(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := apiextv1.AddToScheme(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := oappsv1.Install(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := orbacv1.Install(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := oconfigv1.Install(mgr.GetScheme()); err != nil {
-					log.Fatal(err)
-				}
 
 				// Setup all Controllers
 				if err := operator.AddToOperator(mgr); err != nil {

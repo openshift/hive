@@ -54,6 +54,9 @@ type MachinePoolSpec struct {
 
 	// List of taints that will be applied to the created MachineSet's MachineSpec.
 	// This list will overwrite any modifications made to Node taints on an ongoing basis.
+	// In case of duplicate entries, first encountered taint Value will be preserved,
+	// and the rest collapsed on the corresponding MachineSets.
+	// Note that taints are uniquely identified based on key+effect, not just key.
 	// +optional
 	Taints []corev1.Taint `json:"taints,omitempty"`
 }
@@ -100,6 +103,26 @@ type MachinePoolStatus struct {
 	// Conditions includes more detailed status for the cluster deployment
 	// +optional
 	Conditions []MachinePoolCondition `json:"conditions,omitempty"`
+
+	// OwnedLabels lists the keys of labels this MachinePool created on the remote MachineSet.
+	// Used to identify labels to remove from the remote MachineSet when they are absent from
+	// the MachinePool's spec.labels.
+	// +optional
+	OwnedLabels []string `json:"ownedLabels,omitempty"`
+	// OwnedTaints lists identifiers of taints this MachinePool created on the remote MachineSet.
+	// Used to identify taints to remove from the remote MachineSet when they are absent from
+	// the MachinePool's spec.taints.
+	// +optional
+	OwnedTaints []TaintIdentifier `json:"ownedTaints,omitempty"`
+}
+
+// TaintIdentifier uniquely identifies a Taint. (It turns out taints are mutually exclusive by
+// key+effect, not simply by key.)
+type TaintIdentifier struct {
+	// Key matches corev1.Taint.Key.
+	Key string `json:"key,omitempty"`
+	// Effect matches corev1.Taint.Effect.
+	Effect corev1.TaintEffect `json:"effect,omitempty"`
 }
 
 // MachineSetStatus is the status of a machineset in the remote cluster.

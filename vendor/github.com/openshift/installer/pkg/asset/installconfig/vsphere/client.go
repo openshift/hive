@@ -2,7 +2,6 @@ package vsphere
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"time"
 
@@ -31,6 +30,9 @@ type Finder interface {
 	NetworkList(ctx context.Context, path string) ([]object.NetworkReference, error)
 	Network(ctx context.Context, path string) (object.NetworkReference, error)
 	ResourcePool(ctx context.Context, path string) (*object.ResourcePool, error)
+	VirtualMachine(ctx context.Context, path string) (*object.VirtualMachine, error)
+	VirtualMachineList(ctx context.Context, path string) ([]*object.VirtualMachine, error)
+	HostSystemList(ctx context.Context, path string) ([]*object.HostSystem, error)
 }
 
 // NewFinder creates a new client that conforms with the Finder interface and returns a
@@ -63,7 +65,10 @@ func CreateVSphereClients(ctx context.Context, vcenter, username, password strin
 	restClient := rest.NewClient(c.Client)
 	err = restClient.Login(ctx, u.User)
 	if err != nil {
-		c.Logout(context.TODO())
+		logoutErr := c.Logout(context.TODO())
+		if logoutErr != nil {
+			err = logoutErr
+		}
 		return nil, nil, nil, err
 	}
 
@@ -92,11 +97,9 @@ func GetClusterNetworks(ctx context.Context, finder Finder, datacenter, cluster 
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	// Get vSphere Cluster resource in the given Datacenter.
-	path := fmt.Sprintf("/%s/host/%s", datacenter, cluster)
-	ccr, err := finder.ClusterComputeResource(context.TODO(), path)
+	ccr, err := finder.ClusterComputeResource(context.TODO(), cluster)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not find vSphere cluster at %s", path)
+		return nil, errors.Wrapf(err, "could not find vSphere cluster at %s", cluster)
 	}
 
 	// Get list of Networks inside vSphere Cluster

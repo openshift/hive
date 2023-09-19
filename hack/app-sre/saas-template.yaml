@@ -400,7 +400,7 @@ objects:
       - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-region
         name: Region
         type: string
-      - jsonPath: .metadata.labels.hive\.openshift\.io/version-major-minor-patch
+      - jsonPath: .metadata.labels.hive\.openshift\.io/version
         name: Version
         type: string
       - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-type
@@ -546,6 +546,15 @@ objects:
                     platform:
                       description: Platform holds platform-specific cluster metadata
                       properties:
+                        aws:
+                          description: AWS holds AWS-specific cluster metadata
+                          properties:
+                            hostedZoneRole:
+                              description: HostedZoneRole is the role to assume when
+                                performing operations on a hosted zone owned by another
+                                account.
+                              type: string
+                          type: object
                         azure:
                           description: Azure holds azure-specific cluster metadata
                           properties:
@@ -1671,6 +1680,9 @@ objects:
             spec:
               description: ClusterDeprovisionSpec defines the desired state of ClusterDeprovision
               properties:
+                baseDomain:
+                  description: BaseDomain is the DNS base domain.
+                  type: string
                 clusterID:
                   description: ClusterID is a globally unique identifier for the cluster
                     to deprovision. It will be used if specified.
@@ -1694,7 +1706,8 @@ objects:
                         settings
                       properties:
                         baseDomain:
-                          description: BaseDomain is the DNS base domain
+                          description: 'BaseDomain is the DNS base domain. TODO: Use
+                            the non-platform-specific BaseDomain field.'
                           type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef is the Alibaba account
@@ -1742,6 +1755,10 @@ objects:
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
+                        hostedZoneRole:
+                          description: HostedZoneRole is the role to assume when performing
+                            operations on a hosted zone owned by another account.
+                          type: string
                         region:
                           description: Region is the AWS region for this deprovisioning
                           type: string
@@ -1803,7 +1820,8 @@ objects:
                         settings
                       properties:
                         baseDomain:
-                          description: BaseDomain is the DNS base domain
+                          description: 'BaseDomain is the DNS base domain. TODO: Use
+                            the non-platform-specific BaseDomain field.'
                           type: string
                         credentialsSecretRef:
                           description: CredentialsSecretRef is the IBM Cloud credentials
@@ -3786,6 +3804,15 @@ objects:
                     platform:
                       description: Platform holds platform-specific cluster metadata
                       properties:
+                        aws:
+                          description: AWS holds AWS-specific cluster metadata
+                          properties:
+                            hostedZoneRole:
+                              description: HostedZoneRole is the role to assume when
+                                performing operations on a hosted zone owned by another
+                                account.
+                              type: string
+                          type: object
                         azure:
                           description: Azure holds azure-specific cluster metadata
                           properties:
@@ -4226,7 +4253,7 @@ objects:
                               \ in spec.resourceClaims, that are used by this container.\
                               \ \n This is an alpha field and requires enabling the\
                               \ DynamicResourceAllocation feature gate. \n This field\
-                              \ is immutable."
+                              \ is immutable. It can only be set for containers."
                             items:
                               description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                               properties:
@@ -4264,7 +4291,7 @@ objects:
                               compute resources required. If Requests is omitted for
                               a container, it defaults to Limits if that is explicitly
                               specified, otherwise to an implementation-defined value.
-                              More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                              Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                             type: object
                         type: object
                     required:
@@ -4895,6 +4922,13 @@ objects:
                       description: AWS is the configuration used when installing on
                         AWS.
                       properties:
+                        additionalSecurityGroupIDs:
+                          description: AdditionalSecurityGroupIDs contains IDs of
+                            additional security groups for machines, where each ID
+                            is presented in the format sg-xxxx.
+                          items:
+                            type: string
+                          type: array
                         metadataService:
                           description: EC2MetadataOptions defines metadata service
                             interaction options for EC2 instances in the machine pool.
@@ -5291,7 +5325,10 @@ objects:
                 taints:
                   description: List of taints that will be applied to the created
                     MachineSet's MachineSpec. This list will overwrite any modifications
-                    made to Node taints on an ongoing basis.
+                    made to Node taints on an ongoing basis. In case of duplicate
+                    entries, first encountered taint Value will be preserved, and
+                    the rest collapsed on the corresponding MachineSets. Note that
+                    taints are uniquely identified based on key+effect, not just key.
                   items:
                     description: The node this Taint is attached to has the "effect"
                       on any pod that does not tolerate the Taint.
@@ -5408,6 +5445,32 @@ objects:
                     - minReplicas
                     - name
                     - replicas
+                    type: object
+                  type: array
+                ownedLabels:
+                  description: OwnedLabels lists the keys of labels this MachinePool
+                    created on the remote MachineSet. Used to identify labels to remove
+                    from the remote MachineSet when they are absent from the MachinePool's
+                    spec.labels.
+                  items:
+                    type: string
+                  type: array
+                ownedTaints:
+                  description: OwnedTaints lists identifiers of taints this MachinePool
+                    created on the remote MachineSet. Used to identify taints to remove
+                    from the remote MachineSet when they are absent from the MachinePool's
+                    spec.taints.
+                  items:
+                    description: TaintIdentifier uniquely identifies a Taint. (It
+                      turns out taints are mutually exclusive by key+effect, not simply
+                      by key.)
+                    properties:
+                      effect:
+                        description: Effect matches corev1.Taint.Effect.
+                        type: string
+                      key:
+                        description: Key matches corev1.Taint.Key.
+                        type: string
                     type: object
                   type: array
                 replicas:

@@ -29,16 +29,17 @@ import (
 
 var (
 	defaultTimeout = 2 * time.Minute
+	longTimeout    = 10 * time.Minute
 )
 
 // ClusterUninstaller holds the various options for the cluster we want to delete
 type ClusterUninstaller struct {
-	Logger           logrus.FieldLogger
-	Region           string
-	ProjectID        string
-	NetworkProjectID string
-	ClusterID        string
-	Context          context.Context
+	Logger            logrus.FieldLogger
+	Region            string
+	ProjectID         string
+	NetworkProjectID  string
+	PrivateZoneDomain string
+	ClusterID         string
 
 	computeSvc *compute.Service
 	iamSvc     *iam.Service
@@ -67,8 +68,8 @@ func New(logger logrus.FieldLogger, metadata *types.ClusterMetadata) (providers.
 		Region:             metadata.ClusterPlatformMetadata.GCP.Region,
 		ProjectID:          metadata.ClusterPlatformMetadata.GCP.ProjectID,
 		NetworkProjectID:   metadata.ClusterPlatformMetadata.GCP.NetworkProjectID,
+		PrivateZoneDomain:  metadata.ClusterPlatformMetadata.GCP.PrivateZoneDomain,
 		ClusterID:          metadata.InfraID,
-		Context:            context.Background(),
 		cloudControllerUID: gcptypes.CloudControllerUID(metadata.InfraID),
 		requestIDTracker:   newRequestIDTracker(),
 		pendingItemTracker: newPendingItemTracker(),
@@ -77,9 +78,7 @@ func New(logger logrus.FieldLogger, metadata *types.ClusterMetadata) (providers.
 
 // Run is the entrypoint to start the uninstall process
 func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
-	ctx, cancel := o.contextWithTimeout()
-	defer cancel()
-
+	ctx := context.Background()
 	ssn, err := gcpconfig.GetSession(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get session")
@@ -95,9 +94,12 @@ func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 		return nil, errors.Wrap(err, "failed to create compute service")
 	}
 
+	cctx, cancel := context.WithTimeout(ctx, longTimeout)
+	defer cancel()
+
 	o.cpusByMachineType = map[string]int64{}
 	req := o.computeSvc.MachineTypes.AggregatedList(o.ProjectID).Fields("items/*/machineTypes(name,guestCpus),nextPageToken")
-	if err := req.Pages(o.Context, func(list *compute.MachineTypeAggregatedList) error {
+	if err := req.Pages(cctx, func(list *compute.MachineTypeAggregatedList) error {
 		for _, scopedList := range list.Items {
 			for _, item := range scopedList.MachineTypes {
 				o.cpusByMachineType[item.Name] = item.GuestCpus
@@ -143,7 +145,7 @@ func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 func (o *ClusterUninstaller) destroyCluster() (bool, error) {
 	stagedFuncs := [][]struct {
 		name    string
-		execute func() error
+		execute func(ctx context.Context) error
 	}{{
 		{name: "Stop instances", execute: o.stopInstances},
 	}, {
@@ -168,11 +170,15 @@ func (o *ClusterUninstaller) destroyCluster() (bool, error) {
 		{name: "Subnetworks", execute: o.destroySubnetworks},
 		{name: "Networks", execute: o.destroyNetworks},
 	}}
+
+	// create the main Context, so all stages can accept and make context children
+	ctx := context.Background()
+
 	done := true
 	for _, stage := range stagedFuncs {
 		if done {
 			for _, f := range stage {
-				err := f.execute()
+				err := f.execute(ctx)
 				if err != nil {
 					o.Logger.Debugf("%s: %v", f.name, err)
 					done = false
@@ -253,10 +259,6 @@ func aggregateError(errs []error, pending ...int) error {
 		return errors.Errorf("%d items pending", pending[0])
 	}
 	return nil
-}
-
-func (o *ClusterUninstaller) contextWithTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(o.Context, defaultTimeout)
 }
 
 // requestIDTracker keeps track of a set of request IDs mapped to a unique resource

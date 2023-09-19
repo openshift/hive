@@ -6,15 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1vpshere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const testAWSIC = `apiVersion: v1
@@ -48,7 +47,6 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: 10.0.0.0/16
-  networkType: OpenShiftSDN
   serviceNetwork:
   - 172.30.0.0/16
 platform:
@@ -87,7 +85,6 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: 10.0.0.0/16
-  networkType: OpenShiftSDN
   serviceNetwork:
   - 172.30.0.0/16
 platform:
@@ -127,7 +124,6 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: 10.0.0.0/16
-  networkType: OpenShiftSDN
   serviceNetwork:
   - 172.30.0.0/16
 platform:
@@ -154,9 +150,8 @@ pullSecret: ""
 `
 
 func TestInstallConfigValidation(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-
-	cdBuilder := testcd.FullBuilder("testns", "testcluster", scheme.Scheme)
+	scheme := scheme.GetScheme()
+	cdBuilder := testcd.FullBuilder("testns", "testcluster", scheme)
 
 	tests := []struct {
 		name          string

@@ -26,7 +26,7 @@ spec:
     - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-region
       name: Region
       type: string
-    - jsonPath: .metadata.labels.hive\.openshift\.io/version-major-minor-patch
+    - jsonPath: .metadata.labels.hive\.openshift\.io/version
       name: Version
       type: string
     - jsonPath: .metadata.labels.hive\.openshift\.io/cluster-type
@@ -170,6 +170,15 @@ spec:
                   platform:
                     description: Platform holds platform-specific cluster metadata
                     properties:
+                      aws:
+                        description: AWS holds AWS-specific cluster metadata
+                        properties:
+                          hostedZoneRole:
+                            description: HostedZoneRole is the role to assume when
+                              performing operations on a hosted zone owned by another
+                              account.
+                            type: string
+                        type: object
                       azure:
                         description: Azure holds azure-specific cluster metadata
                         properties:

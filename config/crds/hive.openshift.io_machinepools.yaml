@@ -123,6 +123,13 @@ spec:
                     description: AWS is the configuration used when installing on
                       AWS.
                     properties:
+                      additionalSecurityGroupIDs:
+                        description: AdditionalSecurityGroupIDs contains IDs of additional
+                          security groups for machines, where each ID is presented
+                          in the format sg-xxxx.
+                        items:
+                          type: string
+                        type: array
                       metadataService:
                         description: EC2MetadataOptions defines metadata service interaction
                           options for EC2 instances in the machine pool.
@@ -515,7 +522,10 @@ spec:
               taints:
                 description: List of taints that will be applied to the created MachineSet's
                   MachineSpec. This list will overwrite any modifications made to
-                  Node taints on an ongoing basis.
+                  Node taints on an ongoing basis. In case of duplicate entries, first
+                  encountered taint Value will be preserved, and the rest collapsed
+                  on the corresponding MachineSets. Note that taints are uniquely
+                  identified based on key+effect, not just key.
                 items:
                   description: The node this Taint is attached to has the "effect"
                     on any pod that does not tolerate the Taint.
@@ -630,6 +640,32 @@ spec:
                   - minReplicas
                   - name
                   - replicas
+                  type: object
+                type: array
+              ownedLabels:
+                description: OwnedLabels lists the keys of labels this MachinePool
+                  created on the remote MachineSet. Used to identify labels to remove
+                  from the remote MachineSet when they are absent from the MachinePool's
+                  spec.labels.
+                items:
+                  type: string
+                type: array
+              ownedTaints:
+                description: OwnedTaints lists identifiers of taints this MachinePool
+                  created on the remote MachineSet. Used to identify taints to remove
+                  from the remote MachineSet when they are absent from the MachinePool's
+                  spec.taints.
+                items:
+                  description: TaintIdentifier uniquely identifies a Taint. (It turns
+                    out taints are mutually exclusive by key+effect, not simply by
+                    key.)
+                  properties:
+                    effect:
+                      description: Effect matches corev1.Taint.Effect.
+                      type: string
+                    key:
+                      description: Key matches corev1.Taint.Key.
+                      type: string
                   type: object
                 type: array
               replicas:

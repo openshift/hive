@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
+	icaws "github.com/openshift/installer/pkg/asset/installconfig/aws"
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
 	installertypesaws "github.com/openshift/installer/pkg/types/aws"
 
@@ -110,14 +111,30 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		return nil, false, fmt.Errorf("unable to get cluster version: %v", err)
 	}
 
+	supportedConfig := true
+	var reason, msg string
+
 	if isUsingUnsupportedSpotMarketOptions(pool, clusterVersion, logger) {
+		supportedConfig = false
 		logger.WithField("clusterVersion", clusterVersion).Debug("cluster does not support spot instances")
+		reason = "UnsupportedSpotMarketOptions"
+		msg = "The version of the cluster does not support using spot instances"
+	}
+
+	// The extra-worker-security-group back door can't be used with the supported AdditionalSecurityGroupIDs
+	if metav1.HasAnnotation(pool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) && len(pool.Spec.Platform.AWS.AdditionalSecurityGroupIDs) != 0 {
+		supportedConfig = false
+		reason = "SecurityGroupOptionConflict"
+		msg = fmt.Sprintf("The %s annotation cannot be used with AdditionalSecurityGroupIDs", constants.ExtraWorkerSecurityGroupAnnotation)
+	}
+
+	if !supportedConfig {
 		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
 			pool.Status.Conditions,
 			hivev1.UnsupportedConfigurationMachinePoolCondition,
 			corev1.ConditionTrue,
-			"UnsupportedSpotMarketOptions",
-			"The version of the cluster does not support using spot instances",
+			reason,
+			msg,
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
 		if changed {
@@ -128,6 +145,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		}
 		return nil, false, nil
 	}
+
 	statusChanged := false
 	pool.Status.Conditions, statusChanged = controllerutils.SetMachinePoolConditionWithChangeCheck(
 		pool.Status.Conditions,
@@ -148,7 +166,8 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 			Type:      pool.Spec.Platform.AWS.EC2RootVolume.Type,
 			KMSKeyARN: pool.Spec.Platform.AWS.EC2RootVolume.KMSKeyARN,
 		},
-		Zones: pool.Spec.Platform.AWS.Zones,
+		Zones:                      pool.Spec.Platform.AWS.Zones,
+		AdditionalSecurityGroupIDs: pool.Spec.Platform.AWS.AdditionalSecurityGroupIDs,
 	}
 
 	if pool.Spec.Platform.AWS.EC2Metadata != nil {
@@ -316,13 +335,6 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 		}
 	}
 
-	providerConfig.SecurityGroups = []machineapi.AWSResourceReference{{
-		Filters: []machineapi.Filter{{
-			Name:   "tag:Name",
-			Values: []string{fmt.Sprintf("%s-worker-sg", infraID)},
-		}},
-	}}
-
 	// Day 2: Hive MachinePools with an ExtraWorkerSecurityGroupAnnotation are configured with the additional
 	// security group value specified in the annotation. For details, see HIVE-1802.
 	//
@@ -353,14 +365,14 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 // spec matches the number of AZs, we will not check whether they are public or private. However, if there
 // are two subnets per AZ, we will filter out the public ones, leaving only the private ones. If the pool
 // specifies no subnets, an empty map is returned (this is a valid configuration, not an error).
-func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (map[string]string, error) {
+func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (icaws.Subnets, error) {
 	// Preflight
 	numZones := len(pool.Spec.Platform.AWS.Zones)
 	numSubnets := len(pool.Spec.Platform.AWS.Subnets)
 	switch numSubnets {
 	case 0:
 		// Zero subnets is legal.
-		return map[string]string{}, nil
+		return icaws.Subnets{}, nil
 	case numZones, 2 * numZones:
 		// One per zone, or one public and one private per zone, is legal, and will be validated later.
 		break
@@ -558,18 +570,33 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 	return "", false
 }
 
+func stringDereference(s *string) string {
+
+	if s != nil {
+		return *s
+	}
+	return ""
+}
+
 // validateSubnets ensures there's exactly one subnet per availability zone, and returns
 // the mapping of subnets by availability zone
-func (a *AWSActuator) validateSubnets(subnets []*ec2.Subnet, pool *hivev1.MachinePool) (map[string]string, error) {
+func (a *AWSActuator) validateSubnets(subnets []*ec2.Subnet, pool *hivev1.MachinePool) (icaws.Subnets, error) {
 	conflictingSubnets := sets.NewString()
-	subnetsByAvailabilityZone := make(map[string]string, len(subnets))
+	subnetsByAvailabilityZone := make(icaws.Subnets, len(subnets))
 	for _, subnet := range subnets {
-		if subnetID, ok := subnetsByAvailabilityZone[*subnet.AvailabilityZone]; ok {
+		if oldSubnet, ok := subnetsByAvailabilityZone[*subnet.AvailabilityZone]; ok {
 			conflictingSubnets.Insert(*subnet.SubnetId)
-			conflictingSubnets.Insert(subnetID)
+			conflictingSubnets.Insert(oldSubnet.ID)
 			continue
 		}
-		subnetsByAvailabilityZone[*subnet.AvailabilityZone] = *subnet.SubnetId
+		az := stringDereference(subnet.AvailabilityZone)
+		subnetsByAvailabilityZone[az] = icaws.Subnet{
+			ID:   stringDereference(subnet.SubnetId),
+			ARN:  stringDereference(subnet.SubnetArn),
+			Zone: az,
+			CIDR: stringDereference(subnet.CidrBlock),
+			// TODO: populate local zone fields, Public, ZoneType, ZoneGroupName
+		}
 	}
 
 	var msg, reason string

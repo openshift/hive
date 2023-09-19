@@ -7,29 +7,25 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // fakeBuilder builds fake clients for fake clusters. Used to simulate communication with a cluster
 // that doesn't actually exist in scale testing.
 type fakeBuilder struct {
-	urlToUse int
+	urlToUse       int
+	clusterVersion string
 }
 
 // Build returns a fake controller-runtime test client populated with the resources we expect to query for a
 // fake cluster.
 func (b *fakeBuilder) Build() (client.Client, error) {
-
-	scheme, err := buildScheme()
-	if err != nil {
-		return nil, err
-	}
 
 	fakeObjects := []runtime.Object{
 		&routev1.Route{
@@ -48,7 +44,7 @@ func (b *fakeBuilder) Build() (client.Client, error) {
 			},
 			Status: configv1.ClusterVersionStatus{
 				Desired: configv1.Release{
-					Version: "4.6.8",
+					Version: b.clusterVersion,
 				},
 			},
 		},
@@ -96,7 +92,7 @@ func (b *fakeBuilder) Build() (client.Client, error) {
 		})
 	}
 
-	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(fakeObjects...).Build(), nil
+	return testfake.NewFakeClientBuilder().WithRuntimeObjects(fakeObjects...).Build(), nil
 }
 
 func (b *fakeBuilder) BuildDynamic() (dynamic.Interface, error) {

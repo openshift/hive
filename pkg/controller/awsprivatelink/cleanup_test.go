@@ -4,20 +4,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	"github.com/openshift/hive/pkg/test/generic"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func TestCleanupRequired(t *testing.T) {
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-
+	scheme := scheme.GetScheme()
 	cdBuilder := testcd.FullBuilder(testNS, "test-cd", scheme)
 
 	tests := []struct {

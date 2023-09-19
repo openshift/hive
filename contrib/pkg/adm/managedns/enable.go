@@ -23,11 +23,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hiveutils "github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
@@ -36,6 +34,7 @@ import (
 	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/resource"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const longDesc = `
@@ -121,9 +120,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 // Run executes the command
 func (o *Options) Run(args []string) error {
-	if err := apis.AddToScheme(scheme.Scheme); err != nil {
-		return err
-	}
+	scheme := scheme.GetScheme()
 	rh, err := o.getResourceHelper()
 	if err != nil {
 		return err
@@ -189,7 +186,7 @@ func (o *Options) Run(args []string) error {
 
 	log.Infof("created cloud credentials secret: %s", credsSecret.Name)
 	credsSecret.Namespace = hiveNSName
-	if _, err := rh.ApplyRuntimeObject(credsSecret, scheme.Scheme); err != nil {
+	if _, err := rh.ApplyRuntimeObject(credsSecret, scheme); err != nil {
 		log.WithError(err).Fatal("failed to save generated secret")
 	}
 

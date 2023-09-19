@@ -205,20 +205,20 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconc
 	}
 
 	// Watch for changes to ClusterDeployment
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	// Watch for changes to SyncSets
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.SyncSet{}},
+		source.Kind(mgr.GetCache(), &hivev1.SyncSet{}),
 		handler.EnqueueRequestsFromMapFunc(requestsForSyncSet)); err != nil {
 		return err
 	}
 
 	// Watch for changes to SelectorSyncSets
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.SelectorSyncSet{}},
+		source.Kind(mgr.GetCache(), &hivev1.SelectorSyncSet{}),
 		handler.EnqueueRequestsFromMapFunc(requestsForSelectorSyncSet(r.Client, r.logger))); err != nil {
 		return err
 	}
@@ -226,21 +226,21 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconc
 	// Watch for changes to ClusterSync. These have the same name/namespace as the relevant
 	// ClusterDeployment, so when a ClusterSync watch triggers, the CD of the same name will be reconciled.
 	// When the CD reconciles, it will look up the related ClusterSync.
-	if err := c.Watch(&source.Kind{Type: &hiveintv1alpha1.ClusterSync{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hiveintv1alpha1.ClusterSync{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterSyncLease. These have the same name/namespace as the relevant
 	// ClusterDeployment, so when a ClusterSyncLease watch triggers, the CD of the same name will be reconciled.
 	// When the CD reconciles, it will look up the related ClusterSyncLease.
-	if err := c.Watch(&source.Kind{Type: &hiveintv1alpha1.ClusterSyncLease{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hiveintv1alpha1.ClusterSyncLease{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func requestsForSyncSet(o client.Object) []reconcile.Request {
+func requestsForSyncSet(ctx context.Context, o client.Object) []reconcile.Request {
 	ss, ok := o.(*hivev1.SyncSet)
 	if !ok {
 		return nil
@@ -254,7 +254,7 @@ func requestsForSyncSet(o client.Object) []reconcile.Request {
 }
 
 func requestsForSelectorSyncSet(c client.Client, logger log.FieldLogger) handler.MapFunc {
-	return func(o client.Object) []reconcile.Request {
+	return func(ctx context.Context, o client.Object) []reconcile.Request {
 		sss, ok := o.(*hivev1.SelectorSyncSet)
 		if !ok {
 			return nil
@@ -377,7 +377,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 			logger.Info("ClusterDeployment not found")
 			return reconcile.Result{}, nil
 		}
-		log.WithError(err).Error("failed to get ClusterDeployment")
+		logger.WithError(err).Error("failed to get ClusterDeployment")
 		return reconcile.Result{}, err
 	}
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, logger)
@@ -422,7 +422,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 	// If this cluster carries the fake annotation we will fake out all helper communication with it.
 	resourceHelper, err := r.resourceHelperBuilder(cd, r.remoteClusterAPIClientBuilder, logger)
 	if err != nil {
-		log.WithError(err).Error("cannot create helper")
+		logger.WithError(err).Error("cannot create helper")
 		return reconcile.Result{}, err
 	}
 

@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
+	hiveinternalv1alpha1 "github.com/openshift/hive/pkg/client/applyconfiguration/hiveinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,9 +22,9 @@ type FakeClusterSyncLeases struct {
 	ns   string
 }
 
-var clustersyncleasesResource = schema.GroupVersionResource{Group: "hiveinternal.openshift.io", Version: "v1alpha1", Resource: "clustersyncleases"}
+var clustersyncleasesResource = v1alpha1.SchemeGroupVersion.WithResource("clustersyncleases")
 
-var clustersyncleasesKind = schema.GroupVersionKind{Group: "hiveinternal.openshift.io", Version: "v1alpha1", Kind: "ClusterSyncLease"}
+var clustersyncleasesKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterSyncLease")
 
 // Get takes name of the clusterSyncLease, and returns the corresponding clusterSyncLease object, and an error if there is any.
 func (c *FakeClusterSyncLeases) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterSyncLease, err error) {
@@ -106,6 +108,28 @@ func (c *FakeClusterSyncLeases) DeleteCollection(ctx context.Context, opts v1.De
 func (c *FakeClusterSyncLeases) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterSyncLease, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(clustersyncleasesResource, c.ns, name, pt, data, subresources...), &v1alpha1.ClusterSyncLease{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.ClusterSyncLease), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterSyncLease.
+func (c *FakeClusterSyncLeases) Apply(ctx context.Context, clusterSyncLease *hiveinternalv1alpha1.ClusterSyncLeaseApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterSyncLease, err error) {
+	if clusterSyncLease == nil {
+		return nil, fmt.Errorf("clusterSyncLease provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(clusterSyncLease)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterSyncLease.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterSyncLease.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(clustersyncleasesResource, c.ns, *name, types.ApplyPatchType, data), &v1alpha1.ClusterSyncLease{})
 
 	if obj == nil {
 		return nil, err

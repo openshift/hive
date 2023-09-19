@@ -68,7 +68,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		statusModified = true
 	}
 
-	conditions := cd.Status.Conditions
+	conditions := cd.DeepCopy().Status.Conditions
 
 	// copy the required conditions
 	requiredConditions := []hivev1.ClusterInstallConditionType{
@@ -192,8 +192,8 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			// we are done provisioning
 			cd.Spec.Installed = true
 			cd.Status.InstalledTimestamp = &clusterInstallCompleted.LastTransitionTime
-			cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
-				cd.Status.Conditions,
+			conditions = controllerutils.SetClusterDeploymentCondition(
+				conditions,
 				hivev1.ProvisionedCondition,
 				corev1.ConditionTrue,
 				hivev1.ProvisionedReasonProvisioned,
@@ -320,7 +320,7 @@ func (r *ReconcileClusterDeployment) watchClusterInstall(gvk schema.GroupVersion
 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(gvk)
-	err := r.watcher.Watch(&source.Kind{Type: obj}, handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+	err := r.watcher.Watch(source.Kind(r.Manager.GetCache(), obj), handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 		retval := []reconcile.Request{}
 
 		cdList := &hivev1.ClusterDeploymentList{}

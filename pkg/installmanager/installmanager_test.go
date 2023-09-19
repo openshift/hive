@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,10 +27,10 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	installertypes "github.com/openshift/installer/pkg/types"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/util/scheme"
 	yamlutils "github.com/openshift/hive/pkg/util/yaml"
 )
 
@@ -84,7 +83,6 @@ func init() {
 }
 
 func TestInstallManager(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
 		name                          string
 		existing                      []runtime.Object
@@ -468,7 +466,6 @@ REDACTED LINE OF OUTPUT`,
 }
 
 func TestInstallManagerSSH(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                    string
@@ -621,7 +618,6 @@ func TestInstallManagerSSH(t *testing.T) {
 	}
 }
 func TestInstallManagerSSHKnownHosts(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name         string
@@ -819,7 +815,6 @@ spec:
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			machineapi.AddToScheme(scheme.Scheme)
 
 			pool := &hivev1.MachinePool{
 				ObjectMeta: metav1.ObjectMeta{
@@ -843,7 +838,8 @@ spec:
 				assert.NoError(t, err, "unexpected error patching worker machineset manifests")
 			}
 
-			codecFactory := serializer.NewCodecFactory(scheme.Scheme)
+			scheme := scheme.GetScheme()
+			codecFactory := serializer.NewCodecFactory(scheme)
 			decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
 
 			if tc.expectModified {

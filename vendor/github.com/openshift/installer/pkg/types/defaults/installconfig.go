@@ -42,11 +42,6 @@ func SetInstallConfigDefaults(c *types.InstallConfig) {
 				{CIDR: *libvirtdefaults.DefaultMachineCIDR},
 			}
 		}
-		if c.Platform.PowerVS != nil {
-			c.Networking.MachineNetwork = []types.MachineNetworkEntry{
-				{CIDR: *powervsdefaults.DefaultMachineCIDR},
-			}
-		}
 	}
 	if c.Networking.NetworkType == "" {
 		c.Networking.NetworkType = defaultNetworkType
@@ -72,8 +67,16 @@ func SetInstallConfigDefaults(c *types.InstallConfig) {
 	}
 	c.ControlPlane.Name = "master"
 	SetMachinePoolDefaults(c.ControlPlane, c.Platform.Name())
-	if len(c.Compute) == 0 {
-		c.Compute = []types.MachinePool{{Name: "worker"}}
+
+	defaultComputePoolUndefined := true
+	for _, compute := range c.Compute {
+		if compute.Name == types.MachinePoolComputeRoleName {
+			defaultComputePoolUndefined = false
+			break
+		}
+	}
+	if defaultComputePoolUndefined {
+		c.Compute = append(c.Compute, types.MachinePool{Name: types.MachinePoolComputeRoleName})
 	}
 	for i := range c.Compute {
 		SetMachinePoolDefaults(&c.Compute[i], c.Platform.Name())
@@ -114,6 +117,9 @@ func SetInstallConfigDefaults(c *types.InstallConfig) {
 		}
 	case c.Platform.PowerVS != nil:
 		powervsdefaults.SetPlatformDefaults(c.Platform.PowerVS)
+		c.Networking.MachineNetwork = []types.MachineNetworkEntry{
+			{CIDR: *powervsdefaults.DefaultMachineCIDR},
+		}
 	case c.Platform.None != nil:
 		nonedefaults.SetPlatformDefaults(c.Platform.None)
 	case c.Platform.Nutanix != nil:

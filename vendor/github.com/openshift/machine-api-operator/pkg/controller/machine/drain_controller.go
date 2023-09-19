@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/drain"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -78,7 +79,7 @@ func (d *machineDrainController) Reconcile(ctx context.Context, request reconcil
 	existingDrainedCondition := conditions.Get(m, machinev1.MachineDrained)
 	alreadyDrained := existingDrainedCondition != nil && existingDrainedCondition.Status == corev1.ConditionTrue
 
-	if !m.ObjectMeta.DeletionTimestamp.IsZero() && stringPointerDeref(m.Status.Phase) == phaseDeleting && !alreadyDrained {
+	if !m.ObjectMeta.DeletionTimestamp.IsZero() && pointer.StringDeref(m.Status.Phase, "") == machinev1.PhaseDeleting && !alreadyDrained {
 		drainFinishedCondition := conditions.TrueCondition(machinev1.MachineDrained)
 
 		if _, exists := m.ObjectMeta.Annotations[ExcludeNodeDrainingAnnotation]; !exists && m.Status.NodeRef != nil {

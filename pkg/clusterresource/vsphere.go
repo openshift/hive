@@ -133,18 +133,20 @@ func (p *VSphereCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.Mach
 }
 
 func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
+
+	// TODO: Watch for removal of deprecated fields https://issues.redhat.com/browse/SPLAT-1093
 	ic.Platform = installertypes.Platform{
 		VSphere: &installervsphere.Platform{
-			VCenter:          p.VCenter,
-			Username:         p.Username,
-			Password:         p.Password,
-			Datacenter:       p.Datacenter,
-			DefaultDatastore: p.DefaultDatastore,
-			Folder:           p.Folder,
-			Cluster:          p.Cluster,
-			APIVIPs:          []string{p.APIVIP},
-			IngressVIPs:      []string{p.IngressVIP},
-			Network:          p.Network,
+			DeprecatedVCenter:          p.VCenter,
+			DeprecatedUsername:         p.Username,
+			DeprecatedPassword:         p.Password,
+			DeprecatedDatacenter:       p.Datacenter,
+			DeprecatedDefaultDatastore: p.DefaultDatastore,
+			DeprecatedFolder:           p.Folder,
+			DeprecatedCluster:          p.Cluster,
+			APIVIPs:                    []string{p.APIVIP},
+			IngressVIPs:                []string{p.IngressVIP},
+			DeprecatedNetwork:          p.Network,
 		},
 	}
 }

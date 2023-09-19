@@ -1,5 +1,9 @@
 package vsphere
 
+import (
+	configv1 "github.com/openshift/api/config/v1"
+)
+
 // DiskType is a disk provisioning type for vsphere.
 // +kubebuilder:validation:Enum="";thin;thick;eagerZeroedThick
 type DiskType string
@@ -27,28 +31,45 @@ const (
 	TagCategoryZone = "openshift-zone"
 )
 
-// Platform stores any global configuration used for vsphere platforms
+const (
+	// ControlPlaneRole represents control-plane nodes.
+	ControlPlaneRole = "control-plane"
+	// ComputeRole represents worker nodes.
+	ComputeRole = "compute"
+	// BootstrapRole represents bootstrap nodes.
+	BootstrapRole = "bootstrap"
+)
+
+// Platform stores any global configuration used for vsphere platforms.
 type Platform struct {
 	// VCenter is the domain name or IP address of the vCenter.
-	VCenter string `json:"vCenter"`
+	// Deprecated: Use VCenters.Server
+	DeprecatedVCenter string `json:"vCenter,omitempty"`
 	// Username is the name of the user to use to connect to the vCenter.
-	Username string `json:"username"`
+	// Deprecated: Use VCenters.Username
+	DeprecatedUsername string `json:"username,omitempty"`
 	// Password is the password for the user to use to connect to the vCenter.
-	Password string `json:"password"`
+	// Deprecated: Use VCenters.Password
+	DeprecatedPassword string `json:"password,omitempty"`
 	// Datacenter is the name of the datacenter to use in the vCenter.
-	Datacenter string `json:"datacenter"`
+	// Deprecated: Use FailureDomains.Topology.Datacenter
+	DeprecatedDatacenter string `json:"datacenter,omitempty"`
 	// DefaultDatastore is the default datastore to use for provisioning volumes.
-	DefaultDatastore string `json:"defaultDatastore"`
+	// Deprecated: Use FailureDomains.Topology.Datastore
+	DeprecatedDefaultDatastore string `json:"defaultDatastore,omitempty"`
 	// Folder is the absolute path of the folder that will be used and/or created for
 	// virtual machines. The absolute path is of the form /<datacenter>/vm/<folder>/<subfolder>.
 	// +kubebuilder:validation:Pattern=`^/.*?/vm/.*?`
 	// +optional
-	Folder string `json:"folder,omitempty"`
+	// Deprecated: Use FailureDomains.Topology.Folder
+	DeprecatedFolder string `json:"folder,omitempty"`
 	// Cluster is the name of the cluster virtual machines will be cloned into.
-	Cluster string `json:"cluster,omitempty"`
+	// Deprecated: Use FailureDomains.Topology.Cluster
+	DeprecatedCluster string `json:"cluster,omitempty"`
 	// ResourcePool is the absolute path of the resource pool where virtual machines will be
 	// created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>.
-	ResourcePool string `json:"resourcePool,omitempty"`
+	// Deprecated: Use FailureDomains.Topology.ResourcePool
+	DeprecatedResourcePool string `json:"resourcePool,omitempty"`
 	// ClusterOSImage overrides the url provided in rhcos.json to download the RHCOS OVA
 	ClusterOSImage string `json:"clusterOSImage,omitempty"`
 
@@ -90,7 +111,8 @@ type Platform struct {
 	// +optional
 	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
 	// Network specifies the name of the network to be used by the cluster.
-	Network string `json:"network,omitempty"`
+	// Deprecated: Use FailureDomains.Topology.Network
+	DeprecatedNetwork string `json:"network,omitempty"`
 	// DiskType is the name of the disk provisioning type,
 	// valid values are thin, thick, and eagerZeroedThick. When not
 	// specified, it will be set according to the default storage policy
@@ -107,13 +129,20 @@ type Platform struct {
 	// If this is omitted failure domains (regions and zones) will not be used.
 	// +kubebuilder:validation:Optional
 	FailureDomains []FailureDomain `json:"failureDomains,omitempty"`
+
+	// LoadBalancer defines how the load balancer used by the cluster is configured.
+	// LoadBalancer is available in TechPreview.
+	// +optional
+	LoadBalancer *configv1.VSpherePlatformLoadBalancer `json:"loadBalancer,omitempty"`
+	// Hosts defines network configurations to be applied by the installer. Hosts is available in TechPreview.
+	Hosts []*Host `json:"hosts,omitempty"`
 }
 
 // FailureDomain holds the region and zone failure domain and
 // the vCenter topology of that failure domain.
 type FailureDomain struct {
 	// name defines the name of the FailureDomain
-	// This name is abritrary but will be used
+	// This name is arbitrary but will be used
 	// in VSpherePlatformDeploymentZone for association.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
@@ -176,6 +205,13 @@ type Topology struct {
 	// +kubebuilder:validation:Pattern=`^/.*?/vm/.*?`
 	// +optional
 	Folder string `json:"folder,omitempty"`
+	// template is the inventory path of the virtual machine or template
+	// that will be used for cloning.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=2048
+	// +kubebuilder:validation:Pattern=`^/.*?/vm/.*?`
+	// +optional
+	Template string `json:"template,omitempty"`
 }
 
 // VCenter stores the vCenter connection fields
@@ -192,7 +228,7 @@ type VCenter struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=32767
 	// +kubebuilder:default=443
-	Port uint `json:"port,omitempty"`
+	Port int32 `json:"port,omitempty"`
 	// Username is the username that will be used to connect to vCenter
 	// +kubebuilder:validation:Required
 	Username string `json:"user"`
@@ -203,4 +239,60 @@ type VCenter struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	Datacenters []string `json:"datacenters"`
+}
+
+// Host defines host VMs to generate as part of the installation.
+type Host struct {
+	// FailureDomain refers to the name of a FailureDomain as described in https://github.com/openshift/enhancements/blob/master/enhancements/installer/vsphere-ipi-zonal.md
+	// +optional
+	FailureDomain string `json:"failureDomain"`
+	// NetworkDeviceSpec to be applied to the host
+	// +kubebuilder:validation:Required
+	NetworkDevice *NetworkDeviceSpec `json:"networkDevice"`
+	// Role defines the role of the node
+	// +kubebuilder:validation:Enum="";bootstrap;control-plane;compute
+	// +kubebuilder:validation:Required
+	Role string `json:"role"`
+}
+
+// NetworkDeviceSpec defines network config for static IP assignment.
+type NetworkDeviceSpec struct {
+	// gateway is an IPv4 or IPv6 address which represents the subnet gateway,
+	// for example, 192.168.1.1.
+	// +kubebuilder:validation:Format=ipv4
+	// +kubebuilder:validation:Format=ipv6
+	Gateway string `json:"gateway,omitempty"`
+
+	// ipAddrs is a list of one or more IPv4 and/or IPv6 addresses and CIDR to assign to
+	// this device, for example, 192.168.1.100/24. IP addresses provided via ipAddrs are
+	// intended to allow explicit assignment of a machine's IP address.
+	// +kubebuilder:validation:Format=ipv4
+	// +kubebuilder:validation:Format=ipv6
+	// +kubebuilder:example=192.168.1.100/24
+	// +kubebuilder:example=2001:DB8:0000:0000:244:17FF:FEB6:D37D/64
+	// +kubebuilder:validation:Required
+	IPAddrs []string `json:"ipAddrs"`
+
+	// nameservers is a list of IPv4 and/or IPv6 addresses used as DNS nameservers, for example,
+	// 8.8.8.8. a nameserver is not provided by a fulfilled IPAddressClaim. If DHCP is not the
+	// source of IP addresses for this network device, nameservers should include a valid nameserver.
+	// +kubebuilder:validation:Format=ipv4
+	// +kubebuilder:validation:Format=ipv6
+	// +kubebuilder:example=8.8.8.8
+	Nameservers []string `json:"nameservers,omitempty"`
+}
+
+// IsControlPlane checks if the current host is a master.
+func (h *Host) IsControlPlane() bool {
+	return h.Role == ControlPlaneRole
+}
+
+// IsCompute checks if the current host is a worker.
+func (h *Host) IsCompute() bool {
+	return h.Role == ComputeRole
+}
+
+// IsBootstrap checks if the current host is a bootstrap.
+func (h *Host) IsBootstrap() bool {
+	return h.Role == BootstrapRole
 }

@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
 	scheme "github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type CheckpointInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.CheckpointList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Checkpoint, err error)
+	Apply(ctx context.Context, checkpoint *hivev1.CheckpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Checkpoint, err error)
+	ApplyStatus(ctx context.Context, checkpoint *hivev1.CheckpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Checkpoint, err error)
 	CheckpointExpansion
 }
 
@@ -172,6 +177,62 @@ func (c *checkpoints) Patch(ctx context.Context, name string, pt types.PatchType
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied checkpoint.
+func (c *checkpoints) Apply(ctx context.Context, checkpoint *hivev1.CheckpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Checkpoint, err error) {
+	if checkpoint == nil {
+		return nil, fmt.Errorf("checkpoint provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(checkpoint)
+	if err != nil {
+		return nil, err
+	}
+	name := checkpoint.Name
+	if name == nil {
+		return nil, fmt.Errorf("checkpoint.Name must be provided to Apply")
+	}
+	result = &v1.Checkpoint{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("checkpoints").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *checkpoints) ApplyStatus(ctx context.Context, checkpoint *hivev1.CheckpointApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Checkpoint, err error) {
+	if checkpoint == nil {
+		return nil, fmt.Errorf("checkpoint provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(checkpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	name := checkpoint.Name
+	if name == nil {
+		return nil, fmt.Errorf("checkpoint.Name must be provided to Apply")
+	}
+
+	result = &v1.Checkpoint{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("checkpoints").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

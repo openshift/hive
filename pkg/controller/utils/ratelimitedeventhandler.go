@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"context"
+
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -28,12 +30,12 @@ type rateLimitedUpdateEventHandler struct {
 var _ handler.EventHandler = &rateLimitedUpdateEventHandler{}
 
 // Update implements handler.EventHandler
-func (h *rateLimitedUpdateEventHandler) Update(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (h *rateLimitedUpdateEventHandler) Update(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
 	nq := q
 	if h.shouldRateLimit(e) {
 		nq = &rateLimitedAddQueue{q}
 	}
-	h.EventHandler.Update(e, nq)
+	h.EventHandler.Update(ctx, e, nq)
 }
 
 // rateLimitedAddQueue add queue wraps RateLimitingInterface queue

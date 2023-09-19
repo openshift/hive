@@ -2,6 +2,7 @@ package azure
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/go-autorest/autorest"
 	azureenv "github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/jongio/azidext/go/azidext"
 	azurekiota "github.com/microsoft/kiota-authentication-azure-go"
 	"github.com/pkg/errors"
@@ -29,12 +29,25 @@ var (
 	onceLoggers         = map[string]*sync.Once{}
 )
 
+// AuthenticationType identifies the authentication method used.
+type AuthenticationType int
+
+// The authentication types supported by the installer.
+const (
+	ClientSecretAuth AuthenticationType = iota
+	ClientCertificateAuth
+	ManagedIdentityAuth
+)
+
 // Session is an object representing session for subscription
 type Session struct {
 	Authorizer   autorest.Authorizer
 	Credentials  Credentials
 	Environment  azureenv.Environment
 	AuthProvider *azurekiota.AzureIdentityAuthenticationProvider
+	TokenCreds   azcore.TokenCredential
+	CloudConfig  cloud.Configuration
+	AuthType     AuthenticationType
 }
 
 // Credentials is the data type for credentials as understood by the azure sdk
@@ -43,8 +56,8 @@ type Credentials struct {
 	ClientID                  string `json:"clientId,omitempty"`
 	ClientSecret              string `json:"clientSecret,omitempty"`
 	TenantID                  string `json:"tenantId,omitempty"`
-	ClientCertificatePath     string `json:"certificatePath,omitempty"`
-	ClientCertificatePassword string `json:"certificatePassword,omitempty"`
+	ClientCertificatePath     string `json:"clientCertificate,omitempty"`
+	ClientCertificatePassword string `json:"clientCertificatePassword,omitempty"`
 }
 
 // GetSession returns an azure session by using credentials found in ~/.azure/osServicePrincipal.json
@@ -90,57 +103,75 @@ func GetSessionWithCredentials(cloudName azure.CloudEnvironment, armEndpoint str
 	}
 
 	if credentials == nil {
-		credentials, err = credentialsFromFileOrUser(&cloudEnv)
+		credentials, err = credentialsFromFileOrUser()
 		if err != nil {
 			return nil, err
 		}
 	}
 	var cred azcore.TokenCredential
-	if credentials.ClientCertificatePath != "" {
+	var authType AuthenticationType
+	switch {
+	case credentials.ClientCertificatePath != "":
+		logrus.Warnf("Using client certs to authenticate. Please be warned cluster does not support certs and only the installer does.")
 		cred, err = newTokenCredentialFromCertificates(credentials, cloudConfig)
-	} else {
+		authType = ClientCertificateAuth
+	case credentials.ClientSecret != "":
 		cred, err = newTokenCredentialFromCredentials(credentials, cloudConfig)
+		authType = ClientSecretAuth
+	default:
+		cred, err = newTokenCredentialFromMSI(credentials, cloudConfig)
+		authType = ManagedIdentityAuth
 	}
 	if err != nil {
 		return nil, err
 	}
-	return newSessionFromCredentials(cloudEnv, credentials, cred)
+	session, err := newSessionFromCredentials(cloudEnv, credentials, cred)
+	if err != nil {
+		return nil, err
+	}
+	session.CloudConfig = cloudConfig
+	session.AuthType = authType
+	return session, nil
 }
 
 // credentialsFromFileOrUser returns credentials found
 // in ~/.azure/osServicePrincipal.json and, if no creds are found,
 // asks for them and stores them on disk in a config file
-func credentialsFromFileOrUser(cloudEnv *azureenv.Environment) (*Credentials, error) {
+func credentialsFromFileOrUser() (*Credentials, error) {
 	authFilePath := defaultAuthFilePath
 	if f := os.Getenv(azureAuthEnv); len(f) > 0 {
 		authFilePath = f
 	}
-	// NewAuthorizerFromFileWithResource uses `auth.GetSettingsFromFile`, which uses the `azureAuthEnv` to fetch the auth credentials.
-	// therefore setting the local env here to authFilePath allows NewAuthorizerFromFileWithResource to load credentials.
-	os.Setenv(azureAuthEnv, authFilePath)
-	_, err := auth.NewAuthorizerFromFileWithResource(cloudEnv.ResourceManagerEndpoint)
+
+	var authFile Credentials
+
+	contents, err := os.ReadFile(authFilePath)
 	if err != nil {
-		logrus.Infof("Could not get an azure authorizer from file: %s", err.Error())
-		logrus.Infof("Asking user to provide authentication info")
-		credentials, err := askForCredentials()
+		// If the file with creds was not found, ask user for auth info
+		if errors.Is(err, fs.ErrNotExist) {
+			logrus.Infof("Asking user to provide authentication info")
+			credentials, cerr := askForCredentials()
+			if cerr != nil {
+				return nil, errors.Wrap(cerr, "failed to retrieve credentials from user")
+			}
+			logrus.Infof("Saving user credentials to %q", authFilePath)
+			if cerr = saveCredentials(*credentials, authFilePath); cerr != nil {
+				return nil, errors.Wrap(cerr, "failed to save credentials")
+			}
+			authFile = *credentials
+		} else {
+			// File was found but we failed to read it, just error out and let the user handle it
+			return nil, err
+		}
+	} else {
+		err = json.Unmarshal(contents, &authFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to retrieve credentials from user")
-		}
-		logrus.Infof("Saving user credentials to %q", authFilePath)
-		if err = saveCredentials(*credentials, authFilePath); err != nil {
-			return nil, errors.Wrap(err, "failed to save credentials")
+			return nil, err
 		}
 	}
 
-	//If the authorizer worked right away, we need to read credentials details
-	authSettings, err := auth.GetSettingsFromFile()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get settings from file")
-	}
-
-	credentials, err := getCredentials(authSettings)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to map authsettings to credentials")
+	if err := checkCredentials(authFile); err != nil {
+		return nil, err
 	}
 
 	if _, has := onceLoggers[authFilePath]; !has {
@@ -150,40 +181,21 @@ func credentialsFromFileOrUser(cloudEnv *azureenv.Environment) (*Credentials, er
 		logrus.Infof("Credentials loaded from file %q", authFilePath)
 	})
 
-	return credentials, nil
+	return &authFile, nil
 }
 
-func getCredentials(fs auth.FileSettings) (*Credentials, error) {
-	subscriptionID := fs.GetSubscriptionID()
-	if subscriptionID == "" {
-		return nil, errors.New("could not retrieve subscriptionId from auth file")
+func checkCredentials(creds Credentials) error {
+	if creds.SubscriptionID == "" {
+		return errors.New("could not retrieve subscriptionId from auth file")
 	}
-
-	clientID := fs.Values[auth.ClientID]
-	if clientID == "" {
-		return nil, errors.New("could not retrieve clientId from auth file")
+	if creds.TenantID == "" {
+		return errors.New("could not retrieve tenantId from auth file")
 	}
-	clientSecret := fs.Values[auth.ClientSecret]
-	tenantID := fs.Values[auth.TenantID]
-	if tenantID == "" {
-		return nil, errors.New("could not retrieve tenantId from auth file")
+	if (creds.ClientSecret != "" || creds.ClientCertificatePath != "") && creds.ClientID == "" {
+		return errors.New("could not retrieve clientId from auth file")
 	}
-	clientCertificatePassword := fs.Values[auth.CertificatePassword]
-	clientCertificatePath := fs.Values[auth.CertificatePath]
-	if clientSecret == "" {
-		if clientCertificatePath == "" {
-			return nil, errors.New("could not retrieve either client secret or client certs from auth file")
-		}
-		logrus.Warnf("Using client certs to authenticate. Please be warned cluster does not support certs and only the installer does.")
-	}
-	return &Credentials{
-		SubscriptionID:            subscriptionID,
-		ClientID:                  clientID,
-		ClientSecret:              clientSecret,
-		TenantID:                  tenantID,
-		ClientCertificatePath:     clientCertificatePath,
-		ClientCertificatePassword: clientCertificatePassword,
-	}, nil
+	// If neither client secret nor client certificate are present, we default to Managed Identity
+	return nil
 }
 
 func askForCredentials() (*Credentials, error) {
@@ -290,7 +302,7 @@ func newTokenCredentialFromCertificates(credentials *Credentials, cloudConfig cl
 	// certificate data in PEM or PKCS12 format. It handles common scenarios
 	// but has limitations, for example it doesn't load PEM encrypted private
 	// keys.
-	certs, key, err := azidentity.ParseCertificates(data, nil)
+	certs, key, err := azidentity.ParseCertificates(data, []byte(credentials.ClientCertificatePassword))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse client certificate")
 	}
@@ -298,6 +310,24 @@ func newTokenCredentialFromCertificates(credentials *Credentials, cloudConfig cl
 	cred, err := azidentity.NewClientCertificateCredential(credentials.TenantID, credentials.ClientID, certs, key, &options)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get client credentials from certificate")
+	}
+	return cred, nil
+}
+
+func newTokenCredentialFromMSI(credentials *Credentials, cloudConfig cloud.Configuration) (azcore.TokenCredential, error) {
+	options := azidentity.ManagedIdentityCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloudConfig,
+		},
+	}
+	// User-assigned identity
+	if credentials.ClientID != "" {
+		options.ID = azidentity.ClientID(credentials.ClientID)
+	}
+
+	cred, err := azidentity.NewManagedIdentityCredential(&options)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get client credentials from MSI")
 	}
 	return cred, nil
 }
@@ -329,6 +359,7 @@ func newSessionFromCredentials(cloudEnv azureenv.Environment, credentials *Crede
 		Credentials:  *credentials,
 		Environment:  cloudEnv,
 		AuthProvider: authProvider,
+		TokenCreds:   cred,
 	}, nil
 }
 

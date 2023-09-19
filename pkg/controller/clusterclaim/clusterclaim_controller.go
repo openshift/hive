@@ -74,13 +74,13 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentRecon
 	}
 
 	// Watch for changes to ClusterClaim
-	if err := c.Watch(&source.Kind{Type: &hivev1.ClusterClaim{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterClaim{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	if err := c.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(
 			handler.EnqueueRequestsFromMapFunc(requestsForClusterDeployment),
 			controllerutils.IsClusterDeploymentErrorUpdateEvent)); err != nil {
@@ -89,14 +89,14 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentRecon
 
 	// Watch for changes to the hive-claim-owner Role
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.Role{}},
+		source.Kind(mgr.GetCache(), &rbacv1.Role{}),
 		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleName, r.logger))); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive-claim-owner RoleBinding
 	if err := c.Watch(
-		&source.Kind{Type: &rbacv1.RoleBinding{}},
+		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}),
 		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleBindingName, r.logger))); err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func claimForClusterDeployment(cd *hivev1.ClusterDeployment) *types.NamespacedNa
 	}
 }
 
-func requestsForClusterDeployment(o client.Object) []reconcile.Request {
+func requestsForClusterDeployment(ctx context.Context, o client.Object) []reconcile.Request {
 	cd, ok := o.(*hivev1.ClusterDeployment)
 	if !ok {
 		return nil
@@ -130,7 +130,7 @@ func requestsForClusterDeployment(o client.Object) []reconcile.Request {
 }
 
 func requestsForRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
-	return func(o client.Object) []reconcile.Request {
+	return func(ctx context.Context, o client.Object) []reconcile.Request {
 		if o.GetName() != resourceName {
 			return nil
 		}
@@ -498,6 +498,7 @@ func (r *ReconcileClusterClaim) reconcileForExistingAssignment(claim *hivev1.Clu
 func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.ClusterClaim, logger log.FieldLogger) (reconcile.Result, error) {
 	logger.Info("claim assigned a cluster that has already been claimed by another ClusterClaim")
 	claim.Spec.Namespace = ""
+	// TODO: Update status handling https://issues.redhat.com/browse/HIVE-2274
 	claim.Status.Conditions = controllerutils.SetClusterClaimCondition(
 		claim.Status.Conditions,
 		hivev1.ClusterClaimPendingCondition,
@@ -507,7 +508,7 @@ func (r *ReconcileClusterClaim) reconcileForAssignmentConflict(claim *hivev1.Clu
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 	if err := r.Update(context.Background(), claim); err != nil {
-		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update status of ClusterClaim")
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not update spec of ClusterClaim")
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil

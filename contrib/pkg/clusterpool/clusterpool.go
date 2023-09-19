@@ -18,13 +18,13 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/homedir"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/clusterresource"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -213,10 +213,7 @@ func (o *ClusterPoolOptions) validate(cmd *cobra.Command) error {
 
 // run executes the command
 func (o *ClusterPoolOptions) run() error {
-	scheme := runtime.NewScheme()
-	if err := apis.AddToScheme(scheme); err != nil {
-		return err
-	}
+	scheme := scheme.GetScheme()
 
 	objs, err := o.generateObjects()
 	if err != nil {
@@ -271,6 +268,16 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 		BaseDomain: o.BaseDomain,
 	}
 
+	var awsBuilder *clusterresource.AWSCloudBuilder
+	if o.Cloud == cloudAWS {
+		awsBuilder = &clusterresource.AWSCloudBuilder{
+			Region: o.Region,
+			// TODO: CLI option for this
+			InstanceType: clusterresource.AWSInstanceTypeDefault,
+		}
+		builder.CloudBuilder = awsBuilder
+	}
+
 	if o.createCloudSecret {
 		switch o.Cloud {
 		case cloudAWS:
@@ -280,11 +287,9 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 				o.log.WithError(err).Error("Failed to get AWS credentials")
 				return nil, err
 			}
-			builder.CloudBuilder = &clusterresource.AWSCloudBuilder{
-				AccessKeyID:     accessKeyID,
-				SecretAccessKey: secretAccessKey,
-				Region:          o.Region,
-			}
+			// Update AWS cloud builder with creds
+			awsBuilder.AccessKeyID = accessKeyID
+			awsBuilder.SecretAccessKey = secretAccessKey
 		case cloudAzure:
 			creds, err := azureutils.GetCreds(o.CredsFile)
 			if err != nil {

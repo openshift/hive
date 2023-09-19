@@ -118,8 +118,12 @@ func (m *Manifest) UnmarshalJSON(in []byte) error {
 	if !ok {
 		return fmt.Errorf("expected manifest to decode into *unstructured.Unstructured, got %T", ud)
 	}
-	m.GVK = ud.GroupVersionKind()
 	m.Obj = ud
+	return m.populateFromObj()
+}
+
+func (m *Manifest) populateFromObj() error {
+	m.GVK = m.Obj.GroupVersionKind()
 	m.id = resourceId{
 		Group:     m.GVK.Group,
 		Kind:      m.GVK.Kind,
@@ -132,8 +136,7 @@ func (m *Manifest) UnmarshalJSON(in []byte) error {
 func getFeatureSets(annotations map[string]string) (sets.String, bool, error) {
 	ret := sets.String{}
 	specified := false
-	// We are removing annotations["release.openshift.io/feature-gate"] in 4.12.
-	for _, featureSetAnnotation := range []string{"release.openshift.io/feature-gate", featureSetAnnotation} {
+	for _, featureSetAnnotation := range []string{featureSetAnnotation} {
 		featureSetAnnotationValue, featureSetAnnotationExists := annotations[featureSetAnnotation]
 		if featureSetAnnotationExists {
 			specified = true
@@ -171,7 +174,18 @@ func checkFeatureSets(requiredFeatureSet string, annotations map[string]string) 
 // processing by cluster version operator. Pointer arguments can be set nil to avoid excluding based on that
 // filter. For example, setting profile non-nil and capabilities nil will return an error if the manifest's
 // profile does not match, but will never return an error about capability issues.
-func (m *Manifest) Include(excludeIdentifier *string, requiredFeatureSet *string, profile *string, capabilities *configv1.ClusterVersionCapabilitiesStatus) error {
+func (m *Manifest) Include(excludeIdentifier *string, requiredFeatureSet *string, profile *string, capabilities *configv1.ClusterVersionCapabilitiesStatus, overrides []configv1.ComponentOverride) error {
+	return m.IncludeAllowUnknownCapabilities(excludeIdentifier, requiredFeatureSet, profile, capabilities, overrides, false)
+}
+
+// IncludeAllowUnknownCapabilities returns an error if the manifest fails an inclusion filter and should be excluded from
+// further processing by cluster version operator. Pointer arguments can be set nil to avoid excluding based on that
+// filter. For example, setting profile non-nil and capabilities nil will return an error if the manifest's
+// profile does not match, but will never return an error about capability issues. allowUnknownCapabilities only applies
+// to capabilities filtering. When set to true a manifest will not be excluded simply because it contains an unknown
+// capability. This is necessary to allow updates to an OCP version containing newly defined capabilities.
+func (m *Manifest) IncludeAllowUnknownCapabilities(excludeIdentifier *string, requiredFeatureSet *string, profile *string,
+	capabilities *configv1.ClusterVersionCapabilitiesStatus, overrides []configv1.ComponentOverride, allowUnknownCapabilities bool) error {
 
 	annotations := m.Obj.GetAnnotations()
 	if annotations == nil {
@@ -203,35 +217,67 @@ func (m *Manifest) Include(excludeIdentifier *string, requiredFeatureSet *string
 
 	// If there is no capabilities defined in a release then we do not need to check presence of capabilities in the manifest
 	if capabilities != nil {
-		return checkResourceEnablement(annotations, capabilities)
+		err := checkResourceEnablement(annotations, capabilities, allowUnknownCapabilities)
+		if err != nil {
+			return err
+		}
+	}
+
+	if override := m.getOverrideForManifest(overrides); override != nil && override.Unmanaged {
+		return fmt.Errorf("overridden")
+	}
+
+	return nil
+}
+
+// getOverrideForManifest returns the override when override exists and nil otherwise.
+func (m *Manifest) getOverrideForManifest(overrides []configv1.ComponentOverride) *configv1.ComponentOverride {
+	for _, override := range overrides {
+		namespace := override.Namespace
+		if m.id.Namespace == "" {
+			namespace = "" // cluster-scoped objects don't have namespace.
+		}
+		if m.id.equal(resourceId{
+			Group:     override.Group,
+			Kind:      override.Kind,
+			Name:      override.Name,
+			Namespace: namespace,
+		}) {
+			return &override
+		}
 	}
 	return nil
 }
 
 // checkResourceEnablement, given resource annotations and defined cluster capabilities, checks if the capability
-// annotation exists. If so, each capability name is validated against the known set of capabilities. Each valid
-// capability is then checked if it is disabled. If any invalid capabilities are found an error is returned listing
-// all invalid capabilities. Otherwise, if any disabled capabilities are found an error is returned listing all
-// disabled capabilities.
-func checkResourceEnablement(annotations map[string]string, capabilities *configv1.ClusterVersionCapabilitiesStatus) error {
+// annotation exists. If so, each capability name is validated against the known set of capabilities unless
+// allowUnknownCapabilities is true. Each valid capability is then checked if it is disabled. If any invalid
+// capabilities are found an error is returned listing all invalid capabilities. Otherwise, if any disabled
+// capabilities are found an error is returned listing all disabled capabilities.
+func checkResourceEnablement(annotations map[string]string, capabilities *configv1.ClusterVersionCapabilitiesStatus,
+	allowUnknownCapabilities bool) error {
+
 	caps := getManifestCapabilities(annotations)
 	numCaps := len(caps)
 	unknownCaps := make([]string, 0, numCaps)
 	disabledCaps := make([]string, 0, numCaps)
 
 	for _, c := range caps {
-		var isKnownCap bool
-		var isEnabledCap bool
 
-		for _, knownCapability := range capabilities.KnownCapabilities {
-			if c == knownCapability {
-				isKnownCap = true
+		if !allowUnknownCapabilities {
+			var isKnownCap bool
+			for _, knownCapability := range capabilities.KnownCapabilities {
+				if c == knownCapability {
+					isKnownCap = true
+				}
+			}
+			if !isKnownCap {
+				unknownCaps = append(unknownCaps, string(c))
+				continue
 			}
 		}
-		if !isKnownCap {
-			unknownCaps = append(unknownCaps, string(c))
-			continue
-		}
+
+		var isEnabledCap bool
 		for _, enabledCapability := range capabilities.EnabledCapabilities {
 			if c == enabledCapability {
 				isEnabledCap = true

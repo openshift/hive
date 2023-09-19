@@ -20,6 +20,9 @@ type ClusterDeprovisionSpec struct {
 	// cluster is useful.
 	ClusterName string `json:"clusterName,omitempty"`
 
+	// BaseDomain is the DNS base domain.
+	BaseDomain string `json:"baseDomain,omitempty"`
+
 	// Platform contains platform-specific configuration for a ClusterDeprovision
 	Platform ClusterDeprovisionPlatform `json:"platform,omitempty"`
 }
@@ -59,7 +62,8 @@ type ClusterDeprovisionPlatform struct {
 type AlibabaCloudClusterDeprovision struct {
 	// Region is the Alibaba region for this deprovision
 	Region string `json:"region"`
-	// BaseDomain is the DNS base domain
+	// BaseDomain is the DNS base domain.
+	// TODO: Use the non-platform-specific BaseDomain field.
 	BaseDomain string `json:"baseDomain"`
 	// CredentialsSecretRef is the Alibaba account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
@@ -78,6 +82,11 @@ type AWSClusterDeprovision struct {
 	// AWS account access for deprovisioning the cluster.
 	// +optional
 	CredentialsAssumeRole *aws.AssumeRole `json:"credentialsAssumeRole,omitempty"`
+
+	// HostedZoneRole is the role to assume when performing operations
+	// on a hosted zone owned by another account.
+	// +optional
+	HostedZoneRole *string `json:"hostedZoneRole,omitempty"`
 }
 
 // AzureClusterDeprovision contains Azure-specific configuration for a ClusterDeprovision
@@ -145,7 +154,8 @@ type IBMClusterDeprovision struct {
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 	// Region specifies the IBM Cloud region
 	Region string `json:"region"`
-	// BaseDomain is the DNS base domain
+	// BaseDomain is the DNS base domain.
+	// TODO: Use the non-platform-specific BaseDomain field.
 	BaseDomain string `json:"baseDomain"`
 }
 

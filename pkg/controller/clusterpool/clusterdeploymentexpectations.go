@@ -1,12 +1,15 @@
 package clusterpool
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -14,10 +17,10 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
-func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) error {
+func (r *ReconcileClusterPool) watchClusterDeployments(mgr manager.Manager, c controller.Controller) error {
 	h := &clusterDeploymentEventHandler{
 		EventHandler: handler.EnqueueRequestsFromMapFunc(
-			func(a client.Object) []reconcile.Request {
+			func(ctx context.Context, a client.Object) []reconcile.Request {
 				cpKey := clusterPoolKey(a.(*hivev1.ClusterDeployment))
 				if cpKey == nil {
 					return nil
@@ -27,7 +30,7 @@ func (r *ReconcileClusterPool) watchClusterDeployments(c controller.Controller) 
 		),
 		reconciler: r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(h, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 }
 
@@ -39,10 +42,10 @@ type clusterDeploymentEventHandler struct {
 }
 
 // Create implements handler.EventHandler
-func (h *clusterDeploymentEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *clusterDeploymentEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("ClusterDeployment created")
 	h.trackClusterDeploymentAdd(e.Object)
-	h.EventHandler.Create(e, q)
+	h.EventHandler.Create(context.TODO(), e, q)
 }
 
 // When a ClusterDeployment is created, update the expectations of the ClusterPool that owns the ClusterDeployment.

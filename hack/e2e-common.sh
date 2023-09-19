@@ -161,7 +161,7 @@ function save_hive_logs() {
 }
 # The consumer of this lib can set up its own exit trap, but this basic one will at least help
 # debug e.g. problems from `make deploy` and managed DNS setup.
-trap 'kill %1; save_hive_logs' EXIT
+trap 'set +e; kill %1; save_hive_logs' EXIT
 
 # Install Hive
 IMG="${HIVE_IMAGE}" make deploy
@@ -185,7 +185,7 @@ case "${CLOUD}" in
   if [ -s $CREDS_FILE ] && ! [ "${AWS_ACCESS_KEY_ID}" ] && ! [ "${AWS_SECRET_ACCESS_KEY}" ]; then
     CREDS_FILE_ARG="--creds-file=${CREDS_FILE}"
   fi
-	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.openshift.com}"
+	BASE_DOMAIN="${BASE_DOMAIN:-hive-ci.devcluster.openshift.com}"
 	EXTRA_CREATE_CLUSTER_ARGS="--aws-user-tags expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
   if [ "$REGION" ]; then
     REGION_ARG="--region $REGION"
@@ -193,6 +193,10 @@ case "${CLOUD}" in
     # Default to us-east-2 for testing, because us-east-1 doesn't have all instance types in all AZs
     # and this makes our autoscaling tests fail.
     REGION_ARG="--region us-east-2"
+  fi
+  if [ "$AWS_INSTANCE_TYPE" ]; then
+    # NOTE: Only observed by hiveutil create-cluster, not clusterpool at this time.
+    INSTANCE_TYPE_ARG="--aws-instance-type $AWS_INSTANCE_TYPE"
   fi
 	;;
 "azure")

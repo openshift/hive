@@ -11,13 +11,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/openshift/hive/apis"
 	"github.com/openshift/hive/pkg/constants"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func init() {
@@ -69,7 +67,6 @@ const (
 )
 
 func TestParseInstallLog(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
 	tests := []struct {
 		name            string
 		log             *string
@@ -446,10 +443,10 @@ func TestParseInstallLog(t *testing.T) {
 			if existing == nil {
 				existing = []runtime.Object{buildRegexConfigMap()}
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(existing...).Build()
 			r := &ReconcileClusterProvision{
 				Client: fakeClient,
-				scheme: scheme.Scheme,
+				scheme: scheme.GetScheme(),
 			}
 			reason, message := r.parseInstallLog(test.log, log.WithFields(log.Fields{}))
 			assert.Equal(t, test.expectedReason, reason, "unexpected reason")
@@ -464,7 +461,8 @@ func TestParseInstallLog(t *testing.T) {
 
 // buildRegexConfigMap reads the install log regexes configmap from within config/configmaps/install-log-regexes-configmap.yaml
 func buildRegexConfigMap() runtime.Object {
-	decode := serializer.NewCodecFactory(scheme.Scheme).UniversalDeserializer().Decode
+	scheme := scheme.GetScheme()
+	decode := serializer.NewCodecFactory(scheme).UniversalDeserializer().Decode
 	stream, err := os.ReadFile("../../../config/configmaps/install-log-regexes-configmap.yaml")
 	if err != nil {
 		log.Fatal(err)

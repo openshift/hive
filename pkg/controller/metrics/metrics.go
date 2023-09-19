@@ -769,7 +769,7 @@ func logHistogramDurationMetric(metric *prometheus.HistogramVec, cd *hivev1.Clus
 		cd.Namespace,
 		cd.Name,
 		cd.Labels[hivev1.HiveClusterPlatformLabel],
-		cd.Labels[constants.VersionMajorMinorPatchLabel],
+		cd.Labels[constants.VersionLabel],
 		poolNS).Observe(time)
 }
 

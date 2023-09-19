@@ -14,6 +14,7 @@ import (
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/hive/pkg/util/contracts"
+	"github.com/openshift/hive/pkg/util/scheme"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
@@ -21,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -145,16 +145,18 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(), hiveAdmContainer)
 	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 
+	scheme := scheme.GetScheme()
+
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
 		asset = assets.MustAsset(yaml)
-		wh := util.ReadValidatingWebhookConfigurationV1OrDie(asset, scheme.Scheme)
+		wh := util.ReadValidatingWebhookConfigurationV1OrDie(asset, scheme)
 		validatingWebhooks[i] = wh
 	}
 
 	hLog.Debug("reading apiservice")
 	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
-	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme.Scheme)
+	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme)
 	apiService.Spec.Service.Namespace = hiveNSName
 
 	// If we're running on vanilla Kube (mostly devs using kind), we

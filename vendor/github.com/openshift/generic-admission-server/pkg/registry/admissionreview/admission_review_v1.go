@@ -16,9 +16,10 @@ type V1REST struct {
 	hookFn AdmissionV1HookFunc
 }
 
-var _ rest.Creater = &REST{}
-var _ rest.Scoper = &REST{}
-var _ rest.GroupVersionKindProvider = &REST{}
+var _ rest.Creater = &V1REST{}
+var _ rest.Scoper = &V1REST{}
+var _ rest.GroupVersionKindProvider = &V1REST{}
+var _ rest.SingularNameProvider = &V1REST{}
 
 func NewV1REST(hookFn AdmissionV1HookFunc) *V1REST {
 	return &V1REST{
@@ -48,4 +49,8 @@ func (r *V1REST) Create(ctx context.Context, obj runtime.Object, _ rest.Validate
 	// Copey request uid to response
 	admissionReview.Response.UID = admissionReview.Request.UID
 	return admissionReview, nil
+}
+
+func (r *V1REST) GetSingularName() string {
+	return "admissionreview"
 }

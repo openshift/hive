@@ -11,9 +11,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/hive/pkg/util/scheme"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -69,7 +69,7 @@ func setLogLevel() {
 
 // Get controller-runtime dynamic client
 func getDynamicClient() client.Client {
-	if err := configv1.Install(scheme.Scheme); err != nil {
+	if err := configv1.Install(scheme.GetScheme()); err != nil {
 		log.WithError(err).Fatal("Failed to add Openshift configv1 types to the default scheme")
 	}
 

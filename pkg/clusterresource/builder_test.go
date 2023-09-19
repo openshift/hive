@@ -6,14 +6,12 @@ import (
 	"testing"
 
 	"github.com/ghodss/yaml"
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -108,6 +106,7 @@ func createAWSClusterBuilder() *Builder {
 	b.CloudBuilder = &AWSCloudBuilder{
 		AccessKeyID:     fakeAWSAccessKeyID,
 		SecretAccessKey: fakeAWSSecretAccessKey,
+		InstanceType:    AWSInstanceTypeDefault,
 	}
 	return b
 }
@@ -174,7 +173,7 @@ func TestBuildClusterResources(t *testing.T) {
 				require.NotNil(t, credsSecret)
 				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.AWS.CredentialsSecretRef.Name)
 
-				assert.Equal(t, awsInstanceType, workerPool.Spec.Platform.AWS.InstanceType)
+				assert.Equal(t, AWSInstanceTypeDefault, workerPool.Spec.Platform.AWS.InstanceType)
 			},
 		},
 		{
@@ -311,7 +310,6 @@ metadata:
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 			require.NoError(t, test.builder.Validate())
 			allObjects, err := test.builder.Build()

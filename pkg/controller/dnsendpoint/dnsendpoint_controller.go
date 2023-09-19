@@ -66,13 +66,13 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	if err := ctrl.Watch(&source.Kind{Type: &hivev1.DNSZone{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &hivev1.DNSZone{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	if err := ctrl.Watch(
-		&source.Kind{Type: &hivev1.ClusterDeployment{}},
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(reconciler, reconciler.logger),
 	); err != nil {
 		return err

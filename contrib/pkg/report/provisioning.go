@@ -8,14 +8,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -76,10 +74,6 @@ func (o *ProvisioningReportOptions) Validate(cmd *cobra.Command) error {
 
 // Run executes the command
 func (o *ProvisioningReportOptions) Run(dynClient client.Client) error {
-	if err := apis.AddToScheme(scheme.Scheme); err != nil {
-		return err
-	}
-
 	var ageLT, ageGT *time.Duration
 	var err error
 	if o.AgeLT != "" {

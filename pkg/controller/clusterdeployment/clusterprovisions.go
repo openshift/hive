@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -28,6 +29,7 @@ import (
 
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -282,6 +284,42 @@ func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev
 	return false, nil
 }
 
+// setAWSHostedZoneRoleFromMetadata unmarshals `pm.Raw`, a representation of the installer ClusterMetadata type,
+// and looks for the AWS HostedZoneRole therein. If found, the value is copied into the AWS platform-specific
+// section of `cm`, hive's representation of the cluster metadata. The `cd` is only used to validate that we're
+// operating on an AWS cluster.
+// The caller is responsible for copying `cm` back into `cd` and Update()ing if/as necessary.
+func setAWSHostedZoneRoleFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pmjson []byte, logger log.FieldLogger) {
+	if pmjson == nil {
+		return
+	}
+	if cd.Spec.Platform.AWS == nil {
+		return
+	}
+
+	im := new(installertypes.ClusterMetadata)
+	if err := json.Unmarshal(pmjson, &im); err != nil {
+		logger.WithError(err).Error("Could not unmarshal ClusterMetadata!")
+		return
+	}
+
+	if im.AWS == nil {
+		logger.Warn("ClusterMetadata unexpectedly has no AWS section")
+		return
+	}
+	hzr := im.AWS.HostedZoneRole
+	// This is the empty string for non-shared-VPC setups. That's fine.
+	log.WithField("hostedZoneRole", hzr).Info("Found AWS HostedZoneRole in ClusterMetadata")
+
+	if cm.Platform == nil {
+		cm.Platform = &hivev1.ClusterPlatformMetadata{}
+	}
+	if cm.Platform.AWS == nil {
+		cm.Platform.AWS = &aws.Metadata{}
+	}
+	cm.Platform.AWS.HostedZoneRole = &hzr
+}
+
 // setAzureResourceGroupFromMetadata unmarshals `pm.Raw`, a representation of the installer ClusterMetadata type,
 // and looks for the Azure ResourceGroupName therein. If found, the value is copied into the Azure platform-specific
 // section of `cm`, hive's representation of the cluster metadata. The `cd` is only used to validate that we're
@@ -357,6 +395,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		if provision.Spec.AdminPasswordSecretRef != nil {
 			clusterMetadata.AdminPasswordSecretRef = provision.Spec.AdminPasswordSecretRef
 		}
+		setAWSHostedZoneRoleFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		setAzureResourceGroupFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata
@@ -704,29 +743,26 @@ func (r *ReconcileClusterDeployment) setupAWSCredentialForAssumeRole(cd *hivev1.
 	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
 }
 
-func (r *ReconcileClusterDeployment) watchClusterProvisions(c controller.Controller) error {
+func (r *ReconcileClusterDeployment) watchClusterProvisions(mgr manager.Manager, c controller.Controller) error {
 	handler := &clusterProvisionEventHandler{
-		EnqueueRequestForOwner: handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &hivev1.ClusterDeployment{},
-		},
-		reconciler: r,
+		EventHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()),
+		reconciler:   r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.ClusterProvision{}}, handler)
+	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterProvision{}), handler)
 }
 
 var _ handler.EventHandler = &clusterProvisionEventHandler{}
 
 type clusterProvisionEventHandler struct {
-	handler.EnqueueRequestForOwner
+	handler.EventHandler
 	reconciler *ReconcileClusterDeployment
 }
 
 // Create implements handler.EventHandler
-func (h *clusterProvisionEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *clusterProvisionEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("ClusterProvision created")
 	h.reconciler.trackClusterProvisionAdd(e.Object)
-	h.EnqueueRequestForOwner.Create(e, q)
+	h.EventHandler.Create(ctx, e, q)
 }
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,

@@ -7,26 +7,22 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	clientcache "k8s.io/client-go/tools/cache"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 
 	machinev1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func WaitForMachineSets(cfg *rest.Config, testFunc func([]*machinev1.MachineSet) bool, timeOut time.Duration) error {
 	logger := log.WithField("client", "machineset")
 	logger.Infof("Waiting for MachineSet")
 	done := make(chan struct{})
-	scheme := runtime.NewScheme()
-	err := machinev1.AddToScheme(scheme)
-	if err != nil {
-		return err
-	}
+
 	internalCache, err := cache.New(cfg, cache.Options{
-		Scheme: scheme,
+		Scheme: scheme.GetScheme(),
 	})
 	if err != nil {
 		return err

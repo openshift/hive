@@ -7,6 +7,8 @@ source ${0%/*}/e2e-common.sh
 
 echo "Waiting for the operator deployment to settle"
 oc wait --for=condition=Available --timeout=2m deploy/hive-operator -n $HIVE_OPERATOR_NS
+echo "Waiting for operator to deploy controllers"
+oc wait --for=condition=Ready --timeout=2m hiveconfig/hive
 echo "Waiting for the controllers and admission deployments to settle"
 for deployment in hive-controllers hiveadmission; do
   oc wait --for=condition=Available --timeout=2m deploy/$deployment -n $HIVE_NS
@@ -96,27 +98,34 @@ REAL_POOL_NAME=$CLUSTER_NAME
 
 function cleanup() {
   echo "!EXIT TRAP!"
-  capture_manifests EXIT
-  # Let's save the logs now in case any of the following never finish
+  capture_manifests CLEANUP_000
+  # Let's save the logs now in case any of the following fail
   echo "Saving hive logs before cleanup"
   save_hive_logs
-  oc delete clusterclaim --all
-  oc delete clusterpool --all
+  # Do these asynchronously so we can keep polling the logs
+  oc delete clusterclaim --all &
+  oc delete clusterpool --all &
   # Wait indefinitely for all CDs to disappear. If we exceed the test timeout,
   # we'll get killed, and resources will leak.
+  i=0
   while true; do
     sleep ${sleep_between_tries}
+    i=$((i+1))
+    # re-capture logs so we can debug if things aren't deleting properly
+    echo "Re-capturing hive logs during cleanup"
+    save_hive_logs
+    # re-capture manifests, likewise, but not *too* often as these get added, not overwritten.
+    # This will fire every 100s.
+    [[ $((i%10)) -eq 0 ]] && capture_manifests CLEANUP_$(printf "%03d" $i)
     NUM_CDS=$(count_cds)
     if [[ $NUM_CDS == "0" ]]; then
       break
     fi
     echo "Waiting for $NUM_CDS ClusterDeployment(s) to be cleaned up"
   done
-  # And if we get this far, overwrite the logs with the latest
-  echo "Saving hive logs after cleanup"
-  save_hive_logs
+  echo "Cleanup complete"
 }
-trap 'kill %1; cleanup' EXIT
+trap 'set +e; kill %1; cleanup' EXIT
 
 function wait_for_pool_to_be_ready() {
   local poolname=$1
@@ -207,15 +216,21 @@ echo "Creating real cluster pool"
 # TODO: This can't be changed yet -- see other TODOs (search for 'variable POOL_SIZE')
 POOL_SIZE=1
 # TODO: This is aws-specific at the moment.
+# NOTE: We start with a zero-size pool and scale it up after we add the inventory.
+# Otherwise, adding the inventory immediately makes the already-provisioning cluster
+# stale, BUT it doesn't get purged until it's done provisioning. (Intentional
+# architectural decision to prefer presenting a stale claimable cluster early vs.
+# delaying until a non-stale one is available.)
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" clusterpool create-pool \
   -n "${CLUSTER_NAMESPACE}" \
   --cloud="${CLOUD}" \
   ${REGION_ARG} \
 	${CREDS_FILE_ARG} \
 	--pull-secret-file="${PULL_SECRET_FILE}" \
+	--base-domain="${CLUSTER_DOMAIN}" \
   --image-set "${IMAGESET_NAME}" \
   --region us-east-1 \
-  --size "${POOL_SIZE}" \
+  --size 0 \
   ${REAL_POOL_NAME}
 
 ### INTERLUDE: FAKE POOL
@@ -234,7 +249,8 @@ oc get clusterpool ${REAL_POOL_NAME} -o json \
 NEW_CLUSTER_NAME=cdcci-${CLUSTER_NAME#*-}
 create_customization "cdc-test" "${CLUSTER_NAMESPACE}" "${NEW_CLUSTER_NAME}"
 oc patch cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --type=merge -p '{"spec": {"inventory": [{"name": "cdc-test"}]}}'
-
+# Now we can scale up the pool so it starts creating clusters
+oc scale cp -n $CLUSTER_NAMESPACE $REAL_POOL_NAME --replicas=$POOL_SIZE
 
 wait_for_pool_to_be_ready $FAKE_POOL_NAME
 

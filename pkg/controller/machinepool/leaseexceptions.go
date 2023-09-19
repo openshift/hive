@@ -7,6 +7,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,33 +21,30 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
-func (r *ReconcileMachinePool) watchMachinePoolNameLeases(c controller.Controller) error {
+func (r *ReconcileMachinePool) watchMachinePoolNameLeases(mgr manager.Manager, c controller.Controller) error {
 	h := &machinePoolNameLeaseEventHandler{
-		EnqueueRequestForOwner: handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &hivev1.MachinePool{},
-		},
-		reconciler: r,
+		EventHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.MachinePool{}, handler.OnlyControllerOwner()),
+		reconciler:   r,
 	}
-	return c.Watch(&source.Kind{Type: &hivev1.MachinePoolNameLease{}}, h)
+	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePoolNameLease{}), h)
 }
 
 var _ handler.EventHandler = &machinePoolNameLeaseEventHandler{}
 
 type machinePoolNameLeaseEventHandler struct {
-	handler.EnqueueRequestForOwner
+	handler.EventHandler
 	reconciler *ReconcileMachinePool
 }
 
 // Create implements handler.EventHandler
-func (h *machinePoolNameLeaseEventHandler) Create(e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *machinePoolNameLeaseEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("running Create handler for MachinePoolNameLease")
 	h.reconciler.trackLeaseAdd(e.Object)
-	h.EnqueueRequestForOwner.Create(e, q)
+	h.EventHandler.Create(ctx, e, q)
 }
 
 // Delete implements handler.EventHandler
-func (h *machinePoolNameLeaseEventHandler) Delete(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (h *machinePoolNameLeaseEventHandler) Delete(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
 	logger := h.reconciler.logger
 	logger.Info("running Delete handler for MachinePoolNameLease, requeuing all pools for cluster")
 	lease, ok := e.Object.(*hivev1.MachinePoolNameLease)

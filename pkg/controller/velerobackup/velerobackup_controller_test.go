@@ -11,7 +11,6 @@ import (
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testcheckpoint "github.com/openshift/hive/pkg/test/checkpoint"
@@ -22,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -37,8 +35,6 @@ const (
 )
 
 func TestNewReconciler(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	velerov1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                    string
@@ -82,8 +78,6 @@ func TestNewReconciler(t *testing.T) {
 }
 
 func TestReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	velerov1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name            string
@@ -288,8 +282,6 @@ func TestReconcile(t *testing.T) {
 }
 
 func TestCreateVeleroBackupObject(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	velerov1.AddToScheme(scheme.Scheme)
 
 	// Arrange
 	formatStr := "2006-01-02t15-04-05z"
@@ -312,8 +304,6 @@ func TestCreateVeleroBackupObject(t *testing.T) {
 }
 
 func TestGetRuntimeObjects(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	velerov1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name            string
@@ -362,8 +352,6 @@ func TestGetRuntimeObjects(t *testing.T) {
 }
 
 func TestGetNamespaceCheckpoint(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	velerov1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name               string
@@ -405,8 +393,6 @@ func TestGetNamespaceCheckpoint(t *testing.T) {
 }
 
 func TestCreateOrUpdateNamespaceCheckpoint(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	velerov1.AddToScheme(scheme.Scheme)
 
 	tests := []struct {
 		name               string

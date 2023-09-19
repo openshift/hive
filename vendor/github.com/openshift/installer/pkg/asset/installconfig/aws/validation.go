@@ -49,12 +49,30 @@ func Validate(ctx context.Context, meta *Metadata, config *types.InstallConfig) 
 	allErrs = append(allErrs, validatePlatform(ctx, meta, field.NewPath("platform", "aws"), config.Platform.AWS, config.Networking, config.Publish)...)
 
 	if config.ControlPlane != nil && config.ControlPlane.Platform.AWS != nil {
-		allErrs = append(allErrs, validateMachinePool(ctx, meta, field.NewPath("controlPlane", "platform", "aws"), config.Platform.AWS, config.ControlPlane.Platform.AWS, controlPlaneReq)...)
+		allErrs = append(allErrs, validateMachinePool(ctx, meta, field.NewPath("controlPlane", "platform", "aws"), config.Platform.AWS, config.ControlPlane.Platform.AWS, controlPlaneReq, "")...)
 	}
+
 	for idx, compute := range config.Compute {
 		fldPath := field.NewPath("compute").Index(idx)
+
+		// Pool's specific validation.
+		// Edge Compute Pool: AWS Local Zones is valid only when installing in existing VPC.
+		if compute.Name == types.MachinePoolEdgeRoleName {
+			if len(config.Platform.AWS.Subnets) == 0 {
+				return errors.New(field.Required(fldPath, "invalid install config. edge machine pool is valid when installing in existing VPC").Error())
+			}
+			edgeSubnets, err := meta.EdgeSubnets(ctx)
+			if err != nil {
+				errMsg := fmt.Sprintf("%s pool. %v", compute.Name, err.Error())
+				return errors.New(field.Invalid(field.NewPath("platform", "aws", "subnets"), config.Platform.AWS.Subnets, errMsg).Error())
+			}
+			if len(edgeSubnets) == 0 {
+				return errors.New(field.Required(fldPath, "invalid install config. There is no valid subnets for edge machine pool").Error())
+			}
+		}
+
 		if compute.Platform.AWS != nil {
-			allErrs = append(allErrs, validateMachinePool(ctx, meta, fldPath.Child("platform", "aws"), config.Platform.AWS, compute.Platform.AWS, computeReq)...)
+			allErrs = append(allErrs, validateMachinePool(ctx, meta, fldPath.Child("platform", "aws"), config.Platform.AWS, compute.Platform.AWS, computeReq, compute.Name)...)
 		}
 	}
 	return allErrs.ToAggregate()
@@ -74,7 +92,7 @@ func validatePlatform(ctx context.Context, meta *Metadata, fldPath *field.Path, 
 		allErrs = append(allErrs, validateSubnets(ctx, meta, fldPath.Child("subnets"), platform.Subnets, networking, publish)...)
 	}
 	if platform.DefaultMachinePlatform != nil {
-		allErrs = append(allErrs, validateMachinePool(ctx, meta, fldPath.Child("defaultMachinePlatform"), platform, platform.DefaultMachinePlatform, controlPlaneReq)...)
+		allErrs = append(allErrs, validateMachinePool(ctx, meta, fldPath.Child("defaultMachinePlatform"), platform, platform.DefaultMachinePlatform, controlPlaneReq, "")...)
 	}
 	return allErrs
 }
@@ -153,10 +171,22 @@ func validateSubnets(ctx context.Context, meta *Metadata, fldPath *field.Path, s
 		}
 	}
 
+	edgeSubnets, err := meta.EdgeSubnets(ctx)
+	if err != nil {
+		return append(allErrs, field.Invalid(fldPath, subnets, err.Error()))
+	}
+	edgeSubnetsIdx := map[string]int{}
+	for idx, id := range subnets {
+		if _, ok := edgeSubnets[id]; ok {
+			edgeSubnetsIdx[id] = idx
+		}
+	}
+
 	allErrs = append(allErrs, validateSubnetCIDR(fldPath, privateSubnets, privateSubnetsIdx, networking.MachineNetwork)...)
 	allErrs = append(allErrs, validateSubnetCIDR(fldPath, publicSubnets, publicSubnetsIdx, networking.MachineNetwork)...)
 	allErrs = append(allErrs, validateDuplicateSubnetZones(fldPath, privateSubnets, privateSubnetsIdx, "private")...)
 	allErrs = append(allErrs, validateDuplicateSubnetZones(fldPath, publicSubnets, publicSubnetsIdx, "public")...)
+	allErrs = append(allErrs, validateDuplicateSubnetZones(fldPath, edgeSubnets, edgeSubnetsIdx, "edge")...)
 
 	privateZones := sets.NewString()
 	publicZones := sets.NewString()
@@ -174,16 +204,23 @@ func validateSubnets(ctx context.Context, meta *Metadata, fldPath *field.Path, s
 	return allErrs
 }
 
-func validateMachinePool(ctx context.Context, meta *Metadata, fldPath *field.Path, platform *awstypes.Platform, pool *awstypes.MachinePool, req resourceRequirements) field.ErrorList {
+func validateMachinePool(ctx context.Context, meta *Metadata, fldPath *field.Path, platform *awstypes.Platform, pool *awstypes.MachinePool, req resourceRequirements, poolName string) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(pool.Zones) > 0 {
 		availableZones := sets.String{}
 		if len(platform.Subnets) > 0 {
-			privateSubnets, err := meta.PrivateSubnets(ctx)
+			var err error
+			var subnets Subnets
+			switch poolName {
+			case types.MachinePoolEdgeRoleName:
+				subnets, err = meta.EdgeSubnets(ctx)
+			default:
+				subnets, err = meta.PrivateSubnets(ctx)
+			}
 			if err != nil {
 				return append(allErrs, field.InternalError(fldPath, err))
 			}
-			for _, subnet := range privateSubnets {
+			for _, subnet := range subnets {
 				availableZones.Insert(subnet.Zone)
 			}
 		} else {
@@ -218,6 +255,36 @@ func validateMachinePool(ctx context.Context, meta *Metadata, fldPath *field.Pat
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), pool.InstanceType, errMsg))
 		}
 	}
+
+	if len(pool.AdditionalSecurityGroupIDs) > 0 {
+		allErrs = append(allErrs, validateSecurityGroupIDs(ctx, meta, fldPath.Child("additionalSecurityGroupIDs"), platform, pool)...)
+	}
+
+	return allErrs
+}
+
+func validateSecurityGroupIDs(ctx context.Context, meta *Metadata, fldPath *field.Path, platform *awstypes.Platform, pool *awstypes.MachinePool) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	vpc, err := meta.VPC(ctx)
+	if err != nil {
+		errMsg := fmt.Sprintf("could not determine cluster VPC: %s", err.Error())
+		return append(allErrs, field.Invalid(fldPath, vpc, errMsg))
+	}
+
+	securityGroups, err := DescribeSecurityGroups(ctx, meta.session, pool.AdditionalSecurityGroupIDs, platform.Region)
+	if err != nil {
+		return append(allErrs, field.Invalid(fldPath, pool.AdditionalSecurityGroupIDs, err.Error()))
+	}
+
+	for _, sg := range securityGroups {
+		sgVpcID := *sg.VpcId
+		if sgVpcID != vpc {
+			errMsg := fmt.Sprintf("sg %s is associated with vpc %s not the provided vpc %s", *sg.GroupId, sgVpcID, vpc)
+			allErrs = append(allErrs, field.Invalid(fldPath, sgVpcID, errMsg))
+		}
+	}
+
 	return allErrs
 }
 
@@ -348,21 +415,22 @@ func ValidateForProvisioning(client API, ic *types.InstallConfig, metadata *Meta
 	var zonePath *field.Path
 	var zone *route53.HostedZone
 
-	errors := field.ErrorList{}
 	allErrs := field.ErrorList{}
+	r53cfg := GetR53ClientCfg(metadata.session, ic.AWS.HostedZoneRole)
 
 	if ic.AWS.HostedZone != "" {
 		zoneName = ic.AWS.HostedZone
 		zonePath = field.NewPath("aws", "hostedZone")
-		zoneOutput, err := client.GetHostedZone(zoneName)
+		zoneOutput, err := client.GetHostedZone(zoneName, r53cfg)
 		if err != nil {
+			errMsg := errors.Wrapf(err, "unable to retrieve hosted zone").Error()
 			return field.ErrorList{
-				field.Invalid(zonePath, zoneName, "cannot find hosted zone"),
+				field.Invalid(zonePath, zoneName, errMsg),
 			}.ToAggregate()
 		}
 
-		if errors = validateHostedZone(zoneOutput, zonePath, zoneName, metadata); len(errors) > 0 {
-			allErrs = append(allErrs, errors...)
+		if errs := validateHostedZone(zoneOutput, zonePath, zoneName, metadata); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
 		}
 
 		zone = zoneOutput.HostedZone
@@ -379,8 +447,8 @@ func ValidateForProvisioning(client API, ic *types.InstallConfig, metadata *Meta
 		zone = baseDomainOutput
 	}
 
-	if errors = client.ValidateZoneRecords(zone, zoneName, zonePath, ic); len(errors) > 0 {
-		allErrs = append(allErrs, errors...)
+	if errs := client.ValidateZoneRecords(zone, zoneName, zonePath, ic, r53cfg); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
 	}
 
 	return allErrs.ToAggregate()

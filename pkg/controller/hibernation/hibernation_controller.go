@@ -139,7 +139,7 @@ func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentRecon
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(&source.Kind{Type: &hivev1.ClusterDeployment{}},
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
 		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Log(controllerutils.LogLevel(err), "Error setting up a watch on ClusterDeployment")
@@ -651,7 +651,7 @@ func deleteTransitionMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterD
 		"cluster_deployment_namespace": cd.Namespace,
 		"cluster_deployment":           cd.Name,
 		"platform":                     cd.Labels[hivev1.HiveClusterPlatformLabel],
-		"cluster_version":              cd.Labels[constants.VersionMajorMinorPatchLabel],
+		"cluster_version":              cd.Labels[constants.VersionLabel],
 		"cluster_pool_namespace":       poolNS,
 	})
 }
@@ -675,7 +675,7 @@ func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDepl
 		poolNS = cd.Spec.ClusterPoolRef.Namespace
 		poolName = cd.Spec.ClusterPoolRef.PoolName
 	}
-	metric.WithLabelValues(cd.Labels[constants.VersionMajorMinorPatchLabel],
+	metric.WithLabelValues(cd.Labels[constants.VersionLabel],
 		cd.Labels[hivev1.HiveClusterPlatformLabel],
 		poolNS,
 		poolName).Observe(time)

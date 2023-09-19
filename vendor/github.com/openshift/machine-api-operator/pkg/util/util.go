@@ -16,6 +16,11 @@ limitations under the License.
 
 package util
 
+import (
+	"fmt"
+	"strings"
+)
+
 // Filter filters a list for a string.
 func Filter(list []string, strToFilter string) (newList []string) {
 	for _, item := range list {
@@ -34,4 +39,26 @@ func Contains(list []string, strToSearch string) bool {
 		}
 	}
 	return false
+}
+
+// MergeCommaSeparatedKeyValuePairs merges multiple comma separated lists of key=value pairs into a single, comma-separated, list
+// of key=value pairs. If a key is present in multiple lists, the value from the last list is used.
+func MergeCommaSeparatedKeyValuePairs(lists ...string) string {
+	merged := make(map[string]string)
+	for _, list := range lists {
+		for _, kv := range strings.Split(list, ",") {
+			kv := strings.Split(kv, "=")
+			if len(kv) != 2 {
+				// ignore invalid key=value pairs
+				continue
+			}
+			merged[kv[0]] = kv[1]
+		}
+	}
+	// convert the map back to a comma separated list
+	var result []string
+	for k, v := range merged {
+		result = append(result, fmt.Sprintf("%s=%s", k, v))
+	}
+	return strings.Join(result, ",")
 }

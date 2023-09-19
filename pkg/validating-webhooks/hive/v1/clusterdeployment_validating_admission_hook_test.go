@@ -39,6 +39,11 @@ var validTestManagedDomains = []string{
 
 func clusterDeploymentTemplate() *hivev1.ClusterDeployment {
 	return &hivev1.ClusterDeployment{
+		// TODO: Remove TypeMeta field once https://github.com/kubernetes-sigs/controller-runtime/issues/2429 is fixed
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: hivev1.SchemeGroupVersion.String(),
+			Kind:       "ClusterDeployment",
+		},
 		Spec: hivev1.ClusterDeploymentSpec{
 			BaseDomain:  "example.com",
 			ClusterName: "SameClusterName",
@@ -649,6 +654,142 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name: "AWS set hosted zone role: installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: pointer.String("my-hzr"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "AWS set hosted zone role: not installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: pointer.String("my-hzr"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "AWS set hosted zone role: while setting installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: pointer.String("my-hzr"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "AWS update hosted zone role",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: pointer.String(""),
+						},
+					},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: pointer.String("my-hzr"),
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "AWS unset hosted zone role",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: pointer.String("my-hzr"),
+						},
+					},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: nil,
+						},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
 			name:            "Azure create valid",
 			newObject:       validAzureClusterDeployment(),
 			operation:       admissionv1beta1.Create,
@@ -777,6 +918,11 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Installed = true
 				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &hivev1azure.Metadata{
+							ResourceGroupName: pointer.String("old-rg"),
+						},
+					},
 				}
 				return cd
 			}(),
@@ -803,6 +949,11 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd.Spec.Installed = true
 				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						Azure: &hivev1azure.Metadata{
+							ResourceGroupName: pointer.String("my-rg"),
+						},
+					},
 				}
 				return cd
 			}(),
@@ -810,9 +961,10 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd := validAzureClusterDeployment()
 				cd.Spec.Installed = true
 				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &hivev1azure.Metadata{
-							ResourceGroupName: pointer.String("my-rg"),
+							ResourceGroupName: nil,
 						},
 					},
 				}

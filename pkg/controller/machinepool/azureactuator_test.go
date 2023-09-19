@@ -88,7 +88,7 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool: func() *hivev1.MachinePool {
 				p := testAzurePool()
-				p.Spec.Replicas = pointer.Int64Ptr(5)
+				p.Spec.Replicas = pointer.Int64(5)
 				return p
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -311,7 +311,7 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment412(),
 			pool: func() *hivev1.MachinePool {
 				p := testAzurePool()
-				p.Spec.Replicas = pointer.Int64Ptr(5)
+				p.Spec.Replicas = pointer.Int64(5)
 				return p
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -595,7 +595,7 @@ func testAzureClusterDeployment() *hivev1.ClusterDeployment {
 
 func testAzureClusterDeployment412() *hivev1.ClusterDeployment {
 	cd := testAzureClusterDeployment()
-	cd.Labels[constants.VersionMajorMinorPatchLabel] = "4.12.0"
+	cd.Labels[constants.VersionLabel] = "4.12.0"
 	return cd
 }
 

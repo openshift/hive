@@ -99,6 +99,7 @@ func (o *ClusterUninstaller) Run() (*types.ClusterQuota, error) {
 	// deleteFuncs contains the functions that will be launched as
 	// goroutines.
 	deleteFuncs := map[string]deleteFunc{
+		"cleanVIPsPorts":        cleanVIPsPorts,
 		"deleteServers":         deleteServers,
 		"deleteServerGroups":    deleteServerGroups,
 		"deleteTrunks":          deleteTrunks,
@@ -350,6 +351,27 @@ func deletePortsByFilter(opts *clientconfig.ClientOpts, filter Filter, logger lo
 	return result, err
 }
 
+func getFIPsByPort(conn *gophercloud.ServiceClient, logger logrus.FieldLogger) (map[string]floatingips.FloatingIP, error) {
+	// Prefetch list of FIPs to save list calls for each port
+	fipByPort := make(map[string]floatingips.FloatingIP)
+	allPages, err := floatingips.List(conn, floatingips.ListOpts{}).AllPages()
+	if err != nil {
+		logger.Error(err)
+		return fipByPort, nil
+	}
+	allFIPs, err := floatingips.ExtractFloatingIPs(allPages)
+	if err != nil {
+		logger.Error(err)
+		return fipByPort, nil
+	}
+
+	// Organize FIPs for easy lookup
+	for _, fip := range allFIPs {
+		fipByPort[fip.PortID] = fip
+	}
+	return fipByPort, err
+}
+
 func deletePorts(opts *clientconfig.ClientOpts, listOpts ports.ListOpts, logger logrus.FieldLogger) (bool, error) {
 	logger.Debug("Deleting openstack ports")
 	defer logger.Debugf("Exiting deleting openstack ports")
@@ -374,22 +396,10 @@ func deletePorts(opts *clientconfig.ClientOpts, listOpts ports.ListOpts, logger 
 	numberToDelete := len(allPorts)
 	numberDeleted := 0
 
-	// Prefetch list of FIPs to save list calls for each port
-	allPages, err = floatingips.List(conn, floatingips.ListOpts{}).AllPages()
+	fipByPort, err := getFIPsByPort(conn, logger)
 	if err != nil {
 		logger.Error(err)
 		return false, nil
-	}
-	allFIPs, err := floatingips.ExtractFloatingIPs(allPages)
-	if err != nil {
-		logger.Error(err)
-		return false, nil
-	}
-
-	// Organize FIPs for easy lookup
-	fipByPort := make(map[string]floatingips.FloatingIP)
-	for _, fip := range allFIPs {
-		fipByPort[fip.PortID] = fip
 	}
 
 	deletePortsWorker := func(portsChannel <-chan ports.Port, deletedChannel chan<- int) {
@@ -450,6 +460,25 @@ func deletePorts(opts *clientconfig.ClientOpts, listOpts ports.ListOpts, logger 
 	return numberDeleted == numberToDelete, nil
 }
 
+func getSecurityGroups(conn *gophercloud.ServiceClient, filter Filter) ([]sg.SecGroup, error) {
+	var emptySecurityGroups []sg.SecGroup
+	tags := filterTags(filter)
+	listOpts := sg.ListOpts{
+		TagsAny: strings.Join(tags, ","),
+	}
+
+	allPages, err := sg.List(conn, listOpts).AllPages()
+	if err != nil {
+		return emptySecurityGroups, err
+	}
+
+	allGroups, err := sg.ExtractGroups(allPages)
+	if err != nil {
+		return emptySecurityGroups, err
+	}
+	return allGroups, nil
+}
+
 func deleteSecurityGroups(opts *clientconfig.ClientOpts, filter Filter, logger logrus.FieldLogger) (bool, error) {
 	logger.Debug("Deleting openstack security-groups")
 	defer logger.Debugf("Exiting deleting openstack security-groups")
@@ -459,18 +488,8 @@ func deleteSecurityGroups(opts *clientconfig.ClientOpts, filter Filter, logger l
 		logger.Error(err)
 		return false, nil
 	}
-	tags := filterTags(filter)
-	listOpts := sg.ListOpts{
-		TagsAny: strings.Join(tags, ","),
-	}
 
-	allPages, err := sg.List(conn, listOpts).AllPages()
-	if err != nil {
-		logger.Error(err)
-		return false, nil
-	}
-
-	allGroups, err := sg.ExtractGroups(allPages)
+	allGroups, err := getSecurityGroups(conn, filter)
 	if err != nil {
 		logger.Error(err)
 		return false, nil
@@ -1091,40 +1110,60 @@ func deleteContainers(opts *clientconfig.ClientOpts, filter Filter, logger logru
 			// Openshiftclusterid in the X-Container-Meta- HEAD output
 			titlekey := strings.Title(strings.ToLower(key))
 			if metadata[titlekey] == val {
-				logger.Debugf("Bulk deleting container %q objects", container)
-				pager := objects.List(conn, container, &objects.ListOpts{
-					Full:  false,
-					Limit: 50,
-				})
-				err = pager.EachPage(func(page pagination.Page) (bool, error) {
+				queue := newSemaphore(3)
+				errCh := make(chan error)
+				err := objects.List(conn, container, nil).EachPage(func(page pagination.Page) (bool, error) {
 					objectsOnPage, err := objects.ExtractNames(page)
 					if err != nil {
 						return false, err
 					}
-					resp, err := objects.BulkDelete(conn, container, objectsOnPage).Extract()
-					if err != nil {
-						return false, err
-					}
-					if len(resp.Errors) > 0 {
-						// Convert resp.Errors to golang errors.
-						// Each error is represented by a list of 2 strings, where the first one
-						// is the object name, and the second one contains an error message.
-						errs := make([]error, len(resp.Errors))
-						for i, objectError := range resp.Errors {
-							errs[i] = fmt.Errorf("cannot delete object %s: %s", objectError[0], objectError[1])
+					queue.Add(func() {
+						for len(objectsOnPage) > 0 {
+							logger.Debugf("Initiating bulk deletion of %d objects in container %q", len(objectsOnPage), container)
+							resp, err := objects.BulkDelete(conn, container, objectsOnPage).Extract()
+							if err != nil {
+								errCh <- err
+								return
+							}
+							if len(resp.Errors) > 0 {
+								// Convert resp.Errors to golang errors.
+								// Each error is represented by a list of 2 strings, where the first one
+								// is the object name, and the second one contains an error message.
+								for _, objectError := range resp.Errors {
+									errCh <- fmt.Errorf("cannot delete object %q: %s", objectError[0], objectError[1])
+								}
+								logger.Debugf("Terminating object deletion routine with error. Deleted %d objects out of %d.", resp.NumberDeleted, len(objectsOnPage))
+							}
+
+							// Some object-storage instances may be set to have a limit to the LIST operation
+							// that is higher to the limit to the BULK DELETE operation. On those clouds, objects
+							// in the BULK DELETE call beyond the limit are silently ignored. In this loop, after
+							// checking that no errors were encountered, we reduce the BULK DELETE list by the
+							// number of processed objects, and send it back to the server if it's not empty.
+							objectsOnPage = objectsOnPage[resp.NumberDeleted+resp.NumberNotFound:]
 						}
-
-						return false, fmt.Errorf("errors occurred during bulk deleting of container %s objects: %w", container, k8serrors.NewAggregate(errs))
-					}
-
+						logger.Debugf("Terminating object deletion routine.")
+					})
 					return true, nil
 				})
 				if err != nil {
 					var gerr gophercloud.ErrDefault404
 					if !errors.As(err, &gerr) {
-						logger.Errorf("Bulk deleting of container %q objects failed: %v", container, err)
+						logger.Errorf("Bulk deletion of container %q objects failed: %v", container, err)
 						return false, nil
 					}
+				}
+				var errs []error
+				go func() {
+					for err := range errCh {
+						errs = append(errs, err)
+					}
+				}()
+
+				queue.Wait()
+				close(errCh)
+				if len(errs) > 0 {
+					return false, fmt.Errorf("errors occurred during bulk deletion of the objects of container %q: %w", container, k8serrors.NewAggregate(errs))
 				}
 				logger.Debugf("Deleting container %q", container)
 				_, err = containers.Delete(conn, container).Extract()
@@ -1810,4 +1849,95 @@ func validateCloud(opts *clientconfig.ClientOpts, logger logrus.FieldLogger) err
 	}
 
 	return networkextensions.Validate(availableExtensions)
+}
+
+// cleanClusterSgs removes the installer security groups from the user provided Port.
+func cleanClusterSgs(providedPortSGs []string, clusterSGs []sg.SecGroup) []string {
+	var sgs []string
+	for _, providedPortSG := range providedPortSGs {
+		if !isClusterSG(providedPortSG, clusterSGs) {
+			sgs = append(sgs, providedPortSG)
+		}
+	}
+	return sgs
+}
+
+func isClusterSG(providedPortSG string, clusterSGs []sg.SecGroup) bool {
+	for _, clusterSG := range clusterSGs {
+		if providedPortSG == clusterSG.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func cleanVIPsPorts(opts *clientconfig.ClientOpts, filter Filter, logger logrus.FieldLogger) (bool, error) {
+	logger.Debug("Cleaning provided Ports for API and Ingress VIPs")
+	defer logger.Debugf("Exiting clean of provided Ports for API and Ingress VIPs")
+	conn, err := clientconfig.NewServiceClient("network", opts)
+	if err != nil {
+		logger.Error(err)
+		return false, nil
+	}
+
+	tag := filter["openshiftClusterID"] + openstackdefaults.DualStackVIPsPortTag
+	PortlistOpts := ports.ListOpts{
+		TagsAny: tag,
+	}
+	allPages, err := ports.List(conn, PortlistOpts).AllPages()
+	if err != nil {
+		logger.Error(err)
+		return false, nil
+	}
+
+	allPorts, err := ports.ExtractPorts(allPages)
+	if err != nil {
+		logger.Error(err)
+		return false, nil
+	}
+
+	numberToClean := len(allPorts)
+	numberCleaned := 0
+
+	// Updating user provided API and Ingress Ports
+	if len(allPorts) > 0 {
+		clusterSGs, err := getSecurityGroups(conn, filter)
+		if err != nil {
+			logger.Error(err)
+			return false, nil
+		}
+		fipByPort, err := getFIPsByPort(conn, logger)
+		if err != nil {
+			logger.Error(err)
+			return false, nil
+		}
+		for _, port := range allPorts {
+			logger.Debugf("Updating security groups for Port: %q", port.ID)
+			sgs := cleanClusterSgs(port.SecurityGroups, clusterSGs)
+			_, err := ports.Update(conn, port.ID, ports.UpdateOpts{SecurityGroups: &sgs}).Extract()
+			if err != nil {
+				return false, nil
+			}
+			if fip, ok := fipByPort[port.ID]; ok {
+				logger.Debugf("Dissociating Floating IP %q", fip.ID)
+				_, err := floatingips.Update(conn, fip.ID, floatingips.UpdateOpts{}).Extract()
+				if err != nil {
+					// Ignore the error if the floating ip cannot be found and return with an appropriate message if it's another type of error
+					var gerr gophercloud.ErrDefault404
+					if !errors.As(err, &gerr) {
+						return false, nil
+					}
+					logger.Debugf("Cannot find floating ip %q. It's probably already been deleted.", fip.ID)
+				}
+			}
+
+			logger.Debugf("Deleting tag for Port: %q", port.ID)
+			err = attributestags.Delete(conn, "ports", port.ID, tag).ExtractErr()
+			if err != nil {
+				return false, nil
+			}
+			numberCleaned++
+		}
+	}
+	return numberCleaned == numberToClean, nil
 }

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/util/scheme"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/golang/mock/gomock"
@@ -19,17 +21,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -37,6 +36,7 @@ import (
 	"github.com/openshift/hive/pkg/controller/machinepool/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testfake "github.com/openshift/hive/pkg/test/fake"
 )
 
 const (
@@ -56,8 +56,6 @@ func init() {
 }
 
 func TestRemoteMachineSetReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	machineapi.AddToScheme(scheme.Scheme)
 
 	getPool := func(c client.Client, poolName string) *hivev1.MachinePool {
 		pool := &hivev1.MachinePool{}
@@ -282,8 +280,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				mp := testMachinePool()
 				mp.Spec.Labels["test-label-2"] = "test-value-2"
 				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
-					Key:   "test-taint-2",
-					Value: "test-value-2",
+					Key:    "test-taint-2",
+					Value:  "test-value-2",
+					Effect: "NoSchedule",
 				})
 				return mp
 			}(),
@@ -293,8 +292,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
 					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "test-value",
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
 					})
 					return ms
 				}(),
@@ -308,12 +308,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "test-value",
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
 					})
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint-2",
-						Value: "test-value-2",
+						Key:    "test-taint-2",
+						Value:  "test-value-2",
+						Effect: "NoSchedule",
 					})
 					return ms
 				}(),
@@ -324,20 +326,22 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			clusterDeployment: testClusterDeployment(),
 			machinePool: func() *hivev1.MachinePool {
 				mp := testMachinePool()
+				// Allow empty string as value for labels
 				mp.Spec.Labels["test-label-2"] = ""
 				mp.Spec.Labels["test-label-1"] = "test-value-1"
 				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
-					Key:   "test-taint",
-					Value: "test-value",
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
 				})
 				return mp
 			}(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
 				func() *machineapi.MachineSet {
-					//ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					// remote MachineSet with empty Spec.Template.Spec.Labels
 					msReplicas := int32(1)
-					rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.Scheme)
+					rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.GetScheme())
 					if err != nil {
 						log.WithError(err).Fatal("error encoding AWS machine provider spec")
 					}
@@ -380,8 +384,132 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms.Spec.Template.Spec.ObjectMeta.Labels["test-label-1"] = "test-value-1"
 					ms.Spec.Template.Spec.ObjectMeta.Labels["test-label-2"] = ""
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "test-value",
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+		},
+		{
+			name:              "Update all entries of taints (account for duplicate entries)",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "new-value",
+					Effect: "NoSchedule",
+				})
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "new-value-won't-be-added",
+					Effect: "NoSchedule",
+				})
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "new-value",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+		},
+		{
+			name:              "Delete labels and taints if relevant entries in MachinePool Spec modified",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Labels["test-label"] = "keep-me"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "keep-me",
+					Effect: "NoSchedule",
+				})
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "collapse-me",
+					Effect: "NoSchedule",
+				})
+				mp.Status.OwnedLabels = []string{"test-label-2"}
+				mp.Status.OwnedTaints = []hivev1.TaintIdentifier{
+					{Key: "test-taint-2", Effect: "NoSchedule"},
+				}
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.Labels["test-label"] = "keep-me"
+					ms.Spec.Template.Spec.Labels["test-label-2"] = "remove-me"
+					ms.Spec.Template.Spec.Labels["test-label-3"] = "preserve-me"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "keep-me",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint-2",
+						Value:  "remove-me",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint-3",
+						Value:  "preserve-me",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint-3",
+						Value:  "collapse-me",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
+					ms.Spec.Template.Spec.Labels["test-label"] = "keep-me"
+					ms.Spec.Template.Spec.Labels["test-label-3"] = "preserve-me"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "keep-me",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint-3",
+						Value:  "preserve-me",
+						Effect: "NoSchedule",
 					})
 					return ms
 				}(),
@@ -395,8 +523,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				mp.Spec.Labels["test-label-2"] = "test-value-2"
 				mp.Spec.Labels["test-label-1"] = "test-value-1"
 				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
-					Key:   "test-taint",
-					Value: "test-value",
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
 				})
 				return mp
 			}(),
@@ -407,8 +536,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms.Spec.Template.Spec.Labels["test-label-1"] = "test-value-1"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "test-value",
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
 					})
 					return ms
 				}(),
@@ -422,8 +552,57 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms.Spec.Template.Spec.Labels["test-label-1"] = "test-value-1"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
-						Key:   "test-taint",
-						Value: "test-value",
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+		},
+		{
+			name:              "Collapse of duplicate entries should result in an update",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePool()
+				mp.Spec.Labels["test-label"] = "test-value"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
+				})
+				return mp
+			}(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					})
+					return ms
+				}(),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				func() *machineapi.MachineSet {
+					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
+					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
 					})
 					return ms
 				}(),
@@ -988,10 +1167,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		apis.AddToScheme(scheme.Scheme)
-		machineapi.AddToScheme(scheme.Scheme)
-		autoscalingv1.SchemeBuilder.AddToScheme(scheme.Scheme)
-		autoscalingv1beta1.SchemeBuilder.AddToScheme(scheme.Scheme)
 		t.Run(test.name, func(t *testing.T) {
 			localExisting := []runtime.Object{}
 			if test.clusterDeployment != nil {
@@ -1000,8 +1175,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			if test.machinePool != nil {
 				localExisting = append(localExisting, test.machinePool)
 			}
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(localExisting...).Build()
-			remoteFakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(localExisting...).Build()
+			remoteFakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
 
 			mockCtrl := gomock.NewController(t)
 
@@ -1020,7 +1196,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 
 			rcd := &ReconcileMachinePool{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				logger:                        logger,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 				actuatorBuilder: func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
@@ -1077,7 +1253,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 							if !reflect.DeepEqual(eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels) {
 								t.Errorf("machineset %v machinespec has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels)
 							}
-							if !reflect.DeepEqual(eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints) {
+							// Taints are stored as a list, so sort them before comparing.
+							if !reflect.DeepEqual(sortedTaints(eMS.Spec.Template.Spec.Taints), sortedTaints(rMS.Spec.Template.Spec.Taints)) {
 								t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
 							}
 
@@ -1115,6 +1292,101 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 
 			if rCAL, err := getRCAL(remoteFakeClient); assert.NoError(t, err, "error getting cluster autoscalers") {
 				assert.ElementsMatch(t, test.expectedRemoteClusterAutoscalers, rCAL.Items, "unexpected remote cluster autoscalers")
+			}
+		})
+	}
+}
+
+// sortedTaints sorts and returns the provided list of taints based on the ascending order of taint key, effect and value - in that order.
+func sortedTaints(taints []corev1.Taint) []corev1.Taint {
+	sort.SliceStable(taints, func(i, j int) bool {
+		if taints[i].Key != taints[j].Key {
+			return taints[i].Key < taints[j].Key
+		}
+		if taints[i].Effect != taints[j].Effect {
+			return taints[i].Effect < taints[j].Effect
+		}
+		return taints[i].Value < taints[j].Value
+	})
+	return taints
+}
+
+func TestUpdateOwnedLabelsTaints(t *testing.T) {
+	tests := []struct {
+		name                string
+		machinePool         *hivev1.MachinePool
+		expectedOwnedLabels []string
+		expectedOwnedTaints []hivev1.TaintIdentifier
+	}{
+		{
+			name: "Carry over labels from spec",
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePoolWithoutLabelsTaints()
+				mp.Spec.Labels = make(map[string]string)
+				mp.Spec.Labels["test-label"] = "test-value"
+				return mp
+			}(),
+			expectedOwnedLabels: []string{"test-label"},
+		},
+		{
+			name: "Carry over taints from spec",
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePoolWithoutLabelsTaints()
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
+				})
+				return mp
+			}(),
+			expectedOwnedTaints: []hivev1.TaintIdentifier{
+				{
+					Key:    "test-taint",
+					Effect: "NoSchedule",
+				},
+			},
+		},
+		{
+			name: "Remove duplicate taints",
+			machinePool: func() *hivev1.MachinePool {
+				mp := testMachinePoolWithoutLabelsTaints()
+				mp.Spec.Labels = make(map[string]string)
+				mp.Spec.Labels["test-label"] = "test-value"
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "test-value",
+					Effect: "NoSchedule",
+				})
+				mp.Spec.Taints = append(mp.Spec.Taints, corev1.Taint{
+					Key:    "test-taint",
+					Value:  "Value doesn't matter during comparison",
+					Effect: "NoSchedule",
+				})
+				return mp
+			}(),
+			expectedOwnedLabels: []string{"test-label"},
+			expectedOwnedTaints: []hivev1.TaintIdentifier{
+				{
+					Key:    "test-taint",
+					Effect: "NoSchedule",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualMachinePoolStatus := updateOwnedLabelsAndTaints(test.machinePool)
+			// Explicitly check the length to ensure there aren't any empty entries
+			if assert.Equal(t, len(test.expectedOwnedLabels), len(actualMachinePoolStatus.OwnedLabels)) && len(actualMachinePoolStatus.OwnedLabels) > 0 {
+				if !reflect.DeepEqual(test.expectedOwnedLabels, actualMachinePoolStatus.OwnedLabels) {
+					t.Errorf("expected labels: %v, actual labels: %v", test.expectedOwnedLabels, actualMachinePoolStatus.OwnedLabels)
+				}
+			}
+			if assert.Equal(t, len(test.expectedOwnedTaints), len(actualMachinePoolStatus.OwnedTaints)) && len(actualMachinePoolStatus.OwnedTaints) > 0 {
+				if !reflect.DeepEqual(test.expectedOwnedTaints, actualMachinePoolStatus.OwnedTaints) {
+					t.Errorf("expected taints: %v, actual taints: %v", test.expectedOwnedTaints, actualMachinePoolStatus.OwnedTaints)
+				}
 			}
 		})
 	}
@@ -1182,10 +1454,9 @@ Machine machine-3 failed (InsufficientResources): No available quota,
 `,
 	}}
 
-	machineapi.AddToScheme(scheme.Scheme)
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			fake := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			fake := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			ms := &machineapi.MachineSet{}
 			err := fake.Get(context.TODO(), types.NamespacedName{Namespace: machineAPINamespace, Name: testName}, ms)
@@ -1198,7 +1469,7 @@ Machine machine-3 failed (InsufficientResources): No available quota,
 	}
 }
 
-func testMachinePool() *hivev1.MachinePool {
+func testMachinePoolWithoutLabelsTaints() *hivev1.MachinePool {
 	return &hivev1.MachinePool{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: hivev1.SchemeGroupVersion.String(),
@@ -1218,18 +1489,6 @@ func testMachinePool() *hivev1.MachinePool {
 			Platform: hivev1.MachinePoolPlatform{
 				AWS: &hivev1aws.MachinePoolPlatform{
 					InstanceType: testInstanceType,
-				},
-			},
-			Labels: map[string]string{
-				"machine.openshift.io/cluster-api-cluster":      testInfraID,
-				"machine.openshift.io/cluster-api-machine-role": testPoolName,
-				"machine.openshift.io/cluster-api-machine-type": testPoolName,
-			},
-			Taints: []corev1.Taint{
-				{
-					Key:    "foo",
-					Value:  "bar",
-					Effect: corev1.TaintEffectNoSchedule,
 				},
 			},
 		},
@@ -1254,6 +1513,23 @@ func testMachinePool() *hivev1.MachinePool {
 			},
 		},
 	}
+}
+
+func testMachinePool() *hivev1.MachinePool {
+	p := testMachinePoolWithoutLabelsTaints()
+	p.Spec.Labels = map[string]string{
+		"machine.openshift.io/cluster-api-cluster":      testInfraID,
+		"machine.openshift.io/cluster-api-machine-role": testPoolName,
+		"machine.openshift.io/cluster-api-machine-type": testPoolName,
+	}
+	p.Spec.Taints = []corev1.Taint{
+		{
+			Key:    "foo",
+			Value:  "bar",
+			Effect: corev1.TaintEffectNoSchedule,
+		},
+	}
+	return p
 }
 
 func testAutoscalingMachinePool(min, max int) *hivev1.MachinePool {
@@ -1287,7 +1563,7 @@ func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
 }
 
 func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machineapi.MachineSet) {
-	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.Scheme)
+	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.GetScheme())
 	if err != nil {
 		log.WithError(err).Fatal("error encoding custom machine provider spec")
 	}
@@ -1297,7 +1573,7 @@ func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machinea
 }
 
 func testMachineSpec(machineType string) machineapi.MachineSpec {
-	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.Scheme)
+	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.GetScheme())
 	if err != nil {
 		log.WithError(err).Fatal("error encoding AWS machine provider spec")
 	}
@@ -1439,7 +1715,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Finalizers: []string{hivev1.FinalizerDeprovision},
 			UID:        types.UID("1234"),
 			Labels: map[string]string{
-				constants.VersionMajorMinorPatchLabel: "4.4.0",
+				constants.VersionLabel: "4.4.0",
 			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{
@@ -1480,6 +1756,6 @@ func withClusterVersion(cd *hivev1.ClusterDeployment, version string) *hivev1.Cl
 	if cd.Labels == nil {
 		cd.Labels = make(map[string]string, 1)
 	}
-	cd.Labels[constants.VersionMajorMinorPatchLabel] = version
+	cd.Labels[constants.VersionLabel] = version
 	return cd
 }

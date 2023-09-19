@@ -18,9 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
-	"k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/contrib/pkg/utils"
@@ -33,6 +31,7 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
+	"github.com/openshift/hive/pkg/util/scheme"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/validate"
 )
@@ -174,8 +173,9 @@ type Options struct {
 	FeatureSet                        string
 
 	// AWS
-	AWSUserTags    []string
-	AWSPrivateLink bool
+	AWSUserTags     []string
+	AWSPrivateLink  bool
+	AWSInstanceType string
 
 	// Azure
 	AzureBaseDomainResourceGroupName string
@@ -330,6 +330,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	// AWS flags
 	flags.StringSliceVar(&opt.AWSUserTags, "aws-user-tags", nil, "Additional tags to add to resources. Must be in the form \"key=value\"")
 	flags.BoolVar(&opt.AWSPrivateLink, "aws-private-link", false, "Enables access to cluster using AWS PrivateLink")
+	flags.StringVar(&opt.AWSInstanceType, "aws-instance-type", clusterresource.AWSInstanceTypeDefault, "AWS cloud instance type")
 
 	// Azure flags
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
@@ -495,9 +496,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 // Run executes the command
 func (o *Options) Run() error {
-	if err := apis.AddToScheme(scheme.Scheme); err != nil {
-		return err
-	}
+	scheme := scheme.GetScheme()
 
 	objs, err := o.GenerateObjects()
 	if err != nil {
@@ -510,7 +509,7 @@ func (o *Options) Run() error {
 		} else {
 			printer = &printers.JSONPrinter{}
 		}
-		printObjects(objs, scheme.Scheme, printer)
+		printObjects(objs, scheme, printer)
 		return err
 	}
 	rh, err := utils.GetResourceHelper(o.log)
@@ -531,7 +530,7 @@ func (o *Options) Run() error {
 			return err
 		}
 		accessor.SetNamespace(o.Namespace)
-		if _, err := rh.ApplyRuntimeObject(obj, scheme.Scheme); err != nil {
+		if _, err := rh.ApplyRuntimeObject(obj, scheme); err != nil {
 			return err
 		}
 
@@ -660,6 +659,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			SecretAccessKey: secretAccessKey,
 			UserTags:        userTags,
 			Region:          o.Region,
+			InstanceType:    o.AWSInstanceType,
 			PrivateLink:     o.AWSPrivateLink,
 		}
 		builder.CloudBuilder = awsProvider

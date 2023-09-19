@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -26,6 +25,8 @@ import (
 	"github.com/openshift/hive/pkg/awsclient"
 	mockawsclient "github.com/openshift/hive/pkg/awsclient/mock"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func TestCanHandle(t *testing.T) {
@@ -256,9 +257,7 @@ func TestReplacePreemptibleMachines(t *testing.T) {
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
 
-	scheme := runtime.NewScheme()
-	hivev1.AddToScheme(scheme)
-	machineapi.AddToScheme(scheme)
+	scheme := scheme.GetScheme()
 
 	testcd := testcd.FullBuilder(namespace, cdName, scheme).Options(
 		testcd.Installed(),
@@ -320,7 +319,7 @@ func TestReplacePreemptibleMachines(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actuator := testAWSActuator(nil)
-			c := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(test.existingMachines...).Build()
+			c := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existingMachines...).Build()
 
 			replaced, err := actuator.ReplaceMachines(testcd, c, logger)
 			if test.expectedErr != "" {

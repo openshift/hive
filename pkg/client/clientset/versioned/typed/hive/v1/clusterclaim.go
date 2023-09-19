@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1 "github.com/openshift/hive/pkg/client/applyconfiguration/hive/v1"
 	scheme "github.com/openshift/hive/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type ClusterClaimInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterClaimList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterClaim, err error)
+	Apply(ctx context.Context, clusterClaim *hivev1.ClusterClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterClaim, err error)
+	ApplyStatus(ctx context.Context, clusterClaim *hivev1.ClusterClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterClaim, err error)
 	ClusterClaimExpansion
 }
 
@@ -172,6 +177,62 @@ func (c *clusterClaims) Patch(ctx context.Context, name string, pt types.PatchTy
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterClaim.
+func (c *clusterClaims) Apply(ctx context.Context, clusterClaim *hivev1.ClusterClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterClaim, err error) {
+	if clusterClaim == nil {
+		return nil, fmt.Errorf("clusterClaim provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterClaim)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterClaim.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterClaim.Name must be provided to Apply")
+	}
+	result = &v1.ClusterClaim{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("clusterclaims").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *clusterClaims) ApplyStatus(ctx context.Context, clusterClaim *hivev1.ClusterClaimApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterClaim, err error) {
+	if clusterClaim == nil {
+		return nil, fmt.Errorf("clusterClaim provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterClaim)
+	if err != nil {
+		return nil, err
+	}
+
+	name := clusterClaim.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterClaim.Name must be provided to Apply")
+	}
+
+	result = &v1.ClusterClaim{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("clusterclaims").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

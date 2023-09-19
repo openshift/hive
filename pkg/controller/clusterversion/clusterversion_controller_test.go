@@ -13,20 +13,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	configv1 "github.com/openshift/api/config/v1"
 
-	"github.com/openshift/hive/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -44,8 +43,6 @@ func init() {
 }
 
 func TestClusterVersionReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
 
 	tests := []struct {
 		name         string
@@ -73,6 +70,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				testKubeconfigSecret(),
 			},
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "2.3.4+somebuild", cd.Labels[constants.VersionLabel], "unexpected version label")
 				assert.Equal(t, "2", cd.Labels[constants.VersionMajorLabel], "unexpected version major label")
 				assert.Equal(t, "2.3", cd.Labels[constants.VersionMajorMinorLabel], "unexpected version major-minor label")
 				assert.Equal(t, "2.3.4", cd.Labels[constants.VersionMajorMinorPatchLabel], "unexpected version major-minor-patch label")
@@ -82,7 +80,8 @@ func TestClusterVersionReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			scheme := scheme.GetScheme()
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			if !test.noRemoteCall {
@@ -90,7 +89,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 			}
 			rcd := &ReconcileClusterVersion{
 				Client:                        fakeClient,
-				scheme:                        scheme.Scheme,
+				scheme:                        scheme,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
 			}
 
@@ -191,8 +190,7 @@ func testRemoteClusterAPIClient() client.Client {
 		},
 	}
 	remoteClusterVersion.Status = *testRemoteClusterVersionStatus()
-
-	return fake.NewClientBuilder().WithRuntimeObjects(remoteClusterVersion).Build()
+	return testfake.NewFakeClientBuilder().WithRuntimeObjects(remoteClusterVersion).Build()
 }
 
 func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	// always not rate limited
 	q := &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
 	h := NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, func(_ event.UpdateEvent) bool { return false })
-	h.Update(event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
+	h.Update(context.TODO(), event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
 	require.Equal(t, 1, len(q.added))
 	require.Equal(t, 0, len(q.ratelimitAdded))
@@ -30,7 +31,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	// always rate limited
 	q = &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
 	h = NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, func(_ event.UpdateEvent) bool { return true })
-	h.Update(event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
+	h.Update(context.TODO(), event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
 	require.Equal(t, 0, len(q.added))
 	require.Equal(t, 1, len(q.ratelimitAdded))
@@ -38,14 +39,14 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	// always rate limited not UPDATE
 	q = &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
 	h = NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, func(_ event.UpdateEvent) bool { return true })
-	h.Generic(event.GenericEvent{Object: o}, q)
+	h.Generic(context.TODO(), event.GenericEvent{Object: o}, q)
 
 	require.Equal(t, 1, len(q.added))
 	require.Equal(t, 0, len(q.ratelimitAdded))
 
 	// always rate limited with complex handler
 	q = &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
-	h = NewRateLimitedUpdateEventHandler(handler.EnqueueRequestsFromMapFunc(func(_ client.Object) []reconcile.Request {
+	h = NewRateLimitedUpdateEventHandler(handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
 		return []reconcile.Request{{
 			NamespacedName: types.NamespacedName{
 				Namespace: "test-ns",
@@ -63,7 +64,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 			},
 		}}
 	}), func(_ event.UpdateEvent) bool { return true })
-	h.Update(event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
+	h.Update(context.TODO(), event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
 	require.Equal(t, 0, len(q.added))
 	require.Equal(t, 3, len(q.ratelimitAdded))

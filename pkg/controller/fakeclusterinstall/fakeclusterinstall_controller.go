@@ -67,7 +67,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for changes to FakeClusterInstall
-	err = c.Watch(&source.Kind{Type: &hiveint.FakeClusterInstall{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hiveint.FakeClusterInstall{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching FakeClusterInstall")
 		return err

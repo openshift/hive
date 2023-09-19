@@ -27,8 +27,8 @@ func TestClusterAccumulator(t *testing.T) {
 		// Four managed clusters successfully installed:
 		testClusterDeployment("i1", "managed", tenDaysAgo, true),
 		testClusterDeployment("i2", "managed", tenDaysAgo, true),
-		testClusterDeployment("i3", "managed", threeHoursAgo, true),
-		testClusterDeployment("i4", "managed", threeHoursAgo, true),
+		testClusterDeploymentWithPowerState("i3", "managed", threeHoursAgo, true, hivev1.ClusterPowerStateHibernating),
+		testClusterDeploymentWithPowerState("i4", "managed", threeHoursAgo, true, hivev1.ClusterPowerStateHibernating),
 
 		// Expect three managed clusters still installing within normal timeframe:
 		testClusterDeploymentWithConditions("a", "managed", fiveMinsAgo, false,
@@ -81,7 +81,8 @@ func TestClusterAccumulator(t *testing.T) {
 		accumulator.processCluster(&cd)
 	}
 
-	assert.Equal(t, 14, accumulator.total["managed"])
+	assert.Equal(t, 12, accumulator.total["unspecified"]["managed"])
+	assert.Equal(t, 2, accumulator.total["Hibernating"]["managed"])
 	assert.Equal(t, 5, accumulator.installed["managed"])
 	assert.Equal(t, 9, accumulator.uninstalled["0h"]["managed"])
 	assert.Equal(t, 5, accumulator.uninstalled["1h"]["managed"])
@@ -90,7 +91,7 @@ func TestClusterAccumulator(t *testing.T) {
 	assert.Equal(t, 1, accumulator.uninstalled["24h"]["managed"])
 	assert.Equal(t, 1, accumulator.uninstalled["72h"]["managed"])
 
-	assert.Equal(t, 5, accumulator.total["unmanaged"])
+	assert.Equal(t, 5, accumulator.total["unspecified"]["unmanaged"])
 	assert.Equal(t, 2, accumulator.installed["unmanaged"])
 	assert.Equal(t, 3, accumulator.uninstalled["0h"]["unmanaged"])
 	assert.Equal(t, 2, accumulator.uninstalled["1h"]["unmanaged"])
@@ -117,7 +118,8 @@ func TestClusterAccumulator(t *testing.T) {
 	for _, cd := range clusters {
 		accumulator.processCluster(&cd)
 	}
-	assert.Equal(t, 9, accumulator.total["managed"])
+	assert.Equal(t, 7, accumulator.total["unspecified"]["managed"])
+	assert.Equal(t, 2, accumulator.total["Hibernating"]["managed"])
 	assert.Equal(t, 2, accumulator.installed["managed"])
 	assert.Equal(t, 7, accumulator.uninstalled["0h"]["managed"])
 	assert.Equal(t, 3, accumulator.uninstalled["1h"]["managed"])
@@ -176,6 +178,12 @@ func testClusterDeployment(name, clusterType string, created metav1.Time, instal
 			Installed: installed,
 		},
 	}
+}
+
+func testClusterDeploymentWithPowerState(name, clusterType string, created metav1.Time, installed bool, powerState hivev1.ClusterPowerState) hivev1.ClusterDeployment {
+	cd := testClusterDeployment(name, clusterType, created, installed)
+	cd.Status.PowerState = powerState
+	return cd
 }
 
 func testDeletedClusterDeployment(name, clusterType string, created metav1.Time, deleted metav1.Time, installed bool) hivev1.ClusterDeployment {

@@ -33,7 +33,7 @@ var (
 	metricClusterDeploymentsTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments",
 		Help: "Total number of cluster deployments.",
-	}, []string{"cluster_type", "age_lt"})
+	}, []string{"cluster_type", "age_lt", "power_state"})
 	metricClusterDeploymentsInstalledTotal = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "hive_cluster_deployments_installed",
 		Help: "Total number of cluster deployments that are successfully installed.",
@@ -495,8 +495,8 @@ type clusterAccumulator struct {
 	ageFilter    string
 	ageFilterDur time.Duration
 
-	// total maps cluster type to counter.
-	total map[string]int
+	// total maps powerState to cluster type to counter.
+	total map[string]map[string]int
 
 	// deprovisioning maps a "greater than" duration string (i.e. 8h) to
 	// cluster type to counter. Specify 0h if you want a bucket for the smallest duration.
@@ -531,7 +531,7 @@ const (
 func newClusterAccumulator(ageFilter string, durationBuckets []string) (*clusterAccumulator, error) {
 	ca := &clusterAccumulator{
 		ageFilter:       ageFilter,
-		total:           map[string]int{},
+		total:           map[string]map[string]int{},
 		installed:       map[string]int{},
 		deprovisioning:  map[string]map[string]int{},
 		uninstalled:     map[string]map[string]int{},
@@ -559,12 +559,16 @@ func newClusterAccumulator(ageFilter string, durationBuckets []string) (*cluster
 	return ca, nil
 }
 
-func (ca *clusterAccumulator) ensureClusterTypeBuckets(clusterType string) {
+func (ca *clusterAccumulator) ensureClusterTypeBuckets(clusterType string, powerState string) {
 	// Make sure an entry exists for this cluster type in all relevant maps:
 
-	_, ok := ca.total[clusterType]
+	_, ok := ca.total[powerState]
 	if !ok {
-		ca.total[clusterType] = 0
+		ca.total[powerState] = map[string]int{}
+	}
+	_, ok = ca.total[powerState][clusterType]
+	if !ok {
+		ca.total[powerState][clusterType] = 0
 	}
 
 	for k, v := range ca.deprovisioning {
@@ -599,10 +603,11 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 	}
 
 	clusterType := GetLabelValue(cd, hivev1.HiveClusterTypeLabel)
-	ca.ensureClusterTypeBuckets(clusterType)
+	powerState := GetPowerStateValue(cd.Status.PowerState)
+	ca.ensureClusterTypeBuckets(clusterType, powerState)
 	ca.clusterTypesSet[clusterType] = true
 
-	ca.total[clusterType]++
+	ca.total[powerState][clusterType]++
 
 	if cd.DeletionTimestamp != nil {
 		// Sort deleted clusters into buckets based on how long since
@@ -645,7 +650,9 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovisioning, conditions *prometheus.GaugeVec, mcLog log.FieldLogger) {
 
 	for k, v := range ca.total {
-		total.WithLabelValues(k, ca.ageFilter).Set(float64(v))
+		for clusterType := range ca.clusterTypesSet {
+			total.WithLabelValues(clusterType, ca.ageFilter, k).Set(float64(v[clusterType]))
+		}
 	}
 	for k, v := range ca.installed {
 		installed.WithLabelValues(k, ca.ageFilter).Set(float64(v))
@@ -685,6 +692,14 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovis
 func GetLabelValue(obj metav1.Object, label string) string {
 	if typeStr := obj.GetLabels()[label]; typeStr != "" {
 		return typeStr
+	}
+	return constants.MetricLabelDefaultValue
+}
+
+// GetPowerStateValue returns the value of the power state if set, otherwise a default value.
+func GetPowerStateValue(powerState hivev1.ClusterPowerState) string {
+	if powerState != "" {
+		return string(powerState)
 	}
 	return constants.MetricLabelDefaultValue
 }

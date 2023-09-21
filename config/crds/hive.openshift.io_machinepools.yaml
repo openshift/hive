@@ -288,6 +288,11 @@ spec:
                     description: GCP is the configuration used when installing on
                       GCP.
                     properties:
+                      networkProjectID:
+                        description: NetworkProjectID specifies which project the
+                          network and subnets exist in when they are not in the main
+                          ProjectID.
+                        type: string
                       osDisk:
                         description: OSDisk defines the storage for instances.
                         properties:

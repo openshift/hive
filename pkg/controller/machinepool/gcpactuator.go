@@ -168,10 +168,11 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			GCP: &installertypesgcp.Platform{
-				Region:        cd.Spec.Platform.GCP.Region,
-				ProjectID:     a.projectID,
-				ComputeSubnet: a.subnet,
-				Network:       a.network,
+				Region:           cd.Spec.Platform.GCP.Region,
+				ProjectID:        a.projectID,
+				ComputeSubnet:    a.subnet,
+				Network:          a.network,
+				NetworkProjectID: pool.Spec.Platform.GCP.NetworkProjectID,
 			},
 		},
 	}

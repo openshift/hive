@@ -9,8 +9,6 @@
 package scheme
 
 import (
-	configv1 "github.com/openshift/api/config/v1"
-	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -18,9 +16,11 @@ import (
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	oappsv1 "github.com/openshift/api/apps/v1"
 	orbacv1 "github.com/openshift/api/authorization/v1"
-	oconfigv1 "github.com/openshift/api/config/v1"
-	machineapi "github.com/openshift/api/machine/v1beta1"
+	configv1 "github.com/openshift/api/config/v1"
+	machinev1alpha1 "github.com/openshift/api/machine/v1alpha1"
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	ingresscontroller "github.com/openshift/api/operator/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
 	"github.com/openshift/hive/apis"
@@ -30,7 +30,6 @@ import (
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	openstackprovider "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis"
 
 	ovirtprovider "github.com/openshift/cluster-api-provider-ovirt/pkg/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -60,11 +59,14 @@ func init() {
 	hiveintv1alpha1.AddToScheme(hive_scheme)
 	hivev1.AddToScheme(hive_scheme)
 	ingresscontroller.AddToScheme(hive_scheme)
-	machineapi.AddToScheme(hive_scheme)
+	// For some reason machinev1alpha1.Install() doesn't add any types.
+	// Mimic how installer registers OpenstackProviderSpec:
+	hive_scheme.AddKnownTypes(machinev1alpha1.GroupVersion,
+		&machinev1alpha1.OpenstackProviderSpec{},
+	)
+	machinev1beta1.AddToScheme(hive_scheme)
 	monitoringv1.AddToScheme(hive_scheme)
 	oappsv1.Install(hive_scheme)
-	oconfigv1.Install(hive_scheme)
-	openstackprovider.AddToScheme(hive_scheme)
 	orbacv1.Install(hive_scheme)
 	ovirtprovider.AddToScheme(hive_scheme)
 	rbacv1.AddToScheme(hive_scheme)

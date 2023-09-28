@@ -5431,15 +5431,12 @@ objects:
                       turns out taints are mutually exclusive by key+effect, not simply
                       by key.)
                     properties:
-                      effect:omitempty:
+                      effect:
                         description: Effect matches corev1.Taint.Effect.
                         type: string
-                      key:omitempty:
+                      key:
                         description: Key matches corev1.Taint.Key.
                         type: string
-                    required:
-                    - effect:omitempty
-                    - key:omitempty
                     type: object
                   type: array
                 replicas:

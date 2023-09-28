@@ -243,7 +243,7 @@ func TestReconcile(t *testing.T) {
 				if *test.errorConnecting {
 					buildError = errors.New("cluster not reachable")
 				}
-				mockRemoteClientBuilder.EXPECT().Reachable().Return(buildError)
+				mockRemoteClientBuilder.EXPECT().Build().Return(nil, buildError)
 			}
 			if test.errorConnectingSecondary != nil {
 				mockRemoteClientBuilder.EXPECT().UseSecondaryAPIURL().Return(mockRemoteClientBuilder)
@@ -251,7 +251,7 @@ func TestReconcile(t *testing.T) {
 				if *test.errorConnectingSecondary {
 					buildError = errors.New("cluster not reachable")
 				}
-				mockRemoteClientBuilder.EXPECT().Reachable().Return(buildError)
+				mockRemoteClientBuilder.EXPECT().Build().Return(nil, buildError)
 			}
 			rcd := &ReconcileRemoteMachineSet{
 				Client:                        fakeClient,

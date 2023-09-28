@@ -30,6 +30,7 @@ import (
 // Builder is used to build API clients to the remote cluster
 type Builder interface {
 	// Build will return a static controller-runtime client for the remote cluster.
+	// It is also responsible for verifying reachability of client, and will fail if unreachable.
 	Build() (client.Client, error)
 
 	// BuildDynamic will return a dynamic kubeclient for the remote cluster.
@@ -48,9 +49,6 @@ type Builder interface {
 	// UseSecondaryAPIURL will use the secondary API URL. If there is an API URL override, then the initial API URL
 	// is the secondary.
 	UseSecondaryAPIURL() Builder
-
-	// Reachable internally builds a client and runs a query to make sure it is healthy.
-	Reachable() error
 }
 
 // NewBuilder creates a new Builder for creating a client to connect to the remote cluster associated with the specified
@@ -202,25 +200,18 @@ func (b *builder) Build() (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	scheme := scheme.GetScheme()
-
-	return client.New(cfg, client.Options{
-		Scheme: scheme,
-	})
-}
-
-func (b *builder) Reachable() error {
-	cfg, err := b.RESTConfig()
-	if err != nil {
-		return err
-	}
+	// Verify reachability of client
 	dc, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	_, err = restmapper.GetAPIGroupResources(dc)
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return client.New(cfg, client.Options{
+		Scheme: scheme.GetScheme(),
+	})
 }
 
 func (b *builder) BuildDynamic() (dynamic.Interface, error) {

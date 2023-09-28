@@ -115,5 +115,3 @@ func (b *fakeBuilder) UseSecondaryAPIURL() Builder {
 func (b *fakeBuilder) RESTConfig() (*rest.Config, error) {
 	return nil, errors.New("RESTConfig not implemented for fake cluster client builder")
 }
-
-func (b *fakeBuilder) Reachable() error { return nil }

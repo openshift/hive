@@ -402,7 +402,7 @@ func (r *hibernationReconciler) startMachines(cd *hivev1.ClusterDeployment, logg
 	}
 	err := actuator.StartMachines(cd, r.Client, logger)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to start machines: %v", err)
+		msg := fmt.Sprintf("Failed to start machines: %v (more detail may be available in the logs)", err)
 		r.setCDCondition(cd, hivev1.ClusterReadyCondition, hivev1.ReadyReasonFailedToStartMachines, msg,
 			corev1.ConditionFalse, logger)
 		cd.Status.PowerState = hivev1.ClusterPowerStateFailedToStartMachines
@@ -432,7 +432,7 @@ func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logge
 	}
 	err := actuator.StopMachines(cd, r.Client, logger)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to stop machines: %v", err)
+		msg := fmt.Sprintf("Failed to stop machines: %v (more detail may be available in the logs)", err)
 		changed = r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonFailedToStop, msg,
 			corev1.ConditionFalse, logger)
 		cd.Status.PowerState = hivev1.ClusterPowerStateFailedToStop

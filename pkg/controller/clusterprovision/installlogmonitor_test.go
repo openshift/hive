@@ -64,6 +64,8 @@ const (
 	noWorkerNodesReady                      = "ReadyIngressNodesAvailable: Authentication requires functional ingress which requires at least one schedulable and ready node. Got 0 worker nodes, 3 master nodes, 0 custom target nodes (none are schedulable or ready for ingress pods)."
 	s3AccessControlListNotSupported         = "time=\"2023-04-11T08:22:52Z\" level=error msg=\"Error: error creating S3 bucket ACL for rosa-6lr7x-flcmj-bootstrap: AccessControlListNotSupported: The bucket does not allow ACLs\""
 	awsAccountBlocked                       = "Error: creating EC2 Instance: Blocked: This account is currently blocked and not recognized as a valid account. Please contact aws-verification@amazon.com if you have questions."
+	ingressOperatorDegraded                 = "Cluster operator authentication Degraded is True with OAuthServerRouteEndpointAccessibleController_SyncError\nCluster operator ingress Degraded is True with IngressDegraded"
+	awsSubnetInsufficientIPSpace            = "IngressControllerUnavailable: One or more status conditions indicate unavailable: LoadBalancerReady=False (SyncLoadBalancerFailed: The service-controller component is reporting SyncLoadBalancerFailed events like: Error syncing load balancer: failed to ensure load balancer: InvalidSubnet: Not enough IP space available in subnet-08dcf1a15b3330b1d. ELB requires at least 8 free IP addresses in each subnet.\\n\\tstatus code: 400, request id: ac141e76-b455-4082-8ff3-556107921222\\nThe kube-controller-manager logs may contain more details.)\""
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -74,6 +76,16 @@ func TestParseInstallLog(t *testing.T) {
 		expectedReason  string
 		expectedMessage *string
 	}{
+		{
+			name:           "AWSSubnetInsufficientIPSpace",
+			log:            pointer.String(awsSubnetInsufficientIPSpace),
+			expectedReason: "AWSSubnetInsufficientIPSpace",
+		},
+		{
+			name:           "IngressOperatorDegraded",
+			log:            pointer.String(ingressOperatorDegraded),
+			expectedReason: "IngressOperatorDegraded",
+		},
 		{
 			name:           "S3AccessControlListNotSupported",
 			log:            pointer.String(s3AccessControlListNotSupported),

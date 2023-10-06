@@ -1665,6 +1665,11 @@ data:
       - "EIP: AddressLimitExceeded"
       installFailingReason: EIPAddressLimitExceeded
       installFailingMessage: EIP Address limit exceeded
+    - name: AWSSubnetInsufficientIPSpace
+      searchRegexStrings:
+      - "InvalidSubnet: Not enough IP space available in"
+      installFailingReason: AWSSubnetInsufficientIPSpace
+      installFailingMessage: Insufficient IP space available in subnet
     - name: MissingPublicSubnetForZone
       searchRegexStrings:
       - "No public subnet provided for zone"
@@ -1924,6 +1929,11 @@ data:
       - "Got 0 worker nodes, \\d+ master nodes.*none are schedulable or ready for ingress pods"
       installFailingReason: NoWorkerNodesReady
       installFailingMessage: 0 worker nodes have joined the cluster
+    - name: IngressOperatorDegraded 
+      searchRegexStrings:
+      - "Cluster operator ingress Degraded is True"
+      installFailingReason: IngressOperatorDegraded
+      installFailingMessage: Timeout waiting for the ingress operator to become ready
     - name: AuthenticationOperatorDegraded
       searchRegexStrings:
       - "Cluster operator authentication Degraded is True"

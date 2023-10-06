@@ -5152,6 +5152,17 @@ objects:
                                   type: string
                               type: object
                           type: object
+                        secureBoot:
+                          description: SecureBoot Defines whether the instance should
+                            have secure boot enabled. Verifies the digital signature
+                            of all boot components, and halts the boot process if
+                            signature verification fails. If omitted, the platform
+                            chooses a default, which is subject to change over time.
+                            Currently that default is "Disabled".
+                          enum:
+                          - Enabled
+                          - Disabled
+                          type: string
                         type:
                           description: InstanceType defines the GCP instance type.
                             eg. n1-standard-4

@@ -223,6 +223,7 @@ func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams gene
 		return nil, nil, err
 	}
 	o.DeleteOptions, err = delete.NewDeleteFlags("").ToOptions(dynamicClient, ioStreams)
+	o.DeleteOptions.ForceDeletion = true
 	if err != nil {
 		r.logger.WithError(err).Error("cannot create delete options")
 		return nil, nil, err

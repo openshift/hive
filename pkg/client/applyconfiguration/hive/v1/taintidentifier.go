@@ -9,8 +9,8 @@ import (
 // TaintIdentifierApplyConfiguration represents an declarative configuration of the TaintIdentifier type for use
 // with apply.
 type TaintIdentifierApplyConfiguration struct {
-	Key    *string         `json:"key:omitempty,omitempty"`
-	Effect *v1.TaintEffect `json:"effect:omitempty,omitempty"`
+	Key    *string         `json:"key,omitempty"`
+	Effect *v1.TaintEffect `json:"effect,omitempty"`
 }
 
 // TaintIdentifierApplyConfiguration constructs an declarative configuration of the TaintIdentifier type for use with

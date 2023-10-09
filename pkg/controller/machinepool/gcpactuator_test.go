@@ -183,6 +183,34 @@ func TestGCPActuator(t *testing.T) {
 				generateGCPMachineSetName("worker", "zone1"): 3,
 			},
 		},
+		{
+			name: "generate machinesets with SecureBoot enabled",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.SecureBoot = "Enabled"
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
+		{
+			name: "generate machinesets with SecureBoot disabled",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.SecureBoot = "Disabled"
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -272,6 +300,13 @@ func TestGCPActuator(t *testing.T) {
 					// NetworkProjectID
 					if npid := platform.NetworkProjectID; npid != "" {
 						assert.Equal(t, npid, gcpProvider.NetworkInterfaces[0].ProjectID)
+					}
+
+					// SecureBoot
+					if sb := platform.SecureBoot; sb == "Enabled" {
+						assert.Equal(t, sb, string(gcpProvider.ShieldedInstanceConfig.SecureBoot))
+					} else {
+						assert.Equal(t, "", string(gcpProvider.ShieldedInstanceConfig.SecureBoot))
 					}
 				}
 			}

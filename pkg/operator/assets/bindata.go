@@ -150,6 +150,10 @@ spec:
             controller-tools.k8s.io: "1.0"
       serviceAccount: hive-controllers
       serviceAccountName: hive-controllers
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: clustersync
         resources:
@@ -195,6 +199,10 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
 `)
 
 func configClustersyncStatefulsetYamlBytes() ([]byte, error) {

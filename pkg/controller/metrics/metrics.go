@@ -242,6 +242,8 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
+			// Reset metric on each pass to prevent reporting stale metrics when count drops to zero
+			metricClusterDeploymentsTotal.Reset()
 			accumulator, err := newClusterAccumulator(infinity, []string{"0h", "1h", "2h", "8h", "24h", "72h"})
 			if err != nil {
 				mcLog.WithError(err).Error("unable to calculate metrics")

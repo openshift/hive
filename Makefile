@@ -206,8 +206,10 @@ deploy: ensure-kustomize install
 	# Create a default basic HiveConfig so the operator will deploy Hive
 	oc process --local=true -p HIVE_NS=${HIVE_NS} -p LOG_LEVEL=${LOG_LEVEL} -f config/templates/hiveconfig.yaml | oc apply -f -
 
-verify-codegen:
-	bash -x hack/verify-codegen.sh
+# NOTE: Keep the paths checked below in sync with those passed to the generators in `hack/update-codegen.sh`
+verify-codegen: update-codegen
+	git diff --exit-code pkg/client
+	git diff --exit-code apis
 verify: verify-codegen
 
 update-codegen:

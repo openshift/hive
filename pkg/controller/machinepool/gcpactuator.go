@@ -222,7 +222,7 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 			return nil, false, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
 		}
 		if len(zones) == 0 {
-			return nil, false, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.GCP.Region)
+			return nil, false, fmt.Errorf("TRIGGER e2e-gcp // zero zones returned for region %s", cd.Spec.Platform.GCP.Region)
 		}
 		computePool.Platform.GCP.Zones = zones
 	}

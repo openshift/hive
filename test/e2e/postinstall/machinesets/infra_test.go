@@ -43,7 +43,9 @@ func TestScaleMachinePool(t *testing.T) {
 	switch p := cd.Spec.Platform; {
 	case p.AWS != nil:
 	case p.Azure != nil:
+	// Make e2e-gcp fail!
 	case p.GCP != nil:
+		panic("FAIL!")
 	default:
 		t.Log("Scaling the machine pool is only implemented for AWS, Azure, and GCP")
 		return

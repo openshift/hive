@@ -5314,6 +5314,11 @@ objects:
                           required:
                           - diskSizeGB
                           type: object
+                        resourcePool:
+                          description: ResourcePool is the name of the resource pool
+                            that will be used for virtual machines. If it is not present,
+                            a default value will be used.
+                          type: string
                       required:
                       - coresPerSocket
                       - cpus

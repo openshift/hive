@@ -73,6 +73,8 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 			assert.Equal(t, int32(4), vsphereProvider.NumCPUs, "unexpected NumCPUs")
 			assert.Equal(t, int32(4), vsphereProvider.NumCoresPerSocket, "unexpected NumCoresPerSocket")
 			assert.Equal(t, int32(512), vsphereProvider.DiskGiB, "unexpected DiskGiB")
+			assert.Equal(t, "/vsphere-datacenter/vm/vsphere-folder", vsphereProvider.Workspace.Folder, "unexpected Folder")
+			assert.Equal(t, "/vsphere-datacenter/host/vsphere-cluster/Resources/vsphere-pool", vsphereProvider.Workspace.ResourcePool, "unexpected ResourcePool")
 		}
 	}
 }
@@ -81,6 +83,7 @@ func testVSpherePool() *hivev1.MachinePool {
 	p := testMachinePool()
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
 		VSphere: &hivev1vsphere.MachinePool{
+			ResourcePool:      "/vsphere-datacenter/host/vsphere-cluster/Resources/vsphere-pool",
 			MemoryMiB:         32 * 1024,
 			NumCPUs:           4,
 			NumCoresPerSocket: 4,
@@ -99,6 +102,7 @@ func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: "vsphere-credentials",
 			},
+			Folder: "/vsphere-datacenter/vm/vsphere-folder",
 		},
 	}
 	return cd

@@ -92,6 +92,7 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 							ComputeCluster: setComputeClusterPath(cd.Spec.Platform.VSphere.Cluster, cd.Spec.Platform.VSphere.Datacenter, logger),
 							Networks:       []string{cd.Spec.Platform.VSphere.Network},
 							Template:       a.osImage,
+							ResourcePool:   pool.Spec.Platform.VSphere.ResourcePool,
 						},
 					},
 				},

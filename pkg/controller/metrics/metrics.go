@@ -409,7 +409,7 @@ func (mc *Calculator) registerOptionalMetrics(mConfig *metricsconfig.MetricsConf
 			mapMetricToDurationHistograms[MetricClusterReadyTransitionSeconds] = metric.Duration.Duration
 		// Gauges
 		case metricsconfig.CurrentClusterSyncFailing:
-			metrics.Registry.MustRegister(newClusterSyncFailingCollector(mc.Client, metric.Duration.Duration))
+			metrics.Registry.MustRegister(newClusterSyncFailingCollector(mc.Client, metric.Duration.Duration, GetOptionalClusterTypeLabels(mConfig)))
 		}
 	}
 }

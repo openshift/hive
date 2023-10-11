@@ -677,11 +677,16 @@ func TestDeprovisioningUnderwayCollector(t *testing.T) {
 func TestClusterSyncCollector(t *testing.T) {
 	scheme := scheme.GetScheme()
 
+	cdBuilder := func(name string) testcd.Builder {
+		return testcd.FullBuilder(name, name, scheme)
+	}
+
 	cases := []struct {
 		name string
 
-		existing []runtime.Object
-		min      time.Duration
+		existing       []runtime.Object
+		min            time.Duration
+		optionalLabels map[string]string
 
 		expected1 []string
 		expected2 []string
@@ -691,24 +696,96 @@ func TestClusterSyncCollector(t *testing.T) {
 			existing: []runtime.Object{
 				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
 			},
-			min:       1 * time.Hour,
-			expected1: []string(nil),
-			expected2: []string(nil),
+			min:            1 * time.Hour,
+			optionalLabels: map[string]string{},
+			expected1:      []string(nil),
+			expected2:      []string(nil),
 		},
 		{
 			name: "clustersync passed threshold",
 			existing: []runtime.Object{
 				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+				cdBuilder("test-namespace").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.UnreachableCondition,
+					Status: corev1.ConditionUnknown,
+				})),
 			},
-			min:       0 * time.Hour,
-			expected1: []string{"namespaced_name = test-namespace/test-name"},
+			min:            0 * time.Hour,
+			optionalLabels: map[string]string{},
+			expected1:      []string{"namespaced_name = test-namespace/test-name unreachable = Unknown"},
+			expected2:      []string(nil),
+		},
+		{
+			name:           "no clustersync",
+			existing:       nil,
+			min:            1 * time.Hour,
+			optionalLabels: map[string]string{},
+			expected1:      []string(nil),
+			expected2:      []string(nil),
+		},
+		{
+			name: "report expected fixed labels",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+				cdBuilder("test-namespace").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.UnreachableCondition,
+					Status: corev1.ConditionTrue,
+				})),
+			},
+			min:            0 * time.Hour,
+			optionalLabels: map[string]string{},
+			expected1:      []string{"namespaced_name = test-namespace/test-name unreachable = True"},
+			expected2:      []string(nil),
+		},
+		{
+			name: "skip reporting when ClusterDeployment not found",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+			},
+			min:            0 * time.Hour,
+			optionalLabels: map[string]string{},
+			expected1:      []string(nil),
+			expected2:      []string(nil),
+		},
+		{
+			name: "report optional metrics",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+				cdBuilder("test-namespace").Build(
+					testcd.WithLabel("cd-label", "test-value"),
+					testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.UnreachableCondition,
+						Status: corev1.ConditionUnknown,
+					})),
+			},
+			min: 0 * time.Hour,
+			optionalLabels: map[string]string{
+				"test_label": "cd-label",
+			},
+			expected1: []string{"namespaced_name = test-namespace/test-name test_label = test-value unreachable = Unknown"},
 			expected2: []string(nil),
 		},
 		{
-			name:      "no clustersync",
-			existing:  nil,
-			min:       1 * time.Hour,
-			expected1: []string(nil),
+			name: "report multiple optional metrics",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+				cdBuilder("test-namespace").Build(
+					testcd.WithLabel("cd-label-1", "value-1"),
+					testcd.WithLabel("cd-label-2", "value-2"),
+					testcd.WithLabel("cd-label-3", "value-3"),
+					testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+						Type:   hivev1.UnreachableCondition,
+						Status: corev1.ConditionUnknown,
+					})),
+			},
+			min: 0 * time.Hour,
+			optionalLabels: map[string]string{
+				"label1": "cd-label-1",
+				"label2": "cd-label-2",
+				"label3": "cd-label-3",
+			},
+			// ensure correct values for all labels are reported
+			expected1: []string{"label1 = value-1 label2 = value-2 label3 = value-3 namespaced_name = test-namespace/test-name unreachable = Unknown"},
 			expected2: []string(nil),
 		},
 	}
@@ -716,7 +793,7 @@ func TestClusterSyncCollector(t *testing.T) {
 		t.Run("test", func(t *testing.T) {
 			c := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
-			collect := newClusterSyncFailingCollector(c, test.min)
+			collect := newClusterSyncFailingCollector(c, test.min, test.optionalLabels)
 			// TODO: Determine whether collect.Describe() is necessary in test cases
 			descCh := make(chan *prometheus.Desc)
 			go func() {

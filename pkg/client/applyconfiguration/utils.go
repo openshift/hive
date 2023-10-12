@@ -251,6 +251,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &hivev1.SyncSetCommonSpecApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("SyncSetSpec"):
 		return &hivev1.SyncSetSpecApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("TaintIdentifier"):
+		return &hivev1.TaintIdentifierApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("VeleroBackupConfig"):
 		return &hivev1.VeleroBackupConfigApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("VSphereClusterDeprovision"):

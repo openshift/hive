@@ -8,6 +8,8 @@ type MachinePoolStatusApplyConfiguration struct {
 	Replicas    *int32                                   `json:"replicas,omitempty"`
 	MachineSets []MachineSetStatusApplyConfiguration     `json:"machineSets,omitempty"`
 	Conditions  []MachinePoolConditionApplyConfiguration `json:"conditions,omitempty"`
+	OwnedLabels []string                                 `json:"ownedLabels,omitempty"`
+	OwnedTaints []TaintIdentifierApplyConfiguration      `json:"ownedTaints,omitempty"`
 }
 
 // MachinePoolStatusApplyConfiguration constructs an declarative configuration of the MachinePoolStatus type for use with
@@ -46,6 +48,29 @@ func (b *MachinePoolStatusApplyConfiguration) WithConditions(values ...*MachineP
 			panic("nil value passed to WithConditions")
 		}
 		b.Conditions = append(b.Conditions, *values[i])
+	}
+	return b
+}
+
+// WithOwnedLabels adds the given value to the OwnedLabels field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the OwnedLabels field.
+func (b *MachinePoolStatusApplyConfiguration) WithOwnedLabels(values ...string) *MachinePoolStatusApplyConfiguration {
+	for i := range values {
+		b.OwnedLabels = append(b.OwnedLabels, values[i])
+	}
+	return b
+}
+
+// WithOwnedTaints adds the given value to the OwnedTaints field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the OwnedTaints field.
+func (b *MachinePoolStatusApplyConfiguration) WithOwnedTaints(values ...*TaintIdentifierApplyConfiguration) *MachinePoolStatusApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithOwnedTaints")
+		}
+		b.OwnedTaints = append(b.OwnedTaints, *values[i])
 	}
 	return b
 }

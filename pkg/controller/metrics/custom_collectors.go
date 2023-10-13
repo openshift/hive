@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -345,29 +346,30 @@ func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
 		// Failing cluster syncs
 		cond := controllerutils.FindCondition(cs.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
 		if cond != nil && cond.Status == corev1.ConditionTrue {
+			var cdRef hivev1.ClusterDeployment
 			for _, cd := range clusterDeployments.Items {
-				// Expect to find the corresponding ClusterDeployment. In the rare case it got garbage collected by the time
-				// we fetched the list of ClusterSyncs, do not report the metric.
-				if cd.Namespace == cs.Namespace {
-					// Ignore uninstalled ClusterDeployments as it wouldn't have all conditions initialized.
-					if unreachableCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.UnreachableCondition); unreachableCondition != nil {
-						fixedLabels := make(map[string]string, len(cc.dynamicLabels.fixedLabels))
-						fixedLabels["namespaced_name"] = cs.Namespace + "/" + cs.Name
-						fixedLabels["unreachable"] = string(unreachableCondition.Status)
-						labelValues := cc.dynamicLabels.buildLabelSlice(fixedLabels, &cd)
-						seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
-						// check if duration crosses the threshold
-						if cc.minDuration.Seconds() <= seconds {
-							ch <- prometheus.MustNewConstMetric(
-								cc.metricClusterSyncFailingSeconds,
-								prometheus.GaugeValue,
-								seconds,
-								labelValues...,
-							)
-						}
-					}
+				if cd.Namespace == cs.Namespace && cd.Name == cs.Name {
+					cdRef = cd
+					break
 				}
-				continue
+			}
+			fixedLabels := make(map[string]string, len(cc.dynamicLabels.fixedLabels))
+			fixedLabels["namespaced_name"] = cs.Namespace + "/" + cs.Name
+			if !reflect.ValueOf(cdRef).IsZero() {
+				if unreachableCondition := controllerutils.FindCondition(cdRef.Status.Conditions, hivev1.UnreachableCondition); unreachableCondition != nil {
+					fixedLabels["unreachable"] = string(unreachableCondition.Status)
+				}
+			}
+			labelValues := cc.dynamicLabels.buildLabelSlice(fixedLabels, &cdRef)
+			seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
+			// check if duration crosses the threshold
+			if cc.minDuration.Seconds() <= seconds {
+				ch <- prometheus.MustNewConstMetric(
+					cc.metricClusterSyncFailingSeconds,
+					prometheus.GaugeValue,
+					seconds,
+					labelValues...,
+				)
 			}
 		}
 	}

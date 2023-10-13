@@ -677,8 +677,8 @@ func TestDeprovisioningUnderwayCollector(t *testing.T) {
 func TestClusterSyncCollector(t *testing.T) {
 	scheme := scheme.GetScheme()
 
-	cdBuilder := func(name string) testcd.Builder {
-		return testcd.FullBuilder(name, name, scheme)
+	cdBuilder := func(namespace string, name string) testcd.Builder {
+		return testcd.FullBuilder(namespace, name, scheme)
 	}
 
 	cases := []struct {
@@ -705,7 +705,7 @@ func TestClusterSyncCollector(t *testing.T) {
 			name: "clustersync passed threshold",
 			existing: []runtime.Object{
 				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
-				cdBuilder("test-namespace").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				cdBuilder("test-namespace", "test-name").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.UnreachableCondition,
 					Status: corev1.ConditionUnknown,
 				})),
@@ -727,7 +727,7 @@ func TestClusterSyncCollector(t *testing.T) {
 			name: "report expected fixed labels",
 			existing: []runtime.Object{
 				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
-				cdBuilder("test-namespace").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
+				cdBuilder("test-namespace", "test-name").Build(testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 					Type:   hivev1.UnreachableCondition,
 					Status: corev1.ConditionTrue,
 				})),
@@ -738,20 +738,31 @@ func TestClusterSyncCollector(t *testing.T) {
 			expected2:      []string(nil),
 		},
 		{
-			name: "skip reporting when ClusterDeployment not found",
+			name: "report  fixed labels; no unreachable condition",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+				cdBuilder("test-namespace", "test-name").Build(),
+			},
+			min:            0 * time.Hour,
+			optionalLabels: map[string]string{},
+			expected1:      []string{"namespaced_name = test-namespace/test-name unreachable = unspecified"},
+			expected2:      []string(nil),
+		},
+		{
+			name: "report when ClusterDeployment not found",
 			existing: []runtime.Object{
 				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
 			},
 			min:            0 * time.Hour,
 			optionalLabels: map[string]string{},
-			expected1:      []string(nil),
+			expected1:      []string{"namespaced_name = test-namespace/test-name unreachable = unspecified"},
 			expected2:      []string(nil),
 		},
 		{
 			name: "report optional metrics",
 			existing: []runtime.Object{
 				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
-				cdBuilder("test-namespace").Build(
+				cdBuilder("test-namespace", "test-name").Build(
 					testcd.WithLabel("cd-label", "test-value"),
 					testcd.WithCondition(hivev1.ClusterDeploymentCondition{
 						Type:   hivev1.UnreachableCondition,
@@ -769,7 +780,7 @@ func TestClusterSyncCollector(t *testing.T) {
 			name: "report multiple optional metrics",
 			existing: []runtime.Object{
 				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
-				cdBuilder("test-namespace").Build(
+				cdBuilder("test-namespace", "test-name").Build(
 					testcd.WithLabel("cd-label-1", "value-1"),
 					testcd.WithLabel("cd-label-2", "value-2"),
 					testcd.WithLabel("cd-label-3", "value-3"),
@@ -786,6 +797,21 @@ func TestClusterSyncCollector(t *testing.T) {
 			},
 			// ensure correct values for all labels are reported
 			expected1: []string{"label1 = value-1 label2 = value-2 label3 = value-3 namespaced_name = test-namespace/test-name unreachable = Unknown"},
+			expected2: []string(nil),
+		},
+		{
+			name: "report multiple optional metrics; no clusterdeployment found",
+			existing: []runtime.Object{
+				testcs.FullBuilder("test-namespace", "test-name", scheme).Options(FailingSince(time.Now())).Build(),
+			},
+			min: 0 * time.Hour,
+			optionalLabels: map[string]string{
+				"label1": "cd-label-1",
+				"label2": "cd-label-2",
+				"label3": "cd-label-3",
+			},
+			// ensure correct values for all labels are reported
+			expected1: []string{"label1 = unspecified label2 = unspecified label3 = unspecified namespaced_name = test-namespace/test-name unreachable = unspecified"},
 			expected2: []string(nil),
 		},
 	}

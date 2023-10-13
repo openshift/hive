@@ -1156,7 +1156,13 @@ Hive will then:
 
 ## Cluster Adoption
 
-It is possible to adopt cluster deployments into Hive. To do so you will need to create a ClusterDeployment with Spec.Installed set to True, no Spec.Provisioning section, and include the following:
+It is possible to adopt cluster deployments into Hive.
+This will allow you to manage the cluster as if it had been provisioned by Hive, including:
+- [MachinePools](#machine-pools)
+- [SyncSets and SelectorSyncSets](syncset.md)
+- [Deprovisioning](#cluster-deprovisioning)
+
+To do so you will need to create a ClusterDeployment with Spec.Installed set to True, no Spec.Provisioning section, and include the following:
 
   * cluster INFRAID (obtained from `oc get infrastructure cluster -o json | jq .status.infrastructureName`)
   * cluster ID (obtained from `oc get clusterversion version -o json | jq .spec.clusterID`)

@@ -37,6 +37,7 @@
 - [Cluster Adoption](#cluster-adoption)
   - [Example Adoption ClusterDeployment](#example-adoption-clusterdeployment)
   - [Adopting with hiveutil](#adopting-with-hiveutil)
+  - [Transferring ownership](#transferring-ownership)
 - [Configuration Management](#configuration-management)
   - [Vertical Scaling](#vertical-scaling)
   - [SyncSet](#syncset)
@@ -1224,6 +1225,18 @@ If the cluster you are looking to adopt is on AWS and uses a shared VPC, you wil
 bin/hiveutil create-cluster --namespace=namespace-to-adopt-into --base-domain=example.com mycluster --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=[INFRAID] --adopt-cluster-id=[CLUSTERID]
 ```
 
+### Transferring ownership
+
+If you wish to transfer ownership of a cluster which is already managed by hive, and have access to the ClusterDeployment, there is no need to create a new ClusterDeployment using `hiveutil`. Instead, simply do the following:
+
+1. Save the current `ClusterDeployment` and relevant creds and certs manifests locally.
+    ``` bash
+    oc get cd <clusterdeployment_name> -n <namespace> -o yaml > clusterdeployment.yaml
+    oc get secrets <clusterdeployment_name_creds> -n <namespace> -o yaml > clusterdeployment_creds.yaml
+    ```
+1. Edit the `ClusterDeployment`, setting `spec.preserveOnDelete` to `true`. This ensures that the next step will only release the hive resources without destroying the cluster in the cloud infrastructure.
+1. Delete the `ClusterDeployment`
+1. From the hive instance that will adopt the cluster, `oc apply` the `ClusterDeployment`, creds and certs manifests you saved in the first step.
 ## Configuration Management
 
 ### Vertical Scaling

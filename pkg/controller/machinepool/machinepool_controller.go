@@ -250,7 +250,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 	// Sync log annotations from the CD to the pool, if necessary.
-	if controllerutils.CopyLogAnnotation(cd, pool) {
+	if controllerutils.CopyLogAnnotation(cd, pool, constants.AdditionalLogFieldsAnnotation) {
 		return reconcile.Result{}, r.Update(context.Background(), pool)
 	}
 

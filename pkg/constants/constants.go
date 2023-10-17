@@ -523,6 +523,11 @@ const (
 	// for forcing rollout of such changes on the target cluster -- e.g. by deleting the Machines -- as the machine
 	// config operator will not do so.
 	OverrideMachinePoolPlatformAnnotation = "hive.openshift.io/override-machinepool-platform"
+
+	// HoldUninstallPodAnnotation, if set to "true" on a ClusterDeployment, will cause hive to add the key as a finalizer
+	// to the uninstall pod when the ClusterDeployment is deleted. The user will need to explicitly delete the finalizer
+	// to allow the pod to be garbage collected. This can be useful e.g. for gathering uninstall logs.
+	HoldUninstallPodAnnotation = "hive.openshift.io/hold-uninstall-pod"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

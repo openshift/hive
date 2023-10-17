@@ -106,7 +106,7 @@ func AddLogFieldsEnvVar(from metav1.Object, to *batchv1.Job) {
 	}
 }
 
-func CopyLogAnnotation(from, to metav1.Object) bool {
+func CopyLogAnnotation(from, to metav1.Object, key string) bool {
 	froma := from.GetAnnotations()
 	if froma == nil {
 		// Spoof empty so we can delete the annotation if it exists on `to`
@@ -119,7 +119,6 @@ func CopyLogAnnotation(from, to metav1.Object) bool {
 	}
 
 	changed := false
-	key := constants.AdditionalLogFieldsAnnotation
 	fromv, fromexists := froma[key]
 	tov, toexists := toa[key]
 	if fromexists && fromv != tov {

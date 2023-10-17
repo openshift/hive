@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -446,13 +447,17 @@ func GenerateUninstallerJobForDeprovision(
 	job.Spec = batchv1.JobSpec{
 		Completions:           &completions,
 		BackoffLimit:          &backoffLimit,
-		ActiveDeadlineSeconds: pointer.Int64Ptr(int64(deprovisionJobDeadline.Seconds())),
+		ActiveDeadlineSeconds: pointer.Int64(int64(deprovisionJobDeadline.Seconds())),
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: labels,
 			},
 			Spec: podSpec,
 		},
+	}
+
+	if hold, err := strconv.ParseBool(req.Annotations[constants.HoldUninstallPodAnnotation]); err == nil && hold {
+		job.Spec.Template.ObjectMeta.Finalizers = []string{constants.HoldUninstallPodAnnotation}
 	}
 
 	switch {

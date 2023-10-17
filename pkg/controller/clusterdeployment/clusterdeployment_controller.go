@@ -1537,7 +1537,7 @@ func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDeleteAndLogAnnotati
 		return false, nil
 	}
 
-	changed := controllerutils.CopyLogAnnotation(cd, dnsZone)
+	changed := controllerutils.CopyLogAnnotation(cd, dnsZone, constants.AdditionalLogFieldsAnnotation)
 
 	if dnsZone.Spec.PreserveOnDelete != cd.Spec.PreserveOnDelete {
 		changed = true
@@ -1715,7 +1715,7 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 			LinkToParentDomain: true,
 		},
 	}
-	controllerutils.CopyLogAnnotation(cd, dnsZone)
+	controllerutils.CopyLogAnnotation(cd, dnsZone, constants.AdditionalLogFieldsAnnotation)
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:
@@ -1798,7 +1798,8 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			BaseDomain:  cd.Spec.BaseDomain,
 		},
 	}
-	controllerutils.CopyLogAnnotation(cd, req)
+	controllerutils.CopyLogAnnotation(cd, req, constants.AdditionalLogFieldsAnnotation)
+	controllerutils.CopyLogAnnotation(cd, req, constants.HoldUninstallPodAnnotation)
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:

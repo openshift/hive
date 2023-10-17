@@ -183,7 +183,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 			Stage:   hivev1.ClusterProvisionStageInitializing,
 		},
 	}
-	controllerutils.CopyLogAnnotation(cd, provision)
+	controllerutils.CopyLogAnnotation(cd, provision, constants.AdditionalLogFieldsAnnotation)
 
 	// Copy over the name, cluster ID and infra ID from previous provision so that a failed install can be removed.
 	if lastFailedProvision != nil {

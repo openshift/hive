@@ -335,7 +335,7 @@ func TestCopyLogAnnotation(t *testing.T) {
 			if tt.toa != nil {
 				to.Annotations = tt.toa
 			}
-			if got := CopyLogAnnotation(from, to); got != tt.expectChanged {
+			if got := CopyLogAnnotation(from, to, constants.AdditionalLogFieldsAnnotation); got != tt.expectChanged {
 				t.Errorf("CopyLogAnnotations() = %v, want %v", got, tt.expectChanged)
 			}
 			if tt.expectTargetAnnotation != nil {

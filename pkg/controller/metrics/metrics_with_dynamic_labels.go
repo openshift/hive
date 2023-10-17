@@ -28,6 +28,15 @@ type dynamicLabels struct {
 	optionalLabels map[string]string
 }
 
+// dynamicLabelsForCustomCollectors is aimed at metrics reported via custom collectors. Since these collectors do not
+// yet have methods to report metrics as a label-value map and expects a slice of values for corresponding labels
+// instead, we add an additional field labelList, which stores the order of labels used while defining the metric.
+type dynamicLabelsForCustomCollectors struct {
+	dynamicLabels
+	// labelList stores the exact order of labels defined in Desc method, it is used while reporting the metric.
+	labelList []string
+}
+
 // getLabelList combines the fixed and optional labels and returns the list with just the labels that can be used to
 // define the metric
 func (d *dynamicLabels) getLabelList() []string {
@@ -71,6 +80,30 @@ func (d *dynamicLabels) buildLabels(fixedLabels map[string]string, obj metav1.Ob
 		labels[key] = GetLabelValue(obj, value)
 	}
 	return labels
+}
+
+// buildLabelSlice fetches the optional label values and reports a slice of values
+// that can be used for observing metrics that cannot accept a map of labels and values.
+// The resultant slice will follow the same order as the labelList to ensure
+// correct values are reported for their corresponding labels.
+func (d *dynamicLabelsForCustomCollectors) buildLabelSlice(fixedLabels map[string]string, obj metav1.Object) []string {
+	labelValues := make([]string, len(d.labelList))
+
+	for index, label := range d.labelList {
+		// Add values for fixed labels
+		if index < len(fixedLabels) {
+			if value := fixedLabels[label]; value != "" {
+				labelValues[index] = value
+			} else {
+				labelValues[index] = constants.MetricLabelDefaultValue
+			}
+		} else {
+			// Add values for optional labels
+			labelValues[index] = GetLabelValue(obj, d.optionalLabels[label])
+		}
+	}
+
+	return labelValues
 }
 
 type CounterVecWithDynamicLabels struct {

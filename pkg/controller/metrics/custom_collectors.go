@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -33,8 +35,8 @@ var (
 type provisioningUnderwayCollector struct {
 	client client.Client
 
-	// minDuration, when non-zero, is the minimum duration afer which clusters provisioning
-	// will start becomming part of this metric. When set to zero, all clusters provisioning
+	// minDuration, when non-zero, is the minimum duration after which clusters provisioning
+	// will start becoming part of this metric. When set to zero, all clusters provisioning
 	// will be included in the metric.
 	minDuration time.Duration
 
@@ -43,7 +45,7 @@ type provisioningUnderwayCollector struct {
 	metricClusterDeploymentProvisionUnderwaySeconds *prometheus.Desc
 }
 
-// collects the metrics for provisioningUnderwayCollector
+// Collect collects the metrics for provisioningUnderwayCollector
 func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 	ccLog := log.WithField("controller", "metrics")
 	ccLog.Info("calculating provisioning underway metrics across all ClusterDeployments")
@@ -132,7 +134,7 @@ type provisioningUnderwayInstallRestartsCollector struct {
 	metricClusterDeploymentProvisionUnderwayInstallRestarts *prometheus.Desc
 }
 
-// collects the metrics for provisioningUnderwayInstallRestartsCollector
+// Collect collects the metrics for provisioningUnderwayInstallRestartsCollector
 func (cc provisioningUnderwayInstallRestartsCollector) Collect(ch chan<- prometheus.Metric) {
 	ccLog := log.WithField("controller", "metrics")
 	ccLog.Info("calculating provisioning underway install restarts metrics across all ClusterDeployments")
@@ -249,7 +251,7 @@ type deprovisioningUnderwayCollector struct {
 	metricClusterDeploymentDeprovisionUnderwaySeconds *prometheus.Desc
 }
 
-// collects the metrics for deprovisioningUnderwayCollector
+// Collect collects the metrics for deprovisioningUnderwayCollector
 func (cc deprovisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 	ccLog := log.WithField("controller", "metrics")
 	ccLog.Info("calculating deprovisioning underway metrics across all ClusterDeployments")
@@ -306,7 +308,7 @@ func newDeprovisioningUnderwaySecondsCollector(client client.Client) prometheus.
 type clusterSyncFailingCollector struct {
 	client client.Client
 
-	// minDuration, when non-zero, is the minimum duration afer which clustersync failure
+	// minDuration, when non-zero, is the minimum duration after which clustersync failure
 	// will start becoming part of this metric. When set to zero, all clustersync failures
 	// will be included in the metric.
 	minDuration time.Duration
@@ -314,9 +316,14 @@ type clusterSyncFailingCollector struct {
 	// metricClusterSyncFailingSeconds is a prometheus metric for the number of seconds
 	// between the start of a failing clustersync and now.
 	metricClusterSyncFailingSeconds *prometheus.Desc
+
+	// dynamicLabels is a collection of fixed (mandatory) and optional labels for the clusterSyncFailing metric.
+	// It also has labelList which stores the order of labels as defined in Desc. MustNewConstMetric doesn't
+	// accept a map of labels and values, so maintaining the order is needed while observing the metric.
+	dynamicLabels dynamicLabelsForCustomCollectors
 }
 
-// collects the metrics for custerSyncFailingCollector
+// Collect collects the metrics for custerSyncFailingCollector
 func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
 	ccLog := log.WithField("controller", "metrics")
 	ccLog.Info("calculating cluster sync failing seconds metrics")
@@ -328,10 +335,32 @@ func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	clusterDeployments := &hivev1.ClusterDeploymentList{}
+	err = cc.client.List(context.Background(), clusterDeployments)
+	if err != nil {
+		log.WithError(err).Error("error listing cluster deployments")
+		return
+	}
+
 	for _, cs := range clusterSyncList.Items {
 		// Failing cluster syncs
 		cond := controllerutils.FindCondition(cs.Status.Conditions, hiveintv1alpha1.ClusterSyncFailed)
 		if cond != nil && cond.Status == corev1.ConditionTrue {
+			var cdRef hivev1.ClusterDeployment
+			for _, cd := range clusterDeployments.Items {
+				if cd.Namespace == cs.Namespace && cd.Name == cs.Name {
+					cdRef = cd
+					break
+				}
+			}
+			fixedLabels := make(map[string]string, len(cc.dynamicLabels.fixedLabels))
+			fixedLabels["namespaced_name"] = cs.Namespace + "/" + cs.Name
+			if !reflect.ValueOf(cdRef).IsZero() {
+				if unreachableCondition := controllerutils.FindCondition(cdRef.Status.Conditions, hivev1.UnreachableCondition); unreachableCondition != nil {
+					fixedLabels["unreachable"] = string(unreachableCondition.Status)
+				}
+			}
+			labelValues := cc.dynamicLabels.buildLabelSlice(fixedLabels, &cdRef)
 			seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
 			// check if duration crosses the threshold
 			if cc.minDuration.Seconds() <= seconds {
@@ -339,7 +368,7 @@ func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
 					cc.metricClusterSyncFailingSeconds,
 					prometheus.GaugeValue,
 					seconds,
-					cs.Namespace+"/"+cs.Name,
+					labelValues...,
 				)
 			}
 		}
@@ -350,22 +379,30 @@ func (cc clusterSyncFailingCollector) Describe(ch chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(cc, ch)
 }
 
-// MetricClusterSyncFailingSeconds is a prometheus metric that tracks the number of seconds for which a
-// clustersync has been in failing state
-var (
-	metricClusterSyncFailingSecondsDesc = prometheus.NewDesc(
-		"hive_clustersync_failing_seconds",
-		"Length of time a clustersync has been failing",
+func newClusterSyncFailingCollector(client client.Client, minimum time.Duration, optionalLabels map[string]string) prometheus.Collector {
+	metricName := "hive_clustersync_failing_seconds"
+	baseLabels := dynamicLabels{
 		// namespaced_name would be logged as $namespace/$name
-		[]string{"namespaced_name"},
-		nil,
-	)
-)
-
-func newClusterSyncFailingCollector(client client.Client, minimum time.Duration) prometheus.Collector {
+		// unreachable reports the status of unreachable condition of the corresponding cluster deployment
+		fixedLabels:    []string{"namespaced_name", "unreachable"},
+		optionalLabels: optionalLabels,
+	}
+	if repeatedLabels := baseLabels.getRepeatedLabels(); repeatedLabels != nil {
+		panic(fmt.Sprintf("Label(s) %v in HiveConfig.Spec.AdditionalClusterDeploymentLabels conflict with fixed label(s) for the metric %s. Please rename your label.", repeatedLabels, metricName))
+	}
+	labels := dynamicLabelsForCustomCollectors{
+		dynamicLabels: baseLabels,
+		labelList:     baseLabels.getLabelList(),
+	}
 	return clusterSyncFailingCollector{
-		client:                          client,
-		metricClusterSyncFailingSeconds: metricClusterSyncFailingSecondsDesc,
-		minDuration:                     minimum,
+		client: client,
+		metricClusterSyncFailingSeconds: prometheus.NewDesc(
+			metricName,
+			"Length of time a clustersync has been failing",
+			labels.labelList,
+			nil,
+		),
+		minDuration:   minimum,
+		dynamicLabels: labels,
 	}
 }

@@ -409,7 +409,7 @@ func (mc *Calculator) registerOptionalMetrics(mConfig *metricsconfig.MetricsConf
 			mapMetricToDurationHistograms[MetricClusterReadyTransitionSeconds] = metric.Duration.Duration
 		// Gauges
 		case metricsconfig.CurrentClusterSyncFailing:
-			metrics.Registry.MustRegister(newClusterSyncFailingCollector(mc.Client, metric.Duration.Duration))
+			metrics.Registry.MustRegister(newClusterSyncFailingCollector(mc.Client, metric.Duration.Duration, GetOptionalClusterTypeLabels(mConfig)))
 		}
 	}
 }
@@ -692,8 +692,10 @@ func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovis
 
 // GetLabelValue returns the value of the label if set, otherwise a default value.
 func GetLabelValue(obj metav1.Object, label string) string {
-	if typeStr := obj.GetLabels()[label]; typeStr != "" {
-		return typeStr
+	if obj != nil {
+		if typeStr := obj.GetLabels()[label]; typeStr != "" {
+			return typeStr
+		}
 	}
 	return constants.MetricLabelDefaultValue
 }

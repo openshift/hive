@@ -8,6 +8,12 @@ ifeq ($(HOME),/)
 export HOME=/tmp/home
 endif
 
+# Silence the "go compliance shim". It just produces a lot of noise we don't care about.
+# Do this before includes so it takes effect there as well.
+# TODO: This can be removed once https://issues.redhat.com/browse/ART-7963 is resolved.
+GO_COMPLIANCE_INFO=0
+export GO_COMPLIANCE_INFO
+
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \

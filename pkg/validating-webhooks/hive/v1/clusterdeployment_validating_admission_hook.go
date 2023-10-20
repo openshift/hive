@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/hive/apis/hive/v1/gcp"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 
 	"github.com/openshift/hive/pkg/constants"
@@ -696,6 +697,17 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 						}
 						// copy over the value to spoof the immutability checker
 						oldObject.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole = cd.Spec.ClusterMetadata.Platform.AWS.HostedZoneRole
+					}
+					// Special case: allow setting or changing -- but not unsetting -- GCP Network Project ID.
+					if cd.Spec.ClusterMetadata.Platform.GCP != nil && cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID != nil {
+						if oldObject.Spec.ClusterMetadata.Platform == nil {
+							oldObject.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
+						}
+						if oldObject.Spec.ClusterMetadata.Platform.GCP == nil {
+							oldObject.Spec.ClusterMetadata.Platform.GCP = &gcp.Metadata{}
+						}
+						// copy over the value to spoof the immutability checker
+						oldObject.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID = cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID
 					}
 				}
 				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)

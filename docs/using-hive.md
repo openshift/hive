@@ -1223,6 +1223,19 @@ If the cluster you are looking to adopt is on AWS and uses a shared VPC, you wil
         hostedZoneRole: account-b-zone-role
 ```
 
+If the cluster you are looking to adopt is on GCP and uses a shared VPC, you will also need to include the name of the network project ID in `spec.clusterMetadata.platform.gcp.networkProjectID`.
+
+```yaml
+  clusterMetadata:
+    adminKubeconfigSecretRef:
+      name: my-gcp-cluster-admin-kubeconfig
+    clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
+    infraID: my-gcp-cluster-wsvdn
+    platform:
+      gcp:
+        networkProjectID: some@project.id
+```
+
 ### Adopting with hiveutil
 
 [hiveutil](hiveutil.md) is a development focused CLI tool which can be built from the hive repo. To adopt a cluster specify the following flags:

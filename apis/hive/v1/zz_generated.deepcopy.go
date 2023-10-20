@@ -1378,6 +1378,11 @@ func (in *ClusterPlatformMetadata) DeepCopyInto(out *ClusterPlatformMetadata) {
 		*out = new(azure.Metadata)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.GCP != nil {
+		in, out := &in.GCP, &out.GCP
+		*out = new(gcp.Metadata)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -2416,6 +2421,11 @@ func (in *GCPClusterDeprovision) DeepCopyInto(out *GCPClusterDeprovision) {
 	if in.CredentialsSecretRef != nil {
 		in, out := &in.CredentialsSecretRef, &out.CredentialsSecretRef
 		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
+	if in.NetworkProjectID != nil {
+		in, out := &in.NetworkProjectID, &out.NetworkProjectID
+		*out = new(string)
 		**out = **in
 	}
 	return

@@ -167,3 +167,13 @@ func AzureResourceGroup(cd *hivev1.ClusterDeployment) (string, error) {
 	}
 	return *cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName, nil
 }
+
+func GCPNetworkProjectID(cd *hivev1.ClusterDeployment) *string {
+	if cd.Spec.ClusterMetadata == nil ||
+		cd.Spec.ClusterMetadata.Platform == nil ||
+		cd.Spec.ClusterMetadata.Platform.GCP == nil {
+		return nil
+	}
+	// may still be nil
+	return cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID
+}

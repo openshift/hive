@@ -178,6 +178,9 @@ spec:
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
+                      networkProjectID:
+                        description: NetworkProjectID is used for shared VPC setups
+                        type: string
                       region:
                         description: Region is the GCP region for this deprovision
                         type: string

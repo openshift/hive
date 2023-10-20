@@ -31,6 +31,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -367,6 +368,38 @@ func setAzureResourceGroupFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.
 	cm.Platform.Azure.ResourceGroupName = &rg
 }
 
+func setGCPNetworkProjectIDFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pmjson []byte, logger log.FieldLogger) {
+	if pmjson == nil {
+		return
+	}
+	if cd.Spec.Platform.GCP == nil {
+		return
+	}
+
+	im := new(installertypes.ClusterMetadata)
+	if err := json.Unmarshal(pmjson, &im); err != nil {
+		logger.WithError(err).Error("Could not unmarshal ClusterMetadata!")
+		return
+	}
+
+	if im.GCP == nil {
+		logger.Warn("ClusterMetadata unexpectedly has no GCP section")
+		return
+	}
+	npid := im.GCP.NetworkProjectID
+	// This is the empty string for non-shared-VPC setups. That's fine.
+	log.WithField("networkProjectID", npid).Info("Found GCP NetworkProjectID in ClusterMetadata")
+
+	if cm.Platform == nil {
+		cm.Platform = &hivev1.ClusterPlatformMetadata{}
+	}
+	if cm.Platform.GCP == nil {
+		cm.Platform.GCP = &gcp.Metadata{}
+	}
+	cm.Platform.GCP.NetworkProjectID = &npid
+
+}
+
 func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (result reconcile.Result, returnedErr error) {
 	logger = logger.WithField("provision", cd.Status.ProvisionRef.Name)
 	logger.Debug("reconciling existing provision")
@@ -397,6 +430,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		}
 		setAWSHostedZoneRoleFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		setAzureResourceGroupFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
+		setGCPNetworkProjectIDFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata
 			logger.Infof("Saving infra ID %q for cluster", cd.Spec.ClusterMetadata.InfraID)

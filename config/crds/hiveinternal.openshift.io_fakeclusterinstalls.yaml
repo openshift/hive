@@ -106,6 +106,13 @@ spec:
                         required:
                         - resourceGroupName
                         type: object
+                      gcp:
+                        description: GCP holds GCP-specific cluster metadata
+                        properties:
+                          networkProjectID:
+                            description: NetworkProjectID is used for shared VPC setups
+                            type: string
+                        type: object
                     type: object
                 required:
                 - adminKubeconfigSecretRef

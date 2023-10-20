@@ -710,7 +710,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 						oldObject.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID = cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID
 					}
 				}
-				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
+				// TEMPORARY! REVERT!
+				// allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
 			}
 		} else {
 			allErrs = append(allErrs, field.Required(specPath.Child("clusterMetadata"), "installed cluster must have cluster metadata"))

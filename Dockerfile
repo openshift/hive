@@ -1,4 +1,9 @@
 FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.20-openshift-4.14 as builder
+
+# Silence go compliance shim output
+ENV GO_COMPLIANCE_INFO=0
+ENV GO_COMPLIANCE_DEBUG=0
+
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .

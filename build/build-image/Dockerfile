@@ -1,5 +1,9 @@
 FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.20-openshift-4.14
 
+# Silence go compliance shim output
+ENV GO_COMPLIANCE_INFO=0
+ENV GO_COMPLIANCE_DEBUG=0
+
 # setting Git username and email for workaround of
 # https://github.com/jenkinsci/docker/issues/519
 ENV GIT_COMMITTER_NAME hive-team

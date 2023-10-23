@@ -11,6 +11,7 @@ import (
 type GCPClusterDeprovisionApplyConfiguration struct {
 	Region               *string                  `json:"region,omitempty"`
 	CredentialsSecretRef *v1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+	NetworkProjectID     *string                  `json:"networkProjectID,omitempty"`
 }
 
 // GCPClusterDeprovisionApplyConfiguration constructs an declarative configuration of the GCPClusterDeprovision type for use with
@@ -32,5 +33,13 @@ func (b *GCPClusterDeprovisionApplyConfiguration) WithRegion(value string) *GCPC
 // If called multiple times, the CredentialsSecretRef field is set to the value of the last call.
 func (b *GCPClusterDeprovisionApplyConfiguration) WithCredentialsSecretRef(value v1.LocalObjectReference) *GCPClusterDeprovisionApplyConfiguration {
 	b.CredentialsSecretRef = &value
+	return b
+}
+
+// WithNetworkProjectID sets the NetworkProjectID field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NetworkProjectID field is set to the value of the last call.
+func (b *GCPClusterDeprovisionApplyConfiguration) WithNetworkProjectID(value string) *GCPClusterDeprovisionApplyConfiguration {
+	b.NetworkProjectID = &value
 	return b
 }

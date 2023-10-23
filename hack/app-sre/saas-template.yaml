@@ -565,6 +565,14 @@ objects:
                           required:
                           - resourceGroupName
                           type: object
+                        gcp:
+                          description: GCP holds GCP-specific cluster metadata
+                          properties:
+                            networkProjectID:
+                              description: NetworkProjectID is used for shared VPC
+                                setups
+                              type: string
+                          type: object
                       type: object
                   required:
                   - adminKubeconfigSecretRef
@@ -1809,6 +1817,9 @@ objects:
                               type: string
                           type: object
                           x-kubernetes-map-type: atomic
+                        networkProjectID:
+                          description: NetworkProjectID is used for shared VPC setups
+                          type: string
                         region:
                           description: Region is the GCP region for this deprovision
                           type: string
@@ -3822,6 +3833,14 @@ objects:
                               type: string
                           required:
                           - resourceGroupName
+                          type: object
+                        gcp:
+                          description: GCP holds GCP-specific cluster metadata
+                          properties:
+                            networkProjectID:
+                              description: NetworkProjectID is used for shared VPC
+                                setups
+                              type: string
                           type: object
                       type: object
                   required:

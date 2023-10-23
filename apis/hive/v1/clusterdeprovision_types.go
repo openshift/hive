@@ -110,6 +110,10 @@ type GCPClusterDeprovision struct {
 	Region string `json:"region"`
 	// CredentialsSecretRef is the GCP account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef *corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+
+	// NetworkProjectID is used for shared VPC setups
+	// +optional
+	NetworkProjectID *string `json:"networkProjectID,omitempty"`
 }
 
 // OpenStackClusterDeprovision contains OpenStack-specific configuration for a ClusterDeprovision

@@ -45,6 +45,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/hive/apis/hive/v1/gcp"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -530,6 +531,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	// Discover Azure ResourceGroup if applicable
 	if r.discoverAzureResourceGroup(cd, cdLog) {
+		return reconcile.Result{}, r.Update(context.TODO(), cd)
+	}
+
+	// Discover GCP NetworkProjectID if applicable
+	if r.discoverGCPNetworkProjectID(cd, cdLog) {
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
@@ -2463,6 +2469,62 @@ func (r *ReconcileClusterDeployment) discoverAzureResourceGroup(cd *hivev1.Clust
 
 	// If we get here, rg is nonempty. Use it.
 	setrg(cd, &rg)
+	return true
+}
+
+// discoverGCPNetworkProjectID is intended to retrofit GCP clusters which were a) adopted, or b) created before
+// support for shared VPC was added. It attempts to discover the network project ID for the cluster by parsing
+// the install-config.
+// No op if platform is not GCP.
+// No op if the field is already set (we don't validate that it is correct).
+// This is best effort. If things go wrong, we log but do not fail out. THIS WILL BLOCK DEPROVISIONING. If
+// this happens, the field must be set manually.
+// The return indicates whether the field was modified. If `true`, the caller is responsible for pushing
+// an Update() back to the server.
+func (r *ReconcileClusterDeployment) discoverGCPNetworkProjectID(cd *hivev1.ClusterDeployment, log log.FieldLogger) bool {
+	log = log.WithField("subtask", "discoverGCPNetworkProjectID")
+
+	// Do we need to do this at all?
+	if getClusterPlatform(cd) != constants.PlatformGCP {
+		return false
+	}
+	if !cd.Spec.Installed {
+		// Provisioner should set the field when installation finishes; no-op for now.
+		return false
+	}
+	if controllerutils.GCPNetworkProjectID(cd) != nil {
+		// Already set, nothing to do
+		return false
+	}
+
+	// Parse the install-config
+	ic := r.getInstallConfig(cd, log)
+	if ic == nil {
+		// getInstallConfig logged
+		return false
+	}
+
+	if ic.Platform.GCP == nil {
+		// This log might be redundant with one from ValidateInstallConfig
+		log.Warn("No GCP platform section in install-config")
+		return false
+	}
+
+	npid := ic.Platform.GCP.NetworkProjectID
+	// It's okay if this is the empty string.
+	log.WithField("networkProjectID", npid).Info("Found GCP NetworkProjectID in install-config")
+
+	// Initialize structs as necessary
+	if cd.Spec.ClusterMetadata == nil {
+		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform == nil {
+		cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
+	}
+	if cd.Spec.ClusterMetadata.Platform.GCP == nil {
+		cd.Spec.ClusterMetadata.Platform.GCP = &gcp.Metadata{}
+	}
+	cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID = &npid
 	return true
 }
 

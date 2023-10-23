@@ -18,10 +18,11 @@ import (
 
 // gcpOptions is the set of options to deprovision a GCP cluster
 type gcpOptions struct {
-	logLevel  string
-	infraID   string
-	region    string
-	projectID string
+	logLevel         string
+	infraID          string
+	region           string
+	projectID        string
+	networkProjectID string
 }
 
 // NewDeprovisionGCPCommand is the entrypoint to create the GCP deprovision subcommand
@@ -46,6 +47,7 @@ func NewDeprovisionGCPCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.region, "region", "", "GCP region where the cluster is installed")
+	flags.StringVar(&opt.networkProjectID, "network-project-id", "", "For shared VPC setups")
 	return cmd
 }
 

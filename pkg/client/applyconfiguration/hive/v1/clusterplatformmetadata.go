@@ -5,6 +5,7 @@ package v1
 import (
 	aws "github.com/openshift/hive/apis/hive/v1/aws"
 	azure "github.com/openshift/hive/apis/hive/v1/azure"
+	gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 )
 
 // ClusterPlatformMetadataApplyConfiguration represents an declarative configuration of the ClusterPlatformMetadata type for use
@@ -12,6 +13,7 @@ import (
 type ClusterPlatformMetadataApplyConfiguration struct {
 	AWS   *aws.Metadata   `json:"aws,omitempty"`
 	Azure *azure.Metadata `json:"azure,omitempty"`
+	GCP   *gcp.Metadata   `json:"gcp,omitempty"`
 }
 
 // ClusterPlatformMetadataApplyConfiguration constructs an declarative configuration of the ClusterPlatformMetadata type for use with
@@ -33,5 +35,13 @@ func (b *ClusterPlatformMetadataApplyConfiguration) WithAWS(value aws.Metadata) 
 // If called multiple times, the Azure field is set to the value of the last call.
 func (b *ClusterPlatformMetadataApplyConfiguration) WithAzure(value azure.Metadata) *ClusterPlatformMetadataApplyConfiguration {
 	b.Azure = &value
+	return b
+}
+
+// WithGCP sets the GCP field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the GCP field is set to the value of the last call.
+func (b *ClusterPlatformMetadataApplyConfiguration) WithGCP(value gcp.Metadata) *ClusterPlatformMetadataApplyConfiguration {
+	b.GCP = &value
 	return b
 }

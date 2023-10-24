@@ -658,6 +658,10 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		req.Namespace,
 		"gcp", constants.GCPCredentialsDir, req.Spec.Platform.GCP.CredentialsSecretRef.Name,
 		"", "", "")
+	npid := ""
+	if req.Spec.Platform.GCP.NetworkProjectID != nil {
+		npid = *req.Spec.Platform.GCP.NetworkProjectID
+	}
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -670,6 +674,7 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 				"--loglevel", "debug",
 				"--creds-dir", constants.GCPCredentialsDir,
 				"--region", req.Spec.Platform.GCP.Region,
+				"--network-project-id", npid,
 				req.Spec.InfraID,
 			},
 			VolumeMounts: volumeMounts,

@@ -95,8 +95,9 @@ func (o *gcpOptions) Run() error {
 		InfraID: o.infraID,
 		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
 			GCP: &typesgcp.Metadata{
-				Region:    o.region,
-				ProjectID: o.projectID,
+				Region:           o.region,
+				ProjectID:        o.projectID,
+				NetworkProjectID: o.networkProjectID,
 			},
 		},
 	}

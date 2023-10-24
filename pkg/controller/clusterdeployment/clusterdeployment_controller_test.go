@@ -854,6 +854,36 @@ platform:
 			},
 		},
 		{
+			name: "Get GCP NetworkProjectID from provision metadata",
+			existing: []runtime.Object{
+				testInstallConfigSecret(`
+platform:
+  gcp:
+    region: us-central1
+`),
+				func() *hivev1.ClusterDeployment {
+					baseCD := testClusterDeploymentWithProvision()
+					baseCD.Labels[hivev1.HiveClusterPlatformLabel] = "gcp"
+					baseCD.Labels[hivev1.HiveClusterRegionLabel] = "us-central1"
+					baseCD.Spec.Platform.AWS = nil
+					baseCD.Spec.Platform.GCP = &gcp.Platform{
+						Region: "us-central1",
+					}
+					return testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(baseCD))
+				}(),
+				testSuccessfulProvision(tcp.WithMetadata(`{"gcp": {"networkProjectID": "some@proj.id"}}`)),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				if cd := getCD(c); assert.NotNil(t, cd, "missing clusterdeployment") {
+					if npid := controllerutils.GCPNetworkProjectID(cd); assert.NotNil(t, npid, "expected NetworkProjectID not to be nil") {
+						assert.Equal(t, "some@proj.id", *npid, "incorrect value for GCP NetworkProjectID")
+					}
+				}
+			},
+		},
+		{
 			name: "Get Azure ResourceGroupName from provision metadata",
 			existing: []runtime.Object{
 				testInstallConfigSecret(`
@@ -4912,6 +4942,179 @@ platform:
 	}
 }
 
+func Test_discoverGCPNetworkProjectID(t *testing.T) {
+	logger := log.WithField("controller", "clusterDeployment")
+	gcpCD := func(installed bool, cm *hivev1.ClusterMetadata) *hivev1.ClusterDeployment {
+		cd := testEmptyClusterDeployment()
+		cd.ObjectMeta = metav1.ObjectMeta{
+			Name:      testName,
+			Namespace: testNamespace,
+		}
+		cd.Spec = hivev1.ClusterDeploymentSpec{
+			Platform: hivev1.Platform{
+				GCP: &gcp.Platform{
+					Region: "us-central1",
+				},
+			},
+			Provisioning: &hivev1.Provisioning{
+				InstallConfigSecretRef: &corev1.LocalObjectReference{
+					Name: installConfigSecretName,
+				},
+			},
+		}
+		if installed {
+			cd.Spec.Installed = true
+		}
+		if cm != nil {
+			cd.Spec.ClusterMetadata = cm
+		}
+		return cd
+	}
+	tests := []struct {
+		name                 string
+		cd                   *hivev1.ClusterDeployment
+		icSecret             *corev1.Secret
+		wantReturn           bool
+		wantNetworkProjectID *string
+	}{
+		{
+			name: "no-op: non-GCP platform",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := gcpCD(true, nil)
+				cd.Spec.Platform = hivev1.Platform{
+					Azure: &azure.Platform{},
+				}
+				return cd
+			}(),
+		},
+		{
+			name: "no-op: cluster not installed",
+			cd:   gcpCD(false, nil),
+		},
+		{
+			name: "no-op: already set",
+			cd: gcpCD(true, &hivev1.ClusterMetadata{
+				Platform: &hivev1.ClusterPlatformMetadata{
+					GCP: &gcp.Metadata{
+						NetworkProjectID: pointer.String("my@np.id"),
+					},
+				},
+			},
+			),
+			wantNetworkProjectID: pointer.String("my@np.id"),
+		},
+		{
+			name: "no-op: already set, empty string acceptable",
+			cd: gcpCD(true, &hivev1.ClusterMetadata{
+				Platform: &hivev1.ClusterPlatformMetadata{
+					GCP: &gcp.Metadata{
+						NetworkProjectID: pointer.String(""),
+					},
+				},
+			},
+			),
+			wantNetworkProjectID: pointer.String(""),
+		},
+		{
+			name: "set from install-config: field absent",
+			cd:   gcpCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+  gcp:
+    region: us-central1
+`),
+			wantReturn:           true,
+			wantNetworkProjectID: pointer.String(""),
+		},
+		{
+			name: "set from install-config: field empty",
+			cd:   gcpCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+  gcp:
+    region: us-east-1
+    networkProjectID: ""
+`),
+			wantReturn:           true,
+			wantNetworkProjectID: pointer.String(""),
+		},
+		{
+			name: "set from install-config: field populated",
+			cd:   gcpCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+  gcp:
+    region: us-east-1
+    networkProjectID: some@np.id
+`),
+			wantReturn:           true,
+			wantNetworkProjectID: pointer.String("some@np.id"),
+		},
+		{
+			name: "no cd provisioning",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := gcpCD(true, nil)
+				cd.Spec.Provisioning = nil
+				return cd
+			}(),
+		},
+		{
+			name: "no installConfigSecretRef",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := gcpCD(true, nil)
+				cd.Spec.Provisioning = &hivev1.Provisioning{}
+				return cd
+			}(),
+		},
+		{
+			name: "no cd installConfigSecretRef.name",
+			cd: func() *hivev1.ClusterDeployment {
+				cd := gcpCD(true, nil)
+				cd.Spec.Provisioning = &hivev1.Provisioning{
+					InstallConfigSecretRef: &corev1.LocalObjectReference{},
+				}
+				return cd
+			}(),
+		},
+		{
+			name: "no install-config secret",
+			cd:   gcpCD(true, nil),
+		},
+		{
+			name: "invalid install-config",
+			cd:   gcpCD(true, nil),
+			icSecret: testInstallConfigSecret(`
+platform:
+spacing problem!
+`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(filterNils(test.cd, test.icSecret)...).Build()
+			r := &ReconcileClusterDeployment{
+				Client: fakeClient,
+				scheme: scheme.GetScheme(),
+			}
+
+			if gotReturn := r.discoverGCPNetworkProjectID(test.cd, logger); gotReturn != test.wantReturn {
+				t.Errorf("ReconcileClusterDeployment.discoverGCPNetworkProjectID() = %v, want %v", gotReturn, test.wantReturn)
+			}
+
+			// Note that we're *not* getting this from the server -- the func updates the local obj, but the
+			// caller is responsible for Update()ing.
+			gotNPID := controllerutils.GCPNetworkProjectID(test.cd)
+			if test.wantNetworkProjectID == nil {
+				assert.Nil(t, gotNPID, "expected network project ID to be nil in cd")
+			} else {
+				if assert.NotNil(t, gotNPID, "expected network project ID to be non-nil on cd") {
+					assert.Equal(t, *test.wantNetworkProjectID, *gotNPID, "wrong value for network project ID on cd")
+				}
+			}
+		})
+	}
+}
 func getProvisions(c client.Client) []*hivev1.ClusterProvision {
 	provisionList := &hivev1.ClusterProvisionList{}
 	if err := c.List(context.TODO(), provisionList); err != nil {

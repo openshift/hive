@@ -617,10 +617,15 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 	if stage == hivev1.ClusterProvisionStageComplete {
 		timeMetric = metricInstallSuccessSeconds
 	}
+	installVersion := constants.MetricLabelDefaultValue
+	// InstallVersion is set by the imageset job. Can be nil if we never ran that (e.g. minimal install mode).
+	if cd.Status.InstallVersion != nil {
+		installVersion = *cd.Status.InstallVersion
+	}
 	fixedLabels := map[string]string{
 		"platform":        cd.Labels[hivev1.HiveClusterPlatformLabel],
 		"region":          cd.Labels[hivev1.HiveClusterRegionLabel],
-		"cluster_version": *cd.Status.InstallVersion,
+		"cluster_version": installVersion,
 		"workers":         r.getWorkers(*cd),
 		"install_attempt": strconv.Itoa(instance.Spec.Attempt),
 	}

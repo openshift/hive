@@ -577,6 +577,122 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "Minimal install mode requires installerImageOverride",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Status.InstallerImage = nil
+					if cd.Annotations == nil {
+						cd.Annotations = map[string]string{}
+					}
+					cd.Annotations[constants.MinimalInstallModeAnnotation] = "True"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.InstallImagesNotResolvedCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "MinimalInstallModeWithoutImageOverride",
+					},
+				})
+			},
+		},
+		{
+			name: "Minimal install mode 'resolves' images without an imageset job",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					// Trigger "images not yet resolved"
+					cd.Status.InstallerImage = nil
+					if cd.Annotations == nil {
+						cd.Annotations = map[string]string{}
+					}
+					cd.Annotations[constants.MinimalInstallModeAnnotation] = "True"
+					cd.Spec.Provisioning.InstallerImageOverride = "test-installer-image:latest"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				assert.Nil(t, getImageSetJob(c), "expected no imageset job")
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.InstallImagesNotResolvedCondition,
+						Status: corev1.ConditionFalse,
+						Reason: "ImagesResolved",
+					},
+				})
+				assert.Equal(t, "test-installer-image:latest", *cd.Status.InstallerImage)
+				assert.Equal(t, "<NONE>", *cd.Status.CLIImage)
+			},
+		},
+		{
+			name: "Minimal install mode updates InstallImagesNotResolved condition if images already resolved",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					if cd.Annotations == nil {
+						cd.Annotations = map[string]string{}
+					}
+					cd.Annotations[constants.MinimalInstallModeAnnotation] = "True"
+					cd.Spec.Provisioning.InstallerImageOverride = "test-installer-image:latest"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				assert.Nil(t, getImageSetJob(c), "expected no imageset job")
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.InstallImagesNotResolvedCondition,
+						Status: corev1.ConditionFalse,
+						Reason: "ImagesResolved",
+					},
+				})
+				// These are from testClusterDeployment(), not the overrides -- we don't reset them if already set
+				assert.Equal(t, "installer-image:latest", *cd.Status.InstallerImage)
+				assert.Equal(t, "cli:latest", *cd.Status.CLIImage)
+			},
+		},
+		{
+			name: "Minimal install mode skips cli initContainer in provision pod",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
+					if cd.Annotations == nil {
+						cd.Annotations = map[string]string{}
+					}
+					cd.Annotations[constants.MinimalInstallModeAnnotation] = "True"
+					cd.Spec.Provisioning.InstallerImageOverride = "test-installer-image:latest"
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				provisions := getProvisions(c)
+				if assert.Len(t, provisions, 1, "expected exactly one ClusterProvision") {
+					podSpec := provisions[0].Spec.PodSpec
+					if assert.Len(t, podSpec.InitContainers, 1, "expected exactly one initContainer") {
+						assert.Equal(t, "installer", podSpec.InitContainers[0].Name, "expected the initContainer to be 'installer'")
+					}
+				}
+			},
+		},
+		{
 			name: "failed verification of release image using tags should set InstallImagesNotResolvedCondition",
 			existing: []runtime.Object{
 				func() *hivev1.ClusterDeployment {

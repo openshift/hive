@@ -972,6 +972,37 @@ const (
 func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, releaseImage string, cdLog log.FieldLogger) (*reconcile.Result, error) {
 	areImagesResolved := cd.Status.InstallerImage != nil && cd.Status.CLIImage != nil
 
+	// In minimal install mode, don't even run the image resolver pod -- just trust the InstallerImageOverride
+	if minimal, err := strconv.ParseBool(cd.Annotations[constants.MinimalInstallModeAnnotation]); err == nil && minimal {
+		changed1, changed2 := false, false
+		if !areImagesResolved {
+			// "resolve" the images via installerImageOverride
+			installerImage := cd.Spec.Provisioning.InstallerImageOverride
+			if installerImage == "" {
+				return &reconcile.Result{}, r.updateCondition(
+					cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue,
+					"MinimalInstallModeWithoutImageOverride",
+					"InstallerImageOverride is required when using minimal-install-mode annotation", cdLog)
+			}
+			cd.Status.InstallerImage = &installerImage
+			cd.Status.CLIImage = pointer.String("<NONE>")
+			changed1 = true
+		}
+		cd.Status.Conditions, changed2 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+			cd.Status.Conditions,
+			hivev1.InstallImagesNotResolvedCondition,
+			corev1.ConditionFalse,
+			imagesResolvedReason,
+			imagesResolvedMsg,
+			controllerutils.UpdateConditionIfReasonOrMessageChange,
+		)
+		var err error
+		if changed1 || changed2 {
+			err = r.statusUpdate(cd, cdLog)
+		}
+		return nil, err
+	}
+
 	jobKey := client.ObjectKey{Namespace: cd.Namespace, Name: imageset.GetImageSetJobName(cd.Name)}
 	jobLog := cdLog.WithField("job", jobKey.Name)
 

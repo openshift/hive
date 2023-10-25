@@ -1831,9 +1831,15 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			ResourceGroupName:    &rg,
 		}
 	case cd.Spec.Platform.GCP != nil:
+		// If we haven't discovered the NetworkProjectID yet, fail
+		npid := controllerutils.GCPNetworkProjectID(cd)
+		if npid == nil {
+			return nil, errors.New("GCP NetworkProjectID unset it ClusterMetadata; refusing to deprovision.")
+		}
 		req.Spec.Platform.GCP = &hivev1.GCPClusterDeprovision{
 			Region:               cd.Spec.Platform.GCP.Region,
 			CredentialsSecretRef: &cd.Spec.Platform.GCP.CredentialsSecretRef,
+			NetworkProjectID:     npid,
 		}
 	case cd.Spec.Platform.OpenStack != nil:
 		req.Spec.Platform.OpenStack = &hivev1.OpenStackClusterDeprovision{

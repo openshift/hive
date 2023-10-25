@@ -18,6 +18,7 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
+	"github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
@@ -1698,7 +1699,7 @@ platform:
 			},
 		},
 		{
-			name: "Create deprovision after late-failure provision removed",
+			name: "AWS: Create deprovision after late-failure provision removed",
 			existing: []runtime.Object{
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
@@ -1716,7 +1717,107 @@ platform:
 					assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected hive finalizer")
 				}
 				deprovision := getDeprovision(c)
-				assert.NotNil(t, deprovision, "missing deprovision request")
+				if assert.NotNil(t, deprovision, "missing deprovision request") {
+					if assert.NotNil(t, deprovision.Spec.Platform.AWS) {
+						if assert.NotNil(t, deprovision.Spec.Platform.AWS.HostedZoneRole) {
+							assert.Equal(t, "account-b-role", *deprovision.Spec.Platform.AWS.HostedZoneRole)
+						}
+					}
+				}
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.ProvisionedReasonDeprovisioning,
+					Message: "Cluster is being deprovisioned",
+				}})
+			},
+		},
+		{
+			name: "GCP: Create deprovision after late-failure provision removed",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
+					cd.Spec.Platform.AWS = nil
+					cd.Spec.Platform.GCP = &gcp.Platform{
+						CredentialsSecretRef: corev1.LocalObjectReference{
+							Name: "gcp-credentials",
+						},
+						Region: "us-central1",
+					}
+					cd.Spec.ClusterMetadata.Platform.AWS = nil
+					cd.Spec.ClusterMetadata.Platform.GCP = &gcp.Metadata{
+						NetworkProjectID: pointer.String("some@np.id"),
+					}
+					cd.Labels[hivev1.HiveClusterPlatformLabel] = "gcp"
+					cd.Labels[hivev1.HiveClusterRegionLabel] = "us-central1"
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected hive finalizer")
+				}
+				deprovision := getDeprovision(c)
+				if assert.NotNil(t, deprovision, "missing deprovision request") {
+					if assert.NotNil(t, deprovision.Spec.Platform.GCP) {
+						if assert.NotNil(t, deprovision.Spec.Platform.GCP.NetworkProjectID) {
+							assert.Equal(t, "some@np.id", *deprovision.Spec.Platform.GCP.NetworkProjectID)
+						}
+					}
+				}
+				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
+					Type:    hivev1.ProvisionedCondition,
+					Status:  corev1.ConditionFalse,
+					Reason:  hivev1.ProvisionedReasonDeprovisioning,
+					Message: "Cluster is being deprovisioned",
+				}})
+			},
+		},
+		{
+			name: "Azure: Create deprovision after late-failure provision removed",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeploymentWithProvision())
+					cd.Spec.Platform.AWS = nil
+					cd.Spec.Platform.Azure = &azure.Platform{
+						CredentialsSecretRef: corev1.LocalObjectReference{
+							Name: "azure-credentials",
+						},
+						Region: "westus",
+					}
+					cd.Spec.ClusterMetadata.Platform.AWS = nil
+					cd.Spec.ClusterMetadata.Platform.Azure = &azure.Metadata{
+						ResourceGroupName: pointer.String("some-rg"),
+					}
+					cd.Labels[hivev1.HiveClusterPlatformLabel] = "azure"
+					cd.Labels[hivev1.HiveClusterRegionLabel] = "westus"
+					now := metav1.Now()
+					cd.DeletionTimestamp = &now
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				if assert.NotNil(t, cd, "missing clusterdeployment") {
+					assert.Contains(t, cd.Finalizers, hivev1.FinalizerDeprovision, "expected hive finalizer")
+				}
+				deprovision := getDeprovision(c)
+				if assert.NotNil(t, deprovision, "missing deprovision request") {
+					if assert.NotNil(t, deprovision.Spec.Platform.Azure) {
+						if assert.NotNil(t, deprovision.Spec.Platform.Azure.ResourceGroupName) {
+							assert.Equal(t, "some-rg", *deprovision.Spec.Platform.Azure.ResourceGroupName)
+						}
+					}
+				}
 				testassert.AssertConditions(t, getCD(c), []hivev1.ClusterDeploymentCondition{{
 					Type:    hivev1.ProvisionedCondition,
 					Status:  corev1.ConditionFalse,

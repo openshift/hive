@@ -84,6 +84,37 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
 		},
 		{
+			name: "installer image name override",
+			existingClusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Annotations = map[string]string{
+					constants.OverrideInstallerImageNameAnnotation: "some-other-installer",
+				}
+				return cd
+			}(),
+			images: map[string]string{
+				"some-other-installer": testInstallerImage,
+				"cli":                  testCLIImage,
+			},
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
+		},
+		{
+			name: "installer image name override (baremetal)",
+			existingClusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testClusterDeployment()
+				cd.Spec.Platform.BareMetal = &baremetal.Platform{}
+				cd.Annotations = map[string]string{
+					constants.OverrideInstallerImageNameAnnotation: "some-other-installer",
+				}
+				return cd
+			}(),
+			images: map[string]string{
+				"some-other-installer": testInstallerImage,
+				"cli":                  testCLIImage,
+			},
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
+		},
+		{
 			name:                      "successful execution with version in release metadata",
 			existingClusterDeployment: testClusterDeployment(),
 			images: map[string]string{

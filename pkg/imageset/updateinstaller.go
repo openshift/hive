@@ -174,6 +174,12 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		if cd.Spec.Platform.BareMetal != nil {
 			installerTagName = "baremetal-installer"
 		}
+		// Override annotation is allowed to override baremetal-installer too
+		if cd.Annotations != nil {
+			if override := cd.Annotations[constants.OverrideInstallerImageNameAnnotation]; override != "" {
+				installerTagName = override
+			}
+		}
 		installerImage, err = findImageSpec(is, installerTagName)
 		if err != nil {
 			return errors.Wrap(err, "could not get installer image")

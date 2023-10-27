@@ -139,12 +139,14 @@ type InstallManager struct {
 	waitForInstallCompleteExecutions int
 	binaryDir                        string
 	actuator                         LogUploaderActuator
+	sleep                            func(time.Duration)
 }
 
 // NewInstallManagerCommand is the entrypoint to create the 'install-manager' subcommand
 func NewInstallManagerCommand() *cobra.Command {
 	im := &InstallManager{
 		actuator: getActuator(),
+		sleep:    time.Sleep,
 	}
 	cmd := &cobra.Command{
 		Use:   "install-manager NAMESPACE CLUSTER_PROVISION_NAME",
@@ -493,7 +495,7 @@ func (m *InstallManager) Run() error {
 				// Not a fatal error.
 				m.log.WithError(err).WithField("pauseDuration", pauseDur).Warn("error parsing pause duration, skipping pause")
 			} else {
-				time.Sleep(dur)
+				m.sleep(dur)
 			}
 		}
 
@@ -607,7 +609,7 @@ func (m *InstallManager) waitForFiles(files []string) {
 			if _, err := os.Stat(p); !os.IsNotExist(err) {
 				found = true
 			} else {
-				time.Sleep(500 * time.Millisecond)
+				m.sleep(500 * time.Millisecond)
 			}
 		}
 		m.log.WithField("path", p).Info("found file")
@@ -1050,7 +1052,7 @@ func (m *InstallManager) runOpenShiftInstallCommand(args ...string) error {
 
 	err = cmd.Wait()
 	// give goroutine above a chance to read through whole buffer
-	time.Sleep(time.Second)
+	m.sleep(time.Second)
 	if err != nil {
 		m.log.WithError(err).Error("error after waiting for command completion")
 		return err
@@ -1106,7 +1108,7 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 		}
 		// pause for EOF and any other error
 		if err != nil {
-			time.Sleep(time.Millisecond * 5)
+			m.sleep(time.Millisecond * 5)
 			continue
 		}
 

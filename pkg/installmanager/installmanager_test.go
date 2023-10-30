@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -80,6 +81,10 @@ echo "echo Agent pid %s;"`
 
 func init() {
 	log.SetLevel(log.DebugLevel)
+}
+
+func dummySleep(d time.Duration) {
+	return
 }
 
 func TestInstallManager(t *testing.T) {
@@ -186,6 +191,7 @@ func TestInstallManager(t *testing.T) {
 
 			im := InstallManager{
 				LogLevel:               "debug",
+				sleep:                  dummySleep,
 				WorkDir:                tempDir,
 				ClusterProvisionName:   testProvisionName,
 				Namespace:              testNamespace,

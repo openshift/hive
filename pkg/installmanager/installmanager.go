@@ -335,7 +335,7 @@ func (m *InstallManager) Run() error {
 
 	m.ClusterName = cd.Spec.ClusterName
 
-	if err := m.copyInstallerBinaries(); err != nil {
+	if err := m.copyInstallerBinaries(cd); err != nil {
 		m.log.WithError(err).Error("error waiting for/copying binaries")
 		return err
 	}
@@ -617,10 +617,12 @@ func (m *InstallManager) waitForFiles(files []string) {
 	m.log.Infof("all files found, ready to proceed")
 }
 
-func (m *InstallManager) copyInstallerBinaries() error {
+func (m *InstallManager) copyInstallerBinaries(cd *hivev1.ClusterDeployment) error {
 	fileList := []string{
 		filepath.Join(m.WorkDir, "openshift-install"),
-		filepath.Join(m.WorkDir, "oc"),
+	}
+	if minimal, err := strconv.ParseBool(cd.Annotations[constants.MinimalInstallModeAnnotation]); err != nil || !minimal {
+		fileList = append(fileList, filepath.Join(m.WorkDir, "oc"))
 	}
 
 	// copy each binary to our container user's home dir to avoid situations
@@ -1245,6 +1247,10 @@ func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment, sshPrivKeyPath
 }
 
 func (m *InstallManager) gatherClusterLogs(cd *hivev1.ClusterDeployment) error {
+	if minimal, err := strconv.ParseBool(cd.Annotations[constants.MinimalInstallModeAnnotation]); err == nil && minimal {
+		m.log.Info("Minimal install mode: not attempting must-gather")
+		return nil
+	}
 	m.log.Info("attempting to gather logs with oc adm must-gather")
 	destDir := filepath.Join(m.LogsDir, fmt.Sprintf("%s-must-gather", time.Now().Format("20060102150405")))
 	cmd := exec.Command(filepath.Join(m.binaryDir, "oc"), "adm", "must-gather", "--dest-dir", destDir)

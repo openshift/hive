@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -300,7 +301,6 @@ func InstallerPodSpec(
 	if cd.Status.CLIImage == nil {
 		return nil, fmt.Errorf("cli image not resolved")
 	}
-	cliImage := *cd.Status.CLIImage
 
 	// This is used when scheduling the installer pod. It ensures that installer pods don't overwhelm
 	// a given node's memory.
@@ -320,9 +320,12 @@ func InstallerPodSpec(
 			Args:         []string{"cp -v /bin/openshift-install /output/openshift-install.tmp && mv -v /output/openshift-install.tmp /output/openshift-install && ls -la /output"},
 			VolumeMounts: volumeMounts,
 		},
-		{
+	}
+	// Don't pull the CLI image in minimal mode. This disables must-gather!
+	if minimal, err := strconv.ParseBool(cd.Annotations[constants.MinimalInstallModeAnnotation]); err != nil || !minimal {
+		initContainers = append(initContainers, corev1.Container{
 			Name:            "cli",
-			Image:           cliImage,
+			Image:           *cd.Status.CLIImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
@@ -330,7 +333,7 @@ func InstallerPodSpec(
 			// so it doesn't try to run a partially copied binary.
 			Args:         []string{"cp -v /usr/bin/oc /output/oc.tmp && mv -v /output/oc.tmp /output/oc && ls -la /output"},
 			VolumeMounts: volumeMounts,
-		},
+		})
 	}
 	containers := []corev1.Container{
 		{

@@ -523,6 +523,11 @@ const (
 	// for forcing rollout of such changes on the target cluster -- e.g. by deleting the Machines -- as the machine
 	// config operator will not do so.
 	OverrideMachinePoolPlatformAnnotation = "hive.openshift.io/override-machinepool-platform"
+
+	// MinimalInstallModeAnnotation, if set to "true" on a ClusterDeployment along with InstallerImageOverride, asks hive
+	// to avoid downloading the release and oc images at all -- only the (overridden) installer image will be pulled.
+	// Side effects include: a) You can't use a release image verifier; b) We won't try to must-gather on the spoke.
+	MinimalInstallModeAnnotation = "hive.openshift.io/minimal-install-mode"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

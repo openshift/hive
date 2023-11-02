@@ -4,16 +4,23 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
-	"github.com/openshift/generic-admission-server/pkg/apiserver"
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/openshift/generic-admission-server/pkg/apiserver"
+	"github.com/openshift/generic-admission-server/pkg/registry/admissionreview/generated"
 )
 
 const defaultEtcdPathPrefix = "/registry/online.openshift.io"
@@ -74,9 +81,36 @@ func NewCommandStartAdmissionServer(out, errOut io.Writer, stopCh <-chan struct{
 	}
 
 	flags := cmd.Flags()
-	o.RecommendedOptions.AddFlags(flags)
+	o.AddFlags(flags)
 
 	return cmd
+}
+
+func (o *AdmissionServerOptions) AddFlags(fs *pflag.FlagSet) {
+	o.RecommendedOptions.AddFlags(fs)
+	// first set the UnauthenticatedHTTP2DOSMitigation feature to true by default
+	if err := feature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{
+		string(features.UnauthenticatedHTTP2DOSMitigation): true,
+	}); err != nil {
+		panic(err)
+	}
+	// an operator should be able to override the feature gate if it is passed from CLI
+	feature.DefaultMutableFeatureGate.AddFlag(fs)
+
+	// it is not possible to modify imported feature gates (Default field)
+	// make sure the feature-gates help represents reality
+	fs.VisitAll(func(flag *pflag.Flag) {
+		if flag.Name == "feature-gates" {
+			fgUsage := strings.Split(flag.Usage, "\n")
+			for i, fg := range fgUsage {
+				if strings.Contains(fg, string(features.UnauthenticatedHTTP2DOSMitigation)+"=") {
+					fgUsage[i] = strings.Replace(fg, "default=false", "default=true", 1)
+					break
+				}
+			}
+			flag.Usage = strings.Join(fgUsage, "\n")
+		}
+	})
 }
 
 func (o AdmissionServerOptions) Validate(args []string) error {
@@ -94,6 +128,7 @@ func (o AdmissionServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(generated.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}

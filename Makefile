@@ -93,11 +93,6 @@ $(addprefix vendor-submodules-,$(GO_SUB_MODULES)):
 	# handle tidy for submodules
 	(cd $(subst vendor-submodules-,,$@); go mod tidy && go mod vendor)
 
-.PHONY: verify-vendor
-verify-vendor: vendor
-	git diff --exit-code vendor/
-verify: verify-vendor
-
 # Update the manifest directory of artifacts OLM will deploy. Copies files in from
 # the locations kubebuilder generates them.
 .PHONY: manifests
@@ -215,6 +210,12 @@ verify: verify-codegen
 update-codegen:
 	hack/update-codegen.sh
 update: update-codegen
+
+# This needs to come after codegen to copy zz_generated.deepcopy files down into vendor/
+.PHONY: verify-vendor
+verify-vendor: vendor
+	git diff --exit-code vendor/
+verify: verify-vendor
 
 # Build the template file used for direct (OLM-less) deploy by app-sre
 build-app-sre-template: ensure-kustomize

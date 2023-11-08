@@ -68,25 +68,6 @@ bin/hiveutil create-cluster --base-domain=mydomain.example.com --cloud=gcp myclu
 
 NOTE: For deprovisioning a cluster, `hiveutil` will use creds from `~/.gcp/osServiceAccount.json` or the `GOOGLE_CREDENTIALS` environment variable (with the environment variable prefered).
 
-#### Create Cluster on oVirt
-
-Credentials will be read from `~/.ovirt/ovirt-config.yaml`. An example file looks like:
-```yaml
-ovirt_url: https://ovirt.hive.example.com/ovirt-engine/api
-ovirt_fqdn: ""
-ovirt_pem_url: ""
-ovirt_username: admin@internal
-ovirt_password: secretpassword
-ovirt_ca_bundle: |-
-  -----BEGIN CERTIFICATE-----
-  CA CERT DATA
-  -----END CERTIFICATE-----
-```
-
-```bash
-bin/hiveutil create-cluster --cloud=ovirt --ovirt-api-vip=192.168.1.10  --ovirt-ingress-vip=192.168.1.11 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id storage-domain-UUID --ovirt-cluster-id ovirt-cluster-UUID --ovirt-ca-certs ~/ovirt-ca.pem --base-domain ovirt.hive.example.com mycluster
-```
-
 #### Create Cluster on vSphere
 
 Set credentials/connection information in the following environment variables. `GOVC_USERNAME` should hold the vSphere username, `GOVC_PASSWORD` should be set to the vSphere user's password. If the vCenter instance is using self-signed certificates or is otherwise untrusted by the system being used to connect to vCenter, `GOVC_TLS_CA_CERTS` should be set to the path of a file containing the CA certificate for the vCenter instance. 

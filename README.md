@@ -15,7 +15,6 @@ The Hive service can be used to provision and perform initial configuration of O
 * Google Cloud Platform
 * IBM Cloud
 * OpenStack
-* oVirt
 * vSphere
 
 In the future Hive will support more cloud providers.

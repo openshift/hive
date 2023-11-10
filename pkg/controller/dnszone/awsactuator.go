@@ -500,7 +500,7 @@ func (a *AWSActuator) GetNameServers() ([]string, error) {
 	}
 
 	logger := a.logger.WithField("id", a.hostedZone.Id)
-	logger.Debug("Listing hosted zone NS records")
+	logger.Info("Listing hosted zone NS records")
 	resp, err := a.awsClient.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 		HostedZoneId:    aws.String(*a.hostedZone.Id),
 		StartRecordType: aws.String("NS"),
@@ -530,7 +530,7 @@ func (a *AWSActuator) GetNameServers() ([]string, error) {
 	for i, record := range resp.ResourceRecordSets[0].ResourceRecords {
 		result[i] = aws.StringValue(record.Value)
 	}
-	logger.WithField("nameservers", result).Debug("found hosted zone name servers")
+	logger.WithField("nameservers", result).Info("found hosted zone name servers")
 	return result, nil
 }
 

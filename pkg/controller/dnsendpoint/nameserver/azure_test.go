@@ -22,15 +22,15 @@ func TestAzureGet(t *testing.T) {
 	cases := []struct {
 		name                string
 		listRecordSets      []*RecordSetPage
-		expectedNameServers map[string]sets.String
+		expectedNameServers map[string]sets.Set[string]
 	}{
 		{
 			name: "single name server",
 			listRecordSets: []*RecordSetPage{
 				azure.recordSetPage(azure.withRecordSets(azure.recordSet("test-subdomain", "NS", "test-ns"))),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain.test-domain": sets.NewString("test-ns"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain.test-domain": sets.New[string]("test-ns"),
 			},
 		},
 		{
@@ -50,8 +50,8 @@ func TestAzureGet(t *testing.T) {
 			listRecordSets: []*RecordSetPage{
 				azure.recordSetPage(azure.withRecordSets(azure.recordSet("test-subdomain", "NS", "test-ns-1", "test-ns-2", "test-ns-3"))),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain.test-domain": sets.NewString("test-ns-1", "test-ns-2", "test-ns-3"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain.test-domain": sets.New[string]("test-ns-1", "test-ns-2", "test-ns-3"),
 			},
 		},
 		{
@@ -63,10 +63,10 @@ func TestAzureGet(t *testing.T) {
 					azure.recordSet("test-subdomain-3", "NS", "test-ns-3"),
 				)),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain-1.test-domain": sets.NewString("test-ns-1"),
-				"test-subdomain-2.test-domain": sets.NewString("test-ns-2"),
-				"test-subdomain-3.test-domain": sets.NewString("test-ns-3"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain-1.test-domain": sets.New[string]("test-ns-1"),
+				"test-subdomain-2.test-domain": sets.New[string]("test-ns-2"),
+				"test-subdomain-3.test-domain": sets.New[string]("test-ns-3"),
 			},
 		},
 	}

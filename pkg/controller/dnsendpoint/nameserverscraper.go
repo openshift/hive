@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/controller/dnsendpoint/nameserver"
@@ -22,9 +24,26 @@ const (
 	defaultScrapePeriod = 2 * time.Hour
 )
 
+var (
+	metricSubdomainsScraped = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "hive_managed_dns_subdomains_scraped",
+		Help: "The number of subdomains of a root managed domain handled by the name server scraper.",
+	}, []string{"managed_domain"})
+	metricScrapeDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "hive_managed_dns_scrape_seconds",
+		Help:    "How long it took to scrape a root domain.",
+		Buckets: []float64{1, 10, 30, 60, 120},
+	}, []string{"managed_domain"})
+)
+
+func init() {
+	metrics.Registry.MustRegister(metricSubdomainsScraped)
+	metrics.Registry.MustRegister(metricScrapeDuration)
+}
+
 type endpointState struct {
 	dnsZone  *hivev1.DNSZone
-	nsValues sets.String
+	nsValues sets.Set[string]
 }
 
 // A map, keyed by subdomain name, of endpointState objects
@@ -127,11 +146,11 @@ func newNameServerScraper(logger log.FieldLogger, nameServerQuery nameserver.Que
 }
 
 // GetEndpoint gets the root domain name and the name servers for the specified subdomain.
-func (s *nameServerScraper) GetEndpoint(subdomain string) (rootDomain string, nameServers sets.String) {
+func (s *nameServerScraper) GetEndpoint(subdomain string) (rootDomain string, nameServers sets.Set[string]) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	rootDomain, nsMap := s.rootDomainNameServers(subdomain)
-	nameServers = sets.NewString()
+	nameServers = sets.Set[string]{}
 	if nsMap != nil {
 		if endpoint, ok := nsMap[subdomain]; ok {
 			nameServers = endpoint.nsValues
@@ -143,7 +162,7 @@ func (s *nameServerScraper) GetEndpoint(subdomain string) (rootDomain string, na
 // CheckSeedScrapeStatus
 //   - Ensures the cache has been seeded with this dnsZone. This enables the scraper to enqueue the
 //     DNSZone to the dnsendpoint controller if necessary.
-//   - Returns whether the scraper has run yet (ever, since this controller started).
+//   - Returns whether the scraper has run yet (ever, since this controller started) for the *root* domain.
 func (s *nameServerScraper) CheckSeedScrapeStatus(dnsZone *hivev1.DNSZone, rootDomain string) bool {
 	s.mux.Lock()
 	defer s.mux.Unlock()
@@ -167,7 +186,7 @@ func (s *nameServerScraper) CheckSeedScrapeStatus(dnsZone *hivev1.DNSZone, rootD
 }
 
 // SyncEndpoint adds or updates the subdomain's endpointState in the scraper's cache
-func (s *nameServerScraper) SyncEndpoint(dnsZone *hivev1.DNSZone, subdomain string, nameServers sets.String) {
+func (s *nameServerScraper) SyncEndpoint(dnsZone *hivev1.DNSZone, subdomain string, nameServers sets.Set[string]) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	_, nsMap := s.rootDomainNameServers(subdomain)
@@ -223,7 +242,8 @@ func (s *nameServerScraper) Start(ctx context.Context) error {
 
 func (s *nameServerScraper) scrape(rootDomain string) error {
 	logger := s.logger.WithField("rootDomain", rootDomain)
-	logger.Debug("scrape root domain")
+	logger.Info("scrape root domain")
+	start := time.Now()
 	currentNameServerMap, err := s.nameServerQuery.Get(rootDomain)
 	if err != nil {
 		return errors.Wrap(err, "error querying name servers")
@@ -241,7 +261,7 @@ func (s *nameServerScraper) scrape(rootDomain string) error {
 		// Keep track of subdomains for which we have name servers. We'll use this to find out if
 		// there are DNSZones that have a) already been reconciled, and b) not been set up yet in
 		// the root hosted zone. Those need to be enqueued explicitly to the dnsendpoint controller.
-		seenSubdomains := sets.String{}
+		seenSubdomains := sets.Set[string]{}
 		// Sync our cache with NS entries for each subdomain.
 		// NOTE: We are caching *all* the subdomains, not just the ones for DNSZones managed by
 		// this controller. This is to mitigate timing issues on controller restart: so the
@@ -275,9 +295,11 @@ func (s *nameServerScraper) scrape(rootDomain string) error {
 	}()
 	for _, changedDNSZone := range changedDNSZones {
 		logger.WithField("dnsZone", fmt.Sprintf("%s/%s", changedDNSZone.GetNamespace(), changedDNSZone.GetName())).
-			Debug("notify dnsendpoint controller")
+			Info("notify dnsendpoint controller of name server change")
 		s.notifyChange(changedDNSZone)
 	}
+	metricScrapeDuration.With(prometheus.Labels{"managed_domain": rootDomain}).Observe(time.Since(start).Seconds())
+	metricSubdomainsScraped.With(prometheus.Labels{"managed_domain": rootDomain}).Set((float64)(len(currentNameServerMap)))
 	return nil
 }
 

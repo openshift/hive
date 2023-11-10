@@ -118,7 +118,7 @@ func (s *LiveAzureTestSuite) TestDeleteOfNonExistentNS() {
 	}
 	for _, tc := range cases {
 		s.T().Run(tc.name, func(t *testing.T) {
-			err := s.getCUT().Delete(s.rootDomain, fmt.Sprintf("non-existent.subdomain.%s", s.rootDomain), sets.NewString(tc.deleteValues...))
+			err := s.getCUT().Delete(s.rootDomain, fmt.Sprintf("non-existent.subdomain.%s", s.rootDomain), sets.New(tc.deleteValues...))
 			s.NoError(err, "expected no error")
 		})
 	}
@@ -128,10 +128,10 @@ func (s *LiveAzureTestSuite) testCreateAndDelete(tc *testCreateAndDeleteCase) {
 	cut := s.getCUT()
 	domain := fmt.Sprintf("live-azure-test-%08d.%s", rand.Intn(100000000), s.rootDomain)
 	s.T().Logf("domain = %q", domain)
-	err := cut.CreateOrUpdate(s.rootDomain, domain, sets.NewString(tc.createValues...))
+	err := cut.CreateOrUpdate(s.rootDomain, domain, sets.New(tc.createValues...))
 	if s.NoError(err, "unexpected error creating NS") {
 		defer func() {
-			err := cut.Delete(s.rootDomain, domain, sets.NewString(tc.deleteValues...))
+			err := cut.Delete(s.rootDomain, domain, sets.New(tc.deleteValues...))
 			s.NoError(err, "unexpected error deleting NS")
 		}()
 	}
@@ -140,30 +140,30 @@ func (s *LiveAzureTestSuite) testCreateAndDelete(tc *testCreateAndDeleteCase) {
 	s.NoError(err, "unexpected error querying domain")
 	s.NotEmpty(nameServers, "expected some name servers")
 	actualValues := nameServers[domain]
-	s.Equal(sets.NewString(tc.createValues...), actualValues, "unexpected values for domain")
+	s.Equal(sets.New(tc.createValues...), actualValues, "unexpected values for domain")
 }
 
 func (s *LiveAzureTestSuite) testCreateThenUpdate(tc *testCreateThenUpdateCase) {
 	cut := s.getCUT()
 	domain := fmt.Sprintf("live-azure-test-%08d.%s", rand.Intn(100000000), s.rootDomain)
 	s.T().Logf("domain = %q", domain)
-	err := cut.CreateOrUpdate(s.rootDomain, domain, sets.NewString(tc.createValues...))
+	err := cut.CreateOrUpdate(s.rootDomain, domain, sets.New(tc.createValues...))
 	if s.NoError(err, "unexpected error creating NS") {
 		defer func() {
-			err := cut.Delete(s.rootDomain, domain, sets.NewString())
+			err := cut.Delete(s.rootDomain, domain, sets.Set[string]{})
 			s.NoError(err, "unexpected error deleting NS")
 		}()
 	}
 
 	// now test updating by re-issuing a Create()
-	err = cut.CreateOrUpdate(s.rootDomain, domain, sets.NewString(tc.updateValues...))
+	err = cut.CreateOrUpdate(s.rootDomain, domain, sets.New(tc.updateValues...))
 	s.NoError(err, "unexpected error updating NS")
 
 	nameServers, err := cut.Get(s.rootDomain)
 	s.NoError(err, "unexpected error querying domain")
 	s.NotEmpty(nameServers, "expected some name servers")
 	actualValues := nameServers[domain]
-	s.Equal(sets.NewString(tc.updateValues...), actualValues, "unexpected values for domain")
+	s.Equal(sets.New(tc.updateValues...), actualValues, "unexpected values for domain")
 }
 
 func (s *LiveAzureTestSuite) getCUT() *azureQuery {

@@ -1719,6 +1719,7 @@ data:
     - name: DefaultEbsKmsKeyInsufficientPermissions
       searchRegexStrings:
         - "Client.InternalError: Client error on launch"
+        - "Client.InvalidKMSKey.InvalidState: The KMS key provided is in an incorrect state"
       installFailingReason: DefaultEbsKmsKeyInsufficientPermissions
       installFailingMessage: Default KMS key for EBS encryption has insufficient permissions to launch EC2 instances
     - name: SimulatorThrottling

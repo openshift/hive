@@ -528,6 +528,10 @@ const (
 	// to avoid downloading the release and oc images at all -- only the (overridden) installer image will be pulled.
 	// Side effects include: a) You can't use a release image verifier; b) We won't try to must-gather on the spoke.
 	MinimalInstallModeAnnotation = "hive.openshift.io/minimal-install-mode"
+
+	// OverrideInstallerImageNameAnnotation specifies the name of the image within release metadata containing the
+	// `openshift-install` command. By default we look for the image named `installer`.
+	OverrideInstallerImageNameAnnotation = "hive.openshift.io/installer-image-name-override"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

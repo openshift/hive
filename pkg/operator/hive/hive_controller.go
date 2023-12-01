@@ -564,13 +564,6 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	if err := r.cleanupLegacySyncSetInstances(hLog); err != nil {
-		hLog.WithError(err).Error("error cleaning up legacy SyncSetInstances")
-		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeletingLegacySyncSetInstances", err.Error())
-		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
-		return reconcile.Result{}, err
-	}
-
 	// If we get here, we've successfully scrubbed all *our* resources out of previous target
 	// namespaces. Ideally, we would delete the namespace. Unfortunately, there's no good way to
 	// tell whether a) we were the one to create it, or b) it's empty. So settle for unlabeling it,

@@ -1,5 +1,20 @@
 # AWS Private Link
 
+- [Overview](#overview)
+- [Setting up AWS Private Link with hiveutil](#setting-up-aws-private-link-with-hiveutil)
+- [Configuring Hive to enable AWS Private Link](#configuring-hive-to-enable-aws-private-link)
+  - [Security Groups for VPC Endpoints](#security-groups-for-vpc-endpoints)
+- [Using AWS Private Link](#using-aws-private-link)
+- [Permissions required for AWS Private Link](#permissions-required-for-aws-private-link)
+- [Using A DNS records type in Private Hosted Zones](#using-a-dns-records-type-in-private-hosted-zones)
+- [Developing for Private Link](#developing-for-private-link)
+  - [Setup VPCs in AWS](#setup-vpcs-in-aws)
+  - [Create OCP cluster in preexisting Hive VPC](#create-ocp-cluster-in-preexisting-hive-vpc)
+  - [Setup network peering connection between Hive and Private link VPCs](#setup-network-peering-connection-between-hive-and-private-link-vpcs)
+  - [Setup the security group rules to allow traffic](#setup-the-security-group-rules-to-allow-traffic)
+  - [Configure the inventory for VPC endpoints in HiveConfig](#configure-the-inventory-for-vpc-endpoints-in-hiveconfig)
+- [Controller Flow](#controller-flow)
+
 ## Overview
 
 Customers often want the core services of their OpenShift cluster to be
@@ -452,3 +467,70 @@ the steps mentioned [above](#configuring-hive-to-enable-aws-private-link)
 [aws-vpc-peering]: https://docs.aws.amazon.com/vpc/latest/peering/create-vpc-peering-connection.html
 [aws-vpc-peering-route-tables]: https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html
 [aws-vpc-peering-security-groups]: https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-security-groups.html
+
+## Controller Flow
+
+```mermaid
+flowchart TD
+    Reconcile["Reconcile(CD)"]
+        --> getCD("GET(CD)")
+        %% -...->|NotFound| X["return (no requeue)"]
+    %% getCD -.->|err|Reconcile
+    getCD --> AddLogFields("AddLogFields()")
+    %% AddLogFields -.->|"reconcile<br>paused?"| X
+    AddLogFields --> InitConds("Init Conditions")
+    %% InitConds -.->|err|Reconcile
+    %% InitConds -.->|"platform != AWS"| X
+    %% subgraph cleanupRequired ["cleanup required?"]
+        %% crA{"Deleting &&<br>PreserveOnDelete&&<br>PrivateLink Enabled"} --> crB[No]
+        %% crC{"EndpointID ||<br>VPCEndpointService ID ||<br>VPCEndpointService.Name ||<br>HostedZoneID"} -->crD[Yes]
+    %% end
+    %% InitConds -.-|"Marked for deletion?"| cleanupCD
+    %% InitConds -.->|"PrivateLink not enabled"| cleanupRequired
+    %% cleanupRequired -.->|"No"| X
+    %% subgraph cleanupCD
+    %% end
+    %% cleanupRequired -.->|"Yes"| cleanupCD
+    InitConds --> EnsureFinalizer["Ensure Finalizer"]
+    %% EnsureFinalizer -.->|"Region not<br>Supported"|X
+    subgraph shouldSync ["should sync?"]
+    end
+    EnsureFinalizer -->shouldSync
+    %% shouldSync -.->|"No; RequeueAfter(time)"|Reconcile
+    shouldSync -.->|"Yes"| Installed{"Installed?"}
+    Installed -.->|"Yes"| reconcilePrivateLink(["reconcilePrivateLink()"])
+    %% Installed -.->|"No"| provisionStarted{"provision started?"}
+    %% provisionStarted -.->|"No (will be queued when provision starts)"|X
+    %% provisionStarted
+    %%     -.->|"Yes"| getCP["GET(ClusterProvision)"]
+    %%     -.->|"err"|Reconcile
+    %% getCP -.->|"need to clean up previous attempt?"|cleanupCD
+    %% getCP -.->|"cluster metadata not yet set<br>(will be queued when set)"|X
+    %% getCP --> reconcilePrivateLink
+    reconcilePrivateLink
+        --> createAWSClient["Create AWS client"]
+        %% -.->|"err"|Reconcile
+    createAWSClient --> discoverNLB["Discover ARN for LoadBalancer<br>{infraID}-int (Created by installer)"]
+    %% discoverNLB -.->|"not found:<br>requeueAfter(1m)"|Reconcile
+    %% discoverNLB -.->|"err"|Reconcile
+    discoverNLB -->|ARN| reconcileVPCEndpointService
+    subgraph reconcileVPCEndpointService["Reconcile VPC Endpoint Service"]
+        EnsureVPCEndpointService["Ensure VPC Endpoint Service"]
+        --> syncNLBs["sync NLBs"]
+        --> syncVPCEndpointServicePermissions["sync VPC Endpoint Service Permissions"]
+    end
+    reconcileVPCEndpointService -->|"VPC Endpoint Service"| reconcileVPCEndpoint
+    subgraph reconcileVPCEndpoint["Reconcile VPC Endpoint"]
+        chooseVPC["Choose emptiest VPC from<br>HiveConfig EndpointVPCInventory<br>for region & AZ"] -->
+        createVPCEndpoint["Create VPC Endpoint"]
+    end
+    reconcileVPCEndpoint -->|"VPC Endpoint"| reconcileHostedZone["Reconcile Hosted Zone"]
+    subgraph reconcileHostedZone
+        ensureHostedZone["Ensure Hosted Zone"]
+        --> syncRSet["Sync RecordSet: point to VPC Endpoint"]
+    end
+    reconcileHostedZone -->|"Hosted Zone ID"| reconcileHostedZoneAssociations["Reconcile Hosted Zone Associations"]
+    subgraph reconcileHostedZoneAssociations
+        syncHZAssoc["Sync Hosted Zone Associations:<br>Associate Hosted Zone with all<br>VPCs in HiveConfig AssociatedVPCs"]
+    end
+```

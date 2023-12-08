@@ -64,6 +64,8 @@ const (
 	noWorkerNodesReady                      = "ReadyIngressNodesAvailable: Authentication requires functional ingress which requires at least one schedulable and ready node. Got 0 worker nodes, 3 master nodes, 0 custom target nodes (none are schedulable or ready for ingress pods)."
 	s3AccessControlListNotSupported         = "time=\"2023-04-11T08:22:52Z\" level=error msg=\"Error: error creating S3 bucket ACL for rosa-6lr7x-flcmj-bootstrap: AccessControlListNotSupported: The bucket does not allow ACLs\""
 	awsAccountBlocked                       = "Error: creating EC2 Instance: Blocked: This account is currently blocked and not recognized as a valid account. Please contact aws-verification@amazon.com if you have questions."
+	installConfigAuthFail                   = `failed to fetch Master Machines: failed to load asset "Install Config": failed to create install config: failed to create a network client: Authentication failed`
+	installConfigBadCACert                  = `failed to fetch Master Machines: failed to load asset "Install Config": failed to create install config: failed to create a network client: Error parsing CA Cert from /etc/pki/ca-trust/extracted/pem/tls-ca-bundle1111.pem`
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -434,6 +436,16 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "AWSAccountBlocked",
 			log:            pointer.String(awsAccountBlocked),
 			expectedReason: "AWSAccountIsBlocked",
+		},
+		{
+			name:           "InstallConfigAuthFail",
+			log:            pointer.String(installConfigAuthFail),
+			expectedReason: "InstallConfigNetworkAuthFail",
+		},
+		{
+			name:           "InstallConfigCACert",
+			log:            pointer.String(installConfigBadCACert),
+			expectedReason: "InstallConfigNetworkBadCACert",
 		},
 	}
 

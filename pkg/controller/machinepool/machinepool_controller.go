@@ -3,6 +3,7 @@ package machinepool
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -33,6 +34,7 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
+	cpms "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 
@@ -520,24 +522,75 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 	return nil, nil
 }
 
-// matchAndMutate decides whether gMS ("generated MachineSet") and rMS ("remote MachineSet" -- the one already extant
-// on the spoke cluster) are talking about the same machines. In certain edge cases (vsphere) this may be true when
-// the names don't match, in which case this func will mutate gMS to make the names match. HIVE-2254.
-func matchAndMutate(pool *hivev1.MachinePool, cd *hivev1.ClusterDeployment, gMS *machineapi.MachineSet, rMS machineapi.MachineSet) bool {
-	// HACK: For vsphere, the default worker pool may or may not have a `-0` suffix.
-	// - If the cluster was created on 4.12 or earlier, it won't.
-	// - If the cluster was created on 4.13 or later, it will.
-	// - If we are vendoring installer code from 4.12 or earlier, our locally-generated MachineSets won't have the suffix.
-	// - If we are vendoring 4.13+ installer code, they will.
-	// TODO: When we implement support for zonal, we may need to get cleverer than hardcoding "-0".
-	if cd.Spec.Platform.VSphere == nil || pool.Spec.Name != "worker" || !(strings.HasSuffix(rMS.Name, "-worker") || strings.HasSuffix(rMS.Name, "-worker-0")) {
-		// This hack only applies to the default worker pool on vsphere; otherwise the name (mis)match is sufficient.
-		return gMS.Name == rMS.Name
+// Compare Failure Domains to confirm that they match
+func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, logger log.FieldLogger) (bool, error) {
+	rSpec := rMS.Spec.Template.Spec
+	gSpec := gMS.Spec.Template.Spec
+	var err error
+
+	if rSpec.ProviderSpec.Value == nil {
+		return false, errors.New("remote MachineSet provider spec is nil")
 	}
-	// If we get here, we know it's vsphere, and both gMS and rMS are talking about the default worker pool.
-	// Make gMS's name match so we don't end up with a separate MachineSet
-	gMS.Name = rMS.Name
-	return true
+	if gSpec.ProviderSpec.Value == nil {
+		return false, errors.New("generated MachineSet provider spec is nil")
+	}
+	// cpms utils operate on the Raw value of the provider spec rather than the Object,
+	// and internally unmarshal the raw value into the Object.
+	// Ensure that Raw is populated before calling cpms utils.
+	// TODO remove this once cpms utils operate on the Object instead of the Raw value.
+	if rSpec.ProviderSpec.Value.Raw == nil {
+		rSpec.ProviderSpec.Value.Raw, err = json.Marshal(rMS.Spec.Template.Spec.ProviderSpec.Value.Object)
+		if err != nil {
+			logger.WithError(err).Error("unable to marshal remote ms provider spec object to raw value")
+			return false, err
+		}
+	}
+	if gSpec.ProviderSpec.Value.Raw == nil {
+		gSpec.ProviderSpec.Value.Raw, err = json.Marshal(gMS.Spec.Template.Spec.ProviderSpec.Value.Object)
+		if err != nil {
+			logger.WithError(err).Error("unable to marshal generate ms provider spec object to raw value")
+			return false, err
+		}
+	}
+
+	rMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(rSpec)
+	if err != nil {
+		logger.WithError(err).Errorf("unable to parse remote MachineSet %v provider config", rMS.Name)
+		return false, err
+	}
+	gMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(gSpec)
+	if err != nil {
+		logger.WithError(err).Errorf("unable to parse generated MachineSet %v provider config", gMS.Name)
+		return false, err
+	}
+	fd1 := rMS_providerconfig.ExtractFailureDomain()
+	fd2 := gMS_providerconfig.ExtractFailureDomain()
+	return fd1.Equal(fd2), nil
+}
+
+// matchMachineSets decides whether gMS ("generated MachineSet") and rMS ("remote MachineSet" -- the one already extant
+// on the spoke cluster) are talking about the same machines. In certain cases, this may be true when
+// the names don't match. The function therefore relies on the hive machinePoolNameLabel to determine whether the MachineSets
+// are part of the same MachinePool. If the machinePoolNameLabels match, the function then confirms that the MachineSets belong
+// to the same Availability Zone (aka Failure Domain). This ensures that the MachineSets are referring to the same machines.
+// We can count on this because the upsteam generator guarentees at most one MachineSet per Failure Domain. HIVE-2254.
+func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, logger log.FieldLogger) (bool, error) {
+
+	gLabel, gLabelExists := gMS.Labels[machinePoolNameLabel]
+	rLabel, rLabelExists := rMS.Labels[machinePoolNameLabel]
+
+	if !gLabelExists {
+		// panic because this should never happen
+		panic(fmt.Sprintf("generated MachineSet %v does not have a machinePoolNameLabel", gMS.Name))
+	}
+	if !rLabelExists {
+		return false, nil
+	}
+	if gLabel != rLabel {
+		return false, nil
+	}
+
+	return matchFailureDomains(gMS, rMS, logger)
 }
 
 func (r *ReconcileMachinePool) syncMachineSets(
@@ -558,10 +611,22 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	for i, ms := range generatedMachineSets {
 		found := false
 		for _, rMS := range remoteMachineSets.Items {
-			if matchAndMutate(pool, cd, ms, rMS) {
-				found = true
+			var err error
+			found, err = matchMachineSets(ms, rMS, logger)
+			// Labels matched but there was still an error
+			// In order to prevent the creation of a duplicate MachineSet, error out and do not continue matching.
+			if err != nil {
+				logger.WithError(err).Errorf("unable to match MachineSets %s and %s", ms.Name, rMS.Name)
+				return nil, err
+			}
+			if found {
+				logger.Infof("Found matching remote MachineSet %s for generated MachineSet %s", rMS.Name, ms.Name)
 				objectModified := false
 				objectMetaModified := false
+				// Rename generated MachineSet if there is a name mismatch
+				// The rename doesn't currently serve a functional purpose, but may assist in future cases where it gets used.
+				// TODO: Determine how to handle a case where a remote machineSet has the same name as a different (non-matching) generated machineSet.
+				ms.Name = rMS.Name
 				resourcemerge.EnsureObjectMeta(&objectMetaModified, &rMS.ObjectMeta, ms.ObjectMeta)
 				msLog := logger.WithField("machineset", rMS.Name)
 

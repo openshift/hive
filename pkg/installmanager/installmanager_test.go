@@ -36,6 +36,7 @@ import (
 )
 
 const (
+	machinePoolNameLabel = "hive.openshift.io/machine-pool"
 	testDeploymentName   = "test-deployment"
 	testProvisionName    = "test-provision"
 	testNamespace        = "test-namespace"
@@ -795,7 +796,7 @@ spec:
   template:
     metadata:
       labels:
-      - "potato.openshift.io/potato-api-potato-type": "yukongold"
+        "potato.openshift.io/potato-api-potato-type": "yukongold"
 `,
 			expectModified: false,
 		},
@@ -807,7 +808,7 @@ spec:
   template:
     metadata:
       labels:
-      - "machine.openshift.io/cluster-api-machine-type": "infra"
+        "machine.openshift.io/cluster-api-machine-type": "infra"
 `,
 			expectModified: false,
 		},
@@ -848,7 +849,8 @@ spec:
 			decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
 
 			if tc.expectModified {
-				machineSetObj, _, err := decoder.Decode(*modifiedBytes, nil, nil)
+
+				machineSetObj, _, err := decoder.Decode(modifiedBytes, nil, nil)
 				assert.NoError(t, err, "expected to be able to decode MachineSet yaml")
 				machineSet, _ := machineSetObj.(*machineapi.MachineSet)
 
@@ -860,6 +862,206 @@ spec:
 				assert.Equal(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Name, "vpc-id", "expected an vpc-id named filter to be configured within Security Group Filters in AWSMachineProviderConfig")
 				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Values, "testvpc123", "expected testvpc123 to be configured within Security Group Filters in AWSMachineProviderConfig")
 			}
+		})
+	}
+}
+
+func TestPatchMachineSetsWithMachinePoolLabel(t *testing.T) {
+	machineSetYAMLBase := `---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: test-cluster
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: test-cluster-worker-us-east-1a
+    spec:
+      providerSpec:
+        value:
+          ami:
+            id: ami-03d1c2cba04df838c
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              volumeSize: 120
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          iamInstanceProfile:
+            id: test-cluster-worker-profile
+          instanceType: m4.large
+          kind: AWSMachineProviderConfig
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1`
+
+	cases := []struct {
+		name               string
+		manifestYAML       string
+		expectModified     bool
+		expectErr          bool
+		machinePoolType    string
+		testExistingLabels map[string]string
+	}{
+		{
+			name:            "MachinePool label applies to worker MachineSet",
+			manifestYAML:    machineSetYAMLBase,
+			expectModified:  true,
+			machinePoolType: "worker",
+		},
+		{
+			name:            "No matching MachinePool for MachineSet type",
+			manifestYAML:    machineSetYAMLBase,
+			expectModified:  false,
+			machinePoolType: "not-worker",
+		},
+		{
+			name: "Manifest is not a MachineSet",
+			manifestYAML: `---
+apiVersion: machine.openshift.io/v1beta1
+kind: Potato
+spec:
+  template:
+    metadata:
+      labels:
+        "potato.openshift.io/potato-api-potato-type": "yukongold"
+`,
+			expectModified:  false,
+			machinePoolType: "worker",
+		},
+		{
+			name: "MachinePool label applies to edge MachineSet",
+			manifestYAML: `---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+spec:
+  template:
+    metadata:
+      labels:
+        "machine.openshift.io/cluster-api-cluster": "test-cluster"
+        "machine.openshift.io/cluster-api-machine-role": "edge"
+        "machine.openshift.io/cluster-api-machine-type": "edge"
+        "machine.openshift.io/cluster-api-machineset": "test-cluster-edge-us-east-1a"`,
+			expectModified:  true,
+			machinePoolType: "edge",
+		},
+		{
+			name: "machine-type label does not exist",
+			manifestYAML: `---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+spec:
+  template:
+    metadata:
+      labels:
+        "machine.openshift.io/cluster-api-cluster": "test-cluster"
+        "machine.openshift.io/cluster-api-machine-role": "edge"
+        "machine.openshift.io/cluster-api-machineset": "test-cluster-edge-us-east-1a"`,
+			expectModified:  false,
+			expectErr:       true,
+			machinePoolType: "edge",
+		},
+		{
+			name: "MachineSet name label does not exist",
+			manifestYAML: `---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+spec:
+  template:
+    metadata:
+      labels:
+        "machine.openshift.io/cluster-api-cluster": "test-cluster"
+        "machine.openshift.io/cluster-api-machine-role": "edge"
+		"machine.openshift.io/cluster-api-machine-type": "edge"`,
+			expectModified:  false,
+			expectErr:       true,
+			machinePoolType: "edge",
+		},
+		{
+			name: "MachineSet spec.template.metadata section does not exist", // FIXME do we need this?
+			manifestYAML: `---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+spec:
+  template: {}`,
+			expectModified:  false,
+			expectErr:       true,
+			machinePoolType: "edge",
+		},
+		{
+			name: "metadata.labels section already exists and is not overwritten",
+			manifestYAML: `---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    "potato": "salad"
+spec:
+  template:
+    metadata:
+      labels:
+        "machine.openshift.io/cluster-api-cluster": "test-cluster"
+        "machine.openshift.io/cluster-api-machine-role": "edge"
+        "machine.openshift.io/cluster-api-machine-type": "edge"
+        "machine.openshift.io/cluster-api-machineset": "test-cluster-edge-us-east-1a"`,
+			expectModified:     true,
+			machinePoolType:    "edge",
+			testExistingLabels: map[string]string{"potato": "salad"},
+		},
+	}
+	for _, tc := range cases {
+
+		t.Run(tc.name, func(t *testing.T) {
+
+			pool := &hivev1.MachinePool{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testpool",
+					Namespace: "testnamespace",
+				},
+			}
+
+			pool.Spec.Name = tc.machinePoolType
+
+			mapPoolsByType := map[string]*hivev1.MachinePool{tc.machinePoolType: pool}
+
+			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
+
+			modifiedBytes, err := patchLabelMachineSetManifest([]byte(tc.manifestYAML), mapPoolsByType, logger)
+			if tc.expectModified {
+				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
+			} else {
+				assert.Nil(t, modifiedBytes, "expected manifest to not be modified")
+			}
+			if tc.expectErr {
+				assert.Error(t, err, "expected error patching worker machineset manifests")
+			} else {
+				assert.NoError(t, err, "unexpected error patching worker machineset manifests")
+			}
+
+			codecFactory := serializer.NewCodecFactory(scheme.Scheme)
+			decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
+
+			if tc.expectModified {
+
+				machineSetObj, _, err := decoder.Decode(modifiedBytes, nil, nil)
+				assert.NoError(t, err, "expected to be able to decode MachineSet yaml")
+				machineSet, _ := machineSetObj.(*machineapi.MachineSet)
+
+				assert.Equal(t, "true", machineSet.ObjectMeta.Labels[constants.HiveManagedLabel])
+				assert.Equal(t, pool.Spec.Name, machineSet.ObjectMeta.Labels[machinePoolNameLabel], "expected label %s to be %s", machinePoolNameLabel, pool.Spec.Name)
+
+				if tc.testExistingLabels != nil {
+					for k, v := range tc.testExistingLabels {
+						assert.Equal(t, v, machineSet.ObjectMeta.Labels[k], "expected label %s to be %s", k, v)
+					}
+				}
+			}
+
 		})
 	}
 }

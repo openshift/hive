@@ -66,6 +66,8 @@ const (
 	awsAccountBlocked                       = "Error: creating EC2 Instance: Blocked: This account is currently blocked and not recognized as a valid account. Please contact aws-verification@amazon.com if you have questions."
 	ingressOperatorDegraded                 = "Cluster operator authentication Degraded is True with OAuthServerRouteEndpointAccessibleController_SyncError\nCluster operator ingress Degraded is True with IngressDegraded"
 	awsSubnetInsufficientIPSpace            = "IngressControllerUnavailable: One or more status conditions indicate unavailable: LoadBalancerReady=False (SyncLoadBalancerFailed: The service-controller component is reporting SyncLoadBalancerFailed events like: Error syncing load balancer: failed to ensure load balancer: InvalidSubnet: Not enough IP space available in subnet-08dcf1a15b3330b1d. ELB requires at least 8 free IP addresses in each subnet.\\n\\tstatus code: 400, request id: ac141e76-b455-4082-8ff3-556107921222\\nThe kube-controller-manager logs may contain more details.)\""
+	installConfigAuthFail                   = `failed to fetch Master Machines: failed to load asset "Install Config": failed to create install config: failed to create a network client: Authentication failed`
+	installConfigBadCACert                  = `failed to fetch Master Machines: failed to load asset "Install Config": failed to create install config: failed to create a network client: Error parsing CA Cert from /etc/pki/ca-trust/extracted/pem/tls-ca-bundle1111.pem`
 )
 
 func TestParseInstallLog(t *testing.T) {
@@ -446,6 +448,16 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "AWSAccountBlocked",
 			log:            pointer.String(awsAccountBlocked),
 			expectedReason: "AWSAccountIsBlocked",
+		},
+		{
+			name:           "InstallConfigAuthFail",
+			log:            pointer.String(installConfigAuthFail),
+			expectedReason: "InstallConfigNetworkAuthFail",
+		},
+		{
+			name:           "InstallConfigCACert",
+			log:            pointer.String(installConfigBadCACert),
+			expectedReason: "InstallConfigNetworkBadCACert",
 		},
 	}
 

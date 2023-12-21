@@ -177,6 +177,14 @@ spec:
               fieldPath: metadata.name
         - name: HIVE_SKIP_LEADER_ELECTION
           value: "true"
+        - name: TMPDIR
+          value: /tmp
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: true
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -195,6 +203,9 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
+      volumes:
+      - name: tmp
+        emptyDir: {}
 `)
 
 func configClustersyncStatefulsetYamlBytes() ([]byte, error) {
@@ -436,9 +447,17 @@ spec:
         envFrom:
         - configMapRef:
             name: hive-feature-gates
+        env:
+        - name: TMPDIR
+          value: /tmp
         volumeMounts:
         - mountPath: /var/serving-cert
           name: serving-cert
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: true
         readinessProbe:
           httpGet:
             path: /healthz
@@ -449,6 +468,8 @@ spec:
         secret:
           defaultMode: 420
           secretName: hiveadmission-serving-cert
+      - name: tmp
+        emptyDir: {}
 `)
 
 func configHiveadmissionDeploymentYamlBytes() ([]byte, error) {
@@ -858,6 +879,8 @@ spec:
       volumes:
       - name: kubectl-cache
         emptyDir: {}
+      - name: tmp
+        emptyDir: {}
       containers:
       # By default we will use the latest CI images published from hive master:
       - image: registry.ci.openshift.org/openshift/hive-v4.0:hive
@@ -875,6 +898,8 @@ spec:
         volumeMounts:
         - name: kubectl-cache
           mountPath: /var/cache/kubectl
+        - name: tmp
+          mountPath: /tmp
         env:
         - name: CLI_CACHE_DIR
           value: /var/cache/kubectl
@@ -882,6 +907,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: TMPDIR
+          value: /tmp
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: true
         readinessProbe:
           httpGet:
             path: /readyz

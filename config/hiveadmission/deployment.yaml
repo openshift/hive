@@ -42,9 +42,17 @@ spec:
         envFrom:
         - configMapRef:
             name: hive-feature-gates
+        env:
+        - name: TMPDIR
+          value: /tmp
         volumeMounts:
         - mountPath: /var/serving-cert
           name: serving-cert
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: true
         readinessProbe:
           httpGet:
             path: /healthz
@@ -55,3 +63,5 @@ spec:
         secret:
           defaultMode: 420
           secretName: hiveadmission-serving-cert
+      - name: tmp
+        emptyDir: {}

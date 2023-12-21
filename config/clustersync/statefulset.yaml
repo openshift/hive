@@ -54,6 +54,14 @@ spec:
               fieldPath: metadata.name
         - name: HIVE_SKIP_LEADER_ELECTION
           value: "true"
+        - name: TMPDIR
+          value: /tmp
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: true
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -72,3 +80,6 @@ spec:
           periodSeconds: 10
           successThreshold: 1
           timeoutSeconds: 1
+      volumes:
+      - name: tmp
+        emptyDir: {}

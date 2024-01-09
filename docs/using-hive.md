@@ -958,6 +958,8 @@ Hive can optionally create delegated DNS zones for each cluster.
 
 NOTE: This feature only works for provisioning to AWS, GCP, and Azure.
 
+NOTE: This feature is mutually exclusive with the `UserConfiguredDNS` install-config option.
+
 To use this feature:
 
   1. Manually create a DNS zone for your "root" domain (i.e. hive.example.com in the example below) and ensure your DNS is operational.

@@ -3,10 +3,16 @@
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../../../k8s.io/code-generator)}
 
+# use gsed for MAC env
+SED_CMD=sed
+if [[ `uname` == 'Darwin' ]]; then
+  SED_CMD=gsed
+fi
+
 # HACK: For some reason this script is not executable.
-sed -i 's,^exec \(.*/generate-internal-groups.sh\),bash \1,g' ${CODEGEN_PKG}/generate-groups.sh
+${SED_CMD} -i 's,^exec \(.*/generate-internal-groups.sh\),bash \1,g' ${CODEGEN_PKG}/generate-groups.sh
 # ...but we have to put it back, or `verify` will puke.
-trap "git checkout ${CODEGEN_PKG}/generate-internal-groups.sh" EXIT
+trap "git checkout ${CODEGEN_PKG}/generate-groups.sh" EXIT
 
 cd "${SCRIPT_ROOT}"
 

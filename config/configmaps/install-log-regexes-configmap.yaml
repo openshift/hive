@@ -315,6 +315,16 @@ data:
       - "failed to initialize the cluster: Some cluster operators are still updating:"
       installFailingReason: GeneralClusterOperatorsStillUpdating
       installFailingMessage: Timeout waiting for all cluster operators to become ready
+    - name: InstallConfigNetworkAuthFail
+      searchRegexStrings:
+      - "failed to create install config: failed to create a network client: Authentication failed"
+      installFailingReason: InstallConfigNetworkAuthFail
+      installFailingMessage: Authentication failure attempting to create a network client - check credentials and certificates
+    - name: InstallConfigNetworkBadCACert
+      searchRegexStrings:
+      - "failed to create install config: failed to create a network client: Error parsing CA Cert from"
+      installFailingReason: InstallConfigNetworkBadCACert
+      installFailingMessage: Failure attempting to create a network client - invalid CA certificate
 
     # Keep these at the bottom so that they're only hit if nothing above matches.
     # We don't want to show these to users unless it's a last resort. It's barely better than "unknown error".

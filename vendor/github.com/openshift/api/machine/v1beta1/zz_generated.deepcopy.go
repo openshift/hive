@@ -303,11 +303,6 @@ func (in *AzureMachineProviderSpec) DeepCopyInto(out *AzureMachineProviderSpec) 
 		*out = new(int64)
 		**out = **in
 	}
-	if in.Zone != nil {
-		in, out := &in.Zone, &out.Zone
-		*out = new(string)
-		**out = **in
-	}
 	if in.SpotVMOptions != nil {
 		in, out := &in.SpotVMOptions, &out.SpotVMOptions
 		*out = new(SpotVMOptions)
@@ -1789,6 +1784,11 @@ func (in *VSphereMachineProviderSpec) DeepCopyInto(out *VSphereMachineProviderSp
 		**out = **in
 	}
 	in.Network.DeepCopyInto(&out.Network)
+	if in.TagIDs != nil {
+		in, out := &in.TagIDs, &out.TagIDs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.20-openshift-4.14
+FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
 
 # setting Git username and email for workaround of
 # https://github.com/jenkinsci/docker/issues/519

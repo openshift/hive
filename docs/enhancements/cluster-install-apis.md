@@ -106,6 +106,10 @@ It will be possible for a ClusterInstall CRD and it's controllers to be entirely
 
 To support an external application providing their own ClusterInstall CRD implementation, Hive will need RBAC to be able to access those objects. Hive will ship with a role granting full access to the apigroup "extensions.hive.openshift.io". CRDs which implement the interface should use this apigroup regardless if they are in Hive or external.
 
+#### Registering a ClusterInstall Implementation
+
+For a CRD to be accepted as a valid ClusterInstall implementation it must be labeled with `contracts.hive.openshift.io/clusterinstall: "true"`. The Hive operator will watch for CRDs with this label and configure an admission webhook to only allow valid implementations to be referenced by a ClusterDeployment.
+
 ### Cluster Deprovisioning
 
 Today in Hive each ClusterDeployment is given a finalizer automatically, and when the API resource is deleted we create a ClusterDeprovision resource, which launches a pod to run the openshift-install deprovision process until it completes, after which the finalizer is removed and the ClusterDeployment is removed.

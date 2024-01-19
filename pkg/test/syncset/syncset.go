@@ -3,6 +3,7 @@ package syncset
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/yaml"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/test/generic"
@@ -116,6 +117,20 @@ func WithResources(objs ...hivev1.MetaRuntimeObject) Option {
 	}
 }
 
+// Each resource is a separate string. Don't pass in one string with a yaml list.
+func WithYAMLResources(objs ...string) Option {
+	return func(syncSet *hivev1.SyncSet) {
+		syncSet.Spec.Resources = make([]runtime.RawExtension, len(objs))
+		for i, obj := range objs {
+			jsonObj, err := yaml.YAMLToJSON([]byte(obj))
+			if err != nil {
+				panic(err)
+			}
+			syncSet.Spec.Resources[i].Raw = jsonObj
+		}
+	}
+}
+
 func WithSecrets(secrets ...hivev1.SecretMapping) Option {
 	return func(syncSet *hivev1.SyncSet) {
 		syncSet.Spec.Secrets = secrets
@@ -125,5 +140,11 @@ func WithSecrets(secrets ...hivev1.SecretMapping) Option {
 func WithPatches(patches ...hivev1.SyncObjectPatch) Option {
 	return func(syncSet *hivev1.SyncSet) {
 		syncSet.Spec.Patches = patches
+	}
+}
+
+func WithResourceParametersEnabled(on bool) Option {
+	return func(syncSet *hivev1.SyncSet) {
+		syncSet.Spec.EnableResourceTemplates = on
 	}
 }

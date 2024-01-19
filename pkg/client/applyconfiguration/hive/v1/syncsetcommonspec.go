@@ -10,11 +10,12 @@ import (
 // SyncSetCommonSpecApplyConfiguration represents an declarative configuration of the SyncSetCommonSpec type for use
 // with apply.
 type SyncSetCommonSpecApplyConfiguration struct {
-	Resources         []runtime.RawExtension              `json:"resources,omitempty"`
-	ResourceApplyMode *v1.SyncSetResourceApplyMode        `json:"resourceApplyMode,omitempty"`
-	Patches           []SyncObjectPatchApplyConfiguration `json:"patches,omitempty"`
-	Secrets           []SecretMappingApplyConfiguration   `json:"secretMappings,omitempty"`
-	ApplyBehavior     *v1.SyncSetApplyBehavior            `json:"applyBehavior,omitempty"`
+	Resources               []runtime.RawExtension              `json:"resources,omitempty"`
+	ResourceApplyMode       *v1.SyncSetResourceApplyMode        `json:"resourceApplyMode,omitempty"`
+	Patches                 []SyncObjectPatchApplyConfiguration `json:"patches,omitempty"`
+	Secrets                 []SecretMappingApplyConfiguration   `json:"secretMappings,omitempty"`
+	ApplyBehavior           *v1.SyncSetApplyBehavior            `json:"applyBehavior,omitempty"`
+	EnableResourceTemplates *bool                               `json:"enableResourceTemplates,omitempty"`
 }
 
 // SyncSetCommonSpecApplyConfiguration constructs an declarative configuration of the SyncSetCommonSpec type for use with
@@ -72,5 +73,13 @@ func (b *SyncSetCommonSpecApplyConfiguration) WithSecrets(values ...*SecretMappi
 // If called multiple times, the ApplyBehavior field is set to the value of the last call.
 func (b *SyncSetCommonSpecApplyConfiguration) WithApplyBehavior(value v1.SyncSetApplyBehavior) *SyncSetCommonSpecApplyConfiguration {
 	b.ApplyBehavior = &value
+	return b
+}
+
+// WithEnableResourceTemplates sets the EnableResourceTemplates field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the EnableResourceTemplates field is set to the value of the last call.
+func (b *SyncSetCommonSpecApplyConfiguration) WithEnableResourceTemplates(value bool) *SyncSetCommonSpecApplyConfiguration {
+	b.EnableResourceTemplates = &value
 	return b
 }

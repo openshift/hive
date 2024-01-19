@@ -73,6 +73,14 @@ func (b *SelectorSyncSetSpecApplyConfiguration) WithApplyBehavior(value hivev1.S
 	return b
 }
 
+// WithEnableResourceTemplates sets the EnableResourceTemplates field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the EnableResourceTemplates field is set to the value of the last call.
+func (b *SelectorSyncSetSpecApplyConfiguration) WithEnableResourceTemplates(value bool) *SelectorSyncSetSpecApplyConfiguration {
+	b.EnableResourceTemplates = &value
+	return b
+}
+
 // WithClusterDeploymentSelector sets the ClusterDeploymentSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ClusterDeploymentSelector field is set to the value of the last call.

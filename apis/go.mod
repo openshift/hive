@@ -1,6 +1,6 @@
 module github.com/openshift/hive/apis
 
-go 1.20
+go 1.21
 
 require (
 	// go get -u github.com/openshift/api@relase-4.13

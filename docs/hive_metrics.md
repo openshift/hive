@@ -39,6 +39,8 @@ Opt into them via `HiveConfig.Spec.MetricsConfig.AdditionalClusterDeploymentLabe
 For example, including `{"ocp_major_version": "hive.openshift.io/version-major"}` will cause affected metrics to include a label key ocp_major_version with the value from the `hive.openshift.io/version-major` ClusterDeployment label -- e.g. "4".
 Every metric that allows optional labels will always have all the labels mentioned present. If the corresponding Cluster Deployment label is not present then the metric label will report its value as "unspecified".
 
+The hive operator will panic if provided additional labels overlap with the fixed labels of the corresponding metric. Please refer to the fixed labels of each metric [here](#list-of-all-hive-metrics).
+
 Note: It is up to the cluster admins to be mindful of cardinality and ensure these labels are not too specific, like cluster id, otherwise it can negatively impact your observability system's performance
 
 ### List of all Hive metrics
@@ -46,97 +48,97 @@ Note: It is up to the cluster admins to be mindful of cardinality and ensure the
 #### Hive Operator metrics
 These metrics are observed by the Hive Operator. None of these are optional.
 
-|           Metric Name           | Optional Label Support |
-|:-------------------------------:|:----------------------:|
-|   hive_hiveconfig_conditions    |           N            |
-| hive_operator_reconcile_seconds |           N            |
+|           Metric Name           | Optional Label Support | Fixed Labels              |
+|:-------------------------------:|:----------------------:|---------------------------|
+|   hive_hiveconfig_conditions    |           N            | {"condition", "reason"}   |
+| hive_operator_reconcile_seconds |           N            | {"controller", "outcome"} |
 
 #### Metrics reported by all controllers
 These metrics are observed by all Hive Controllers. None of these are optional.
 
-|                Metric Name                | Optional Label Support |
-|:-----------------------------------------:|:----------------------:|
-|      hive_kube_client_requests_total      |           N            |
-|     hive_kube_client_request_seconds      |           N            |
-| hive_kube_client_requests_cancelled_total |           N            |
+|                Metric Name                | Optional Label Support | Fixed Labels                                             |
+|:-----------------------------------------:|:----------------------:|----------------------------------------------------------|
+|      hive_kube_client_requests_total      |           N            | {"controller", "method", "resource", "remote", "status"} |
+|     hive_kube_client_request_seconds      |           N            | {"controller", "method", "resource", "remote", "status"} |
+| hive_kube_client_requests_cancelled_total |           N            | {"controller", "method", "resource", "remote"}           |
 
 #### ClusterDeployment controller metrics
 These metrics are observed while processing ClusterDeployments. None of these are optional.
 
-|                       Metric Name                        | Optional Label Support |
-|:--------------------------------------------------------:|:----------------------:|
-|   hive_cluster_deployment_install_job_duration_seconds   |           N            |
-|    hive_cluster_deployment_install_job_delay_seconds     |           N            |
-|    hive_cluster_deployment_imageset_job_delay_seconds    |           N            |
-|        hive_cluster_deployment_dns_delay_seconds         |           N            |
-|    hive_cluster_deployment_completed_install_restart     |           Y            |
-|          hive_cluster_deployments_created_total          |           Y            |
-|         hive_cluster_deployments_installed_total         |           Y            |
-|          hive_cluster_deployments_deleted_total          |           Y            |
-| hive_cluster_deployments_provision_failed_terminal_total |           Y            |
+|                       Metric Name                        | Optional Label Support | Fixed Labels                                     |
+|:--------------------------------------------------------:|:----------------------:|--------------------------------------------------|
+|   hive_cluster_deployment_install_job_duration_seconds   |           N            | {}                                               |
+|    hive_cluster_deployment_install_job_delay_seconds     |           N            | {}                                               |
+|    hive_cluster_deployment_imageset_job_delay_seconds    |           N            | {}                                               |
+|        hive_cluster_deployment_dns_delay_seconds         |           N            | {}                                               |
+|    hive_cluster_deployment_completed_install_restart     |           Y            | {}                                               |
+|          hive_cluster_deployments_created_total          |           Y            | {}                                               |
+|         hive_cluster_deployments_installed_total         |           Y            | {}                                               |
+|          hive_cluster_deployments_deleted_total          |           Y            | {}                                               |
+| hive_cluster_deployments_provision_failed_terminal_total |           Y            | {"clusterpool_namespacedname", "failure_reason"} |
 
 #### ClusterProvision controller metrics
 These metrics are observed while processing ClusterProvisions. None of these are optional.
 
-|                  Metric Name                  | Optional Label Support |
-|:---------------------------------------------:|:----------------------:|
-|     hive_cluster_provision_results_total      |           Y            |
-|              hive_install_errors              |           Y            |
-| hive_cluster_deployment_install_failure_total |           Y            |
-| hive_cluster_deployment_install_success_total |           Y            |
+|                  Metric Name                  | Optional Label Support | Fixed Labels                                                            |
+|:---------------------------------------------:|:----------------------:|-------------------------------------------------------------------------|
+|     hive_cluster_provision_results_total      |           Y            | {"result"}                                                              |
+|              hive_install_errors              |           Y            | {"reason"}                                                              |
+| hive_cluster_deployment_install_failure_total |           Y            | {"platform", "region", "cluster_version", "workers", "install_attempt"} |
+| hive_cluster_deployment_install_success_total |           Y            | {"platform", "region", "cluster_version", "workers", "install_attempt"} |
 
 #### ClusterDeprovision controller metrics
 These metrics are observed while processing ClusterDeprovisions. None of these are optional.
 
-|                      Metric Name                       | Optional Label Support |
-|:------------------------------------------------------:|:----------------------:|
-| hive_cluster_deployment_uninstall_job_duration_seconds |           N            |
+|                      Metric Name                       | Optional Label Support | Fixed Labels |
+|:------------------------------------------------------:|:----------------------:|--------------|
+| hive_cluster_deployment_uninstall_job_duration_seconds |           N            | {}           |
 
 #### ClusterPool controller metrics
 These metrics are observed while processing ClusterPools. None of these are optional.
 
-|                    Metric Name                    | Optional Label Support |
-|:-------------------------------------------------:|:----------------------:|
-|  hive_clusterpool_clusterdeployments_assignable   |           N            |
-|    hive_clusterpool_clusterdeployments_claimed    |           N            |
-|   hive_clusterpool_clusterdeployments_deleting    |           N            |
-|  hive_clusterpool_clusterdeployments_installing   |           N            |
-|   hive_clusterpool_clusterdeployments_unclaimed   |           N            |
-|    hive_clusterpool_clusterdeployments_standby    |           N            |
-|     hive_clusterpool_clusterdeployments_stale     |           N            |
-|    hive_clusterpool_clusterdeployments_broken     |           N            |
-| hive_clusterpool_stale_clusterdeployments_deleted |           N            |
-|    hive_clusterclaim_assignment_delay_seconds     |           N            |
+|                    Metric Name                    | Optional Label Support | Fixed Labels                                  |
+|:-------------------------------------------------:|:----------------------:|-----------------------------------------------|
+|  hive_clusterpool_clusterdeployments_assignable   |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|    hive_clusterpool_clusterdeployments_claimed    |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|   hive_clusterpool_clusterdeployments_deleting    |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|  hive_clusterpool_clusterdeployments_installing   |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|   hive_clusterpool_clusterdeployments_unclaimed   |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|    hive_clusterpool_clusterdeployments_standby    |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|     hive_clusterpool_clusterdeployments_stale     |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|    hive_clusterpool_clusterdeployments_broken     |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+| hive_clusterpool_stale_clusterdeployments_deleted |           N            | {"clusterpool_namespace", "clusterpool_name"} |
+|    hive_clusterclaim_assignment_delay_seconds     |           N            | {"clusterpool_namespace", "clusterpool_name"} |
 
 #### Metrics controller metrics
 These metrics are accumulated across all instance of that type.
 Some of these metrics are optional and the admin can opt for logging them via `HiveConfig.Spec.MetricsConfig.MetricsWithDuration`
 
-|                          Metric Name                           | Optional Label Support | Optional |
-|:--------------------------------------------------------------:|:----------------------:|:--------:|
-|                    hive_cluster_deployments                    |           N            |    N     |
-|               hive_cluster_deployments_installed               |           N            |    N     |
-|              hive_cluster_deployments_uninstalled              |           N            |    N     |
-|            hive_cluster_deployments_deprovisioning             |           N            |    N     |
-|              hive_cluster_deployments_conditions               |           N            |    N     |
-|                       hive_install_jobs                        |           N            |    N     |
-|                      hive_uninstall_jobs                       |           N            |    N     |
-|                       hive_imageset_jobs                       |           N            |    N     |
-|              hive_selectorsyncset_clusters_total               |           N            |    N     |
-|         hive_selectorsyncset_clusters_unapplied_total          |           N            |    N     |
-|                      hive_syncsets_total                       |           N            |    N     |
-|                 hive_syncsets_unapplied_total                  |           N            |    N     |
-|      hive_cluster_deployment_deprovision_underway_seconds      |           N            |    N     |
-|                hive_clustersync_failing_seconds                |           N            |    Y     |
-|    hive_cluster_deployments_hibernation_transition_seconds     |           N            |    Y     |
-|      hive_cluster_deployments_running_transition_seconds       |           N            |    Y     |
-|           hive_cluster_deployments_stopping_seconds            |           N            |    Y     |
-|           hive_cluster_deployments_resuming_seconds            |           N            |    Y     |
-| hive_cluster_deployments_waiting_for_cluster_operators_seconds |           N            |    Y     |
-|               hive_controller_reconcile_seconds                |           N            |    N     |
-|             hive_cluster_deployment_syncset_paused             |           N            |    N     |
-|       hive_cluster_deployment_provision_underway_seconds       |           N            |    N     |
-|  hive_cluster_deployment_provision_underway_install_restarts   |           N            |    N     |
+|                          Metric Name                           | Optional Label Support | Optional | Fixed Labels                                                                                                    |
+|:--------------------------------------------------------------:|:----------------------:|:--------:|-----------------------------------------------------------------------------------------------------------------|
+|                    hive_cluster_deployments                    |           N            |    N     | {"cluster_type", "age_lt", "power_state"}                                                                       |
+|               hive_cluster_deployments_installed               |           N            |    N     | {"cluster_type", "age_lt"}                                                                                      |
+|              hive_cluster_deployments_uninstalled              |           N            |    N     | {"cluster_type", "age_lt", "uninstalled_gt"}                                                                    |
+|            hive_cluster_deployments_deprovisioning             |           N            |    N     | {"cluster_type", "age_lt", "deprovisioning_gt"}                                                                 |
+|              hive_cluster_deployments_conditions               |           N            |    N     | {"cluster_type", "age_lt", "condition"}                                                                         |
+|                       hive_install_jobs                        |           N            |    N     | {"cluster_type", "state"}                                                                                       |
+|                      hive_uninstall_jobs                       |           N            |    N     | {"cluster_type", "state"}                                                                                       |
+|                       hive_imageset_jobs                       |           N            |    N     | {"cluster_type", "state"}                                                                                       |
+|              hive_selectorsyncset_clusters_total               |           N            |    N     | {"name"}                                                                                                        |
+|         hive_selectorsyncset_clusters_unapplied_total          |           N            |    N     | {"name"}                                                                                                        |
+|                      hive_syncsets_total                       |           N            |    N     | {}                                                                                                              |
+|                 hive_syncsets_unapplied_total                  |           N            |    N     | {}                                                                                                              |
+|      hive_cluster_deployment_deprovision_underway_seconds      |           N            |    N     | {"cluster_deployment", "namespace", "cluster_type"}                                                             |
+|                hive_clustersync_failing_seconds                |           Y            |    Y     | {"namespaced_name", "unreachable"}                                                                              |
+|    hive_cluster_deployments_hibernation_transition_seconds     |           N            |    Y     | {"cluster_version", "platform", "cluster_pool_namespace", "cluster_pool_name"}                                  |
+|      hive_cluster_deployments_running_transition_seconds       |           N            |    Y     | {"cluster_version", "platform", "cluster_pool_namespace", "cluster_pool_name"}                                  |
+|           hive_cluster_deployments_stopping_seconds            |           N            |    Y     | {"cluster_deployment_namespace", "cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"} |
+|           hive_cluster_deployments_resuming_seconds            |           N            |    Y     | {"cluster_deployment_namespace", "cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"} |
+| hive_cluster_deployments_waiting_for_cluster_operators_seconds |           N            |    Y     | {"cluster_deployment_namespace", "cluster_deployment", "platform", "cluster_version", "cluster_pool_namespace"} |
+|               hive_controller_reconcile_seconds                |           N            |    N     | {"controller", "outcome"}                                                                                       |
+|             hive_cluster_deployment_syncset_paused             |           N            |    N     | {"cluster_deployment", "namespace", "cluster_type"}                                                             |
+|       hive_cluster_deployment_provision_underway_seconds       |           N            |    N     | {"cluster_deployment", "namespace", "cluster_type", "condition", "reason", "platform", "image_set"}             |
+|  hive_cluster_deployment_provision_underway_install_restarts   |           N            |    N     | {"cluster_deployment", "namespace", "cluster_type", "condition", "reason", "platform", "image_set"}             |
 
 ### Example: Configure metricsConfig
 

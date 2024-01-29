@@ -43,28 +43,28 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	asset := assets.MustAsset(ssAsset)
 	hLog.Debug("reading statefulset")
 	newClusterSyncStatefulSet := controllerutils.ReadStatefulsetOrDie(asset)
-	hiveContainer, err := containerByName(&newClusterSyncStatefulSet.Spec.Template.Spec, "clustersync")
+	clusterSyncContainer, err := containerByName(&newClusterSyncStatefulSet.Spec.Template.Spec, "clustersync")
 	if err != nil {
 		return err
 	}
-	applyDeploymentConfig(hiveconfig, hivev1.DeploymentNameClustersync, hiveContainer, hLog)
+	applyDeploymentConfig(hiveconfig, hivev1.DeploymentNameClustersync, clusterSyncContainer, hLog)
 
 	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {
-		hiveContainer.Image = r.hiveImage
+		clusterSyncContainer.Image = r.hiveImage
 		hiveImageEnvVar := corev1.EnvVar{
 			Name:  images.HiveImageEnvVar,
 			Value: r.hiveImage,
 		}
 
-		hiveContainer.Env = append(hiveContainer.Env, hiveImageEnvVar)
+		clusterSyncContainer.Env = append(clusterSyncContainer.Env, hiveImageEnvVar)
 	}
 
 	if r.hiveImagePullPolicy != "" {
-		hiveContainer.ImagePullPolicy = r.hiveImagePullPolicy
+		clusterSyncContainer.ImagePullPolicy = r.hiveImagePullPolicy
 
-		hiveContainer.Env = append(
-			hiveContainer.Env,
+		clusterSyncContainer.Env = append(
+			clusterSyncContainer.Env,
 			corev1.EnvVar{
 				Name:  images.HiveImagePullPolicyEnvVar,
 				Value: string(r.hiveImagePullPolicy),
@@ -73,7 +73,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	}
 
 	if level := hiveconfig.Spec.LogLevel; level != "" {
-		hiveContainer.Args = append(hiveContainer.Args, "--log-level", level)
+		clusterSyncContainer.Args = append(clusterSyncContainer.Args, "--log-level", level)
 	}
 
 	if syncSetReapplyInterval := hiveconfig.Spec.SyncSetReapplyInterval; syncSetReapplyInterval != "" {
@@ -82,7 +82,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 			Value: syncSetReapplyInterval,
 		}
 
-		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
+		clusterSyncContainer.Env = append(clusterSyncContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
 
 	hiveNSName := GetHiveNamespace(hiveconfig)
@@ -109,6 +109,10 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 			clusterSyncControllerConfig, found := getHiveControllerConfig(hivev1.ClustersyncControllerName, hiveconfig.Spec.ControllersConfig.Controllers)
 			if found && clusterSyncControllerConfig.Replicas != nil {
 				newClusterSyncStatefulSet.Spec.Replicas = clusterSyncControllerConfig.Replicas
+			}
+
+			if found && clusterSyncControllerConfig.Resources != nil {
+				clusterSyncContainer.Resources = *clusterSyncControllerConfig.Resources
 			}
 		}
 	}

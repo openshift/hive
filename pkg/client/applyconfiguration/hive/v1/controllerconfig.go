@@ -2,15 +2,20 @@
 
 package v1
 
+import (
+	v1 "k8s.io/api/core/v1"
+)
+
 // ControllerConfigApplyConfiguration represents an declarative configuration of the ControllerConfig type for use
 // with apply.
 type ControllerConfigApplyConfiguration struct {
-	ConcurrentReconciles *int32 `json:"concurrentReconciles,omitempty"`
-	ClientQPS            *int32 `json:"clientQPS,omitempty"`
-	ClientBurst          *int32 `json:"clientBurst,omitempty"`
-	QueueQPS             *int32 `json:"queueQPS,omitempty"`
-	QueueBurst           *int32 `json:"queueBurst,omitempty"`
-	Replicas             *int32 `json:"replicas,omitempty"`
+	ConcurrentReconciles *int32                   `json:"concurrentReconciles,omitempty"`
+	ClientQPS            *int32                   `json:"clientQPS,omitempty"`
+	ClientBurst          *int32                   `json:"clientBurst,omitempty"`
+	QueueQPS             *int32                   `json:"queueQPS,omitempty"`
+	QueueBurst           *int32                   `json:"queueBurst,omitempty"`
+	Replicas             *int32                   `json:"replicas,omitempty"`
+	Resources            *v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ControllerConfigApplyConfiguration constructs an declarative configuration of the ControllerConfig type for use with
@@ -64,5 +69,13 @@ func (b *ControllerConfigApplyConfiguration) WithQueueBurst(value int32) *Contro
 // If called multiple times, the Replicas field is set to the value of the last call.
 func (b *ControllerConfigApplyConfiguration) WithReplicas(value int32) *ControllerConfigApplyConfiguration {
 	b.Replicas = &value
+	return b
+}
+
+// WithResources sets the Resources field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Resources field is set to the value of the last call.
+func (b *ControllerConfigApplyConfiguration) WithResources(value v1.ResourceRequirements) *ControllerConfigApplyConfiguration {
+	b.Resources = &value
 	return b
 }

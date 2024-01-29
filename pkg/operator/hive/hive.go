@@ -47,7 +47,7 @@ const (
 )
 
 var (
-	controllersUsingReplicas = hivev1.ControllerNames{hivev1.ClustersyncControllerName}
+	controllersInTheirOwnIsolatedPods = hivev1.ControllerNames{hivev1.ClustersyncControllerName}
 )
 
 func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, namespacesToClean []string, configHashes ...string) error {

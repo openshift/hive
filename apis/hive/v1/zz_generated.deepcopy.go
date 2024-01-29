@@ -2087,6 +2087,11 @@ func (in *ControllerConfig) DeepCopyInto(out *ControllerConfig) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Resources != nil {
+		in, out := &in.Resources, &out.Resources
+		*out = new(corev1.ResourceRequirements)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

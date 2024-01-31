@@ -187,9 +187,13 @@ var hiveControllersConfigMapInfo = configMapInfo{
 			}
 			for _, controller := range instance.Spec.ControllersConfig.Controllers {
 				replicasIsSet := controller.Config.Replicas != nil
-				replicasShouldBeSet := controllersUsingReplicas.Contains(controller.Name)
-				if !replicasShouldBeSet && replicasIsSet {
+				resourcesIsSet := controller.Config.Resources != nil
+				isolatedController := controllersInTheirOwnIsolatedPods.Contains(controller.Name)
+				if !isolatedController && replicasIsSet {
 					log.WithField("controller", controller.Name).Warn("hiveconfig.spec.controllersConfig.controllers[].config.replicas shouldn't be set for this controller")
+				}
+				if !isolatedController && resourcesIsSet {
+					log.WithField("controller", controller.Name).Warn("hiveconfig.spec.controllersConfig.controllers[].config.resources shouldn't be set for this controller")
 				}
 
 				setHiveControllersConfig(&controller.Config, datap, controller.Name)

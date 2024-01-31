@@ -528,7 +528,13 @@ type ControllerConfig struct {
 	// Replicas specifies the number of replicas the specific controller pod should use.
 	// This is ONLY for controllers that have been split out into their own pods.
 	// This is ignored for all others.
+	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+	// Resources describes the compute resource requirements of the controller container.
+	// This is ONLY for controllers that have been split out into their own pods.
+	// This is ignored for all others.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=clusterDeployment;clusterrelocate;clusterstate;clusterversion;controlPlaneCerts;dnsendpoint;dnszone;remoteingress;remotemachineset;machinepool;syncidentityprovider;unreachable;velerobackup;clusterprovision;clusterDeprovision;clusterpool;clusterpoolnamespace;hibernation;clusterclaim;metrics;clustersync

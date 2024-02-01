@@ -25,6 +25,8 @@ spec:
       volumes:
       - name: kubectl-cache
         emptyDir: {}
+      - name: tmp
+        emptyDir: {}
       containers:
       # By default we will use the latest CI images published from hive master:
       - image: registry.ci.openshift.org/openshift/hive-v4.0:hive
@@ -42,6 +44,8 @@ spec:
         volumeMounts:
         - name: kubectl-cache
           mountPath: /var/cache/kubectl
+        - name: tmp
+          mountPath: /tmp
         env:
         - name: CLI_CACHE_DIR
           value: /var/cache/kubectl
@@ -49,6 +53,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: TMPDIR
+          value: /tmp
+        securityContext:
+          privileged: false
+          readOnlyRootFilesystem: true
         readinessProbe:
           httpGet:
             path: /readyz

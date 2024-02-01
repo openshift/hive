@@ -7596,6 +7596,8 @@ objects:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          - name: TMPDIR
+            value: /tmp
           image: ${REGISTRY_IMG}@${IMAGE_DIGEST}
           imagePullPolicy: Always
           livenessProbe:
@@ -7615,14 +7617,21 @@ objects:
             requests:
               cpu: 100m
               memory: 256Mi
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
           volumeMounts:
           - mountPath: /var/cache/kubectl
             name: kubectl-cache
+          - mountPath: /tmp
+            name: tmp
         serviceAccountName: hive-operator
         terminationGracePeriodSeconds: 10
         volumes:
         - emptyDir: {}
           name: kubectl-cache
+        - emptyDir: {}
+          name: tmp
 parameters:
 - name: REGISTRY_IMG
   required: true

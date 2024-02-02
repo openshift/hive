@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -22,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -2419,6 +2421,136 @@ func TestReconcileClusterSync_UpsertToSyncResourceApplyMode(t *testing.T) {
 	}
 }
 
+func TestReconcileClusterSync_WithParameters(t *testing.T) {
+	resourceToApply := `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: some-pod
+  namespace: default
+  labels:
+    hive.openshift.io/managed: "true"
+spec:
+  containers:
+  - args:
+    - --region
+    - >-
+      {{ fromCDLabel "hive.openshift.io/cluster-region" }}
+    - --optional-param
+    - ""
+    - --log-level
+    - debug
+    command:
+    - /opt/{{ fromCDLabel "hive.openshift.io/cluster-platform" }}/do-the-thing
+    env: {}
+    image: quay.io/openshift/release:{{ fromCDLabel "hive.openshift.io/version" }}
+    imagePullPolicy: >-
+      {{ fromCDLabel "some.label.that/does-not-exist" }}
+    livenessProbe:
+      failureThreshold: >-
+        {{ fromCDLabel "hive.openshift.io/version-major" }}
+      httpGet:
+        path: /healthz
+        port: 8080
+        scheme: HTTP
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+  enableServiceLinks: >-
+    {{ fromCDLabel "hive.openshift.io/hiveutil-created" }}
+`
+	cases := []struct {
+		name                    string
+		cdLabels                map[string]string
+		enableParams            bool
+		expectedResourceApplied string
+	}{
+		{
+			name:                    "params not enabled; resource unchanged",
+			expectedResourceApplied: resourceToApply,
+		},
+		{
+			name:         "params enabled",
+			enableParams: true,
+			cdLabels: map[string]string{
+				"hive.openshift.io/cluster-region":   "us-east-1",
+				"hive.openshift.io/cluster-platform": "aws",
+				"hive.openshift.io/version":          "4.13.8",
+				"hive.openshift.io/version-major":    "4",
+				"hive.openshift.io/version-minor":    "13",
+				"hive.openshift.io/version-fix":      "8",
+				"hive.openshift.io/hiveutil-created": "true",
+			},
+			// NOTE: Per Pod schema, livenessProbe.failureThreshold should be int, and
+			// enableServiceLinks should be bool. They're strings in this test to highlight
+			// a limitation of this feature: Since `resources` are embedded as JSON byte
+			// arrays, they must parse as valid JSON *before interpolation*, and a template
+			// can not be parsed as a valid numeric, bool, etc. value.
+			expectedResourceApplied: `
+apiVersion: v1
+kind: Pod
+metadata:
+  name: some-pod
+  namespace: default
+  labels:
+    hive.openshift.io/managed: "true"
+spec:
+  containers:
+  - args:
+    - --region
+    - us-east-1
+    - --optional-param
+    - ""
+    - --log-level
+    - debug
+    command:
+    - /opt/aws/do-the-thing
+    env: {}
+    image: quay.io/openshift/release:4.13.8
+    imagePullPolicy: ""
+    livenessProbe:
+      failureThreshold: "4"
+      httpGet:
+        path: /healthz
+        port: 8080
+        scheme: HTTP
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+  enableServiceLinks: "true"
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			scheme := scheme.GetScheme()
+			syncSet := testsyncset.FullBuilder(testNamespace, "test-syncset", scheme).Build(
+				testsyncset.ForClusterDeployments(testCDName),
+				testsyncset.WithApplyMode(hivev1.UpsertResourceApplyMode),
+				testsyncset.WithGeneration(1),
+				testsyncset.WithYAMLResources(resourceToApply),
+				testsyncset.WithResourceParametersEnabled(tc.enableParams),
+			)
+			cd := cdBuilder(scheme).Build()
+			// cdLabels may be `nil`
+			cd.SetLabels(tc.cdLabels)
+			rt := newReconcileTest(t, mockCtrl, scheme,
+				cd,
+				clusterSyncBuilder(scheme).Build(),
+				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+					teststatefulset.WithCurrentReplicas(3),
+					teststatefulset.WithReplicas(3),
+				),
+				syncSet)
+			rt.mockResourceHelper.EXPECT().Apply(newYamlApplyMatcher(t, tc.expectedResourceApplied)).Return(resource.CreatedApplyResult, nil)
+			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
+			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
+			rt.run(t)
+		})
+	}
+}
+
 func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
 	return testcd.FullBuilder(testNamespace, testCDName, scheme).
 		GenericOptions(
@@ -2547,6 +2679,52 @@ func (m *applyMatcher) String() string {
 }
 
 func (m *applyMatcher) Got(got interface{}) string {
+	switch t := got.(type) {
+	case []byte:
+		return string(t)
+	default:
+		return fmt.Sprintf("%v", t)
+	}
+}
+
+// yamlApplyMatcher is a gomock.Matcher for the payload parameter to resource.Apply that, on
+// mismatch, emits the delta between the expected and actual value as a JSON patch string.
+// The idea is that you don't have to try to visually compare full dumps of expected/actual
+// values. That's hard enough when they're YAML; harder when they're JSON; nigh impossible
+// when they're []byte.
+type yamlApplyMatcher struct {
+	want []byte
+	t    *testing.T
+}
+
+// newYamlApplyMatcher accepts an expected resource.Apply payload as a YAML string and
+// internally converts it to the []byte JSON format Apply expects.
+func newYamlApplyMatcher(t *testing.T, yamlString string) gomock.Matcher {
+	want, err := yaml.ToJSON([]byte(yamlString))
+	assert.NoError(t, err, "Couldn't convert YAML to JSON")
+	return &yamlApplyMatcher{
+		want: want,
+		t:    t,
+	}
+}
+
+// Matches implements gomock.Matcher for yamlApplyMatcher such that, when a mismatch occurs,
+// the delta is emitted as a JSON patch string, allowing quick and easy visualization.
+func (m *yamlApplyMatcher) Matches(x interface{}) bool {
+	bytes, ok := x.([]byte)
+	assert.True(m.t, ok, "Unexpectedly got %T instead of []byte", x)
+	diff, err := jsonpatch.CreateMergePatch(m.want, bytes)
+	assert.NoError(m.t, err, "Failed to generate merge patch from got\n%s\nto want\n%s", bytes, m.want)
+	diffString := string(diff)
+	assert.Equal(m.t, "{}", diffString)
+	return diffString == "{}"
+}
+
+func (m *yamlApplyMatcher) String() string {
+	return string(m.want)
+}
+
+func (m *yamlApplyMatcher) Got(got interface{}) string {
 	switch t := got.(type) {
 	case []byte:
 		return string(t)

@@ -634,7 +634,7 @@ func (r *ReconcileClusterSync) applySyncSets(
 		}
 
 		// Apply the syncset
-		resourcesApplied, resourcesInSyncSet, syncSetNeedsRequeue, err := r.applySyncSet(syncSet, resourceHelper, logger)
+		resourcesApplied, resourcesInSyncSet, syncSetNeedsRequeue, err := r.applySyncSet(syncSet, cd, resourceHelper, logger)
 		newSyncStatus := hiveintv1alpha1.SyncStatus{
 			Name:               syncSet.AsMetaObject().GetName(),
 			ObservedGeneration: syncSet.AsMetaObject().GetGeneration(),
@@ -744,6 +744,7 @@ func getOldSyncStatus(syncSet CommonSyncSet, syncSetStatuses []hiveintv1alpha1.S
 
 func (r *ReconcileClusterSync) applySyncSet(
 	syncSet CommonSyncSet,
+	cd *hivev1.ClusterDeployment,
 	resourceHelper resource.Helper,
 	logger log.FieldLogger,
 ) (
@@ -752,7 +753,7 @@ func (r *ReconcileClusterSync) applySyncSet(
 	requeue bool,
 	returnErr error,
 ) {
-	resources, referencesToResources, decodeErr := decodeResources(syncSet, logger)
+	resources, referencesToResources, decodeErr := decodeResources(syncSet, cd, logger)
 	referencesToSecrets := referencesToSecrets(syncSet)
 	resourcesInSyncSet = append(referencesToResources, referencesToSecrets...)
 	if decodeErr != nil {
@@ -803,7 +804,7 @@ func (r *ReconcileClusterSync) applySyncSet(
 	return
 }
 
-func decodeResources(syncSet CommonSyncSet, logger log.FieldLogger) (
+func decodeResources(syncSet CommonSyncSet, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (
 	resources []*unstructured.Unstructured, references []hiveintv1alpha1.SyncResourceReference, returnErr error,
 ) {
 	var decodeErrors []error
@@ -813,6 +814,14 @@ func decodeResources(syncSet CommonSyncSet, logger log.FieldLogger) (
 			logger.WithField("resourceIndex", i).WithError(err).Warn("error decoding unstructured object")
 			decodeErrors = append(decodeErrors, errors.Wrapf(err, "failed to decode resource %d", i))
 			continue
+		}
+		// Apply templates, if enabled
+		if syncSet.GetSpec().EnableResourceTemplates {
+			if err := processParameters(u, cd, logger); err != nil {
+				logger.WithField("resourceIndex", i).WithError(err).Warn("error parameterizing object")
+				decodeErrors = append(decodeErrors, errors.Wrapf(err, "failed to parameterize resource %d", i))
+				continue
+			}
 		}
 		resources = append(resources, u)
 		references = append(references, hiveintv1alpha1.SyncResourceReference{

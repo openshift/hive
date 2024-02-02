@@ -1168,7 +1168,7 @@ func (r *ReconcileMachinePool) createActuator(
 		}
 		return NewAzureActuator(creds, cd.Spec.Platform.Azure.CloudName.Name(), logger)
 	case cd.Spec.Platform.OpenStack != nil:
-		return NewOpenStackActuator(masterMachine, r.scheme, r.Client, logger)
+		return NewOpenStackActuator(masterMachine, r.Client, logger)
 	case cd.Spec.Platform.VSphere != nil:
 		return NewVSphereActuator(masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.Ovirt != nil:

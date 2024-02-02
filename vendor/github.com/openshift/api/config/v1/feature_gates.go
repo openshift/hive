@@ -441,4 +441,14 @@ var (
 		ResponsiblePerson:   "pmuller",
 		OwningProduct:       ocpSpecific,
 	}
+
+	FeatureGateTranslateStreamCloseWebsocketRequests = FeatureGateName("TranslateStreamCloseWebsocketRequests")
+	translateStreamCloseWebsocketRequests            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateTranslateStreamCloseWebsocketRequests,
+		},
+		OwningJiraComponent: "kube-apiserver",
+		ResponsiblePerson:   "akashem",
+		OwningProduct:       kubernetes,
+	}
 )

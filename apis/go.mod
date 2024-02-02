@@ -6,7 +6,7 @@ toolchain go1.21.6
 
 require (
 	// go get -u github.com/openshift/api@relase-4.16
-	github.com/openshift/api v0.0.0-20240118221011-59fa376de7cb
+	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 	k8s.io/api v0.29.1
 	k8s.io/apimachinery v0.29.1

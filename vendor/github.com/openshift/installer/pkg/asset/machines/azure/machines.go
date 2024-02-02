@@ -83,16 +83,22 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 		machines = append(machines, machine)
 	}
 	replicas := int32(total)
-	failureDomains := []machinev1.AzureFailureDomain{}
-	sort.Strings(mpool.Zones)
-	for _, zone := range mpool.Zones {
-		domain := machinev1.AzureFailureDomain{
-			Zone: zone,
-		}
 
-		failureDomains = append(failureDomains, domain)
+	failureDomains := []machinev1.AzureFailureDomain{}
+	if len(mpool.Zones) > 1 {
+		sort.Strings(mpool.Zones)
+		for _, zone := range mpool.Zones {
+			domain := machinev1.AzureFailureDomain{
+				Zone: zone,
+			}
+
+			failureDomains = append(failureDomains, domain)
+		}
+		machineSetProvider.Zone = ""
+	} else if len(mpool.Zones) == 1 {
+		machineSetProvider.Zone = mpool.Zones[0]
 	}
-	machineSetProvider.Zone = nil
+
 	controlPlaneMachineSet := &machinev1.ControlPlaneMachineSet{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "machine.openshift.io/v1",
@@ -118,10 +124,6 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 			Template: machinev1.ControlPlaneMachineSetTemplate{
 				MachineType: machinev1.OpenShiftMachineV1Beta1MachineType,
 				OpenShiftMachineV1Beta1Machine: &machinev1.OpenShiftMachineV1Beta1MachineTemplate{
-					FailureDomains: machinev1.FailureDomains{
-						Platform: v1.AzurePlatformType,
-						Azure:    &failureDomains,
-					},
 					ObjectMeta: machinev1.ControlPlaneMachineSetTemplateObjectMeta{
 						Labels: map[string]string{
 							"machine.openshift.io/cluster-api-cluster":      clusterID,
@@ -138,13 +140,21 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 			},
 		},
 	}
+
+	if len(failureDomains) > 0 {
+		controlPlaneMachineSet.Spec.Template.OpenShiftMachineV1Beta1Machine.FailureDomains = &machinev1.FailureDomains{
+			Platform: v1.AzurePlatformType,
+			Azure:    &failureDomains,
+		}
+	}
+
 	return machines, controlPlaneMachineSet, nil
 }
 
 func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string, userDataSecret string, clusterID string, role string, azIdx *int, capabilities map[string]string, useImageGallery bool) (*machineapi.AzureMachineProviderSpec, error) {
-	var az *string
+	var az string
 	if len(mpool.Zones) > 0 && azIdx != nil {
-		az = &mpool.Zones[*azIdx]
+		az = mpool.Zones[*azIdx]
 	}
 
 	hyperVGen, err := icazure.GetHyperVGenerationVersion(capabilities, "")
@@ -165,6 +175,9 @@ func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string
 	var image machineapi.Image
 	if mpool.OSImage.Publisher != "" {
 		image.Type = machineapi.AzureImageTypeMarketplaceWithPlan
+		if mpool.OSImage.Plan == azure.ImageNoPurchasePlan {
+			image.Type = machineapi.AzureImageTypeMarketplaceNoPlan
+		}
 		image.Publisher = mpool.OSImage.Publisher
 		image.Offer = mpool.OSImage.Offer
 		image.SKU = mpool.OSImage.SKU
@@ -212,12 +225,20 @@ func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string
 		}
 	}
 
-	var securityProfile *machineapi.SecurityProfile
-	if mpool.EncryptionAtHost {
-		securityProfile = &machineapi.SecurityProfile{
-			EncryptionAtHost: &mpool.EncryptionAtHost,
+	var diskSecurityProfile machineapi.VMDiskSecurityProfile
+	if mpool.OSDisk.SecurityProfile != nil && mpool.OSDisk.SecurityProfile.SecurityEncryptionType != "" {
+		diskSecurityProfile = machineapi.VMDiskSecurityProfile{
+			SecurityEncryptionType: machineapi.SecurityEncryptionTypes(mpool.OSDisk.SecurityProfile.SecurityEncryptionType),
+		}
+
+		if mpool.OSDisk.SecurityProfile.DiskEncryptionSet != nil {
+			diskSecurityProfile.DiskEncryptionSet = machineapi.DiskEncryptionSetParameters{
+				ID: mpool.OSDisk.SecurityProfile.DiskEncryptionSet.ToID(),
+			}
 		}
 	}
+
+	securityProfile := generateSecurityProfile(mpool)
 
 	ultraSSDCapability := machineapi.AzureUltraSSDCapabilityState(mpool.UltraSSDCapability)
 
@@ -237,6 +258,7 @@ func provider(platform *azure.Platform, mpool *azure.MachinePool, osImage string
 			ManagedDisk: machineapi.OSDiskManagedDiskParameters{
 				StorageAccountType: mpool.OSDisk.DiskType,
 				DiskEncryptionSet:  diskEncryptionSet,
+				SecurityProfile:    diskSecurityProfile,
 			},
 		},
 		SecurityProfile:       securityProfile,
@@ -293,4 +315,49 @@ func getNetworkInfo(platform *azure.Platform, clusterID, role string) (string, s
 // getVMNetworkingType should set the correct capability for instance type
 func getVMNetworkingType(value string) bool {
 	return value == string(azure.VMnetworkingTypeAccelerated)
+}
+
+func generateSecurityProfile(mpool *azure.MachinePool) *machineapi.SecurityProfile {
+	securityProfile := &machineapi.SecurityProfile{}
+
+	if mpool.EncryptionAtHost {
+		securityProfile.EncryptionAtHost = &mpool.EncryptionAtHost
+	}
+
+	if mpool.Settings != nil && mpool.Settings.SecurityType != "" {
+		securityProfile.Settings = machineapi.SecuritySettings{
+			SecurityType: machineapi.SecurityTypes(mpool.Settings.SecurityType),
+		}
+
+		var uefiSettings machineapi.UEFISettings
+		if securityProfile.Settings.SecurityType == machineapi.SecurityTypesTrustedLaunch {
+			if mpool.Settings.TrustedLaunch != nil && mpool.Settings.TrustedLaunch.UEFISettings != nil {
+				if sb := mpool.Settings.TrustedLaunch.UEFISettings.SecureBoot; sb != nil {
+					uefiSettings.SecureBoot = machineapi.SecureBootPolicy(*sb)
+				}
+				if vtpm := mpool.Settings.TrustedLaunch.UEFISettings.VirtualizedTrustedPlatformModule; vtpm != nil {
+					uefiSettings.VirtualizedTrustedPlatformModule = machineapi.VirtualizedTrustedPlatformModulePolicy(*vtpm)
+				}
+
+				securityProfile.Settings.TrustedLaunch = &machineapi.TrustedLaunch{
+					UEFISettings: uefiSettings,
+				}
+			}
+		} else if securityProfile.Settings.SecurityType == machineapi.SecurityTypesConfidentialVM {
+			if mpool.Settings.ConfidentialVM != nil && mpool.Settings.ConfidentialVM.UEFISettings != nil {
+				if sb := mpool.Settings.ConfidentialVM.UEFISettings.SecureBoot; sb != nil {
+					uefiSettings.SecureBoot = machineapi.SecureBootPolicy(*sb)
+				}
+				if vtpm := mpool.Settings.ConfidentialVM.UEFISettings.VirtualizedTrustedPlatformModule; vtpm != nil {
+					uefiSettings.VirtualizedTrustedPlatformModule = machineapi.VirtualizedTrustedPlatformModulePolicy(*vtpm)
+				}
+
+				securityProfile.Settings.ConfidentialVM = &machineapi.ConfidentialVM{
+					UEFISettings: uefiSettings,
+				}
+			}
+		}
+	}
+
+	return securityProfile
 }

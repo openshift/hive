@@ -106,7 +106,7 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 			Template: machinev1.ControlPlaneMachineSetTemplate{
 				MachineType: machinev1.OpenShiftMachineV1Beta1MachineType,
 				OpenShiftMachineV1Beta1Machine: &machinev1.OpenShiftMachineV1Beta1MachineTemplate{
-					FailureDomains: machinev1.FailureDomains{
+					FailureDomains: &machinev1.FailureDomains{
 						Platform: v1.GCPPlatformType,
 						GCP:      &failureDomains,
 					},
@@ -132,8 +132,8 @@ func Machines(clusterID string, config *types.InstallConfig, pool *types.Machine
 
 func provider(clusterID string, platform *gcp.Platform, mpool *gcp.MachinePool, osImage string, azIdx int, role, userDataSecret string, credentialsMode types.CredentialsMode) (*machineapi.GCPMachineProviderSpec, error) {
 	az := mpool.Zones[azIdx]
-	if len(platform.Licenses) > 0 {
-		osImage = fmt.Sprintf("%s-rhcos-image", clusterID)
+	if mpool.OSImage != nil {
+		osImage = fmt.Sprintf("projects/%s/global/images/%s", mpool.OSImage.Project, mpool.OSImage.Name)
 	}
 	network, subnetwork, err := getNetworks(platform, clusterID, role)
 	if err != nil {
@@ -185,6 +185,10 @@ func provider(clusterID string, platform *gcp.Platform, mpool *gcp.MachinePool, 
 	if mpool.SecureBoot == string(machineapi.SecureBootPolicyEnabled) {
 		shieldedInstanceConfig.SecureBoot = machineapi.SecureBootPolicyEnabled
 	}
+	labels := make(map[string]string, len(platform.UserLabels))
+	for _, label := range platform.UserLabels {
+		labels[label.Key] = label.Value
+	}
 	return &machineapi.GCPMachineProviderSpec{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "machine.openshift.io/v1beta1",
@@ -198,6 +202,7 @@ func provider(clusterID string, platform *gcp.Platform, mpool *gcp.MachinePool, 
 			SizeGB:        mpool.OSDisk.DiskSizeGB,
 			Type:          mpool.OSDisk.DiskType,
 			Image:         osImage,
+			Labels:        labels,
 			EncryptionKey: encryptionKey,
 		}},
 		NetworkInterfaces: []*machineapi.GCPNetworkInterface{{
@@ -217,6 +222,7 @@ func provider(clusterID string, platform *gcp.Platform, mpool *gcp.MachinePool, 
 		ShieldedInstanceConfig: shieldedInstanceConfig,
 		ConfidentialCompute:    machineapi.ConfidentialComputePolicy(mpool.ConfidentialCompute),
 		OnHostMaintenance:      machineapi.GCPHostMaintenanceType(mpool.OnHostMaintenance),
+		Labels:                 labels,
 	}, nil
 }
 

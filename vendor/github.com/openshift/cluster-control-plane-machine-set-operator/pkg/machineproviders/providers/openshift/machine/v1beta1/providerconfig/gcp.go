@@ -17,9 +17,9 @@ limitations under the License.
 package providerconfig
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	v1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -37,7 +37,9 @@ type GCPProviderConfig struct {
 func (g GCPProviderConfig) InjectFailureDomain(fd machinev1.GCPFailureDomain) GCPProviderConfig {
 	newGCPProviderConfig := g
 
-	newGCPProviderConfig.providerConfig.Zone = fd.Zone
+	if fd.Zone != "" {
+		newGCPProviderConfig.providerConfig.Zone = fd.Zone
+	}
 
 	return newGCPProviderConfig
 }
@@ -57,10 +59,11 @@ func (g GCPProviderConfig) Config() machinev1beta1.GCPMachineProviderSpec {
 
 // newGCPProviderConfig creates a GCP type ProviderConfig from the raw extension.
 // It should return an error if the provided RawExtension does not represent a GCPProviderConfig.
-func newGCPProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
+func newGCPProviderConfig(logger logr.Logger, raw *runtime.RawExtension) (ProviderConfig, error) {
 	var gcpMachineProviderSpec machinev1beta1.GCPMachineProviderSpec
-	if err := json.Unmarshal(raw.Raw, &gcpMachineProviderSpec); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal GCP provider config: %w", err)
+
+	if err := checkForUnknownFieldsInProviderSpecAndUnmarshal(logger, raw, &gcpMachineProviderSpec); err != nil {
+		return nil, fmt.Errorf("failed to check for unknown fields in the provider spec: %w", err)
 	}
 
 	gcpProviderConfig := GCPProviderConfig{

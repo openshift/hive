@@ -2,10 +2,12 @@ package aws
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 
+	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/pkg/errors"
 
 	typesaws "github.com/openshift/installer/pkg/types/aws"
 )
@@ -16,9 +18,10 @@ import (
 type Metadata struct {
 	session           *session.Session
 	availabilityZones []string
-	privateSubnets    map[string]Subnet
-	publicSubnets     map[string]Subnet
-	edgeSubnets       map[string]Subnet
+	edgeZones         []string
+	privateSubnets    Subnets
+	publicSubnets     Subnets
+	edgeSubnets       Subnets
 	vpc               string
 	instanceTypes     map[string]InstanceType
 
@@ -48,7 +51,7 @@ func (m *Metadata) unlockedSession(ctx context.Context) (*session.Session, error
 		var err error
 		m.session, err = GetSessionWithOptions(WithRegion(m.Region), WithServiceEndpoints(m.Region, m.Services))
 		if err != nil {
-			return nil, errors.Wrap(err, "creating AWS session")
+			return nil, fmt.Errorf("creating AWS session: %w", err)
 		}
 	}
 
@@ -67,31 +70,105 @@ func (m *Metadata) AvailabilityZones(ctx context.Context) ([]string, error) {
 		}
 		m.availabilityZones, err = availabilityZones(ctx, session, m.Region)
 		if err != nil {
-			return nil, errors.Wrap(err, "error retrieving Availability Zones")
+			return nil, fmt.Errorf("error retrieving Availability Zones: %w", err)
 		}
 	}
 
 	return m.availabilityZones, nil
 }
 
+// EdgeZones retrieves a list of Local and Wavelength zones for the configured region.
+func (m *Metadata) EdgeZones(ctx context.Context) ([]string, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if len(m.edgeZones) == 0 {
+		session, err := m.unlockedSession(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		m.edgeZones, err = edgeZones(ctx, session, m.Region)
+		if err != nil {
+			return nil, fmt.Errorf("getting Local Zones: %w", err)
+		}
+	}
+
+	return m.edgeZones, nil
+}
+
 // EdgeSubnets retrieves subnet metadata indexed by subnet ID, for
 // subnets that the cloud-provider logic considers to be edge
 // (i.e. Local Zone).
-func (m *Metadata) EdgeSubnets(ctx context.Context) (map[string]Subnet, error) {
+func (m *Metadata) EdgeSubnets(ctx context.Context) (Subnets, error) {
 	err := m.populateSubnets(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving Edge Subnets")
+		return nil, fmt.Errorf("error retrieving Edge Subnets: %w", err)
 	}
 	return m.edgeSubnets, nil
+}
+
+// SetZoneAttributes retrieves AWS Zone attributes and update required fields in zones.
+func (m *Metadata) SetZoneAttributes(ctx context.Context, zoneNames []string, zones Zones) error {
+	sess, err := m.Session(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get aws session to populate zone details: %w", err)
+	}
+	azs, err := describeFilteredZones(ctx, sess, m.Region, zoneNames)
+	if err != nil {
+		return fmt.Errorf("unable to filter zones: %w", err)
+	}
+
+	for _, az := range azs {
+		zoneName := awssdk.StringValue(az.ZoneName)
+		if _, ok := zones[zoneName]; !ok {
+			zones[zoneName] = &Zone{Name: zoneName}
+		}
+		if zones[zoneName].GroupName == "" {
+			zones[zoneName].GroupName = awssdk.StringValue(az.GroupName)
+		}
+		if zones[zoneName].Type == "" {
+			zones[zoneName].Type = awssdk.StringValue(az.ZoneType)
+		}
+		if az.ParentZoneName != nil {
+			zones[zoneName].ParentZoneName = awssdk.StringValue(az.ParentZoneName)
+		}
+	}
+	return nil
+}
+
+// AllZones return all the zones and it's attributes available on the region.
+func (m *Metadata) AllZones(ctx context.Context) (Zones, error) {
+	sess, err := m.Session(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get aws session to populate zone details: %w", err)
+	}
+	azs, err := describeAvailabilityZones(ctx, sess, m.Region, []string{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to gather availability zones: %w", err)
+	}
+	zoneDesc := make(Zones, len(azs))
+	for _, az := range azs {
+		zoneName := awssdk.StringValue(az.ZoneName)
+		zoneDesc[zoneName] = &Zone{
+			Name:      zoneName,
+			GroupName: awssdk.StringValue(az.GroupName),
+			Type:      awssdk.StringValue(az.ZoneType),
+		}
+		if az.ParentZoneName != nil {
+			zoneDesc[zoneName].ParentZoneName = awssdk.StringValue(az.ParentZoneName)
+		}
+	}
+	return zoneDesc, nil
 }
 
 // PrivateSubnets retrieves subnet metadata indexed by subnet ID, for
 // subnets that the cloud-provider logic considers to be private
 // (i.e. not public).
-func (m *Metadata) PrivateSubnets(ctx context.Context) (map[string]Subnet, error) {
+func (m *Metadata) PrivateSubnets(ctx context.Context) (Subnets, error) {
 	err := m.populateSubnets(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving Private Subnets")
+		return nil, fmt.Errorf("error retrieving Private Subnets: %w", err)
 	}
 	return m.privateSubnets, nil
 }
@@ -99,10 +176,10 @@ func (m *Metadata) PrivateSubnets(ctx context.Context) (map[string]Subnet, error
 // PublicSubnets retrieves subnet metadata indexed by subnet ID, for
 // subnets that the cloud-provider logic considers to be public
 // (e.g. with suitable routing for hosting public load balancers).
-func (m *Metadata) PublicSubnets(ctx context.Context) (map[string]Subnet, error) {
+func (m *Metadata) PublicSubnets(ctx context.Context) (Subnets, error) {
 	err := m.populateSubnets(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving Public Subnets")
+		return nil, fmt.Errorf("error retrieving Public Subnets: %w", err)
 	}
 	return m.publicSubnets, nil
 }
@@ -111,7 +188,7 @@ func (m *Metadata) PublicSubnets(ctx context.Context) (map[string]Subnet, error)
 func (m *Metadata) VPC(ctx context.Context) (string, error) {
 	err := m.populateSubnets(ctx)
 	if err != nil {
-		return "", errors.Wrap(err, "error retrieving VPC")
+		return "", fmt.Errorf("error retrieving VPC: %w", err)
 	}
 	return m.vpc, nil
 }
@@ -155,7 +232,7 @@ func (m *Metadata) InstanceTypes(ctx context.Context) (map[string]InstanceType, 
 
 		m.instanceTypes, err = instanceTypes(ctx, session, m.Region)
 		if err != nil {
-			return nil, errors.Wrap(err, "error listing instance types")
+			return nil, fmt.Errorf("error listing instance types: %w", err)
 		}
 	}
 

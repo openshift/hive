@@ -34,9 +34,6 @@ func AvailabilityZones(project, region string) ([]string, error) {
 	filter := fmt.Sprintf("(region eq %s) (status eq UP)", regionURL)
 	zones, err := gcpconfig.GetZones(ctx, svc, project, filter)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list zones")
-	}
-	if len(zones) == 0 {
 		return nil, errors.New("no zone was found")
 	}
 
@@ -54,28 +51,42 @@ func AvailabilityZones(project, region string) ([]string, error) {
 // arm64, since the instance t2a-standard-* is not available in all
 // availability zones.
 func ZonesForInstanceType(project, region, instanceType string) ([]string, error) {
+	ssn, err := gcpconfig.GetSession(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	svc, err := compute.NewService(context.Background(), option.WithCredentials(ssn.Credentials))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create compute service: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	ssn, err := gcpconfig.GetSession(ctx)
+	pZones, err := gcpconfig.GetZones(ctx, svc, project, fmt.Sprintf("(region eq .*%s) (status eq UP)", region))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get session")
+		return nil, fmt.Errorf("failed to get zones for project: %w", err)
 	}
-
-	svc, err := compute.NewService(ctx, option.WithCredentials(ssn.Credentials))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create compute service")
+	pZoneNames := sets.New[string]()
+	for _, z := range pZones {
+		pZoneNames.Insert(z.Name)
 	}
 
 	machines, err := gcpconfig.GetMachineTypeList(ctx, svc, project, region, instanceType, "items/*/machineTypes(zone),nextPageToken")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get zones for instance type")
+		return nil, fmt.Errorf("failed to get zones for instance type: %w", err)
+	}
+	// Custom machine types do not show up in the list. Let's fallback to the project zones
+	if len(machines) == 0 {
+		return sets.List(pZoneNames), nil
 	}
 
-	found := sets.New[string]()
+	zones := sets.New[string]()
 	for _, machine := range machines {
-		found.Insert(machine.Zone)
+		zones.Insert(machine.Zone)
 	}
 
-	return sets.List(found), nil
+	// Not all instance zones might be available in the project
+	return sets.List(zones.Intersection(pZoneNames)), nil
 }

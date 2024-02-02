@@ -4,9 +4,6 @@ package powervs
 // use.
 type Platform struct {
 
-	// ServiceInstanceID is the ID of the Power IAAS instance created from the IBM Cloud Catalog
-	ServiceInstanceID string `json:"serviceInstanceID"`
-
 	// PowerVSResourceGroup is the resource group in which Power VS resources will be created.
 	PowerVSResourceGroup string `json:"powervsResourceGroup"`
 
@@ -38,11 +35,6 @@ type Platform struct {
 	// +optional
 	VPCSubnets []string `json:"vpcSubnets,omitempty"`
 
-	// PVSNetworkName specifies an existing network within the Power VS Service Instance.
-	//
-	// +optional
-	PVSNetworkName string `json:"pvsNetworkName,omitempty"`
-
 	// ClusterOSImage is a pre-created Power VS boot image that overrides the
 	// default image for cluster nodes.
 	//
@@ -55,8 +47,9 @@ type Platform struct {
 	// +optional
 	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
 
-	// CloudConnctionName is the name of an existing Power VS Cloud connection.
-	// If empty, one is created by the installer.
+	// ServiceInstanceGUID is the GUID of the Power IAAS instance created from the IBM Cloud Catalog
+	// before the cluster is completed.  Leave unset to allow the installer to create a service
+	// instance during cluster creation.
 	// +optional
-	CloudConnectionName string `json:"cloudConnectionName,omitempty"`
+	ServiceInstanceGUID string `json:"serviceInstanceGUID,omitempty"`
 }

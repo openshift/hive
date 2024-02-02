@@ -71,32 +71,6 @@ spec:
                 description: Platform contains platform-specific configuration for
                   a ClusterDeprovision
                 properties:
-                  alibabacloud:
-                    description: AlibabaCloud contains Alibaba Cloud specific deprovision
-                      settings
-                    properties:
-                      baseDomain:
-                        description: 'BaseDomain is the DNS base domain. TODO: Use
-                          the non-platform-specific BaseDomain field.'
-                        type: string
-                      credentialsSecretRef:
-                        description: CredentialsSecretRef is the Alibaba account credentials
-                          to use for deprovisioning the cluster
-                        properties:
-                          name:
-                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?'
-                            type: string
-                        type: object
-                        x-kubernetes-map-type: atomic
-                      region:
-                        description: Region is the Alibaba region for this deprovision
-                        type: string
-                    required:
-                    - baseDomain
-                    - credentialsSecretRef
-                    - region
-                    type: object
                   aws:
                     description: AWS contains AWS-specific deprovision settings
                     properties:

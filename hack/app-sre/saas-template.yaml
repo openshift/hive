@@ -889,28 +889,6 @@ objects:
                       required:
                       - agentSelector
                       type: object
-                    alibabacloud:
-                      description: AlibabaCloud is the configuration used when installing
-                        on Alibaba Cloud
-                      properties:
-                        credentialsSecretRef:
-                          description: CredentialsSecretRef refers to a secret that
-                            contains Alibaba Cloud account access credentials.
-                          properties:
-                            name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
-                              type: string
-                          type: object
-                          x-kubernetes-map-type: atomic
-                        region:
-                          description: Region specifies the Alibaba Cloud region where
-                            the cluster will be created.
-                          type: string
-                      required:
-                      - credentialsSecretRef
-                      - region
-                      type: object
                     aws:
                       description: AWS is the configuration used when installing on
                         AWS.
@@ -1709,32 +1687,6 @@ objects:
                   description: Platform contains platform-specific configuration for
                     a ClusterDeprovision
                   properties:
-                    alibabacloud:
-                      description: AlibabaCloud contains Alibaba Cloud specific deprovision
-                        settings
-                      properties:
-                        baseDomain:
-                          description: 'BaseDomain is the DNS base domain. TODO: Use
-                            the non-platform-specific BaseDomain field.'
-                          type: string
-                        credentialsSecretRef:
-                          description: CredentialsSecretRef is the Alibaba account
-                            credentials to use for deprovisioning the cluster
-                          properties:
-                            name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
-                              type: string
-                          type: object
-                          x-kubernetes-map-type: atomic
-                        region:
-                          description: Region is the Alibaba region for this deprovision
-                          type: string
-                      required:
-                      - baseDomain
-                      - credentialsSecretRef
-                      - region
-                      type: object
                     aws:
                       description: AWS contains AWS-specific deprovision settings
                       properties:
@@ -2318,28 +2270,6 @@ objects:
                           x-kubernetes-map-type: atomic
                       required:
                       - agentSelector
-                      type: object
-                    alibabacloud:
-                      description: AlibabaCloud is the configuration used when installing
-                        on Alibaba Cloud
-                      properties:
-                        credentialsSecretRef:
-                          description: CredentialsSecretRef refers to a secret that
-                            contains Alibaba Cloud account access credentials.
-                          properties:
-                            name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
-                              type: string
-                          type: object
-                          x-kubernetes-map-type: atomic
-                        region:
-                          description: Region specifies the Alibaba Cloud region where
-                            the cluster will be created.
-                          type: string
-                      required:
-                      - credentialsSecretRef
-                      - region
                       type: object
                     aws:
                       description: AWS is the configuration used when installing on
@@ -5012,39 +4942,6 @@ objects:
                   description: Platform is configuration for machine pool specific
                     to the platform.
                   properties:
-                    alibabacloud:
-                      description: AlibabaCloud is the configuration used when installing
-                        on Alibaba Cloud.
-                      properties:
-                        imageID:
-                          description: ImageID is the Image ID that should be used
-                            to create ECS instance. If set, the ImageID should belong
-                            to the same region as the cluster.
-                          type: string
-                        instanceType:
-                          description: InstanceType defines the ECS instance type.
-                            eg. ecs.g6.large
-                          type: string
-                        systemDiskCategory:
-                          description: SystemDiskCategory defines the category of
-                            the system disk.
-                          enum:
-                          - ''
-                          - cloud_efficiency
-                          - cloud_essd
-                          type: string
-                        systemDiskSize:
-                          description: SystemDiskSize defines the size of the system
-                            disk in gibibytes (GiB).
-                          minimum: 120
-                          type: integer
-                        zones:
-                          description: Zones is list of availability zones that can
-                            be used. eg. ["cn-hangzhou-i", "cn-hangzhou-h", "cn-hangzhou-j"]
-                          items:
-                            type: string
-                          type: array
-                      type: object
                     aws:
                       description: AWS is the configuration used when installing on
                         AWS.

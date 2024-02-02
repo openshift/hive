@@ -11,7 +11,6 @@ require (
 	github.com/IBM/networking-go-sdk v0.42.2
 	github.com/IBM/platform-services-go-sdk v0.42.0
 	github.com/IBM/vpc-go-sdk v0.20.0
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1458
 	github.com/aws/aws-sdk-go v1.44.215
 	github.com/blang/semver/v4 v4.0.0
 	github.com/davecgh/go-spew v1.1.1
@@ -132,7 +131,6 @@ require (
 	github.com/PaesslerAG/gval v1.0.0 // indirect
 	github.com/PaesslerAG/jsonpath v0.1.1 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect
-	github.com/aliyun/aliyun-oss-go-sdk v2.1.8+incompatible // indirect
 	github.com/apparentlymart/go-cidr v1.1.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/ashanbrown/forbidigo v1.5.1 // indirect
@@ -259,7 +257,6 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb // indirect
 	github.com/openshift/cloud-credential-operator v0.0.0-20200316201045-d10080b52c9e // indirect
-	github.com/openshift/cluster-api-provider-alibaba v0.0.1-0.20220606091606-a7bf6bf132ca
 	github.com/ovirt/go-ovirt v0.0.0-20210809163552-d4276e35d3db // indirect
 	github.com/pborman/uuid v1.2.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect

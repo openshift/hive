@@ -1109,19 +1109,6 @@ func (r *ReconcileMachinePool) createActuator(
 	logger log.FieldLogger,
 ) (Actuator, error) {
 	switch {
-	case cd.Spec.Platform.AlibabaCloud != nil:
-		creds := &corev1.Secret{}
-		if err := r.Get(
-			context.TODO(),
-			types.NamespacedName{
-				Name:      cd.Spec.Platform.AlibabaCloud.CredentialsSecretRef.Name,
-				Namespace: cd.Namespace,
-			},
-			creds,
-		); err != nil {
-			return nil, err
-		}
-		return NewAlibabaCloudActuator(creds, cd.Spec.Platform.AlibabaCloud.Region, masterMachine, logger)
 	case cd.Spec.Platform.AWS != nil:
 		creds := awsclient.CredentialsSource{
 			Secret: &awsclient.SecretCredentialsSource{

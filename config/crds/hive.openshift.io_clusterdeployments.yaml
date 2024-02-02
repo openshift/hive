@@ -509,28 +509,6 @@ spec:
                     required:
                     - agentSelector
                     type: object
-                  alibabacloud:
-                    description: AlibabaCloud is the configuration used when installing
-                      on Alibaba Cloud
-                    properties:
-                      credentialsSecretRef:
-                        description: CredentialsSecretRef refers to a secret that
-                          contains Alibaba Cloud account access credentials.
-                        properties:
-                          name:
-                            description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Add other useful fields. apiVersion, kind, uid?'
-                            type: string
-                        type: object
-                        x-kubernetes-map-type: atomic
-                      region:
-                        description: Region specifies the Alibaba Cloud region where
-                          the cluster will be created.
-                        type: string
-                    required:
-                    - credentialsSecretRef
-                    - region
-                    type: object
                   aws:
                     description: AWS is the configuration used when installing on
                       AWS.

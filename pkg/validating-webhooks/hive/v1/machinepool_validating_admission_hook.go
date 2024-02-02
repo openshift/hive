@@ -19,7 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivev1alibabacloud "github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
@@ -312,10 +311,6 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 		platforms = append(platforms, "ibmcloud")
 		allErrs = append(allErrs, validateIBMCloudMachinePoolPlatformInvariants(p, platformPath.Child("ibmcloud"))...)
 	}
-	if p := spec.Platform.AlibabaCloud; p != nil {
-		platforms = append(platforms, "alibabacloud")
-		allErrs = append(allErrs, validateAlibabaCloudMachinePoolPlatformInvariants(p, platformPath.Child("alibabacloud"))...)
-	}
 
 	switch len(platforms) {
 	case 0:
@@ -434,11 +429,6 @@ func validateOvirtMachinePoolPlatformInvariants(platform *hivev1ovirt.MachinePoo
 }
 
 func validateIBMCloudMachinePoolPlatformInvariants(platform *hivev1ibmcloud.MachinePool, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	return allErrs
-}
-
-func validateAlibabaCloudMachinePoolPlatformInvariants(platform *hivev1alibabacloud.MachinePool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	return allErrs
 }

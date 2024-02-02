@@ -169,8 +169,6 @@ func InstallerPodSpec(
 	var credentialRef, certificateRef string
 
 	switch {
-	case cd.Spec.Platform.AlibabaCloud != nil:
-		credentialRef = cd.Spec.Platform.AlibabaCloud.CredentialsSecretRef.Name
 	case cd.Spec.Platform.AWS != nil:
 		credentialRef = cd.Spec.Platform.AWS.CredentialsSecretRef.Name
 		if credentialRef == "" {
@@ -459,8 +457,6 @@ func GenerateUninstallerJobForDeprovision(
 	}
 
 	switch {
-	case req.Spec.Platform.AlibabaCloud != nil:
-		completeAlibabaCloudDeprovisionJob(req, job)
 	case req.Spec.Platform.AWS != nil:
 		completeAWSDeprovisionJob(req, job)
 	case req.Spec.Platform.Azure != nil:
@@ -788,31 +784,6 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 				"--region", req.Spec.Platform.IBMCloud.Region,
 				"--base-domain", req.Spec.Platform.IBMCloud.BaseDomain,
 				"--cluster-name", req.Spec.ClusterName,
-				"--loglevel", "debug",
-			},
-		},
-	}
-}
-
-func completeAlibabaCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
-	env, _, _ := envAndVolumes(
-		req.Namespace,
-		"", "", req.Spec.Platform.AlibabaCloud.CredentialsSecretRef.Name,
-		"", "", "")
-
-	job.Spec.Template.Spec.Containers = []corev1.Container{
-		{
-			Name:            "deprovision",
-			Image:           images.GetHiveImage(),
-			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Env:             env,
-			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision", "alibabacloud",
-				req.Spec.InfraID,
-				"--region", req.Spec.Platform.AlibabaCloud.Region,
-				"--cluster-name", req.Spec.ClusterName,
-				"--base-domain", req.Spec.Platform.AlibabaCloud.BaseDomain,
 				"--loglevel", "debug",
 			},
 		},

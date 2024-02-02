@@ -42,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	"github.com/openshift/installer/pkg/destroy/alibabacloud"
 	"github.com/openshift/installer/pkg/destroy/aws"
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
@@ -52,7 +51,6 @@ import (
 	"github.com/openshift/installer/pkg/destroy/providers"
 	"github.com/openshift/installer/pkg/destroy/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
-	installertypesalibabacloud "github.com/openshift/installer/pkg/types/alibabacloud"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
@@ -62,7 +60,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
-	aliutils "github.com/openshift/hive/contrib/pkg/utils/alibabacloud"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
@@ -532,8 +529,6 @@ func (m *InstallManager) Run() error {
 func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 	// Configure credentials (including certs) appropriately according to the cloud provider
 	switch {
-	case cd.Spec.Platform.AlibabaCloud != nil:
-		aliutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.AWS != nil:
 		awsutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.Azure != nil:
@@ -666,22 +661,6 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, infr
 func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
 	var uninstaller providers.Destroyer
 	switch {
-	case cd.Spec.Platform.AlibabaCloud != nil:
-		metadata := &installertypes.ClusterMetadata{
-			ClusterName: cd.Spec.ClusterName,
-			InfraID:     infraID,
-			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
-				AlibabaCloud: &installertypesalibabacloud.Metadata{
-					ClusterDomain: fmt.Sprintf("%s.%s", cd.Spec.ClusterName, cd.Spec.BaseDomain),
-					Region:        cd.Spec.Platform.AlibabaCloud.Region,
-				},
-			},
-		}
-		var err error
-		uninstaller, err = alibabacloud.New(logger, metadata)
-		if err != nil {
-			return err
-		}
 	case cd.Spec.Platform.AWS != nil:
 		// run the uninstaller to clean up any cloud resources previously created
 		filters := []aws.Filter{

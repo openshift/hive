@@ -49,9 +49,11 @@ const (
 func TestReconcileClusterPool(t *testing.T) {
 	scheme := scheme.GetScheme()
 
-	// See calculatePoolVersion. If this changes, the easiest way to figure out the new value is
+	// See calculatePoolVersion. If these change, the easiest way to figure out the new value is
 	// to pull it from the test failure :)
-	initialPoolVersion := "182b591e56ca056b"
+	initialPoolVersion := "ac2dc91b241dd33d"
+	inventoryPoolVersion := "06983eaafac7f695"
+	openstackPoolVersion := "0a55303c49151e0d"
 
 	poolBuilder := testcp.FullBuilder(testNamespace, testLeasePoolName, scheme).
 		GenericOptions(
@@ -85,8 +87,6 @@ func TestReconcileClusterPool(t *testing.T) {
 		}),
 	)
 
-	inventoryPoolVersion := "e0bc44f74a546c63"
-	openstackPoolVersion := "ab01156f6cab966c"
 	inventoryPoolBuilder := func() testcp.Builder {
 		return initializedPoolBuilder.Options(
 			testcp.WithInventory([]string{"test-cdc-1"}),
@@ -327,7 +327,7 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcdc.Available(),
 				),
 				testcd.FullBuilder("c1", "c1", scheme).Build(
-					testcd.WithPoolVersion("e0bc44f74a546c63"),
+					testcd.WithPoolVersion(inventoryPoolVersion),
 					testcd.WithUnclaimedClusterPoolReference(testNamespace, testLeasePoolName),
 					testcd.WithCustomization("test-cdc-1"),
 					testcd.Running(),

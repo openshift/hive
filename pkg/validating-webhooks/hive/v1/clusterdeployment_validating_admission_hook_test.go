@@ -16,7 +16,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1agent "github.com/openshift/hive/apis/hive/v1/agent"
-	hivev1alibabacloud "github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
@@ -79,16 +78,6 @@ func validGCPClusterDeployment() *hivev1.ClusterDeployment {
 		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
 		Region:               "us-central1",
 	}
-	return cd
-}
-
-func validAlibabaCloudClusterDeployment() *hivev1.ClusterDeployment {
-	cd := clusterDeploymentTemplate()
-	cd.Spec.Platform.AlibabaCloud = &hivev1alibabacloud.Platform{
-		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
-		Region:               "test-alibaba-cloud-region",
-	}
-	cd.Spec.Provisioning.ManifestsConfigMapRef = &corev1.LocalObjectReference{Name: "fake-manifests-configmap"}
 	return cd
 }
 
@@ -1428,23 +1417,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
-			name:            "Alibaba Cloud create valid",
-			newObject:       validAlibabaCloudClusterDeployment(),
-			operation:       admissionv1beta1.Create,
-			expectedAllowed: true,
-		},
-		{
-			name: "Alibaba Cloud create missing manifests",
-			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAlibabaCloudClusterDeployment()
-				cd.Spec.Provisioning.ManifestsConfigMapRef = nil
-				cd.Spec.Provisioning.ManifestsSecretRef = nil
-				return cd
-			}(),
-			operation:       admissionv1beta1.Create,
-			expectedAllowed: false,
-		},
-		{
 			name: "manifestsConfigMapRef and manifestsSecretRef mutually exclusive (create)",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()
@@ -1460,9 +1432,9 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			// This gets caught by the "Spec is immutable except [... not Provisioning ...]" check
 			name:      "manifestsConfigMapRef and manifestsSecretRef mutually exclusive (update)",
-			oldObject: validAlibabaCloudClusterDeployment(),
+			oldObject: validAzureClusterDeployment(),
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAlibabaCloudClusterDeployment()
+				cd := validAzureClusterDeployment()
 				// Already has ManifestsConfigMapRef
 				cd.Spec.Provisioning.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "bar"}
 				return cd

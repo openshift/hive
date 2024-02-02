@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivev1alibabacloud "github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
@@ -229,13 +228,6 @@ func WithAzurePlatform(platform *hivev1azure.Platform) Option {
 func WithIBMCloudPlatform(platform *hivev1ibmcloud.Platform) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.Platform.IBMCloud = platform
-	}
-}
-
-// WithAlibabaCloudPlatform sets the specified Alibaba Cloud platform on the cd.
-func WithAlibabaCloudPlatform(platform *hivev1alibabacloud.Platform) Option {
-	return func(clusterDeployment *hivev1.ClusterDeployment) {
-		clusterDeployment.Spec.Platform.AlibabaCloud = platform
 	}
 }
 

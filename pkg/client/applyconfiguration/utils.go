@@ -15,8 +15,6 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=hive.openshift.io, Version=v1
-	case v1.SchemeGroupVersion.WithKind("AlibabaCloudClusterDeprovision"):
-		return &hivev1.AlibabaCloudClusterDeprovisionApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ArgoCDConfig"):
 		return &hivev1.ArgoCDConfigApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("AWSAssociatedVPC"):

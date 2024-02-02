@@ -23,8 +23,8 @@ func WaitForMachines(cfg *rest.Config, testFunc func([]*machinev1.Machine) bool,
 	scheme := scheme.GetScheme()
 
 	internalCache, err := cache.New(cfg, cache.Options{
-		Namespaces: []string{"openshift-machine-api"},
-		Scheme:     scheme,
+		DefaultNamespaces: map[string]cache.Config{"openshift-machine-api": {}},
+		Scheme:            scheme,
 	})
 	if err != nil {
 		return err

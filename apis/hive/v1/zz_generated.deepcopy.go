@@ -887,8 +887,8 @@ func (in *ClusterDeploymentSpec) DeepCopyInto(out *ClusterDeploymentSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.BoundServiceAccountSignkingKeySecretRef != nil {
-		in, out := &in.BoundServiceAccountSignkingKeySecretRef, &out.BoundServiceAccountSignkingKeySecretRef
+	if in.BoundServiceAccountSigningKeySecretRef != nil {
+		in, out := &in.BoundServiceAccountSigningKeySecretRef, &out.BoundServiceAccountSigningKeySecretRef
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}

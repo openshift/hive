@@ -11,24 +11,24 @@ import (
 // ClusterDeploymentSpecApplyConfiguration represents an declarative configuration of the ClusterDeploymentSpec type for use
 // with apply.
 type ClusterDeploymentSpecApplyConfiguration struct {
-	ClusterName                             *string                                         `json:"clusterName,omitempty"`
-	BaseDomain                              *string                                         `json:"baseDomain,omitempty"`
-	Platform                                *PlatformApplyConfiguration                     `json:"platform,omitempty"`
-	PullSecretRef                           *corev1.LocalObjectReference                    `json:"pullSecretRef,omitempty"`
-	PreserveOnDelete                        *bool                                           `json:"preserveOnDelete,omitempty"`
-	ControlPlaneConfig                      *ControlPlaneConfigSpecApplyConfiguration       `json:"controlPlaneConfig,omitempty"`
-	Ingress                                 []ClusterIngressApplyConfiguration              `json:"ingress,omitempty"`
-	CertificateBundles                      []CertificateBundleSpecApplyConfiguration       `json:"certificateBundles,omitempty"`
-	ManageDNS                               *bool                                           `json:"manageDNS,omitempty"`
-	ClusterMetadata                         *ClusterMetadataApplyConfiguration              `json:"clusterMetadata,omitempty"`
-	Installed                               *bool                                           `json:"installed,omitempty"`
-	Provisioning                            *ProvisioningApplyConfiguration                 `json:"provisioning,omitempty"`
-	ClusterInstallRef                       *ClusterInstallLocalReferenceApplyConfiguration `json:"clusterInstallRef,omitempty"`
-	ClusterPoolRef                          *ClusterPoolReferenceApplyConfiguration         `json:"clusterPoolRef,omitempty"`
-	PowerState                              *hivev1.ClusterPowerState                       `json:"powerState,omitempty"`
-	HibernateAfter                          *metav1.Duration                                `json:"hibernateAfter,omitempty"`
-	InstallAttemptsLimit                    *int32                                          `json:"installAttemptsLimit,omitempty"`
-	BoundServiceAccountSignkingKeySecretRef *corev1.LocalObjectReference                    `json:"boundServiceAccountSigningKeySecretRef,omitempty"`
+	ClusterName                            *string                                         `json:"clusterName,omitempty"`
+	BaseDomain                             *string                                         `json:"baseDomain,omitempty"`
+	Platform                               *PlatformApplyConfiguration                     `json:"platform,omitempty"`
+	PullSecretRef                          *corev1.LocalObjectReference                    `json:"pullSecretRef,omitempty"`
+	PreserveOnDelete                       *bool                                           `json:"preserveOnDelete,omitempty"`
+	ControlPlaneConfig                     *ControlPlaneConfigSpecApplyConfiguration       `json:"controlPlaneConfig,omitempty"`
+	Ingress                                []ClusterIngressApplyConfiguration              `json:"ingress,omitempty"`
+	CertificateBundles                     []CertificateBundleSpecApplyConfiguration       `json:"certificateBundles,omitempty"`
+	ManageDNS                              *bool                                           `json:"manageDNS,omitempty"`
+	ClusterMetadata                        *ClusterMetadataApplyConfiguration              `json:"clusterMetadata,omitempty"`
+	Installed                              *bool                                           `json:"installed,omitempty"`
+	Provisioning                           *ProvisioningApplyConfiguration                 `json:"provisioning,omitempty"`
+	ClusterInstallRef                      *ClusterInstallLocalReferenceApplyConfiguration `json:"clusterInstallRef,omitempty"`
+	ClusterPoolRef                         *ClusterPoolReferenceApplyConfiguration         `json:"clusterPoolRef,omitempty"`
+	PowerState                             *hivev1.ClusterPowerState                       `json:"powerState,omitempty"`
+	HibernateAfter                         *metav1.Duration                                `json:"hibernateAfter,omitempty"`
+	InstallAttemptsLimit                   *int32                                          `json:"installAttemptsLimit,omitempty"`
+	BoundServiceAccountSigningKeySecretRef *corev1.LocalObjectReference                    `json:"boundServiceAccountSigningKeySecretRef,omitempty"`
 }
 
 // ClusterDeploymentSpecApplyConfiguration constructs an declarative configuration of the ClusterDeploymentSpec type for use with
@@ -183,10 +183,10 @@ func (b *ClusterDeploymentSpecApplyConfiguration) WithInstallAttemptsLimit(value
 	return b
 }
 
-// WithBoundServiceAccountSignkingKeySecretRef sets the BoundServiceAccountSignkingKeySecretRef field in the declarative configuration to the given value
+// WithBoundServiceAccountSigningKeySecretRef sets the BoundServiceAccountSigningKeySecretRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the BoundServiceAccountSignkingKeySecretRef field is set to the value of the last call.
-func (b *ClusterDeploymentSpecApplyConfiguration) WithBoundServiceAccountSignkingKeySecretRef(value corev1.LocalObjectReference) *ClusterDeploymentSpecApplyConfiguration {
-	b.BoundServiceAccountSignkingKeySecretRef = &value
+// If called multiple times, the BoundServiceAccountSigningKeySecretRef field is set to the value of the last call.
+func (b *ClusterDeploymentSpecApplyConfiguration) WithBoundServiceAccountSigningKeySecretRef(value corev1.LocalObjectReference) *ClusterDeploymentSpecApplyConfiguration {
+	b.BoundServiceAccountSigningKeySecretRef = &value
 	return b
 }

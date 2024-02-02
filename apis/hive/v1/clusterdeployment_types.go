@@ -191,12 +191,12 @@ type ClusterDeploymentSpec struct {
 	// +optional
 	InstallAttemptsLimit *int32 `json:"installAttemptsLimit,omitempty"`
 
-	// BoundServiceAccountSignkingKeySecretRef refers to a Secret that contains a
+	// BoundServiceAccountSigningKeySecretRef refers to a Secret that contains a
 	// 'bound-service-account-signing-key.key' data key pointing to the private
 	// key that will be used to sign ServiceAccount objects. Primarily used to
 	// provision AWS clusters to use Amazon's Security Token Service.
 	// +optional
-	BoundServiceAccountSignkingKeySecretRef *corev1.LocalObjectReference `json:"boundServiceAccountSigningKeySecretRef,omitempty"`
+	BoundServiceAccountSigningKeySecretRef *corev1.LocalObjectReference `json:"boundServiceAccountSigningKeySecretRef,omitempty"`
 }
 
 // ClusterInstallLocalReference provides reference to an object that implements

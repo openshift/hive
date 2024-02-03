@@ -254,7 +254,7 @@ func InstallerPodSpec(
 	}
 
 	// If this cluster is using a custom BoundServiceAccountSigningKey, mount volume for the bound service account signing key:
-	if ref := cd.Spec.BoundServiceAccountSignkingKeySecretRef; ref != nil {
+	if ref := cd.Spec.BoundServiceAccountSigningKeySecretRef; ref != nil {
 		env = append(env, corev1.EnvVar{
 			Name:  "BOUND_TOKEN_SIGNING_KEY_SECRET_NAME",
 			Value: ref.Name,

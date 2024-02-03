@@ -442,7 +442,7 @@ objects:
                     should belong.
                   type: string
                 boundServiceAccountSigningKeySecretRef:
-                  description: BoundServiceAccountSignkingKeySecretRef refers to a
+                  description: BoundServiceAccountSigningKeySecretRef refers to a
                     Secret that contains a 'bound-service-account-signing-key.key'
                     data key pointing to the private key that will be used to sign
                     ServiceAccount objects. Primarily used to provision AWS clusters

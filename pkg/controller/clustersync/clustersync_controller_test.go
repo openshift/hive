@@ -2530,7 +2530,7 @@ spec:
 				testsyncset.WithApplyMode(hivev1.UpsertResourceApplyMode),
 				testsyncset.WithGeneration(1),
 				testsyncset.WithYAMLResources(resourceToApply),
-				testsyncset.WithResourceParametersEnabled(tc.enableParams),
+				testsyncset.WithEnableResourceTemplates(tc.enableParams),
 			)
 			cd := cdBuilder(scheme).Build()
 			// cdLabels may be `nil`

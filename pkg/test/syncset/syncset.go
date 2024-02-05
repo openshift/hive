@@ -118,6 +118,7 @@ func WithResources(objs ...hivev1.MetaRuntimeObject) Option {
 }
 
 // Each resource is a separate string. Don't pass in one string with a yaml list.
+// NOTE: Input must be valid YAML, including being JSON-able.
 func WithYAMLResources(objs ...string) Option {
 	return func(syncSet *hivev1.SyncSet) {
 		syncSet.Spec.Resources = make([]runtime.RawExtension, len(objs))
@@ -143,7 +144,7 @@ func WithPatches(patches ...hivev1.SyncObjectPatch) Option {
 	}
 }
 
-func WithResourceParametersEnabled(on bool) Option {
+func WithEnableResourceTemplates(on bool) Option {
 	return func(syncSet *hivev1.SyncSet) {
 		syncSet.Spec.EnableResourceTemplates = on
 	}

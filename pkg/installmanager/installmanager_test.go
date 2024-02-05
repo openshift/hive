@@ -833,7 +833,8 @@ spec:
 				},
 			}
 			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
-			modifiedBytes, err := patchWorkerMachineSetManifest([]byte(tc.manifestYAML), pool, testVPCID, logger)
+			mapPoolsByType := map[string]*hivev1.MachinePool{"worker": pool}
+			modifiedBytes, err := patchMachineSetManifest([]byte(tc.manifestYAML), mapPoolsByType, testVPCID, true, false, logger)
 			if tc.expectModified {
 				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
 			} else {
@@ -1031,7 +1032,7 @@ spec:
 
 			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
 
-			modifiedBytes, err := patchLabelMachineSetManifest([]byte(tc.manifestYAML), mapPoolsByType, logger)
+			modifiedBytes, err := patchMachineSetManifest([]byte(tc.manifestYAML), mapPoolsByType, "", false, true, logger)
 			if tc.expectModified {
 				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
 			} else {

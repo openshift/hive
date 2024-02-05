@@ -773,6 +773,7 @@ func TestPatchWorkerMachineSet(t *testing.T) {
 		// expectModified indicates the number of security groups we expect to have been augmented.
 		expectModified int
 		expectErr      bool
+		existingSGs    [][]string
 	}{
 		{
 			name: "Patch applies with one security group filter value",
@@ -785,6 +786,7 @@ func TestPatchWorkerMachineSet(t *testing.T) {
               - test-czcpt-worker-sg
 `),
 			expectModified: 1,
+			existingSGs:    [][]string{{"test-czcpt-worker-sg"}},
 		},
 		{
 			name: "Patch applies with more than one security group filter value",
@@ -798,6 +800,7 @@ func TestPatchWorkerMachineSet(t *testing.T) {
               - another-sg
 `),
 			expectModified: 1,
+			existingSGs:    [][]string{{"an-extra-sg", "another-sg"}},
 		},
 		{
 			name: "Patch applies with no security group filter values",
@@ -809,6 +812,7 @@ func TestPatchWorkerMachineSet(t *testing.T) {
               values: []
 `),
 			expectModified: 1,
+			existingSGs:    [][]string{{}},
 		},
 		{
 			name: "Manifest is not a MachineSet",
@@ -844,6 +848,7 @@ spec:
               - test-security-group
 `),
 			expectModified: 1,
+			existingSGs:    [][]string{{"test-security-group"}},
 		},
 		{
 			name: "Terraform + CAPI",
@@ -864,6 +869,10 @@ spec:
               - test-czcpt-lb
 `),
 			expectModified: 3,
+			existingSGs: [][]string{
+				{"test-czcpt-worker-sg"},
+				{"test-czcpt-node"},
+				{"test-czcpt-lb"}},
 		},
 		{
 			name: "CAPI only",
@@ -880,6 +889,9 @@ spec:
               - test-czcpt-lb
 `),
 			expectModified: 2,
+			existingSGs: [][]string{
+				{"test-czcpt-node"},
+				{"test-czcpt-lb"}},
 		},
 	}
 	for _, tc := range cases {
@@ -895,7 +907,8 @@ spec:
 				},
 			}
 			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
-			modifiedBytes, err := patchWorkerMachineSetManifest([]byte(tc.manifestYAML), pool, testVPCID, logger)
+			mapPoolsByType := map[string]*hivev1.MachinePool{"worker": pool}
+			modifiedBytes, err := patchMachineSetManifest([]byte(tc.manifestYAML), mapPoolsByType, testVPCID, logger)
 			if tc.expectModified > 0 {
 				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
 			} else {
@@ -925,6 +938,14 @@ spec:
 						assert.Contains(t, awsMachineTemplate.SecurityGroups[i].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within Security Group Filters in AWSMachineProviderConfig")
 						assert.Equal(t, awsMachineTemplate.SecurityGroups[i].Filters[1].Name, "vpc-id", "expected an vpc-id named filter to be configured within Security Group Filters in AWSMachineProviderConfig")
 						assert.Contains(t, awsMachineTemplate.SecurityGroups[i].Filters[1].Values, "testvpc123", "expected testvpc123 to be configured within Security Group Filters in AWSMachineProviderConfig")
+					}
+				}
+				// Confirm existing tag:Name security group values were not overwritten
+				if len(tc.existingSGs) > 0 {
+					for i, values := range tc.existingSGs {
+						for _, sg := range values {
+							assert.Contains(t, awsMachineTemplate.SecurityGroups[i].Filters[0].Values, sg, fmt.Sprintf("expected %s to be configured within Security Group Filters in AWSMachineProviderConfig", sg))
+						}
 					}
 				}
 			}
@@ -1097,7 +1118,7 @@ spec:
 
 			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
 
-			modifiedBytes, err := patchLabelMachineSetManifest([]byte(tc.manifestYAML), mapPoolsByType, logger)
+			modifiedBytes, err := patchMachineSetManifest([]byte(tc.manifestYAML), mapPoolsByType, "", logger)
 			if tc.expectModified {
 				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
 			} else {

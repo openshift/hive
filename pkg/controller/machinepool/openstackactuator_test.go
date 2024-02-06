@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	ospprovider "sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1"
+	"sigs.k8s.io/yaml"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
@@ -54,6 +56,153 @@ func BROKEN__TestOpenStackActuator(t *testing.T) {
 			} else {
 				require.NoError(t, err, "unexpected error for test cast")
 				validateOSPMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
+			}
+		})
+	}
+}
+
+func Test_getOpenStackOSImage(t *testing.T) {
+	logger := log.WithField("actuator", "openstackactuator_test")
+	tests := []struct {
+		name             string
+		providerSpecYaml string
+		wantOSImage      string
+		wantErr          bool
+	}{
+		{
+			name:             "Un-unmarshalable providerSpec",
+			providerSpecYaml: "this is not valid yaml",
+			wantErr:          true,
+		},
+		{
+			name: "Old apiVersion, OSImage in image",
+			// This is a real providerSpec from a real live test. We won't bother with
+			// complete ones after this.
+			providerSpecYaml: `apiVersion: openstackproviderconfig.openshift.io/v1alpha1
+cloudName: openstack
+cloudsSecret:
+  name: openstack-cloud-credentials
+  namespace: openshift-machine-api
+flavor: m1.xlarge
+image: clc-auto-psi-fh6rg-rhcos
+kind: OpenstackProviderSpec
+metadata:
+  creationTimestamp: null
+networks:
+- filter: {}
+  subnets:
+  - filter:
+    name: clc-auto-psi-fh6rg-nodes
+    tags: openshiftClusterID=clc-auto-psi-fh6rg
+securityGroups:
+- filter: {}
+  name: clc-auto-psi-fh6rg-worker
+serverGroupName: clc-auto-psi-fh6rg-worker
+serverMetadata:
+  Name: clc-auto-psi-fh6rg-worker
+  openshiftClusterID: clc-auto-psi-fh6rg
+tags:
+- openshiftClusterID=clc-auto-psi-fh6rg
+trunk: true
+userDataSecret:
+  name: worker-user-data
+`,
+			wantOSImage: "clc-auto-psi-fh6rg-rhcos",
+		},
+		{
+			name: "Future apiVersion, OSImage in rootVolume",
+			providerSpecYaml: `apiVersion: something.we.do.not.know.yet/v1theta1
+kind: OpenstackProviderSpec
+rootVolume:
+  sourceUUID: the-image
+`,
+			wantOSImage: "the-image",
+		},
+		{
+			name: "sourceUUID takes precedence over image",
+			providerSpecYaml: `apiVersion: whatever/v1
+image: not-the-image
+kind: OpenstackProviderSpec
+rootVolume:
+  sourceUUID: the-image
+`,
+			wantOSImage: "the-image",
+		},
+		{
+			name: "empty rootVolume ignored",
+			providerSpecYaml: `apiVersion: whatever/v1
+image: the-image
+kind: OpenstackProviderSpec
+rootVolume: {}
+`,
+			wantOSImage: "the-image",
+		},
+		{
+			name: "empty sourceUUID ignored",
+			providerSpecYaml: `apiVersion: whatever/v1
+image: the-image
+kind: OpenstackProviderSpec
+rootVolume:
+  sourceUUID: ""
+`,
+			wantOSImage: "the-image",
+		},
+		{
+			name: "rootVolume not castable to map",
+			providerSpecYaml: `apiVersion: whatever/v1
+kind: OpenstackProviderSpec
+rootVolume: 42
+`,
+			wantErr: true,
+		},
+		{
+			name: "sourceUUID not castable to string",
+			providerSpecYaml: `apiVersion: whatever/v1
+kind: OpenstackProviderSpec
+rootVolume:
+  sourceUUID: 42
+`,
+			wantErr: true,
+		},
+		{
+			name: "image not castable to string",
+			providerSpecYaml: `apiVersion: whatever/v1
+image: 42
+kind: OpenstackProviderSpec
+`,
+			wantErr: true,
+		},
+		{
+			name: "no osImage found",
+			providerSpecYaml: `apiVersion: whatever/v1
+image: ""
+kind: OpenstackProviderSpec
+rootVolume:
+  sourceUUID: ""
+`,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			providerSpecJSON, err := yaml.YAMLToJSON([]byte(tt.providerSpecYaml))
+			assert.NoError(t, err, "Couldn't convert yaml providerSpec test input to JSON")
+			masterMachine := &machineapi.Machine{
+				Spec: machineapi.MachineSpec{
+					ProviderSpec: machineapi.ProviderSpec{
+						Value: &runtime.RawExtension{
+							Raw: providerSpecJSON,
+						},
+					},
+				},
+			}
+			gotOSImage, err := getOpenStackOSImage(masterMachine, logger)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getOpenStackOSImage() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotOSImage != tt.wantOSImage {
+				t.Errorf("getOpenStackOSImage() = %v, want %v", gotOSImage, tt.wantOSImage)
 			}
 		})
 	}

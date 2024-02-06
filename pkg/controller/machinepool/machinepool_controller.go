@@ -73,9 +73,6 @@ func Add(mgr manager.Manager) error {
 	if err := addAlibabaCloudProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add Alibaba provider to scheme")
 	}
-	if err := addOpenStackProviderToScheme(scheme); err != nil {
-		return errors.Wrap(err, "cannot add OpenStack provider to scheme")
-	}
 	if err := addOvirtProviderToScheme(scheme); err != nil {
 		return errors.Wrap(err, "cannot add OVirt provider to scheme")
 	}
@@ -1064,7 +1061,7 @@ func (r *ReconcileMachinePool) createActuator(
 		}
 		return NewAzureActuator(creds, cd.Spec.Platform.Azure.CloudName.Name(), logger)
 	case cd.Spec.Platform.OpenStack != nil:
-		return NewOpenStackActuator(masterMachine, r.scheme, r.Client, logger)
+		return NewOpenStackActuator(masterMachine, r.Client, logger)
 	case cd.Spec.Platform.VSphere != nil:
 		return NewVSphereActuator(masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.Ovirt != nil:

@@ -76,7 +76,6 @@ require (
 	k8s.io/kube-aggregator v0.26.2
 	k8s.io/kubectl v0.26.2
 	k8s.io/utils v0.0.0-20230313181309-38a27ef9d749
-	sigs.k8s.io/cluster-api-provider-openstack v0.0.0
 	sigs.k8s.io/controller-runtime v0.14.2
 	sigs.k8s.io/controller-tools v0.10.0
 	sigs.k8s.io/yaml v1.3.0
@@ -412,7 +411,6 @@ replace (
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
 	sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20200929152424-eab2e087f366 // Indirect dependency through MAO from cluster API providers
 	sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20210626224711-5d94c794092f // Indirect dependency through MAO from cluster API providers
-	sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20211111204942-611d320170af
 )
 
 // from installer as part of https://github.com/openshift/installer/pull/4350

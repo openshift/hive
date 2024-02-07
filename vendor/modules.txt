@@ -10789,10 +10789,6 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/cluster-api-provider-openstack v0.0.0 => github.com/openshift/cluster-api-provider-openstack v0.0.0-20211111204942-611d320170af
-## explicit; go 1.16
-sigs.k8s.io/cluster-api-provider-openstack/pkg/apis
-sigs.k8s.io/cluster-api-provider-openstack/pkg/apis/openstackproviderconfig/v1alpha1
 # sigs.k8s.io/controller-runtime v0.14.2
 ## explicit; go 1.19
 sigs.k8s.io/controller-runtime
@@ -10963,7 +10959,6 @@ sigs.k8s.io/yaml
 # sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v0.4.5
 # sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20200929152424-eab2e087f366
 # sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20210626224711-5d94c794092f
-# sigs.k8s.io/cluster-api-provider-openstack => github.com/openshift/cluster-api-provider-openstack v0.0.0-20211111204942-611d320170af
 # github.com/apparentlymart/go-cidr => github.com/apparentlymart/go-cidr v1.0.1
 # github.com/hashicorp/go-plugin => github.com/hashicorp/go-plugin v1.2.2
 # github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.7

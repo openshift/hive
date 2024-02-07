@@ -11,12 +11,12 @@ import (
 	"gopkg.in/yaml.v2"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	machinev1alpha1 "github.com/openshift/api/machine/v1alpha1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	installosp "github.com/openshift/installer/pkg/asset/machines/openstack"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -38,8 +38,8 @@ type OpenStackActuator struct {
 var _ Actuator = &OpenStackActuator{}
 
 // NewOpenStackActuator is the constructor for building a OpenStackActuator
-func NewOpenStackActuator(masterMachine *machinev1beta1.Machine, scheme *runtime.Scheme, kubeClient client.Client, logger log.FieldLogger) (*OpenStackActuator, error) {
-	osImage, err := getOpenStackOSImage(masterMachine, scheme, logger)
+func NewOpenStackActuator(masterMachine *machinev1beta1.Machine, kubeClient client.Client, logger log.FieldLogger) (*OpenStackActuator, error) {
+	osImage, err := getOpenStackOSImage(masterMachine, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting os image from master machine")
 		return nil, err
@@ -139,37 +139,42 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 }
 
 // Get the OS image from an existing master machine.
-func getOpenStackOSImage(masterMachine *machinev1beta1.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
-	providerSpec, err := decodeOpenStackMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, scheme)
-	if err != nil {
+func getOpenStackOSImage(masterMachine *machinev1beta1.Machine, logger log.FieldLogger) (string, error) {
+	var u unstructured.Unstructured
+	if err := json.Unmarshal(masterMachine.Spec.ProviderSpec.Value.Raw, &u); err != nil {
 		logger.WithError(err).Warn("cannot decode OpenstackProviderSpec from master machine")
-		return "", errors.Wrap(err, "cannot decode OpenstackProviderSpec from master machine")
+		return "", errors.Wrap(err, "Failed to unmarshal master machine OpenstackProviderSpec to Unstructured")
 	}
-	var osImage string
-	if providerSpec.RootVolume != nil {
-		osImage = providerSpec.RootVolume.SourceUUID
-	} else {
-		osImage = providerSpec.Image
+	osImage, err := osImageFromUnstructuredProviderSpec(&u)
+	if err != nil {
+		logger.WithError(err).Warn("cannot glean OSImage from master machine OpenstackProviderSpec")
+		return "", err
 	}
 	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
 	return osImage, nil
 }
 
-func decodeOpenStackMachineProviderSpec(rawExt *runtime.RawExtension, scheme *runtime.Scheme) (*machinev1alpha1.OpenstackProviderSpec, error) {
-	codecFactory := serializer.NewCodecFactory(scheme)
-	decoder := codecFactory.UniversalDecoder(machinev1alpha1.GroupVersion)
-	if rawExt == nil {
-		return nil, fmt.Errorf("MachineSet has no ProviderSpec")
+// osImageFromUnstructuredProviderSpec exists because it's hard to decode OpenstackProviderSpec into a go object
+// because, depending on the version of the cluster from which it was obtained, it may be one of two different
+// apiVersions. Rather than trying to figure out which one, just path into it in its Unstructured form.
+func osImageFromUnstructuredProviderSpec(u *unstructured.Unstructured) (string, error) {
+	sourceUUID, sfound, serr := unstructured.NestedString(u.Object, "rootVolume", "sourceUUID")
+	if serr == nil && sfound && sourceUUID != "" {
+		return sourceUUID, nil
 	}
-	obj, gvk, err := decoder.Decode([]byte(rawExt.Raw), nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode OpenStack ProviderSpec: %v", err)
+	image, ifound, ierr := unstructured.NestedString(u.Object, "image")
+	if ierr == nil && ifound && image != "" {
+		return image, nil
 	}
-	spec, ok := obj.(*machinev1alpha1.OpenstackProviderSpec)
-	if !ok {
-		return nil, fmt.Errorf("unexpected object: %#v", gvk)
+	// Now it's about making the error helpful
+	if ierr != nil || serr != nil {
+		// Aggregate will filter out nil errors
+		return "", utilerrors.NewAggregate([]error{serr, ierr})
 	}
-	return spec, nil
+	if !sfound && !ifound {
+		return "", fmt.Errorf("cannot find rootVolume.sourceUUID or image fields")
+	}
+	return "", fmt.Errorf("empty OSImage found")
 }
 
 // yamlOptsBuilder lets us provide our own functions to return a 'clouds.yaml' file that has been

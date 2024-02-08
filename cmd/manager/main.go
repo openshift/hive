@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	_ "github.com/openshift/generic-admission-server/pkg/cmd"
 
@@ -155,9 +156,9 @@ func newRootCommand() *cobra.Command {
 			run := func(ctx context.Context) {
 				// Create a new Cmd to provide shared dependencies and start components
 				mgr, err := manager.New(cfg, manager.Options{
-					Scheme:             scheme.GetScheme(),
-					MetricsBindAddress: ":2112",
-					Logger:             utillogrus.NewLogr(log.StandardLogger()),
+					Scheme:  scheme.GetScheme(),
+					Metrics: metricsserver.Options{BindAddress: ":2112"},
+					Logger:  utillogrus.NewLogr(log.StandardLogger()),
 				})
 				if err != nil {
 					log.Fatal(err)

@@ -947,6 +947,11 @@ func (in *ClusterDeploymentStatus) DeepCopyInto(out *ClusterDeploymentStatus) {
 		*out = new(PlatformStatus)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ClusterVersionStatus != nil {
+		in, out := &in.ClusterVersionStatus, &out.ClusterVersionStatus
+		*out = new(configv1.ClusterVersionStatus)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

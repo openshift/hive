@@ -560,6 +560,11 @@ const (
 	// of the clusterversion controller, which syncs hive.openshift.io/version* labels. It is how we plumb
 	// HiveConfig.Spec.ClusterVersionPollInterval from hive-operator through to the clusterversion controller.
 	ClusterVersionPollIntervalEnvVar = "CLUSTERVERSION_POLL_INTERVAL"
+
+	// SyncClusterVersionStatusAnnotation, if set to "true" on a ClusterDeployment, causes hive to copy the entire
+	// status section of the `clusterversion version` object from the spoke cluster into
+	// ClusterDeployment.Status.ClusterVersionStatus.
+	SyncClusterVersionStatusAnnotation = "hive.openshift.io/sync-clusterversion-status"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -315,6 +315,91 @@ func TestClusterVersionReconcile(t *testing.T) {
 				assert.Equal(t, "It can't upgrade", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
 			},
 		},
+		{
+			name: "set ClusterVersionStatus",
+			existing: []runtime.Object{
+				testClusterDeployment(withAnnotations(map[string]string{constants.SyncClusterVersionStatusAnnotation: "true"})),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				if assert.NotNil(t, cd.Status.ClusterVersionStatus) {
+					assert.Equal(t, testRemoteClusterVersionStatus(), cd.Status.ClusterVersionStatus, "unexpected cd.status.clusterVersionStatus")
+				}
+			},
+		},
+		{
+			name: "clear ClusterVersionStatus",
+			existing: []runtime.Object{
+				testClusterDeployment(
+					withClusterVersionStatus(testRemoteClusterVersionStatus()),
+					withAnnotations(map[string]string{constants.SyncClusterVersionStatusAnnotation: "false"}),
+				),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Nil(t, cd.Status.ClusterVersionStatus, "expected cd.status.clusterVersionStatus to be nil")
+			},
+		},
+		{
+			name: "changed ClusterVersionStatus",
+			existing: []runtime.Object{
+				testClusterDeployment(
+					withClusterVersionStatus(testRemoteClusterVersionStatus()),
+					withAnnotations(map[string]string{constants.SyncClusterVersionStatusAnnotation: "true"}),
+				),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(withConditions(
+				configv1.ClusterOperatorStatusCondition{
+					Type:   configv1.OperatorDegraded,
+					Status: configv1.ConditionTrue,
+				},
+			)),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				if assert.NotNil(t, cd.Status.ClusterVersionStatus) {
+					assert.Equal(t, testRemoteClusterVersionStatus(withConditions(
+						configv1.ClusterOperatorStatusCondition{
+							Type:   configv1.OperatorDegraded,
+							Status: configv1.ConditionTrue,
+						},
+					)), cd.Status.ClusterVersionStatus, "unexpected cd.status.clusterVersionStatus")
+				}
+			},
+		},
+		{
+			name: "unchanged populated ClusterVersionStatus",
+			existing: []runtime.Object{
+				testClusterDeployment(
+					withClusterVersionStatus(testRemoteClusterVersionStatus()),
+					withAnnotations(map[string]string{constants.SyncClusterVersionStatusAnnotation: "true"}),
+				),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				if assert.NotNil(t, cd.Status.ClusterVersionStatus) {
+					assert.Equal(t, testRemoteClusterVersionStatus(), cd.Status.ClusterVersionStatus, "unexpected cd.status.clusterVersionStatus")
+				}
+
+			},
+		},
+		{
+			name: "unchanged unset ClusterVersionStatus",
+			existing: []runtime.Object{
+				testClusterDeployment(
+					withClusterVersionStatus(testRemoteClusterVersionStatus()),
+					// Also test unparseable annotation here
+					withAnnotations(map[string]string{constants.SyncClusterVersionStatusAnnotation: "bogus"}),
+				),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Nil(t, cd.Status.ClusterVersionStatus)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -377,6 +462,12 @@ func deleted() cdOpt {
 	return func(cd *hivev1.ClusterDeployment) {
 		now := metav1.Now()
 		cd.DeletionTimestamp = &now
+	}
+}
+
+func withClusterVersionStatus(cvs *configv1.ClusterVersionStatus) cdOpt {
+	return func(cd *hivev1.ClusterDeployment) {
+		cd.Status.ClusterVersionStatus = cvs
 	}
 }
 

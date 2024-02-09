@@ -532,6 +532,11 @@ const (
 	// OverrideInstallerImageNameAnnotation specifies the name of the image within release metadata containing the
 	// `openshift-install` command. By default we look for the image named `installer`.
 	OverrideInstallerImageNameAnnotation = "hive.openshift.io/installer-image-name-override"
+
+	// SyncClusterVersionStatusAnnotation, if set to "true" on a ClusterDeployment, causes hive to copy the entire
+	// status section of the `clusterversion version` object from the spoke cluster into
+	// ClusterDeployment.Status.ClusterVersionStatus.
+	SyncClusterVersionStatusAnnotation = "hive.openshift.io/sync-clusterversion-status"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

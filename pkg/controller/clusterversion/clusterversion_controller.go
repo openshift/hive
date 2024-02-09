@@ -3,6 +3,7 @@ package clusterversion
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/blang/semver/v4"
@@ -151,7 +152,13 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
+	// This Update()s CD iff necessary
 	if err := r.updateClusterVersionLabels(cd, clusterVersion, cdLog); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// This Update()s CD.Status iff necessary
+	if err := r.syncClusterVersionStatus(cd, clusterVersion, cdLog); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -196,6 +203,42 @@ func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterD
 
 	if err := r.Update(context.TODO(), cd); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error update cluster deployment labels")
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterVersion) syncClusterVersionStatus(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
+	doSync := false
+
+	if stringVal := cd.Annotations[constants.SyncClusterVersionStatusAnnotation]; stringVal != "" {
+		var err error
+		doSync, err = strconv.ParseBool(stringVal)
+		if err != nil {
+			cdLog.WithError(err).Warnf("error parsing %s annotation", constants.SyncClusterVersionStatusAnnotation)
+			return err
+		}
+	}
+
+	if doSync {
+		// TODO: Confirm that this won't thrash due to e.g. probe times or slice ordering
+		if reflect.DeepEqual(cd.Status.ClusterVersionStatus, clusterVersion) {
+			cdLog.Debug("clusterversion status has not changed, nothing to update")
+			return nil
+		}
+		cdLog.Debug("updating clusterversion status")
+		cd.Status.ClusterVersionStatus = &clusterVersion.Status
+	} else {
+		// If this got switched off, clear the field so it doesn't go stale
+		if cd.Status.ClusterVersionStatus == nil {
+			return nil
+		}
+		cdLog.Debug("clearing clusterversion status")
+		cd.Status.ClusterVersionStatus = nil
+	}
+
+	if err := r.Status().Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating cluster deployment's clusterVersionStatus")
 		return err
 	}
 	return nil

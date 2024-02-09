@@ -3,6 +3,7 @@
 package v1
 
 import (
+	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +25,7 @@ type ClusterDeploymentStatusApplyConfiguration struct {
 	PowerState              *hivev1.ClusterPowerState                      `json:"powerState,omitempty"`
 	ProvisionRef            *corev1.LocalObjectReference                   `json:"provisionRef,omitempty"`
 	Platform                *PlatformStatusApplyConfiguration              `json:"platformStatus,omitempty"`
+	ClusterVersionStatus    *configv1.ClusterVersionStatus                 `json:"clusterVersionStatus,omitempty"`
 }
 
 // ClusterDeploymentStatusApplyConfiguration constructs an declarative configuration of the ClusterDeploymentStatus type for use with
@@ -143,5 +145,13 @@ func (b *ClusterDeploymentStatusApplyConfiguration) WithProvisionRef(value corev
 // If called multiple times, the Platform field is set to the value of the last call.
 func (b *ClusterDeploymentStatusApplyConfiguration) WithPlatform(value *PlatformStatusApplyConfiguration) *ClusterDeploymentStatusApplyConfiguration {
 	b.Platform = value
+	return b
+}
+
+// WithClusterVersionStatus sets the ClusterVersionStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ClusterVersionStatus field is set to the value of the last call.
+func (b *ClusterDeploymentStatusApplyConfiguration) WithClusterVersionStatus(value configv1.ClusterVersionStatus) *ClusterDeploymentStatusApplyConfiguration {
+	b.ClusterVersionStatus = &value
 	return b
 }

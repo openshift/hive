@@ -1816,6 +1816,7 @@ data:
     - name: AWSDeniedBySCP
       searchRegexStrings:
       - "AccessDenied: .* with an explicit deny in a service control policy"
+      - "UnauthorizedOperation: .* with an explicit deny in a service control policy"
       installFailingReason: AWSDeniedBySCP
       installFailingMessage: "A service control policy (SCP) is too restrictive for performing cluster installation"
     - name: VcpuLimitExceeded

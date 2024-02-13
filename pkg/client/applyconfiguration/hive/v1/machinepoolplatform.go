@@ -3,7 +3,6 @@
 package v1
 
 import (
-	alibabacloud "github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	aws "github.com/openshift/hive/apis/hive/v1/aws"
 	azure "github.com/openshift/hive/apis/hive/v1/azure"
 	gcp "github.com/openshift/hive/apis/hive/v1/gcp"
@@ -16,28 +15,19 @@ import (
 // MachinePoolPlatformApplyConfiguration represents an declarative configuration of the MachinePoolPlatform type for use
 // with apply.
 type MachinePoolPlatformApplyConfiguration struct {
-	AlibabaCloud *alibabacloud.MachinePool `json:"alibabacloud,omitempty"`
-	AWS          *aws.MachinePoolPlatform  `json:"aws,omitempty"`
-	Azure        *azure.MachinePool        `json:"azure,omitempty"`
-	GCP          *gcp.MachinePool          `json:"gcp,omitempty"`
-	OpenStack    *openstack.MachinePool    `json:"openstack,omitempty"`
-	VSphere      *vsphere.MachinePool      `json:"vsphere,omitempty"`
-	Ovirt        *ovirt.MachinePool        `json:"ovirt,omitempty"`
-	IBMCloud     *ibmcloud.MachinePool     `json:"ibmcloud,omitempty"`
+	AWS       *aws.MachinePoolPlatform `json:"aws,omitempty"`
+	Azure     *azure.MachinePool       `json:"azure,omitempty"`
+	GCP       *gcp.MachinePool         `json:"gcp,omitempty"`
+	OpenStack *openstack.MachinePool   `json:"openstack,omitempty"`
+	VSphere   *vsphere.MachinePool     `json:"vsphere,omitempty"`
+	Ovirt     *ovirt.MachinePool       `json:"ovirt,omitempty"`
+	IBMCloud  *ibmcloud.MachinePool    `json:"ibmcloud,omitempty"`
 }
 
 // MachinePoolPlatformApplyConfiguration constructs an declarative configuration of the MachinePoolPlatform type for use with
 // apply.
 func MachinePoolPlatform() *MachinePoolPlatformApplyConfiguration {
 	return &MachinePoolPlatformApplyConfiguration{}
-}
-
-// WithAlibabaCloud sets the AlibabaCloud field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AlibabaCloud field is set to the value of the last call.
-func (b *MachinePoolPlatformApplyConfiguration) WithAlibabaCloud(value alibabacloud.MachinePool) *MachinePoolPlatformApplyConfiguration {
-	b.AlibabaCloud = &value
-	return b
 }
 
 // WithAWS sets the AWS field in the declarative configuration to the given value

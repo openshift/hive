@@ -27,7 +27,6 @@ spec:
     For provisioning OpenShift, Hive uses the [OpenShift installer](https://github.com/openshift/installer).
 
     ### Supported cloud providers
-    * Alibaba Cloud
     * AWS
     * Azure
     * Google Cloud Platform

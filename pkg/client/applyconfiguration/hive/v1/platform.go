@@ -4,7 +4,6 @@ package v1
 
 import (
 	agent "github.com/openshift/hive/apis/hive/v1/agent"
-	alibabacloud "github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	aws "github.com/openshift/hive/apis/hive/v1/aws"
 	azure "github.com/openshift/hive/apis/hive/v1/azure"
 	baremetal "github.com/openshift/hive/apis/hive/v1/baremetal"
@@ -19,7 +18,6 @@ import (
 // PlatformApplyConfiguration represents an declarative configuration of the Platform type for use
 // with apply.
 type PlatformApplyConfiguration struct {
-	AlibabaCloud   *alibabacloud.Platform   `json:"alibabacloud,omitempty"`
 	AWS            *aws.Platform            `json:"aws,omitempty"`
 	Azure          *azure.Platform          `json:"azure,omitempty"`
 	BareMetal      *baremetal.Platform      `json:"baremetal,omitempty"`
@@ -36,14 +34,6 @@ type PlatformApplyConfiguration struct {
 // apply.
 func Platform() *PlatformApplyConfiguration {
 	return &PlatformApplyConfiguration{}
-}
-
-// WithAlibabaCloud sets the AlibabaCloud field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AlibabaCloud field is set to the value of the last call.
-func (b *PlatformApplyConfiguration) WithAlibabaCloud(value alibabacloud.Platform) *PlatformApplyConfiguration {
-	b.AlibabaCloud = &value
-	return b
 }
 
 // WithAWS sets the AWS field in the declarative configuration to the given value

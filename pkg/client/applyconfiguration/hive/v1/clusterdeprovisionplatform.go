@@ -5,28 +5,19 @@ package v1
 // ClusterDeprovisionPlatformApplyConfiguration represents an declarative configuration of the ClusterDeprovisionPlatform type for use
 // with apply.
 type ClusterDeprovisionPlatformApplyConfiguration struct {
-	AlibabaCloud *AlibabaCloudClusterDeprovisionApplyConfiguration `json:"alibabacloud,omitempty"`
-	AWS          *AWSClusterDeprovisionApplyConfiguration          `json:"aws,omitempty"`
-	Azure        *AzureClusterDeprovisionApplyConfiguration        `json:"azure,omitempty"`
-	GCP          *GCPClusterDeprovisionApplyConfiguration          `json:"gcp,omitempty"`
-	OpenStack    *OpenStackClusterDeprovisionApplyConfiguration    `json:"openstack,omitempty"`
-	VSphere      *VSphereClusterDeprovisionApplyConfiguration      `json:"vsphere,omitempty"`
-	Ovirt        *OvirtClusterDeprovisionApplyConfiguration        `json:"ovirt,omitempty"`
-	IBMCloud     *IBMClusterDeprovisionApplyConfiguration          `json:"ibmcloud,omitempty"`
+	AWS       *AWSClusterDeprovisionApplyConfiguration       `json:"aws,omitempty"`
+	Azure     *AzureClusterDeprovisionApplyConfiguration     `json:"azure,omitempty"`
+	GCP       *GCPClusterDeprovisionApplyConfiguration       `json:"gcp,omitempty"`
+	OpenStack *OpenStackClusterDeprovisionApplyConfiguration `json:"openstack,omitempty"`
+	VSphere   *VSphereClusterDeprovisionApplyConfiguration   `json:"vsphere,omitempty"`
+	Ovirt     *OvirtClusterDeprovisionApplyConfiguration     `json:"ovirt,omitempty"`
+	IBMCloud  *IBMClusterDeprovisionApplyConfiguration       `json:"ibmcloud,omitempty"`
 }
 
 // ClusterDeprovisionPlatformApplyConfiguration constructs an declarative configuration of the ClusterDeprovisionPlatform type for use with
 // apply.
 func ClusterDeprovisionPlatform() *ClusterDeprovisionPlatformApplyConfiguration {
 	return &ClusterDeprovisionPlatformApplyConfiguration{}
-}
-
-// WithAlibabaCloud sets the AlibabaCloud field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AlibabaCloud field is set to the value of the last call.
-func (b *ClusterDeprovisionPlatformApplyConfiguration) WithAlibabaCloud(value *AlibabaCloudClusterDeprovisionApplyConfiguration) *ClusterDeprovisionPlatformApplyConfiguration {
-	b.AlibabaCloud = value
-	return b
 }
 
 // WithAWS sets the AWS field in the declarative configuration to the given value

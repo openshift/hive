@@ -15,14 +15,6 @@ To view what `create-cluster` generates, *without* submitting it to the API serv
 
 `--release-image` can be specified to control which OpenShift release image to use.
 
-#### Create Cluster on Alibaba Cloud
-
-Credentials will be read from either `~/.alibabacloud/credentials`, the contents of the `ALIBABA_CLOUD_ACCESS_KEY_ID` and `ALIBABA_CLOUD_ACCESS_KEY_SECRET` environment variables, or the value provided with the `--creds-file` parameter (in increasing order of preference). An [Alibaba Cloud credential manifests](./using-hive.md#alibaba-cloud-credential-manifests) directory containing cloud credential secrets for OpenShift components must be provided.
-
-```bash
-bin/hiveutil create-cluster --cloud=alibabacloud --region="cn-hangzhou" --base-domain=alibaba.hive.openshift.com --manifests=/path/to/manifests/ --credentials-mode-manual mycluster
-```
-
 #### Create Cluster on AWS
 
 Credentials will be read from your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables. If the environment variables are missing or empty, then `create-cluster` will look for creds at `~/.aws/credentials`. Alternatively you can specify an AWS credentials file with `--creds-file`.

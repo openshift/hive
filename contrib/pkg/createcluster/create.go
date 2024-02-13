@@ -22,7 +22,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/contrib/pkg/utils"
-	alibabacloudutils "github.com/openshift/hive/contrib/pkg/utils/alibabacloud"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azurecredutil "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
@@ -90,7 +89,6 @@ https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest
 `
 const (
 	hiveutilCreatedLabel = "hive.openshift.io/hiveutil-created"
-	cloudAlibaba         = "alibabacloud"
 	cloudAWS             = "aws"
 	cloudAzure           = "azure"
 	cloudGCP             = "gcp"
@@ -110,7 +108,6 @@ type: TestFailResource
 
 var (
 	validClouds = map[string]bool{
-		cloudAlibaba:   true,
 		cloudAWS:       true,
 		cloudAzure:     true,
 		cloudGCP:       true,
@@ -120,8 +117,7 @@ var (
 		cloudVSphere:   true,
 	}
 	manualCCOModeClouds = map[string]bool{
-		cloudAlibaba: true,
-		cloudIBM:     true,
+		cloudIBM: true,
 	}
 )
 
@@ -238,7 +234,6 @@ func NewCreateClusterCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use: `create-cluster CLUSTER_DEPLOYMENT_NAME
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=alibabacloud --base-domain=alibaba.hive.openshift.com --manifests=/manifests --credentials-mode-manual
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=aws
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resource-group-name=RESOURCE_GROUP_NAME
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
@@ -311,7 +306,7 @@ This option is redundant (but permitted) for following clouds, which always use 
 	flags.BoolVar(&opt.CreateSampleSyncsets, "create-sample-syncsets", false, "Create a set of sample syncsets for testing")
 	flags.StringVar(&opt.ManifestsDir, "manifests", "", "Directory containing manifests to add during installation")
 	flags.StringVar(&opt.MachineNetwork, "machine-network", "10.0.0.0/16", "Cluster's MachineNetwork to pass to the installer")
-	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to Alibaba Cloud, AWS, Azure, GCP and IBM.")
+	flags.StringVar(&opt.Region, "region", "", "Region to which to install the cluster. This is only relevant to AWS, Azure, GCP and IBM.")
 	flags.StringSliceVarP(&opt.Labels, "labels", "l", nil, "Label to apply to the ClusterDeployment (key=val). Multiple labels may be delimited by commas (key1=val1,key2=val2).")
 	flags.StringSliceVarP(&opt.Annotations, "annotations", "a", nil, "Annotation to apply to the ClusterDeployment (key=val)")
 	flags.BoolVar(&opt.SkipMachinePools, "skip-machine-pools", false, "Skip generation of Hive MachinePools for day 2 MachineSet management")
@@ -379,8 +374,6 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 
 	if o.Region == "" {
 		switch o.Cloud {
-		case cloudAlibaba:
-			o.Region = "cn-hangzhou"
 		case cloudAWS:
 			o.Region = "us-east-1"
 		case cloudAzure:
@@ -473,7 +466,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 	if o.Region != "" {
 		switch c := o.Cloud; c {
-		case cloudAlibaba, cloudAWS, cloudAzure, cloudGCP, cloudIBM:
+		case cloudAWS, cloudAzure, cloudGCP, cloudIBM:
 		default:
 			return fmt.Errorf("cannot specify --region when using --cloud=%q", c)
 		}
@@ -625,18 +618,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	}
 
 	switch o.Cloud {
-	case cloudAlibaba:
-		defaultCredsFilePath := filepath.Join(o.homeDir, ".alibabacloud", "credentials")
-		accessKeyID, accessKeySecret, err := alibabacloudutils.GetAlibabaCloud(o.CredsFile, defaultCredsFilePath)
-		if err != nil {
-			return nil, err
-		}
-		alibabaCloudProvider := &clusterresource.AlibabaCloudBuilder{
-			AccessKeyID:     accessKeyID,
-			AccessKeySecret: accessKeySecret,
-			Region:          o.Region,
-		}
-		builder.CloudBuilder = alibabaCloudProvider
 	case cloudAWS:
 		defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
 		accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(o.CredsFile, defaultCredsFilePath)

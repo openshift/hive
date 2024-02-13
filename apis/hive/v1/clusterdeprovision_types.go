@@ -40,8 +40,6 @@ type ClusterDeprovisionStatus struct {
 // ClusterDeprovisionPlatform contains platform-specific configuration for the
 // deprovision
 type ClusterDeprovisionPlatform struct {
-	// AlibabaCloud contains Alibaba Cloud specific deprovision settings
-	AlibabaCloud *AlibabaCloudClusterDeprovision `json:"alibabacloud,omitempty"`
 	// AWS contains AWS-specific deprovision settings
 	AWS *AWSClusterDeprovision `json:"aws,omitempty"`
 	// Azure contains Azure-specific deprovision settings
@@ -56,17 +54,6 @@ type ClusterDeprovisionPlatform struct {
 	Ovirt *OvirtClusterDeprovision `json:"ovirt,omitempty"`
 	// IBMCloud contains IBM Cloud specific deprovision settings
 	IBMCloud *IBMClusterDeprovision `json:"ibmcloud,omitempty"`
-}
-
-// AlibabaCloudClusterDeprovision contains AlibabaCloud-specific configuration for a ClusterDeprovision
-type AlibabaCloudClusterDeprovision struct {
-	// Region is the Alibaba region for this deprovision
-	Region string `json:"region"`
-	// BaseDomain is the DNS base domain.
-	// TODO: Use the non-platform-specific BaseDomain field.
-	BaseDomain string `json:"baseDomain"`
-	// CredentialsSecretRef is the Alibaba account credentials to use for deprovisioning the cluster
-	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 }
 
 // AWSClusterDeprovision contains AWS-specific configuration for a ClusterDeprovision

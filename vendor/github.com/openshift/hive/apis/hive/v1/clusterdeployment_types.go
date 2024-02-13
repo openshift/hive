@@ -6,7 +6,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/hive/apis/hive/v1/agent"
-	"github.com/openshift/hive/apis/hive/v1/alibabacloud"
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
@@ -626,9 +625,6 @@ type ClusterDeploymentList struct {
 // Platform is the configuration for the specific platform upon which to perform
 // the installation. Only one of the platform configuration should be set.
 type Platform struct {
-	// AlibabaCloud is the configuration used when installing on Alibaba Cloud
-	AlibabaCloud *alibabacloud.Platform `json:"alibabacloud,omitempty"`
-
 	// AWS is the configuration used when installing on AWS.
 	AWS *aws.Platform `json:"aws,omitempty"`
 

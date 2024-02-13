@@ -30,7 +30,6 @@ func NewDeprovisionCommand() *cobra.Command {
 	}
 	flags := cmd.PersistentFlags()
 	flags.StringVar(&credsDir, "creds-dir", "", "directory of the creds. Changes in the creds will cause the program to terminate")
-	cmd.AddCommand(NewDeprovisionAlibabaCloudCommand())
 	cmd.AddCommand(NewDeprovisionAzureCommand())
 	cmd.AddCommand(NewDeprovisionGCPCommand())
 	cmd.AddCommand(NewDeprovisionIBMCloudCommand())

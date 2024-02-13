@@ -188,29 +188,6 @@ github.com/alexkohler/prealloc/pkg
 # github.com/alingse/asasalint v0.0.11
 ## explicit; go 1.18
 github.com/alingse/asasalint
-# github.com/aliyun/alibaba-cloud-sdk-go v1.61.1458
-## explicit; go 1.13
-github.com/aliyun/alibaba-cloud-sdk-go/sdk
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/provider
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/signers
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/responses
-github.com/aliyun/alibaba-cloud-sdk-go/sdk/utils
-github.com/aliyun/alibaba-cloud-sdk-go/services/alidns
-github.com/aliyun/alibaba-cloud-sdk-go/services/ecs
-github.com/aliyun/alibaba-cloud-sdk-go/services/pvtz
-github.com/aliyun/alibaba-cloud-sdk-go/services/ram
-github.com/aliyun/alibaba-cloud-sdk-go/services/resourcemanager
-github.com/aliyun/alibaba-cloud-sdk-go/services/slb
-github.com/aliyun/alibaba-cloud-sdk-go/services/tag
-github.com/aliyun/alibaba-cloud-sdk-go/services/vpc
-# github.com/aliyun/aliyun-oss-go-sdk v2.1.8+incompatible
-## explicit
-github.com/aliyun/aliyun-oss-go-sdk/oss
 # github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df
 ## explicit; go 1.18
 github.com/antlr/antlr4/runtime/Go/antlr/v4
@@ -9119,9 +9096,6 @@ github.com/openshift/client-go/machine/listers/machine/v1beta1
 github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
 github.com/openshift/cloud-credential-operator/pkg/aws
 github.com/openshift/cloud-credential-operator/version
-# github.com/openshift/cluster-api-provider-alibaba v0.0.1-0.20220606091606-a7bf6bf132ca
-## explicit; go 1.18
-github.com/openshift/cluster-api-provider-alibaba/pkg/apis/alibabacloudprovider/v1
 # github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519
 ## explicit; go 1.17
 github.com/openshift/cluster-api-provider-ovirt/pkg/apis
@@ -9150,7 +9124,6 @@ github.com/openshift/hive/apis
 github.com/openshift/hive/apis/helpers
 github.com/openshift/hive/apis/hive/v1
 github.com/openshift/hive/apis/hive/v1/agent
-github.com/openshift/hive/apis/hive/v1/alibabacloud
 github.com/openshift/hive/apis/hive/v1/aws
 github.com/openshift/hive/apis/hive/v1/azure
 github.com/openshift/hive/apis/hive/v1/baremetal
@@ -9167,7 +9140,6 @@ github.com/openshift/hive/apis/scheme
 # github.com/openshift/installer v0.9.0-master.0.20230721132804-2c449439afd9
 ## explicit; go 1.20
 github.com/openshift/installer/data
-github.com/openshift/installer/pkg/asset/installconfig/alibabacloud
 github.com/openshift/installer/pkg/asset/installconfig/aws
 github.com/openshift/installer/pkg/asset/installconfig/azure
 github.com/openshift/installer/pkg/asset/installconfig/gcp
@@ -9176,7 +9148,6 @@ github.com/openshift/installer/pkg/asset/installconfig/ibmcloud/responses
 github.com/openshift/installer/pkg/asset/installconfig/openstack/validation
 github.com/openshift/installer/pkg/asset/installconfig/ovirt
 github.com/openshift/installer/pkg/asset/installconfig/vsphere
-github.com/openshift/installer/pkg/asset/machines/alibabacloud
 github.com/openshift/installer/pkg/asset/machines/aws
 github.com/openshift/installer/pkg/asset/machines/azure
 github.com/openshift/installer/pkg/asset/machines/gcp
@@ -9184,7 +9155,6 @@ github.com/openshift/installer/pkg/asset/machines/ibmcloud
 github.com/openshift/installer/pkg/asset/machines/openstack
 github.com/openshift/installer/pkg/asset/machines/ovirt
 github.com/openshift/installer/pkg/asset/machines/vsphere
-github.com/openshift/installer/pkg/destroy/alibabacloud
 github.com/openshift/installer/pkg/destroy/aws
 github.com/openshift/installer/pkg/destroy/azure
 github.com/openshift/installer/pkg/destroy/gcp

@@ -58,6 +58,7 @@ const (
 	noMatchLog                              = "an example of something that doesn't match the log regexes"
 	bootstrapFailed                         = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
 	awsDeniedByScp                          = "AccessDenied: entity is not authorized to perform: iam:PressTheButton on resource: Thing with an explicit deny in a service control policy"
+	awsUnauthorizedByScp                    = "Error: error creating EC2 VPC: UnauthorizedOperation: You are not authorized to perform this operation. User: arn:aws:iam::12341234123:user/osdManagedAdmin-12341 is not authorized to perform: ec2:CreateVpc on resource: arn:aws:ec2:us-west-1:123412341234:vpc/* with an explicit deny in a service control policy"
 	awsInsufficientCapacity                 = "level=error msg=\"failed to fetch Cluster: failed to generate asset \"Cluster\": failure applying terraform for \"cluster\" stage: failed to create cluster: failed to apply Terraform: exit status 1\n\nError: Error launching source instance: InsufficientInstanceCapacity: We currently do not have sufficient m5.2xlarge capacity in the Availability Zone you requested (eu-south-1b). Our system will be working on provisioning additional capacity. You can currently get m5.2xlarge capacity by not specifying an Availability Zone in your request or choosing eu-south-1a, eu-south-1c."
 	gp3VolumeLimitExceeded                  = "Error launching source instance: VolumeLimitExceeded: You have exceeded your maximum gp3 storage limit of 50 TiB in this region. Please contact AWS Support to request an Elastic Block Store service limit increase."
 	defaultEbsKmsKeyInsufficientPermissions = "level=error msg=Error: Error waiting for instance (i-abcdefg01234) to become ready: Failed to reach target state. Reason: Client.InternalError: Client error on launch"
@@ -191,6 +192,11 @@ func TestParseInstallLog(t *testing.T) {
 		{
 			name:           "AWSDeniedBySCP",
 			log:            pointer.String(awsDeniedByScp),
+			expectedReason: "AWSDeniedBySCP",
+		},
+		{
+			name:           "AWSUnauthorizedBySCP",
+			log:            pointer.String(awsUnauthorizedByScp),
 			expectedReason: "AWSDeniedBySCP",
 		},
 		{

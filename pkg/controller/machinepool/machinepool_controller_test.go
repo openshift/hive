@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
@@ -1171,7 +1172,12 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			}
 			scheme := scheme.GetScheme()
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(localExisting...).Build()
-			remoteFakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.remoteExisting...).Build()
+			infra := &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+			}
+			remoteFakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(append(test.remoteExisting, infra)...).Build()
 
 			mockCtrl := gomock.NewController(t)
 
@@ -1756,7 +1762,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 func printAWSMachineProviderConfig(cfg *machineapi.AWSMachineProviderConfig) string {
 	b, err := json.Marshal(cfg)
 	if err != nil {
-
+		// Where this is used, may as well print the error :shrug:
+		return err.Error()
 	}
 	return string(b)
 }

@@ -272,7 +272,7 @@ func getClient(kubeConfig *rest.Config) (client.Client, error) {
 
 	managerOptions := manager.Options{
 		Scheme:         scheme,
-		MapperProvider: apiutil.NewDiscoveryRESTMapper,
+		MapperProvider: apiutil.NewDynamicRESTMapper,
 	}
 	httpClient, err := rest.HTTPClientFor(kubeConfig)
 	if err != nil {

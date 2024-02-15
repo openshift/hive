@@ -11,16 +11,15 @@ import (
 	"k8s.io/client-go/rest"
 	apiregv1client "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 
-	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
-func MustGetClient() client.Client {
+func MustGetClient() client.WithWatch {
 	return MustGetClientFromConfig(MustGetConfig())
 }
 
-func MustGetClientFromConfig(cfg *rest.Config) client.Client {
-	c, err := client.New(cfg, client.Options{Scheme: scheme.GetScheme()})
+func MustGetClientFromConfig(cfg *rest.Config) client.WithWatch {
+	c, err := client.NewWithWatch(cfg, client.Options{Scheme: scheme.GetScheme()})
 	if err != nil {
 		log.Fatalf("Error obtaining client: %v", err)
 	}
@@ -31,14 +30,6 @@ func MustGetKubernetesClient() kclient.Interface {
 	c, err := kclient.NewForConfig(MustGetConfig())
 	if err != nil {
 		log.Fatalf("Error obtaining kubernetes client: %v", err)
-	}
-	return c
-}
-
-func MustGetHiveClient() hiveclient.Interface {
-	c, err := hiveclient.NewForConfig(MustGetConfig())
-	if err != nil {
-		log.Fatalf("Error obtaining hive client: %v", err)
 	}
 	return c
 }

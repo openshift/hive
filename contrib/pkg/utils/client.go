@@ -9,13 +9,13 @@ import (
 )
 
 // GetClient returns a new dynamic controller-runtime client.
-func GetClient() (client.Client, error) {
+func GetClient() (client.WithWatch, error) {
 	cfg, err := GetClientConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	dynamicClient, err := client.New(cfg, client.Options{Scheme: scheme.GetScheme()})
+	dynamicClient, err := client.NewWithWatch(cfg, client.Options{Scheme: scheme.GetScheme()})
 	if err != nil {
 		return nil, err
 	}

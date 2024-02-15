@@ -20,7 +20,7 @@ cd "${SCRIPT_ROOT}"
 # NOTE: Keep Makefile's `verify-codegen` in sync with the paths in these commands (the second and third arg)
 ###
 
-GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "all" \
+GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "deepcopy" \
   github.com/openshift/hive/pkg/client \
   github.com/openshift/hive/apis \
   "hive:v1 hiveinternal:v1alpha1" \

@@ -14,17 +14,18 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hiveclient "github.com/openshift/hive/pkg/client/clientset/versioned"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -47,9 +48,9 @@ func TestDestroyCluster(t *testing.T) {
 
 	fail := failTestFunc(t, logger)
 
-	c := common.MustGetHiveClient()
+	c := common.MustGetClient()
 	logger.Info("Deleting cluster deployment")
-	err := c.HiveV1().ClusterDeployments(cd.Namespace).Delete(context.TODO(), cd.Name, metav1.DeleteOptions{})
+	err := c.Delete(context.TODO(), cd)
 	if err != nil {
 		fail("Failed to delete cluster deployment: %v", err)
 	}
@@ -68,17 +69,10 @@ func TestDestroyCluster(t *testing.T) {
 	logger.Info("Cluster deployment has been removed")
 
 	// Ensure that no dnszones owned by the clusterdeployment are left over
-	zoneLabelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			constants.DNSZoneTypeLabel:           constants.DNSZoneTypeChild,
-			constants.ClusterDeploymentNameLabel: cd.Name,
-		},
-	})
-	if err != nil {
-		fail("Failed to create a dns zone label selector: %v", err)
-	}
-	dnsZoneList, err := c.HiveV1().DNSZones(cd.Namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: zoneLabelSelector.String(),
+	dnsZoneList := &hivev1.DNSZoneList{}
+	err = c.List(context.TODO(), dnsZoneList, client.MatchingLabels{
+		constants.DNSZoneTypeLabel:           constants.DNSZoneTypeChild,
+		constants.ClusterDeploymentNameLabel: cd.Name,
 	})
 	if err != nil {
 		fail("Failed to get dns zone list: %v", err)
@@ -195,14 +189,26 @@ func writeJobLog(job *batchv1.Job, logger *log.Entry) {
 	}
 }
 
-func waitForClusterDeploymentToGoAway(cd *hivev1.ClusterDeployment, client hiveclient.Interface) error {
+func waitForClusterDeploymentToGoAway(cd *hivev1.ClusterDeployment, cl client.WithWatch) error {
 	waitContext, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	nameFilter := func(options *metav1.ListOptions) {
-		options.FieldSelector = fmt.Sprintf("metadata.name=%s", cd.Name)
+	opts := []client.ListOption{
+		client.InNamespace(cd.Namespace),
+		client.MatchingFields{"metadata.name": cd.Name},
 	}
-	listWatcher := cache.NewFilteredListWatchFromClient(client.HiveV1().RESTClient(), "clusterdeployments", cd.Namespace, nameFilter)
+
+	listWatcher := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			clist := &hivev1.ClusterDeploymentList{}
+			err := cl.List(context.TODO(), clist, opts...)
+			return clist, err
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			clist := &hivev1.ClusterDeploymentList{}
+			return cl.Watch(context.TODO(), clist, opts...)
+		},
+	}
 	checkIfExists := func(store cache.Store) (bool, error) {
 		return len(store.List()) == 0, nil
 	}

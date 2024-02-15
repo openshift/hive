@@ -2,6 +2,8 @@ package powervs
 
 import (
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Since there is no API to query these, we have to hard-code them here.
@@ -12,7 +14,9 @@ import (
 type Region struct {
 	Description string
 	VPCRegion   string
+	COSRegion   string
 	Zones       []string
+	SysTypes    []string
 }
 
 // Regions holds the regions for IBM Power VS, and descriptions used during the survey.
@@ -20,61 +24,37 @@ var Regions = map[string]Region{
 	"dal": {
 		Description: "Dallas, USA",
 		VPCRegion:   "us-south",
-		Zones:       []string{"dal12"},
+		COSRegion:   "us-south",
+		Zones:       []string{"dal10", "dal12"},
+		SysTypes:    []string{"s922", "e980"},
 	},
 	"eu-de": {
 		Description: "Frankfurt, Germany",
 		VPCRegion:   "eu-de",
-		Zones: []string{
-			"eu-de-1",
-			"eu-de-2",
-		},
+		COSRegion:   "eu-de",
+		Zones:       []string{"eu-de-1", "eu-de-2"},
+		SysTypes:    []string{"s922", "e980"},
 	},
-	"lon": {
-		Description: "London, UK.",
-		VPCRegion:   "eu-gb",
-		Zones: []string{
-			"lon04",
-			"lon06",
-		},
-	},
-	"mon": {
-		Description: "Montreal, Canada",
-		VPCRegion:   "ca-tor",
-		Zones:       []string{"mon01"},
-	},
-	"osa": {
-		Description: "Osaka, Japan",
-		VPCRegion:   "jp-osa",
-		Zones:       []string{"osa21"},
-	},
-	"syd": {
-		Description: "Sydney, Australia",
-		VPCRegion:   "au-syd",
-		Zones: []string{
-			"syd04",
-			"syd05",
-		},
+	"mad": {
+		Description: "Madrid, Spain",
+		VPCRegion:   "eu-es",
+		COSRegion:   "eu-de", // @HACK - PowerVS says COS not supported in this region
+		Zones:       []string{"mad02", "mad04"},
+		SysTypes:    []string{"s1022"},
 	},
 	"sao": {
 		Description: "São Paulo, Brazil",
 		VPCRegion:   "br-sao",
-		Zones:       []string{"sao01"},
+		COSRegion:   "br-sao",
+		Zones:       []string{"sao04"},
+		SysTypes:    []string{"s922", "e980"},
 	},
-	"tor": {
-		Description: "Toronto, Canada",
-		VPCRegion:   "ca-tor",
-		Zones:       []string{"tor01"},
-	},
-	"tok": {
-		Description: "Tokyo, Japan",
-		VPCRegion:   "jp-tok",
-		Zones:       []string{"tok04"},
-	},
-	"us-east": {
+	"wdc": {
 		Description: "Washington DC, USA",
 		VPCRegion:   "us-east",
-		Zones:       []string{"us-east"},
+		COSRegion:   "us-east",
+		Zones:       []string{"wdc06", "wdc07"},
+		SysTypes:    []string{"s922", "e980"},
 	},
 }
 
@@ -143,4 +123,52 @@ func RegionFromZone(zone string) string {
 		}
 	}
 	return ""
+}
+
+// AvailableSysTypes returns the default system type for the zone.
+func AvailableSysTypes(region string) ([]string, error) {
+	knownRegion, ok := Regions[region]
+	if !ok {
+		return nil, fmt.Errorf("unknown region name provided")
+	}
+	return knownRegion.SysTypes, nil
+}
+
+// AllKnownSysTypes returns aggregated known system types from all regions.
+func AllKnownSysTypes() sets.Set[string] {
+	sysTypes := sets.New[string]()
+	for _, region := range Regions {
+		sysTypes.Insert(region.SysTypes...)
+	}
+	return sysTypes
+}
+
+// COSRegionForVPCRegion returns the corresponding COS region for the given VPC region.
+func COSRegionForVPCRegion(vpcRegion string) (string, error) {
+	for r := range Regions {
+		if vpcRegion == Regions[r].VPCRegion {
+			return Regions[r].COSRegion, nil
+		}
+	}
+
+	return "", fmt.Errorf("COS region corresponding to a VPC region %s not found ", vpcRegion)
+}
+
+// COSRegionForPowerVSRegion returns the IBM COS region for the specified PowerVS region.
+func COSRegionForPowerVSRegion(region string) (string, error) {
+	if r, ok := Regions[region]; ok {
+		return r.COSRegion, nil
+	}
+
+	return "", fmt.Errorf("COS region corresponding to a PowerVS region %s not found ", region)
+}
+
+// ValidateCOSRegion validates that given COS region is known/tested.
+func ValidateCOSRegion(region string) bool {
+	for r := range Regions {
+		if region == Regions[r].COSRegion {
+			return true
+		}
+	}
+	return false
 }

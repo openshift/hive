@@ -23,6 +23,16 @@ var (
 )
 
 var (
+	FeatureGateValidatingAdmissionPolicy = FeatureGateName("ValidatingAdmissionPolicy")
+	validatingAdmissionPolicy            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateValidatingAdmissionPolicy,
+		},
+		OwningJiraComponent: "kube-apiserver",
+		ResponsiblePerson:   "benluddy",
+		OwningProduct:       kubernetes,
+	}
+
 	FeatureGateGatewayAPI = FeatureGateName("GatewayAPI")
 	gateGatewayAPI        = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
@@ -41,16 +51,6 @@ var (
 		OwningJiraComponent: "auth",
 		ResponsiblePerson:   "stlaz",
 		OwningProduct:       ocpSpecific,
-	}
-
-	FeatureGateRetroactiveDefaultStorageClass = FeatureGateName("RetroactiveDefaultStorageClass")
-	retroactiveDefaultStorageClass            = FeatureGateDescription{
-		FeatureGateAttributes: FeatureGateAttributes{
-			Name: FeatureGateRetroactiveDefaultStorageClass,
-		},
-		OwningJiraComponent: "storage",
-		ResponsiblePerson:   "RomanBednar",
-		OwningProduct:       kubernetes,
 	}
 
 	FeatureGateExternalCloudProvider = FeatureGateName("ExternalCloudProvider")
@@ -143,16 +143,6 @@ var (
 		OwningProduct:       ocpSpecific,
 	}
 
-	FeatureGatePDBUnhealthyPodEvictionPolicy = FeatureGateName("PDBUnhealthyPodEvictionPolicy")
-	pdbUnhealthyPodEvictionPolicy            = FeatureGateDescription{
-		FeatureGateAttributes: FeatureGateAttributes{
-			Name: FeatureGatePDBUnhealthyPodEvictionPolicy,
-		},
-		OwningJiraComponent: "apps",
-		ResponsiblePerson:   "atiratree",
-		OwningProduct:       kubernetes,
-	}
-
 	FeatureGateDynamicResourceAllocation = FeatureGateName("DynamicResourceAllocation")
 	dynamicResourceAllocation            = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
@@ -163,30 +153,10 @@ var (
 		OwningProduct:       kubernetes,
 	}
 
-	FeatureGateAdmissionWebhookMatchConditions = FeatureGateName("AdmissionWebhookMatchConditions")
-	admissionWebhookMatchConditions            = FeatureGateDescription{
-		FeatureGateAttributes: FeatureGateAttributes{
-			Name: FeatureGateAdmissionWebhookMatchConditions,
-		},
-		OwningJiraComponent: "kube-apiserver",
-		ResponsiblePerson:   "benluddy",
-		OwningProduct:       kubernetes,
-	}
-
 	FeatureGateAzureWorkloadIdentity = FeatureGateName("AzureWorkloadIdentity")
 	azureWorkloadIdentity            = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
 			Name: FeatureGateAzureWorkloadIdentity,
-		},
-		OwningJiraComponent: "cloud-credential-operator",
-		ResponsiblePerson:   "abutcher",
-		OwningProduct:       ocpSpecific,
-	}
-
-	FeatureGateAWSSecurityTokenService = FeatureGateName("AWSSecurityTokenService")
-	awsSecurityTokenService            = FeatureGateDescription{
-		FeatureGateAttributes: FeatureGateAttributes{
-			Name: FeatureGateAWSSecurityTokenService,
 		},
 		OwningJiraComponent: "cloud-credential-operator",
 		ResponsiblePerson:   "abutcher",
@@ -292,6 +262,16 @@ var (
 		OwningProduct:       ocpSpecific,
 	}
 
+	FeatureGateNetworkLiveMigration = FeatureGateName("NetworkLiveMigration")
+	sdnLiveMigration                = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateNetworkLiveMigration,
+		},
+		OwningJiraComponent: "Networking/ovn-kubernetes",
+		ResponsiblePerson:   "pliu",
+		OwningProduct:       ocpSpecific,
+	}
+
 	FeatureGateAutomatedEtcdBackup = FeatureGateName("AutomatedEtcdBackup")
 	automatedEtcdBackup            = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
@@ -310,5 +290,165 @@ var (
 		OwningJiraComponent: "ecoproject",
 		ResponsiblePerson:   "msluiter",
 		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateDNSNameResolver = FeatureGateName("DNSNameResolver")
+	dnsNameResolver            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateDNSNameResolver,
+		},
+		OwningJiraComponent: "dns",
+		ResponsiblePerson:   "miciah",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateVSphereControlPlaneMachineset = FeatureGateName("VSphereControlPlaneMachineSet")
+	vSphereControlPlaneMachineset            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateVSphereControlPlaneMachineset,
+		},
+		OwningJiraComponent: "splat",
+		ResponsiblePerson:   "rvanderp3",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateMachineConfigNodes = FeatureGateName("MachineConfigNodes")
+	machineConfigNodes            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateMachineConfigNodes,
+		},
+		OwningJiraComponent: "MachineConfigOperator",
+		ResponsiblePerson:   "cdoern",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateClusterAPIInstall = FeatureGateName("ClusterAPIInstall")
+	clusterAPIInstall            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateClusterAPIInstall,
+		},
+		OwningJiraComponent: "Installer",
+		ResponsiblePerson:   "vincepri",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateMetricsServer = FeatureGateName("MetricsServer")
+	metricsServer            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateMetricsServer,
+		},
+		OwningJiraComponent: "Monitoring",
+		ResponsiblePerson:   "slashpai",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateInstallAlternateInfrastructureAWS = FeatureGateName("InstallAlternateInfrastructureAWS")
+	installAlternateInfrastructureAWS            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateInstallAlternateInfrastructureAWS,
+		},
+		OwningJiraComponent: "Installer",
+		ResponsiblePerson:   "padillon",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateGCPClusterHostedDNS = FeatureGateName("GCPClusterHostedDNS")
+	gcpClusterHostedDNS            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateGCPClusterHostedDNS,
+		},
+		OwningJiraComponent: "Installer",
+		ResponsiblePerson:   "barbacbd",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateMixedCPUsAllocation = FeatureGateName("MixedCPUsAllocation")
+	mixedCPUsAllocation            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateMixedCPUsAllocation,
+		},
+		OwningJiraComponent: "NodeTuningOperator",
+		ResponsiblePerson:   "titzhak",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateManagedBootImages = FeatureGateName("ManagedBootImages")
+	managedBootImages            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateManagedBootImages,
+		},
+		OwningJiraComponent: "MachineConfigOperator",
+		ResponsiblePerson:   "djoshy",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateDisableKubeletCloudCredentialProviders = FeatureGateName("DisableKubeletCloudCredentialProviders")
+	disableKubeletCloudCredentialProviders            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateDisableKubeletCloudCredentialProviders,
+		},
+		OwningJiraComponent: "cloud-provider",
+		ResponsiblePerson:   "jspeed",
+		OwningProduct:       kubernetes,
+	}
+
+	FeatureGateOnClusterBuild = FeatureGateName("OnClusterBuild")
+	onClusterBuild            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateOnClusterBuild,
+		},
+		OwningJiraComponent: "MachineConfigOperator",
+		ResponsiblePerson:   "dkhater",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateSignatureStores = FeatureGateName("SignatureStores")
+	signatureStores            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateSignatureStores,
+		},
+		OwningJiraComponent: "Cluster Version Operator",
+		ResponsiblePerson:   "lmohanty",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateKMSv1 = FeatureGateName("KMSv1")
+	kmsv1            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateKMSv1,
+		},
+		OwningJiraComponent: "kube-apiserver",
+		ResponsiblePerson:   "dgrisonnet",
+		OwningProduct:       kubernetes,
+	}
+
+	FeatureGatePinnedImages = FeatureGateName("PinnedImages")
+	pinnedImages            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGatePinnedImages,
+		},
+		OwningJiraComponent: "MachineConfigOperator",
+		ResponsiblePerson:   "jhernand",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateUpgradeStatus = FeatureGateName("UpgradeStatus")
+	upgradeStatus            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateUpgradeStatus,
+		},
+		OwningJiraComponent: "Cluster Version Operator",
+		ResponsiblePerson:   "pmuller",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateTranslateStreamCloseWebsocketRequests = FeatureGateName("TranslateStreamCloseWebsocketRequests")
+	translateStreamCloseWebsocketRequests            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateTranslateStreamCloseWebsocketRequests,
+		},
+		OwningJiraComponent: "kube-apiserver",
+		ResponsiblePerson:   "akashem",
+		OwningProduct:       kubernetes,
 	}
 )

@@ -88,6 +88,18 @@ func (r resourceId) String() string {
 	}
 }
 
+func (m *Manifest) String() string {
+	if m == nil {
+		return "nil pointer manifest"
+	}
+
+	if m.OriginalFilename != "" {
+		return fmt.Sprintf("Filename: %q %s", m.OriginalFilename, m.id.String())
+	}
+
+	return m.id.String()
+}
+
 func (m Manifest) SameResourceID(manifest Manifest) bool {
 	return m.id.equal(manifest.id)
 }
@@ -344,8 +356,9 @@ func ManifestsFromFiles(files []string) ([]Manifest, error) {
 			errs = append(errs, errors.Wrapf(err, "error parsing %s", file.Name()))
 			continue
 		}
-		for _, m := range ms {
-			m.OriginalFilename = filepath.Base(file.Name())
+		filename := filepath.Base(file.Name())
+		for i, m := range ms {
+			ms[i].OriginalFilename = filename
 			err = addIfNotDuplicateResource(m, ids)
 			if err != nil {
 				errs = append(errs, errors.Wrapf(err, "File %s contains", file.Name()))

@@ -71,7 +71,10 @@ func (r *kubeconfigClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
 	}
 
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	expander := restmapper.NewShortcutExpander(mapper, discoveryClient)
+	expander := restmapper.NewShortcutExpander(
+		mapper, discoveryClient,
+		// TODO: Plumb logger through kubeconfigClientGetter and log warnings here
+		func(string) {})
 	return expander, nil
 }
 

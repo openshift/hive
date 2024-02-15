@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -271,7 +271,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 			"Failed to check if machine exists: %v", err,
 		))
 
-		if patchErr := r.updateStatus(ctx, m, pointer.StringDeref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
+		if patchErr := r.updateStatus(ctx, m, ptr.Deref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
 			klog.Errorf("%v: error patching status: %v", machineName, patchErr)
 		}
 
@@ -283,7 +283,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 		if err := r.actuator.Update(ctx, m); err != nil {
 			klog.Errorf("%v: error updating machine: %v, retrying in %v seconds", machineName, err, requeueAfter)
 
-			if patchErr := r.updateStatus(ctx, m, pointer.StringDeref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
+			if patchErr := r.updateStatus(ctx, m, ptr.Deref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
 				klog.Errorf("%v: error patching status: %v", machineName, patchErr)
 			}
 
@@ -295,7 +295,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 
 		if !machineIsProvisioned(m) {
 			klog.Errorf("%v: instance exists but providerID or addresses has not been given to the machine yet, requeuing", machineName)
-			if patchErr := r.updateStatus(ctx, m, pointer.StringDeref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
+			if patchErr := r.updateStatus(ctx, m, ptr.Deref(m.Status.Phase, ""), nil, originalConditions); patchErr != nil {
 				klog.Errorf("%v: error patching status: %v", machineName, patchErr)
 			}
 
@@ -338,7 +338,7 @@ func (r *ReconcileMachine) Reconcile(ctx context.Context, request reconcile.Requ
 	))
 
 	// Machine resource created and instance does not exist yet.
-	if pointer.StringDeref(m.Status.Phase, "") == "" {
+	if ptr.Deref(m.Status.Phase, "") == "" {
 		klog.V(2).Infof("%v: setting phase to Provisioning and requeuing", machineName)
 		if err := r.updateStatus(ctx, m, machinev1.PhaseProvisioning, nil, originalConditions); err != nil {
 			return reconcile.Result{}, err
@@ -400,7 +400,7 @@ func isInvalidMachineConfigurationError(err error) bool {
 // machine conditions so that the diff can be calculated properly within this function.
 func (r *ReconcileMachine) updateStatus(ctx context.Context, machine *machinev1.Machine, phase string, failureCause error, originalConditions []machinev1.Condition) error {
 	phaseChanged := false
-	if pointer.StringDeref(machine.Status.Phase, "") != phase {
+	if ptr.Deref(machine.Status.Phase, "") != phase {
 		klog.V(3).Infof("%v: going into phase %q", machine.GetName(), phase)
 
 		phaseChanged = true
@@ -582,7 +582,7 @@ func (r *ReconcileMachine) now() time.Time {
 }
 
 func machineIsProvisioned(machine *machinev1.Machine) bool {
-	return len(machine.Status.Addresses) > 0 || pointer.StringDeref(machine.Spec.ProviderID, "") != ""
+	return len(machine.Status.Addresses) > 0 || ptr.Deref(machine.Spec.ProviderID, "") != ""
 }
 
 func machineHasNode(machine *machinev1.Machine) bool {
@@ -590,7 +590,7 @@ func machineHasNode(machine *machinev1.Machine) bool {
 }
 
 func machineIsFailed(machine *machinev1.Machine) bool {
-	return pointer.StringDeref(machine.Status.Phase, "") == machinev1.PhaseFailed
+	return ptr.Deref(machine.Status.Phase, "") == machinev1.PhaseFailed
 }
 
 func nodeIsUnreachable(node *corev1.Node) bool {

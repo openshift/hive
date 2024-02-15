@@ -9,10 +9,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/strings/slices"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/vsphere"
+	"github.com/openshift/installer/pkg/types/vsphere/conversion"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -48,6 +50,25 @@ func ValidatePlatform(p *vsphere.Platform, agentBasedInstallation bool, fldPath 
 		// Validate hosts if configured for static IP
 		if p.Hosts != nil {
 			allErrs = append(allErrs, validateHosts(p, c, fldPath.Child("hosts"))...)
+		}
+	} else {
+		// agent-based installation allows the credentials to be optional
+		if len(p.VCenters) > 0 {
+			if p.VCenters[0].Username != "" && p.VCenters[0].Password != "" &&
+				p.VCenters[0].Server != "" && len(p.VCenters[0].Datacenters) != 0 {
+				allErrs = append(allErrs, validateVCenters(p, fldPath.Child("vcenters"))...)
+			}
+		}
+
+		// Validate the FailureDomain if it is not one that is pregenerated.
+		// Pregenerated ones are used if user does not enter any credentials.
+		// Pregenerated values do not pass validation.
+		if len(p.FailureDomains) > 0 {
+			if p.FailureDomains[0].Name != conversion.GeneratedFailureDomainName &&
+				p.FailureDomains[0].Zone != conversion.GeneratedFailureDomainZone &&
+				p.FailureDomains[0].Region != conversion.GeneratedFailureDomainRegion {
+				allErrs = append(allErrs, validateFailureDomains(p, fldPath.Child("failureDomains"), isLegacyUpi)...)
+			}
 		}
 	}
 
@@ -95,12 +116,20 @@ func validateVCenters(p *vsphere.Platform, fldPath *field.Path) field.ErrorList 
 }
 
 func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUpi bool) field.ErrorList {
+	var fdNames []string
 	allErrs := field.ErrorList{}
 	topologyFld := fldPath.Child("topology")
 	var associatedVCenter *vsphere.VCenter
-	for _, failureDomain := range p.FailureDomains {
+	for index, failureDomain := range p.FailureDomains {
 		if len(failureDomain.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify the name"))
+		} else {
+			// Check and make sure the name is not duplicated w/ any other Failure Domains
+			if slices.Contains(fdNames, failureDomain.Name) {
+				allErrs = append(allErrs, field.Duplicate(fldPath.Child("name").Index(index), failureDomain.Name))
+			} else {
+				fdNames = append(fdNames, failureDomain.Name)
+			}
 		}
 		if len(failureDomain.Server) > 0 {
 			for i, vcenter := range p.VCenters {

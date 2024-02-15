@@ -24,6 +24,7 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
+	testassert "github.com/openshift/hive/pkg/test/assert"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	testcr "github.com/openshift/hive/pkg/test/clusterrelocate"
 	testcm "github.com/openshift/hive/pkg/test/configmap"
@@ -851,7 +852,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 				if !assert.NoError(t, err, "unexpected error getting destination object") {
 					continue
 				}
-				assert.Equal(t, obj, destObj, "destination object different than expected object")
+				testassert.AssertEqualWhereItCounts(t, obj, destObj, "destination object different than expected object")
 			}
 			for _, obj := range tc.unexpectedResources {
 				objKey := client.ObjectKeyFromObject(obj)

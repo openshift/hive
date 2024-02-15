@@ -84,6 +84,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.machine.v1.AzureFailureDomain
   map:
     fields:
+    - name: subnet
+      type:
+        scalar: string
     - name: zone
       type:
         scalar: string
@@ -212,10 +215,32 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.openshift.api.machine.v1.GCPFailureDomain
           elementRelationship: atomic
+    - name: nutanix
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.machine.v1.NutanixFailureDomainReference
+          elementRelationship: associative
+          keys:
+          - name
+    - name: openstack
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.machine.v1.OpenStackFailureDomain
+          elementRelationship: atomic
     - name: platform
       type:
         scalar: string
       default: ""
+    - name: vsphere
+      type:
+        list:
+          elementType:
+            namedType: com.github.openshift.api.machine.v1.VSphereFailureDomain
+          elementRelationship: associative
+          keys:
+          - name
     unions:
     - discriminator: platform
       fields:
@@ -225,10 +250,23 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: Azure
       - fieldName: gcp
         discriminatorValue: GCP
+      - fieldName: nutanix
+        discriminatorValue: Nutanix
+      - fieldName: openstack
+        discriminatorValue: OpenStack
+      - fieldName: vsphere
+        discriminatorValue: VSphere
 - name: com.github.openshift.api.machine.v1.GCPFailureDomain
   map:
     fields:
     - name: zone
+      type:
+        scalar: string
+      default: ""
+- name: com.github.openshift.api.machine.v1.NutanixFailureDomainReference
+  map:
+    fields:
+    - name: name
       type:
         scalar: string
       default: ""
@@ -238,7 +276,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: failureDomains
       type:
         namedType: com.github.openshift.api.machine.v1.FailureDomains
-      default: {}
     - name: metadata
       type:
         namedType: com.github.openshift.api.machine.v1.ControlPlaneMachineSetTemplateObjectMeta
@@ -247,6 +284,32 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.openshift.api.machine.v1beta1.MachineSpec
       default: {}
+- name: com.github.openshift.api.machine.v1.OpenStackFailureDomain
+  map:
+    fields:
+    - name: availabilityZone
+      type:
+        scalar: string
+    - name: rootVolume
+      type:
+        namedType: com.github.openshift.api.machine.v1.RootVolume
+- name: com.github.openshift.api.machine.v1.RootVolume
+  map:
+    fields:
+    - name: availabilityZone
+      type:
+        scalar: string
+    - name: volumeType
+      type:
+        scalar: string
+      default: ""
+- name: com.github.openshift.api.machine.v1.VSphereFailureDomain
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: com.github.openshift.api.machine.v1beta1.Condition
   map:
     fields:

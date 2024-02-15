@@ -18,6 +18,7 @@ import (
 	kresource "k8s.io/cli-runtime/pkg/resource"
 	kcmdapply "k8s.io/kubectl/pkg/cmd/apply"
 	"k8s.io/kubectl/pkg/cmd/delete"
+	"k8s.io/kubectl/pkg/util/openapi"
 
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
@@ -182,13 +183,12 @@ func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 		}
 		return CreatedApplyResult, nil
 	}
-	openAPISchema, _ := f.OpenAPISchema()
 	patcher := kcmdapply.Patcher{
 		Mapping:       info.Mapping,
 		Helper:        kresource.NewHelper(info.Client, info.Mapping),
 		Overwrite:     true,
 		BackOff:       clockwork.NewRealClock(),
-		OpenapiSchema: openAPISchema,
+		OpenAPIGetter: f,
 	}
 	sourceBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, sourceObj)
 	if err != nil {
@@ -203,6 +203,14 @@ func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 		result = UnchangedApplyResult
 	}
 	return result, nil
+}
+
+type annoyingIndirectOpenAPIResourcesGetter struct {
+	r openapi.Resources
+}
+
+func (x annoyingIndirectOpenAPIResourcesGetter) OpenAPISchema() (openapi.Resources, error) {
+	return x.r, nil
 }
 
 func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams genericclioptions.IOStreams) (*kcmdapply.ApplyOptions, *changeTracker, error) {
@@ -229,7 +237,7 @@ func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams gene
 		return nil, nil, err
 	}
 	// Re-use the openAPISchema that should have been initialized in the constructor.
-	o.OpenAPISchema = r.openAPISchema
+	o.OpenAPIGetter = annoyingIndirectOpenAPIResourcesGetter{r.openAPISchema}
 	o.Validator, err = f.Validator(metav1.FieldValidationIgnore)
 	if err != nil {
 		r.logger.WithError(err).Error("cannot obtain schema to validate objects from factory")

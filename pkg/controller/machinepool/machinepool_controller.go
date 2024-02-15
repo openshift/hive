@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +47,7 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
+	"github.com/openshift/hive/pkg/util/logrus"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
@@ -316,6 +318,11 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
+	infrastructure, err := r.getInfrastructure(remoteClusterAPIClient, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
@@ -333,7 +340,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return *result, nil
 	}
 
-	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, remoteClusterAPIClient, logger)
+	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, infrastructure, remoteClusterAPIClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineSets")
 		return reconcile.Result{}, err
@@ -352,6 +359,23 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	return r.updatePoolStatusForMachineSets(pool, machineSets, remoteClusterAPIClient, logger)
+}
+
+func (r *ReconcileMachinePool) getInfrastructure(remoteClusterAPIClient client.Client, logger log.FieldLogger) (*configv1.Infrastructure, error) {
+	infrastructure := &configv1.Infrastructure{}
+	tm := metav1.TypeMeta{}
+	tm.SetGroupVersionKind(configv1.SchemeGroupVersion.WithKind("Infrastructure"))
+	if err := remoteClusterAPIClient.Get(
+		context.Background(),
+		types.NamespacedName{Name: "cluster"},
+		infrastructure,
+		// TODO: Why is this necessary?
+		&client.GetOptions{Raw: &metav1.GetOptions{TypeMeta: tm}},
+	); err != nil {
+		logger.WithError(err).Error("unable to fetch infrastructure object")
+		return nil, err
+	}
+	return infrastructure, nil
 }
 
 func (r *ReconcileMachinePool) getMasterMachine(
@@ -513,7 +537,7 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 }
 
 // Compare Failure Domains to confirm that they match
-func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, logger log.FieldLogger) (bool, error) {
+func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
 	rSpec := rMS.Spec.Template.Spec
 	gSpec := gMS.Spec.Template.Spec
 	var err error
@@ -543,12 +567,14 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 		}
 	}
 
-	rMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(rSpec)
+	// - The provider config funcs take a different kind of logger. Convert.
+	logr := logrus.NewLogr(logger)
+	rMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, rSpec, infrastructure)
 	if err != nil {
 		logger.WithError(err).Errorf("unable to parse remote MachineSet %v provider config", rMS.Name)
 		return false, err
 	}
-	gMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(gSpec)
+	gMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, gSpec, infrastructure)
 	if err != nil {
 		logger.WithError(err).Errorf("unable to parse generated MachineSet %v provider config", gMS.Name)
 		return false, err
@@ -564,7 +590,7 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 // are part of the same MachinePool. If the machinePoolNameLabels match, the function then confirms that the MachineSets belong
 // to the same Availability Zone (aka Failure Domain). This ensures that the MachineSets are referring to the same machines.
 // We can count on this because the upsteam generator guarentees at most one MachineSet per Failure Domain. HIVE-2254.
-func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, logger log.FieldLogger) (bool, error) {
+func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
 
 	gLabel, gLabelExists := gMS.Labels[machinePoolNameLabel]
 	rLabel, rLabelExists := rMS.Labels[machinePoolNameLabel]
@@ -580,7 +606,7 @@ func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, log
 		return false, nil
 	}
 
-	return matchFailureDomains(gMS, rMS, logger)
+	return matchFailureDomains(gMS, rMS, infrastructure, logger)
 }
 
 func (r *ReconcileMachinePool) syncMachineSets(
@@ -588,6 +614,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	cd *hivev1.ClusterDeployment,
 	generatedMachineSets []*machineapi.MachineSet,
 	remoteMachineSets *machineapi.MachineSetList,
+	infrastructure *configv1.Infrastructure,
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
 ) ([]*machineapi.MachineSet, error) {
@@ -615,7 +642,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 		found := false
 		for _, rMS := range remoteMachineSets.Items {
 			var err error
-			found, err = matchMachineSets(ms, rMS, logger)
+			found, err = matchMachineSets(ms, rMS, infrastructure, logger)
 			// Labels matched but there was still an error
 			// In order to prevent the creation of a duplicate MachineSet, error out and do not continue matching.
 			if err != nil {

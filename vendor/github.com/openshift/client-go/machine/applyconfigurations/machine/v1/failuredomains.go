@@ -9,10 +9,13 @@ import (
 // FailureDomainsApplyConfiguration represents an declarative configuration of the FailureDomains type for use
 // with apply.
 type FailureDomainsApplyConfiguration struct {
-	Platform *v1.PlatformType                        `json:"platform,omitempty"`
-	AWS      *[]AWSFailureDomainApplyConfiguration   `json:"aws,omitempty"`
-	Azure    *[]AzureFailureDomainApplyConfiguration `json:"azure,omitempty"`
-	GCP      *[]GCPFailureDomainApplyConfiguration   `json:"gcp,omitempty"`
+	Platform  *v1.PlatformType                                  `json:"platform,omitempty"`
+	AWS       *[]AWSFailureDomainApplyConfiguration             `json:"aws,omitempty"`
+	Azure     *[]AzureFailureDomainApplyConfiguration           `json:"azure,omitempty"`
+	GCP       *[]GCPFailureDomainApplyConfiguration             `json:"gcp,omitempty"`
+	VSphere   []VSphereFailureDomainApplyConfiguration          `json:"vsphere,omitempty"`
+	OpenStack []OpenStackFailureDomainApplyConfiguration        `json:"openstack,omitempty"`
+	Nutanix   []NutanixFailureDomainReferenceApplyConfiguration `json:"nutanix,omitempty"`
 }
 
 // FailureDomainsApplyConfiguration constructs an declarative configuration of the FailureDomains type for use with
@@ -85,6 +88,45 @@ func (b *FailureDomainsApplyConfiguration) WithGCP(values ...*GCPFailureDomainAp
 			panic("nil value passed to WithGCP")
 		}
 		*b.GCP = append(*b.GCP, *values[i])
+	}
+	return b
+}
+
+// WithVSphere adds the given value to the VSphere field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the VSphere field.
+func (b *FailureDomainsApplyConfiguration) WithVSphere(values ...*VSphereFailureDomainApplyConfiguration) *FailureDomainsApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithVSphere")
+		}
+		b.VSphere = append(b.VSphere, *values[i])
+	}
+	return b
+}
+
+// WithOpenStack adds the given value to the OpenStack field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the OpenStack field.
+func (b *FailureDomainsApplyConfiguration) WithOpenStack(values ...*OpenStackFailureDomainApplyConfiguration) *FailureDomainsApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithOpenStack")
+		}
+		b.OpenStack = append(b.OpenStack, *values[i])
+	}
+	return b
+}
+
+// WithNutanix adds the given value to the Nutanix field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Nutanix field.
+func (b *FailureDomainsApplyConfiguration) WithNutanix(values ...*NutanixFailureDomainReferenceApplyConfiguration) *FailureDomainsApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithNutanix")
+		}
+		b.Nutanix = append(b.Nutanix, *values[i])
 	}
 	return b
 }

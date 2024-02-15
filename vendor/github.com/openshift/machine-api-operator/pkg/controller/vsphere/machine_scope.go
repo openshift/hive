@@ -22,9 +22,10 @@ const (
 // machineScopeParams defines the input parameters used to create a new MachineScope.
 type machineScopeParams struct {
 	context.Context
-	client    runtimeclient.Client
-	apiReader runtimeclient.Reader
-	machine   *machinev1.Machine
+	client                     runtimeclient.Client
+	apiReader                  runtimeclient.Reader
+	machine                    *machinev1.Machine
+	StaticIPFeatureGateEnabled bool
 }
 
 // machineScope defines a scope defined around a machine and its cluster.
@@ -39,10 +40,11 @@ type machineScope struct {
 	// vSphere cloud-provider config
 	vSphereConfig *vSphereConfig
 	// machine resource
-	machine            *machinev1.Machine
-	providerSpec       *machinev1.VSphereMachineProviderSpec
-	providerStatus     *machinev1.VSphereMachineProviderStatus
-	machineToBePatched runtimeclient.Patch
+	machine                    *machinev1.Machine
+	providerSpec               *machinev1.VSphereMachineProviderSpec
+	providerStatus             *machinev1.VSphereMachineProviderStatus
+	machineToBePatched         runtimeclient.Patch
+	staticIPFeatureGateEnabled bool
 }
 
 // newMachineScope creates a new machineScope from the supplied parameters.
@@ -84,15 +86,16 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 	}
 
 	return &machineScope{
-		Context:            params.Context,
-		client:             params.client,
-		apiReader:          params.apiReader,
-		session:            authSession,
-		machine:            params.machine,
-		providerSpec:       providerSpec,
-		providerStatus:     providerStatus,
-		vSphereConfig:      vSphereConfig,
-		machineToBePatched: runtimeclient.MergeFrom(params.machine.DeepCopy()),
+		Context:                    params.Context,
+		client:                     params.client,
+		apiReader:                  params.apiReader,
+		session:                    authSession,
+		machine:                    params.machine,
+		providerSpec:               providerSpec,
+		providerStatus:             providerStatus,
+		vSphereConfig:              vSphereConfig,
+		staticIPFeatureGateEnabled: params.StaticIPFeatureGateEnabled,
+		machineToBePatched:         runtimeclient.MergeFrom(params.machine.DeepCopy()),
 	}, nil
 }
 

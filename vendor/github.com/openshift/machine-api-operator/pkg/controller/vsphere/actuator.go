@@ -27,27 +27,30 @@ const (
 
 // Actuator is responsible for performing machine reconciliation.
 type Actuator struct {
-	client        runtimeclient.Client
-	apiReader     runtimeclient.Reader
-	eventRecorder record.EventRecorder
-	TaskIDCache   map[string]string
+	client                     runtimeclient.Client
+	apiReader                  runtimeclient.Reader
+	eventRecorder              record.EventRecorder
+	TaskIDCache                map[string]string
+	StaticIPFeatureGateEnabled bool
 }
 
 // ActuatorParams holds parameter information for Actuator.
 type ActuatorParams struct {
-	Client        runtimeclient.Client
-	APIReader     runtimeclient.Reader
-	EventRecorder record.EventRecorder
-	TaskIDCache   map[string]string
+	Client                     runtimeclient.Client
+	APIReader                  runtimeclient.Reader
+	EventRecorder              record.EventRecorder
+	TaskIDCache                map[string]string
+	StaticIPFeatureGateEnabled bool
 }
 
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		client:        params.Client,
-		apiReader:     params.APIReader,
-		eventRecorder: params.EventRecorder,
-		TaskIDCache:   params.TaskIDCache,
+		client:                     params.Client,
+		apiReader:                  params.APIReader,
+		eventRecorder:              params.EventRecorder,
+		TaskIDCache:                params.TaskIDCache,
+		StaticIPFeatureGateEnabled: params.StaticIPFeatureGateEnabled,
 	}
 }
 
@@ -66,10 +69,11 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 	klog.Infof("%s: actuator creating machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:   ctx,
-		client:    a.client,
-		machine:   machine,
-		apiReader: a.apiReader,
+		Context:                    ctx,
+		client:                     a.client,
+		machine:                    machine,
+		apiReader:                  a.apiReader,
+		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -108,10 +112,11 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1.Machine) (bool, error) {
 	klog.Infof("%s: actuator checking if machine exists", machine.GetName())
 	scope, err := newMachineScope(machineScopeParams{
-		Context:   ctx,
-		client:    a.client,
-		machine:   machine,
-		apiReader: a.apiReader,
+		Context:                    ctx,
+		client:                     a.client,
+		machine:                    machine,
+		apiReader:                  a.apiReader,
+		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
 	})
 	if err != nil {
 		return false, fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -125,10 +130,11 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 	delete(a.TaskIDCache, machine.Name)
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:   ctx,
-		client:    a.client,
-		machine:   machine,
-		apiReader: a.apiReader,
+		Context:                    ctx,
+		client:                     a.client,
+		machine:                    machine,
+		apiReader:                  a.apiReader,
+		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -165,10 +171,11 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1.Machine) error
 	delete(a.TaskIDCache, machine.Name)
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:   ctx,
-		client:    a.client,
-		machine:   machine,
-		apiReader: a.apiReader,
+		Context:                    ctx,
+		client:                     a.client,
+		machine:                    machine,
+		apiReader:                  a.apiReader,
+		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)

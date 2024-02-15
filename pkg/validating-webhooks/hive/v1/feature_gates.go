@@ -54,7 +54,7 @@ func equalOnlyWhenFeatureGate(fs *featureSet, obj *unstructured.Unstructured, fi
 	p := strings.Split(fieldPath, ".")
 	v, found, err := unstructured.NestedFieldNoCopy(obj.Object, p...)
 	if err == nil && found && assert.ObjectsAreEqualValues(expected, v) && !fs.IsEnabled(featureGate) {
-		return append(allErrs, field.NotSupported(field.NewPath(fieldPath), v, nil))
+		return append(allErrs, field.NotSupported(field.NewPath(fieldPath), v, []string{}))
 	}
 	return allErrs
 }

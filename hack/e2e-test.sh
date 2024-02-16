@@ -91,8 +91,9 @@ fi
 export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 
 echo "Creating cluster deployment"
-# Add a bogus API URL override to validate that our unreachable controller correctly
-# falls back to the default API URL when the override is unreachable.
+# - Add a bogus API URL override to validate that our unreachable controller correctly
+#   falls back to the default API URL when the override is unreachable.
+# - For cost savings, use two workers instead of three.
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
 	--cloud="${CLOUD}" \
 	${CREDS_FILE_ARG} \
@@ -102,11 +103,14 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--release-image="${RELEASE_IMAGE}" \
 	--install-once=true \
 	--uninstall-once=true \
+	--workers=2 \
 	${REGION_ARG} \
 	${INSTANCE_TYPE_ARG} \
 	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS} \
-  -o json | jq '.items[0].spec.controlPlaneConfig.apiURLOverride = "bogus-url.example.com"' | oc apply -f -
+  -o json \
+  | jq '.items[0].spec.controlPlaneConfig.apiURLOverride = "bogus-url.example.com"' \
+  | oc apply -f -
 
 # Sanity check the cluster deployment printer
 i=1

@@ -478,6 +478,9 @@ github.com/go-playground/universal-translator
 # github.com/go-playground/validator/v10 v10.13.0
 ## explicit; go 1.18
 github.com/go-playground/validator/v10
+# github.com/go-test/deep v1.1.0
+## explicit; go 1.16
+github.com/go-test/deep
 # github.com/go-toolsmith/astcast v1.1.0
 ## explicit; go 1.16
 github.com/go-toolsmith/astcast
@@ -502,8 +505,8 @@ github.com/go-toolsmith/typep
 # github.com/go-xmlfmt/xmlfmt v1.1.2
 ## explicit
 github.com/go-xmlfmt/xmlfmt
-# github.com/gobuffalo/flect v0.2.5
-## explicit; go 1.13
+# github.com/gobuffalo/flect v0.3.0
+## explicit; go 1.16
 github.com/gobuffalo/flect
 # github.com/gobwas/glob v0.2.3
 ## explicit
@@ -746,7 +749,7 @@ github.com/grpc-ecosystem/go-grpc-prometheus
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
-# github.com/hashicorp/errwrap v1.0.0
+# github.com/hashicorp/errwrap v1.1.0
 ## explicit
 github.com/hashicorp/errwrap
 # github.com/hashicorp/go-cleanhttp v0.5.2
@@ -9104,6 +9107,10 @@ github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1
 ## explicit; go 1.16
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1
+# github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20231107105652-3110ed81e74c
+## explicit; go 1.18
+github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/failuredomain
+github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig
 # github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 ## explicit; go 1.12
 github.com/openshift/custom-resource-status/conditions/v1
@@ -9445,6 +9452,9 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.2.0
 ## explicit; go 1.16
 github.com/tidwall/pretty
+# github.com/tidwall/sjson v1.2.5
+## explicit; go 1.14
+github.com/tidwall/sjson
 # github.com/timakin/bodyclose v0.0.0-20221125081123-e39cf3fc478e
 ## explicit; go 1.12
 github.com/timakin/bodyclose/passes/bodyclose
@@ -10866,7 +10876,7 @@ sigs.k8s.io/controller-runtime/pkg/source
 sigs.k8s.io/controller-runtime/pkg/webhook
 sigs.k8s.io/controller-runtime/pkg/webhook/admission
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
-# sigs.k8s.io/controller-tools v0.10.0
+# sigs.k8s.io/controller-tools v0.11.3
 ## explicit; go 1.19
 sigs.k8s.io/controller-tools/cmd/controller-gen
 sigs.k8s.io/controller-tools/pkg/crd

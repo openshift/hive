@@ -198,6 +198,10 @@ case "${CLOUD}" in
     # NOTE: Only observed by hiveutil create-cluster, not clusterpool at this time.
     INSTANCE_TYPE_ARG="--aws-instance-type $AWS_INSTANCE_TYPE"
   fi
+  # Default workers to the smaller m6a.large
+  AWS_WORKER_INSTANCE_TYPE=${AWS_WORKER_INSTANCE_TYPE:-m6a.large}
+  # NOTE: Only observed by hiveutil create-cluster, not clusterpool at this time.
+  WORKER_INSTANCE_TYPE_ARG="--aws-worker-instance-type $AWS_WORKER_INSTANCE_TYPE"
 	;;
 "azure")
 	CREDS_FILE_ARG="--creds-file=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"

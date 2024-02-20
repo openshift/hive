@@ -94,6 +94,9 @@ echo "Creating cluster deployment"
 # - Add a bogus API URL override to validate that our unreachable controller correctly
 #   falls back to the default API URL when the override is unreachable.
 # - For cost savings, use two workers instead of three.
+# - For cost savings, use spot instances for the default worker pool. (NOTE: This will
+#   only kick in if machines are replaced after installation. To start off with spot
+#   instances, MachineSet manifests must be edited via installmanager.)
 go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME}" \
 	--cloud="${CLOUD}" \
 	${CREDS_FILE_ARG} \
@@ -110,6 +113,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	${EXTRA_CREATE_CLUSTER_ARGS} \
   -o json \
   | jq '.items[0].spec.controlPlaneConfig.apiURLOverride = "bogus-url.example.com"' \
+  | jq 'if .items[1].spec.platform.aws != null then .items[1].spec.platform.aws.spotMarketOptions = {} else . end' \
   | oc apply -f -
 
 # Sanity check the cluster deployment printer

@@ -964,77 +964,101 @@ func patchMachineSetManifest(manifestBytes []byte, poolsByType map[string]*hivev
 		return nil, errors.Wrap(err, "Error converting yaml to json")
 	}
 
-	// Return if file is not a MachineSet manifest
-	if kind := gjson.Get(string(manifestBytesJson), `kind`).String(); kind != "MachineSet" {
-		return nil, nil
+	modified := true
+
+	// ===> HACK ===>
+	// Use spot instances for masters and workers.
+	// If this is f'real, it doesn't belong in this func. Probably. Maybe.
+	var path string
+	kind := gjson.Get(string(manifestBytesJson), `kind`).String()
+	switch kind {
+	case "ControlPlaneMachineSet":
+		path = `spec.template.machines_v1beta1_machine_openshift_io.`
+	case "Machine":
+		path = ``
+	case "MachineSet":
+		path = `spec.template.`
+	default:
+		modified = false
 	}
-	modified := false
+	if modified {
+		manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, path+`spec.providerSpec.value.spotMarketOptions`, map[string]string{})
+		if err != nil {
+			logger.WithError(err).Errorf("error adding spot-ness to %s manifests", kind)
+			return nil, err
+		}
+	}
+	// <=== HACK <===
 
-	if addSecurityGroup {
-		pool := poolsByType["worker"]
+	if kind := gjson.Get(string(manifestBytesJson), `kind`).String(); kind == "MachineSet" {
 
-		isWorker := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
+		if addSecurityGroup {
+			pool := poolsByType["worker"]
 
-		if isWorker == "worker" {
-			modified = true
-			var vpcIDFilterValue map[string]interface{} = map[string]interface{}{
-				"name":   "vpc-id",
-				"values": []string{vpcID},
+			isWorker := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
+
+			if isWorker == "worker" {
+				modified = true
+				var vpcIDFilterValue map[string]interface{} = map[string]interface{}{
+					"name":   "vpc-id",
+					"values": []string{vpcID},
+				}
+
+				// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
+				// annotation found on the MachinePool to the existing tag:Name filter in the worker
+				// MachineSet manifest
+				securityGroupFilterValue := pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation]
+
+				manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `spec.template.spec.providerSpec.value.securityGroups.0.filters.0.values.0`, securityGroupFilterValue)
+				if err != nil {
+					logger.WithError(err).Error("error adding security group name to worker machineset manifest")
+					return nil, err
+				}
+
+				// Add a filter for the vpcID since the names of security groups may be the same within a
+				// given AWS account. HIVE-1874
+				manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `spec.template.spec.providerSpec.value.securityGroups.0.filters.-1`, vpcIDFilterValue)
+				if err != nil {
+					logger.WithError(err).Error("error adding vpc-id filter to worker machineset manifest")
+					return nil, err
+				}
+			}
+		}
+
+		if addMPLabel {
+			// Match MachineSet to MachinePool name
+			msetType := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
+			if msetType == "" {
+				logger.Error("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
+				return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
 			}
 
-			// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
-			// annotation found on the MachinePool to the existing tag:Name filter in the worker
-			// MachineSet manifest
-			securityGroupFilterValue := pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation]
+			if pool, exists := poolsByType[msetType]; exists {
+				modified = true
+				poolName := pool.Spec.Name
+				msetName := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machineset`).String()
+				if msetName == "" {
+					logger.WithError(err).Error("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
+					return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
+				}
+				logger.Infof("Matching machineset %s of type %s with pool %s", msetName, msetType, poolName)
 
-			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `spec.template.spec.providerSpec.value.securityGroups.0.filters.0.values.0`, securityGroupFilterValue)
-			if err != nil {
-				logger.WithError(err).Error("error adding security group name to worker machineset manifest")
-				return nil, err
-			}
+				manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/managed`, "true")
+				if err != nil {
+					logger.WithError(err).Error("error applying hive managed label patch")
+					return nil, err
+				}
 
-			// Add a filter for the vpcID since the names of security groups may be the same within a
-			// given AWS account. HIVE-1874
-			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `spec.template.spec.providerSpec.value.securityGroups.0.filters.-1`, vpcIDFilterValue)
-			if err != nil {
-				logger.WithError(err).Error("error adding vpc-id filter to worker machineset manifest")
-				return nil, err
+				// Add a pool-name label to the MachineSet containing the pool.Spec.Name which is equivalent to the value of the machine.openshift.io/cluster-api-machineset label
+				manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/machine-pool`, msetType)
+				if err != nil {
+					logger.WithError(err).Error("error applying machine pool label patch")
+					return nil, err
+				}
 			}
 		}
 	}
 
-	if addMPLabel {
-		// Match MachineSet to MachinePool name
-		msetType := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
-		if msetType == "" {
-			logger.Error("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
-			return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
-		}
-
-		if pool, exists := poolsByType[msetType]; exists {
-			modified = true
-			poolName := pool.Spec.Name
-			msetName := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machineset`).String()
-			if msetName == "" {
-				logger.WithError(err).Error("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
-				return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
-			}
-			logger.Infof("Matching machineset %s of type %s with pool %s", msetName, msetType, poolName)
-
-			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/managed`, "true")
-			if err != nil {
-				logger.WithError(err).Error("error applying hive managed label patch")
-				return nil, err
-			}
-
-			// Add a pool-name label to the MachineSet containing the pool.Spec.Name which is equivalent to the value of the machine.openshift.io/cluster-api-machineset label
-			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/machine-pool`, msetType)
-			if err != nil {
-				logger.WithError(err).Error("error applying machine pool label patch")
-				return nil, err
-			}
-		}
-	}
 	if modified {
 		// Convert back to yaml
 		modifiedBytes, err := yaml.JSONToYAML(manifestBytesJson)

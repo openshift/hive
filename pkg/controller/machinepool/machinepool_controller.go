@@ -845,7 +845,7 @@ func (r *ReconcileMachinePool) syncMachineAutoscalers(
 				}
 			}
 
-			if !found {
+			if !found && maxReplicas > 0 {
 				ma := &autoscalingv1beta1.MachineAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: ms.Namespace,

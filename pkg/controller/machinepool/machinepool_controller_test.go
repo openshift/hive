@@ -1138,6 +1138,58 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Create machine autoscalers where maxReplicas < #AZs",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testAutoscalingMachinePool(1, 2),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testClusterAutoscaler("1"),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 0, 0, "us-east-1c"),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 0, 0, "us-east-1c"),
+			},
+			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
+				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 1),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 0, 1),
+			},
+			expectedRemoteClusterAutoscalers: []autoscalingv1.ClusterAutoscaler{
+				*testClusterAutoscaler("1"),
+			},
+		},
+		{
+			name:              "Create machine autoscalers where maxReplicas < #AZs and minReplicas==0",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testAutoscalingMachinePool(0, 2),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testClusterAutoscaler("1"),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 0, 0, "us-east-1c"),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 0, 0, "us-east-1c"),
+			},
+			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
+				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 0, 1),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 0, 1),
+			},
+			expectedRemoteClusterAutoscalers: []autoscalingv1.ClusterAutoscaler{
+				*testClusterAutoscaler("1"),
+			},
+		},
+		{
 			name: "VSphere: generated without suffix, remate without suffix",
 			clusterDeployment: func() *hivev1.ClusterDeployment {
 				cd := testClusterDeployment()

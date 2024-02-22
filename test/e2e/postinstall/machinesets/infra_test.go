@@ -308,9 +308,9 @@ func TestAutoscalingMachinePool(t *testing.T) {
 
 	// busyboxDeployment creates a large number of pods to place CPU pressure
 	// on the machine pool. With 100 replicas and a CPU request for each pod of
-	// 1, the total CPU request from the deployment is 100. For AWS using m6i.xlarge,
-	// each machine has a CPU limit of 6. For the max replicas of 12, the total
-	// CPU limit is 72.
+	// 1, the total CPU request from the deployment is 100. For AWS using m6a.xlarge,
+	// each machine has a CPU limit of 4. For the max replicas of 12, the total
+	// CPU limit is 48.
 	busyboxDeployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",

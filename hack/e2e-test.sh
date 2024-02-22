@@ -106,6 +106,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--workers=2 \
 	${REGION_ARG} \
 	${INSTANCE_TYPE_ARG} \
+	${WORKER_INSTANCE_TYPE_ARG} \
 	${MANAGED_DNS_ARG} \
 	${EXTRA_CREATE_CLUSTER_ARGS} \
   -o json \

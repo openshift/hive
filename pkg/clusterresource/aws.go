@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	AWSInstanceTypeDefault = "m6i.xlarge"
+	AWSInstanceTypeDefault = "m6a.xlarge"
 	volumeSize             = 120
 	volumeType             = "gp3"
 )
@@ -37,7 +37,11 @@ type AWSCloudBuilder struct {
 	// Region is the AWS region to which to install the cluster
 	Region string
 
+	// Instance type for masters and workers, unless the latter is overridden by WorkerInstanceType
 	InstanceType string
+
+	// Instance type for workers only. If empty, InstanceType is used.
+	WorkerInstanceType string
 
 	PrivateLink bool
 }
@@ -96,9 +100,16 @@ func (p *AWSCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
 	return []runtime.Object{}
 }
 
+func (p *AWSCloudBuilder) workerInstanceType() string {
+	if p.WorkerInstanceType != "" {
+		return p.WorkerInstanceType
+	}
+	return p.InstanceType
+}
+
 func (p *AWSCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.AWS = &hivev1aws.MachinePoolPlatform{
-		InstanceType: p.InstanceType,
+		InstanceType: p.workerInstanceType(),
 		EC2RootVolume: hivev1aws.EC2RootVolume{
 			Size: volumeSize,
 			Type: volumeType,
@@ -115,16 +126,18 @@ func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertype
 		},
 	}
 
-	// Used for both control plane and workers.
-	mpp := &awsinstallertypes.MachinePool{
-		InstanceType: p.InstanceType,
-		EC2RootVolume: awsinstallertypes.EC2RootVolume{
-			Size: volumeSize,
-			Type: volumeType,
-		},
+	ec2 := awsinstallertypes.EC2RootVolume{
+		Size: volumeSize,
+		Type: volumeType,
 	}
-	ic.ControlPlane.Platform.AWS = mpp
-	ic.Compute[0].Platform.AWS = mpp
+	ic.ControlPlane.Platform.AWS = &awsinstallertypes.MachinePool{
+		InstanceType:  p.InstanceType,
+		EC2RootVolume: ec2,
+	}
+	ic.Compute[0].Platform.AWS = &awsinstallertypes.MachinePool{
+		InstanceType:  p.workerInstanceType(),
+		EC2RootVolume: ec2,
+	}
 
 	if len(o.BoundServiceAccountSigningKey) > 0 {
 		ic.CredentialsMode = installertypes.ManualCredentialsMode

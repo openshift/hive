@@ -5,6 +5,7 @@ go 1.21
 toolchain go1.21.6
 
 require (
+// dummy change - no intention of merging
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12

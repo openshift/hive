@@ -106,17 +106,19 @@ func NewFromManifests(manifests []manifest.Manifest, clientBuilder sigstore.HTTP
 // The keys within the config map in the data field define how verification is performed:
 //
 // verifier-public-key-*: One or more GPG public keys in ASCII form that must have signed the
-//                        release image by digest.
+//
+//	release image by digest.
 //
 // store-*: A URL (scheme file://, http://, or https://) location that contains signatures. These
-//          signatures are in the atomic container signature format. The URL will have the digest
-//          of the image appended to it as "<STORE>/<ALGO>=<DIGEST>/signature-<NUMBER>" as described
-//          in the container image signing format. The docker-image-manifest section of the
-//          signature must match the release image digest. Signatures are searched starting at
-//          NUMBER 1 and incrementing if the signature exists but is not valid. The signature is a
-//          GPG signed and encrypted JSON message. The file store is provided for testing only at
-//          the current time, although future versions of the CVO might allow host mounting of
-//          signatures.
+//
+//	signatures are in the atomic container signature format. The URL will have the digest
+//	of the image appended to it as "<STORE>/<ALGO>=<DIGEST>/signature-<NUMBER>" as described
+//	in the container image signing format. The docker-image-manifest section of the
+//	signature must match the release image digest. Signatures are searched starting at
+//	NUMBER 1 and incrementing if the signature exists but is not valid. The signature is a
+//	GPG signed and encrypted JSON message. The file store is provided for testing only at
+//	the current time, although future versions of the CVO might allow host mounting of
+//	signatures.
 //
 // See https://github.com/containers/image/blob/ab49b0a48428c623a8f03b41b9083d48966b34a9/docs/signature-protocols.md
 // for a description of the signature store

@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -45,8 +44,6 @@ var (
 
 	// noSuchSubnetRegex is a regex used to fetch condition message from error when subnets specified in the MachinePool are invalid
 	noSuchSubnetRegex = regexp.MustCompile(`^InvalidSubnetID\.NotFound:\s+([^\t]+)\t`)
-
-	versionsSupportingSpotInstances = semver.MustParseRange(">=4.5.0")
 )
 
 // NewAWSActuator is the constructor for building a AWSActuator
@@ -106,20 +103,9 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	if pool.Spec.Platform.AWS == nil {
 		return nil, false, errors.New("MachinePool is not for AWS")
 	}
-	clusterVersion, err := getClusterVersion(cd)
-	if err != nil {
-		return nil, false, fmt.Errorf("unable to get cluster version: %v", err)
-	}
 
 	supportedConfig := true
 	var reason, msg string
-
-	if isUsingUnsupportedSpotMarketOptions(pool, clusterVersion, logger) {
-		supportedConfig = false
-		logger.WithField("clusterVersion", clusterVersion).Debug("cluster does not support spot instances")
-		reason = "UnsupportedSpotMarketOptions"
-		msg = "The version of the cluster does not support using spot instances"
-	}
 
 	// The extra-worker-security-group back door can't be used with the supported AdditionalSecurityGroupIDs
 	if metav1.HasAnnotation(pool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) && len(pool.Spec.Platform.AWS.AdditionalSecurityGroupIDs) != 0 {
@@ -493,24 +479,6 @@ func (a *AWSActuator) filterPublicSubnets(subnets []*ec2.Subnet, pool *hivev1.Ma
 	}
 
 	return privateSubnets, nil
-}
-
-func isUsingUnsupportedSpotMarketOptions(pool *hivev1.MachinePool, clusterVersion string, logger log.FieldLogger) bool {
-	if pool.Spec.Platform.AWS.SpotMarketOptions == nil {
-		return false
-	}
-	parsedVersion, err := semver.ParseTolerant(clusterVersion)
-	if err != nil {
-		logger.WithError(err).WithField("clusterVersion", clusterVersion).Warn("could not parse the cluster version")
-		return true
-	}
-	// Use only major, minor, and patch so that pre-release versions of 4.5.0 are within the >=4.5.0 range.
-	parsedVersion = semver.Version{
-		Major: parsedVersion.Major,
-		Minor: parsedVersion.Minor,
-		Patch: parsedVersion.Patch,
-	}
-	return !versionsSupportingSpotInstances(parsedVersion)
 }
 
 // tagNameSubnetPublicELB is the tag name used on a subnet to designate that

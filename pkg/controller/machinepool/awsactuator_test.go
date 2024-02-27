@@ -345,35 +345,6 @@ func TestAWSActuator(t *testing.T) {
 			},
 		},
 		{
-			name:              "supported spot market options",
-			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
-			machinePool:       withSpotMarketOptions(testMachinePool()),
-			masterMachine:     testMachine("master0", "master"),
-			mockAWSClient: func(client *mockaws.MockClient) {
-				mockDescribeAvailabilityZones(client, []string{"zone1"})
-			},
-			expectedMachineSetReplicas: map[string]int64{
-				generateAWSMachineSetName("zone1"): 3,
-			},
-			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
-			},
-		},
-		{
-			name:              "unsupported spot market options",
-			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.4.0"),
-			machinePool:       withSpotMarketOptions(testMachinePool()),
-			masterMachine:     testMachine("master0", "master"),
-			expectedCondition: &hivev1.MachinePoolCondition{
-				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
-				Status: corev1.ConditionTrue,
-				Reason: "UnsupportedSpotMarketOptions",
-			},
-			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
-			},
-		},
-		{
 			name:              "ec2 metadata",
 			clusterDeployment: withClusterVersion(testClusterDeployment(), "4.5.0"),
 			machinePool:       withEC2Metadata(testMachinePool(), "Optional"),
@@ -427,20 +398,6 @@ func TestAWSActuator(t *testing.T) {
 				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
 				Status: corev1.ConditionFalse,
 				Reason: "ConfigurationSupported",
-			},
-			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
-			},
-		},
-		{
-			name:              "malformed cluster version",
-			clusterDeployment: withClusterVersion(testClusterDeployment(), "bad-version"),
-			machinePool:       withSpotMarketOptions(testMachinePool()),
-			masterMachine:     testMachine("master0", "master"),
-			expectedCondition: &hivev1.MachinePoolCondition{
-				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
-				Status: corev1.ConditionTrue,
-				Reason: "UnsupportedSpotMarketOptions",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
@@ -892,11 +849,6 @@ func encodeAWSMachineProviderSpec(awsProviderSpec *machineapi.AWSMachineProvider
 	return &runtime.RawExtension{
 		Raw: buf2.Bytes(),
 	}, nil
-}
-
-func withSpotMarketOptions(pool *hivev1.MachinePool) *hivev1.MachinePool {
-	pool.Spec.Platform.AWS.SpotMarketOptions = &awshivev1.SpotMarketOptions{}
-	return pool
 }
 
 func withEC2Metadata(pool *hivev1.MachinePool, metadataAuth string) *hivev1.MachinePool {

@@ -55,6 +55,8 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+// Dummy comment
+
 func TestRemoteMachineSetReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	machineapi.AddToScheme(scheme.Scheme)

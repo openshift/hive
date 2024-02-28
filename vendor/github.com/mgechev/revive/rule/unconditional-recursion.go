@@ -10,7 +10,7 @@ import (
 type UnconditionalRecursionRule struct{}
 
 // Apply applies the rule to given file.
-func (r *UnconditionalRecursionRule) Apply(file *lint.File, _ lint.Arguments) []lint.Failure {
+func (*UnconditionalRecursionRule) Apply(file *lint.File, _ lint.Arguments) []lint.Failure {
 	var failures []lint.Failure
 
 	onFailure := func(failure lint.Failure) {
@@ -23,17 +23,17 @@ func (r *UnconditionalRecursionRule) Apply(file *lint.File, _ lint.Arguments) []
 }
 
 // Name returns the rule name.
-func (r *UnconditionalRecursionRule) Name() string {
+func (*UnconditionalRecursionRule) Name() string {
 	return "unconditional-recursion"
 }
 
 type funcDesc struct {
-	reciverID *ast.Ident
-	id        *ast.Ident
+	receiverID *ast.Ident
+	id         *ast.Ident
 }
 
 func (fd *funcDesc) equal(other *funcDesc) bool {
-	receiversAreEqual := (fd.reciverID == nil && other.reciverID == nil) || fd.reciverID != nil && other.reciverID != nil && fd.reciverID.Name == other.reciverID.Name
+	receiversAreEqual := (fd.receiverID == nil && other.receiverID == nil) || fd.receiverID != nil && other.receiverID != nil && fd.receiverID.Name == other.receiverID.Name
 	idsAreEqual := (fd.id == nil && other.id == nil) || fd.id.Name == other.id.Name
 
 	return receiversAreEqual && idsAreEqual
@@ -61,8 +61,10 @@ func (w lintUnconditionalRecursionRule) Visit(node ast.Node) ast.Visitor {
 	case *ast.FuncDecl:
 		var rec *ast.Ident
 		switch {
-		case n.Recv == nil || n.Recv.NumFields() < 1 || len(n.Recv.List[0].Names) < 1:
+		case n.Recv == nil:
 			rec = nil
+		case n.Recv.NumFields() < 1 || len(n.Recv.List[0].Names) < 1:
+			rec = &ast.Ident{Name: "_"}
 		default:
 			rec = n.Recv.List[0].Names[0]
 		}
@@ -149,7 +151,7 @@ var exitFunctions = map[string]map[string]bool{
 	},
 }
 
-func (w *lintUnconditionalRecursionRule) hasControlExit(node ast.Node) bool {
+func (lintUnconditionalRecursionRule) hasControlExit(node ast.Node) bool {
 	// isExit returns true if the given node makes control exit the function
 	isExit := func(node ast.Node) bool {
 		switch n := node.(type) {

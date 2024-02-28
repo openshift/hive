@@ -26,4 +26,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
 
-replace github.com/openshift/api => github.com/openshift/api v0.0.0-20221004120407-c46852673d03
+replace github.com/openshift/api => github.com/openshift/api github.com/openshift/api v0.0.0-20240214213616-e741d64e9f22

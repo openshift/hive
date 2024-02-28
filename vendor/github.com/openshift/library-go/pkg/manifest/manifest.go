@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -21,7 +23,20 @@ import (
 const (
 	CapabilityAnnotation  = "capability.openshift.io/name"
 	DefaultClusterProfile = "self-managed-high-availability"
+	featureSetAnnotation  = "release.openshift.io/feature-set"
 )
+
+var knownFeatureSets = sets.String{}
+
+func init() {
+	for featureSet := range configv1.FeatureSets {
+		if len(featureSet) == 0 {
+			knownFeatureSets.Insert("Default")
+			continue
+		}
+		knownFeatureSets.Insert(string(featureSet))
+	}
+}
 
 // resourceId uniquely identifies a Kubernetes resource.
 // It is used to identify any duplicate resources within
@@ -114,11 +129,59 @@ func (m *Manifest) UnmarshalJSON(in []byte) error {
 	return validateResourceId(m.id)
 }
 
+func getFeatureSets(annotations map[string]string) (sets.String, bool, error) {
+	ret := sets.String{}
+	specified := false
+	for _, featureSetAnnotation := range []string{featureSetAnnotation} {
+		featureSetAnnotationValue, featureSetAnnotationExists := annotations[featureSetAnnotation]
+		if featureSetAnnotationExists {
+			specified = true
+			featureSetAnnotationValues := strings.Split(featureSetAnnotationValue, ",")
+			for _, manifestFeatureSet := range featureSetAnnotationValues {
+				if !knownFeatureSets.Has(manifestFeatureSet) {
+					// never include the manifest if the feature-set annotation is outside of known values
+					return nil, specified, fmt.Errorf("unrecognized value %q in %s=%s; known values are: %v", manifestFeatureSet, featureSetAnnotation, featureSetAnnotationValue, strings.Join(knownFeatureSets.List(), ","))
+				}
+			}
+			ret.Insert(featureSetAnnotationValues...)
+		}
+	}
+
+	return ret, specified, nil
+}
+
+func checkFeatureSets(requiredFeatureSet string, annotations map[string]string) error {
+	requiredAnnotationValue := requiredFeatureSet
+	if len(requiredFeatureSet) == 0 {
+		requiredAnnotationValue = "Default" // "" in the FeatureSet API is "Default" in the annotation value
+	}
+	manifestFeatureSets, manifestSpecifiesFeatureSets, err := getFeatureSets(annotations)
+	if err != nil {
+		return err
+	}
+	if manifestSpecifiesFeatureSets && !manifestFeatureSets.Has(requiredAnnotationValue) {
+		return fmt.Errorf("%q is required, and %s=%s", requiredAnnotationValue, featureSetAnnotation, strings.Join(manifestFeatureSets.List(), ","))
+	}
+
+	return nil
+}
+
 // Include returns an error if the manifest fails an inclusion filter and should be excluded from further
 // processing by cluster version operator. Pointer arguments can be set nil to avoid excluding based on that
 // filter. For example, setting profile non-nil and capabilities nil will return an error if the manifest's
 // profile does not match, but will never return an error about capability issues.
-func (m *Manifest) Include(excludeIdentifier *string, includeTechPreview *bool, profile *string, capabilities *configv1.ClusterVersionCapabilitiesStatus) error {
+func (m *Manifest) Include(excludeIdentifier *string, requiredFeatureSet *string, profile *string, capabilities *configv1.ClusterVersionCapabilitiesStatus) error {
+	return m.IncludeAllowUnknownCapabilities(excludeIdentifier, requiredFeatureSet, profile, capabilities, false)
+}
+
+// IncludeAllowUnknownCapabilities returns an error if the manifest fails an inclusion filter and should be excluded from
+// further processing by cluster version operator. Pointer arguments can be set nil to avoid excluding based on that
+// filter. For example, setting profile non-nil and capabilities nil will return an error if the manifest's
+// profile does not match, but will never return an error about capability issues. allowUnknownCapabilities only applies
+// to capabilities filtering. When set to true a manifest will not be excluded simply because it contains an unknown
+// capability. This is necessary to allow updates to an OCP version containing newly defined capabilities.
+func (m *Manifest) IncludeAllowUnknownCapabilities(excludeIdentifier *string, requiredFeatureSet *string, profile *string,
+	capabilities *configv1.ClusterVersionCapabilitiesStatus, allowUnknownCapabilities bool) error {
 
 	annotations := m.Obj.GetAnnotations()
 	if annotations == nil {
@@ -132,15 +195,10 @@ func (m *Manifest) Include(excludeIdentifier *string, includeTechPreview *bool, 
 		}
 	}
 
-	if includeTechPreview != nil {
-		featureGateAnnotation := "release.openshift.io/feature-gate"
-		featureGateAnnotationValue, featureGateAnnotationExists := annotations[featureGateAnnotation]
-		if featureGateAnnotationValue == string(configv1.TechPreviewNoUpgrade) && !(*includeTechPreview) {
-			return fmt.Errorf("tech-preview excluded, and %s=%s", featureGateAnnotation, featureGateAnnotationValue)
-		}
-		// never include the manifest if the feature-gate annotation is outside of allowed values (only TechPreviewNoUpgrade is currently allowed)
-		if featureGateAnnotationExists && featureGateAnnotationValue != string(configv1.TechPreviewNoUpgrade) {
-			return fmt.Errorf("unrecognized value %s=%s", featureGateAnnotation, featureGateAnnotationValue)
+	if requiredFeatureSet != nil {
+		err := checkFeatureSets(*requiredFeatureSet, annotations)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -155,35 +213,40 @@ func (m *Manifest) Include(excludeIdentifier *string, includeTechPreview *bool, 
 
 	// If there is no capabilities defined in a release then we do not need to check presence of capabilities in the manifest
 	if capabilities != nil {
-		return checkResourceEnablement(annotations, capabilities)
+		return checkResourceEnablement(annotations, capabilities, allowUnknownCapabilities)
 	}
 	return nil
 }
 
 // checkResourceEnablement, given resource annotations and defined cluster capabilities, checks if the capability
-// annotation exists. If so, each capability name is validated against the known set of capabilities. Each valid
-// capability is then checked if it is disabled. If any invalid capabilities are found an error is returned listing
-// all invalid capabilities. Otherwise, if any disabled capabilities are found an error is returned listing all
-// disabled capabilities.
-func checkResourceEnablement(annotations map[string]string, capabilities *configv1.ClusterVersionCapabilitiesStatus) error {
+// annotation exists. If so, each capability name is validated against the known set of capabilities unless
+// allowUnknownCapabilities is true. Each valid capability is then checked if it is disabled. If any invalid
+// capabilities are found an error is returned listing all invalid capabilities. Otherwise, if any disabled
+// capabilities are found an error is returned listing all disabled capabilities.
+func checkResourceEnablement(annotations map[string]string, capabilities *configv1.ClusterVersionCapabilitiesStatus,
+	allowUnknownCapabilities bool) error {
+
 	caps := getManifestCapabilities(annotations)
 	numCaps := len(caps)
 	unknownCaps := make([]string, 0, numCaps)
 	disabledCaps := make([]string, 0, numCaps)
 
 	for _, c := range caps {
-		var isKnownCap bool
-		var isEnabledCap bool
 
-		for _, knownCapability := range capabilities.KnownCapabilities {
-			if c == knownCapability {
-				isKnownCap = true
+		if !allowUnknownCapabilities {
+			var isKnownCap bool
+			for _, knownCapability := range capabilities.KnownCapabilities {
+				if c == knownCapability {
+					isKnownCap = true
+				}
+			}
+			if !isKnownCap {
+				unknownCaps = append(unknownCaps, string(c))
+				continue
 			}
 		}
-		if !isKnownCap {
-			unknownCaps = append(unknownCaps, string(c))
-			continue
-		}
+
+		var isEnabledCap bool
 		for _, enabledCapability := range capabilities.EnabledCapabilities {
 			if c == enabledCapability {
 				isEnabledCap = true

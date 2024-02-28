@@ -141,14 +141,8 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 	case *Call:
 	case *ChangeInterface:
 	case *ChangeType:
+	case *SliceToArrayPointer:
 	case *Convert:
-		if _, ok := instr.X.Type().Underlying().(*types.Slice); ok {
-			if ptr, ok := instr.Type().Underlying().(*types.Pointer); ok {
-				if _, ok := ptr.Elem().(*types.Array); ok {
-					break
-				}
-			}
-		}
 		if _, ok := instr.X.Type().Underlying().(*types.Basic); !ok {
 			if _, ok := instr.Type().Underlying().(*types.Basic); !ok {
 				s.errorf("convert %s -> %s: at least one type must be basic", instr.X.Type(), instr.Type())
@@ -195,6 +189,9 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 	case *Load:
 	case *Parameter:
 	case *Const:
+	case *AggregateConst:
+	case *ArrayConst:
+	case *GenericConst:
 	case *Recv:
 	case *TypeSwitch:
 	default:
@@ -213,8 +210,6 @@ func (s *sanity) checkInstr(idx int, instr Instruction) {
 		t := v.Type()
 		if t == nil {
 			s.errorf("no type: %s = %s", v.Name(), v)
-		} else if t == tRangeIter {
-			// not a proper type; ignore.
 		} else if b, ok := t.Underlying().(*types.Basic); ok && b.Info()&types.IsUntyped != 0 {
 			if _, ok := v.(*Const); !ok {
 				s.errorf("instruction has 'untyped' result: %s = %s : %s", v.Name(), v, t)
@@ -451,7 +446,7 @@ func (s *sanity) checkFunction(fn *Function) bool {
 	// separate-compilation model), and error.Error.
 	if fn.Pkg == nil {
 		switch fn.Synthetic {
-		case SyntheticWrapper, SyntheticBound, SyntheticThunk:
+		case SyntheticWrapper, SyntheticBound, SyntheticThunk, SyntheticGeneric:
 		default:
 			if !strings.HasSuffix(fn.name, "Error") {
 				s.errorf("nil Pkg")

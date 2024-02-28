@@ -56,6 +56,8 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+// Dummy comment
+
 func TestRemoteMachineSetReconcile(t *testing.T) {
 
 	getPool := func(c client.Client, poolName string) *hivev1.MachinePool {

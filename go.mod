@@ -429,4 +429,4 @@ exclude (
 )
 
 // Override the OpenShift API version in hive
-replace github.com/openshift/api => github.com/openshift/api v0.0.0-20221004120407-c46852673d03
+replace github.com/openshift/api => github.com/openshift/api v0.0.0-20231118005202-0f638a8a4705

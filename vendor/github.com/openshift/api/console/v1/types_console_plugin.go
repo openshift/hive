@@ -36,11 +36,11 @@ type ConsolePluginSpec struct {
 	Proxy []ConsolePluginProxy `json:"proxy,omitempty"`
 	// i18n is the configuration of plugin's localization resources.
 	// +optional
-	I18n ConsolePluginI18n `json:"i18n,omitempty"`
+	I18n ConsolePluginI18n `json:"i18n"`
 }
 
 // LoadType is an enumeration of i18n loading types
-// +kubebuilder:validation:Enum:=Preload;Lazy
+// +kubebuilder:validation:Enum:=Preload;Lazy;""
 type LoadType string
 
 const (
@@ -50,12 +50,20 @@ const (
 	// Lazy wont preload any plugin's localization resources, instead
 	// will leave thier loading to runtime's lazy-loading.
 	Lazy LoadType = "Lazy"
+	// Empty is the default value of the LoadType field and it's
+	// purpose is to improve discoverability of the field. The
+	// the behaviour is equivalent to Lazy type.
+	Empty LoadType = ""
 )
 
 // ConsolePluginI18n holds information on localization resources that are served by
 // the dynamic plugin.
 type ConsolePluginI18n struct {
 	// loadType indicates how the plugin's localization resource should be loaded.
+	// Valid values are Preload, Lazy and the empty string.
+	// When set to Preload, all localization resources are fetched when the plugin is loaded.
+	// When set to Lazy, localization resources are lazily loaded as and when they are required by the console.
+	// When omitted or set to the empty string, the behaviour is equivalent to Lazy type.
 	// +kubebuilder:validation:Required
 	LoadType LoadType `json:"loadType"`
 }

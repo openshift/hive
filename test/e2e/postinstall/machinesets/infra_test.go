@@ -26,6 +26,7 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/test/e2e/common"
 )
 
@@ -278,10 +279,21 @@ func TestAutoscalingMachinePool(t *testing.T) {
 			time.Sleep(10 * time.Second)
 		case err != nil:
 			t.Fatalf("could not get the cluster autoscaler: %v", err)
+		default:
+			t.Log("found cluster autoscaler")
+			break
 		}
 	}
+	machineSetList := &machinev1.MachineSetList{}
+	rc.List(context.Background(), machineSetList)
+	for _, machineSet := range machineSetList.Items {
+		// Check labels
+		require.Equal(t, "true", machineSet.Labels[constants.HiveManagedLabel], "Incorrect hive managed label on machineset")
+		require.Equal(t, pool.Spec.Name, machineSet.Labels["hive.openshift.io/machine-pool"], "Incorrect machine pool label on machineset")
+	}
+
 	if clusterAutoscaler.Name == "" {
-		t.Fatalf("timed out waiting for cluster autoscaler")
+		t.Fatalf("timed out waiting for cluster autoscaler. MP: %#v \n Autoscaler: %#v", pool, clusterAutoscaler)
 	}
 	if clusterAutoscaler.Spec.ScaleDown == nil {
 		clusterAutoscaler.Spec.ScaleDown = &autoscalingv1.ScaleDownConfig{}

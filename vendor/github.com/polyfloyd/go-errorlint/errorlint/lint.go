@@ -6,7 +6,6 @@ import (
 	"go/constant"
 	"go/token"
 	"go/types"
-	"regexp"
 )
 
 type Lint struct {
@@ -48,11 +47,11 @@ func LintFmtErrorfCalls(fset *token.FileSet, info types.Info) []Lint {
 		var lintArg ast.Expr
 		args := call.Args[1:]
 		for i := 0; i < len(args) && i < len(formatVerbs); i++ {
-			if info.Types[args[i]].Type.String() != "error" && !isErrorStringCall(info, args[i]) {
+			if !implementsError(info.Types[args[i]].Type) && !isErrorStringCall(info, args[i]) {
 				continue
 			}
 
-			if formatVerbs[i] == "%w" {
+			if formatVerbs[i] == "w" {
 				lintArg = nil
 				break
 			}
@@ -85,6 +84,9 @@ func isErrorStringCall(info types.Info, expr ast.Expr) bool {
 	return false
 }
 
+// printfFormatStringVerbs returns a normalized list of all the verbs that are used per argument to
+// the printf function. The index of each returned element corresponds to index of the respective
+// argument.
 func printfFormatStringVerbs(info types.Info, call *ast.CallExpr) ([]string, bool) {
 	if len(call.Args) <= 1 {
 		return nil, false
@@ -96,10 +98,23 @@ func printfFormatStringVerbs(info types.Info, call *ast.CallExpr) ([]string, boo
 	}
 	formatString := constant.StringVal(info.Types[strLit].Value)
 
-	// Naive format string argument verb. This does not take modifiers such as
-	// padding into account...
-	re := regexp.MustCompile(`%[^%]`)
-	return re.FindAllString(formatString, -1), true
+	pp := printfParser{str: formatString}
+	verbs, err := pp.ParseAllVerbs()
+	if err != nil {
+		return nil, false
+	}
+	orderedVerbs := verbOrder(verbs, len(call.Args)-1)
+
+	resolvedVerbs := make([]string, len(orderedVerbs))
+	for i, vv := range orderedVerbs {
+		for _, v := range vv {
+			resolvedVerbs[i] = v.format
+			if v.format == "w" {
+				break
+			}
+		}
+	}
+	return resolvedVerbs, true
 }
 
 func isFmtErrorfCallExpr(info types.Info, expr ast.Expr) (*ast.CallExpr, bool) {
@@ -121,7 +136,7 @@ func isFmtErrorfCallExpr(info types.Info, expr ast.Expr) (*ast.CallExpr, bool) {
 	return nil, false
 }
 
-func LintErrorComparisons(fset *token.FileSet, info types.Info) []Lint {
+func LintErrorComparisons(fset *token.FileSet, info *TypesInfoExt) []Lint {
 	lints := []Lint{}
 
 	for expr := range info.Types {
@@ -138,11 +153,15 @@ func LintErrorComparisons(fset *token.FileSet, info types.Info) []Lint {
 			continue
 		}
 		// Find comparisons of which one side is a of type error.
-		if !isErrorComparison(info, binExpr) {
+		if !isErrorComparison(info.Info, binExpr) {
 			continue
 		}
-
+		// Some errors that are returned from some functions are exempt.
 		if isAllowedErrorComparison(info, binExpr) {
+			continue
+		}
+		// Comparisons that happen in `func (type) Is(error) bool` are okay.
+		if isNodeInErrorIsFunc(info, binExpr) {
 			continue
 		}
 
@@ -166,11 +185,17 @@ func LintErrorComparisons(fset *token.FileSet, info types.Info) []Lint {
 		if tagType.Type.String() != "error" {
 			continue
 		}
+		if isNodeInErrorIsFunc(info, switchStmt) {
+			continue
+		}
 
-		lints = append(lints, Lint{
-			Message: "switch on an error will fail on wrapped errors. Use errors.Is to check for specific errors",
-			Pos:     switchStmt.Pos(),
-		})
+		if switchComparesNonNil(switchStmt) {
+			lints = append(lints, Lint{
+				Message: "switch on an error will fail on wrapped errors. Use errors.Is to check for specific errors",
+				Pos:     switchStmt.Pos(),
+			})
+		}
+
 	}
 
 	return lints
@@ -190,6 +215,55 @@ func isErrorComparison(info types.Info, binExpr *ast.BinaryExpr) bool {
 	tx := info.Types[binExpr.X]
 	ty := info.Types[binExpr.Y]
 	return tx.Type.String() == "error" || ty.Type.String() == "error"
+}
+
+func isNodeInErrorIsFunc(info *TypesInfoExt, node ast.Node) bool {
+	funcDecl := info.ContainingFuncDecl(node)
+	if funcDecl == nil {
+		return false
+	}
+
+	if funcDecl.Name.Name != "Is" {
+		return false
+	}
+	if funcDecl.Recv == nil {
+		return false
+	}
+	// There should be 1 argument of type error.
+	if ii := funcDecl.Type.Params.List; len(ii) != 1 || info.Types[ii[0].Type].Type.String() != "error" {
+		return false
+	}
+	// The return type should be bool.
+	if ii := funcDecl.Type.Results.List; len(ii) != 1 || info.Types[ii[0].Type].Type.String() != "bool" {
+		return false
+	}
+
+	return true
+}
+
+// switchComparesNonNil returns true if one of its clauses compares by value.
+func switchComparesNonNil(switchStmt *ast.SwitchStmt) bool {
+	for _, caseBlock := range switchStmt.Body.List {
+		caseClause, ok := caseBlock.(*ast.CaseClause)
+		if !ok {
+			continue
+		}
+		for _, clause := range caseClause.List {
+			switch clause := clause.(type) {
+			case nil:
+				// default label is safe
+				continue
+			case *ast.Ident:
+				// `case nil` is safe
+				if clause.Name == "nil" {
+					continue
+				}
+			}
+			// anything else (including an Ident other than nil) isn't safe
+			return true
+		}
+	}
+	return false
 }
 
 func LintErrorTypeAssertions(fset *token.FileSet, info types.Info) []Lint {
@@ -246,4 +320,21 @@ func LintErrorTypeAssertions(fset *token.FileSet, info types.Info) []Lint {
 func isErrorTypeAssertion(info types.Info, typeAssert *ast.TypeAssertExpr) bool {
 	t := info.Types[typeAssert.X]
 	return t.Type.String() == "error"
+}
+
+func implementsError(t types.Type) bool {
+	mset := types.NewMethodSet(t)
+
+	for i := 0; i < mset.Len(); i++ {
+		if mset.At(i).Kind() != types.MethodVal {
+			continue
+		}
+
+		obj := mset.At(i).Obj()
+		if obj.Name() == "Error" && obj.Type().String() == "func() string" {
+			return true
+		}
+	}
+
+	return false
 }

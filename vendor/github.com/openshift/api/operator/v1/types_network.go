@@ -404,7 +404,8 @@ type KuryrConfig struct {
 	// mtu is the MTU that Kuryr should use when creating pod networks in Neutron.
 	// The value has to be lower or equal to the MTU of the nodes network and Neutron has
 	// to allow creation of tenant networks with such MTU. If unset Pod networks will be
-	// created with the same MTU as the nodes network has.
+	// created with the same MTU as the nodes network has. This also affects the services
+	// network created by cluster-network-operator.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	MTU *uint32 `json:"mtu,omitempty"`
@@ -534,6 +535,12 @@ type PolicyAuditConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	MaxFileSize *uint32 `json:"maxFileSize,omitempty"`
+
+	// maxLogFiles specifies the maximum number of ACL_audit log files that can be present.
+	// +kubebuilder:default=5
+	// +kubebuilder:validation:Minimum=1
+	// +optional
+	MaxLogFiles *int32 `json:"maxLogFiles,omitempty"`
 
 	// destination is the location for policy log messages.
 	// Regardless of this config, persistent logs will always be dumped to the host

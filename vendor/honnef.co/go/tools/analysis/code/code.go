@@ -10,10 +10,14 @@ import (
 	"go/types"
 	"strings"
 
-	"honnef.co/go/tools/analysis/facts"
+	"honnef.co/go/tools/analysis/facts/generated"
+	"honnef.co/go/tools/analysis/facts/purity"
+	"honnef.co/go/tools/analysis/facts/tokenfile"
 	"honnef.co/go/tools/go/ast/astutil"
 	"honnef.co/go/tools/go/types/typeutil"
+	"honnef.co/go/tools/pattern"
 
+	"golang.org/x/exp/typeparams"
 	"golang.org/x/tools/go/analysis"
 )
 
@@ -73,7 +77,11 @@ func SelectorName(pass *analysis.Pass, expr *ast.SelectorExpr) string {
 		}
 		panic(fmt.Sprintf("unsupported selector: %v", expr))
 	}
-	return fmt.Sprintf("(%s).%s", sel.Recv(), sel.Obj().Name())
+	if v, ok := sel.Obj().(*types.Var); ok && v.IsField() {
+		return fmt.Sprintf("(%s).%s", typeutil.DereferenceR(sel.Recv()), sel.Obj().Name())
+	} else {
+		return fmt.Sprintf("(%s).%s", sel.Recv(), sel.Obj().Name())
+	}
 }
 
 func IsNil(pass *analysis.Pass, expr ast.Expr) bool {
@@ -132,7 +140,19 @@ func ExprToString(pass *analysis.Pass, expr ast.Expr) (string, bool) {
 }
 
 func CallName(pass *analysis.Pass, call *ast.CallExpr) string {
-	switch fun := astutil.Unparen(call.Fun).(type) {
+	fun := astutil.Unparen(call.Fun)
+
+	// Instantiating a function cannot return another generic function, so doing this once is enough
+	switch idx := fun.(type) {
+	case *ast.IndexExpr:
+		fun = idx.X
+	case *typeparams.IndexListExpr:
+		fun = idx.X
+	}
+
+	// (foo)[T] is not a valid instantiationg, so no need to unparen again.
+
+	switch fun := fun.(type) {
 	case *ast.SelectorExpr:
 		fn, ok := pass.TypesInfo.ObjectOf(fun.Sel).(*types.Func)
 		if !ok {
@@ -177,7 +197,7 @@ func IsCallToAny(pass *analysis.Pass, node ast.Node, names ...string) bool {
 }
 
 func File(pass *analysis.Pass, node Positioner) *ast.File {
-	m := pass.ResultOf[facts.TokenFile].(map[*token.File]*ast.File)
+	m := pass.ResultOf[tokenfile.Analyzer].(map[*token.File]*ast.File)
 	return m[pass.Fset.File(node.Pos())]
 }
 
@@ -190,9 +210,9 @@ func IsGenerated(pass *analysis.Pass, pos token.Pos) bool {
 
 // Generator returns the generator that generated the file containing
 // pos. It ignores //line directives.
-func Generator(pass *analysis.Pass, pos token.Pos) (facts.Generator, bool) {
+func Generator(pass *analysis.Pass, pos token.Pos) (generated.Generator, bool) {
 	file := pass.Fset.PositionFor(pos, false).Filename
-	m := pass.ResultOf[facts.Generated].(map[string]facts.Generator)
+	m := pass.ResultOf[generated.Analyzer].(map[string]generated.Generator)
 	g, ok := m[file]
 	return g, ok
 }
@@ -202,7 +222,7 @@ func Generator(pass *analysis.Pass, pos token.Pos) (facts.Generator, bool) {
 // syntactic check, meaning that any function call may have side
 // effects, regardless of the called function's body. Otherwise,
 // purity will be consulted to determine the purity of function calls.
-func MayHaveSideEffects(pass *analysis.Pass, expr ast.Expr, purity facts.PurityResult) bool {
+func MayHaveSideEffects(pass *analysis.Pass, expr ast.Expr, purity purity.Result) bool {
 	switch expr := expr.(type) {
 	case *ast.BadExpr:
 		return true
@@ -257,6 +277,18 @@ func MayHaveSideEffects(pass *analysis.Pass, expr ast.Expr, purity facts.PurityR
 		return false
 	case *ast.IndexExpr:
 		return MayHaveSideEffects(pass, expr.X, purity) || MayHaveSideEffects(pass, expr.Index, purity)
+	case *typeparams.IndexListExpr:
+		// In theory, none of the checks are necessary, as IndexListExpr only involves types. But there is no harm in
+		// being safe.
+		if MayHaveSideEffects(pass, expr.X, purity) {
+			return true
+		}
+		for _, idx := range expr.Indices {
+			if MayHaveSideEffects(pass, idx, purity) {
+				return true
+			}
+		}
+		return false
 	case *ast.KeyValueExpr:
 		return MayHaveSideEffects(pass, expr.Key, purity) || MayHaveSideEffects(pass, expr.Value, purity)
 	case *ast.SelectorExpr:
@@ -274,7 +306,7 @@ func MayHaveSideEffects(pass *analysis.Pass, expr ast.Expr, purity facts.PurityR
 		if MayHaveSideEffects(pass, expr.X, purity) {
 			return true
 		}
-		return expr.Op == token.ARROW
+		return expr.Op == token.ARROW || expr.Op == token.AND
 	case *ast.ParenExpr:
 		return MayHaveSideEffects(pass, expr.X, purity)
 	case nil:
@@ -291,4 +323,36 @@ func IsGoVersion(pass *analysis.Pass, minor int) bool {
 	}
 	version := f.Get().(int)
 	return version >= minor
+}
+
+var integerLiteralQ = pattern.MustParse(`(IntegerLiteral tv)`)
+
+func IntegerLiteral(pass *analysis.Pass, node ast.Node) (types.TypeAndValue, bool) {
+	m, ok := Match(pass, integerLiteralQ, node)
+	if !ok {
+		return types.TypeAndValue{}, false
+	}
+	return m.State["tv"].(types.TypeAndValue), true
+}
+
+func IsIntegerLiteral(pass *analysis.Pass, node ast.Node, value constant.Value) bool {
+	tv, ok := IntegerLiteral(pass, node)
+	if !ok {
+		return false
+	}
+	return constant.Compare(tv.Value, token.EQL, value)
+}
+
+// IsMethod reports whether expr is a method call of a named method with signature meth.
+// If name is empty, it is not checked.
+// For now, method expressions (Type.Method(recv, ..)) are not considered method calls.
+func IsMethod(pass *analysis.Pass, expr *ast.SelectorExpr, name string, meth *types.Signature) bool {
+	if name != "" && expr.Sel.Name != name {
+		return false
+	}
+	sel, ok := pass.TypesInfo.Selections[expr]
+	if !ok || sel.Kind() != types.MethodVal {
+		return false
+	}
+	return types.Identical(sel.Type(), meth)
 }

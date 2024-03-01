@@ -42,7 +42,7 @@ require (
 	github.com/openshift/generic-admission-server v1.14.1-0.20221208154047-0cd6b8367d91
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v0.9.0-master.0.20230216120756-2659252502ba
-	github.com/openshift/library-go v0.0.0-20220920133651-093893cf326b
+	github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a
 	github.com/openshift/machine-api-operator v0.2.1-0.20220930152820-30825f121cc5
 	github.com/openshift/machine-api-provider-gcp v0.0.0
 	github.com/openshift/machine-api-provider-ibmcloud v0.0.0-20230124105206-50aa171a52e1
@@ -76,8 +76,8 @@ require (
 	k8s.io/kube-aggregator v0.26.2
 	k8s.io/kubectl v0.26.2
 	k8s.io/utils v0.0.0-20230313181309-38a27ef9d749
-	sigs.k8s.io/controller-runtime v0.14.2
-	sigs.k8s.io/controller-tools v0.10.0
+	sigs.k8s.io/controller-runtime v0.14.4
+	sigs.k8s.io/controller-tools v0.11.3
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -90,6 +90,7 @@ require (
 	github.com/curioswitch/go-reassign v0.2.0 // indirect
 	github.com/denis-tingaikin/go-header v0.4.3 // indirect
 	github.com/firefart/nonamedreturns v1.0.4 // indirect
+	github.com/go-test/deep v1.1.0 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
 	github.com/junk1tm/musttag v0.4.4 // indirect
@@ -98,6 +99,7 @@ require (
 	github.com/lufeee/execinquery v1.2.1 // indirect
 	github.com/maratori/testableexamples v1.0.0 // indirect
 	github.com/nunnatsa/ginkgolinter v0.8.1 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/sashamelentyev/interfacebloat v1.1.0 // indirect
 	github.com/sashamelentyev/usestdlibvars v1.21.1 // indirect
 	github.com/sivchari/containedctx v1.0.2 // indirect
@@ -173,7 +175,7 @@ require (
 	github.com/go-toolsmith/strparse v1.0.0 // indirect
 	github.com/go-toolsmith/typep v1.0.2 // indirect
 	github.com/go-xmlfmt/xmlfmt v1.1.2 // indirect
-	github.com/gobuffalo/flect v0.2.5 // indirect
+	github.com/gobuffalo/flect v0.3.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -200,7 +202,7 @@ require (
 	github.com/gostaticanalysis/nilerr v0.1.1 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
-	github.com/hashicorp/errwrap v1.0.0 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.2 // indirect
@@ -230,7 +232,7 @@ require (
 	github.com/matoous/godox v0.0.0-20210227103229-6504466cf951 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mbilski/exhaustivestruct v1.2.0 // indirect
 	github.com/metal3-io/baremetal-operator/apis v0.0.0 // indirect
@@ -254,7 +256,7 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/openshift/client-go v0.0.0-20221019143426-16aed247da5c // indirect
+	github.com/openshift/client-go v0.0.0-20230120202327-72f107311084 // indirect
 	github.com/openshift/cloud-credential-operator v0.0.0-20200316201045-d10080b52c9e // indirect
 	github.com/openshift/cluster-api-provider-alibaba v0.0.1-0.20220606091606-a7bf6bf132ca
 	github.com/ovirt/go-ovirt v0.0.0-20210809163552-d4276e35d3db // indirect
@@ -266,7 +268,7 @@ require (
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/quasilyte/go-ruleguard v0.3.18 // indirect
-	github.com/quasilyte/regex/syntax v0.0.0-20200805063351-8f842688393c // indirect
+	github.com/quasilyte/regex/syntax v0.0.0-20210819130434-b3f0c404a727 // indirect
 	github.com/ryancurrah/gomodguard v1.3.0 // indirect
 	github.com/ryanrolds/sqlclosecheck v0.4.0 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.0.7 // indirect
@@ -276,7 +278,7 @@ require (
 	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd // indirect
 	github.com/sonatard/noctx v0.0.1 // indirect
 	github.com/sourcegraph/go-diff v0.7.0 // indirect
-	github.com/spf13/afero v1.8.2 // indirect
+	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
@@ -308,8 +310,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.20.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
-	go.uber.org/atomic v1.8.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
@@ -382,6 +384,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go v0.47.0 // indirect
 	github.com/microsoftgraph/msgraph-sdk-go-core v0.30.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20231107105652-3110ed81e74c
 	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/quasilyte/gogrep v0.0.0-20220828223005-86e4605de09f // indirect
@@ -393,6 +396,7 @@ require (
 	github.com/t-yuki/gocover-cobertura v0.0.0-20180217150009-aaee18c8195c // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tidwall/sjson v1.2.5
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20221208152030-732eee02a75a // indirect
 	k8s.io/kms v0.26.2 // indirect

@@ -22,6 +22,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
@@ -394,17 +395,15 @@ func (m *InstallManager) Run() error {
 	}
 
 	// Get worker MachinePool for the ClusterDeployment if one exists.
-	workerMachinePool, err := m.loadWorkerMachinePool(cd)
+	mapPoolsByType, err := m.loadMachinePools(cd)
 	if err != nil {
-		// Error indicates we weren't able to check if there was a worker MachinePool
-		// associated with the ClusterDeployment.
-		m.log.WithError(err).Error("error looking up worker machine pool")
+		m.log.WithError(err).Error("error loading machine pools")
 		return err
 	}
 
 	// Generate installer assets we need to modify or upload.
 	m.log.Info("generating assets")
-	if err := m.generateAssets(cd, workerMachinePool); err != nil {
+	if err := m.generateAssets(cd, mapPoolsByType); err != nil {
 		m.log.Info("reading installer log")
 		installLog, readErr := m.readInstallerLog(m, scrubInstallLog)
 		if readErr != nil {
@@ -836,8 +835,14 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 
 // generateAssets runs openshift-install commands to generate on-disk assets we need to
 // upload or modify prior to provisioning resources in the cloud.
-func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMachinePool *hivev1.MachinePool) error {
+func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, mapPoolsByType map[string]*hivev1.MachinePool) error {
 	m.log.Info("running openshift-install create manifests")
+
+	workerMachinePool, ok := mapPoolsByType["worker"]
+	if !ok {
+		workerMachinePool = nil
+	}
+
 	err := m.runOpenShiftInstallCommand("create", "manifests")
 	if err != nil {
 		m.log.WithError(err).Error("error generating installer assets")
@@ -864,23 +869,31 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 	// Day 0: Configure Hive worker MachinePool manifests with additional security group when
 	// ExtraWorkerSecurityGroupAnnotation has been set in annotations for the worker MachinePool.
 	// For details, see HIVE-1802.
-	if workerMachinePool != nil && metav1.HasAnnotation(workerMachinePool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) {
+	// Configure Hive MachineSet manifests with a label for the MachinePool name
+	var awsClient awsclient.Client
+	var vpcID string
+	addSecurityGroup := (workerMachinePool != nil) && (metav1.HasAnnotation(workerMachinePool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation))
+	if addSecurityGroup {
 		if cd.Spec.Platform.AWS == nil {
 			return errors.New("ExtraWorkerSecurityGroup annotation cannot be configured for non-AWS MachinePool")
 		}
 		m.log.Info("retrieving VPC ID of configured worker machinepool subnets")
-		awsClient, err := awsclient.NewClientFromSecret(nil, cd.Spec.Platform.AWS.Region)
+		awsClient, err = awsclient.NewClientFromSecret(nil, cd.Spec.Platform.AWS.Region)
 		if err != nil {
 			return err
 		}
-		vpcID, err := machinepool.GetVPCIDForMachinePool(awsClient, workerMachinePool)
+		vpcID, err = machinepool.GetVPCIDForMachinePool(awsClient, workerMachinePool)
 		if err != nil {
 			return err
 		}
+	}
 
-		m.log.Info("modifying worker machineset manifests")
+	addMPLabel := len(mapPoolsByType) > 0
 
-		// TODO: Handle error arg to WalkDirFunc
+	// TODO: Handle error arg to WalkDirFunc
+	if addSecurityGroup || addMPLabel {
+		m.log.Info("modifying machineset manifests")
+
 		err = filepath.WalkDir(filepath.Join(m.WorkDir, "openshift"), func(path string, d fs.DirEntry, _ error) error {
 			if d.IsDir() || (filepath.Ext(path) != ".yaml" && filepath.Ext(path) != ".yml") {
 				return nil
@@ -891,27 +904,37 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 				m.log.WithError(err).Error("error reading manifest file")
 				return err
 			}
-
-			modifiedManifestBytes, err := patchWorkerMachineSetManifest(manifestBytes, workerMachinePool, vpcID, m.log)
+			if addSecurityGroup {
+				modifiedBytes, err := patchWorkerMachineSetManifest(manifestBytes, workerMachinePool, vpcID, m.log)
+				if err != nil {
+					m.log.WithError(err).Error("error patching worker machineset manifest")
+					return err
+				}
+				err = writeModifiedBytesToFile(modifiedBytes, d, path, m.log)
+				if err != nil {
+					return err
+				}
+			}
+			manifestBytes, err = os.ReadFile(path)
 			if err != nil {
-				m.log.WithError(err).Error("error patching worker machineset manifest")
+				m.log.WithError(err).Error("error reading manifest file")
 				return err
 			}
-			if modifiedManifestBytes != nil {
-				info, err := d.Info()
+			if addMPLabel {
+				modifiedBytes, err := patchLabelMachineSetManifest(manifestBytes, mapPoolsByType, m.log)
 				if err != nil {
-					m.log.WithError(err).Error("error retrieving file info")
+					m.log.WithError(err).Error("error labeling machineset manifests")
 					return err
 				}
-				err = os.WriteFile(path, *modifiedManifestBytes, info.Mode())
+				err = writeModifiedBytesToFile(modifiedBytes, d, path, m.log)
 				if err != nil {
-					m.log.WithError(err).Error("error writing manifest")
 					return err
 				}
-			}
 
+			}
 			return nil
 		})
+
 		if err != nil {
 			m.log.WithError(err).Error("error finding machine pool manifests")
 			return err
@@ -947,6 +970,91 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 	return nil
 }
 
+// TODO: Combine this with patchWorkerMachineSetManifest once HIVE-2397 is completed
+func writeModifiedBytesToFile(modifiedManifestBytes []byte, d fs.DirEntry, path string, logger log.FieldLogger) error {
+	if modifiedManifestBytes != nil {
+		info, err := d.Info()
+		if err != nil {
+			logger.WithError(err).Error("error retrieving file info")
+			return err
+		}
+		err = os.WriteFile(path, modifiedManifestBytes, info.Mode())
+		if err != nil {
+			logger.WithError(err).Error("error writing manifest")
+			return err
+		}
+	}
+	return nil
+}
+
+func patchLabelMachineSetManifest(manifestBytes []byte, poolsByType map[string]*hivev1.MachinePool, logger log.FieldLogger) ([]byte, error) {
+	manifestBytesJson, err := yaml.YAMLToJSON(manifestBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "Error converting yaml to json")
+	}
+	/*
+		c, err := yamlutils.Decode(manifestBytes)
+		// Decoding the yaml here shouldn't produce an error. An error indicates that the
+		// installer produced yaml that could not be decoded.
+		if err != nil {
+			logger.WithError(err).Error("unable to decode manifest bytes")
+			return nil, err
+		}
+
+		// Return if file is not a MachineSet manifest
+		if isMachineSet, _ := yamlutils.Test(c, "/kind", "MachineSet"); !isMachineSet {
+			return nil, nil
+		}
+	*/
+
+	// Return if file is not a MachineSet manifest
+	if kind := gjson.Get(string(manifestBytesJson), `kind`).String(); kind != "MachineSet" {
+		return nil, nil
+	}
+
+	// Match MachineSet to MachinePool name
+	msetType := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
+	if msetType == "" {
+		logger.Error("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
+		return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
+	}
+
+	if pool, exists := poolsByType[msetType]; exists {
+		poolName := pool.Spec.Name
+		msetName := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machineset`).String()
+		if msetName == "" {
+			logger.WithError(err).Error("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
+			return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
+		}
+		logger.Infof("Matching machineset %s of type %s with pool %s", msetName, msetType, poolName)
+
+		manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/managed`, "true")
+		if err != nil {
+			logger.WithError(err).Error("error applying hive managed label patch")
+			return nil, err
+		}
+
+		// Add a pool-name label to the MachineSet containing the pool.Spec.Name which is equivalent to the value of the machine.openshift.io/cluster-api-machineset label
+		manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/machine-pool`, msetType)
+		if err != nil {
+			logger.WithError(err).Error("error applying machine pool label patch")
+			return nil, err
+		}
+
+		// Convert back to yaml
+		modifiedBytes, err := yaml.JSONToYAML(manifestBytesJson)
+		if err != nil {
+			logger.WithError(err).Error("error converting json to yaml")
+			return nil, err
+		}
+
+		return modifiedBytes, nil
+	}
+
+	return nil, nil
+
+}
+
 // patchWorkerMachineSetManifest accepts a yaml manifest as []byte and patches the manifest to include an additional
 // security group filter if that manifest is the definition of a worker MachineSet. The security group is obtained from
 // an annotation (constants.ExtraWorkerSecurityGroupAnnotation) on the provided MachinePool and is the value of the
@@ -954,7 +1062,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, workerMach
 // The first return value points to the modified manifest. It is `nil` if the manifest was not modified.
 // The second return value indicates an error from which we should not proceed.
 // Of note, it is not an error if `manifestBytes` represents valid yaml that is not a worker MachineSet.
-func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, vpcID string, logger log.FieldLogger) (*[]byte, error) {
+func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, vpcID string, logger log.FieldLogger) ([]byte, error) {
 	c, err := yamlutils.Decode(manifestBytes)
 	// Decoding the yaml here shouldn't produce an error. An error indicates that the
 	// installer produced yaml that could not be decoded.
@@ -1002,7 +1110,7 @@ func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePoo
 		logger.WithError(err).Error("error applying patch")
 		return nil, err
 	}
-	return &modifiedBytes, nil
+	return modifiedBytes, nil
 }
 
 // provisionCluster invokes the openshift-install create cluster command to provision resources
@@ -1177,18 +1285,18 @@ func (m *InstallManager) loadClusterDeployment() (*hivev1.ClusterDeployment, err
 	return cd, nil
 }
 
-func (m *InstallManager) loadWorkerMachinePool(cd *hivev1.ClusterDeployment) (*hivev1.MachinePool, error) {
+func (m *InstallManager) loadMachinePools(cd *hivev1.ClusterDeployment) (map[string]*hivev1.MachinePool, error) {
+	mapPoolsByType := map[string]*hivev1.MachinePool{}
 	mpL := &hivev1.MachinePoolList{}
 	if err := m.DynamicClient.List(context.Background(), mpL, &client.ListOptions{Namespace: m.Namespace}); err != nil {
 		return nil, err
 	}
 	for _, pool := range mpL.Items {
-		if pool.Spec.ClusterDeploymentRef.Name == cd.Name && pool.Spec.Name == "worker" {
-			return &pool, nil
+		if pool.Spec.ClusterDeploymentRef.Name == cd.Name {
+			mapPoolsByType[pool.Spec.Name] = &pool
 		}
 	}
-	// No worker pool is associated with the ClusterDeployment (no error)
-	return nil, nil
+	return mapPoolsByType, nil
 }
 
 // gatherLogs will attempt to gather logs after a failed install. First we attempt

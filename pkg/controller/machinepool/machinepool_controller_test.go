@@ -49,6 +49,7 @@ const (
 	testRegion          = "test-region"
 	testPoolName        = "worker"
 	testInstanceType    = "test-instance-type"
+	testZone            = "test-zone"
 )
 
 func init() {
@@ -133,19 +134,19 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 		},
 		{
@@ -155,19 +156,19 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			actuatorDoNotProceed: true,
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 		},
 		{
@@ -176,19 +177,19 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 0, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 0, 0, "us-east-1c"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 1),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 1, "us-east-1c"),
 			},
 		},
 		{
@@ -197,19 +198,68 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
+		},
+		{
+			name:              "Match and update missing MachineSet with different name but matching MachinePool and AZ",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("bar-12345-worker-us-east-1a", "worker", false, 2, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 2, 1, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
+			},
+		},
+		{
+			name:              "Fail to update MachineSet with same name and AZ but no MachinePool label",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSetNotManaged("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"), // no hive MachinePool label
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+			},
+			expectErr: true,
+		},
+		{
+			name:              "Fail to update MachineSet with same name and MachinePool label but different AZ",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 2, 0, "not-us-east-1a"),
+			},
+			expectErr: true,
 		},
 		{
 			name: "Skip create missing machine set when clusterDeployment has annotation hive.openshift.io/syncset-pause: true ",
@@ -237,20 +287,20 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1d", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1d", "worker", true, 1, 0, "us-east-1d"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 		},
 		{
@@ -259,15 +309,15 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 3, 0),
-				testMachineSet("foo-12345-other-us-east-1b", "other", true, 3, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 3, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1b", "other", true, 3, 0, "us-east-1b"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 3, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 3, 0, "us-east-1a"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 3, 0),
-				testMachineSet("foo-12345-other-us-east-1b", "other", true, 3, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 3, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1b", "other", true, 3, 0, "us-east-1b"),
 			},
 		},
 		{
@@ -276,22 +326,22 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-other-us-east-1a", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1b", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1c", "other", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-other-us-east-1a", "other", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1b", "other", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1c", "other", true, 1, 0, "us-east-1c"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1a", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1b", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1c", "other", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1a", "other", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1b", "other", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1c", "other", true, 1, 0, "us-east-1c"),
 			},
 		},
 		{
@@ -305,18 +355,18 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			}(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-other-us-east-1a", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1b", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1c", "other", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-other-us-east-1a", "other", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1b", "other", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1c", "other", true, 1, 0, "us-east-1c"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectNoFinalizer: true,
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-other-us-east-1a", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1b", "other", true, 1, 0),
-				testMachineSet("foo-12345-other-us-east-1c", "other", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-other-us-east-1a", "other", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1b", "other", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-other-us-east-1c", "other", true, 1, 0, "us-east-1c"),
 			},
 		},
 		{
@@ -324,16 +374,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool: testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectNoFinalizer: true,
 			expectPoolPresent: true,
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 		},
 		{
@@ -347,16 +397,16 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool: testMachinePool(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectNoFinalizer: true,
 			expectPoolPresent: true,
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 		},
 		{
@@ -365,23 +415,23 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				testClusterAutoscaler("3"),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -398,22 +448,22 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -430,9 +480,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				func() runtime.Object {
 					a := testClusterAutoscaler("1")
 					a.Spec.ScaleDown = nil
@@ -443,14 +493,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -467,9 +517,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				func() runtime.Object {
 					a := testClusterAutoscaler("1")
 					a.Spec.ScaleDown.Enabled = false
@@ -480,14 +530,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -504,9 +554,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				func() runtime.Object {
 					a := testClusterAutoscaler("1")
 					a.Spec.BalanceSimilarNodeGroups = nil
@@ -517,14 +567,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -541,9 +591,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				func() runtime.Object {
 					a := testClusterAutoscaler("1")
 					a.Spec.BalanceSimilarNodeGroups = pointer.BoolPtr(false)
@@ -554,14 +604,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -580,23 +630,23 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				testClusterAutoscaler("1"),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -613,20 +663,20 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				testClusterAutoscaler("1"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -643,23 +693,23 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				testClusterAutoscaler("1"),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 1),
 				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 2, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "2", 1, 2),
@@ -676,9 +726,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool:       testAutoscalingMachinePool(3, 5),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				testClusterAutoscaler("1"),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
@@ -686,14 +736,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineAutoscaler("foo-12345-worker-us-east-1d", "1", 1, 1),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -715,9 +765,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			}(),
 			remoteExisting: []runtime.Object{
 				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", true, 1, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", true, 1, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				testClusterAutoscaler("1"),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
@@ -737,14 +787,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testClusterAutoscaler("1"),
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 0, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 0, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 0, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 0, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 0, 0),
-				testMachineSet("foo-12345-worker-us-east-1b", "worker", false, 0, 0),
-				testMachineSet("foo-12345-worker-us-east-1c", "worker", false, 0, 0),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 0, 0, "us-east-1c"),
 			},
 			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
 				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 0, 2),
@@ -823,69 +873,6 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 			generatedMachineSets: []*machineapi.MachineSet{
 				testMachineSet("foo-12345-worker", "worker", false, 1, 0),
-			},
-			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
-			},
-		},
-		{
-			name: "VSphere: generated with suffix, remate with suffix",
-			clusterDeployment: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeployment()
-				cd.Spec.Platform = hivev1.Platform{
-					VSphere: &vsphere.Platform{},
-				}
-				return cd
-			}(),
-			machinePool: testMachinePool(),
-			remoteExisting: []runtime.Object{
-				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
-			},
-			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-0", "worker", false, 1, 0),
-			},
-			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
-			},
-		},
-		{
-			name: "VSphere: generated without suffix, remate with suffix",
-			clusterDeployment: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeployment()
-				cd.Spec.Platform = hivev1.Platform{
-					VSphere: &vsphere.Platform{},
-				}
-				return cd
-			}(),
-			machinePool: testMachinePool(),
-			remoteExisting: []runtime.Object{
-				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
-			},
-			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker", "worker", false, 1, 0),
-			},
-			expectedRemoteMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-0", "worker", true, 1, 0),
-			},
-		},
-		{
-			name: "VSphere: generated with suffix, remate without suffix",
-			clusterDeployment: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeployment()
-				cd.Spec.Platform = hivev1.Platform{
-					VSphere: &vsphere.Platform{},
-				}
-				return cd
-			}(),
-			machinePool: testMachinePool(),
-			remoteExisting: []runtime.Object{
-				testMachine("master1", "master"),
-				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
-			},
-			generatedMachineSets: []*machineapi.MachineSet{
-				testMachineSet("foo-12345-worker-0", "worker", false, 1, 0),
 			},
 			expectedRemoteMachineSets: []*machineapi.MachineSet{
 				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
@@ -1192,6 +1179,16 @@ func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
 	}
 }
 
+func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machineapi.MachineSet) {
+	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.Scheme)
+	if err != nil {
+		log.WithError(err).Fatal("error encoding custom machine provider spec")
+	}
+	return func(ms *machineapi.MachineSet) {
+		ms.Spec.Template.Spec.ProviderSpec.Value = rawAWSProviderSpec
+	}
+}
+
 func testMachineSpec(machineType string) machineapi.MachineSpec {
 	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(testAWSProviderSpec(), scheme.Scheme)
 	if err != nil {
@@ -1238,7 +1235,21 @@ func testMachineSetMachine(name string, machineType string, machineSetName strin
 	return m
 }
 
-func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int) *machineapi.MachineSet {
+func testMachineSetWithAZ(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, az string) *machineapi.MachineSet {
+	pc := testAWSProviderSpec()
+	pc.Placement.AvailabilityZone = az
+
+	return testMachineSet(name, machineType, unstompedAnnotation, replicas, generation, replaceProviderSpec(pc))
+}
+
+func testMachineSetNotManaged(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, az string) *machineapi.MachineSet {
+
+	ms := testMachineSetWithAZ(name, machineType, unstompedAnnotation, replicas, generation, az)
+	delete(ms.Labels, machinePoolNameLabel) // remove machinePoolNameLabel
+	return ms
+}
+
+func testMachineSet(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, mutators ...func(*machineapi.MachineSet)) *machineapi.MachineSet {
 	msReplicas := int32(replicas)
 	ms := machineapi.MachineSet{
 		TypeMeta: metav1.TypeMeta{
@@ -1279,6 +1290,10 @@ func testMachineSet(name string, machineType string, unstompedAnnotation bool, r
 		ms.Annotations = map[string]string{
 			"hive.openshift.io/unstomped": "true",
 		}
+	}
+
+	for _, mutator := range mutators {
+		mutator(&ms)
 	}
 	return &ms
 }

@@ -35,7 +35,7 @@ func (m *MockQuery) EXPECT() *MockQueryMockRecorder {
 }
 
 // CreateOrUpdate mocks base method.
-func (m *MockQuery) CreateOrUpdate(rootDomain, domain string, values sets.String) error {
+func (m *MockQuery) CreateOrUpdate(rootDomain, domain string, values sets.Set[string]) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateOrUpdate", rootDomain, domain, values)
 	ret0, _ := ret[0].(error)
@@ -49,7 +49,7 @@ func (mr *MockQueryMockRecorder) CreateOrUpdate(rootDomain, domain, values inter
 }
 
 // Delete mocks base method.
-func (m *MockQuery) Delete(rootDomain, domain string, values sets.String) error {
+func (m *MockQuery) Delete(rootDomain, domain string, values sets.Set[string]) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", rootDomain, domain, values)
 	ret0, _ := ret[0].(error)
@@ -63,10 +63,10 @@ func (mr *MockQueryMockRecorder) Delete(rootDomain, domain, values interface{}) 
 }
 
 // Get mocks base method.
-func (m *MockQuery) Get(rootDomain string) (map[string]sets.String, error) {
+func (m *MockQuery) Get(rootDomain string) (map[string]sets.Set[string], error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", rootDomain)
-	ret0, _ := ret[0].(map[string]sets.String)
+	ret0, _ := ret[0].(map[string]sets.Set[string])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

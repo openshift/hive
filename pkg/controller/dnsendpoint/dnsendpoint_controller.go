@@ -158,6 +158,11 @@ type ReconcileDNSEndpoint struct {
 }
 
 // Reconcile syncs the name server entries for a DNSZone subdomain in the root domain's hosted zone.
+// Discrepancies are discovered by comparing to the nameServerScraper's cache.
+// The DNSZone.Status.NameServers are considered definitive. If the scraper's cache differs, we
+// reassert the entries from the DNSZone (and update the cache to prevent thrashing).
+// If the DNSZone is marked for deletion, we delete the subdomain's records from the root domain's
+// hosted zone (and delete the cache entry).
 func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	dnsLog := controllerutils.BuildControllerLogger(ControllerName, "dnsZone", request.NamespacedName)
 	dnsLog.Info("reconciling dns endpoint")
@@ -199,12 +204,12 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 	dnsLog = dnsLog.WithField("subdomain", fullDomain)
 
 	var rootDomain string
-	var currentNameServers sets.String
+	var scrapedNameServers sets.Set[string]
 
 	var nsTool nameServerTool
 
 	for i, nst := range r.nameServerTools {
-		rootDomain, currentNameServers = nst.scraper.GetEndpoint(fullDomain)
+		rootDomain, scrapedNameServers = nst.scraper.GetEndpoint(fullDomain)
 		if rootDomain != "" {
 			nsTool = r.nameServerTools[i]
 			break
@@ -236,16 +241,22 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, nil
 	}
 
-	desiredNameServers := sets.NewString(instance.Status.NameServers...)
+	desiredNameServers := sets.New(instance.Status.NameServers...)
 
 	switch {
-	// NS is up-to-date
-	// TODO: If this controller hits a new DNSZone first, currentNameServers and desiredNameServers
-	// are both empty, and therefore equal, so we'll hit this case; but that's not actually "NS
-	// record is up to date". Consider a new `case` with a better message ("name servers not yet
-	// discovered for dnszone/domain"?)
-	case !isDeleted && currentNameServers.Equal(desiredNameServers):
-		dnsLog.Debug("NS record is up to date")
+	// DNSZone's NS records match the scraper cache.
+	case !isDeleted && scrapedNameServers.Equal(desiredNameServers):
+		// This is the common case...
+		msg := "NS records are up to date"
+		// ...but on a fresh install if the timing is right:
+		// - we seeded the cache
+		// - AND the scraper ran
+		// - BUT it did not find NS entries for this subdomain
+		// This means the cloud provider has not yet created NS entries for this subdomain.
+		if len(desiredNameServers) == 0 {
+			msg = "NS records not yet created by the cloud provider"
+		}
+		dnsLog.Info(msg)
 
 	// NS needs to be created or updated
 	case !isDeleted && len(desiredNameServers) > 0:
@@ -263,8 +274,8 @@ func (r *ReconcileDNSEndpoint) Reconcile(ctx context.Context, request reconcile.
 	// NS needs to be deleted, either because the DNSZone has been deleted or because
 	// there are no targets for the NS.
 	default:
-		dnsLog.Info("deleting NS record")
-		if err := nsTool.queryClient.Delete(rootDomain, fullDomain, currentNameServers); err != nil {
+		dnsLog.Info("deleting NS records")
+		if err := nsTool.queryClient.Delete(rootDomain, fullDomain, scrapedNameServers); err != nil {
 			dnsLog.WithError(err).Error("error deleting NS record")
 			return reconcile.Result{}, err
 		}
@@ -315,7 +326,7 @@ func createNameServerQuery(c client.Client, logger log.FieldLogger, managedDomai
 	return nil
 }
 
-func updateParentLinkCreatedCondition(c client.Client, logger log.FieldLogger, dnsZone *hivev1.DNSZone, created bool, nameServers sets.String) (bool, error) {
+func updateParentLinkCreatedCondition(c client.Client, logger log.FieldLogger, dnsZone *hivev1.DNSZone, created bool, nameServers sets.Set[string]) (bool, error) {
 	var status corev1.ConditionStatus
 	var reason string
 	var message string

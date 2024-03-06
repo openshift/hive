@@ -31,11 +31,12 @@ type awsQuery struct {
 var _ Query = (*awsQuery)(nil)
 
 // Get implements Query.Get.
-func (q *awsQuery) Get(domain string) (map[string]sets.String, error) {
+func (q *awsQuery) Get(domain string) (map[string]sets.Set[string], error) {
 	awsClient, err := q.getAWSClient()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get AWS client")
 	}
+	// TODO: cache the zone ID in rootDomainsInfo (how to make this generic across clouds?)
 	zoneID, err := q.queryZoneID(awsClient, domain)
 	if err != nil {
 		return nil, errors.Wrap(err, "error querying zone ID")
@@ -48,7 +49,7 @@ func (q *awsQuery) Get(domain string) (map[string]sets.String, error) {
 }
 
 // CreateOrUpdate implements Query.CreateOrUpdate.
-func (q *awsQuery) CreateOrUpdate(rootDomain string, domain string, values sets.String) error {
+func (q *awsQuery) CreateOrUpdate(rootDomain string, domain string, values sets.Set[string]) error {
 	awsClient, err := q.getAWSClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get AWS client")
@@ -67,7 +68,7 @@ func (q *awsQuery) CreateOrUpdate(rootDomain string, domain string, values sets.
 }
 
 // Delete implements Query.Delete.
-func (q *awsQuery) Delete(rootDomain string, domain string, values sets.String) error {
+func (q *awsQuery) Delete(rootDomain string, domain string, values sets.Set[string]) error {
 	awsClient, err := q.getAWSClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get AWS client")
@@ -140,8 +141,8 @@ func (q *awsQuery) queryZoneID(awsClient awsclient.Client, domain string) (*stri
 }
 
 // queryNameServers queries AWS for the name servers in the specified hosted zone.
-func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID string) (map[string]sets.String, error) {
-	nameServers := map[string]sets.String{}
+func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID string) (map[string]sets.Set[string], error) {
+	nameServers := map[string]sets.Set[string]{}
 	maxItems := "100"
 	listInput := &route53.ListResourceRecordSetsInput{
 		HostedZoneId: &hostedZoneID,
@@ -159,7 +160,7 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 			if recordSet.Type == nil || *recordSet.Type != route53.RRTypeNs {
 				continue
 			}
-			values := sets.NewString()
+			values := sets.Set[string]{}
 			for _, record := range recordSet.ResourceRecords {
 				values.Insert(*record.Value)
 			}
@@ -175,7 +176,7 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 }
 
 // queryNameServer queries AWS for the name servers in the specified hosted zone for the specified domain.
-func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID string, domain string) (sets.String, error) {
+func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID string, domain string) (sets.Set[string], error) {
 	maxItems := "1"
 	recordType := route53.RRTypeNs
 	listOutput, err := awsClient.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
@@ -200,7 +201,7 @@ func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID stri
 	if recordSet.Type == nil || *recordSet.Type != route53.RRTypeNs {
 		return nil, nil
 	}
-	values := sets.NewString()
+	values := sets.Set[string]{}
 	for _, record := range recordSet.ResourceRecords {
 		values.Insert(*record.Value)
 	}
@@ -208,7 +209,7 @@ func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID stri
 }
 
 // changeNameServers changes the name servers for the specified domain in the specified hosted zone.
-func (q *awsQuery) changeNameServers(awsClient awsclient.Client, hostedZoneID string, domain string, values sets.String, action string) error {
+func (q *awsQuery) changeNameServers(awsClient awsclient.Client, hostedZoneID string, domain string, values sets.Set[string], action string) error {
 	recordType := route53.RRTypeNs
 	ttl := int64(60)
 	records := make([]*route53.ResourceRecord, 0, len(values))

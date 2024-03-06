@@ -2,19 +2,19 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Hive Metrics](#hive-metrics)
-    - [Optional Metrics](#optional-metrics)
-      - [Duration-based Metrics](#duration-based-metrics)
-      - [Metrics with Optional Cluster Deployment labels](#metrics-with-optional-cluster-deployment-labels)
-    - [List of all Hive metrics](#list-of-all-hive-metrics)
-      - [Hive Operator metrics](#hive-operator-metrics)
-      - [Metrics reported by all controllers](#metrics-reported-by-all-controllers)
-      - [ClusterDeployment controller metrics](#clusterdeployment-controller-metrics)
-      - [ClusterProvision controller metrics](#clusterprovision-controller-metrics)
-      - [ClusterDeprovision controller metrics](#clusterdeprovision-controller-metrics)
-      - [ClusterPool controller metrics](#clusterpool-controller-metrics)
-      - [Metrics controller metrics](#metrics-controller-metrics)
-    - [Example: Configure metricsConfig](#example-configure-metricsconfig)
+- [Optional Metrics](#optional-metrics)
+  - [Duration-based Metrics](#duration-based-metrics)
+  - [Metrics with Optional Cluster Deployment labels](#metrics-with-optional-cluster-deployment-labels)
+- [List of all Hive metrics](#list-of-all-hive-metrics)
+  - [Hive Operator metrics](#hive-operator-metrics)
+  - [Metrics reported by all controllers](#metrics-reported-by-all-controllers)
+  - [ClusterDeployment controller metrics](#clusterdeployment-controller-metrics)
+  - [ClusterProvision controller metrics](#clusterprovision-controller-metrics)
+  - [ClusterDeprovision controller metrics](#clusterdeprovision-controller-metrics)
+  - [ClusterPool controller metrics](#clusterpool-controller-metrics)
+  - [Metrics controller metrics](#metrics-controller-metrics)
+- [Managed DNS Metrics](#managed-dns-metrics)
+- [Example: Configure metricsConfig](#example-configure-metricsconfig)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -139,6 +139,15 @@ Some of these metrics are optional and the admin can opt for logging them via `H
 |             hive_cluster_deployment_syncset_paused             |           N            |    N     | {"cluster_deployment", "namespace", "cluster_type"}                                                             |
 |       hive_cluster_deployment_provision_underway_seconds       |           N            |    N     | {"cluster_deployment", "namespace", "cluster_type", "condition", "reason", "platform", "image_set"}             |
 |  hive_cluster_deployment_provision_underway_install_restarts   |           N            |    N     | {"cluster_deployment", "namespace", "cluster_type", "condition", "reason", "platform", "image_set"}             |
+
+### Managed DNS Metrics
+These are specific to the [Managed DNS flow](using-hive.md#managed-dns-1), and are probably interesting only to developers.
+Not optional.
+
+|           Metric Name               | Optional Label Support | Fixed Labels       |
+|:-----------------------------------:|:----------------------:|--------------------|
+|   hive_managed_dns_scrape_seconds   |           N            | {"managed_domain"} |
+| hive_managed_dns_subdomains_scraped |           N            | {"managed_domain"} |
 
 ### Example: Configure metricsConfig
 

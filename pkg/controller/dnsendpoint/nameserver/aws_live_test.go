@@ -82,10 +82,10 @@ func (s *LiveAWSTestSuite) TestCreateAndDelete() {
 			cut := s.getCUT()
 			domain := fmt.Sprintf("live-aws-test-%08d.%s", rand.Intn(100000000), s.rootDomain)
 			s.T().Logf("domain = %q", domain)
-			err := cut.CreateOrUpdate(s.rootDomain, domain, sets.NewString(tc.createValues...))
+			err := cut.CreateOrUpdate(s.rootDomain, domain, sets.New(tc.createValues...))
 			if s.NoError(err, "unexpected error creating NS") {
 				defer func() {
-					err := cut.Delete(s.rootDomain, domain, sets.NewString(tc.deleteValues...))
+					err := cut.Delete(s.rootDomain, domain, sets.New(tc.deleteValues...))
 					s.NoError(err, "unexpected error deleting NS")
 				}()
 			}
@@ -113,7 +113,7 @@ func (s *LiveAWSTestSuite) TestDeleteOfNonExistentNS() {
 	}
 	for _, tc := range cases {
 		s.T().Run(tc.name, func(t *testing.T) {
-			err := s.getCUT().Delete(s.rootDomain, fmt.Sprintf("non-existent.subdomain.%s", s.rootDomain), sets.NewString(tc.deleteValues...))
+			err := s.getCUT().Delete(s.rootDomain, fmt.Sprintf("non-existent.subdomain.%s", s.rootDomain), sets.New(tc.deleteValues...))
 			s.NoError(err, "expected no error")
 		})
 	}

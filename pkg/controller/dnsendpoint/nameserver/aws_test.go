@@ -19,7 +19,7 @@ func TestAWSGet(t *testing.T) {
 		name                          string
 		listHostedZonesOutputs        []*route53.ListHostedZonesByNameOutput
 		listResourceRecordSetsOutputs []*route53.ListResourceRecordSetsOutput
-		expectedNameServers           map[string]sets.String
+		expectedNameServers           map[string]sets.Set[string]
 	}{
 		{
 			name: "no hosted zones",
@@ -55,8 +55,8 @@ func TestAWSGet(t *testing.T) {
 					testRecordSet("test-subdomain.", "NS", "test-ns"),
 				)),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain": sets.NewString("test-ns"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain": sets.New[string]("test-ns"),
 			},
 		},
 		{
@@ -76,8 +76,8 @@ func TestAWSGet(t *testing.T) {
 					testRecordSet("test-subdomain.", "NS", "test-ns"),
 				)),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain": sets.NewString("test-ns"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain": sets.New[string]("test-ns"),
 			},
 		},
 		{
@@ -110,8 +110,8 @@ func TestAWSGet(t *testing.T) {
 					testRecordSet("test-subdomain.", "NS", "test-ns"),
 				)),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain": sets.NewString("test-ns"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain": sets.New[string]("test-ns"),
 			},
 		},
 		{
@@ -124,8 +124,8 @@ func TestAWSGet(t *testing.T) {
 					testRecordSet("test-subdomain.", "NS", "test-ns-1", "test-ns-2", "test-ns-3"),
 				)),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain": sets.NewString("test-ns-1", "test-ns-2", "test-ns-3"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain": sets.New[string]("test-ns-1", "test-ns-2", "test-ns-3"),
 			},
 		},
 		{
@@ -140,10 +140,10 @@ func TestAWSGet(t *testing.T) {
 					testRecordSet("test-subdomain-3.", "NS", "test-ns-3"),
 				)),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain-1": sets.NewString("test-ns-1"),
-				"test-subdomain-2": sets.NewString("test-ns-2"),
-				"test-subdomain-3": sets.NewString("test-ns-3"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain-1": sets.New[string]("test-ns-1"),
+				"test-subdomain-2": sets.New[string]("test-ns-2"),
+				"test-subdomain-3": sets.New[string]("test-ns-3"),
 			},
 		},
 		{
@@ -165,9 +165,9 @@ func TestAWSGet(t *testing.T) {
 					),
 				),
 			},
-			expectedNameServers: map[string]sets.String{
-				"test-subdomain-1": sets.NewString("test-ns-1"),
-				"test-subdomain-2": sets.NewString("test-ns-2"),
+			expectedNameServers: map[string]sets.Set[string]{
+				"test-subdomain-1": sets.New[string]("test-ns-1"),
+				"test-subdomain-2": sets.New[string]("test-ns-2"),
 			},
 		},
 	}
@@ -235,7 +235,7 @@ func withHostedZones(hostedZones ...*route53.HostedZone) listHostedZonesOutputOp
 
 func hzTruncated() listHostedZonesOutputOption {
 	return func(out *route53.ListHostedZonesByNameOutput) {
-		out.IsTruncated = pointer.BoolPtr(true)
+		out.IsTruncated = pointer.Bool(true)
 		out.NextDNSName = pointer.String("next-dns-name")
 		out.NextHostedZoneId = pointer.String("next-hosted-zone-id")
 	}
@@ -248,7 +248,7 @@ func testHostedZone(name string, zoneID string, opts ...hostedZoneOption) *route
 		Name: &name,
 		Id:   &zoneID,
 		Config: &route53.HostedZoneConfig{
-			PrivateZone: pointer.BoolPtr(false),
+			PrivateZone: pointer.Bool(false),
 		},
 	}
 	for _, o := range opts {
@@ -259,7 +259,7 @@ func testHostedZone(name string, zoneID string, opts ...hostedZoneOption) *route
 
 func private() hostedZoneOption {
 	return func(zone *route53.HostedZone) {
-		zone.Config.PrivateZone = pointer.BoolPtr(true)
+		zone.Config.PrivateZone = pointer.Bool(true)
 	}
 }
 

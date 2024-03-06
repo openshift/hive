@@ -52,7 +52,7 @@ type azureQuery struct {
 var _ Query = (*azureQuery)(nil)
 
 // Get implements Query.Get.
-func (q *azureQuery) Get(domain string) (map[string]sets.String, error) {
+func (q *azureQuery) Get(domain string) (map[string]sets.Set[string], error) {
 	azureClient, err := q.getAzureClient()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get azure client")
@@ -62,7 +62,7 @@ func (q *azureQuery) Get(domain string) (map[string]sets.String, error) {
 }
 
 // CreateOrUpdate implements Query.Create.
-func (q *azureQuery) CreateOrUpdate(rootDomain string, domain string, values sets.String) error {
+func (q *azureQuery) CreateOrUpdate(rootDomain string, domain string, values sets.Set[string]) error {
 	azureClient, err := q.getAzureClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get Azure client")
@@ -72,7 +72,7 @@ func (q *azureQuery) CreateOrUpdate(rootDomain string, domain string, values set
 }
 
 // Delete implements Query.Delete.
-func (q *azureQuery) Delete(rootDomain string, domain string, values sets.String) error {
+func (q *azureQuery) Delete(rootDomain string, domain string, values sets.Set[string]) error {
 	azureClient, err := q.getAzureClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get Azure client")
@@ -92,7 +92,7 @@ func (q *azureQuery) deleteNameServers(azureClient azureclient.Client, rootDomai
 }
 
 // createNameServers creates the name servers for the specified domain in the specified managed zone.
-func (q *azureQuery) createNameServers(azureClient azureclient.Client, rootDomain string, domain string, values sets.String) error {
+func (q *azureQuery) createNameServers(azureClient azureclient.Client, rootDomain string, domain string, values sets.Set[string]) error {
 	ctx, cancel := contextWithTimeout(context.TODO())
 	defer cancel()
 
@@ -101,10 +101,10 @@ func (q *azureQuery) createNameServers(azureClient azureclient.Client, rootDomai
 	return errors.Wrap(err, "something went wrong when creating name servers")
 }
 
-func (q *azureQuery) recordSet(values sets.String) dns.RecordSet {
+func (q *azureQuery) recordSet(values sets.Set[string]) dns.RecordSet {
 	nsRecords := make([]dns.NsRecord, len(values))
 
-	for i, v := range values.List() {
+	for i, v := range sets.List(values) {
 		nsRecords[i] = dns.NsRecord{
 			Nsdname: to.StringPtr(v),
 		}
@@ -119,11 +119,11 @@ func (q *azureQuery) recordSet(values sets.String) dns.RecordSet {
 }
 
 // queryNameServers queries Azure for the name servers in the specified managed zone.
-func (q *azureQuery) queryNameServers(azureClient azureclient.Client, rootDomain string) (map[string]sets.String, error) {
+func (q *azureQuery) queryNameServers(azureClient azureclient.Client, rootDomain string) (map[string]sets.Set[string], error) {
 	ctx, cancel := contextWithTimeout(context.TODO())
 	defer cancel()
 
-	nameServers := map[string]sets.String{}
+	nameServers := map[string]sets.Set[string]{}
 	recordSetsPage, err := azureClient.ListRecordSetsByZone(ctx, q.resourceGroupName, rootDomain, "")
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (q *azureQuery) queryNameServers(azureClient azureclient.Client, rootDomain
 			if recordSet.RecordSetProperties.NsRecords == nil {
 				continue
 			}
-			values := sets.NewString()
+			values := sets.Set[string]{}
 			for _, v := range *recordSet.NsRecords {
 				values.Insert(*v.Nsdname)
 			}

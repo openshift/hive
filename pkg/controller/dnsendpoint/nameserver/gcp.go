@@ -42,7 +42,7 @@ type gcpQuery struct {
 var _ Query = (*gcpQuery)(nil)
 
 // Get implements Query.Get.
-func (q *gcpQuery) Get(domain string) (map[string]sets.String, error) {
+func (q *gcpQuery) Get(domain string) (map[string]sets.Set[string], error) {
 	gcpClient, err := q.getGCPClient()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get GCP client")
@@ -59,7 +59,7 @@ func (q *gcpQuery) Get(domain string) (map[string]sets.String, error) {
 }
 
 // CreateOrUpdate implements Query.CreateOrUpdate.
-func (q *gcpQuery) CreateOrUpdate(rootDomain string, domain string, values sets.String) error {
+func (q *gcpQuery) CreateOrUpdate(rootDomain string, domain string, values sets.Set[string]) error {
 	gcpClient, err := q.getGCPClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get GCP client")
@@ -78,7 +78,7 @@ func (q *gcpQuery) CreateOrUpdate(rootDomain string, domain string, values sets.
 }
 
 // Delete implements Query.Delete.
-func (q *gcpQuery) Delete(rootDomain string, domain string, values sets.String) error {
+func (q *gcpQuery) Delete(rootDomain string, domain string, values sets.Set[string]) error {
 	gcpClient, err := q.getGCPClient()
 	if err != nil {
 		return errors.Wrap(err, "failed to get GCP client")
@@ -144,8 +144,8 @@ func (q *gcpQuery) queryZoneName(gcpClient gcpclient.Client, domain string) (str
 }
 
 // queryNameServers queries GCP for the name servers in the specified managed zone.
-func (q *gcpQuery) queryNameServers(gcpClient gcpclient.Client, managedZone string) (map[string]sets.String, error) {
-	nameServers := map[string]sets.String{}
+func (q *gcpQuery) queryNameServers(gcpClient gcpclient.Client, managedZone string) (map[string]sets.Set[string], error) {
+	nameServers := map[string]sets.Set[string]{}
 	listOpts := gcpclient.ListResourceRecordSetsOptions{}
 	for {
 		listOutput, err := gcpClient.ListResourceRecordSets(managedZone, listOpts)
@@ -156,7 +156,7 @@ func (q *gcpQuery) queryNameServers(gcpClient gcpclient.Client, managedZone stri
 			if recordSet.Type != "NS" {
 				continue
 			}
-			values := sets.NewString()
+			values := sets.Set[string]{}
 			for _, v := range recordSet.Rrdatas {
 				values.Insert(controllerutils.Undotted(v))
 			}
@@ -170,7 +170,7 @@ func (q *gcpQuery) queryNameServers(gcpClient gcpclient.Client, managedZone stri
 }
 
 // queryNameServer queries GCP for the name servers for the specified domain in the specified managed zone.
-func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone string, domain string) (sets.String, error) {
+func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone string, domain string) (sets.Set[string], error) {
 	listOutput, err := gcpClient.ListResourceRecordSets(
 		managedZone,
 		gcpclient.ListResourceRecordSetsOptions{
@@ -185,7 +185,7 @@ func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone strin
 	if len(listOutput.Rrsets) == 0 {
 		return nil, nil
 	}
-	values := sets.NewString()
+	values := sets.Set[string]{}
 	for _, v := range listOutput.Rrsets[0].Rrdatas {
 		values.Insert(controllerutils.Undotted(v))
 	}
@@ -193,7 +193,7 @@ func (q *gcpQuery) queryNameServer(gcpClient gcpclient.Client, managedZone strin
 }
 
 // createNameServers creates the name servers for the specified domain in the specified managed zone.
-func (q *gcpQuery) createNameServers(gcpClient gcpclient.Client, managedZone string, domain string, values sets.String) error {
+func (q *gcpQuery) createNameServers(gcpClient gcpclient.Client, managedZone string, domain string, values sets.Set[string]) error {
 
 	err := gcpClient.AddResourceRecordSet(managedZone, q.resourceRecordSet(domain, values))
 	if gcpErr, ok := err.(*googleapi.Error); ok && gcpErr.Code == http.StatusConflict {
@@ -217,7 +217,7 @@ func (q *gcpQuery) createNameServers(gcpClient gcpclient.Client, managedZone str
 	switch len(response.Rrsets) {
 	case 1:
 		// Exactly one NS record that needs updating
-		currentNSValues := sets.NewString(response.Rrsets[0].Rrdatas...)
+		currentNSValues := sets.New(response.Rrsets[0].Rrdatas...)
 
 		addRRSet := q.resourceRecordSet(domain, values)
 		removeRRSet := q.resourceRecordSet(domain, currentNSValues)
@@ -230,13 +230,13 @@ func (q *gcpQuery) createNameServers(gcpClient gcpclient.Client, managedZone str
 }
 
 // deleteNameServers deletes the name servers for the specified domain in the specified managed zone.
-func (q *gcpQuery) deleteNameServers(gcpClient gcpclient.Client, managedZone string, domain string, values sets.String) error {
+func (q *gcpQuery) deleteNameServers(gcpClient gcpclient.Client, managedZone string, domain string, values sets.Set[string]) error {
 	return gcpClient.DeleteResourceRecordSet(managedZone, q.resourceRecordSet(domain, values))
 }
 
-func (q *gcpQuery) resourceRecordSet(domain string, values sets.String) *dns.ResourceRecordSet {
+func (q *gcpQuery) resourceRecordSet(domain string, values sets.Set[string]) *dns.ResourceRecordSet {
 	dottedValues := make([]string, len(values))
-	for i, v := range values.List() {
+	for i, v := range sets.List(values) {
 		dottedValues[i] = controllerutils.Dotted(v)
 	}
 	return &dns.ResourceRecordSet{

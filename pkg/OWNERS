@@ -1,0 +1,4 @@
+filters:
+  "_test\\.go$":
+     labels:
+     - area/unit-tests

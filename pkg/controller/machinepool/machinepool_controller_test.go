@@ -832,6 +832,38 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Delete machine autoscalers whose maxReplicas would be zero",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testAutoscalingMachinePool(1, 2),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
+				testClusterAutoscaler("1"),
+				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 1),
+				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 2, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 1, 0, "us-east-1c"),
+			},
+			expectedRemoteMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 0, 1, "us-east-1c"),
+			},
+			expectedRemoteMachineAutoscalers: []autoscalingv1beta1.MachineAutoscaler{
+				*testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 1),
+				*testMachineAutoscaler("foo-12345-worker-us-east-1b", "2", 0, 1),
+			},
+			expectedRemoteClusterAutoscalers: []autoscalingv1.ClusterAutoscaler{
+				*testClusterAutoscaler("1"),
+			},
+		},
+		{
 			name:              "Create machine autoscalers where maxReplicas < #AZs and minReplicas==0",
 			clusterDeployment: testClusterDeployment(),
 			machinePool:       testAutoscalingMachinePool(0, 2),
@@ -959,8 +991,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					for _, rMS := range rMSL.Items {
 						if eMS.Name == rMS.Name {
 							found = true
-							assert.Equal(t, *eMS.Spec.Replicas, *rMS.Spec.Replicas, "Replicas")
-							assert.Equal(t, eMS.Generation, rMS.Generation, "Generation")
+							assert.Equal(t, *eMS.Spec.Replicas, *rMS.Spec.Replicas, "Replicas for %s", rMS.Name)
+							assert.Equal(t, eMS.Generation, rMS.Generation, "Generation for %s", rMS.Name)
 							if !reflect.DeepEqual(eMS.ObjectMeta.Labels, rMS.ObjectMeta.Labels) {
 								t.Errorf("machineset %v has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Labels, rMS.Labels)
 							}

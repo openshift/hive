@@ -816,7 +816,7 @@ func (r *ReconcileMachinePool) syncMachineAutoscalers(
 		for i, ms := range machineSets {
 			minReplicas, maxReplicas := getMinMaxReplicasForMachineSet(pool, machineSets, i)
 			found := false
-			for _, rMA := range remoteMachineAutoscalers.Items {
+			for j, rMA := range remoteMachineAutoscalers.Items {
 				if ms.Name == rMA.Name {
 					found = true
 					objectModified := false
@@ -826,7 +826,7 @@ func (r *ReconcileMachinePool) syncMachineAutoscalers(
 						maLog.WithField("desired", minReplicas).
 							WithField("observed", rMA.Spec.MinReplicas).
 							Info("min replicas out of sync")
-						rMA.Spec.MinReplicas = minReplicas
+						remoteMachineAutoscalers.Items[j].Spec.MinReplicas = minReplicas
 						objectModified = true
 					}
 
@@ -834,17 +834,21 @@ func (r *ReconcileMachinePool) syncMachineAutoscalers(
 						maLog.WithField("desired", maxReplicas).
 							WithField("observed", rMA.Spec.MaxReplicas).
 							Info("max replicas out of sync")
-						rMA.Spec.MaxReplicas = maxReplicas
+						remoteMachineAutoscalers.Items[j].Spec.MaxReplicas = maxReplicas
 						objectModified = true
 					}
 
-					if objectModified {
-						machineAutoscalersToUpdate = append(machineAutoscalersToUpdate, &rMA)
+					// A MachineAutoscaler can't have MaxReplicas==0. In that case, update will
+					// bounce. We must delete the MachineAutoscaler instead, which we trigger
+					// below based on having set MaxReplicas to zero above.
+					if objectModified && maxReplicas > 0 {
+						machineAutoscalersToUpdate = append(machineAutoscalersToUpdate, &remoteMachineAutoscalers.Items[j])
 					}
 					break
 				}
 			}
 
+			// Don't attempt to create a MachineAutoscaler with MaxReplicas==0.
 			if !found && maxReplicas > 0 {
 				ma := &autoscalingv1beta1.MachineAutoscaler{
 					ObjectMeta: metav1.ObjectMeta{
@@ -879,7 +883,10 @@ func (r *ReconcileMachinePool) syncMachineAutoscalers(
 		if pool.DeletionTimestamp == nil && pool.Spec.Autoscaling != nil {
 			for _, ms := range machineSets {
 				if rMA.Name == ms.Name {
-					delete = false
+					// A MachineAutoscaler can't have MaxReplicas==0. Delete it if that's the case.
+					if rMA.Spec.MaxReplicas > 0 {
+						delete = false
+					}
 					break
 				}
 			}

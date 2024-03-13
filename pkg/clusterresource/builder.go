@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
-	yamlpatch "github.com/krishicks/yaml-patch"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/validate"
 	"github.com/pkg/errors"
+	"github.com/tidwall/sjson"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -419,17 +419,21 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 	// Remove metadataService field from machinepool platform within installconfig.
 	// TODO: Remove this once https://bugzilla.redhat.com/show_bug.cgi?id=2098299 has been addressed.
 	if installConfig.Platform.AWS != nil {
-		ops := yamlpatch.Patch{
-			yamlpatch.Operation{
-				Op:   "remove",
-				Path: yamlpatch.OpPath("/compute/0/platform/aws/metadataService"),
-			},
-			yamlpatch.Operation{
-				Op:   "remove",
-				Path: yamlpatch.OpPath("/controlPlane/platform/aws/metadataService"),
-			},
+		d, err = yaml.YAMLToJSON(d)
+		if err != nil {
+			return nil, errors.Wrap(err, "error converting install-config.yaml to JSON")
 		}
-		modifiedBytes, err := ops.Apply(d)
+		d, err = sjson.DeleteBytes(d, `compute.0.platform.aws.metadataService`)
+		if err != nil {
+			return nil, errors.Wrap(err, "error removing metadataService field from install-config.yaml")
+		}
+		d, err = sjson.DeleteBytes(d, `controlPlane.platform.aws.metadataService`)
+		if err != nil {
+			return nil, errors.Wrap(err, "error removing metadataService field from install-config.yaml")
+		}
+
+		// Convert back to yaml
+		modifiedBytes, err := yaml.JSONToYAML(d)
 		if err != nil {
 			return nil, errors.Wrap(err, "error patching install-config.yaml to remove metadataService field")
 		}
@@ -438,17 +442,19 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 
 	// Remove osImage field from machinepool platform within installconfig.
 	if installConfig.Platform.Azure != nil {
-		ops := yamlpatch.Patch{
-			yamlpatch.Operation{
-				Op:   "remove",
-				Path: yamlpatch.OpPath("/compute/0/platform/azure/osImage"),
-			},
-			yamlpatch.Operation{
-				Op:   "remove",
-				Path: yamlpatch.OpPath("/controlPlane/platform/azure/osImage"),
-			},
+		d, err = yaml.YAMLToJSON(d)
+		if err != nil {
+			return nil, errors.Wrap(err, "error converting install-config.yaml to JSON")
 		}
-		modifiedBytes, err := ops.Apply(d)
+		d, err = sjson.DeleteBytes(d, `compute.0.platform.azure.osImage`)
+		if err != nil {
+			return nil, errors.Wrap(err, "error removing osImage field from install-config.yaml")
+		}
+		d, err = sjson.DeleteBytes(d, `controlPlane.platform.azure.osImage`)
+		if err != nil {
+			return nil, errors.Wrap(err, "error removing osImage field from install-config.yaml")
+		}
+		modifiedBytes, err := yaml.JSONToYAML(d)
 		if err != nil {
 			return nil, errors.Wrap(err, "error patching install-config.yaml to remove osImage field")
 		}

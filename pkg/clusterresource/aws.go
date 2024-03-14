@@ -114,15 +114,16 @@ func (p *AWSCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachineP
 			Size: volumeSize,
 			Type: volumeType,
 		},
+		UserTags: p.UserTags,
 	}
-
 }
 
 func (p *AWSCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
 	// Inject platform details into InstallConfig:
 	ic.Platform = installertypes.Platform{
 		AWS: &awsinstallertypes.Platform{
-			Region: p.Region,
+			Region:   p.Region,
+			UserTags: p.UserTags,
 		},
 	}
 

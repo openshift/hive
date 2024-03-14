@@ -178,8 +178,6 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		return nil, false, errors.Wrap(err, "processing subnets")
 	}
 
-	// FIXME: These should be updated to feed from installconfig
-	// if the machine pool supplied tags are empty
 	userTags := map[string]string{}
 	if len(pool.Spec.Platform.AWS.UserTags) > 0 {
 		userTags = pool.Spec.Platform.AWS.UserTags

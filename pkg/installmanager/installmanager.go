@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -76,7 +75,6 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	"github.com/openshift/hive/pkg/util/scheme"
-	yamlutils "github.com/openshift/hive/pkg/util/yaml"
 )
 
 const (
@@ -853,7 +851,7 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, mapPoolsBy
 	// For details, see HIVE-1802.
 	// Configure Hive MachineSet manifests with a label for the MachinePool name
 	var awsClient awsclient.Client
-	var vpcID string
+	vpcID := ""
 	addSecurityGroup := (workerMachinePool != nil) && (metav1.HasAnnotation(workerMachinePool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation))
 	if addSecurityGroup {
 		if cd.Spec.Platform.AWS == nil {
@@ -886,34 +884,17 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, mapPoolsBy
 				m.log.WithError(err).Error("error reading manifest file")
 				return err
 			}
-			if addSecurityGroup {
-				modifiedBytes, err := patchWorkerMachineSetManifest(manifestBytes, workerMachinePool, vpcID, m.log)
-				if err != nil {
-					m.log.WithError(err).Error("error patching worker machineset manifest")
-					return err
-				}
-				err = writeModifiedBytesToFile(modifiedBytes, d, path, m.log)
-				if err != nil {
-					return err
-				}
-			}
-			manifestBytes, err = os.ReadFile(path)
+
+			modifiedBytes, err := patchMachineSetManifest(manifestBytes, mapPoolsByType, vpcID, addSecurityGroup, addMPLabel, m.log)
 			if err != nil {
-				m.log.WithError(err).Error("error reading manifest file")
+				m.log.WithError(err).Error("error patching machineset manifest")
 				return err
 			}
-			if addMPLabel {
-				modifiedBytes, err := patchLabelMachineSetManifest(manifestBytes, mapPoolsByType, m.log)
-				if err != nil {
-					m.log.WithError(err).Error("error labeling machineset manifests")
-					return err
-				}
-				err = writeModifiedBytesToFile(modifiedBytes, d, path, m.log)
-				if err != nil {
-					return err
-				}
-
+			err = writeModifiedBytesToFile(modifiedBytes, d, path, m.log)
+			if err != nil {
+				return err
 			}
+
 			return nil
 		})
 
@@ -952,7 +933,6 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, mapPoolsBy
 	return nil
 }
 
-// TODO: Combine this with patchWorkerMachineSetManifest once HIVE-2397 is completed
 func writeModifiedBytesToFile(modifiedManifestBytes []byte, d fs.DirEntry, path string, logger log.FieldLogger) error {
 	if modifiedManifestBytes != nil {
 		info, err := d.Info()
@@ -969,60 +949,93 @@ func writeModifiedBytesToFile(modifiedManifestBytes []byte, d fs.DirEntry, path 
 	return nil
 }
 
-func patchLabelMachineSetManifest(manifestBytes []byte, poolsByType map[string]*hivev1.MachinePool, logger log.FieldLogger) ([]byte, error) {
+// patchMachineSetManifest accepts a yaml manifest as []byte and patches the manifest to include an additional
+// security group filter if that manifest is the definition of a worker MachineSet and the addSecurityGroup flag is set.
+// The security group is obtained from an annotation (constants.ExtraWorkerSecurityGroupAnnotation) on the provided
+// MachinePool and is the value of the annotation (singular).
+// The second flag, addMPLabel, is used to patch the manifest to include a label that matches the name of the
+// MachinePool that the MachineSet is associated with. This is used to match MachineSets to MachinePools.
+// The first return value points to the modified manifest. It is `nil` if the manifest was not modified.
+// The second return value indicates an error from which we should not proceed.
+// Of note, it is not an error if `manifestBytes` represents valid yaml that is not a worker MachineSet.
+func patchMachineSetManifest(manifestBytes []byte, poolsByType map[string]*hivev1.MachinePool, vpcID string, addSecurityGroup bool, addMPLabel bool, logger log.FieldLogger) ([]byte, error) {
 	manifestBytesJson, err := yaml.YAMLToJSON(manifestBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "Error converting yaml to json")
 	}
-	/*
-		c, err := yamlutils.Decode(manifestBytes)
-		// Decoding the yaml here shouldn't produce an error. An error indicates that the
-		// installer produced yaml that could not be decoded.
-		if err != nil {
-			logger.WithError(err).Error("unable to decode manifest bytes")
-			return nil, err
-		}
-
-		// Return if file is not a MachineSet manifest
-		if isMachineSet, _ := yamlutils.Test(c, "/kind", "MachineSet"); !isMachineSet {
-			return nil, nil
-		}
-	*/
 
 	// Return if file is not a MachineSet manifest
 	if kind := gjson.Get(string(manifestBytesJson), `kind`).String(); kind != "MachineSet" {
 		return nil, nil
 	}
+	modified := false
 
-	// Match MachineSet to MachinePool name
-	msetType := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
-	if msetType == "" {
-		logger.Error("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
-		return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
+	if addSecurityGroup {
+		pool := poolsByType["worker"]
+
+		isWorker := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
+
+		if isWorker == "worker" {
+			modified = true
+			var vpcIDFilterValue map[string]interface{} = map[string]interface{}{
+				"name":   "vpc-id",
+				"values": []string{vpcID},
+			}
+
+			// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
+			// annotation found on the MachinePool to the existing tag:Name filter in the worker
+			// MachineSet manifest
+			securityGroupFilterValue := pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation]
+
+			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `spec.template.spec.providerSpec.value.securityGroups.0.filters.0.values.0`, securityGroupFilterValue)
+			if err != nil {
+				logger.WithError(err).Error("error adding security group name to worker machineset manifest")
+				return nil, err
+			}
+
+			// Add a filter for the vpcID since the names of security groups may be the same within a
+			// given AWS account. HIVE-1874
+			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `spec.template.spec.providerSpec.value.securityGroups.0.filters.-1`, vpcIDFilterValue)
+			if err != nil {
+				logger.WithError(err).Error("error adding vpc-id filter to worker machineset manifest")
+				return nil, err
+			}
+		}
 	}
 
-	if pool, exists := poolsByType[msetType]; exists {
-		poolName := pool.Spec.Name
-		msetName := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machineset`).String()
-		if msetName == "" {
-			logger.WithError(err).Error("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
-			return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
-		}
-		logger.Infof("Matching machineset %s of type %s with pool %s", msetName, msetType, poolName)
-
-		manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/managed`, "true")
-		if err != nil {
-			logger.WithError(err).Error("error applying hive managed label patch")
-			return nil, err
+	if addMPLabel {
+		// Match MachineSet to MachinePool name
+		msetType := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machine-type`).String()
+		if msetType == "" {
+			logger.Error("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
+			return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machine-type label")
 		}
 
-		// Add a pool-name label to the MachineSet containing the pool.Spec.Name which is equivalent to the value of the machine.openshift.io/cluster-api-machineset label
-		manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/machine-pool`, msetType)
-		if err != nil {
-			logger.WithError(err).Error("error applying machine pool label patch")
-			return nil, err
-		}
+		if pool, exists := poolsByType[msetType]; exists {
+			modified = true
+			poolName := pool.Spec.Name
+			msetName := gjson.Get(string(manifestBytesJson), `spec.template.metadata.labels.machine\.openshift\.io\/cluster-api-machineset`).String()
+			if msetName == "" {
+				logger.WithError(err).Error("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
+				return nil, errors.New("MachineSet does not contain machine.openshift.io/cluster-api-machineset label")
+			}
+			logger.Infof("Matching machineset %s of type %s with pool %s", msetName, msetType, poolName)
 
+			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/managed`, "true")
+			if err != nil {
+				logger.WithError(err).Error("error applying hive managed label patch")
+				return nil, err
+			}
+
+			// Add a pool-name label to the MachineSet containing the pool.Spec.Name which is equivalent to the value of the machine.openshift.io/cluster-api-machineset label
+			manifestBytesJson, err = sjson.SetBytes(manifestBytesJson, `metadata.labels.hive\.openshift\.io/machine-pool`, msetType)
+			if err != nil {
+				logger.WithError(err).Error("error applying machine pool label patch")
+				return nil, err
+			}
+		}
+	}
+	if modified {
 		// Convert back to yaml
 		modifiedBytes, err := yaml.JSONToYAML(manifestBytesJson)
 		if err != nil {
@@ -1032,67 +1045,7 @@ func patchLabelMachineSetManifest(manifestBytes []byte, poolsByType map[string]*
 
 		return modifiedBytes, nil
 	}
-
 	return nil, nil
-
-}
-
-// patchWorkerMachineSetManifest accepts a yaml manifest as []byte and patches the manifest to include an additional
-// security group filter if that manifest is the definition of a worker MachineSet. The security group is obtained from
-// an annotation (constants.ExtraWorkerSecurityGroupAnnotation) on the provided MachinePool and is the value of the
-// annotation (singular).
-// The first return value points to the modified manifest. It is `nil` if the manifest was not modified.
-// The second return value indicates an error from which we should not proceed.
-// Of note, it is not an error if `manifestBytes` represents valid yaml that is not a worker MachineSet.
-func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, vpcID string, logger log.FieldLogger) ([]byte, error) {
-	c, err := yamlutils.Decode(manifestBytes)
-	// Decoding the yaml here shouldn't produce an error. An error indicates that the
-	// installer produced yaml that could not be decoded.
-	if err != nil {
-		logger.WithError(err).Error("unable to decode manifest bytes")
-		return nil, err
-	}
-
-	// Return if file is not a worker MachineSet manifest
-	if isMachineSet, _ := yamlutils.Test(c, "/kind", "MachineSet"); !isMachineSet {
-		return nil, nil
-	}
-	// Note: We have to escape the `/` in the label key as `~1` per https://datatracker.ietf.org/doc/html/rfc6901#section-3
-	if isWorkerMachineSet, _ := yamlutils.Test(c, "/spec/template/metadata/labels/machine.openshift.io~1cluster-api-machine-type", "worker"); !isWorkerMachineSet {
-		return nil, nil
-	}
-
-	securityGroupFilterValue := interface{}(pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
-	var vpcIDFilterValue map[string]interface{} = map[string]interface{}{
-		"name":   "vpc-id",
-		"values": []string{vpcID},
-	}
-	vpcIDFilterValueInterface := interface{}(vpcIDFilterValue)
-	ops := yamlpatch.Patch{
-		// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
-		// annotation found on the MachinePool to the existing tag:Name filter in the worker
-		// MachineSet manifest
-		yamlpatch.Operation{
-			Op:    "add",
-			Path:  yamlpatch.OpPath("/spec/template/spec/providerSpec/value/securityGroups/0/filters/0/values/-"),
-			Value: yamlpatch.NewNode(&securityGroupFilterValue),
-		},
-		// Add a filter for the vpcID since the names of security groups may be the same within a
-		// given AWS account. HIVE-1874
-		yamlpatch.Operation{
-			Op:    "add",
-			Path:  yamlpatch.OpPath("/spec/template/spec/providerSpec/value/securityGroups/0/filters/-"),
-			Value: yamlpatch.NewNode(&vpcIDFilterValueInterface),
-		},
-	}
-
-	// Apply patch to manifest
-	modifiedBytes, err := ops.Apply(manifestBytes)
-	if err != nil {
-		logger.WithError(err).Error("error applying patch")
-		return nil, err
-	}
-	return modifiedBytes, nil
 }
 
 // provisionCluster invokes the openshift-install create cluster command to provision resources
@@ -1995,26 +1948,12 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 	infraNameBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(infraName)))
 	resourceGroupNameBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(resourceGroupName)))
 
-	ops := yamlpatch.Patch{
-		yamlpatch.Operation{
-			Op:    "add", //ok even if /data/azure_region already exists
-			Path:  yamlpatch.OpPath("/data/azure_region"),
-			Value: yamlpatch.NewNode(&regionBase64),
-		},
-		yamlpatch.Operation{
-			Op:    "add",
-			Path:  yamlpatch.OpPath("/data/azure_resource_prefix"),
-			Value: yamlpatch.NewNode(&infraNameBase64),
-		},
-		yamlpatch.Operation{
-			Op:    "add",
-			Path:  yamlpatch.OpPath("/data/azure_resourcegroup"),
-			Value: yamlpatch.NewNode(&resourceGroupNameBase64),
-		},
-	}
+	overrideCredsJson, _ = sjson.SetBytes(overrideCredsJson, "data.azure_region", regionBase64)
+	overrideCredsJson, _ = sjson.SetBytes(overrideCredsJson, "data.azure_resource_prefix", infraNameBase64)
+	overrideCredsJson, _ = sjson.SetBytes(overrideCredsJson, "data.azure_resourcegroup", resourceGroupNameBase64)
 
 	// Apply patch to 99_cloud-creds-secret.yaml
-	modifiedBytes, err := ops.Apply(overrideCredsBytes)
+	modifiedBytes, err := yaml.JSONToYAML(overrideCredsJson)
 	if err != nil {
 		return nil, errors.Wrap(err, "error applying patch on 99_cloud-creds-secret.yaml")
 	}

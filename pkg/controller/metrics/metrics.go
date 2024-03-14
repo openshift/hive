@@ -242,8 +242,8 @@ func (mc *Calculator) Start(ctx context.Context) error {
 		if err != nil {
 			log.WithError(err).Error("error listing cluster deployments")
 		} else {
-			// Reset metric on each pass to prevent reporting stale metrics when count drops to zero
-			metricClusterDeploymentsTotal.Reset()
+			// Reset metrics on each pass to prevent reporting stale metrics when count drops to zero
+			resetMetrics()
 			accumulator, err := newClusterAccumulator(infinity, []string{"0h", "1h", "2h", "8h", "24h", "72h"})
 			if err != nil {
 				mcLog.WithError(err).Error("unable to calculate metrics")
@@ -793,3 +793,50 @@ func logHistogramDurationMetric(metric *prometheus.HistogramVec, cd *hivev1.Clus
 }
 
 var elapsedDurationBuckets = []time.Duration{2 * time.Minute, time.Minute, 30 * time.Second, 10 * time.Second, 5 * time.Second, time.Second, 0}
+
+// Reset metrics to prevent reporting stale metrics when count drops to zero
+func resetMetrics() {
+
+	metricsGaugeVecList := []*prometheus.GaugeVec{metricClusterDeploymentsTotal,
+		metricClusterDeploymentsInstalledTotal,
+		metricClusterDeploymentsUninstalledTotal,
+		metricClusterDeploymentsDeprovisioningTotal,
+		metricClusterDeploymentsWithConditionTotal,
+		metricInstallJobsTotal,
+		metricUninstallJobsTotal,
+		metricImagesetJobsTotal,
+		metricSelectorSyncSetClustersTotal,
+		metricSelectorSyncSetClustersUnappliedTotal,
+		metricClusterDeploymentSyncsetPaused}
+
+	for _, metric := range metricsGaugeVecList {
+		metric.Reset()
+	}
+
+	metricsGaugeList := []prometheus.Gauge{
+		metricSyncSetsTotal,
+		metricSyncSetsUnappliedTotal}
+
+	for _, metric := range metricsGaugeList {
+		metric.Set(0)
+	}
+
+	metricsList := []*prometheus.HistogramVec{
+		metricControllerReconcileTime}
+
+	for _, metric := range metricsList {
+		metric.Reset()
+	}
+
+	optionalMetricsList := []*prometheus.HistogramVec{
+		MetricStoppingClustersSeconds,
+		MetricResumingClustersSeconds,
+		MetricWaitingForCOClustersSeconds,
+		MetricClusterHibernationTransitionSeconds,
+		MetricClusterReadyTransitionSeconds}
+
+	for _, metric := range optionalMetricsList {
+		metric.Reset()
+	}
+
+}

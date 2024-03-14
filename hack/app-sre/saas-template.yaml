@@ -5015,6 +5015,12 @@ objects:
                           items:
                             type: string
                           type: array
+                        tags:
+                          additionalProperties:
+                            type: string
+                          description: Tags contains the user defined tags to be supplied
+                            for the ec2 instance
+                          type: object
                         type:
                           description: InstanceType defines the ec2 instance type.
                             eg. m4-large

@@ -36,6 +36,10 @@ type MachinePoolPlatform struct {
 	//
 	// +optional
 	AdditionalSecurityGroupIDs []string `json:"additionalSecurityGroupIDs,omitempty"`
+
+	// Tags contains the user defined tags to be supplied for the ec2 instance
+	// +optional
+	UserTags map[string]string `json:"tags,omitempty"`
 }
 
 // SpotMarketOptions defines the options available to a user when configuring

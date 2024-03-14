@@ -177,10 +177,13 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	if err != nil {
 		return nil, false, errors.Wrap(err, "processing subnets")
 	}
-	// userTags are settings available in the installconfig that we are choosing
-	// to ignore for the timebeing. These empty settings should be updated to feed
-	// from the machinepool / installconfig in the future.
+
+	// FIXME: These should be updated to feed from installconfig
+	// if the machine pool supplied tags are empty
 	userTags := map[string]string{}
+	if len(pool.Spec.Platform.AWS.UserTags) > 0 {
+		userTags = pool.Spec.Platform.AWS.UserTags
+	}
 
 	installerMachineSets, err := installaws.MachineSets(
 		&installaws.MachineSetInput{

@@ -54,7 +54,8 @@ func TestAWSActuator(t *testing.T) {
 		expectedSGFilters            []machineapi.Filter
 		// Security groups identified by ID start with the *second* SecurityGroup ([1])
 		// and do not use Filters.
-		expectedSGIDs []string
+		expectedSGIDs    []string
+		expectedUserTags map[string]string
 	}
 	tests := []ttype{
 		{
@@ -569,7 +570,8 @@ func TestAWSActuator(t *testing.T) {
 				},
 			},
 			expectedSGIDs: []string{"sg-one", "sg-two"},
-		}, {
+		},
+		{
 			name:              "ExtraWorkerSecurityGroup and AdditionalSecurityGroupIDs are mutually exclusive",
 			clusterDeployment: testClusterDeployment(),
 			machinePool: func() *hivev1.MachinePool {
@@ -585,6 +587,46 @@ func TestAWSActuator(t *testing.T) {
 				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
 				Status: corev1.ConditionTrue,
 				Reason: "SecurityGroupOptionConflict",
+			},
+		},
+		{
+			name:              "machinepool has UserTags",
+			clusterDeployment: testClusterDeployment(),
+			machinePool: func() *hivev1.MachinePool {
+				pool := testMachinePool()
+				pool.Spec.Platform.AWS.UserTags = map[string]string{
+					"test-label":   "test-value",
+					"test-label-2": "test-value-2",
+				}
+				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
+				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
+				return pool
+			}(),
+			masterMachine: testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				gomock.InOrder(
+					mockDescribeSubnets(client, []string{"zone1", "zone2"},
+						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1"),
+				)
+				mockDescribeRouteTables(client,
+					map[string]bool{
+						"subnet-zone1":    false,
+						"subnet-zone2":    false,
+						"pubSubnet-zone1": true,
+						"pubSubnet-zone2": true,
+					},
+					"vpc-1")
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAWSMachineSetName("zone1"): 2,
+				generateAWSMachineSetName("zone2"): 1,
+			},
+			expectedAMI: &machineapi.AWSResourceReference{
+				ID: pointer.String(testAMI),
+			},
+			expectedUserTags: map[string]string{
+				"test-label":   "test-value",
+				"test-label-2": "test-value-2",
 			},
 		},
 	}
@@ -633,6 +675,19 @@ func TestAWSActuator(t *testing.T) {
 			if test.expectedEC2MetadataAuth != "" {
 				assert.NotNil(t, awsProvider.MetadataServiceOptions, "Missing ec2metadata")
 				assert.Equal(t, test.expectedEC2MetadataAuth, string(awsProvider.MetadataServiceOptions.Authentication))
+			}
+			if test.expectedUserTags != nil {
+				if assert.Equal(t, len(test.expectedUserTags), len(awsProvider.Tags)-1, "expected n-1 user tags") {
+					for _, tag := range awsProvider.Tags {
+						value, ok := test.expectedUserTags[tag.Name]
+						// skip owner tag, no need to match non user tags
+						if tag.Name == "kubernetes.io/cluster/foo-12345" {
+							continue
+						}
+						assert.True(t, ok, fmt.Sprintf("mismatched key '%s' of user tags", tag.Name))
+						assert.Equal(t, value, tag.Value, "mismatched value of user tags")
+					}
+				}
 			}
 		}
 	}

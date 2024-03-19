@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
 
@@ -17,10 +18,17 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1osp "github.com/openshift/hive/apis/hive/v1/openstack"
+	testfake "github.com/openshift/hive/pkg/test/fake"
+
+	clientconfig "github.com/gophercloud/utils/openstack/clientconfig"
+	openstackmachines "github.com/openshift/installer/pkg/asset/machines/openstack"
 )
 
-// This test is broken! The installer now checks for trunk support by querying the OpenStack service.
-func BROKEN__TestOpenStackActuator(t *testing.T) {
+const (
+	cloudName = "rhos-d"
+)
+
+func TestOpenStackActuator(t *testing.T) {
 	tests := []struct {
 		name                       string
 		clusterDeployment          *hivev1.ClusterDeployment
@@ -33,15 +41,35 @@ func BROKEN__TestOpenStackActuator(t *testing.T) {
 			clusterDeployment: testOSPClusterDeployment(),
 			pool:              testOSPPool(),
 			expectedMachineSetReplicas: map[string]int64{
-				fmt.Sprintf("%s-worker", testInfraID): 3,
+				fmt.Sprintf("%s-worker-%d", testInfraID, 0): 3,
 			},
 		},
 	}
+	cloudBytes, _ := yaml.Marshal(clientconfig.Clouds{
+		Clouds: map[string]clientconfig.Cloud{
+			cloudName: {},
+		},
+	})
+	remoteFakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(
+		&corev1.Secret{
+			ObjectMeta: v1.ObjectMeta{
+				Name:      "osp-credentials",
+				Namespace: testNamespace,
+			},
+			Data: map[string][]byte{
+				"clouds.yaml": cloudBytes,
+			},
+		},
+	).Build()
+	// Hack trunk support to skip the cloud call
+	ts := true
+	openstackmachines.TrunkSupportBypass = &ts
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actuator := &OpenStackActuator{
-				logger: log.WithField("actuator", "openstackactuator_test"),
+				logger:     log.WithField("actuator", "openstackactuator_test"),
+				kubeClient: remoteFakeClient,
 			}
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
@@ -49,7 +77,7 @@ func BROKEN__TestOpenStackActuator(t *testing.T) {
 			if test.expectedErr {
 				assert.Error(t, err, "expected error for test case")
 			} else {
-				require.NoError(t, err, "unexpected error for test cast")
+				require.NoError(t, err, "unexpected error for test case")
 				validateOSPMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
 			}
 		})
@@ -208,8 +236,8 @@ func validateOSPMachineSets(t *testing.T, mSets []*machinev1beta1.MachineSet, ex
 
 	for _, ms := range mSets {
 		expectedReplicas, ok := expectedMSReplicas[ms.Name]
-		if assert.True(t, ok, "unexpected machine set") {
-			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch")
+		if assert.True(t, ok, "unexpected machine set: %s", ms.Name) {
+			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch for MachineSet %s", ms.Name)
 		}
 
 		ospProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machinev1alpha1.OpenstackProviderSpec)
@@ -236,7 +264,7 @@ func testOSPClusterDeployment() *hivev1.ClusterDeployment {
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: "osp-credentials",
 			},
-			Cloud: "rhos-d",
+			Cloud: cloudName,
 		},
 	}
 	return cd

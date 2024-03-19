@@ -15,6 +15,11 @@ import (
 
 const maxInt32 int64 = int64(^uint32(0)) >> 1
 
+// For testing purposes, allow skipping the cloud query for trunk support.
+// When unset (nil) we will do the check; otherwise we'll use the addressed
+// value.
+var TrunkSupportBypass *bool
+
 // MachineSets returns the MachineSets encoded by the given machine-pool. The
 // number of returned MachineSets, while being capped to the number of
 // replicas, depends on the variable-length fields in the machine-pool. Each
@@ -33,9 +38,16 @@ func MachineSets(clusterID string, config *types.InstallConfig, pool *types.Mach
 	}
 	platform := config.Platform.OpenStack
 	mpool := pool.Platform.OpenStack
-	trunkSupport, err := checkNetworkExtensionAvailability(platform.Cloud, "trunk", clientOpts)
-	if err != nil {
-		return nil, err
+
+	var trunkSupport bool
+	if TrunkSupportBypass != nil {
+		trunkSupport = *TrunkSupportBypass
+	} else {
+		var err error
+		trunkSupport, err = checkNetworkExtensionAvailability(platform.Cloud, "trunk", clientOpts)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	failureDomains := failureDomainsFromSpec(*mpool)

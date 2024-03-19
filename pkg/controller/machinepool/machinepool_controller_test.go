@@ -1825,6 +1825,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 						Name: "aws-credentials",
 					},
 					Region: testRegion,
+					UserTags: map[string]string{
+						"cd-label":              "cd-value",
+						"cd-label-sync-from-mp": "cd-value-2",
+					},
 				},
 			},
 			ClusterMetadata: &hivev1.ClusterMetadata{

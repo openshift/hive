@@ -37,6 +37,13 @@ const (
 	fakeKMSKeyARN = "fakearn"
 )
 
+var (
+	baseUserTagsFromCD = map[string]string{
+		"cd-label":              "cd-value",
+		"cd-label-sync-from-mp": "cd-value-2",
+	}
+)
+
 func TestAWSActuator(t *testing.T) {
 	type ttype struct {
 		name                         string
@@ -72,6 +79,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "generate machinesets across zones",
@@ -89,6 +97,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "generate machinesets for specified zones",
@@ -107,6 +116,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "generate machinesets for specified zones and subnets",
@@ -141,6 +151,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "list zones returns zero",
@@ -154,6 +165,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "subnets specfied in the machinepool do not exist",
@@ -177,6 +189,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "more than one private subnet for availability zone",
@@ -201,6 +214,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			// This test exists to hit the NotEnoughSubnetsForZones error path. Because of our simple
@@ -236,6 +250,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "no private subnet for availability zone",
@@ -256,6 +271,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "no public subnet for availability zone and private subnet",
@@ -276,6 +292,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "public subnets all don't have route tables pointing to igw",
@@ -310,6 +327,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "public subnets some don't have route tables pointing to igw",
@@ -344,6 +362,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "ec2 metadata",
@@ -360,6 +379,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "kms key disk encryption",
@@ -376,6 +396,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "unsupported configuration condition cleared",
@@ -403,6 +424,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "master machine references AMI by tag",
@@ -446,6 +468,7 @@ func TestAWSActuator(t *testing.T) {
 					},
 				},
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "machinepool has an ExtraWorkerSecurityGroup annotation",
@@ -495,6 +518,7 @@ func TestAWSActuator(t *testing.T) {
 					Values: []string{"vpc-1"},
 				},
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "machinepool has an ExtraWorkerSecurityGroup annotation but has no subnets",
@@ -569,7 +593,8 @@ func TestAWSActuator(t *testing.T) {
 					Values: []string{"foo-12345-worker-sg"},
 				},
 			},
-			expectedSGIDs: []string{"sg-one", "sg-two"},
+			expectedSGIDs:    []string{"sg-one", "sg-two"},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "ExtraWorkerSecurityGroup and AdditionalSecurityGroupIDs are mutually exclusive",
@@ -588,6 +613,7 @@ func TestAWSActuator(t *testing.T) {
 				Status: corev1.ConditionTrue,
 				Reason: "SecurityGroupOptionConflict",
 			},
+			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
 			name:              "machinepool has UserTags",
@@ -595,8 +621,9 @@ func TestAWSActuator(t *testing.T) {
 			machinePool: func() *hivev1.MachinePool {
 				pool := testMachinePool()
 				pool.Spec.Platform.AWS.UserTags = map[string]string{
-					"test-label":   "test-value",
-					"test-label-2": "test-value-2",
+					"pool-label":            "pool-value",
+					"pool-label-2":          "pool-value-2",
+					"cd-label-sync-from-mp": "pool-precedence-value",
 				}
 				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
 				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
@@ -625,8 +652,10 @@ func TestAWSActuator(t *testing.T) {
 				ID: pointer.String(testAMI),
 			},
 			expectedUserTags: map[string]string{
-				"test-label":   "test-value",
-				"test-label-2": "test-value-2",
+				"pool-label":            "pool-value",
+				"pool-label-2":          "pool-value-2",
+				"cd-label":              "cd-value",
+				"cd-label-sync-from-mp": "pool-precedence-value",
 			},
 		},
 	}

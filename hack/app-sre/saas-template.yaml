@@ -5015,16 +5015,18 @@ objects:
                           items:
                             type: string
                           type: array
-                        tags:
-                          additionalProperties:
-                            type: string
-                          description: Tags contains the user defined tags to be supplied
-                            for the ec2 instance
-                          type: object
                         type:
                           description: InstanceType defines the ec2 instance type.
                             eg. m4-large
                           type: string
+                        userTags:
+                          additionalProperties:
+                            type: string
+                          description: UserTags contains the user defined tags to
+                            be supplied for the ec2 instance. Note that these will
+                            be merged with ClusterDeployment.Spec.Platform.AWS.UserTags,
+                            with this field taking precedence when keys collide.
+                          type: object
                         zones:
                           description: Zones is list of availability zones that can
                             be used.

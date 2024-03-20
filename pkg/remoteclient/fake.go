@@ -116,3 +116,7 @@ func (b *fakeBuilder) UseSecondaryAPIURL() Builder {
 func (b *fakeBuilder) RESTConfig() (*rest.Config, error) {
 	return nil, errors.New("RESTConfig not implemented for fake cluster client builder")
 }
+
+func (b *fakeBuilder) RESTConfigAndSecretVersion() (*rest.Config, string, error) {
+	return nil, "", errors.New("RESTConfigAndSecretVersion not implemented for fake cluster client builder")
+}

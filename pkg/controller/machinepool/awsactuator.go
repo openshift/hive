@@ -173,7 +173,8 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 	// A map, keyed by availability zone, of subnets. By the time we pass this to MachineSets(), it
 	// must either be empty or contain exactly one entry per AZ.
-	subnets, err := a.getSubnetsByAvailabilityZone(pool)
+	clusterID := cd.Spec.ClusterMetadata.InfraID
+	subnets, err := a.getSubnetsByAvailabilityZone(pool, clusterID)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "processing subnets")
 	}
@@ -184,7 +185,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 	installerMachineSets, err := installaws.MachineSets(
 		&installaws.MachineSetInput{
-			ClusterID: cd.Spec.ClusterMetadata.InfraID,
+			ClusterID: clusterID,
 			InstallConfigPlatformAWS: &installertypesaws.Platform{
 				// TODO: This sucks. We're cherry-picking which fields to populate
 				// based on reading the vendored code to discover what they're using.
@@ -363,14 +364,47 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 // spec matches the number of AZs, we will not check whether they are public or private. However, if there
 // are two subnets per AZ, we will filter out the public ones, leaving only the private ones. If the pool
 // specifies no subnets, an empty map is returned (this is a valid configuration, not an error).
-func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (icaws.Subnets, error) {
+func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool, clusterID string) (icaws.Subnets, error) {
 	// Preflight
 	numZones := len(pool.Spec.Platform.AWS.Zones)
 	numSubnets := len(pool.Spec.Platform.AWS.Subnets)
 	switch numSubnets {
 	case 0:
-		// Zero subnets is legal.
-		return icaws.Subnets{}, nil
+		// HIVE-2443
+		subnets := icaws.Subnets{}
+		for _, zone := range pool.Spec.Platform.AWS.Zones {
+			subnetName := fmt.Sprintf("%s-private-%s", clusterID, zone)
+
+			subnetFilter := []*ec2.Filter{{
+				Name:   aws.String("tag:Name"),
+				Values: aws.StringSlice([]string{subnetName}),
+			}}
+			// Lookup by filter
+			req := &ec2.DescribeSubnetsInput{
+				Filters: subnetFilter,
+			}
+			resp, err := a.awsClient.DescribeSubnets(req)
+			if err != nil {
+				return nil, err
+			}
+			for _, subnet := range resp.Subnets {
+				subnets[zone] = icaws.Subnet{
+					ID:   aws.StringValue(subnet.SubnetId),
+					ARN:  aws.StringValue(subnet.SubnetArn),
+					Zone: &icaws.Zone{Name: aws.StringValue(subnet.AvailabilityZone)},
+					CIDR: aws.StringValue(subnet.CidrBlock),
+				} // FIXME confirm
+
+				if subnets[zone].ID == "" {
+					return nil, errors.Errorf("empty subnet id found for zone %s", zone)
+				}
+			}
+		}
+		// Not legal to have no subnets
+		if len(subnets) < 0 {
+			return nil, errors.New("no subnets found for any availability zone")
+		}
+		break
 	case numZones, 2 * numZones:
 		// One per zone, or one public and one private per zone, is legal, and will be validated later.
 		break

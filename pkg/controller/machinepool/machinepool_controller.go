@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
+
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -34,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	v1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
@@ -323,7 +327,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
+	generatedMachineSets, proceed, actuator, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
 		return reconcile.Result{}, err
@@ -340,7 +344,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return *result, nil
 	}
 
-	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, infrastructure, remoteClusterAPIClient, logger)
+	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, infrastructure, remoteClusterAPIClient, actuator, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineSets")
 		return reconcile.Result{}, err
@@ -431,24 +435,24 @@ func (r *ReconcileMachinePool) generateMachineSets(
 	masterMachine *machineapi.Machine,
 	remoteMachineSets *machineapi.MachineSetList,
 	logger log.FieldLogger,
-) ([]*machineapi.MachineSet, bool, error) {
+) ([]*machineapi.MachineSet, bool, Actuator, error) {
 	if pool.DeletionTimestamp != nil {
-		return nil, true, nil
+		return nil, true, nil, nil
 	}
 
 	actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, logger)
 	if err != nil {
 		logger.WithError(err).Error("unable to create actuator")
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
 	generatedMachineSets, proceed, err := actuator.GenerateMachineSets(cd, pool, logger)
 	if err != nil {
-		return nil, false, errors.Wrap(err, "could not generate machinesets")
+		return nil, false, actuator, errors.Wrap(err, "could not generate machinesets")
 	} else if !proceed {
 		logger.Info("actuator indicated not to proceed, returning")
-		return nil, false, nil
+		return nil, false, nil, nil
 	}
 
 	for i, ms := range generatedMachineSets {
@@ -476,7 +480,7 @@ func (r *ReconcileMachinePool) generateMachineSets(
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
 
-	return generatedMachineSets, true, nil
+	return generatedMachineSets, true, actuator, nil
 }
 
 // ensureEnoughReplicas ensures that the min replicas in the machine pool is
@@ -537,16 +541,16 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 }
 
 // Compare Failure Domains to confirm that they match
-func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
+func matchFailureDomains(pool *hivev1.MachinePool, gMS machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, actuator Actuator, logger log.FieldLogger) (bool, []*ec2.Subnet, error) {
 	rSpec := rMS.Spec.Template.Spec
 	gSpec := gMS.Spec.Template.Spec
 	var err error
 
 	if rSpec.ProviderSpec.Value == nil {
-		return false, errors.New("remote MachineSet provider spec is nil")
+		return false, nil, errors.New("remote MachineSet provider spec is nil")
 	}
 	if gSpec.ProviderSpec.Value == nil {
-		return false, errors.New("generated MachineSet provider spec is nil")
+		return false, nil, errors.New("generated MachineSet provider spec is nil")
 	}
 	// cpms utils operate on the Raw value of the provider spec rather than the Object,
 	// and internally unmarshal the raw value into the Object.
@@ -556,14 +560,14 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 		rSpec.ProviderSpec.Value.Raw, err = json.Marshal(rMS.Spec.Template.Spec.ProviderSpec.Value.Object)
 		if err != nil {
 			logger.WithError(err).Error("unable to marshal remote ms provider spec object to raw value")
-			return false, err
+			return false, nil, err
 		}
 	}
 	if gSpec.ProviderSpec.Value.Raw == nil {
 		gSpec.ProviderSpec.Value.Raw, err = json.Marshal(gMS.Spec.Template.Spec.ProviderSpec.Value.Object)
 		if err != nil {
 			logger.WithError(err).Error("unable to marshal generate ms provider spec object to raw value")
-			return false, err
+			return false, nil, err
 		}
 	}
 
@@ -572,16 +576,69 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 	rMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, rSpec, infrastructure)
 	if err != nil {
 		logger.WithError(err).Errorf("unable to parse remote MachineSet %v provider config", rMS.Name)
-		return false, err
+		return false, nil, err
 	}
 	gMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, gSpec, infrastructure)
 	if err != nil {
 		logger.WithError(err).Errorf("unable to parse generated MachineSet %v provider config", gMS.Name)
-		return false, err
+		return false, nil, err
 	}
 	fd1 := rMS_providerconfig.ExtractFailureDomain()
 	fd2 := gMS_providerconfig.ExtractFailureDomain()
-	return fd1.Equal(fd2), nil
+
+	if rMS_providerconfig.Type() == "AWS" {
+		subnets := []*ec2.Subnet{}
+		awsactuator := actuator.(*AWSActuator)
+
+		if aws.StringValue(fd1.AWS().Subnet.ID) == "" {
+			subnets, err = getSubnetIDByFilter(fd1.AWS().Subnet, *awsactuator)
+			if err != nil {
+				return false, nil, err
+			}
+		}
+		subnets, err = awsactuator.filterPublicSubnets(subnets, pool)
+		if err != nil {
+			return false, nil, err
+		}
+
+		if aws.StringValue(subnets[0].AvailabilityZone) != fd2.AWS().Placement.AvailabilityZone {
+			return false, subnets, nil
+		} else {
+			return true, subnets, nil
+		}
+	}
+
+	return fd1.Equal(fd2), nil, nil
+}
+
+func getSubnetIDByFilter(subnet *v1.AWSResourceReference, actuator AWSActuator) ([]*ec2.Subnet, error) {
+	for _, filter := range *subnet.Filters {
+		if filter.Name == "tag:Name" { // FIXME use all filters or just this one?
+			req := &ec2.DescribeSubnetsInput{
+				Filters: []*ec2.Filter{
+					{
+						Name:   aws.String("tag:Name"),
+						Values: aws.StringSlice(filter.Values),
+					},
+				},
+			}
+			resp, err := actuator.awsClient.DescribeSubnets(req)
+			if err != nil {
+				return nil, err
+			}
+			if len(resp.Subnets) == 0 {
+				return nil, fmt.Errorf("no subnets found for filter %v", filter)
+			}
+			// compare subnets to generated machineset
+			// FIXME do I compare all subnets in list? How does this work
+			if len(resp.Subnets) > 1 {
+				return nil, fmt.Errorf("multiple subnets found for filter %v", filter)
+			}
+
+			return resp.Subnets, nil
+		}
+	}
+	return nil, fmt.Errorf("no tag:Name filter found for subnet %v", subnet)
 }
 
 // matchMachineSets decides whether gMS ("generated MachineSet") and rMS ("remote MachineSet" -- the one already extant
@@ -590,7 +647,7 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 // are part of the same MachinePool. If the machinePoolNameLabels match, the function then confirms that the MachineSets belong
 // to the same Availability Zone (aka Failure Domain). This ensures that the MachineSets are referring to the same machines.
 // We can count on this because the upsteam generator guarentees at most one MachineSet per Failure Domain. HIVE-2254.
-func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
+func matchMachineSets(pool *hivev1.MachinePool, gMS machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, actuator Actuator, logger log.FieldLogger) (bool, []*ec2.Subnet, error) {
 
 	gLabel, gLabelExists := gMS.Labels[machinePoolNameLabel]
 	rLabel, rLabelExists := rMS.Labels[machinePoolNameLabel]
@@ -600,13 +657,13 @@ func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, inf
 		panic(fmt.Sprintf("generated MachineSet %v does not have a machinePoolNameLabel", gMS.Name))
 	}
 	if !rLabelExists {
-		return false, nil
+		return false, nil, nil
 	}
 	if gLabel != rLabel {
-		return false, nil
+		return false, nil, nil
 	}
 
-	return matchFailureDomains(gMS, rMS, infrastructure, logger)
+	return matchFailureDomains(pool, gMS, rMS, infrastructure, actuator, logger)
 }
 
 func (r *ReconcileMachinePool) syncMachineSets(
@@ -616,6 +673,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	remoteMachineSets *machineapi.MachineSetList,
 	infrastructure *configv1.Infrastructure,
 	remoteClusterAPIClient client.Client,
+	actuator Actuator,
 	logger log.FieldLogger,
 ) ([]*machineapi.MachineSet, error) {
 	result := make([]*machineapi.MachineSet, len(generatedMachineSets))
@@ -642,7 +700,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 		found := false
 		for _, rMS := range remoteMachineSets.Items {
 			var err error
-			found, err = matchMachineSets(ms, rMS, infrastructure, logger)
+			found, update_subnets, err := matchMachineSets(pool, *ms, rMS, infrastructure, actuator, logger)
 			// Labels matched but there was still an error
 			// In order to prevent the creation of a duplicate MachineSet, error out and do not continue matching.
 			if err != nil {
@@ -659,6 +717,13 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				ms.Name = rMS.Name
 				resourcemerge.EnsureObjectMeta(&objectMetaModified, &rMS.ObjectMeta, ms.ObjectMeta)
 				msLog := logger.WithField("machineset", rMS.Name)
+
+				if update_subnets != nil {
+					// Update remote provider config
+					actuator.(*AWSActuator).updateProviderConfig(&rMS, *update_subnets[0].SubnetId, pool, *update_subnets[0].VpcId)
+					// how to update?
+					objectModified = true
+				}
 
 				if pool.Spec.Autoscaling == nil {
 					if *rMS.Spec.Replicas != *ms.Spec.Replicas {
@@ -757,6 +822,12 @@ func (r *ReconcileMachinePool) syncMachineSets(
 
 				result[i] = &rMS
 				break
+			} else if update_subnets != nil {
+				// Update remote provider config
+				actuator.(*AWSActuator).updateProviderConfig(&rMS, *update_subnets[0].SubnetId, pool, *update_subnets[0].VpcId)
+				// how to update?
+				rMS.Generation++
+				machineSetsToUpdate = append(machineSetsToUpdate, &rMS)
 			}
 		}
 

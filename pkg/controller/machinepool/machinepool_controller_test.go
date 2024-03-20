@@ -1646,6 +1646,23 @@ func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
 	}
 }
 
+func testAWSProviderSpecWithFilter(filter_values []string) *machineapi.AWSMachineProviderConfig {
+	return &machineapi.AWSMachineProviderConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "AWSMachineProviderConfig",
+			APIVersion: machineapi.SchemeGroupVersion.String(),
+		},
+		AMI: machineapi.AWSResourceReference{
+			Filters: []machineapi.Filter{
+				{
+					Name:   "tag:Name", // FIXME add more than just tag:Name?
+					Values: filter_values,
+				},
+			},
+		},
+	}
+}
+
 func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machineapi.MachineSet) {
 	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.GetScheme())
 	if err != nil {
@@ -1705,6 +1722,12 @@ func testMachineSetMachine(name string, machineType string, machineSetName strin
 func testMachineSetWithAZ(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, az string) *machineapi.MachineSet {
 	pc := testAWSProviderSpec()
 	pc.Placement.AvailabilityZone = az
+
+	return testMachineSet(name, machineType, unstompedAnnotation, replicas, generation, replaceProviderSpec(pc))
+}
+
+func testMachineSetWithSubnetFilter(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, filter_values []string) *machineapi.MachineSet {
+	pc := testAWSProviderSpecWithFilter(filter_values)
 
 	return testMachineSet(name, machineType, unstompedAnnotation, replicas, generation, replaceProviderSpec(pc))
 }

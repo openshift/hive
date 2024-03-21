@@ -201,7 +201,7 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 	allObjects = append(allObjects, o.generateClusterDeployment())
 
 	if mp := o.generateMachinePool(); mp != nil && !o.SkipMachinePools {
-		allObjects = append(allObjects, o.generateMachinePool())
+		allObjects = append(allObjects, mp)
 	}
 
 	if o.InstallConfigTemplate != "" {

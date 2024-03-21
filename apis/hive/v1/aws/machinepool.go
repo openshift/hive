@@ -36,6 +36,12 @@ type MachinePoolPlatform struct {
 	//
 	// +optional
 	AdditionalSecurityGroupIDs []string `json:"additionalSecurityGroupIDs,omitempty"`
+
+	// UserTags contains the user defined tags to be supplied for the ec2 instance.
+	// Note that these will be merged with ClusterDeployment.Spec.Platform.AWS.UserTags, with
+	// this field taking precedence when keys collide.
+	// +optional
+	UserTags map[string]string `json:"userTags,omitempty"`
 }
 
 // SpotMarketOptions defines the options available to a user when configuring

@@ -599,7 +599,11 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		args = append(args, "--cluster-domain", req.Spec.ClusterName+"."+req.Spec.BaseDomain)
 	}
 
-	args = append(args, fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID))
+	args = append(
+		args,
+		fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
+		fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s=owned", req.Spec.InfraID),
+	)
 
 	containers := []corev1.Container{
 		{

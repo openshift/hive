@@ -30,6 +30,7 @@ import (
 	azurevalidation "github.com/openshift/installer/pkg/types/azure/validation"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	baremetalvalidation "github.com/openshift/installer/pkg/types/baremetal/validation"
+	"github.com/openshift/installer/pkg/types/external"
 	"github.com/openshift/installer/pkg/types/featuregates"
 	"github.com/openshift/installer/pkg/types/gcp"
 	gcpvalidation "github.com/openshift/installer/pkg/types/gcp/validation"
@@ -218,6 +219,17 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 					"disabling CloudCredential capability available only for baremetal platforms"))
 			}
 		}
+
+		if !enabledCaps.Has(configv1.ClusterVersionCapabilityCloudControllerManager) {
+			if c.None == nil && c.BareMetal == nil && c.External == nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("capabilities"), c.Capabilities,
+					"disabling CloudControllerManager is only supported on the Baremetal, None, or External platform with cloudControllerManager value none"))
+			}
+			if c.External != nil && c.External.CloudControllerManager == external.CloudControllerManagerTypeExternal {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("capabilities"), c.Capabilities,
+					"disabling CloudControllerManager on External platform supported only with cloudControllerManager value none"))
+			}
+		}
 	}
 
 	allErrs = append(allErrs, ValidateFeatureSet(c)...)
@@ -379,7 +391,7 @@ func validateNetworking(n *types.Networking, singleNodeOpenShift bool, fldPath *
 	}
 
 	if n.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("networkType"), n.NetworkType, "networkType OpenShiftSDN is deprecated, please use OVNKubernetes"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("networkType"), n.NetworkType, "networkType OpenShiftSDN is not supported, please use OVNKubernetes"))
 	}
 
 	if len(n.MachineNetwork) > 0 {
@@ -909,7 +921,12 @@ func validatePlatform(platform *types.Platform, usingAgentMethod bool, fldPath *
 		})
 	}
 	if platform.PowerVS != nil {
-		validate(powervs.Name, platform.PowerVS, func(f *field.Path) field.ErrorList { return powervsvalidation.ValidatePlatform(platform.PowerVS, f) })
+		if c.SSHKey == "" {
+			allErrs = append(allErrs, field.Required(field.NewPath("sshKey"), "sshKey is required"))
+		}
+		validate(powervs.Name, platform.PowerVS, func(f *field.Path) field.ErrorList {
+			return powervsvalidation.ValidatePlatform(platform.PowerVS, f)
+		})
 	}
 	if platform.VSphere != nil {
 		validate(vsphere.Name, platform.VSphere, func(f *field.Path) field.ErrorList {

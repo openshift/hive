@@ -3,6 +3,7 @@ package validation
 import (
 	"fmt"
 	"net"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -72,13 +73,6 @@ func ValidatePlatform(p *vsphere.Platform, agentBasedInstallation bool, fldPath 
 		}
 	}
 
-	// Platform fields only allowed in TechPreviewNoUpgrade
-	if c.FeatureSet != configv1.TechPreviewNoUpgrade {
-		if c.VSphere.LoadBalancer != nil {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("loadBalancer"), "load balancer is not supported in this feature set"))
-		}
-	}
-
 	if c.VSphere.LoadBalancer != nil {
 		if !validateLoadBalancer(c.VSphere.LoadBalancer.Type) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("loadBalancer", "type"), c.VSphere.LoadBalancer.Type, "invalid load balancer type"))
@@ -117,6 +111,7 @@ func validateVCenters(p *vsphere.Platform, fldPath *field.Path) field.ErrorList 
 
 func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUpi bool) field.ErrorList {
 	var fdNames []string
+	tagUrnPattern := regexp.MustCompile(`^(urn):(vmomi):(InventoryServiceTag):([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}):([^:]+)$`)
 	allErrs := field.ErrorList{}
 	topologyFld := fldPath.Child("topology")
 	var associatedVCenter *vsphere.VCenter
@@ -170,6 +165,17 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			if !strings.Contains(failureDomain.Topology.Datastore, failureDomain.Topology.Datacenter) {
 				return append(allErrs, field.Invalid(topologyFld.Child("datastore"), failureDomain.Topology.Datastore, "the datastore defined does not exist in the correct datacenter"))
 			}
+			p.FailureDomains[index].Topology.Datastore = filepath.Clean(p.FailureDomains[index].Topology.Datastore)
+		}
+
+		if len(failureDomain.Topology.TagIDs) > 10 {
+			allErrs = append(allErrs, field.Invalid(topologyFld.Child("tagIDs"), failureDomain.Topology.TagIDs, "a maximum of 10 tags are allowed"))
+		}
+
+		for _, tagID := range failureDomain.Topology.TagIDs {
+			if tagUrnPattern.FindStringSubmatch(tagID) == nil {
+				allErrs = append(allErrs, field.Invalid(topologyFld.Child("tagIDs"), failureDomain.Topology.TagIDs, "tag ID must be in the format of urn:vmomi:InventoryServiceTag:<UUID>:GLOBAL"))
+			}
 		}
 
 		if len(failureDomain.Topology.Networks) == 0 {
@@ -211,6 +217,7 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			if len(failureDomain.Topology.Datacenter) != 0 && datacenterName != failureDomain.Topology.Datacenter {
 				return append(allErrs, field.Invalid(topologyFld.Child("computeCluster"), computeCluster, fmt.Sprintf("compute cluster must be in datacenter %s", failureDomain.Topology.Datacenter)))
 			}
+			p.FailureDomains[index].Topology.ComputeCluster = filepath.Clean(p.FailureDomains[index].Topology.ComputeCluster)
 		}
 
 		if len(failureDomain.Topology.ResourcePool) != 0 {
@@ -228,6 +235,12 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			if len(failureDomain.Topology.ComputeCluster) != 0 && !strings.Contains(failureDomain.Topology.ComputeCluster, clusterName) {
 				return append(allErrs, field.Invalid(topologyFld.Child("resourcePool"), resourcePool, fmt.Sprintf("resource pool must be in compute cluster %s", failureDomain.Topology.ComputeCluster)))
 			}
+
+			p.FailureDomains[index].Topology.ResourcePool = filepath.Clean(p.FailureDomains[index].Topology.ResourcePool)
+		}
+
+		if len(failureDomain.Topology.Template) > 0 {
+			p.FailureDomains[index].Topology.Template = filepath.Clean(p.FailureDomains[index].Topology.Template)
 		}
 	}
 

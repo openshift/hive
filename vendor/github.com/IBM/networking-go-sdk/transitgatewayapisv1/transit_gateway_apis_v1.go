@@ -1,5 +1,5 @@
 /**
- * (C) Copyright IBM Corp. 2022.
+ * (C) Copyright IBM Corp. 2023.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 
 /*
- * IBM OpenAPI SDK Code Generator Version: 3.43.5-e0ec19e2-20220124-172004
+ * IBM OpenAPI SDK Code Generator Version: 3.73.0-eeee85a9-20230607-165104
  */
 
 // Package transitgatewayapisv1 : Operations and models for the TransitGatewayApisV1 service
@@ -603,6 +603,15 @@ func (transitGatewayApis *TransitGatewayApisV1) ListTransitGatewayConnectionsWit
 	builder.AddHeader("Accept", "application/json")
 
 	builder.AddQuery("version", fmt.Sprint(*transitGatewayApis.Version))
+	if listTransitGatewayConnectionsOptions.Start != nil {
+		builder.AddQuery("start", fmt.Sprint(*listTransitGatewayConnectionsOptions.Start))
+	}
+	if listTransitGatewayConnectionsOptions.Limit != nil {
+		builder.AddQuery("limit", fmt.Sprint(*listTransitGatewayConnectionsOptions.Limit))
+	}
+	if listTransitGatewayConnectionsOptions.Name != nil {
+		builder.AddQuery("name", fmt.Sprint(*listTransitGatewayConnectionsOptions.Name))
+	}
 
 	request, err := builder.Build()
 	if err != nil {
@@ -1838,6 +1847,7 @@ type CreateTransitGatewayConnectionOptions struct {
 	//
 	// This field is required to be unspecified for network type 'classic', 'directlink', 'vpc', 'power_virtual_server' and
 	// 'unbound_gre_tunnel' connections.
+	// Deprecated: this field is deprecated and may be removed in a future release.
 	BaseConnectionID *string `json:"base_connection_id,omitempty"`
 
 	// The type of network the Unbound GRE tunnel is targeting. This field is required for network type
@@ -1891,9 +1901,9 @@ type CreateTransitGatewayConnectionOptions struct {
 	// required to be unspecified for network type 'gre_tunnel' and 'unbound_gre_tunnel' connections.
 	PrefixFiltersDefault *string `json:"prefix_filters_default,omitempty"`
 
-	// Remote network BGP ASN. The following ASN values are reserved and unavailable 64512-64513, 65100, 65201-65234,
-	// 65402-65433, 65500 and 4201065000-4201065999. If 'remote_bgp_asn' is omitted on gre_tunnel or unbound_gre_tunnel
-	// connection create requests IBM will assign an ASN.
+	// Remote network BGP ASN. The following ASN values are reserved and unavailable 0, 13884, 36351, 64512-64513, 65100,
+	// 65200-65234, 65402-65433, 65500 and 4201065000-4201065999. If 'remote_bgp_asn' is omitted on gre_tunnel or
+	// unbound_gre_tunnel connection create requests IBM will assign an ASN.
 	//
 	// This field is optional for network type 'gre_tunnel' and 'unbound_gre_tunnel' connections.
 	//
@@ -1978,6 +1988,7 @@ func (_options *CreateTransitGatewayConnectionOptions) SetNetworkType(networkTyp
 }
 
 // SetBaseConnectionID : Allow user to set BaseConnectionID
+// Deprecated: this method is deprecated and may be removed in a future release.
 func (_options *CreateTransitGatewayConnectionOptions) SetBaseConnectionID(baseConnectionID string) *CreateTransitGatewayConnectionOptions {
 	_options.BaseConnectionID = core.StringPtr(baseConnectionID)
 	return _options
@@ -2069,34 +2080,38 @@ type CreateTransitGatewayConnectionPrefixFilterOptions struct {
 	// The connection identifier.
 	ID *string `json:"id" validate:"required,ne="`
 
-	// Whether to permit or deny prefix filter.
+	// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 	Action *string `json:"action" validate:"required"`
 
-	// IP Prefix.
+	// The IPv4 Prefix to be matched by this filter. If both the 'le' and 'ge' are zero, then this filter will only apply
+	// to routes that exactly match this prefix, while a non-zero value for either 'le' or 'ge', this filter can apply to
+	// multiple routes with different prefix lengths, but will still only apply to prefixes contained in the address space
+	// defined by 'prefix'.
 	Prefix *string `json:"prefix" validate:"required"`
 
-	// Identifier of prefix filter to handle the ordering and follow semantics:
-	// - When a filter reference another filter in it's before field, then the filter making the reference is applied
-	// before
-	//   the referenced filter. For example: if filter A references filter B in its before field, A is applied before B.
-	// - When a new filter is added that has the same before as an existing filter, then the older filter will have its
-	// before
-	//   field updated to point to the new filter. Starting with the above example: if filter C is added and it references
-	// B in its
-	//   before field, then A's before field should be modified to point to C, so the order of application would be A, C
-	// and finally B.
-	// - A filter that has an empty before reference will be applied last (though the date order mentioned above will still
-	// apply).
-	//   So continuing the above examples, if filter B has an empty before field, then it will be applied last, but if
-	// filter D
-	//   is created with an empty before field, then B's before field will be modified to point to D, so B will be applied
-	// before D.
+	// A reference to the prefix filter that will be the next filter applied to the Transit Gateway connection.
+	//
+	// If this field is blank, this prefix filter will be the last rule applied before the connection's default rule.
+	//
+	// When a prefix filter is created with the same before field as an existing prefix filter, the existing filter will be
+	// applied before the new filter, and the existing filter's before field will be updated accordingly.
 	Before *string `json:"before,omitempty"`
 
-	// IP Prefix GE.
+	// Defines the minimum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length greater than or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'ge' route matching behavior.
+	// If the 'le' value is non-zero the the 'ge' value must between the prefix length and the
+	// 'le' value, inclusive.
 	Ge *int64 `json:"ge,omitempty"`
 
-	// IP Prefix LE.
+	// Defines the maximum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length less than or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'le' route matching behavior.
+	// If the 'ge' value is non-zero the the 'le' value must between the 'ge' value and 32, inclusive.
 	Le *int64 `json:"le,omitempty"`
 
 	// Allows users to set headers on API requests
@@ -2104,7 +2119,7 @@ type CreateTransitGatewayConnectionPrefixFilterOptions struct {
 }
 
 // Constants associated with the CreateTransitGatewayConnectionPrefixFilterOptions.Action property.
-// Whether to permit or deny prefix filter.
+// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 const (
 	CreateTransitGatewayConnectionPrefixFilterOptions_Action_Deny   = "deny"
 	CreateTransitGatewayConnectionPrefixFilterOptions_Action_Permit = "permit"
@@ -2690,6 +2705,15 @@ type ListTransitGatewayConnectionsOptions struct {
 	// The Transit Gateway identifier.
 	TransitGatewayID *string `json:"transit_gateway_id" validate:"required,ne="`
 
+	// A server supplied token determining which resource to start the page on.
+	Start *string `json:"start,omitempty"`
+
+	// The maximum number of resources to return per page.
+	Limit *int64 `json:"limit,omitempty"`
+
+	// Search for connections with the given name.
+	Name *string `json:"name,omitempty"`
+
 	// Allows users to set headers on API requests
 	Headers map[string]string
 }
@@ -2704,6 +2728,24 @@ func (*TransitGatewayApisV1) NewListTransitGatewayConnectionsOptions(transitGate
 // SetTransitGatewayID : Allow user to set TransitGatewayID
 func (_options *ListTransitGatewayConnectionsOptions) SetTransitGatewayID(transitGatewayID string) *ListTransitGatewayConnectionsOptions {
 	_options.TransitGatewayID = core.StringPtr(transitGatewayID)
+	return _options
+}
+
+// SetStart : Allow user to set Start
+func (_options *ListTransitGatewayConnectionsOptions) SetStart(start string) *ListTransitGatewayConnectionsOptions {
+	_options.Start = core.StringPtr(start)
+	return _options
+}
+
+// SetLimit : Allow user to set Limit
+func (_options *ListTransitGatewayConnectionsOptions) SetLimit(limit int64) *ListTransitGatewayConnectionsOptions {
+	_options.Limit = core.Int64Ptr(limit)
+	return _options
+}
+
+// SetName : Allow user to set Name
+func (_options *ListTransitGatewayConnectionsOptions) SetName(name string) *ListTransitGatewayConnectionsOptions {
+	_options.Name = core.StringPtr(name)
 	return _options
 }
 
@@ -2776,6 +2818,130 @@ func (options *ListTransitGatewaysOptions) SetHeaders(param map[string]string) *
 	return options
 }
 
+// PaginationFirstConnection : A reference to the first page of resources.
+type PaginationFirstConnection struct {
+	// url.
+	Href *string `json:"href" validate:"required"`
+}
+
+// UnmarshalPaginationFirstConnection unmarshals an instance of PaginationFirstConnection from the specified map of raw messages.
+func UnmarshalPaginationFirstConnection(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(PaginationFirstConnection)
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// PaginationFirstTG : A reference to the first page of resources.
+type PaginationFirstTG struct {
+	// url.
+	Href *string `json:"href" validate:"required"`
+}
+
+// UnmarshalPaginationFirstTG unmarshals an instance of PaginationFirstTG from the specified map of raw messages.
+func UnmarshalPaginationFirstTG(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(PaginationFirstTG)
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// PaginationFirstTGWConnection : A reference to the first page of resources. This will be returned when number of connections in response are greater
+// than max page limit.
+type PaginationFirstTGWConnection struct {
+	// url.
+	Href *string `json:"href" validate:"required"`
+}
+
+// UnmarshalPaginationFirstTGWConnection unmarshals an instance of PaginationFirstTGWConnection from the specified map of raw messages.
+func UnmarshalPaginationFirstTGWConnection(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(PaginationFirstTGWConnection)
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// PaginationNextConnection : A reference to the next page of resources; this reference is included for all pages except the last page.
+type PaginationNextConnection struct {
+	// url.
+	Href *string `json:"href" validate:"required"`
+
+	// server generated start token for next page of resources.
+	Start *string `json:"start" validate:"required"`
+}
+
+// UnmarshalPaginationNextConnection unmarshals an instance of PaginationNextConnection from the specified map of raw messages.
+func UnmarshalPaginationNextConnection(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(PaginationNextConnection)
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "start", &obj.Start)
+	if err != nil {
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// PaginationNextTG : A reference to the next page of resources; this reference is included for all pages except the last page.
+type PaginationNextTG struct {
+	// url.
+	Href *string `json:"href" validate:"required"`
+
+	// server generated start token for next page of resources.
+	Start *string `json:"start" validate:"required"`
+}
+
+// UnmarshalPaginationNextTG unmarshals an instance of PaginationNextTG from the specified map of raw messages.
+func UnmarshalPaginationNextTG(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(PaginationNextTG)
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "start", &obj.Start)
+	if err != nil {
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// PaginationNextTGWConnection : A reference to the next page of resources; this reference is included for all pages except the last page.
+type PaginationNextTGWConnection struct {
+	// url.
+	Href *string `json:"href" validate:"required"`
+
+	// server generated start token for next page of resources.
+	Start *string `json:"start" validate:"required"`
+}
+
+// UnmarshalPaginationNextTGWConnection unmarshals an instance of PaginationNextTGWConnection from the specified map of raw messages.
+func UnmarshalPaginationNextTGWConnection(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(PaginationNextTGWConnection)
+	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
+	if err != nil {
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "start", &obj.Start)
+	if err != nil {
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
 // PrefixFilterCollection : prefix filters.
 type PrefixFilterCollection struct {
 	// Array of prefix filters.
@@ -2795,40 +2961,44 @@ func UnmarshalPrefixFilterCollection(m map[string]json.RawMessage, result interf
 
 // PrefixFilterCust : prefix filter.
 type PrefixFilterCust struct {
-	// Whether to permit or deny prefix filter.
+	// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 	Action *string `json:"action" validate:"required"`
 
-	// Identifier of prefix filter that handles the ordering and follow semantics:
-	// - When a filter reference another filter in it's before field, then the filter making the reference is applied
-	// before
-	//   the referenced filter. For example: if filter A references filter B in its before field, A is applied before B.
-	// - When a new filter is added that has the same before as an existing filter, then the older filter will have its
-	// before
-	//   field updated to point to the new filter. Starting with the above example: if filter C is added and it references
-	// B in its
-	//   before field, then A's before field should be modified to point to C, so the order of application would be A, C
-	// and finally B.
-	// - A filter that has an empty before reference will be applied last (though the date order mentioned above will still
-	// apply).
-	//   So continuing the above examples, if filter B has an empty before field, then it will be applied last, but if
-	// filter D
-	//   is created with an empty before field, then B's before field will be modified to point to D, so B will be applied
-	// before D.
+	// A reference to the prefix filter that will be the next filter applied to the Transit Gateway connection.
+	//
+	// If this field is blank, this prefix filter will be the last rule applied before the connection's default rule.
+	//
+	// When a prefix filter is created with the same before field as an existing prefix filter, the existing filter will be
+	// applied before the new filter, and the existing filter's before field will be updated accordingly.
 	Before *string `json:"before,omitempty"`
 
 	// The date and time that this prefix filter was created.
 	CreatedAt *strfmt.DateTime `json:"created_at" validate:"required"`
 
-	// IP Prefix GE.
+	// Defines the minimum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length greater or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'ge' route matching behavior.
+	// If the 'le' value is non-zero the the 'ge' value must between the prefix length and the
+	// 'le' value, inclusive.
 	Ge *int64 `json:"ge,omitempty"`
 
 	// Prefix Filter identifier.
 	ID *string `json:"id" validate:"required"`
 
-	// IP Prefix LE.
+	// Defines the maximum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length less than or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'le' route matching behavior.
+	// If the 'ge' value is non-zero the the 'le' value must between the 'ge' value and 32, inclusive.
 	Le *int64 `json:"le,omitempty"`
 
-	// IP Prefix.
+	// The IPv4 Prefix to be matched by this filter. If both the 'le' and 'ge' are zero, then this filter will only apply
+	// to routes that exactly match this prefix, while a non-zero value for either 'le' or 'ge', this filter can apply to
+	// multiple routes with different prefix lengths, but will still only apply to prefixes contained in the address space
+	// defined by 'prefix'.
 	Prefix *string `json:"prefix" validate:"required"`
 
 	// The date and time that this prefix filter was last updated.
@@ -2836,7 +3006,7 @@ type PrefixFilterCust struct {
 }
 
 // Constants associated with the PrefixFilterCust.Action property.
-// Whether to permit or deny prefix filter.
+// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 const (
 	PrefixFilterCust_Action_Deny   = "deny"
 	PrefixFilterCust_Action_Permit = "permit"
@@ -2881,23 +3051,37 @@ func UnmarshalPrefixFilterCust(m map[string]json.RawMessage, result interface{})
 	return
 }
 
-// PrefixFilterPut : A prefix filter create template.
+// PrefixFilterPut : A prefix filter update template.
 type PrefixFilterPut struct {
-	// Whether to permit or deny prefix filter.
+	// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 	Action *string `json:"action" validate:"required"`
 
-	// IP Prefix GE.
+	// Defines the minimum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length greater or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'ge' route matching behavior.
+	// If the 'le' value is non-zero the the 'ge' value must between the prefix length and the
+	// 'le' value, inclusive.
 	Ge *int64 `json:"ge,omitempty"`
 
-	// IP Prefix LE.
+	// Defines the maximum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length less than or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'le' route matching behavior.
+	// If the 'ge' value is non-zero the the 'le' value must between the 'ge' value and 32, inclusive.
 	Le *int64 `json:"le,omitempty"`
 
-	// IP Prefix.
+	// The IPv4 Prefix to be matched by this filter. If both the 'le' and 'ge' are zero, then this filter will only apply
+	// to routes that exactly match this prefix, while a non-zero value for either 'le' or 'ge', this filter can apply to
+	// multiple routes with different prefix lengths, but will still only apply to prefixes contained in the address space
+	// defined by 'prefix'.
 	Prefix *string `json:"prefix" validate:"required"`
 }
 
 // Constants associated with the PrefixFilterPut.Action property.
-// Whether to permit or deny prefix filter.
+// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 const (
 	PrefixFilterPut_Action_Deny   = "deny"
 	PrefixFilterPut_Action_Permit = "permit"
@@ -3275,10 +3459,10 @@ func UnmarshalTSCollection(m map[string]json.RawMessage, result interface{}) (er
 // TSLocalLocation : Details of a local connection location.
 type TSLocalLocation struct {
 	// A descriptive display name for the location.
-	DisplayName *string `json:"display_name,omitempty"`
+	DisplayName *string `json:"display_name" validate:"required"`
 
 	// The name of the location.
-	Name *string `json:"name,omitempty"`
+	Name *string `json:"name" validate:"required"`
 
 	// Array of supported connection types.
 	SupportedConnectionTypes []string `json:"supported_connection_types,omitempty"`
@@ -3286,7 +3470,7 @@ type TSLocalLocation struct {
 	// The type of the location, determining is this a multi-zone region, a single data center, or a point of presence. The
 	// list of enumerated values for this property may expand in the future. Code and processes using this field must
 	// tolerate unexpected values.
-	Type *string `json:"type,omitempty"`
+	Type *string `json:"type" validate:"required"`
 }
 
 // Constants associated with the TSLocalLocation.Type property.
@@ -3502,14 +3686,15 @@ const (
 // Connection state. The list of enumerated values for this property may expand in the future. Code and processes using
 // this field must tolerate unexpected values.
 const (
-	TransitConnection_Status_Attached   = "attached"
-	TransitConnection_Status_Deleting   = "deleting"
-	TransitConnection_Status_Detached   = "detached"
-	TransitConnection_Status_Detaching  = "detaching"
-	TransitConnection_Status_Failed     = "failed"
-	TransitConnection_Status_Pending    = "pending"
-	TransitConnection_Status_Suspended  = "suspended"
-	TransitConnection_Status_Suspending = "suspending"
+	TransitConnection_Status_Attached       = "attached"
+	TransitConnection_Status_Deleting       = "deleting"
+	TransitConnection_Status_Detached       = "detached"
+	TransitConnection_Status_Detaching      = "detaching"
+	TransitConnection_Status_Failed         = "failed"
+	TransitConnection_Status_NetworkPending = "network_pending"
+	TransitConnection_Status_Pending        = "pending"
+	TransitConnection_Status_Suspended      = "suspended"
+	TransitConnection_Status_Suspending     = "suspending"
 )
 
 // UnmarshalTransitConnection unmarshals an instance of TransitConnection from the specified map of raw messages.
@@ -3609,13 +3794,13 @@ type TransitConnectionCollection struct {
 	Connections []TransitConnection `json:"connections" validate:"required"`
 
 	// A reference to the first page of resources.
-	First *TransitConnectionCollectionFirst `json:"first" validate:"required"`
+	First *PaginationFirstConnection `json:"first" validate:"required"`
 
 	// The maximum number of connections returned on one request.
 	Limit *int64 `json:"limit" validate:"required"`
 
 	// A reference to the next page of resources; this reference is included for all pages except the last page.
-	Next *TransitConnectionCollectionNext `json:"next,omitempty"`
+	Next *PaginationNextConnection `json:"next,omitempty"`
 }
 
 // UnmarshalTransitConnectionCollection unmarshals an instance of TransitConnectionCollection from the specified map of raw messages.
@@ -3625,7 +3810,7 @@ func UnmarshalTransitConnectionCollection(m map[string]json.RawMessage, result i
 	if err != nil {
 		return
 	}
-	err = core.UnmarshalModel(m, "first", &obj.First, UnmarshalTransitConnectionCollectionFirst)
+	err = core.UnmarshalModel(m, "first", &obj.First, UnmarshalPaginationFirstConnection)
 	if err != nil {
 		return
 	}
@@ -3633,7 +3818,7 @@ func UnmarshalTransitConnectionCollection(m map[string]json.RawMessage, result i
 	if err != nil {
 		return
 	}
-	err = core.UnmarshalModel(m, "next", &obj.Next, UnmarshalTransitConnectionCollectionNext)
+	err = core.UnmarshalModel(m, "next", &obj.Next, UnmarshalPaginationNextConnection)
 	if err != nil {
 		return
 	}
@@ -3647,47 +3832,6 @@ func (resp *TransitConnectionCollection) GetNextStart() (*string, error) {
 		return nil, nil
 	}
 	return resp.Next.Start, nil
-}
-
-// TransitConnectionCollectionFirst : A reference to the first page of resources.
-type TransitConnectionCollectionFirst struct {
-	// url.
-	Href *string `json:"href" validate:"required"`
-}
-
-// UnmarshalTransitConnectionCollectionFirst unmarshals an instance of TransitConnectionCollectionFirst from the specified map of raw messages.
-func UnmarshalTransitConnectionCollectionFirst(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(TransitConnectionCollectionFirst)
-	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
-	if err != nil {
-		return
-	}
-	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
-	return
-}
-
-// TransitConnectionCollectionNext : A reference to the next page of resources; this reference is included for all pages except the last page.
-type TransitConnectionCollectionNext struct {
-	// url.
-	Href *string `json:"href,omitempty"`
-
-	// server generated start token for next page of resources.
-	Start *string `json:"start,omitempty"`
-}
-
-// UnmarshalTransitConnectionCollectionNext unmarshals an instance of TransitConnectionCollectionNext from the specified map of raw messages.
-func UnmarshalTransitConnectionCollectionNext(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(TransitConnectionCollectionNext)
-	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
-	if err != nil {
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "start", &obj.Start)
-	if err != nil {
-		return
-	}
-	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
-	return
 }
 
 // TransitGateway : Details of a Transit Gateway.
@@ -3780,13 +3924,13 @@ func UnmarshalTransitGateway(m map[string]json.RawMessage, result interface{}) (
 // TransitGatewayCollection : A list of Transit Gateways.
 type TransitGatewayCollection struct {
 	// A reference to the first page of resources.
-	First *TransitGatewayCollectionFirst `json:"first" validate:"required"`
+	First *PaginationFirstTG `json:"first" validate:"required"`
 
 	// The maximum number of gateways returned on one request.
 	Limit *int64 `json:"limit" validate:"required"`
 
 	// A reference to the next page of resources; this reference is included for all pages except the last page.
-	Next *TransitGatewayCollectionNext `json:"next,omitempty"`
+	Next *PaginationNextTG `json:"next,omitempty"`
 
 	// Collection of Transit Services gateways.
 	TransitGateways []TransitGateway `json:"transit_gateways" validate:"required"`
@@ -3795,7 +3939,7 @@ type TransitGatewayCollection struct {
 // UnmarshalTransitGatewayCollection unmarshals an instance of TransitGatewayCollection from the specified map of raw messages.
 func UnmarshalTransitGatewayCollection(m map[string]json.RawMessage, result interface{}) (err error) {
 	obj := new(TransitGatewayCollection)
-	err = core.UnmarshalModel(m, "first", &obj.First, UnmarshalTransitGatewayCollectionFirst)
+	err = core.UnmarshalModel(m, "first", &obj.First, UnmarshalPaginationFirstTG)
 	if err != nil {
 		return
 	}
@@ -3803,7 +3947,7 @@ func UnmarshalTransitGatewayCollection(m map[string]json.RawMessage, result inte
 	if err != nil {
 		return
 	}
-	err = core.UnmarshalModel(m, "next", &obj.Next, UnmarshalTransitGatewayCollectionNext)
+	err = core.UnmarshalModel(m, "next", &obj.Next, UnmarshalPaginationNextTG)
 	if err != nil {
 		return
 	}
@@ -3823,51 +3967,24 @@ func (resp *TransitGatewayCollection) GetNextStart() (*string, error) {
 	return resp.Next.Start, nil
 }
 
-// TransitGatewayCollectionFirst : A reference to the first page of resources.
-type TransitGatewayCollectionFirst struct {
-	// url.
-	Href *string `json:"href" validate:"required"`
-}
-
-// UnmarshalTransitGatewayCollectionFirst unmarshals an instance of TransitGatewayCollectionFirst from the specified map of raw messages.
-func UnmarshalTransitGatewayCollectionFirst(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(TransitGatewayCollectionFirst)
-	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
-	if err != nil {
-		return
-	}
-	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
-	return
-}
-
-// TransitGatewayCollectionNext : A reference to the next page of resources; this reference is included for all pages except the last page.
-type TransitGatewayCollectionNext struct {
-	// url.
-	Href *string `json:"href" validate:"required"`
-
-	// server generated start token for next page of resources.
-	Start *string `json:"start" validate:"required"`
-}
-
-// UnmarshalTransitGatewayCollectionNext unmarshals an instance of TransitGatewayCollectionNext from the specified map of raw messages.
-func UnmarshalTransitGatewayCollectionNext(m map[string]json.RawMessage, result interface{}) (err error) {
-	obj := new(TransitGatewayCollectionNext)
-	err = core.UnmarshalPrimitive(m, "href", &obj.Href)
-	if err != nil {
-		return
-	}
-	err = core.UnmarshalPrimitive(m, "start", &obj.Start)
-	if err != nil {
-		return
-	}
-	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
-	return
-}
-
 // TransitGatewayConnectionCollection : A set of Transit Gateway network connections.
 type TransitGatewayConnectionCollection struct {
 	// Array of transit gateways network Connections.
 	Connections []TransitGatewayConnectionCust `json:"connections" validate:"required"`
+
+	// A reference to the first page of resources.
+	// This will be returned when number of connections in response are greater than max page limit.
+	First *PaginationFirstTGWConnection `json:"first,omitempty"`
+
+	// The maximum number of connections returned on one request. This will be returned when number of connections in
+	// response are greater than max page limit.
+	Limit *int64 `json:"limit,omitempty"`
+
+	// A reference to the next page of resources; this reference is included for all pages except the last page.
+	Next *PaginationNextTGWConnection `json:"next,omitempty"`
+
+	// total number of resources across all pages (considering the supplied query parameter filters).
+	TotalCount *int64 `json:"total_count,omitempty"`
 }
 
 // UnmarshalTransitGatewayConnectionCollection unmarshals an instance of TransitGatewayConnectionCollection from the specified map of raw messages.
@@ -3877,8 +3994,32 @@ func UnmarshalTransitGatewayConnectionCollection(m map[string]json.RawMessage, r
 	if err != nil {
 		return
 	}
+	err = core.UnmarshalModel(m, "first", &obj.First, UnmarshalPaginationFirstTGWConnection)
+	if err != nil {
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "limit", &obj.Limit)
+	if err != nil {
+		return
+	}
+	err = core.UnmarshalModel(m, "next", &obj.Next, UnmarshalPaginationNextTGWConnection)
+	if err != nil {
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "total_count", &obj.TotalCount)
+	if err != nil {
+		return
+	}
 	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
 	return
+}
+
+// Retrieve the value to be passed to a request to access the next page of results
+func (resp *TransitGatewayConnectionCollection) GetNextStart() (*string, error) {
+	if core.IsNil(resp.Next) {
+		return nil, nil
+	}
+	return resp.Next.Start, nil
 }
 
 // TransitGatewayConnectionCust : Connection included in transit gateway.
@@ -3905,6 +4046,7 @@ type TransitGatewayConnectionCust struct {
 	// connection the tunnel is configured over. The specified connection must reside in the same transit gateway and be in
 	// an active state. The 'classic' connection cannot be deleted until any 'gre_tunnel' connections using it are deleted.
 	// This field only applies to and is required for network type 'gre_tunnel' connections.
+	// Deprecated: this field is deprecated and may be removed in a future release.
 	BaseConnectionID *string `json:"base_connection_id,omitempty"`
 
 	// The date and time that this connection was created.
@@ -4002,14 +4144,15 @@ const (
 // Connection's current configuration state. The list of enumerated values for this property may expand in the future.
 // Code and processes using this field must tolerate unexpected values.
 const (
-	TransitGatewayConnectionCust_Status_Attached   = "attached"
-	TransitGatewayConnectionCust_Status_Deleting   = "deleting"
-	TransitGatewayConnectionCust_Status_Detached   = "detached"
-	TransitGatewayConnectionCust_Status_Detaching  = "detaching"
-	TransitGatewayConnectionCust_Status_Failed     = "failed"
-	TransitGatewayConnectionCust_Status_Pending    = "pending"
-	TransitGatewayConnectionCust_Status_Suspended  = "suspended"
-	TransitGatewayConnectionCust_Status_Suspending = "suspending"
+	TransitGatewayConnectionCust_Status_Attached       = "attached"
+	TransitGatewayConnectionCust_Status_Deleting       = "deleting"
+	TransitGatewayConnectionCust_Status_Detached       = "detached"
+	TransitGatewayConnectionCust_Status_Detaching      = "detaching"
+	TransitGatewayConnectionCust_Status_Failed         = "failed"
+	TransitGatewayConnectionCust_Status_NetworkPending = "network_pending"
+	TransitGatewayConnectionCust_Status_Pending        = "pending"
+	TransitGatewayConnectionCust_Status_Suspended      = "suspended"
+	TransitGatewayConnectionCust_Status_Suspending     = "suspending"
 )
 
 // UnmarshalTransitGatewayConnectionCust unmarshals an instance of TransitGatewayConnectionCust from the specified map of raw messages.
@@ -4370,34 +4513,35 @@ type UpdateTransitGatewayConnectionPrefixFilterOptions struct {
 	// Prefix filter identifier.
 	FilterID *string `json:"filter_id" validate:"required,ne="`
 
-	// Whether to permit or deny prefix filter.
+	// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 	Action *string `json:"action,omitempty"`
 
-	// Identifier of prefix filter to handle the ordering and follow semantics:
-	// - When a filter reference another filter in it's before field, then the filter making the reference is applied
-	// before
-	//   the referenced filter. For example: if filter A references filter B in its before field, A is applied before B.
-	// - When a new filter is added that has the same before as an existing filter, then the older filter will have its
-	// before
-	//   field updated to point to the new filter. Starting with the above example: if filter C is added and it references
-	// B in its
-	//   before field, then A's before field should be modified to point to C, so the order of application would be A, C
-	// and finally B.
-	// - A filter that has an empty before reference will be applied last (though the date order mentioned above will still
-	// apply).
-	//   So continuing the above examples, if filter B has an empty before field, then it will be applied last, but if
-	// filter D
-	//   is created with an empty before field, then B's before field will be modified to point to D, so B will be applied
-	// before D.
+	// A reference to the prefix filter that will be the next filter applied to the Transit Gateway connection.
+	//
+	// If this field is blank, this prefix filter will be the last rule applied before the connection's default rule.
+	//
+	// When a prefix filter is created with the same before field as an existing prefix filter, the existing filter will be
+	// applied before the new filter, and the existing filter's before field will be updated accordingly.
 	Before *string `json:"before,omitempty"`
 
-	// IP Prefix GE.
+	// Defines the minimum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length greater or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'ge' route matching behavior.
+	// If the 'le' value is non-zero the the 'ge' value must between the prefix length and the
+	// 'le' value, inclusive.
 	Ge *int64 `json:"ge,omitempty"`
 
-	// IP Prefix LE.
+	// Defines the maximum matched prefix precision. If this field is non-zero then the filter will match all routes within
+	// the 'prefix' that have a prefix length less than or equal to this value.
+	//
+	// This value can be zero, or a non-negative number greater than or equal to the prefix length of the filter's prefix
+	// or less then or equal to 32. If this value is set to zero, the filter will not use the 'le' route matching behavior.
+	// If the 'ge' value is non-zero the the 'le' value must between the 'ge' value and 32, inclusive.
 	Le *int64 `json:"le,omitempty"`
 
-	// IP Prefix.
+	// The IPv4 Prefix to be matched by this filter.
 	Prefix *string `json:"prefix,omitempty"`
 
 	// Allows users to set headers on API requests
@@ -4405,7 +4549,7 @@ type UpdateTransitGatewayConnectionPrefixFilterOptions struct {
 }
 
 // Constants associated with the UpdateTransitGatewayConnectionPrefixFilterOptions.Action property.
-// Whether to permit or deny prefix filter.
+// Whether or not this prefix filter should allow or deny prefixes matching this filter's prefix definition.
 const (
 	UpdateTransitGatewayConnectionPrefixFilterOptions_Action_Deny   = "deny"
 	UpdateTransitGatewayConnectionPrefixFilterOptions_Action_Permit = "permit"
@@ -4584,4 +4728,247 @@ func UnmarshalZoneIdentityByName(m map[string]json.RawMessage, result interface{
 	}
 	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
 	return
+}
+
+//
+// TransitGatewaysPager can be used to simplify the use of the "ListTransitGateways" method.
+//
+type TransitGatewaysPager struct {
+	hasNext     bool
+	options     *ListTransitGatewaysOptions
+	client      *TransitGatewayApisV1
+	pageContext struct {
+		next *string
+	}
+}
+
+// NewTransitGatewaysPager returns a new TransitGatewaysPager instance.
+func (transitGatewayApis *TransitGatewayApisV1) NewTransitGatewaysPager(options *ListTransitGatewaysOptions) (pager *TransitGatewaysPager, err error) {
+	if options.Start != nil && *options.Start != "" {
+		err = fmt.Errorf("the 'options.Start' field should not be set")
+		return
+	}
+
+	var optionsCopy ListTransitGatewaysOptions = *options
+	pager = &TransitGatewaysPager{
+		hasNext: true,
+		options: &optionsCopy,
+		client:  transitGatewayApis,
+	}
+	return
+}
+
+// HasNext returns true if there are potentially more results to be retrieved.
+func (pager *TransitGatewaysPager) HasNext() bool {
+	return pager.hasNext
+}
+
+// GetNextWithContext returns the next page of results using the specified Context.
+func (pager *TransitGatewaysPager) GetNextWithContext(ctx context.Context) (page []TransitGateway, err error) {
+	if !pager.HasNext() {
+		return nil, fmt.Errorf("no more results available")
+	}
+
+	pager.options.Start = pager.pageContext.next
+
+	result, _, err := pager.client.ListTransitGatewaysWithContext(ctx, pager.options)
+	if err != nil {
+		return
+	}
+
+	var next *string
+	if result.Next != nil {
+		next = result.Next.Start
+	}
+	pager.pageContext.next = next
+	pager.hasNext = (pager.pageContext.next != nil)
+	page = result.TransitGateways
+
+	return
+}
+
+// GetAllWithContext returns all results by invoking GetNextWithContext() repeatedly
+// until all pages of results have been retrieved.
+func (pager *TransitGatewaysPager) GetAllWithContext(ctx context.Context) (allItems []TransitGateway, err error) {
+	for pager.HasNext() {
+		var nextPage []TransitGateway
+		nextPage, err = pager.GetNextWithContext(ctx)
+		if err != nil {
+			return
+		}
+		allItems = append(allItems, nextPage...)
+	}
+	return
+}
+
+// GetNext invokes GetNextWithContext() using context.Background() as the Context parameter.
+func (pager *TransitGatewaysPager) GetNext() (page []TransitGateway, err error) {
+	return pager.GetNextWithContext(context.Background())
+}
+
+// GetAll invokes GetAllWithContext() using context.Background() as the Context parameter.
+func (pager *TransitGatewaysPager) GetAll() (allItems []TransitGateway, err error) {
+	return pager.GetAllWithContext(context.Background())
+}
+
+//
+// ConnectionsPager can be used to simplify the use of the "ListConnections" method.
+//
+type ConnectionsPager struct {
+	hasNext     bool
+	options     *ListConnectionsOptions
+	client      *TransitGatewayApisV1
+	pageContext struct {
+		next *string
+	}
+}
+
+// NewConnectionsPager returns a new ConnectionsPager instance.
+func (transitGatewayApis *TransitGatewayApisV1) NewConnectionsPager(options *ListConnectionsOptions) (pager *ConnectionsPager, err error) {
+	if options.Start != nil && *options.Start != "" {
+		err = fmt.Errorf("the 'options.Start' field should not be set")
+		return
+	}
+
+	var optionsCopy ListConnectionsOptions = *options
+	pager = &ConnectionsPager{
+		hasNext: true,
+		options: &optionsCopy,
+		client:  transitGatewayApis,
+	}
+	return
+}
+
+// HasNext returns true if there are potentially more results to be retrieved.
+func (pager *ConnectionsPager) HasNext() bool {
+	return pager.hasNext
+}
+
+// GetNextWithContext returns the next page of results using the specified Context.
+func (pager *ConnectionsPager) GetNextWithContext(ctx context.Context) (page []TransitConnection, err error) {
+	if !pager.HasNext() {
+		return nil, fmt.Errorf("no more results available")
+	}
+
+	pager.options.Start = pager.pageContext.next
+
+	result, _, err := pager.client.ListConnectionsWithContext(ctx, pager.options)
+	if err != nil {
+		return
+	}
+
+	var next *string
+	if result.Next != nil {
+		next = result.Next.Start
+	}
+	pager.pageContext.next = next
+	pager.hasNext = (pager.pageContext.next != nil)
+	page = result.Connections
+
+	return
+}
+
+// GetAllWithContext returns all results by invoking GetNextWithContext() repeatedly
+// until all pages of results have been retrieved.
+func (pager *ConnectionsPager) GetAllWithContext(ctx context.Context) (allItems []TransitConnection, err error) {
+	for pager.HasNext() {
+		var nextPage []TransitConnection
+		nextPage, err = pager.GetNextWithContext(ctx)
+		if err != nil {
+			return
+		}
+		allItems = append(allItems, nextPage...)
+	}
+	return
+}
+
+// GetNext invokes GetNextWithContext() using context.Background() as the Context parameter.
+func (pager *ConnectionsPager) GetNext() (page []TransitConnection, err error) {
+	return pager.GetNextWithContext(context.Background())
+}
+
+// GetAll invokes GetAllWithContext() using context.Background() as the Context parameter.
+func (pager *ConnectionsPager) GetAll() (allItems []TransitConnection, err error) {
+	return pager.GetAllWithContext(context.Background())
+}
+
+//
+// TransitGatewayConnectionsPager can be used to simplify the use of the "ListTransitGatewayConnections" method.
+//
+type TransitGatewayConnectionsPager struct {
+	hasNext     bool
+	options     *ListTransitGatewayConnectionsOptions
+	client      *TransitGatewayApisV1
+	pageContext struct {
+		next *string
+	}
+}
+
+// NewTransitGatewayConnectionsPager returns a new TransitGatewayConnectionsPager instance.
+func (transitGatewayApis *TransitGatewayApisV1) NewTransitGatewayConnectionsPager(options *ListTransitGatewayConnectionsOptions) (pager *TransitGatewayConnectionsPager, err error) {
+	if options.Start != nil && *options.Start != "" {
+		err = fmt.Errorf("the 'options.Start' field should not be set")
+		return
+	}
+
+	var optionsCopy ListTransitGatewayConnectionsOptions = *options
+	pager = &TransitGatewayConnectionsPager{
+		hasNext: true,
+		options: &optionsCopy,
+		client:  transitGatewayApis,
+	}
+	return
+}
+
+// HasNext returns true if there are potentially more results to be retrieved.
+func (pager *TransitGatewayConnectionsPager) HasNext() bool {
+	return pager.hasNext
+}
+
+// GetNextWithContext returns the next page of results using the specified Context.
+func (pager *TransitGatewayConnectionsPager) GetNextWithContext(ctx context.Context) (page []TransitGatewayConnectionCust, err error) {
+	if !pager.HasNext() {
+		return nil, fmt.Errorf("no more results available")
+	}
+
+	pager.options.Start = pager.pageContext.next
+
+	result, _, err := pager.client.ListTransitGatewayConnectionsWithContext(ctx, pager.options)
+	if err != nil {
+		return
+	}
+
+	var next *string
+	if result.Next != nil {
+		next = result.Next.Start
+	}
+	pager.pageContext.next = next
+	pager.hasNext = (pager.pageContext.next != nil)
+	page = result.Connections
+
+	return
+}
+
+// GetAllWithContext returns all results by invoking GetNextWithContext() repeatedly
+// until all pages of results have been retrieved.
+func (pager *TransitGatewayConnectionsPager) GetAllWithContext(ctx context.Context) (allItems []TransitGatewayConnectionCust, err error) {
+	for pager.HasNext() {
+		var nextPage []TransitGatewayConnectionCust
+		nextPage, err = pager.GetNextWithContext(ctx)
+		if err != nil {
+			return
+		}
+		allItems = append(allItems, nextPage...)
+	}
+	return
+}
+
+// GetNext invokes GetNextWithContext() using context.Background() as the Context parameter.
+func (pager *TransitGatewayConnectionsPager) GetNext() (page []TransitGatewayConnectionCust, err error) {
+	return pager.GetNextWithContext(context.Background())
+}
+
+// GetAll invokes GetAllWithContext() using context.Background() as the Context parameter.
+func (pager *TransitGatewayConnectionsPager) GetAll() (allItems []TransitGatewayConnectionCust, err error) {
+	return pager.GetAllWithContext(context.Background())
 }

@@ -42,12 +42,11 @@ type Workspace struct {
 
 	// The Workspace status
 	// Required: true
-	// Enum: [Active Failed Provisioning]
 	Status *string `json:"status"`
 
 	// The Workspace type
 	// Required: true
-	// Enum: [Public Cloud Private Cloud]
+	// Enum: [off-premises on-premises]
 	Type *string `json:"type"`
 }
 
@@ -156,46 +155,9 @@ func (m *Workspace) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
-var workspaceTypeStatusPropEnum []interface{}
-
-func init() {
-	var res []string
-	if err := json.Unmarshal([]byte(`["Active","Failed","Provisioning"]`), &res); err != nil {
-		panic(err)
-	}
-	for _, v := range res {
-		workspaceTypeStatusPropEnum = append(workspaceTypeStatusPropEnum, v)
-	}
-}
-
-const (
-
-	// WorkspaceStatusActive captures enum value "Active"
-	WorkspaceStatusActive string = "Active"
-
-	// WorkspaceStatusFailed captures enum value "Failed"
-	WorkspaceStatusFailed string = "Failed"
-
-	// WorkspaceStatusProvisioning captures enum value "Provisioning"
-	WorkspaceStatusProvisioning string = "Provisioning"
-)
-
-// prop value enum
-func (m *Workspace) validateStatusEnum(path, location string, value string) error {
-	if err := validate.EnumCase(path, location, value, workspaceTypeStatusPropEnum, true); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (m *Workspace) validateStatus(formats strfmt.Registry) error {
 
 	if err := validate.Required("status", "body", m.Status); err != nil {
-		return err
-	}
-
-	// value enum
-	if err := m.validateStatusEnum("status", "body", *m.Status); err != nil {
 		return err
 	}
 
@@ -206,7 +168,7 @@ var workspaceTypeTypePropEnum []interface{}
 
 func init() {
 	var res []string
-	if err := json.Unmarshal([]byte(`["Public Cloud","Private Cloud"]`), &res); err != nil {
+	if err := json.Unmarshal([]byte(`["off-premises","on-premises"]`), &res); err != nil {
 		panic(err)
 	}
 	for _, v := range res {
@@ -216,11 +178,11 @@ func init() {
 
 const (
 
-	// WorkspaceTypePublicCloud captures enum value "Public Cloud"
-	WorkspaceTypePublicCloud string = "Public Cloud"
+	// WorkspaceTypeOffDashPremises captures enum value "off-premises"
+	WorkspaceTypeOffDashPremises string = "off-premises"
 
-	// WorkspaceTypePrivateCloud captures enum value "Private Cloud"
-	WorkspaceTypePrivateCloud string = "Private Cloud"
+	// WorkspaceTypeOnDashPremises captures enum value "on-premises"
+	WorkspaceTypeOnDashPremises string = "on-premises"
 )
 
 // prop value enum

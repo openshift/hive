@@ -86,6 +86,7 @@ const (
 	adminKubeConfigRelativePath         = "auth/kubeconfig"
 	adminPasswordRelativePath           = "auth/kubeadmin-password"
 	kubernetesKeyPrefix                 = "kubernetes.io/cluster/"
+	capaKeyPrefix                       = "sigs.k8s.io/cluster-api-provider-aws/cluster/"
 	kubeadminUsername                   = "kubeadmin"
 	adminKubeConfigSecretStringTemplate = "%s-admin-kubeconfig"
 	adminPasswordSecretStringTemplate   = "%s-admin-password"
@@ -665,6 +666,7 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		// run the uninstaller to clean up any cloud resources previously created
 		filters := []aws.Filter{
 			{kubernetesKeyPrefix + infraID: "owned"},
+			{capaKeyPrefix + infraID: "owned"},
 		}
 		uninstaller = &aws.ClusterUninstaller{
 			Filters: filters,

@@ -1,15 +1,14 @@
 # Troubleshooting
 
-- [Troubleshooting](#troubleshooting)
-  - [Cluster Install Failure Logs](#cluster-install-failure-logs)
-    - [Setup](#setup)
-    - [Listing stored install logs directories](#listing-stored-install-logs-directories)
-    - [Retrieving stored install logs for a specific cluster provision](#retrieving-stored-install-logs-for-a-specific-cluster-provision)
-  - [Deprovision](#deprovision)
-  - [HiveAdmission](#hiveadmission)
-  - [Cluster's API Certificate Changed](#clusters-api-certificate-changed)
-    - [Updating Certificate Authorities within the Admin Kubeconfig Secret](#updating-certificate-authorities-within-the-admin-kubeconfig-secret)
-    - [Setting a new CA certificate globally on the managing cluster with hiveconfig](#setting-a-new-ca-certificate-globally-on-the-managing-cluster-with-hiveconfig)
+- [Cluster Install Failure Logs](#cluster-install-failure-logs)
+  - [Setup](#setup)
+  - [Listing stored install logs directories](#listing-stored-install-logs-directories)
+  - [Retrieving stored install logs for a specific cluster provision](#retrieving-stored-install-logs-for-a-specific-cluster-provision)
+- [Deprovision](#deprovision)
+- [HiveAdmission](#hiveadmission)
+- [Cluster's API Certificate Changed](#clusters-api-certificate-changed)
+  - [Updating Certificate Authorities within the Admin Kubeconfig Secret](#updating-certificate-authorities-within-the-admin-kubeconfig-secret)
+  - [Setting a new CA certificate globally on the managing cluster with hiveconfig](#setting-a-new-ca-certificate-globally-on-the-managing-cluster-with-hiveconfig)
 
 ## Cluster Install Failure Logs
 
@@ -53,7 +52,7 @@ After deleting your cluster deployment you will see an uninstall job created. If
     * In case your cluster deployment is not available, you can find the tag in AWS console on any object from that cluster.
     * Run following command to deprovision artifacts in the AWS.
       ```bash
-      $ bin/hiveutil aws-tag-deprovision --loglevel=debug kubernetes.io/cluster/<infraID>=owned
+      $ bin/hiveutil aws-tag-deprovision --loglevel=debug kubernetes.io/cluster/<infraID>=owned sigs.k8s.io/cluster-api-provider-aws/cluster/<infraID>=owned
       ```
 
 ## HiveAdmission

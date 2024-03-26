@@ -1380,6 +1380,47 @@ platform:
 						Reason: "DNSZoneFailedToReconcile",
 					},
 				})
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "provision should not exist")
+			},
+		},
+		{
+			name: "No-op when DNSZone cannot be created due to credentials missing permissions",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.ManageDNS = true
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testDNSZoneWithInvalidCredentialsCondition(),
+			},
+			expectExplicitRequeue: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					// Insufficient credentials
+					{
+						Type:   hivev1.DNSNotReadyCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "InsufficientCredentials",
+					},
+					// Provision stopped
+					{
+						Type:   hivev1.ProvisionedCondition,
+						Status: corev1.ConditionFalse,
+						Reason: hivev1.ProvisionedReasonProvisionStopped,
+					},
+					// Not provisioned
+					{
+						Type:   hivev1.ProvisionStoppedCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "DNSZoneFailedToReconcile",
+					},
+				})
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "provision should not exist")
 			},
 		},
 		{
@@ -2649,12 +2690,31 @@ platform:
 				testInstallConfigSecretAWS(),
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
-					cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
-						Type:   hivev1.ProvisionStoppedCondition,
-						Status: corev1.ConditionTrue,
-					})
+					cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+						cd.Status.Conditions,
+						hivev1.ProvisionStoppedCondition,
+						corev1.ConditionTrue,
+						"DNSZoneFailedToReconcile",
+						"DNSZone failed to reconcile (see the DNSNotReadyCondition condition for details)",
+						controllerutils.UpdateConditionAlways)
+					cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+						cd.Status.Conditions,
+						hivev1.ProvisionedCondition,
+						corev1.ConditionFalse,
+						hivev1.ProvisionedReasonProvisionStopped,
+						"Provisioning failed terminally (see the ProvisionStopped condition for details)",
+						controllerutils.UpdateConditionAlways)
+					cd.Status.Conditions = controllerutils.SetClusterDeploymentCondition(
+						cd.Status.Conditions,
+						hivev1.DNSNotReadyCondition,
+						corev1.ConditionTrue,
+						"InsufficientCredentials",
+						"",
+						controllerutils.UpdateConditionAlways)
+					cd.Spec.ManageDNS = true
 					return cd
 				}(),
+				testDNSZoneWithInvalidCredentialsCondition(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -2665,8 +2725,12 @@ platform:
 					{
 						Type:   hivev1.ProvisionStoppedCondition,
 						Status: corev1.ConditionTrue,
+						Reason: "DNSZoneFailedToReconcile",
+						Message: "DNSZone failed to reconcile (see the DNSNotReadyCondition condition for details)",
 					},
 				})
+				provisions := getProvisions(c)
+				assert.Empty(t, provisions, "provision should not exist")
 			},
 		},
 		{

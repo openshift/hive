@@ -18,6 +18,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configv1 "github.com/openshift/api/config/v1"
+	v1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	icaws "github.com/openshift/installer/pkg/asset/installconfig/aws"
 	installaws "github.com/openshift/installer/pkg/asset/machines/aws"
@@ -26,6 +28,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+	msop "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -46,7 +49,62 @@ var (
 	noSuchSubnetRegex = regexp.MustCompile(`^InvalidSubnetID\.NotFound:\s+([^\t]+)\t`)
 )
 
-// NewAWSActuator is the constructor for building a AWSActuator
+func getSubnetIDByFilter(subnet *v1.AWSResourceReference, actuator AWSActuator) ([]*ec2.Subnet, error) {
+	req := &ec2.DescribeSubnetsInput{Filters: []*ec2.Filter{}}
+	for _, filter := range *subnet.Filters {
+		req.Filters = append(req.Filters,
+			&ec2.Filter{
+				Name:   aws.String(filter.Name),
+				Values: aws.StringSlice(filter.Values),
+			},
+		)
+	}
+	resp, err := actuator.awsClient.DescribeSubnets(req)
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Subnets) == 0 {
+		return nil, fmt.Errorf("no subnets found for filter %v", req.Filters)
+	}
+	// FIXME HIVE-2443 is it possible to have multiple subnets?
+	if len(resp.Subnets) > 1 {
+		return nil, fmt.Errorf("multiple subnets found for filter %v", req.Filters)
+	}
+
+	return resp.Subnets, nil
+}
+
+func (a *AWSActuator) GetRemoteMachineSetsWithOpFlags(pool *hivev1.MachinePool, remoteMachineSets *machineapi.MachineSetList, infrastructure *configv1.Infrastructure, logger log.FieldLogger) ([]msop.MachineSetWithOpFlags, error) {
+	remotes_to_update := []msop.MachineSetWithOpFlags{}
+	for _, rMS := range remoteMachineSets.Items {
+		fd1, err := FailureDomainFromProviderSpec(&rMS, infrastructure, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		if aws.StringValue(fd1.AWS().Subnet.ID) == "" {
+			subnets, err := getSubnetIDByFilter(fd1.AWS().Subnet, *a)
+			if err != nil {
+				return nil, err
+			}
+			subnets, err = a.filterPublicSubnets(subnets, pool)
+			if err != nil {
+				return nil, err
+			}
+
+			a.updateProviderConfig(&rMS, *subnets[0].SubnetId, pool, *subnets[0].VpcId)
+			remotes_to_update = append(remotes_to_update, msop.MachineSetWithOpFlags{MS: &rMS, NeedsUpdate: true, NeedsDelete: false})
+
+		} else {
+			// Does not need filter update
+			remotes_to_update = append(remotes_to_update, msop.MachineSetWithOpFlags{MS: &rMS, NeedsUpdate: false, NeedsDelete: false})
+
+		}
+	}
+	return remotes_to_update, nil
+}
+
+// NewAWSActuator is the constructor for building an AWSActuator
 func NewAWSActuator(
 	client client.Client,
 	credentials awsclient.CredentialsSource,
@@ -81,6 +139,7 @@ func NewAWSActuator(
 			}
 		}
 	}
+
 	actuator := &AWSActuator{
 		client:    client,
 		awsClient: awsClient,
@@ -173,7 +232,8 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 	// A map, keyed by availability zone, of subnets. By the time we pass this to MachineSets(), it
 	// must either be empty or contain exactly one entry per AZ.
-	subnets, err := a.getSubnetsByAvailabilityZone(pool)
+	clusterID := cd.Spec.ClusterMetadata.InfraID
+	subnets, err := a.getSubnetsByAvailabilityZone(pool, clusterID, computePool.Platform.AWS.Zones)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "processing subnets")
 	}
@@ -192,7 +252,7 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 
 	installerMachineSets, err := installaws.MachineSets(
 		&installaws.MachineSetInput{
-			ClusterID: cd.Spec.ClusterMetadata.InfraID,
+			ClusterID: clusterID,
 			InstallConfigPlatformAWS: &installertypesaws.Platform{
 				// TODO: This sucks. We're cherry-picking which fields to populate
 				// based on reading the vendored code to discover what they're using.
@@ -373,14 +433,37 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 // spec matches the number of AZs, we will not check whether they are public or private. However, if there
 // are two subnets per AZ, we will filter out the public ones, leaving only the private ones. If the pool
 // specifies no subnets, an empty map is returned (this is a valid configuration, not an error).
-func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (icaws.Subnets, error) {
+func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool, clusterID string, zones []string) (icaws.Subnets, error) {
 	// Preflight
+	results := &ec2.DescribeSubnetsOutput{}
+	var err error
 	numZones := len(pool.Spec.Platform.AWS.Zones)
 	numSubnets := len(pool.Spec.Platform.AWS.Subnets)
 	switch numSubnets {
 	case 0:
-		// Zero subnets is legal.
-		return icaws.Subnets{}, nil
+		// HIVE-2443
+		for _, zone := range zones { // FIXME HIVE-2443 Should we be setting pool.Spec.Platform.AWS.Zones outside of this function grabbing it here?
+			privateSubnetName := fmt.Sprintf("%s-private-%s", clusterID, zone)
+			publicSubnetName := fmt.Sprintf("%s-public-%s", clusterID, zone) // FIXME confirm before review
+
+			subnetFilter := []*ec2.Filter{{
+				Name:   aws.String("tag:Name"),
+				Values: aws.StringSlice([]string{privateSubnetName, publicSubnetName}), // FIXME confirm before review
+			}}
+			// Lookup by filter
+			req := &ec2.DescribeSubnetsInput{
+				Filters: subnetFilter,
+			}
+			results, err = a.awsClient.DescribeSubnets(req)
+			if err != nil { // FIXME HIVE-2443 404?
+				return nil, err
+			}
+			for _, subnet := range results.Subnets {
+				if aws.StringValue(subnet.SubnetId) == "" {
+					return nil, errors.Errorf("empty subnet id found for zone %s", zone)
+				}
+			}
+		}
 	case numZones, 2 * numZones:
 		// One per zone, or one public and one private per zone, is legal, and will be validated later.
 		break
@@ -405,12 +488,14 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ic
 		return nil, errors.New(msg)
 	}
 
-	idPointers := make([]*string, len(pool.Spec.Platform.AWS.Subnets))
-	for i, id := range pool.Spec.Platform.AWS.Subnets {
-		idPointers[i] = aws.String(id)
-	}
+	if numSubnets > 0 { // FIXME HIVE-2443 how to evaluate this without added check
+		idPointers := make([]*string, len(pool.Spec.Platform.AWS.Subnets))
+		for i, id := range pool.Spec.Platform.AWS.Subnets {
+			idPointers[i] = aws.String(id)
+		}
 
-	results, err := a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: idPointers})
+		results, err = a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: idPointers})
+	}
 	if err != nil || len(results.Subnets) == 0 {
 		if strings.Contains(err.Error(), "InvalidSubnet") {
 			conditionMessage := err.Error()
@@ -434,12 +519,12 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ic
 					return nil, err
 				}
 			}
+			return nil, err // FIXME HIVE-2443 add error for results.Subnets
 		}
-		return nil, err
 	}
 
 	var subnets []*ec2.Subnet
-	if numSubnets == numZones {
+	if len(results.Subnets) == numZones {
 		subnets = results.Subnets
 	} else {
 		subnets, err = a.filterPublicSubnets(results.Subnets, pool)

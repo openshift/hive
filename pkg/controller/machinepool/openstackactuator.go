@@ -17,6 +17,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configv1 "github.com/openshift/api/config/v1"
+	machineapi "github.com/openshift/api/machine/v1beta1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
 	installosp "github.com/openshift/installer/pkg/asset/machines/openstack"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -24,6 +26,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	msop "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -52,6 +55,14 @@ func NewOpenStackActuator(masterMachine *machinev1beta1.Machine, kubeClient clie
 		trunkSupportDiscoverer: installosp.CheckNetworkExtensionAvailability,
 	}
 	return actuator, nil
+}
+
+func (a *OpenStackActuator) GetRemoteMachineSetsWithOpFlags(pool *hivev1.MachinePool, remoteMachineSets *machineapi.MachineSetList, infrastructure *configv1.Infrastructure, logger log.FieldLogger) ([]msop.MachineSetWithOpFlags, error) {
+	remotes_to_update := []msop.MachineSetWithOpFlags{}
+	for _, rMS := range remoteMachineSets.Items {
+		remotes_to_update = append(remotes_to_update, msop.MachineSetWithOpFlags{MS: &rMS, NeedsUpdate: false, NeedsDelete: false})
+	}
+	return remotes_to_update, nil
 }
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets

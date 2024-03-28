@@ -78,6 +78,10 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
+				mockDescribeSubnetsByFilter(client, []string{"zone1"}, testInfraID, []string{"subnet-zone1"}, []string{"pubSubnet-zone1"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"pubSubnet-zone1": true}, "vpc-1")
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
@@ -94,6 +98,15 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1", "zone2", "zone3"})
+				mockDescribeSubnetsByFilter(client, []string{"zone1", "zone2", "zone3"}, testInfraID, []string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}, []string{"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"subnet-zone2":    false,
+					"subnet-zone3":    false,
+					"pubSubnet-zone1": true,
+					"pubSubnet-zone2": true,
+					"pubSubnet-zone3": true,
+				}, "vpc-1")
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 1,
@@ -114,6 +127,19 @@ func TestAWSActuator(t *testing.T) {
 				return pool
 			}(),
 			masterMachine: testMachine("master0", "master"),
+			mockAWSClient: func(client *mockaws.MockClient) {
+				mockDescribeSubnetsByFilter(client, []string{"zone1", "zone2", "zone3"}, testInfraID,
+					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"},
+					[]string{"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"subnet-zone2":    false,
+					"subnet-zone3":    false,
+					"pubSubnet-zone1": true,
+					"pubSubnet-zone2": true,
+					"pubSubnet-zone3": true,
+				}, "vpc-1")
+			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 1,
 				generateAWSMachineSetName("zone2"): 1,
@@ -377,6 +403,10 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
+				mockDescribeSubnetsByFilter(client, []string{"zone1"}, testInfraID, []string{"subnet-zone1"}, []string{"pubSubnet-zone1"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"pubSubnet-zone1": true}, "vpc-1")
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
@@ -394,6 +424,10 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine:     testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
+				mockDescribeSubnetsByFilter(client, []string{"zone1"}, testInfraID, []string{"subnet-zone1"}, []string{"pubSubnet-zone1"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"pubSubnet-zone1": true}, "vpc-1")
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
@@ -418,6 +452,10 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1"})
+				mockDescribeSubnetsByFilter(client, []string{"zone1"}, testInfraID, []string{"subnet-zone1"}, []string{"pubSubnet-zone1"}, "vpc-1")
+				mockDescribeRouteTables(client, map[string]bool{
+					"subnet-zone1":    false,
+					"pubSubnet-zone1": true}, "vpc-1")
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 3,
@@ -456,6 +494,17 @@ func TestAWSActuator(t *testing.T) {
 			}(),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeAvailabilityZones(client, []string{"zone1", "zone2", "zone3"})
+				mockDescribeSubnetsByFilter(client, []string{"zone1", "zone2", "zone3"}, testInfraID, []string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}, []string{"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}, "vpc-1")
+				mockDescribeRouteTables(client,
+					map[string]bool{
+						"subnet-zone1":    false,
+						"subnet-zone2":    false,
+						"subnet-zone3":    false,
+						"pubSubnet-zone1": true,
+						"pubSubnet-zone2": true,
+						"pubSubnet-zone3": true,
+					},
+					"vpc-1")
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 1,
@@ -740,6 +789,7 @@ func TestAWSActuator(t *testing.T) {
 	}
 
 	for _, test := range tests {
+
 		t.Run(test.name, func(t *testing.T) {
 
 			mockCtrl := gomock.NewController(t)
@@ -829,6 +879,47 @@ func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) *
 		AvailabilityZones: availabilityZones,
 	}
 	return client.EXPECT().DescribeAvailabilityZones(input).Return(output, nil)
+}
+
+func mockDescribeSubnetsByFilter(client *mockaws.MockClient, zones []string, clusterID string, privateSubnetIDs []string, pubSubnetIDs []string, vpcID string) {
+
+	for _, zone := range zones {
+		privateSubnetName := fmt.Sprintf("%s-private-%s", clusterID, zone)
+		publicSubnetName := fmt.Sprintf("%s-public-%s", clusterID, zone)
+
+		subnetFilter := []*ec2.Filter{{
+			Name:   aws.String("tag:Name"),
+			Values: aws.StringSlice([]string{privateSubnetName, publicSubnetName}), // FIXME confirm before review
+		}}
+
+		input := &ec2.DescribeSubnetsInput{
+			Filters: subnetFilter,
+		}
+
+		subnets := make([]*ec2.Subnet, len(privateSubnetIDs)+len(pubSubnetIDs))
+		for i := range privateSubnetIDs {
+			subnets[i] = &ec2.Subnet{
+				SubnetId:         &privateSubnetIDs[i],
+				AvailabilityZone: &zones[i],
+				VpcId:            &vpcID,
+			}
+		}
+		for i := range pubSubnetIDs {
+			subnets[len(privateSubnetIDs)+i] = &ec2.Subnet{
+				SubnetId:         &pubSubnetIDs[i],
+				AvailabilityZone: &zones[i],
+				VpcId:            &vpcID,
+				Tags: []*ec2.Tag{{
+					Key:   aws.String(tagNameSubnetPublicELB),
+					Value: aws.String("1"),
+				}},
+			}
+		}
+		output := &ec2.DescribeSubnetsOutput{
+			Subnets: subnets,
+		}
+		client.EXPECT().DescribeSubnets(input).Return(output, nil)
+	}
 }
 
 func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubnetIDs []string, pubSubnetIDs []string, vpcID string) *gomock.Call {

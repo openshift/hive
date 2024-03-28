@@ -10,6 +10,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
+	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -21,6 +22,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/azureclient"
+	msop "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -47,6 +49,14 @@ func NewAzureActuator(azureCreds *corev1.Secret, cloudName string, logger log.Fi
 		logger: logger,
 	}
 	return actuator, nil
+}
+
+func (a *AzureActuator) GetRemoteMachineSetsWithOpFlags(pool *hivev1.MachinePool, remoteMachineSets *machineapi.MachineSetList, infrastructure *configv1.Infrastructure, logger log.FieldLogger) ([]msop.MachineSetWithOpFlags, error) {
+	remotes_to_update := []msop.MachineSetWithOpFlags{}
+	for _, rMS := range remoteMachineSets.Items {
+		remotes_to_update = append(remotes_to_update, msop.MachineSetWithOpFlags{&rMS, false, false})
+	}
+	return remotes_to_update, nil
 }
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets

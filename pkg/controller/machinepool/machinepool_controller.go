@@ -3,7 +3,6 @@ package machinepool
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -37,17 +36,16 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	autoscalingv1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1"
 	autoscalingv1beta1 "github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1beta1"
-	cpms "github.com/openshift/cluster-control-plane-machine-set-operator/pkg/machineproviders/providers/openshift/machine/v1beta1/providerconfig"
 	installertypes "github.com/openshift/installer/pkg/types"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
+	msop "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
-	"github.com/openshift/hive/pkg/util/logrus"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
@@ -90,8 +88,8 @@ func Add(mgr manager.Manager) error {
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 	}
-	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
-		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, logger)
+	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (Actuator, error) {
+		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, infrastructure, logger)
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
@@ -185,6 +183,7 @@ type ReconcileMachinePool struct {
 		pool *hivev1.MachinePool,
 		masterMachine *machineapi.Machine,
 		remoteMachineSets []machineapi.MachineSet,
+		infrastructure *configv1.Infrastructure,
 		logger log.FieldLogger,
 	) (Actuator, error)
 
@@ -323,13 +322,25 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
+	actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, infrastructure, logger)
+	if err != nil {
+		logger.WithError(err).Error("unable to create actuator")
+		return reconcile.Result{}, err
+	}
+
+	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, actuator, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
 		return reconcile.Result{}, err
 	} else if !proceed {
 		logger.Info("machineSets generator indicated not to proceed, returning")
 		return reconcile.Result{}, nil
+	}
+
+	remotesWithFlagsList, err := actuator.GetRemoteMachineSetsWithOpFlags(pool, remoteMachineSets, infrastructure, logger)
+	if err != nil {
+		logger.WithError(err).Warn("failed to update actuators with remote machine sets that need filters updated") // FIXME HIVE-2443 better error message
+		return reconcile.Result{}, err                                                                              // FIXME HIVE-2443 how do we want to handle this scenario?
 	}
 
 	switch result, err := r.ensureEnoughReplicas(pool, generatedMachineSets, cd, logger); {
@@ -340,7 +351,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return *result, nil
 	}
 
-	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, infrastructure, remoteClusterAPIClient, logger)
+	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remotesWithFlagsList, infrastructure, remoteClusterAPIClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineSets")
 		return reconcile.Result{}, err
@@ -428,18 +439,11 @@ func (r *ReconcileMachinePool) getRemoteMachineSets(
 func (r *ReconcileMachinePool) generateMachineSets(
 	pool *hivev1.MachinePool,
 	cd *hivev1.ClusterDeployment,
-	masterMachine *machineapi.Machine,
-	remoteMachineSets *machineapi.MachineSetList,
+	actuator Actuator,
 	logger log.FieldLogger,
 ) ([]*machineapi.MachineSet, bool, error) {
 	if pool.DeletionTimestamp != nil {
 		return nil, true, nil
-	}
-
-	actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, logger)
-	if err != nil {
-		logger.WithError(err).Error("unable to create actuator")
-		return nil, false, err
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
@@ -537,51 +541,16 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 }
 
 // Compare Failure Domains to confirm that they match
-func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
-	rSpec := rMS.Spec.Template.Spec
-	gSpec := gMS.Spec.Template.Spec
-	var err error
-
-	if rSpec.ProviderSpec.Value == nil {
-		return false, errors.New("remote MachineSet provider spec is nil")
-	}
-	if gSpec.ProviderSpec.Value == nil {
-		return false, errors.New("generated MachineSet provider spec is nil")
-	}
-	// cpms utils operate on the Raw value of the provider spec rather than the Object,
-	// and internally unmarshal the raw value into the Object.
-	// Ensure that Raw is populated before calling cpms utils.
-	// TODO remove this once cpms utils operate on the Object instead of the Raw value.
-	if rSpec.ProviderSpec.Value.Raw == nil {
-		rSpec.ProviderSpec.Value.Raw, err = json.Marshal(rMS.Spec.Template.Spec.ProviderSpec.Value.Object)
-		if err != nil {
-			logger.WithError(err).Error("unable to marshal remote ms provider spec object to raw value")
-			return false, err
-		}
-	}
-	if gSpec.ProviderSpec.Value.Raw == nil {
-		gSpec.ProviderSpec.Value.Raw, err = json.Marshal(gMS.Spec.Template.Spec.ProviderSpec.Value.Object)
-		if err != nil {
-			logger.WithError(err).Error("unable to marshal generate ms provider spec object to raw value")
-			return false, err
-		}
-	}
-
-	// - The provider config funcs take a different kind of logger. Convert.
-	logr := logrus.NewLogr(logger)
-	rMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, rSpec, infrastructure)
+func matchFailureDomains(pool *hivev1.MachinePool, gMS machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
+	fd1, err := FailureDomainFromProviderSpec(&gMS, infrastructure, logger)
 	if err != nil {
-		logger.WithError(err).Errorf("unable to parse remote MachineSet %v provider config", rMS.Name)
 		return false, err
 	}
-	gMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, gSpec, infrastructure)
+	fd2, err := FailureDomainFromProviderSpec(&rMS, infrastructure, logger)
 	if err != nil {
-		logger.WithError(err).Errorf("unable to parse generated MachineSet %v provider config", gMS.Name)
 		return false, err
 	}
-	fd1 := rMS_providerconfig.ExtractFailureDomain()
-	fd2 := gMS_providerconfig.ExtractFailureDomain()
-	return fd1.Equal(fd2), nil
+	return fd1.Equal(fd2), nil // FIXME HIVE-2254 Confirm this works as expected
 }
 
 // matchMachineSets decides whether gMS ("generated MachineSet") and rMS ("remote MachineSet" -- the one already extant
@@ -590,7 +559,7 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 // are part of the same MachinePool. If the machinePoolNameLabels match, the function then confirms that the MachineSets belong
 // to the same Availability Zone (aka Failure Domain). This ensures that the MachineSets are referring to the same machines.
 // We can count on this because the upsteam generator guarentees at most one MachineSet per Failure Domain. HIVE-2254.
-func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
+func matchMachineSets(pool *hivev1.MachinePool, gMS machineapi.MachineSet, rMS machineapi.MachineSet, infrastructure *configv1.Infrastructure, logger log.FieldLogger) (bool, error) {
 
 	gLabel, gLabelExists := gMS.Labels[machinePoolNameLabel]
 	rLabel, rLabelExists := rMS.Labels[machinePoolNameLabel]
@@ -606,23 +575,21 @@ func matchMachineSets(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, inf
 		return false, nil
 	}
 
-	return matchFailureDomains(gMS, rMS, infrastructure, logger)
+	return matchFailureDomains(pool, gMS, rMS, infrastructure, logger)
 }
 
 func (r *ReconcileMachinePool) syncMachineSets(
 	pool *hivev1.MachinePool,
 	cd *hivev1.ClusterDeployment,
 	generatedMachineSets []*machineapi.MachineSet,
-	remoteMachineSets *machineapi.MachineSetList,
+	remoteMachineSets []msop.MachineSetWithOpFlags,
 	infrastructure *configv1.Infrastructure,
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
 ) ([]*machineapi.MachineSet, error) {
 	result := make([]*machineapi.MachineSet, len(generatedMachineSets))
 
-	machineSetsToDelete := []*machineapi.MachineSet{}
 	machineSetsToCreate := []*machineapi.MachineSet{}
-	machineSetsToUpdate := []*machineapi.MachineSet{}
 
 	// Compile a set of labels and taints that were owned by MachinePool but have now been removed from MachinePool.Spec.
 	// These would need to be deleted from the remoteMachineSet if present.
@@ -640,33 +607,33 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	// Find MachineSets that need updating/creating
 	for i, ms := range generatedMachineSets {
 		found := false
-		for _, rMS := range remoteMachineSets.Items {
+		for j, rMS := range remoteMachineSets {
 			var err error
-			found, err = matchMachineSets(ms, rMS, infrastructure, logger)
+			found, err = matchMachineSets(pool, *ms, *rMS.MS, infrastructure, logger)
 			// Labels matched but there was still an error
 			// In order to prevent the creation of a duplicate MachineSet, error out and do not continue matching.
 			if err != nil {
-				logger.WithError(err).Errorf("unable to match MachineSets %s and %s", ms.Name, rMS.Name)
+				logger.WithError(err).Errorf("unable to match MachineSets %s and %s", ms.Name, rMS.MS.Name)
 				return nil, err
 			}
 			if found {
-				logger.Infof("Found matching remote MachineSet %s for generated MachineSet %s", rMS.Name, ms.Name)
+				logger.Infof("Found matching remote MachineSet %s for generated MachineSet %s", rMS.MS.Name, ms.Name)
 				objectModified := false
 				objectMetaModified := false
 				// Rename generated MachineSet if there is a name mismatch
 				// The rename doesn't currently serve a functional purpose, but may assist in future cases where it gets used.
 				// TODO: Determine how to handle a case where a remote machineSet has the same name as a different (non-matching) generated machineSet.
-				ms.Name = rMS.Name
-				resourcemerge.EnsureObjectMeta(&objectMetaModified, &rMS.ObjectMeta, ms.ObjectMeta)
-				msLog := logger.WithField("machineset", rMS.Name)
+				ms.Name = rMS.MS.Name
+				resourcemerge.EnsureObjectMeta(&objectMetaModified, &rMS.MS.ObjectMeta, ms.ObjectMeta)
+				msLog := logger.WithField("machineset", rMS.MS.Name)
 
 				if pool.Spec.Autoscaling == nil {
-					if *rMS.Spec.Replicas != *ms.Spec.Replicas {
+					if *rMS.MS.Spec.Replicas != *ms.Spec.Replicas {
 						msLog.WithFields(log.Fields{
 							"desired":  *ms.Spec.Replicas,
-							"observed": *rMS.Spec.Replicas,
+							"observed": *rMS.MS.Spec.Replicas,
 						}).Info("replicas out of sync")
-						rMS.Spec.Replicas = ms.Spec.Replicas
+						rMS.MS.Spec.Replicas = ms.Spec.Replicas
 						objectModified = true
 					}
 				} else {
@@ -676,38 +643,38 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					// to set the replicas to explicitly be within the desired range.
 					min, max := getMinMaxReplicasForMachineSet(pool, generatedMachineSets, i)
 					switch {
-					case rMS.Spec.Replicas == nil:
+					case rMS.MS.Spec.Replicas == nil:
 						msLog.WithField("observed", nil).WithField("min", min).WithField("max", max).Info("setting replicas to min")
-						rMS.Spec.Replicas = &min
+						rMS.MS.Spec.Replicas = &min
 						objectModified = true
-					case *rMS.Spec.Replicas < min:
-						msLog.WithField("observed", *rMS.Spec.Replicas).WithField("min", min).WithField("max", max).Info("setting replicas to min")
-						rMS.Spec.Replicas = &min
+					case *rMS.MS.Spec.Replicas < min:
+						msLog.WithField("observed", *rMS.MS.Spec.Replicas).WithField("min", min).WithField("max", max).Info("setting replicas to min")
+						rMS.MS.Spec.Replicas = &min
 						objectModified = true
-					case *rMS.Spec.Replicas > max:
-						msLog.WithField("observed", *rMS.Spec.Replicas).WithField("min", min).WithField("max", max).Info("setting replicas to max")
-						rMS.Spec.Replicas = &max
+					case *rMS.MS.Spec.Replicas > max:
+						msLog.WithField("observed", *rMS.MS.Spec.Replicas).WithField("min", min).WithField("max", max).Info("setting replicas to max")
+						rMS.MS.Spec.Replicas = &max
 						objectModified = true
 					default:
-						msLog.WithField("observed", *rMS.Spec.Replicas).WithField("min", min).WithField("max", max).Debug("replicas within range")
+						msLog.WithField("observed", *rMS.MS.Spec.Replicas).WithField("min", min).WithField("max", max).Debug("replicas within range")
 					}
 				}
 
 				// Carry over the labels on the remote machineset from the generated machineset. Merging strategy preserves the unique labels of remote machineset.
-				if rMS.Spec.Template.Spec.Labels == nil {
-					rMS.Spec.Template.Spec.Labels = make(map[string]string)
+				if rMS.MS.Spec.Template.Spec.Labels == nil {
+					rMS.MS.Spec.Template.Spec.Labels = make(map[string]string)
 				}
 				// First delete the labels that need to be deleted, then sync the remoteMachineSet labels with that of the generatedMachineSet.
-				for key := range rMS.Spec.Template.Spec.Labels {
+				for key := range rMS.MS.Spec.Template.Spec.Labels {
 					if labelsToDelete.Has(key) {
 						// Safe to delete while iterating as long as we're deleting the key for this iteration.
-						delete(rMS.Spec.Template.Spec.Labels, key)
+						delete(rMS.MS.Spec.Template.Spec.Labels, key)
 						objectMetaModified = true
 					}
 				}
 				for key, value := range ms.Spec.Template.Spec.Labels {
-					if val, ok := rMS.Spec.Template.Spec.Labels[key]; !ok || val != value {
-						rMS.Spec.Template.Spec.Labels[key] = value
+					if val, ok := rMS.MS.Spec.Template.Spec.Labels[key]; !ok || val != value {
+						rMS.MS.Spec.Template.Spec.Labels[key] = value
 						objectModified = true
 					}
 				}
@@ -715,7 +682,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				// Carry over the taints on the remote machineset from the generated machineset. Merging strategy preserves the unique taints of remote machineset.
 				// First, build a map of remote MachineSet taints, so we simultaneously collapse duplicate entries.
 				taintMap := make(map[hivev1.TaintIdentifier]corev1.Taint)
-				for _, rTaint := range rMS.Spec.Template.Spec.Taints {
+				for _, rTaint := range rMS.MS.Spec.Template.Spec.Taints {
 					if taintsToDelete.Has(controllerutils.IdentifierForTaint(&rTaint)) {
 						// This entry would be deleted from the final list
 						objectModified = true
@@ -736,26 +703,25 @@ func (r *ReconcileMachinePool) syncMachineSets(
 						objectModified = true
 					}
 				}
-				rMS.Spec.Template.Spec.Taints = *controllerutils.ListFromTaintMap(&taintMap)
+				rMS.MS.Spec.Template.Spec.Taints = *controllerutils.ListFromTaintMap(&taintMap)
 
 				// Platform updates will be blocked by webhook, unless they're not.
-				if !reflect.DeepEqual(rMS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value) {
+				if !reflect.DeepEqual(rMS.MS.Spec.Template.Spec.ProviderSpec.Value, ms.Spec.Template.Spec.ProviderSpec.Value) {
 					msg := "ProviderSpec out of sync"
 					if mutable, err := strconv.ParseBool(pool.Annotations[constants.OverrideMachinePoolPlatformAnnotation]); err != nil || !mutable {
 						msLog.Warning(msg)
 					} else {
 						msLog.Info(msg)
-						rMS.Spec.Template.Spec.ProviderSpec.Value = ms.Spec.Template.Spec.ProviderSpec.Value
+						rMS.MS.Spec.Template.Spec.ProviderSpec.Value = ms.Spec.Template.Spec.ProviderSpec.Value
 						objectModified = true
 					}
 				}
 
 				if objectMetaModified || objectModified {
-					rMS.Generation++
-					machineSetsToUpdate = append(machineSetsToUpdate, &rMS)
+					remoteMachineSets[j].NeedsUpdate = true
 				}
 
-				result[i] = &rMS
+				result[i] = rMS.MS
 				break
 			}
 		}
@@ -767,21 +733,18 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	}
 
 	// Find MachineSets that need deleting
-	for i, rMS := range remoteMachineSets.Items {
-		if !isControlledByMachinePool(cd, pool, &rMS) {
+	for i, rMS := range remoteMachineSets {
+		if !isControlledByMachinePool(cd, pool, rMS.MS) {
 			continue
 		}
-		delete := true
+		remoteMachineSets[i].NeedsDelete = true
 		if pool.DeletionTimestamp == nil {
 			for _, ms := range generatedMachineSets {
-				if rMS.Name == ms.Name {
-					delete = false
+				if rMS.MS.Name == ms.Name {
+					remoteMachineSets[i].NeedsDelete = false // FIXME HIVE-2443 do we need this?
 					break
 				}
 			}
-		}
-		if delete {
-			machineSetsToDelete = append(machineSetsToDelete, &remoteMachineSets.Items[i])
 		}
 	}
 
@@ -793,19 +756,21 @@ func (r *ReconcileMachinePool) syncMachineSets(
 		}
 	}
 
-	for _, ms := range machineSetsToUpdate {
-		logger.WithField("machineset", ms.Name).Info("updating machineset")
-		if err := remoteClusterAPIClient.Update(context.Background(), ms); err != nil {
-			logger.WithError(err).Error("unable to update machine set")
-			return nil, err
-		}
-	}
-
-	for _, ms := range machineSetsToDelete {
-		logger.WithField("machineset", ms.Name).Info("deleting machineset")
-		if err := remoteClusterAPIClient.Delete(context.Background(), ms); err != nil {
-			logger.WithError(err).Error("unable to delete machine set")
-			return nil, err
+	// Update and delete remote machinesets
+	for _, rMS := range remoteMachineSets {
+		if rMS.NeedsDelete {
+			logger.WithField("machineset", rMS.MS.Name).Info("deleting machineset")
+			if err := remoteClusterAPIClient.Delete(context.Background(), rMS.MS); err != nil {
+				logger.WithError(err).Error("unable to delete machine set")
+				return nil, err
+			}
+		} else if rMS.NeedsUpdate { // Ignore update if deleted in previous case
+			logger.WithField("machineset", rMS.MS.Name).Info("updating machineset")
+			rMS.MS.Generation++
+			if err := remoteClusterAPIClient.Update(context.Background(), rMS.MS); err != nil {
+				logger.WithError(err).Error("unable to update machine set")
+				return nil, err
+			}
 		}
 	}
 
@@ -1140,6 +1105,7 @@ func (r *ReconcileMachinePool) createActuator(
 	pool *hivev1.MachinePool,
 	masterMachine *machineapi.Machine,
 	remoteMachineSets []machineapi.MachineSet,
+	infrastructure *configv1.Infrastructure,
 	logger log.FieldLogger,
 ) (Actuator, error) {
 	switch {

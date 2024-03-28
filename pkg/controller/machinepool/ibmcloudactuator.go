@@ -10,12 +10,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	installibmcloud "github.com/openshift/installer/pkg/asset/machines/ibmcloud"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	msop "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 	"github.com/openshift/hive/pkg/ibmclient"
 )
 
@@ -40,6 +42,14 @@ func NewIBMCloudActuator(ibmCreds *corev1.Secret, scheme *runtime.Scheme, logger
 		ibmClient: ibmClient,
 	}
 	return actuator, nil
+}
+
+func (a *IBMCloudActuator) GetRemoteMachineSetsWithOpFlags(pool *hivev1.MachinePool, remoteMachineSets *machineapi.MachineSetList, infrastructure *configv1.Infrastructure, logger log.FieldLogger) ([]msop.MachineSetWithOpFlags, error) {
+	remotes_to_update := []msop.MachineSetWithOpFlags{}
+	for _, rMS := range remoteMachineSets.Items {
+		remotes_to_update = append(remotes_to_update, msop.MachineSetWithOpFlags{&rMS, false, false})
+	}
+	return remotes_to_update, nil
 }
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets

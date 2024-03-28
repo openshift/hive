@@ -8,8 +8,10 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	v1 "github.com/openshift/api/config/v1"
 	v1beta1 "github.com/openshift/api/machine/v1beta1"
-	v1 "github.com/openshift/hive/apis/hive/v1"
+	v10 "github.com/openshift/hive/apis/hive/v1"
+	machinesetwithopflags "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 	logrus "github.com/sirupsen/logrus"
 )
 
@@ -37,7 +39,7 @@ func (m *MockActuator) EXPECT() *MockActuatorMockRecorder {
 }
 
 // GenerateMachineSets mocks base method.
-func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.MachinePool, arg2 logrus.FieldLogger) ([]*v1beta1.MachineSet, bool, error) {
+func (m *MockActuator) GenerateMachineSets(arg0 *v10.ClusterDeployment, arg1 *v10.MachinePool, arg2 logrus.FieldLogger) ([]*v1beta1.MachineSet, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateMachineSets", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*v1beta1.MachineSet)
@@ -50,4 +52,19 @@ func (m *MockActuator) GenerateMachineSets(arg0 *v1.ClusterDeployment, arg1 *v1.
 func (mr *MockActuatorMockRecorder) GenerateMachineSets(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateMachineSets", reflect.TypeOf((*MockActuator)(nil).GenerateMachineSets), arg0, arg1, arg2)
+}
+
+// GetRemoteMachineSetsWithOpFlags mocks base method.
+func (m *MockActuator) GetRemoteMachineSetsWithOpFlags(pool *v10.MachinePool, remoteMachineSets *v1beta1.MachineSetList, infrastructure *v1.Infrastructure, logger logrus.FieldLogger) ([]machinesetwithopflags.MachineSetWithOpFlags, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRemoteMachineSetsWithOpFlags", pool, remoteMachineSets, infrastructure, logger)
+	ret0, _ := ret[0].([]machinesetwithopflags.MachineSetWithOpFlags)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRemoteMachineSetsWithOpFlags indicates an expected call of GetRemoteMachineSetsWithOpFlags.
+func (mr *MockActuatorMockRecorder) GetRemoteMachineSetsWithOpFlags(pool, remoteMachineSets, infrastructure, logger interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRemoteMachineSetsWithOpFlags", reflect.TypeOf((*MockActuator)(nil).GetRemoteMachineSetsWithOpFlags), pool, remoteMachineSets, infrastructure, logger)
 }

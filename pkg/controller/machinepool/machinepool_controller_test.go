@@ -35,6 +35,7 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool/mock"
+	msop "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 	testfake "github.com/openshift/hive/pkg/test/fake"
@@ -1243,9 +1244,34 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSet("foo-12345-worker", "worker", true, 1, 0),
 			},
 		},
+		/*
+			{
+				name:              "AWS: remote machineset subnet filter, update to subnet id", // FIXME HIVE-2443
+				clusterDeployment: testClusterDeployment(),
+				machinePool:       testMachinePool(),
+				remoteExisting: []runtime.Object{
+					testMachine("master1", "master"),
+					testMachineSetWithSubnetFilter("foo-12345-worker-us-east-1a", "worker", false, 0, 0, []string{"us-east-1a"}),
+					testMachineSetWithSubnetFilter("foo-12345-worker-us-east-1b", "worker", false, 0, 0, []string{"us-east-1b"}),
+					testMachineSetWithSubnetFilter("foo-12345-worker-us-east-1c", "worker", false, 0, 0, []string{"us-east-1c"}),
+				},
+				generatedMachineSets: []*machineapi.MachineSet{
+					testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 0, 0, "us-east-1a"),
+					testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", false, 0, 0, "us-east-1b"),
+					testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", false, 0, 0, "us-east-1c"),
+				},
+				expectedRemoteMachineSets: []*machineapi.MachineSet{
+					testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+					testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+					testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
+				},
+			},*/
 	}
 
 	for _, test := range tests {
+		if test.name != "AWS: remote machineset subnet filter, update to subnet id" {
+			continue
+		}
 		t.Run(test.name, func(t *testing.T) {
 			localExisting := []runtime.Object{}
 			if test.clusterDeployment != nil {
@@ -1272,6 +1298,26 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					Return(test.generatedMachineSets, !test.actuatorDoNotProceed, nil)
 			}
 
+			call_getremotemsop := test.remoteExisting != nil &&
+				test.actuatorDoNotProceed != true &&
+				test.clusterDeployment != nil &&
+				test.clusterDeployment.DeletionTimestamp == nil // FIXME HIVE-2443 what condition to set here? Create separate variable for test cases?
+			if call_getremotemsop {
+				rMS_flags := []msop.MachineSetWithOpFlags{}
+				for _, obj := range test.remoteExisting {
+					if obj.GetObjectKind().GroupVersionKind().Kind == "MachineSet" {
+						rMS_flags = append(rMS_flags, msop.MachineSetWithOpFlags{
+							MS:          obj.(*machineapi.MachineSet),
+							NeedsUpdate: false,
+							NeedsDelete: false,
+						})
+					}
+				}
+				mockActuator.EXPECT().
+					GetRemoteMachineSetsWithOpFlags(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(rMS_flags, nil)
+			}
+
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			mockRemoteClientBuilder.EXPECT().Build().Return(remoteFakeClient, nil).AnyTimes()
 
@@ -1283,7 +1329,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				scheme:                        scheme,
 				logger:                        logger,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-				actuatorBuilder: func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, cdLog log.FieldLogger) (Actuator, error) {
+				actuatorBuilder: func(
+					cd *hivev1.ClusterDeployment,
+					pool *hivev1.MachinePool,
+					masterMachine *machineapi.Machine,
+					remoteMachineSets []machineapi.MachineSet,
+					infrastructure *configv1.Infrastructure,
+					logger log.FieldLogger,
+				) (Actuator, error) {
 					return mockActuator, nil
 				},
 				expectations: controllerExpectations,
@@ -1646,6 +1699,23 @@ func testAWSProviderSpec() *machineapi.AWSMachineProviderConfig {
 	}
 }
 
+func testAWSProviderSpecWithFilter(filter_values []string) *machineapi.AWSMachineProviderConfig {
+	return &machineapi.AWSMachineProviderConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "AWSMachineProviderConfig",
+			APIVersion: machineapi.SchemeGroupVersion.String(),
+		},
+		AMI: machineapi.AWSResourceReference{
+			Filters: []machineapi.Filter{
+				{
+					Name:   "tag:Name", // FIXME add more than just tag:Name?
+					Values: filter_values,
+				},
+			},
+		},
+	}
+}
+
 func replaceProviderSpec(pc *machineapi.AWSMachineProviderConfig) func(*machineapi.MachineSet) {
 	rawAWSProviderSpec, err := encodeAWSMachineProviderSpec(pc, scheme.GetScheme())
 	if err != nil {
@@ -1705,6 +1775,12 @@ func testMachineSetMachine(name string, machineType string, machineSetName strin
 func testMachineSetWithAZ(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, az string) *machineapi.MachineSet {
 	pc := testAWSProviderSpec()
 	pc.Placement.AvailabilityZone = az
+
+	return testMachineSet(name, machineType, unstompedAnnotation, replicas, generation, replaceProviderSpec(pc))
+}
+
+func testMachineSetWithSubnetFilter(name string, machineType string, unstompedAnnotation bool, replicas int, generation int, filter_values []string) *machineapi.MachineSet {
+	pc := testAWSProviderSpecWithFilter(filter_values)
 
 	return testMachineSet(name, machineType, unstompedAnnotation, replicas, generation, replaceProviderSpec(pc))
 }

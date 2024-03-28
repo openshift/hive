@@ -9,6 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	installvsphere "github.com/openshift/installer/pkg/asset/machines/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -16,6 +17,7 @@ import (
 	vsphereutil "github.com/openshift/machine-api-operator/pkg/controller/vsphere"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	msop "github.com/openshift/hive/pkg/controller/machinesetwithopflags"
 )
 
 // VSphereActuator encapsulates the pieces necessary to be able to generate
@@ -39,6 +41,14 @@ func NewVSphereActuator(masterMachine *machineapi.Machine, scheme *runtime.Schem
 		osImage: osImage,
 	}
 	return actuator, nil
+}
+
+func (a *VSphereActuator) GetRemoteMachineSetsWithOpFlags(pool *hivev1.MachinePool, remoteMachineSets *machineapi.MachineSetList, infrastructure *configv1.Infrastructure, logger log.FieldLogger) ([]msop.MachineSetWithOpFlags, error) {
+	remotes_to_update := []msop.MachineSetWithOpFlags{}
+	for _, rMS := range remoteMachineSets.Items {
+		remotes_to_update = append(remotes_to_update, msop.MachineSetWithOpFlags{MS: &rMS, NeedsUpdate: false, NeedsDelete: false})
+	}
+	return remotes_to_update, nil
 }
 
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets

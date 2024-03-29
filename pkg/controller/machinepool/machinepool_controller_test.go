@@ -1342,11 +1342,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 								t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
 							}
 
-							rAWSProviderSpec, _ := decodeAWSMachineProviderSpec(rMS.Spec.Template.Spec.ProviderSpec.Value, logger)
+							rAWSProviderSpec, _ := decodeAWSMachineProviderSpec(rMS.Spec.Template.Spec.ProviderSpec.Value)
 							log.Debugf("remote AWS: %v", printAWSMachineProviderConfig(rAWSProviderSpec))
 							assert.NotNil(t, rAWSProviderSpec)
 
-							eAWSProviderSpec, _ := decodeAWSMachineProviderSpec(eMS.Spec.Template.Spec.ProviderSpec.Value, logger)
+							eAWSProviderSpec, _ := decodeAWSMachineProviderSpec(eMS.Spec.Template.Spec.ProviderSpec.Value)
 							log.Debugf("expected AWS: %v", printAWSMachineProviderConfig(eAWSProviderSpec))
 							assert.NotNil(t, eAWSProviderSpec)
 							assert.Equal(t, eAWSProviderSpec.AMI, rAWSProviderSpec.AMI, "%s AMI does not match", eMS.Name)

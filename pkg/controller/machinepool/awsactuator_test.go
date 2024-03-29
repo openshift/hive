@@ -58,12 +58,18 @@ func TestAWSActuator(t *testing.T) {
 		expectedKMSKey               string
 		expectedEC2MetadataAuth      string
 		expectedAMI                  *machineapi.AWSResourceReference
-		expectedSGFilters            []machineapi.Filter
-		// Security groups identified by ID start with the *second* SecurityGroup ([1])
-		// and do not use Filters.
+		expectExtraSG                bool
+		// The first three security groups use Filters by tag:Name with Values:
+		// - $clusterID-$role-sg
+		// - $clusterID-node
+		// - $clusterID-lb
+		// Security groups identified by ID thus start with the *fourth*
+		// SecurityGroup ([3]) and do not use Filters.
 		expectedSGIDs    []string
 		expectedUserTags map[string]string
 	}
+	customVPC := "vpc-1"
+	extraSG := "extra-security-group"
 	tests := []ttype{
 		{
 			name:              "generate single machineset for single zone",
@@ -132,7 +138,7 @@ func TestAWSActuator(t *testing.T) {
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone3"},
 					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"},
-					[]string{"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}, "vpc-1")
+					[]string{"pubSubnet-zone1", "pubSubnet-zone2", "pubSubnet-zone3"}, customVPC)
 				mockDescribeRouteTables(client, map[string]bool{
 					"subnet-zone1":    false,
 					"subnet-zone2":    false,
@@ -140,7 +146,7 @@ func TestAWSActuator(t *testing.T) {
 					"pubSubnet-zone1": true,
 					"pubSubnet-zone2": true,
 					"pubSubnet-zone3": true,
-				}, "vpc-1")
+				}, customVPC)
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 1,
@@ -203,7 +209,7 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone1", "zone2"},
-					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}, []string{}, "vpc-1")
+					[]string{"subnet-zone1", "subnet-zone2", "subnet-zone3"}, []string{}, customVPC)
 			},
 			expectedErr: true,
 			expectedCondition: &hivev1.MachinePoolCondition{
@@ -233,13 +239,13 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2", "zone2", "zone1"},
-					[]string{"priv1-zone1", "priv2-zone2", "priv3-zone2"}, []string{"pub-zone1"}, "vpc-1")
+					[]string{"priv1-zone1", "priv2-zone2", "priv3-zone2"}, []string{"pub-zone1"}, customVPC)
 				mockDescribeRouteTables(client, map[string]bool{
 					"priv1-zone1": false,
 					"priv2-zone2": false,
 					"priv3-zone2": false,
 					"pub-zone1":   true,
-				}, "vpc-1")
+				}, customVPC)
 			},
 			expectedErr: true,
 			expectedCondition: &hivev1.MachinePoolCondition{
@@ -306,13 +312,13 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2"},
-					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
+					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, customVPC)
 				mockDescribeRouteTables(client, map[string]bool{
 					"subnet-zone1":    false,
 					"subnet-zone2":    false,
 					"pubSubnet-zone1": false,
 					"pubSubnet-zone2": false,
-				}, "vpc-1")
+				}, customVPC)
 			},
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
@@ -341,13 +347,13 @@ func TestAWSActuator(t *testing.T) {
 			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
 				mockDescribeSubnets(client, []string{"zone1", "zone2"},
-					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1")
+					[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, customVPC)
 				mockDescribeRouteTables(client, map[string]bool{
 					"subnet-zone1":    false,
 					"subnet-zone2":    false,
 					"pubSubnet-zone1": true,
 					"pubSubnet-zone2": false,
-				}, "vpc-1")
+				}, customVPC)
 			},
 			expectedCondition: &hivev1.MachinePoolCondition{
 				Type:   hivev1.InvalidSubnetsMachinePoolCondition,
@@ -476,7 +482,7 @@ func TestAWSActuator(t *testing.T) {
 			machinePool: func() *hivev1.MachinePool {
 				pool := testMachinePool()
 				pool.Annotations = map[string]string{
-					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+					constants.ExtraWorkerSecurityGroupAnnotation: extraSG,
 				}
 				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
 				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
@@ -486,11 +492,11 @@ func TestAWSActuator(t *testing.T) {
 			mockAWSClient: func(client *mockaws.MockClient) {
 				gomock.InOrder(
 					mockDescribeSubnets(client, []string{"zone1", "zone2"},
-						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1"),
+						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, customVPC),
 					// When an ExtraWorkerSecurityGroup annotation is configured we query the subnets for the first subnet
 					// in the list configured for a MachinePool to discover the VPC ID of the subnet.
 					mockDescribeSubnets(client, []string{"zone1"},
-						[]string{"subnet-zone1"}, []string{}, "vpc-1"),
+						[]string{"subnet-zone1"}, []string{}, customVPC),
 				)
 				mockDescribeRouteTables(client,
 					map[string]bool{
@@ -499,7 +505,7 @@ func TestAWSActuator(t *testing.T) {
 						"pubSubnet-zone1": true,
 						"pubSubnet-zone2": true,
 					},
-					"vpc-1")
+					customVPC)
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 2,
@@ -508,16 +514,7 @@ func TestAWSActuator(t *testing.T) {
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
 			},
-			expectedSGFilters: []machineapi.Filter{
-				{
-					Name:   "tag:Name",
-					Values: []string{"foo-12345-worker-sg", "extra-security-group"},
-				},
-				{
-					Name:   "vpc-id",
-					Values: []string{"vpc-1"},
-				},
-			},
+			expectExtraSG:    true,
 			expectedUserTags: baseUserTagsFromCD,
 		},
 		{
@@ -526,7 +523,7 @@ func TestAWSActuator(t *testing.T) {
 			machinePool: func() *hivev1.MachinePool {
 				pool := testMachinePool()
 				pool.Annotations = map[string]string{
-					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+					constants.ExtraWorkerSecurityGroupAnnotation: extraSG,
 				}
 				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
 				pool.Spec.Platform.AWS.Subnets = []string{}
@@ -541,7 +538,7 @@ func TestAWSActuator(t *testing.T) {
 			machinePool: func() *hivev1.MachinePool {
 				pool := testMachinePool()
 				pool.Annotations = map[string]string{
-					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+					constants.ExtraWorkerSecurityGroupAnnotation: extraSG,
 				}
 				pool.Spec.Platform.AWS.Zones = []string{"zone1", "zone2"}
 				pool.Spec.Platform.AWS.Subnets = []string{"subnet-zone1", "subnet-zone2", "pubSubnet-zone1", "pubSubnet-zone2"}
@@ -569,7 +566,7 @@ func TestAWSActuator(t *testing.T) {
 			mockAWSClient: func(client *mockaws.MockClient) {
 				gomock.InOrder(
 					mockDescribeSubnets(client, []string{"zone1", "zone2"},
-						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1"),
+						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, customVPC),
 				)
 				mockDescribeRouteTables(client,
 					map[string]bool{
@@ -578,7 +575,7 @@ func TestAWSActuator(t *testing.T) {
 						"pubSubnet-zone1": true,
 						"pubSubnet-zone2": true,
 					},
-					"vpc-1")
+					customVPC)
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 2,
@@ -586,12 +583,6 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
 				ID: pointer.String(testAMI),
-			},
-			expectedSGFilters: []machineapi.Filter{
-				{
-					Name:   "tag:Name",
-					Values: []string{"foo-12345-worker-sg"},
-				},
 			},
 			expectedSGIDs:    []string{"sg-one", "sg-two"},
 			expectedUserTags: baseUserTagsFromCD,
@@ -602,7 +593,7 @@ func TestAWSActuator(t *testing.T) {
 			machinePool: func() *hivev1.MachinePool {
 				pool := testMachinePool()
 				pool.Annotations = map[string]string{
-					constants.ExtraWorkerSecurityGroupAnnotation: "extra-security-group",
+					constants.ExtraWorkerSecurityGroupAnnotation: extraSG,
 				}
 				pool.Spec.Platform.AWS.AdditionalSecurityGroupIDs = []string{"additional-security-group"}
 				return pool
@@ -633,7 +624,7 @@ func TestAWSActuator(t *testing.T) {
 			mockAWSClient: func(client *mockaws.MockClient) {
 				gomock.InOrder(
 					mockDescribeSubnets(client, []string{"zone1", "zone2"},
-						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, "vpc-1"),
+						[]string{"subnet-zone1", "subnet-zone2"}, []string{"pubSubnet-zone1", "pubSubnet-zone2"}, customVPC),
 				)
 				mockDescribeRouteTables(client,
 					map[string]bool{
@@ -642,7 +633,7 @@ func TestAWSActuator(t *testing.T) {
 						"pubSubnet-zone1": true,
 						"pubSubnet-zone2": true,
 					},
-					"vpc-1")
+					customVPC)
 			},
 			expectedMachineSetReplicas: map[string]int64{
 				generateAWSMachineSetName("zone1"): 2,
@@ -690,14 +681,41 @@ func TestAWSActuator(t *testing.T) {
 				assert.NotNil(t, providerConfig.Subnet.ID, "missing subnet ID")
 				assert.Equal(t, "subnet-"+providerConfig.Placement.AvailabilityZone, *providerConfig.Subnet.ID, "unexpected subnet ID")
 			}
-			if test.expectedSGFilters != nil {
-				assert.Equal(t, awsProvider.SecurityGroups[0].Filters, test.expectedSGFilters, "unexpected security group filters")
-			}
 
+			defaultSGFilterValues := []string{
+				"foo-12345-worker-sg",
+				"foo-12345-node",
+				"foo-12345-lb",
+			}
+			// Check for the default security groups
+			if assert.GreaterOrEqual(t, len(awsProvider.SecurityGroups), 3, "expected at least the default three SecurityGroups") {
+				for i, val := range defaultSGFilterValues {
+					expNumFilters := 1
+					if test.expectExtraSG {
+						expNumFilters = 2
+					}
+					if assert.Equal(t, expNumFilters, len(awsProvider.SecurityGroups[i].Filters), "unexpected number of Filters for %s", val) {
+						assert.Equal(t, "tag:Name", awsProvider.SecurityGroups[i].Filters[0].Name)
+						if assert.Equal(t, expNumFilters, len(awsProvider.SecurityGroups[i].Filters[0].Values), "unexpected number of Values for %s", val) {
+							assert.Equal(t, val, awsProvider.SecurityGroups[i].Filters[0].Values[0])
+							if test.expectExtraSG {
+								assert.Equal(t, extraSG, awsProvider.SecurityGroups[i].Filters[0].Values[1])
+							}
+						}
+					}
+					if test.expectExtraSG {
+						assert.Equal(t, "vpc-id", awsProvider.SecurityGroups[i].Filters[1].Name)
+						if assert.Equal(t, 1, len(awsProvider.SecurityGroups[i].Filters[1].Values), "unexpected number of Values for vpc-id Filter") {
+							assert.Equal(t, customVPC, awsProvider.SecurityGroups[i].Filters[1].Values[0])
+						}
+					}
+				}
+			}
 			if test.expectedSGIDs != nil {
-				if assert.Equal(t, len(test.expectedSGIDs), len(awsProvider.SecurityGroups)-1, "expected n-1 SecurityGroups holding IDs") {
+				// SecurityGroups holds the defaults plus any specified by ID
+				if assert.Equal(t, len(test.expectedSGIDs), len(awsProvider.SecurityGroups)-len(defaultSGFilterValues), "unexpected number of non-default SecurityGroups") {
 					for i := 0; i < len(test.expectedSGIDs); i++ {
-						assert.Equal(t, test.expectedSGIDs[i], *awsProvider.SecurityGroups[i+1].ID, "mismatched security group ID")
+						assert.Equal(t, test.expectedSGIDs[i], *awsProvider.SecurityGroups[i+len(defaultSGFilterValues)].ID, "mismatched security group ID")
 					}
 				}
 			}
@@ -782,8 +800,7 @@ func TestGetAWSAMIID(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			scheme := scheme.GetScheme()
-			actualAMIID, actualErr := getAWSAMIID(tc.masterMachine, scheme, log.StandardLogger())
+			actualAMIID, actualErr := getAWSAMIID(tc.masterMachine, log.StandardLogger())
 			if tc.expectError {
 				assert.Error(t, actualErr, "expected an error")
 			} else {
@@ -936,7 +953,7 @@ func encodeAWSMachineProviderSpec(awsProviderSpec *machineapi.AWSMachineProvider
 }
 
 func withEC2Metadata(pool *hivev1.MachinePool, metadataAuth string) *hivev1.MachinePool {
-	pool.Spec.Platform.AWS.EC2Metadata = &awshivev1.EC2Metadata{Authentication: "Optional"}
+	pool.Spec.Platform.AWS.EC2Metadata = &awshivev1.EC2Metadata{Authentication: metadataAuth}
 	return pool
 }
 

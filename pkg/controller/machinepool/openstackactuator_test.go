@@ -44,6 +44,26 @@ func TestOpenStackActuator(t *testing.T) {
 				fmt.Sprintf("%s-worker-%d", testInfraID, 0): 3,
 			},
 		},
+		{
+			name:              "autoscaling baseline",
+			clusterDeployment: testOSPClusterDeployment(),
+			pool:              testOSPPool(testmp.WithAutoscaling(5, 7)),
+			expectedMachineSetReplicas: map[string]int64{
+				// NOTE: When autoscaling, our input has Replicas unspecified, whereupon
+				// the installer's MachineSets() func will produce one MachineSet per
+				// Zone (default 1, since we don't support multiple zones yet) with zero
+				// replicas each.
+				fmt.Sprintf("%s-worker-%d", testInfraID, 0): 0,
+			},
+		},
+		{
+			name:              "autoscaling with zero min replicas",
+			clusterDeployment: testOSPClusterDeployment(),
+			pool:              testOSPPool(testmp.WithAutoscaling(0, 3)),
+			expectedMachineSetReplicas: map[string]int64{
+				fmt.Sprintf("%s-worker-%d", testInfraID, 0): 0,
+			},
+		},
 	}
 	cloudBytes, _ := yaml.Marshal(clientconfig.Clouds{
 		Clouds: map[string]clientconfig.Cloud{
@@ -78,7 +98,19 @@ func TestOpenStackActuator(t *testing.T) {
 				assert.Error(t, err, "expected error for test case")
 			} else {
 				require.NoError(t, err, "unexpected error for test case")
-				validateOSPMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas)
+				assert.Equal(t, len(test.expectedMachineSetReplicas), len(generatedMachineSets), "different number of machine sets generated than expected")
+				for _, ms := range generatedMachineSets {
+					expectedReplicas, ok := test.expectedMachineSetReplicas[ms.Name]
+					if assert.True(t, ok, "unexpected machine set: %s", ms.Name) {
+						assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch for MachineSet %s", ms.Name)
+					}
+
+					ospProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machinev1alpha1.OpenstackProviderSpec)
+					if assert.True(t, ok, "failed to convert to openstack provider spec") {
+						assert.Equal(t, "Flav", ospProvider.Flavor, "unexpected instance type")
+					}
+				}
+
 			}
 		})
 	}
@@ -228,22 +260,6 @@ rootVolume:
 				t.Errorf("getOpenStackOSImage() = %v, want %v", gotOSImage, tt.wantOSImage)
 			}
 		})
-	}
-}
-
-func validateOSPMachineSets(t *testing.T, mSets []*machinev1beta1.MachineSet, expectedMSReplicas map[string]int64) {
-	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
-
-	for _, ms := range mSets {
-		expectedReplicas, ok := expectedMSReplicas[ms.Name]
-		if assert.True(t, ok, "unexpected machine set: %s", ms.Name) {
-			assert.Equal(t, expectedReplicas, int64(*ms.Spec.Replicas), "replica mismatch for MachineSet %s", ms.Name)
-		}
-
-		ospProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machinev1alpha1.OpenstackProviderSpec)
-		if assert.True(t, ok, "failed to convert to openstack provider spec") {
-			assert.Equal(t, "Flav", ospProvider.Flavor, "unexpected instance type")
-		}
 	}
 }
 

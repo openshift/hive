@@ -4,6 +4,7 @@ package gcp
 import (
 	"fmt"
 
+	compute "google.golang.org/api/compute/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -15,6 +16,8 @@ import (
 	"github.com/openshift/installer/pkg/types"
 	gcptypes "github.com/openshift/installer/pkg/types/gcp"
 )
+
+const masterRole = "master"
 
 // GenerateMachines returns manifests and runtime objects to provision control plane nodes using CAPI.
 func GenerateMachines(installConfig *installconfig.InstallConfig, infraID string, pool *types.MachinePool, imageName string) ([]*asset.RuntimeFile, error) {
@@ -39,8 +42,15 @@ func GenerateMachines(installConfig *installconfig.InstallConfig, infraID string
 			Object: gcpMachine,
 		})
 
-		dataSecret := fmt.Sprintf("%s-master", infraID)
+		dataSecret := fmt.Sprintf("%s-%s", infraID, masterRole)
 		capiMachine := createCAPIMachine(gcpMachine.Name, dataSecret, infraID)
+
+		if len(mpool.Zones) > 0 {
+			// When there are fewer zones than the number of control plane instances,
+			// cycle through the zones where the instances will reside.
+			zone := mpool.Zones[int(idx)%len(mpool.Zones)]
+			capiMachine.Spec.FailureDomain = ptr.To(zone)
+		}
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_machine_%s.yaml", capiMachine.Name)},
@@ -63,6 +73,9 @@ func GenerateBootstrapMachines(name string, installConfig *installconfig.Install
 
 	// Identify this as a bootstrap machine
 	bootstrapGCPMachine.Labels["install.openshift.io/bootstrap"] = ""
+
+	bootstrapMachineIsPublic := installConfig.Config.Publish == types.ExternalPublishingStrategy
+	bootstrapGCPMachine.Spec.PublicIP = ptr.To(bootstrapMachineIsPublic)
 
 	result = append(result, &asset.RuntimeFile{
 		File:   asset.File{Filename: fmt.Sprintf("10_inframachine_%s.yaml", bootstrapGCPMachine.Name)},
@@ -94,14 +107,10 @@ func createGCPMachine(name string, installConfig *installconfig.InstallConfig, i
 
 	masterSubnet := installConfig.Config.Platform.GCP.ControlPlaneSubnet
 	if masterSubnet == "" {
-		masterSubnet = gcptypes.DefaultSubnetName(infraID, "master")
+		masterSubnet = gcptypes.DefaultSubnetName(infraID, masterRole)
 	}
 
 	gcpMachine := &capg.GCPMachine{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "infrastructure.cluster.x-k8s.io/v1beta1",
-			Kind:       "GCPMachine",
-		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
@@ -117,6 +126,7 @@ func createGCPMachine(name string, installConfig *installconfig.InstallConfig, i
 			RootDeviceSize:   mpool.OSDisk.DiskSizeGB,
 		},
 	}
+	gcpMachine.SetGroupVersionKind(capg.GroupVersion.WithKind("GCPMachine"))
 	// Set optional values from machinepool
 	if mpool.OnHostMaintenance != "" {
 		gcpMachine.Spec.OnHostMaintenance = ptr.To(capg.HostMaintenancePolicy(mpool.OnHostMaintenance))
@@ -129,15 +139,26 @@ func createGCPMachine(name string, installConfig *installconfig.InstallConfig, i
 		shieldedInstanceConfig.SecureBoot = capg.SecureBootPolicyEnabled
 		gcpMachine.Spec.ShieldedInstanceConfig = ptr.To(shieldedInstanceConfig)
 	}
-	if mpool.ServiceAccount != "" {
-		serviceAccount := &capg.ServiceAccount{
-			Email: mpool.ServiceAccount,
-			// Set scopes to value defined at
-			// https://cloud.google.com/compute/docs/access/service-accounts#scopes_best_practice
-			Scopes: []string{"https://www.googleapis.com/auth/cloud-platform"},
-		}
-		gcpMachine.Spec.ServiceAccount = serviceAccount
+
+	serviceAccount := &capg.ServiceAccount{
+		// Set scopes to value defined at
+		// https://cloud.google.com/compute/docs/access/service-accounts#scopes_best_practice
+		Scopes: []string{compute.CloudPlatformScope},
 	}
+
+	projectID := installConfig.Config.Platform.GCP.ProjectID
+	serviceAccount.Email = fmt.Sprintf("%s-%s@%s.iam.gserviceaccount.com", infraID, masterRole[0:1], projectID)
+	// The installer will create a service account for compute nodes with the above naming convention.
+	// The same service account will be used for control plane nodes during a vanilla installation. During a
+	// xpn installation, the installer will attempt to use an existing service account from a user supplied
+	// value in install-config.
+	// Note - the derivation of the ServiceAccount from credentials will no longer be supported.
+	if len(installConfig.Config.Platform.GCP.NetworkProjectID) > 0 {
+		if mpool.ServiceAccount != "" {
+			serviceAccount.Email = mpool.ServiceAccount
+		}
+	}
+	gcpMachine.Spec.ServiceAccount = serviceAccount
 
 	return gcpMachine
 }
@@ -153,17 +174,17 @@ func createCAPIMachine(name string, dataSecret string, infraID string) *capi.Mac
 		},
 		Spec: capi.MachineSpec{
 			ClusterName: infraID,
-			// Leave empty until ignition support is added
-			// Bootstrap: capi.Bootstrap{
-			//	DataSecretName: ptr.To(dataSecret),
-			// },
+			Bootstrap: capi.Bootstrap{
+				DataSecretName: ptr.To(dataSecret),
+			},
 			InfrastructureRef: v1.ObjectReference{
-				APIVersion: "infrastructure.cluster.x-k8s.io/v1beta1",
+				APIVersion: capg.GroupVersion.String(),
 				Kind:       "GCPMachine",
 				Name:       name,
 			},
 		},
 	}
+	machine.SetGroupVersionKind(capi.GroupVersion.WithKind("Machine"))
 
 	return machine
 }

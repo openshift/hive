@@ -30,9 +30,10 @@ import (
 // OpenStackActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
 type OpenStackActuator struct {
-	logger     log.FieldLogger
-	osImage    string
-	kubeClient client.Client
+	logger                 log.FieldLogger
+	osImage                string
+	kubeClient             client.Client
+	trunkSupportDiscoverer func(cloud, alias string, opts *clientconfig.ClientOpts) (bool, error)
 }
 
 var _ Actuator = &OpenStackActuator{}
@@ -45,9 +46,10 @@ func NewOpenStackActuator(masterMachine *machinev1beta1.Machine, kubeClient clie
 		return nil, err
 	}
 	actuator := &OpenStackActuator{
-		logger:     logger,
-		osImage:    osImage,
-		kubeClient: kubeClient,
+		logger:                 logger,
+		osImage:                osImage,
+		kubeClient:             kubeClient,
+		trunkSupportDiscoverer: installosp.CheckNetworkExtensionAvailability,
 	}
 	return actuator, nil
 }
@@ -122,6 +124,10 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		clientOptions.YAMLOpts = yamlOpts
 	}
 
+	trunkSupport, err := a.trunkSupportDiscoverer(cd.Spec.Platform.OpenStack.Cloud, "trunk", clientOptions)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "failed to discover trunk support")
+	}
 	installerMachineSets, err := installosp.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
@@ -129,7 +135,7 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		a.osImage,
 		workerRole,
 		workerUserDataName,
-		clientOptions,
+		trunkSupport,
 	)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")

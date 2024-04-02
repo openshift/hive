@@ -1070,29 +1070,56 @@ func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePoo
 		"values": []string{vpcID},
 	}
 	vpcIDFilterValueInterface := interface{}(vpcIDFilterValue)
-	ops := yamlpatch.Patch{
-		// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
-		// annotation found on the MachinePool to the existing tag:Name filter in the worker
-		// MachineSet manifest
-		yamlpatch.Operation{
-			Op:    "add",
-			Path:  yamlpatch.OpPath("/spec/template/spec/providerSpec/value/securityGroups/0/filters/0/values/-"),
-			Value: yamlpatch.NewNode(&securityGroupFilterValue),
-		},
-		// Add a filter for the vpcID since the names of security groups may be the same within a
-		// given AWS account. HIVE-1874
-		yamlpatch.Operation{
-			Op:    "add",
-			Path:  yamlpatch.OpPath("/spec/template/spec/providerSpec/value/securityGroups/0/filters/-"),
-			Value: yamlpatch.NewNode(&vpcIDFilterValueInterface),
-		},
+	ops := func(idx int) yamlpatch.Patch {
+		return yamlpatch.Patch{
+			// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
+			// annotation found on the MachinePool to the existing tag:Name filter in the worker
+			// MachineSet manifest
+			yamlpatch.Operation{
+				Op:    "add",
+				Path:  yamlpatch.OpPath(fmt.Sprintf("/spec/template/spec/providerSpec/value/securityGroups/%d/filters/0/values/-", idx)),
+				Value: yamlpatch.NewNode(&securityGroupFilterValue),
+			},
+			// Add a filter for the vpcID since the names of security groups may be the same within a
+			// given AWS account. HIVE-1874
+			yamlpatch.Operation{
+				Op:    "add",
+				Path:  yamlpatch.OpPath(fmt.Sprintf("/spec/template/spec/providerSpec/value/securityGroups/%d/filters/-", idx)),
+				Value: yamlpatch.NewNode(&vpcIDFilterValueInterface),
+			},
+		}
 	}
 
 	// Apply patch to manifest
-	modifiedBytes, err := ops.Apply(manifestBytes)
+	modifiedBytes, err := ops(0).Apply(manifestBytes)
 	if err != nil {
 		logger.WithError(err).Error("error applying patch")
 		return nil, err
+	}
+
+	// Okay, icky time.
+	// Installer produces MachineSet manifests with some combination of the following SecurityGroups:
+	// A) $clusterID-$role-sg
+	// B) $clusterID-node, $clusterID-lb
+	// Prior to https://github.com/openshift/installer/pull/8006, it was just A.
+	// After ^, it's A and B.
+	// Once terraform is removed (pending at the time of this writing) it'll just be B.
+	// So we expect the above patch ops to succeed every time, because there will always be at least
+	// one SG.
+	// But now we have to "try" the other two possibilities. We still want to fail out on any error
+	// *other than* the one resulting from a given entry not existing. So we have to scrape and match
+	// that error specifically.
+	for i := 1; i <= 2; i++ {
+		modB, err := ops(i).Apply(modifiedBytes)
+		if err != nil {
+			if strings.Contains(err.Error(), fmt.Sprintf("yamlpatch add operation does not apply: doc is missing path: /spec/template/spec/providerSpec/value/securityGroups/%d/filters/0/values/-", i)) {
+				logger.Infof("Stopping after patching %d security groups", i)
+				return modifiedBytes, nil
+			}
+			logger.WithError(err).Error("error applying patch")
+			return nil, err
+		}
+		modifiedBytes = modB
 	}
 	return modifiedBytes, nil
 }

@@ -65,7 +65,7 @@ func NewAWSActuator(
 	if amiID != "" {
 		log.Infof("using AMI override from %s annotation: %s", hivev1.MachinePoolImageIDOverrideAnnotation, amiID)
 	} else {
-		refByTag, err := masterAMIRefByTag(masterMachine, scheme, logger)
+		refByTag, err := masterAMIRefByTag(masterMachine)
 		if err != nil {
 			logger.WithError(err).Warn("unable to determine if master machine references AMI by tag")
 			return nil, err
@@ -74,7 +74,7 @@ func NewAWSActuator(
 		// machine doesn't reference an AMI by tag. When refByTag is true, amiID will remain an empty string and
 		// will be provided to installer's machineset generation as an empty string.
 		if !refByTag {
-			amiID, err = getAWSAMIID(masterMachine, scheme, logger)
+			amiID, err = getAWSAMIID(masterMachine, logger)
 			if err != nil {
 				logger.WithError(err).Warn("failed to get AMI ID")
 				return nil, err
@@ -264,8 +264,8 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 }
 
 // Get the AMI ID from an existing master machine.
-func getAWSAMIID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
-	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, logger)
+func getAWSAMIID(masterMachine *machineapi.Machine, logger log.FieldLogger) (string, error) {
+	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value)
 	if err != nil {
 		logger.WithError(err).Warn("cannot decode AWSMachineProviderConfig from master machine")
 		return "", errors.Wrap(err, "cannot decode AWSMachineProviderConfig from master machine")
@@ -280,8 +280,8 @@ func getAWSAMIID(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logg
 }
 
 // Return true if the provided master machine references AMI by tag
-func masterAMIRefByTag(masterMachine *machineapi.Machine, scheme *runtime.Scheme, logger log.FieldLogger) (bool, error) {
-	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value, logger)
+func masterAMIRefByTag(masterMachine *machineapi.Machine) (bool, error) {
+	providerSpec, err := decodeAWSMachineProviderSpec(masterMachine.Spec.ProviderSpec.Value)
 	if err != nil {
 		return false, errors.Wrap(err, "cannot decode AWSMachineProviderConfig from master machine")
 	}
@@ -308,7 +308,7 @@ func (a *AWSActuator) fetchAvailabilityZones() ([]string, error) {
 	return zones, nil
 }
 
-func decodeAWSMachineProviderSpec(rawExtension *runtime.RawExtension, logger log.FieldLogger) (*machineapi.AWSMachineProviderConfig, error) {
+func decodeAWSMachineProviderSpec(rawExtension *runtime.RawExtension) (*machineapi.AWSMachineProviderConfig, error) {
 	if rawExtension == nil {
 		return &machineapi.AWSMachineProviderConfig{}, nil
 	}
@@ -348,12 +348,14 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 	// corresponding instances in AWS and will only be configured for newly created instances.
 	if metav1.HasAnnotation(pool.ObjectMeta, constants.ExtraWorkerSecurityGroupAnnotation) && vpcID != "" {
 		// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
-		// annotation found on the MachinePool to the existing tag:Name filter in the worker
-		// MachineSet manifest
-		providerConfig.SecurityGroups[0].Filters[0].Values = append(providerConfig.SecurityGroups[0].Filters[0].Values, pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
-		// Add a filter for the vpcID since the names of security groups may be the same within a
-		// given AWS account. HIVE-1874
-		providerConfig.SecurityGroups[0].Filters = append(providerConfig.SecurityGroups[0].Filters, machineapi.Filter{Name: "vpc-id", Values: []string{vpcID}})
+		// annotation found on the MachinePool to all of the existing tag:Name filters in
+		// the worker MachineSet manifest
+		for i := range providerConfig.SecurityGroups {
+			providerConfig.SecurityGroups[i].Filters[0].Values = append(providerConfig.SecurityGroups[i].Filters[0].Values, pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
+			// Add a filter for the vpcID since the names of security groups may be the same within a
+			// given AWS account. HIVE-1874
+			providerConfig.SecurityGroups[i].Filters = append(providerConfig.SecurityGroups[i].Filters, machineapi.Filter{Name: "vpc-id", Values: []string{vpcID}})
+		}
 	}
 
 	if pool.Spec.Platform.AWS.SpotMarketOptions != nil {

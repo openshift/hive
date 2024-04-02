@@ -727,8 +727,11 @@ func Test_pasteInPullSecret(t *testing.T) {
 	}
 }
 
-func TestPatchWorkerMachineSet(t *testing.T) {
-	machineSetYAMLBase := `---
+// machineSetWithSecurityGroupsYAML returns a YAML string representing a MachineSet.
+// The specified sgs (SecurityGroups) are included in the providerSpec.
+// NOTE: The sgs string must be indented 10 spaces!
+func machineSetWithSecurityGroupsYAML(sgs string) string {
+	return fmt.Sprintf(`---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 spec:
@@ -760,34 +763,52 @@ spec:
           placement:
             availabilityZone: us-east-1a
             region: us-east-1
-          securityGroups:
-          - filters:
-            - name: tag:Name
-              values:` // doesn't end in a newline, each test appends to the string
+%s`, sgs)
+}
 
+func TestPatchWorkerMachineSet(t *testing.T) {
 	cases := []struct {
-		name           string
-		manifestYAML   string
-		expectModified bool
+		name         string
+		manifestYAML string
+		// expectModified indicates the number of security groups we expect to have been augmented.
+		expectModified int
 		expectErr      bool
 	}{
 		{
-			name: "Patch applies with one security group",
-			manifestYAML: machineSetYAMLBase +
-				"\n              - test-czcpt-worker-sg",
-			expectModified: true,
+			name: "Patch applies with one security group filter value",
+			manifestYAML: machineSetWithSecurityGroupsYAML(
+				`
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - test-czcpt-worker-sg
+`),
+			expectModified: 1,
 		},
 		{
-			name: "Patch applies with more than one security group",
-			manifestYAML: machineSetYAMLBase +
-				"\n              - an-extra-sg" +
-				"\n              - another-sg",
-			expectModified: true,
+			name: "Patch applies with more than one security group filter value",
+			manifestYAML: machineSetWithSecurityGroupsYAML(
+				`
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - an-extra-sg
+              - another-sg
+`),
+			expectModified: 1,
 		},
 		{
-			name:           "Patch applies with no security groups",
-			manifestYAML:   machineSetYAMLBase + " []",
-			expectModified: true,
+			name: "Patch applies with no security group filter values",
+			manifestYAML: machineSetWithSecurityGroupsYAML(
+				`
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values: []
+`),
+			expectModified: 1,
 		},
 		{
 			name: "Manifest is not a MachineSet",
@@ -799,7 +820,6 @@ spec:
       labels:
         "potato.openshift.io/potato-api-potato-type": "yukongold"
 `,
-			expectModified: false,
 		},
 		{
 			name: "Manifest is not a worker MachineSet",
@@ -811,13 +831,55 @@ spec:
       labels:
         "machine.openshift.io/cluster-api-machine-type": "infra"
 `,
-			expectModified: false,
 		},
 		{
+			// I think we end up duplicating the filter value here. Which _should_ be harmless.
 			name: "Security group is already configured",
-			manifestYAML: machineSetYAMLBase +
-				"\n              - test-security-group",
-			expectModified: true,
+			manifestYAML: machineSetWithSecurityGroupsYAML(
+				`
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - test-security-group
+`),
+			expectModified: 1,
+		},
+		{
+			name: "Terraform + CAPI",
+			manifestYAML: machineSetWithSecurityGroupsYAML(
+				`
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - test-czcpt-worker-sg
+          - filters:
+            - name: tag:Name
+              values:
+              - test-czcpt-node
+          - filters:
+            - name: tag:Name
+              values:
+              - test-czcpt-lb
+`),
+			expectModified: 3,
+		},
+		{
+			name: "CAPI only",
+			manifestYAML: machineSetWithSecurityGroupsYAML(
+				`
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - test-czcpt-node
+          - filters:
+            - name: tag:Name
+              values:
+              - test-czcpt-lb
+`),
+			expectModified: 2,
 		},
 	}
 	for _, tc := range cases {
@@ -834,7 +896,7 @@ spec:
 			}
 			logger := log.WithFields(log.Fields{"machinePool": pool.Name})
 			modifiedBytes, err := patchWorkerMachineSetManifest([]byte(tc.manifestYAML), pool, testVPCID, logger)
-			if tc.expectModified {
+			if tc.expectModified > 0 {
 				assert.NotNil(t, modifiedBytes, "expected manifest to be modified")
 			} else {
 				assert.Nil(t, modifiedBytes, "expected manifest to not be modified")
@@ -849,7 +911,7 @@ spec:
 			codecFactory := serializer.NewCodecFactory(scheme)
 			decoder := codecFactory.UniversalDecoder(machineapi.SchemeGroupVersion)
 
-			if tc.expectModified {
+			if tc.expectModified > 0 {
 				machineSetObj, _, err := decoder.Decode(modifiedBytes, nil, nil)
 				assert.NoError(t, err, "expected to be able to decode MachineSet yaml")
 				machineSet, _ := machineSetObj.(*machineapi.MachineSet)
@@ -858,9 +920,13 @@ spec:
 				err = json.Unmarshal(machineSet.Spec.Template.Spec.ProviderSpec.Value.Raw, &awsMachineTemplate)
 				assert.NoError(t, err, "expected to be able to decode AWSMachineProviderConfig")
 
-				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within Security Group Filters in AWSMachineProviderConfig")
-				assert.Equal(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Name, "vpc-id", "expected an vpc-id named filter to be configured within Security Group Filters in AWSMachineProviderConfig")
-				assert.Contains(t, awsMachineTemplate.SecurityGroups[0].Filters[1].Values, "testvpc123", "expected testvpc123 to be configured within Security Group Filters in AWSMachineProviderConfig")
+				if assert.Equal(t, tc.expectModified, len(awsMachineTemplate.SecurityGroups), "unexpected number of security groups") {
+					for i := 0; i < tc.expectModified; i++ {
+						assert.Contains(t, awsMachineTemplate.SecurityGroups[i].Filters[0].Values, "test-security-group", "expected test-security-group to be configured within Security Group Filters in AWSMachineProviderConfig")
+						assert.Equal(t, awsMachineTemplate.SecurityGroups[i].Filters[1].Name, "vpc-id", "expected an vpc-id named filter to be configured within Security Group Filters in AWSMachineProviderConfig")
+						assert.Contains(t, awsMachineTemplate.SecurityGroups[i].Filters[1].Values, "testvpc123", "expected testvpc123 to be configured within Security Group Filters in AWSMachineProviderConfig")
+					}
+				}
 			}
 		})
 	}

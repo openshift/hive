@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC.
+// Copyright 2024 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -90,7 +90,9 @@ const apiId = "iam:v1"
 const apiName = "iam"
 const apiVersion = "v1"
 const basePath = "https://iam.googleapis.com/"
+const basePathTemplate = "https://iam.UNIVERSE_DOMAIN/"
 const mtlsBasePath = "https://iam.mtls.googleapis.com/"
+const defaultUniverseDomain = "googleapis.com"
 
 // OAuth2 scopes used by this API.
 const (
@@ -107,7 +109,9 @@ func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, err
 	// NOTE: prepend, so we don't override user-specified scopes.
 	opts = append([]option.ClientOption{scopesOption}, opts...)
 	opts = append(opts, internaloption.WithDefaultEndpoint(basePath))
+	opts = append(opts, internaloption.WithDefaultEndpointTemplate(basePathTemplate))
 	opts = append(opts, internaloption.WithDefaultMTLSEndpoint(mtlsBasePath))
+	opts = append(opts, internaloption.WithDefaultUniverseDomain(defaultUniverseDomain))
 	client, endpoint, err := htransport.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, err
@@ -520,6 +524,44 @@ type RolesService struct {
 	s *Service
 }
 
+// AccessRestrictions: Access related restrictions on the workforce
+// pool.
+type AccessRestrictions struct {
+	// AllowedServices: Optional. Immutable. Services allowed for web
+	// sign-in with the workforce pool. If not set by default there are no
+	// restrictions.
+	AllowedServices []*ServiceConfig `json:"allowedServices,omitempty"`
+
+	// DisableProgrammaticSignin: Optional. Disable programmatic sign-in by
+	// disabling token issue via the Security Token API endpoint. See
+	// [Security Token Service API]
+	// (https://cloud.google.com/iam/docs/reference/sts/rest).
+	DisableProgrammaticSignin bool `json:"disableProgrammaticSignin,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AllowedServices") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AllowedServices") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *AccessRestrictions) MarshalJSON() ([]byte, error) {
+	type NoMethod AccessRestrictions
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // AdminAuditData: Audit log information specific to Cloud IAM admin
 // APIs. This message is serialized as an `Any` type in the
 // `ServiceData` message of an `AuditLog` message.
@@ -769,11 +811,34 @@ type Binding struct {
 	// For example, `admins@example.com`. * `domain:{domain}`: The G Suite
 	// domain (primary) that represents all the users of that domain. For
 	// example, `google.com` or `example.com`. *
-	// `deleted:user:{emailid}?uid={uniqueid}`: An email address (plus
-	// unique identifier) representing a user that has been recently
-	// deleted. For example, `alice@example.com?uid=123456789012345678901`.
-	// If the user is recovered, this value reverts to `user:{emailid}` and
-	// the recovered user retains the role in the binding. *
+	// `principal://iam.googleapis.com/locations/global/workforcePools/{pool_
+	// id}/subject/{subject_attribute_value}`: A single identity in a
+	// workforce identity pool. *
+	// `principalSet://iam.googleapis.com/locations/global/workforcePools/{po
+	// ol_id}/group/{group_id}`: All workforce identities in a group. *
+	// `principalSet://iam.googleapis.com/locations/global/workforcePools/{po
+	// ol_id}/attribute.{attribute_name}/{attribute_value}`: All workforce
+	// identities with a specific attribute value. *
+	// `principalSet://iam.googleapis.com/locations/global/workforcePools/{po
+	// ol_id}/*`: All identities in a workforce identity pool. *
+	// `principal://iam.googleapis.com/projects/{project_number}/locations/gl
+	// obal/workloadIdentityPools/{pool_id}/subject/{subject_attribute_value}
+	// `: A single identity in a workload identity pool. *
+	// `principalSet://iam.googleapis.com/projects/{project_number}/locations
+	// /global/workloadIdentityPools/{pool_id}/group/{group_id}`: A workload
+	// identity pool group. *
+	// `principalSet://iam.googleapis.com/projects/{project_number}/locations
+	// /global/workloadIdentityPools/{pool_id}/attribute.{attribute_name}/{at
+	// tribute_value}`: All identities in a workload identity pool with a
+	// certain attribute. *
+	// `principalSet://iam.googleapis.com/projects/{project_number}/locations
+	// /global/workloadIdentityPools/{pool_id}/*`: All identities in a
+	// workload identity pool. * `deleted:user:{emailid}?uid={uniqueid}`: An
+	// email address (plus unique identifier) representing a user that has
+	// been recently deleted. For example,
+	// `alice@example.com?uid=123456789012345678901`. If the user is
+	// recovered, this value reverts to `user:{emailid}` and the recovered
+	// user retains the role in the binding. *
 	// `deleted:serviceAccount:{emailid}?uid={uniqueid}`: An email address
 	// (plus unique identifier) representing a service account that has been
 	// recently deleted. For example,
@@ -785,11 +850,20 @@ type Binding struct {
 	// that has been recently deleted. For example,
 	// `admins@example.com?uid=123456789012345678901`. If the group is
 	// recovered, this value reverts to `group:{emailid}` and the recovered
-	// group retains the role in the binding.
+	// group retains the role in the binding. *
+	// `deleted:principal://iam.googleapis.com/locations/global/workforcePool
+	// s/{pool_id}/subject/{subject_attribute_value}`: Deleted single
+	// identity in a workforce identity pool. For example,
+	// `deleted:principal://iam.googleapis.com/locations/global/workforcePool
+	// s/my-pool-id/subject/my-subject-attribute-value`.
 	Members []string `json:"members,omitempty"`
 
 	// Role: Role that is assigned to the list of `members`, or principals.
-	// For example, `roles/viewer`, `roles/editor`, or `roles/owner`.
+	// For example, `roles/viewer`, `roles/editor`, or `roles/owner`. For an
+	// overview of the IAM roles and permissions, see the IAM documentation
+	// (https://cloud.google.com/iam/docs/roles-overview). For a list of the
+	// available pre-defined roles, see here
+	// (https://cloud.google.com/iam/docs/understanding-roles).
 	Role string `json:"role,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Condition") to
@@ -2890,6 +2964,35 @@ func (s *ServiceAccountKey) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// ServiceConfig: Configuration for a service.
+type ServiceConfig struct {
+	// Domain: Optional. Domain name of the service. Example:
+	// console.cloud.google
+	Domain string `json:"domain,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Domain") to
+	// unconditionally include in API requests. By default, fields with
+	// empty or default values are omitted from API requests. However, any
+	// non-pointer, non-interface field appearing in ForceSendFields will be
+	// sent to the server regardless of whether the field is empty or not.
+	// This may be used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Domain") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *ServiceConfig) MarshalJSON() ([]byte, error) {
+	type NoMethod ServiceConfig
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // SetIamPolicyRequest: Request message for `SetIamPolicy` method.
 type SetIamPolicyRequest struct {
 	// Policy: REQUIRED: The complete policy to be applied to the
@@ -3325,6 +3428,12 @@ func (s *UploadServiceAccountKeyRequest) MarshalJSON() ([]byte, error) {
 // Provides namespaces for federated users that can be referenced in IAM
 // policies.
 type WorkforcePool struct {
+	// AccessRestrictions: Optional. Configure access restrictions on the
+	// workforce pool users. This is an optional field. If specified web
+	// sign-in can be restricted to given set of services or programmatic
+	// sign-in can be disabled for pool users.
+	AccessRestrictions *AccessRestrictions `json:"accessRestrictions,omitempty"`
+
 	// Description: A user-specified description of the pool. Cannot exceed
 	// 256 characters.
 	Description string `json:"description,omitempty"`
@@ -3379,20 +3488,21 @@ type WorkforcePool struct {
 	// server.
 	googleapi.ServerResponse `json:"-"`
 
-	// ForceSendFields is a list of field names (e.g. "Description") to
-	// unconditionally include in API requests. By default, fields with
+	// ForceSendFields is a list of field names (e.g. "AccessRestrictions")
+	// to unconditionally include in API requests. By default, fields with
 	// empty or default values are omitted from API requests. However, any
 	// non-pointer, non-interface field appearing in ForceSendFields will be
 	// sent to the server regardless of whether the field is empty or not.
 	// This may be used to include empty fields in Patch requests.
 	ForceSendFields []string `json:"-"`
 
-	// NullFields is a list of field names (e.g. "Description") to include
-	// in API requests with the JSON null value. By default, fields with
-	// empty values are omitted from API requests. However, any field with
-	// an empty value appearing in NullFields will be sent to the server as
-	// null. It is an error if a field in this list has a non-empty value.
-	// This may be used to include null fields in Patch requests.
+	// NullFields is a list of field names (e.g. "AccessRestrictions") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
 	NullFields []string `json:"-"`
 }
 
@@ -3413,14 +3523,14 @@ type WorkforcePoolProvider struct {
 	// keywords may be referenced in the expressions: * `assertion`: JSON
 	// representing the authentication credential issued by the provider. *
 	// `google`: The Google attributes mapped from the assertion in the
-	// `attribute_mappings`. `google.profile_photo` and
-	// `google.display_name` are not supported. * `attribute`: The custom
-	// attributes mapped from the assertion in the `attribute_mappings`. The
-	// maximum length of the attribute condition expression is 4096
-	// characters. If unspecified, all valid authentication credentials will
-	// be accepted. The following example shows how to only allow
-	// credentials with a mapped `google.groups` value of `admins`: ```
-	// "'admins' in google.groups" ```
+	// `attribute_mappings`. `google.profile_photo`, `google.display_name`
+	// and `google.posix_username` are not supported. * `attribute`: The
+	// custom attributes mapped from the assertion in the
+	// `attribute_mappings`. The maximum length of the attribute condition
+	// expression is 4096 characters. If unspecified, all valid
+	// authentication credentials will be accepted. The following example
+	// shows how to only allow credentials with a mapped `google.groups`
+	// value of `admins`: ``` "'admins' in google.groups" ```
 	AttributeCondition string `json:"attributeCondition,omitempty"`
 
 	// AttributeMapping: Required. Maps attributes from the authentication
@@ -3441,15 +3551,18 @@ type WorkforcePoolProvider struct {
 	// specifies the authenticated user's thumbnail photo. This is an
 	// optional field. When set, the image will be visible as the user's
 	// profile picture. If not set, a generic user icon will be displayed
-	// instead. This attribute cannot be referenced in IAM bindings. You can
-	// also provide custom attributes by specifying
-	// `attribute.{custom_attribute}`, where {custom_attribute} is the name
-	// of the custom attribute to be mapped. You can define a maximum of 50
-	// custom attributes. The maximum length of a mapped attribute key is
-	// 100 characters, and the key may only contain the characters
-	// [a-z0-9_]. You can reference these attributes in IAM policies to
-	// define fine-grained access for a workforce pool to Google Cloud
-	// resources. For example: * `google.subject`:
+	// instead. This attribute cannot be referenced in IAM bindings. *
+	// `google.posix_username`: The linux username used by OS login. This is
+	// an optional field and the mapped posix username cannot exceed 32
+	// characters, The key must match the regex "^a-zA-Z0-9._{0,31}$". This
+	// attribute cannot be referenced in IAM bindings. You can also provide
+	// custom attributes by specifying `attribute.{custom_attribute}`, where
+	// {custom_attribute} is the name of the custom attribute to be mapped.
+	// You can define a maximum of 50 custom attributes. The maximum length
+	// of a mapped attribute key is 100 characters, and the key may only
+	// contain the characters [a-z0-9_]. You can reference these attributes
+	// in IAM policies to define fine-grained access for a workforce pool to
+	// Google Cloud resources. For example: * `google.subject`:
 	// `principal://iam.googleapis.com/locations/global/workforcePools/{pool}
 	// /subject/{value}` * `google.groups`:
 	// `principalSet://iam.googleapis.com/locations/global/workforcePools/{po

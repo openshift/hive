@@ -19,6 +19,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1osp "github.com/openshift/hive/apis/hive/v1/openstack"
 	testfake "github.com/openshift/hive/pkg/test/fake"
+	testmp "github.com/openshift/hive/pkg/test/machinepool"
 
 	clientconfig "github.com/gophercloud/utils/openstack/clientconfig"
 )
@@ -246,8 +247,8 @@ func validateOSPMachineSets(t *testing.T, mSets []*machinev1beta1.MachineSet, ex
 	}
 }
 
-func testOSPPool() *hivev1.MachinePool {
-	p := testMachinePool()
+func testOSPPool(opts ...testmp.Option) *hivev1.MachinePool {
+	p := testMachinePool(opts...)
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
 		OpenStack: &hivev1osp.MachinePool{
 			Flavor: "Flav",

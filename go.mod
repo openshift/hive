@@ -11,8 +11,8 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/IBM/go-sdk-core/v5 v5.16.3
 	github.com/IBM/networking-go-sdk v0.45.0
-	github.com/IBM/platform-services-go-sdk v0.61.3
-	github.com/IBM/vpc-go-sdk v0.49.1
+	github.com/IBM/platform-services-go-sdk v0.62.0
+	github.com/IBM/vpc-go-sdk v0.50.0
 	github.com/aws/aws-sdk-go v1.50.25
 	github.com/blang/semver/v4 v4.0.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -42,7 +42,7 @@ require (
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 	github.com/openshift/generic-admission-server v1.14.1-0.20231020105858-8dcc3c9b298f
 	github.com/openshift/hive/apis v0.0.0
-	github.com/openshift/installer v0.9.0-master.0.20240327042757-ca7135891152
+	github.com/openshift/installer v0.9.0-master.0.20240405164943-304af6735c65
 	github.com/openshift/library-go v0.0.0-20240207105404-126b47137408
 	github.com/openshift/machine-api-operator v0.2.1-0.20230929171041-2cc7fcf262f3
 	github.com/openshift/machine-api-provider-gcp v0.0.1-0.20231014045125-6096cc86f3ba
@@ -140,7 +140,7 @@ require (
 	4d63.com/gochecknoglobals v0.2.1 // indirect
 	github.com/AlecAivazis/survey/v2 v2.3.5 // indirect
 	github.com/Antonboom/errname v0.1.12 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.4.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5 v5.5.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.23 // indirect

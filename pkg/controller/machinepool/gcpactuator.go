@@ -194,6 +194,10 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 		computePool.Platform.GCP.SecureBoot = secureBoot
 	}
 
+	if ohm := poolGCP.OnHostMaintenance; ohm != "" {
+		computePool.Platform.GCP.OnHostMaintenance = ohm
+	}
+
 	if poolGCP.OSDisk.DiskType != "" {
 		computePool.Platform.GCP.OSDisk.DiskType = poolGCP.OSDisk.DiskType
 	}

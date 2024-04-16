@@ -25,6 +25,14 @@ type MachinePool struct {
 	// +kubebuilder:validation:Enum=Enabled;Disabled
 	// +optional
 	SecureBoot string `json:"secureBoot,omitempty"`
+
+	// OnHostMaintenance determines the behavior when a maintenance event occurs that might cause the instance to reboot.
+	// This is required to be set to "Terminate" if you want to provision machine with attached GPUs.
+	// Otherwise, allowed values are "Migrate" and "Terminate".
+	// If omitted, the platform chooses a default, which is subject to change over time, currently that default is "Migrate".
+	// +kubebuilder:validation:Enum=Migrate;Terminate;
+	// +optional
+	OnHostMaintenance string `json:"onHostMaintenance,omitempty"`
 }
 
 // OSDisk defines the disk for machines on GCP.

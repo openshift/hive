@@ -211,6 +211,34 @@ func TestGCPActuator(t *testing.T) {
 				generateGCPMachineSetName("worker", "zone1"): 3,
 			},
 		},
+		{
+			name: "generate machinesets with OnHostMaintenance=Terminate",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.OnHostMaintenance = "Terminate"
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
+		{
+			name: "generate machinesets with OnHostMaintenance=Migrate",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.OnHostMaintenance = "Migrate"
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -307,6 +335,11 @@ func TestGCPActuator(t *testing.T) {
 						assert.Equal(t, sb, string(gcpProvider.ShieldedInstanceConfig.SecureBoot))
 					} else {
 						assert.Equal(t, "", string(gcpProvider.ShieldedInstanceConfig.SecureBoot))
+					}
+
+					// OnHostMaintenance
+					if ohm := platform.OnHostMaintenance; ohm != "" {
+						assert.Equal(t, ohm, string(gcpProvider.OnHostMaintenance))
 					}
 				}
 			}

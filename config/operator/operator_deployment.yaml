@@ -26,6 +26,9 @@ spec:
         control-plane: hive-operator
         controller-tools.k8s.io: "1.0"
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        kubernetes.io/os: linux
       serviceAccountName: hive-operator
       volumes:
       - name: kubectl-cache

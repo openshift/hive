@@ -7554,6 +7554,9 @@ objects:
             name: kubectl-cache
           - mountPath: /tmp
             name: tmp
+        nodeSelector:
+          kubernetes.io/arch: amd64
+          kubernetes.io/os: linux
         serviceAccountName: hive-operator
         terminationGracePeriodSeconds: 10
         volumes:

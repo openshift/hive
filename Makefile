@@ -303,6 +303,10 @@ docker-dev-push: build image-hive-fedora-dev docker-push
 buildah-dev-build:
 	buildah bud --ulimit nofile=10239:10240 -f ./Dockerfile --tag ${IMG}
 
+.PHONY: podman-dev-build
+podman-dev-build:
+	podman build --tag ${IMG} --ulimit nofile=10239:10240 -f ./Dockerfile .
+
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push
 buildah-dev-push: buildah-dev-build

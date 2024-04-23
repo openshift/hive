@@ -161,13 +161,17 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	// if we are still provisioning...
 	if clusterInstallStopped.Status != corev1.ConditionTrue && clusterInstallCompleted.Status != corev1.ConditionTrue && clusterInstallFailed.Status != corev1.ConditionTrue {
 		// let the end user know
-		conditions, statusModified = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
+		changedProvisionedCondition := false
+		conditions, changedProvisionedCondition = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionFalse,
 			hivev1.ProvisionedReasonProvisioning,
 			"Provisioning in progress",
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
+		if changedProvisionedCondition {
+			statusModified = true
+		}
 	}
 
 	// if the cluster install has very recently become stopped...

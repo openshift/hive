@@ -370,7 +370,10 @@ func InstallerPodSpec(
 
 // GenerateInstallerJob creates a job to install an OpenShift cluster
 // given a ClusterDeployment and an installer image.
-func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, error) {
+func GenerateInstallerJob(
+	provision *hivev1.ClusterProvision,
+	nodeSelector map[string]string,
+	tolerations []corev1.Toleration) (*batchv1.Job, error) {
 
 	pLog := log.WithFields(log.Fields{
 		"clusterProvision": provision.Name,
@@ -384,6 +387,10 @@ func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, err
 		labels = map[string]string{}
 	}
 	labels[constants.InstallJobLabel] = "true"
+
+	podSpec := provision.Spec.PodSpec
+	podSpec.NodeSelector = nodeSelector
+	podSpec.Tolerations = tolerations
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -399,7 +406,7 @@ func GenerateInstallerJob(provision *hivev1.ClusterProvision) (*batchv1.Job, err
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 				},
-				Spec: provision.Spec.PodSpec,
+				Spec: podSpec,
 			},
 		},
 	}
@@ -422,7 +429,9 @@ func GetUninstallJobName(name string) string {
 func GenerateUninstallerJobForDeprovision(
 	req *hivev1.ClusterDeprovision,
 	serviceAccountName, httpProxy, httpsProxy, noProxy string,
-	extraEnvVars []corev1.EnvVar) (*batchv1.Job, error) {
+	extraEnvVars []corev1.EnvVar,
+	nodeSelector map[string]string,
+	tolerations []corev1.Toleration) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
 
@@ -430,6 +439,8 @@ func GenerateUninstallerJobForDeprovision(
 		DNSPolicy:          corev1.DNSClusterFirst,
 		RestartPolicy:      restartPolicy,
 		ServiceAccountName: serviceAccountName,
+		NodeSelector:       nodeSelector,
+		Tolerations:        tolerations,
 	}
 
 	completions := int32(1)

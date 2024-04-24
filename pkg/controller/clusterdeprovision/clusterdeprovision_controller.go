@@ -140,12 +140,31 @@ type ReconcileClusterDeprovision struct {
 	client.Client
 	scheme               *runtime.Scheme
 	deprovisionsDisabled bool
+
+	// nodeSelector is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	nodeSelector *map[string]string
+
+	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	tolerations *[]corev1.Toleration
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeprovision object and makes changes based on the state read
 // and what is in the ClusterDeprovision.Spec
 func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	rLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeprovision", request.NamespacedName)
+
+	// Discover scheduling settings from the controller. We would like to do this in newReconciler,
+	// but we can't count on the cache having been started at that point.
+	if r.nodeSelector == nil || r.tolerations == nil {
+		thisPod, err := controllerutils.GetThisPod(r)
+		if err != nil {
+			rLog.WithError(err).Error("Failed to retrieve the running pod")
+			return reconcile.Result{}, err
+		}
+		r.nodeSelector = &thisPod.Spec.NodeSelector
+		r.tolerations = &thisPod.Spec.Tolerations
+	}
+
 	// For logging, we need to see when the reconciliation loop starts and ends.
 	rLog.Info("reconciling cluster deprovision request")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, rLog)
@@ -292,7 +311,9 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		os.Getenv("HTTP_PROXY"),
 		os.Getenv("HTTPS_PROXY"),
 		os.Getenv("NO_PROXY"),
-		extraEnvVars)
+		extraEnvVars,
+		*r.nodeSelector,
+		*r.tolerations)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

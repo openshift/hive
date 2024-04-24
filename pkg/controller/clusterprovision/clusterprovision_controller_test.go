@@ -272,6 +272,8 @@ func TestClusterProvisionReconcile(t *testing.T) {
 				scheme:       scheme,
 				logger:       logger,
 				expectations: controllerExpectations,
+				nodeSelector: &map[string]string{},
+				tolerations:  &[]corev1.Toleration{},
 			}
 
 			reconcileRequest := reconcile.Request{
@@ -348,7 +350,7 @@ func testProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
 
 func testJob(opts ...testjob.Option) *batchv1.Job {
 	provision := testProvision()
-	job, err := install.GenerateInstallerJob(provision)
+	job, err := install.GenerateInstallerJob(provision, map[string]string{}, []corev1.Toleration{})
 	if err != nil {
 		panic("should not error while generating test install job")
 	}
@@ -558,8 +560,10 @@ compute:
 			}
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(icSecret).Build()
 			rcp := &ReconcileClusterProvision{
-				Client: fakeClient,
-				logger: logger,
+				Client:       fakeClient,
+				logger:       logger,
+				nodeSelector: &map[string]string{},
+				tolerations:  &[]corev1.Toleration{},
 			}
 
 			if got := rcp.getWorkers(*cd); got != test.want {

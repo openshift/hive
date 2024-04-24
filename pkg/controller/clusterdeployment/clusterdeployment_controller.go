@@ -280,12 +280,31 @@ type ReconcileClusterDeployment struct {
 	releaseImageVerifier verify.Interface
 
 	protectedDelete bool
+
+	// nodeSelector is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	nodeSelector *map[string]string
+
+	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	tolerations *[]corev1.Toleration
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
 // and what is in the ClusterDeployment.Spec
 func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
+
+	// Discover scheduling settings from the controller. We would like to do this in NewReconciler,
+	// but we can't count on the cache having been started at that point.
+	if r.nodeSelector == nil || r.tolerations == nil {
+		thisPod, err := controllerutils.GetThisPod(r)
+		if err != nil {
+			cdLog.WithError(err).Error("Failed to retrieve the running pod")
+			return reconcile.Result{}, err
+		}
+		r.nodeSelector = &thisPod.Spec.NodeSelector
+		r.tolerations = &thisPod.Spec.Tolerations
+	}
+
 	cdLog.Info("reconciling cluster deployment")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, cdLog)
 	defer recobsrv.ObserveControllerReconcileTime()
@@ -1017,7 +1036,9 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		job := imageset.GenerateImageSetJob(cd, releaseImage, controllerutils.InstallServiceAccountName,
 			os.Getenv("HTTP_PROXY"),
 			os.Getenv("HTTPS_PROXY"),
-			os.Getenv("NO_PROXY"))
+			os.Getenv("NO_PROXY"),
+			*r.nodeSelector,
+			*r.tolerations)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)

@@ -484,6 +484,14 @@ const (
 	// for the cluster.
 	AWSPrivateLinkFailedClusterDeploymentCondition ClusterDeploymentConditionType = "AWSPrivateLinkFailed"
 
+	// PrivateLinkReadyClusterDeploymentCondition is true when private link access has been
+	// setup for the cluster.
+	PrivateLinkReadyClusterDeploymentCondition ClusterDeploymentConditionType = "PrivateLinkReady"
+
+	// PrivateLinkFailedClusterDeploymentCondition is true controller fails to setup private link access
+	// for the cluster.
+	PrivateLinkFailedClusterDeploymentCondition ClusterDeploymentConditionType = "PrivateLinkFailed"
+
 	// These are conditions that are copied from ClusterInstall on to the ClusterDeployment object.
 	ClusterInstallFailedClusterDeploymentCondition          ClusterDeploymentConditionType = "ClusterInstallFailed"
 	ClusterInstallCompletedClusterDeploymentCondition       ClusterDeploymentConditionType = "ClusterInstallCompleted"

@@ -94,6 +94,10 @@ type HiveConfigSpec struct {
 	// +optional
 	DeploymentConfig *[]DeploymentConfig `json:"deploymentConfig,omitempty"`
 
+	// PrivateLink is used to configure the privatelink controller.
+	// +optional
+	PrivateLink *PrivateLinkConfig `json:"privateLink,omitempty"`
+
 	// AWSPrivateLink defines the configuration for the aws-private-link controller.
 	// It provides 3 major pieces of information required by the controller,
 	// 1. The Credentials that should be used to create AWS PrivateLink resources other than
@@ -192,6 +196,11 @@ type AWSPrivateLinkConfig struct {
 	// +kubebuilder:default=Alias
 	// +optional
 	DNSRecordType AWSPrivateLinkDNSRecordType `json:"dnsRecordType,omitempty"`
+}
+
+// PrivateLinkConfig defines the configuration for the privatelink controller.
+type PrivateLinkConfig struct {
+	AWS *AWSPrivateLinkConfig `json:"aws,omitempty"`
 }
 
 // AWSPrivateLinkDNSRecordType defines what type of DNS record should be created in Private Hosted Zone
@@ -581,6 +590,7 @@ const (
 	MetricsControllerName              ControllerName = "metrics"
 	ClustersyncControllerName          ControllerName = "clustersync"
 	AWSPrivateLinkControllerName       ControllerName = "awsprivatelink"
+	PrivateLinkControllerName          ControllerName = "privatelink"
 	HiveControllerName                 ControllerName = "hive"
 
 	// DeprecatedRemoteMachinesetControllerName was deprecated but can be used to disable the

@@ -392,3 +392,16 @@ func SafeDelete(cl client.Client, ctx context.Context, obj client.Object) error 
 	rv := obj.GetResourceVersion()
 	return cl.Delete(ctx, obj, client.Preconditions{ResourceVersion: &rv})
 }
+
+func GetThisPod(cl client.Client) (*corev1.Pod, error) {
+	podName := os.Getenv("POD_NAME")
+	podNamespace := os.Getenv("POD_NAMESPACE")
+	if podName == "" || podNamespace == "" {
+		return nil, fmt.Errorf("missing POD_NAME (%q) and/or POD_NAMESPACE (%q) env", podName, podNamespace)
+	}
+	po := &corev1.Pod{}
+	if err := cl.Get(context.TODO(), types.NamespacedName{Namespace: podNamespace, Name: podName}, po); err != nil {
+		return nil, err
+	}
+	return po, nil
+}

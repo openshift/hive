@@ -29,7 +29,11 @@ func init() {
 
 func TestGenerateDeprovision(t *testing.T) {
 	dr := testClusterDeprovision()
-	job, err := GenerateUninstallerJobForDeprovision(dr, "someseviceaccount", testHttpProxy, testHttpsProxy, testNoProxy, nil)
+	job, err := GenerateUninstallerJobForDeprovision(
+		dr, "someseviceaccount",
+		testHttpProxy, testHttpsProxy, testNoProxy,
+		nil,
+		map[string]string{}, []corev1.Toleration{})
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)

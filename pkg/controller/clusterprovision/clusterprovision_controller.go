@@ -130,12 +130,31 @@ type ReconcileClusterProvision struct {
 	logger log.FieldLogger
 	// A TTLCache of job creates each clusterprovision expects to see
 	expectations controllerutils.ExpectationsInterface
+
+	// nodeSelector is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	nodeSelector *map[string]string
+
+	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	tolerations *[]corev1.Toleration
 }
 
 // Reconcile reads that state of the cluster for a ClusterProvision object and makes changes based on the state read
 // and what is in the ClusterProvision.Spec
 func (r *ReconcileClusterProvision) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	pLog := controllerutils.BuildControllerLogger(ControllerName, "clusterProvision", request.NamespacedName)
+
+	// Discover scheduling settings from the controller. We would like to do this in newReconciler,
+	// but we can't count on the cache having been started at that point.
+	if r.nodeSelector == nil || r.tolerations == nil {
+		thisPod, err := controllerutils.GetThisPod(r)
+		if err != nil {
+			pLog.WithError(err).Error("Failed to retrieve the running pod")
+			return reconcile.Result{}, err
+		}
+		r.nodeSelector = &thisPod.Spec.NodeSelector
+		r.tolerations = &thisPod.Spec.Tolerations
+	}
+
 	pLog.Info("reconciling cluster provision")
 	recobsrv := hivemetrics.NewReconcileObserver(ControllerName, pLog)
 	defer recobsrv.ObserveControllerReconcileTime()
@@ -216,7 +235,7 @@ func (r *ReconcileClusterProvision) reconcileNewProvision(instance *hivev1.Clust
 }
 
 func (r *ReconcileClusterProvision) createJob(instance *hivev1.ClusterProvision, pLog log.FieldLogger) (reconcile.Result, error) {
-	job, err := install.GenerateInstallerJob(instance)
+	job, err := install.GenerateInstallerJob(instance, *r.nodeSelector, *r.tolerations)
 	if err != nil {
 		pLog.WithError(err).Error("error generating install job")
 		return reconcile.Result{}, err

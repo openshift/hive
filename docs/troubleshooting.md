@@ -1,5 +1,8 @@
 # Troubleshooting
 
+- [ClusterDeployment status conditions](#clusterdeployment-status-conditions)
+  - [Cluster Install fails](#cluster-install-fails)
+  - [Hibernation](#hibernation)
 - [Cluster Install Failure Logs](#cluster-install-failure-logs)
   - [Setup](#setup)
   - [Listing stored install logs directories](#listing-stored-install-logs-directories)
@@ -9,6 +12,24 @@
 - [Cluster's API Certificate Changed](#clusters-api-certificate-changed)
   - [Updating Certificate Authorities within the Admin Kubeconfig Secret](#updating-certificate-authorities-within-the-admin-kubeconfig-secret)
   - [Setting a new CA certificate globally on the managing cluster with hiveconfig](#setting-a-new-ca-certificate-globally-on-the-managing-cluster-with-hiveconfig)
+
+## ClusterDeployment status conditions
+
+The best way of gathering the initial information about the cluster would be to look at the `clusterdeployment.status.conditions[]`. Hive always attempts to bubble up the errors as a part of the relevant `condition.reason` and `condition.message`
+There are 20+ clusterdeployment conditions, so to make parsing easier, these conditions are always sorted  in undesired > desired > initialized/unknown state. This means,  all the conditions which indicate a status that could potentially point at an error will be at the top. Furthermore, within the 3 subtypes, all conditions will also be sorted in alphabetical order of their `condition.type`
+
+### Cluster Install fails
+
+In the event of Cluster install failing:
+
+- `RequirementsMet` condition set as true would indicate that all pre-provision requirements have been met
+- `ProvisionFailed` condition would indicate if the provision has failed. Installer logs will be available in the hive container of the related clusterProvision pod. For logs from the cluster itself, see [Cluster Install Failure Logs](#cluster-install-failure-logs)
+- `ProvisionStopped` set to true will indicate that a provision will no longer be attempted.
+
+### Hibernation
+
+For clusters that do support [hibernation](./hibernating-clusters.md), `Hibernating` and `Ready` conditions work in tandem to report the accurate status when the cluster is transitioning from one powerState to another. In case the transition is taking too long, look at the `clusterDeployment.status.powerState` as well as the reason+message of these conditions.
+Note: when the cluster is hibernating, the `Unreachable` condition is expected to be set to true.
 
 ## Cluster Install Failure Logs
 

@@ -28,7 +28,7 @@ In the event of Cluster install failing:
 
 ### Hibernation
 
-For clusters that do support [hibernation](./hibernating-clusters.md), `Hibernating` and `Ready` conditions work in tandem to report the accurate status when the cluster is transitioning from one powerState to another. In case the transition is taking too long, look at the `clusterDeployment.powerState` as well as the reason+message of these conditions.
+For clusters that do support [hibernation](./hibernating-clusters.md), `Hibernating` and `Ready` conditions work in tandem to report the accurate status when the cluster is transitioning from one powerState to another. In case the transition is taking too long, look at the `clusterDeployment.status.powerState` as well as the reason+message of these conditions.
 Note: when the cluster is hibernating, the `Unreachable` condition is expected to be set to true.
 
 ## Cluster Install Failure Logs

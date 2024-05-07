@@ -55,6 +55,7 @@ const (
 	targetGroupNotFound                     = "level=error msg=Error: error updating LB Target Group (arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd) tags: error tagging resource (arn:aws:elasticloadbalancing:us-east-1:0123445698:targetgroup/aaaabbbbcccc/dddd): TargetGroupNotFound: Target groups 'arn:aws:elasticloadbalancing:us-east-1:xxxx:targetgroup/aaaabbbbcccc/dddd' not found"
 	errorCreatingNLB                        = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Error: Error creating network Load Balancer: InternalFailure: \""
 	terraformFailedDelete                   = "level=fatal msg=terraform destroy: failed to destroy using Terraform"
+	terraformFailedDestroy                  = "level=error\nlevel=fatal msg=terraform destroy: failed doing terraform destroy: exit status 1\n"
 	noMatchLog                              = "an example of something that doesn't match the log regexes"
 	bootstrapFailed                         = "time=\"2022-01-27T03:33:08Z\" level=error msg=\"Failed to wait for bootstrapping to complete. This error usually happens when there is a problem with control plane hosts that prevents the control plane operators from creating the control plane.\""
 	awsDeniedByScp                          = "AccessDenied: entity is not authorized to perform: iam:PressTheButton on resource: Thing with an explicit deny in a service control policy"
@@ -448,6 +449,11 @@ func TestParseInstallLog(t *testing.T) {
 		{
 			name:           "ErrorDestroyingBootstrapResources",
 			log:            pointer.String(terraformFailedDelete),
+			expectedReason: "InstallerFailedToDestroyResources",
+		},
+		{
+			name:           "AltErrorDestroyingBootstrapResources",
+			log:            pointer.String(terraformFailedDestroy),
 			expectedReason: "InstallerFailedToDestroyResources",
 		},
 		{

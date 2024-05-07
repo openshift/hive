@@ -1867,6 +1867,7 @@ data:
     - name: TerraformFailedToDeleteResources
       searchRegexStrings:
         - "terraform destroy: failed to destroy using Terraform"
+        - "terraform destroy: failed doing terraform destroy"
       installFailingReason: InstallerFailedToDestroyResources
       installFailingMessage: The installer failed to destroy installation resources
     - name: AWSAccountBlocked

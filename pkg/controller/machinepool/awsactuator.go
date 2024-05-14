@@ -309,8 +309,14 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 	if providerConfig.Subnet.ID == nil {
 		providerConfig.Subnet = machineapi.AWSResourceReference{
 			Filters: []machineapi.Filter{{
-				Name:   "tag:Name",
-				Values: []string{fmt.Sprintf("%s-private-%s", infraID, providerConfig.Placement.AvailabilityZone)},
+				Name: "tag:Name",
+				Values: []string{
+					// Legacy terraform -- should be harmless for newer CAPI-based clusters.
+					// TODO: Remove when the last non-CAPI-mandatory release is EOL.
+					fmt.Sprintf("%s-private-%s", infraID, providerConfig.Placement.AvailabilityZone),
+					// Newer CAPA -- should be harmless for older/non-CAPI-based clusters.
+					fmt.Sprintf("%s-subnet-private-%s", infraID, providerConfig.Placement.AvailabilityZone),
+				},
 			}},
 		}
 	}

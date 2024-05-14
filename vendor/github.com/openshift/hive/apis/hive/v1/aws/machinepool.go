@@ -13,7 +13,8 @@ type MachinePoolPlatform struct {
 	// private and one public subnet for each availability zone. In this case, the public
 	// subnets will be filtered out and only the private subnets will be used.
 	// If empty/omitted, we will look for subnets in each availability zone tagged with
-	// Name=<clusterID>-private-<az>.
+	// Name=<clusterID>-private-<az> (legacy terraform) or <clusterID>-subnet-private-<az>
+	// (CAPA).
 	Subnets []string `json:"subnets,omitempty"`
 
 	// InstanceType defines the ec2 instance type.

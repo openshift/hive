@@ -56,6 +56,7 @@ in-cluster. This may improve in the future for some clouds.
   * AWS
   * Azure
   * GCP
+  * OpenStack (with [inventory](enhancements/clusterpool-inventory.md))
 
 ## Sample Cluster Pool
 

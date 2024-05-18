@@ -27,20 +27,21 @@ COPY --from=builder /go/src/github.com/openshift/hive/bin/operator /opt/services
 # by default so we must setup some permissions here.
 ENV HOME /home/hive
 RUN mkdir -p /home/hive && \
-    chgrp -R 0 /home/hive && \
-    chmod -R g=u /home/hive
+  chgrp -R 0 /home/hive && \
+  chmod -R g=u /home/hive
 
 # This is so that we can write source certificate anchors during container start up.
 RUN mkdir -p /etc/pki/ca-trust/source/anchors && \
-    chgrp -R 0 /etc/pki/ca-trust/source/anchors && \
-    chmod -R g=u /etc/pki/ca-trust/source/anchors
+  chgrp -R 0 /etc/pki/ca-trust/source/anchors && \
+  chmod -R g=u /etc/pki/ca-trust/source/anchors
 
 # This is so that we can run update-ca-trust during container start up.
 RUN mkdir -p /etc/pki/ca-trust/extracted/openssl && \
-    mkdir -p /etc/pki/ca-trust/extracted/pem && \
-    mkdir -p /etc/pki/ca-trust/extracted/java && \
-    chgrp -R 0 /etc/pki/ca-trust/extracted && \
-    chmod -R g=u /etc/pki/ca-trust/extracted
+  mkdir -p /etc/pki/ca-trust/extracted/pem && \
+  mkdir -p /etc/pki/ca-trust/extracted/java && \
+  chgrp -R 0 /etc/pki/ca-trust/extracted && \
+  chmod -R g=u /etc/pki/ca-trust/extracted
 
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]
+# Konflux not skip test

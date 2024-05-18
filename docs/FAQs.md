@@ -31,3 +31,5 @@ Hive is built to leverage the opinionated OpenShift 4 install process. This does
 `SyncSets` transfer per cluster certificates, identity providers, lists of dedicated admin usernames, etc. Pushing this up to a global `SelectorSyncSet` CRD complicates RBAC and potentially exposes us to reveal more information to someone than we wanted to. The distinction between the two offers better flexibility for RBAC in a multi-tenant use of Hive, and possibly better security as well.
 
 Please refer to [Issue 601](https://github.com/openshift/hive/issues/601) to get more detail.
+
+Testing Konflux

@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -66,6 +67,17 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	}
 
 	computePool := baseMachinePool(pool)
+
+	// HIVE-2476: Avoid nil pointer exception in upstream MachineSets() call.
+	// In master, this was remedied by revendoring to pull in the upstream fix. See:
+	// https://github.com/openshift/installer/pull/8227
+	// https://github.com/openshift/hive/pull/2253
+	// In older branches this would have pulled in too many chained dependencies, so
+	// we're just fixing it "locally".
+	if computePool.Replicas == nil {
+		computePool.Replicas = pointer.Int64(0)
+	}
+
 	computePool.Platform.OpenStack = &installertypesosp.MachinePool{
 		FlavorName: pool.Spec.Platform.OpenStack.Flavor,
 		// The installer's MachinePool-to-MachineSet function will distribute the generated

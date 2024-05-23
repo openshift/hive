@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -563,9 +564,23 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 		logger.WithError(err).Errorf("unable to parse generated MachineSet %v provider config", gMS.Name)
 		return false, err
 	}
-	fd1 := rMS_providerconfig.ExtractFailureDomain()
-	fd2 := gMS_providerconfig.ExtractFailureDomain()
-	return fd1.Equal(fd2), nil
+	rfd := rMS_providerconfig.ExtractFailureDomain()
+	gfd := gMS_providerconfig.ExtractFailureDomain()
+
+	rfdtype, gfdtype := rfd.Type(), gfd.Type()
+	// This should never happen
+	if rfdtype != gfdtype {
+		return false, errors.Errorf("Unexpectedly got differing failure domain types for remote (%s) and generated (%s) MachineSets!", rfdtype, gfdtype)
+	}
+	// HIVE-2443: Special case for AWS: Failure domains for AWS contain a subnet which may be
+	// described by ID, ARN, or Filters. These can't be reliably compared. However, MachineSets are
+	// generated/named based only on the AZ name, so we'll just compare that and ignore the subnet.
+	if rfdtype == configv1.AWSPlatformType { // only necessary to check one since we verified they're equal above
+		return rfd.AWS().Placement.AvailabilityZone == gfd.AWS().Placement.AvailabilityZone, nil
+	}
+
+	// Otherwise the FailureDomain should be unambiguous and we can just compare them.
+	return rfd.Equal(gfd), nil
 }
 
 // matchMachineSets decides whether gMS ("generated MachineSet") and rMS ("remote MachineSet" -- the one already extant

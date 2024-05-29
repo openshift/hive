@@ -755,8 +755,8 @@ data:
           {
             "current": {
               "selected": false,
-              "text": "appsrep05ue1-prometheus",
-              "value": "appsrep05ue1-prometheus"
+              "text": "appsrep09ue1-prometheus",
+              "value": "appsrep09ue1-prometheus"
             },
             "hide": 0,
             "includeAll": false,
@@ -766,7 +766,7 @@ data:
             "query": "prometheus",
             "queryValue": "",
             "refresh": 1,
-            "regex": "^(?!.*cluster)(?=.*(hive|app-sre-prod-01|appsrep05ue1))(.*)$",
+            "regex": "^(?!.*cluster)(?=.*(hive|app-sre-prod-01|appsrep09ue1))(.*)$",
             "skipUrlSync": false,
             "type": "datasource"
           },

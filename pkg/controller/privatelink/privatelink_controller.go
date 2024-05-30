@@ -182,6 +182,11 @@ func (r *ReconcilePrivateLink) Reconcile(ctx context.Context, request reconcile.
 	var privateLinkEnabled bool
 	var spokePlatformType configv1.PlatformType
 	switch {
+	case cd.Spec.Platform.AWS != nil:
+		spokePlatformType = configv1.AWSPlatformType
+		if cd.Spec.Platform.AWS.PrivateLink != nil {
+			privateLinkEnabled = cd.Spec.Platform.AWS.PrivateLink.Enabled
+		}
 	case cd.Spec.Platform.GCP != nil:
 		spokePlatformType = configv1.GCPPlatformType
 	//	if cd.Spec.Platform.GCP.PrivateLink != nil {
@@ -311,6 +316,9 @@ func (r *ReconcilePrivateLink) GetActuator(platform configv1.PlatformType, actua
 		}
 		if actuatorType == actuator.ActuatorTypeHub {
 			return awsactuator.NewAWSHubActuator(&r.Client, awsConfig, logger)
+		}
+		if actuatorType == actuator.ActuatorTypeLink {
+			return awsactuator.NewAWSLinkActuator(&r.Client, awsConfig, logger)
 		}
 		return nil, fmt.Errorf("unable to create privatelink actuator, invalid actuator type: %s/%s", platform, actuatorType)
 	}

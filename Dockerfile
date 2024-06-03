@@ -4,7 +4,7 @@ WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN make build
 
-FROM quay.io/centos/centos:stream
+FROM quay.io/centos/centos:stream9
 
 ARG DNF=dnf
 

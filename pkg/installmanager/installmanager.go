@@ -205,7 +205,6 @@ SSH_PRIV_KEY_PATH: File system path of a file containing the SSH private key cor
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	flags.StringVar(&im.LogsDir, "logs-dir", "/logs", "directory to use for all installer logs")
 
-	cmd.AddCommand(NewInstallManagerAWSCredentials())
 	return cmd
 }
 

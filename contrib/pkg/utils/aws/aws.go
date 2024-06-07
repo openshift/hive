@@ -262,8 +262,6 @@ func ConfigureCreds(c client.Client) {
 		utils.ProjectToDir(credsSecret, constants.AWSCredsMount, constants.AWSConfigSecretKey)
 		os.Setenv("AWS_CONFIG_FILE", filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey))
 	}
-	// Allow credential_process in the config file
-	os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
 	// Install cluster proxy trusted CA bundle
 	utils.InstallCerts(constants.TrustedCABundleDir)
 }

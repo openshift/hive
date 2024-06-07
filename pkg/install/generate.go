@@ -73,23 +73,40 @@ func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, en
 	return controllerutils.CopySecret(client, src, dest, owner, scheme)
 }
 
-// AWSAssumeRoleCLIConfig creates a secret that can assume the role using the hiveutil
-// credential_process helper.
-func AWSAssumeRoleCLIConfig(client client.Client, role *hivev1aws.AssumeRole, secretName, secretNamespace string, owner metav1.Object, scheme *runtime.Scheme) error {
-	cmd := "/usr/bin/hiveutil"
-	args := []string{"install-manager", "aws-credentials"}
-	args = append(args, []string{"--namespace", secretNamespace}...)
-	args = append(args, []string{"--role-arn", role.RoleARN}...)
+// AWSAssumeRoleConfig creates a secret with an AWS credentials file containing:
+// - Role configuration for AssumeRole, pointing to...
+// - A profile containing the source credentials for AssumeRole.
+func AWSAssumeRoleConfig(client client.Client, role *hivev1aws.AssumeRole, secretName, secretNamespace string, owner metav1.Object, scheme *runtime.Scheme) error {
+
+	// Credentials source
+	credsSecret := &corev1.Secret{}
+	if err := client.Get(
+		context.TODO(),
+		types.NamespacedName{
+			Namespace: secretNamespace,
+			// TODO: DRY this string construction
+			Name: fmt.Sprintf("%s-%s", owner.GetName(), os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)),
+		},
+		credsSecret); err != nil {
+		return err
+	}
+	// The old credential_process flow documented creating this with [default].
+	// For backward compatibility, accept that, but convert to [profile source].
+	sourceProfile := strings.Replace(string(credsSecret.Data[constants.AWSConfigSecretKey]), `[default]`, `[profile source]`, 1)
+
+	extID := ""
 	if role.ExternalID != "" {
-		args = append(args, []string{"--external-id", role.ExternalID}...)
+		extID = fmt.Sprintf("external_id = %s\n", role.ExternalID)
 	}
 
-	cmd = fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))
-
-	template := `[default]
-credential_process = %s
-`
-	data := fmt.Sprintf(template, cmd)
+	// Build the config file
+	configFile := fmt.Sprintf(`[default]
+source_profile = source
+role_arn = %s
+%s
+%s
+`,
+		role.RoleARN, extID, sourceProfile)
 
 	secret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -101,9 +118,10 @@ credential_process = %s
 			Name:      secretName,
 		},
 		Data: map[string][]byte{
-			constants.AWSConfigSecretKey: []byte(data),
+			constants.AWSConfigSecretKey: []byte(configFile),
 		},
 	}
+
 	if err := controllerutil.SetOwnerReference(owner, secret, scheme); err != nil {
 		return nil
 	}

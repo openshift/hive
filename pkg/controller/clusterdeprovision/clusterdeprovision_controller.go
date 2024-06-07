@@ -457,6 +457,6 @@ func (r *ReconcileClusterDeprovision) setupAWSCredentialForAssumeRole(cd *hivev1
 		return nil
 	}
 
-	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
+	return install.AWSAssumeRoleConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
 
 }

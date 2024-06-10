@@ -615,7 +615,7 @@ ibmcloud:
   type: bx2-4x16
 ```
 
-For vSphere, replace the contents of `spec.platform` with the settings you want for the instances:
+For vSphere, replace the contents of `spec.platform` with the settings you want for the instances. Note that static IPs are not supported.
 ```yaml
 vsphere:
   coresPerSocket: 1

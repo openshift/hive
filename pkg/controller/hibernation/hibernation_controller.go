@@ -271,8 +271,12 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 			var installedSince, runningSince, claimedSince time.Time
 			var isRunning bool
 
-			installedSince = cd.Status.InstalledTimestamp.Time
-			hibLog = hibLog.WithField("installedSince", installedSince)
+			// This really shouldn't happen because InstalledTimestamp should have been applied even for adopted clusters.
+			// This check is only for the event this code-path is hit before the clusterdeployment controller reconcile has had a chance to update it.
+			if cd.Status.InstalledTimestamp != nil {
+				installedSince = cd.Status.InstalledTimestamp.Time
+				hibLog = hibLog.WithField("installedSince", installedSince)
+			}
 
 			if poolRef != nil && poolRef.ClaimedTimestamp != nil {
 				claimedSince = poolRef.ClaimedTimestamp.Time

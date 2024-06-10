@@ -1068,6 +1068,13 @@ func TestHibernateAfter(t *testing.T) {
 			expectedConditionReason: hivev1.HibernatingReasonUnsupported,
 		},
 		{
+			name: "cluster due for hibernate, InstalledTimeStamp missing)",
+			cd: cdBuilder.Build(
+				testcd.WithHibernateAfter(8 * time.Hour)),
+			cs:                 csBuilder.Build(),
+			expectedPowerState: hivev1.ClusterPowerStateHibernating,
+		},
+		{
 			name: "cluster not yet due for hibernate older version", // cluster that has never been hibernated and thus has no running condition
 			cd: cdBuilder.Build(
 				testcd.WithHibernateAfter(8*time.Hour),

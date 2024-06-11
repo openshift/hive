@@ -42,6 +42,10 @@ type Builder interface {
 	// RESTConfig returns the config for a REST client that connects to the remote cluster.
 	RESTConfig() (*rest.Config, error)
 
+	// RESTConfigAndSecretVersion returns the config for a REST client that connects to the remote cluster,
+	// as well as the resource version of the admin kubeconfig secret.
+	RESTConfigAndSecretVersion() (*rest.Config, string, error)
+
 	// UsePrimaryAPIURL will use the primary API URL. If there is an API URL override, then that is the primary.
 	// Otherwise, the primary is the default API URL.
 	UsePrimaryAPIURL() Builder
@@ -133,7 +137,7 @@ func InitialURL(c client.Client, cd *hivev1.ClusterDeployment) (string, error) {
 		return "https://example.com/veryfakeapi", nil
 	}
 
-	cfg, err := unadulteratedRESTConfig(c, cd)
+	cfg, _, err := unadulteratedRESTConfigAndSecretVersion(c, cd)
 	if err != nil {
 		return "", err
 	}
@@ -258,9 +262,14 @@ func (b *builder) UseSecondaryAPIURL() Builder {
 }
 
 func (b *builder) RESTConfig() (*rest.Config, error) {
-	cfg, err := unadulteratedRESTConfig(b.c, b.cd)
+	config, _, err := b.RESTConfigAndSecretVersion()
+	return config, err
+}
+
+func (b *builder) RESTConfigAndSecretVersion() (*rest.Config, string, error) {
+	cfg, version, err := unadulteratedRESTConfigAndSecretVersion(b.c, b.cd)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	utils.AddControllerMetricsTransportWrapper(cfg, b.controllerName, true)
@@ -284,19 +293,20 @@ func (b *builder) RESTConfig() (*rest.Config, error) {
 		cfg.Proxy = machnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 
-	return cfg, nil
+	return cfg, version, nil
 }
 
-func unadulteratedRESTConfig(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, error) {
+func unadulteratedRESTConfigAndSecretVersion(c client.Client, cd *hivev1.ClusterDeployment) (*rest.Config, string, error) {
 	kubeconfigSecret := &corev1.Secret{}
 	if err := c.Get(
 		context.Background(),
 		client.ObjectKey{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name},
 		kubeconfigSecret,
 	); err != nil {
-		return nil, errors.Wrap(err, "could not get admin kubeconfig secret")
+		return nil, "", errors.Wrap(err, "could not get admin kubeconfig secret")
 	}
-	return restConfigFromSecret(kubeconfigSecret)
+	config, err := restConfigFromSecret(kubeconfigSecret)
+	return config, kubeconfigSecret.ObjectMeta.GetResourceVersion(), err
 }
 
 func restConfigFromSecret(kubeconfigSecret *corev1.Secret) (*rest.Config, error) {

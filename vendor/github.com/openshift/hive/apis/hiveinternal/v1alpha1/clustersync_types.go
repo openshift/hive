@@ -9,6 +9,12 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+const (
+	// FinalizerCachePurge is used on ClusterDeployments to ensure we remove cluster sync related
+	// entries from a cache before cleaning up the CD object.
+	FinalizerCachePurge string = "hive.openshift.io/clustersync-cache"
+)
+
 // ClusterSync is the status of all of the SelectorSyncSets and SyncSets that apply to a ClusterDeployment.
 // +k8s:openapi-gen=true
 // +kubebuilder:subresource:status

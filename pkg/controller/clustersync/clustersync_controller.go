@@ -183,13 +183,16 @@ func resourceHelperBuilderFunc(
 		return resource.NewFakeHelper(logger), nil
 	}
 
-	restConfig, err := remoteClusterAPIClientBuilderFunc(cd).RESTConfig()
+	restConfig, secretVersion, err := remoteClusterAPIClientBuilderFunc(cd).RESTConfigAndSecretVersion()
 	if err != nil {
 		logger.WithError(err).Error("unable to get REST config")
 		return nil, err
 	}
 
-	return resource.NewHelperFromRESTConfig(restConfig, logger)
+	if cd.Spec.ClusterMetadata == nil || len(cd.Spec.ClusterMetadata.ClusterID) == 0 {
+		return nil, fmt.Errorf("missing clusterID for cluster %s/%s", cd.Namespace, cd.Name)
+	}
+	return resource.NewHelper(logger, resource.WithRESTConfig(restConfig), resource.WithCacheKeyAndVersion(cd.Spec.ClusterMetadata.ClusterID, secretVersion))
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -406,7 +409,32 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 
 	if cd.DeletionTimestamp != nil {
 		logger.Debug("cluster is being deleted")
+
+		if controllerutils.HasFinalizer(cd, hiveintv1alpha1.FinalizerCachePurge) {
+			if cd.Spec.ClusterMetadata == nil || len(cd.Spec.ClusterMetadata.ClusterID) == 0 {
+				logger.
+					WithField("cluster_name", cd.Name).
+					WithField("cluster_namespace", cd.Namespace).
+					Warn("missing clusterID for cluster, cache entry may dangle")
+			} else {
+				resource.RemoveRestConfigClientGetterCacheEntry(logger, cd.Spec.ClusterMetadata.ClusterID)
+			}
+
+			logger.Debugf("removing cache purge finalizer")
+			controllerutils.DeleteFinalizer(cd, hiveintv1alpha1.FinalizerCachePurge)
+			return reconcile.Result{}, r.Update(context.TODO(), cd)
+		}
+
 		return reconcile.Result{}, nil
+	} else {
+		if !controllerutils.HasFinalizer(cd, hiveintv1alpha1.FinalizerCachePurge) {
+			logger.Debug("adding cache purge finalizer")
+			controllerutils.AddFinalizer(cd, hiveintv1alpha1.FinalizerCachePurge)
+			if err = r.Update(context.TODO(), cd); err != nil {
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{Requeue: true}, nil
+		}
 	}
 
 	if !cd.Spec.Installed {

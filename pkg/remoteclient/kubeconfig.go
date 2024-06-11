@@ -83,3 +83,8 @@ func (b *kubeconfigBuilder) UseSecondaryAPIURL() Builder {
 func (b *kubeconfigBuilder) RESTConfig() (*rest.Config, error) {
 	return restConfigFromSecret(b.secret)
 }
+
+func (b *kubeconfigBuilder) RESTConfigAndSecretVersion() (*rest.Config, string, error) {
+	config, err := restConfigFromSecret(b.secret)
+	return config, b.secret.ObjectMeta.GetResourceVersion(), err
+}

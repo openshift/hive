@@ -48,6 +48,13 @@ type helper struct {
 	restConfig     *rest.Config
 	getFactory     func(namespace string) (cmdutil.Factory, error)
 	openAPISchema  openapi.Resources
+
+	// restConfigClientGetterKey is an optional field, and iff set will be used as a cache key
+	// for reusing restConfigClientGetters (see restconfig_factory.go)
+	restConfigClientGetterKey string
+	// restConfigClientGetterVersion is an optional field, and iff set will be used as a cache version
+	// for invalidating restConfigClientGetters (see restconfig_factory.go)
+	restConfigClientGetterVersion string
 }
 
 // cacheOpenAPISchema builds the very expensive OpenAPISchema (>3s commonly) once, and stores
@@ -65,40 +72,47 @@ func (r *helper) cacheOpenAPISchema() error {
 	return nil
 }
 
-// NewHelperFromRESTConfig returns a new object that allows apply and patch operations
-func NewHelperFromRESTConfig(restConfig *rest.Config, logger log.FieldLogger) (Helper, error) {
-	r := &helper{
-		logger:     logger,
-		cacheDir:   getCacheDir(logger),
-		restConfig: restConfig,
+type HelperOption func(*helper)
+
+func WithKubeconfig(kubeconfig []byte) HelperOption {
+	return func(r *helper) {
+		r.kubeconfig = kubeconfig
+		r.getFactory = r.getKubeconfigFactory
 	}
-	r.getFactory = r.getRESTConfigFactory
-	err := r.cacheOpenAPISchema()
-	return r, err
 }
 
-// NewHelperWithMetricsFromRESTConfig returns a new object that allows apply and patch operations, with metrics tracking enabled.
-func NewHelperWithMetricsFromRESTConfig(restConfig *rest.Config, controllerName hivev1.ControllerName, logger log.FieldLogger) (Helper, error) {
-	r := &helper{
-		logger:         logger,
-		metricsEnabled: true,
-		controllerName: controllerName,
-		cacheDir:       getCacheDir(logger),
-		restConfig:     restConfig,
+func WithRESTConfig(restConfig *rest.Config) HelperOption {
+	return func(r *helper) {
+		r.restConfig = restConfig
+		r.getFactory = r.getRESTConfigFactory
 	}
-	r.getFactory = r.getRESTConfigFactory
-	err := r.cacheOpenAPISchema()
-	return r, err
+}
+
+func WithMetrics(controllerName hivev1.ControllerName) HelperOption {
+	return func(r *helper) {
+		r.metricsEnabled = true
+		r.controllerName = controllerName
+	}
+}
+
+func WithCacheKeyAndVersion(restConfigClientGetterKey string, restConfigClientGetterVersion string) HelperOption {
+	return func(r *helper) {
+		r.restConfigClientGetterKey = restConfigClientGetterKey
+		r.restConfigClientGetterVersion = restConfigClientGetterVersion
+	}
 }
 
 // NewHelper returns a new object that allows apply and patch operations
-func NewHelper(kubeconfig []byte, logger log.FieldLogger) (Helper, error) {
+func NewHelper(logger log.FieldLogger, options ...HelperOption) (Helper, error) {
 	r := &helper{
-		logger:     logger,
-		cacheDir:   getCacheDir(logger),
-		kubeconfig: kubeconfig,
+		logger:   logger,
+		cacheDir: getCacheDir(logger),
 	}
-	r.getFactory = r.getKubeconfigFactory
+
+	for _, f := range options {
+		f(r)
+	}
+
 	err := r.cacheOpenAPISchema()
 	return r, err
 }

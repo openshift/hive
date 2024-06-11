@@ -98,6 +98,22 @@ func (mr *MockBuilderMockRecorder) RESTConfig() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RESTConfig", reflect.TypeOf((*MockBuilder)(nil).RESTConfig))
 }
 
+// RESTConfigAndSecretVersion mocks base method.
+func (m *MockBuilder) RESTConfigAndSecretVersion() (*rest.Config, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RESTConfigAndSecretVersion")
+	ret0, _ := ret[0].(*rest.Config)
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// RESTConfigAndSecretVersion indicates an expected call of RESTConfigAndSecretVersion.
+func (mr *MockBuilderMockRecorder) RESTConfigAndSecretVersion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RESTConfigAndSecretVersion", reflect.TypeOf((*MockBuilder)(nil).RESTConfigAndSecretVersion))
+}
+
 // UsePrimaryAPIURL mocks base method.
 func (m *MockBuilder) UsePrimaryAPIURL() remoteclient.Builder {
 	m.ctrl.T.Helper()

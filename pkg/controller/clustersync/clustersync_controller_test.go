@@ -293,7 +293,6 @@ func TestReconcileClusterSync_NoWorkToDo(t *testing.T) {
 			cd: testcd.FullBuilder(testNamespace, testCDName, scheme).
 				GenericOptions(
 					testgeneric.WithUID(testCDUID),
-					testgeneric.WithFinalizer(hiveintv1alpha1.FinalizerCachePurge),
 				).
 				Options(
 					testcd.WithCondition(hivev1.ClusterDeploymentCondition{
@@ -2556,7 +2555,6 @@ func cdBuilder(scheme *runtime.Scheme) testcd.Builder {
 	return testcd.FullBuilder(testNamespace, testCDName, scheme).
 		GenericOptions(
 			testgeneric.WithUID(testCDUID),
-			testgeneric.WithFinalizer(hiveintv1alpha1.FinalizerCachePurge),
 		).
 		Options(
 			testcd.Installed(),

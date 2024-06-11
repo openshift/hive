@@ -1,3 +1,4 @@
+# Dummy PR test
 # Add timestamps to our output
 shopt -s expand_aliases
 alias echo='/bin/echo -n `date -Ins --universal`"  "; /bin/echo'

@@ -56,7 +56,7 @@ func GetResourceHelper(logger log.FieldLogger) (resource.Helper, error) {
 		logger.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
-	return resource.NewHelper(logger, resource.WithRESTConfig(cfg))
+	return resource.NewHelperFromRESTConfig(cfg, logger)
 }
 
 func DefaultNamespace() (string, error) {

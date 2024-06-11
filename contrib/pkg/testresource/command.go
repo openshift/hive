@@ -55,7 +55,7 @@ func newApplyCommand() *cobra.Command {
 			}
 			content := mustRead(args[0])
 			kubeconfig := mustRead(kubeconfigPath)
-			helper, err := resource.NewHelper(log.WithField("cmd", "apply"), resource.WithKubeconfig(kubeconfig))
+			helper, err := resource.NewHelper(kubeconfig, log.WithField("cmd", "apply"))
 			if err != nil {
 				fmt.Printf("Error creating resource helper: %v\n", err)
 				return
@@ -127,7 +127,7 @@ func newPatchCommand() *cobra.Command {
 			}
 			content := mustRead(args[0])
 			kubeconfig := mustRead(kubeconfigPath)
-			helper, err := resource.NewHelper(log.WithField("cmd", "patch"), resource.WithKubeconfig(kubeconfig))
+			helper, err := resource.NewHelper(kubeconfig, log.WithField("cmd", "patch"))
 			if err != nil {
 				fmt.Printf("Error creating resource helper: %v\n", err)
 				return

@@ -379,7 +379,7 @@ func (o *Options) getResourceHelper() (resource.Helper, error) {
 		log.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
-	return resource.NewHelper(log.WithField("command", "adm manage-dns enable"), resource.WithRESTConfig(cfg))
+	return resource.NewHelperFromRESTConfig(cfg, log.WithField("command", "adm manage-dns enable"))
 }
 
 func (o *Options) setupLocalClients() error {

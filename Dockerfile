@@ -1,17 +1,29 @@
 ARG CONTAINER_SUB_MANAGER_OFF=0
-ARG EL8_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-ARG EL9_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
-ARG BASE_IMAGE=registry.ci.openshift.org/ocp/4.15:base
+ARG EL8_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+ARG EL9_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+ARG BASE_IMAGE=registry.ci.openshift.org/ocp/4.16:base-rhel9
 
 FROM ${EL8_BUILD_IMAGE} as builder_rhel8
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
+
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
-RUN make build
 RUN make build-hiveutil
+
+FROM ${EL9_BUILD_IMAGE} as builder_rhel9
+ARG CONTAINER_SUB_MANAGER_OFF
+RUN mkdir -p /go/src/github.com/openshift/hive
+WORKDIR /go/src/github.com/openshift/hive
+COPY . .
+
+ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
+RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+RUN python3 -m ensurepip
+RUN make build-hiveadmission build-manager build-operator && \
+  make build-hiveutil
 
 FROM ${BASE_IMAGE}
 ARG CONTAINER_SUB_MANAGER_OFF
@@ -30,10 +42,12 @@ RUN if ! rpm -q libvirt-libs; then dnf install -y libvirt-libs && dnf clean all 
 # tar is needed to package must-gathers on install failure
 RUN if ! which tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
-COPY --from=builder_rhel8 /go/src/github.com/openshift/hive/bin/manager /opt/services/
-COPY --from=builder_rhel8 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
-COPY --from=builder_rhel8 /go/src/github.com/openshift/hive/bin/operator /opt/services/hive-operator
-COPY --from=builder_rhel8 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin/hiveutil
+COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/manager /opt/services/
+COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
+COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/operator /opt/services/hive-operator
+
+COPY --from=builder_rhel8 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin/hiveutil.rhel8
+COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin/hiveutil
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
 # Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as
@@ -44,16 +58,9 @@ RUN mkdir -p /home/hive && \
   chgrp -R 0 /home/hive && \
   chmod -R g=u /home/hive
 
-RUN mkdir -p /etc/pki/ca-trust/source/anchors && \
-  chgrp -R 0 /etc/pki/ca-trust/source/anchors && \
-  chmod -R g=u /etc/pki/ca-trust/source/anchors
-
-# This is so that we can run update-ca-trust during container start up.
-RUN mkdir -p /etc/pki/ca-trust/extracted/openssl && \
-  mkdir -p /etc/pki/ca-trust/extracted/pem && \
-  mkdir -p /etc/pki/ca-trust/extracted/java && \
-  chgrp -R 0 /etc/pki/ca-trust/extracted && \
-  chmod -R g=u /etc/pki/ca-trust/extracted
+RUN mkdir -p /output/hive-trusted-cabundle && \
+  chgrp -R 0 /output/hive-trusted-cabundle && \
+  chmod -R g=u /output/hive-trusted-cabundle
 
 # replace removed symlink when using activation-key
 RUN if [ -e "/activation-key/org" ]; then ln -s /etc/rhsm-host /run/secrets/rhsm ; fi

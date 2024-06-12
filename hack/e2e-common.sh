@@ -139,7 +139,9 @@ function save_hive_logs() {
   done
   # Let's try to save any prov/deprov pod logs
   oc get po -A -l hive.openshift.io/install=true -o custom-columns=:.metadata.namespace,:.metadata.name --no-headers | while read ns po; do
-    oc logs -n $ns $po -c hive > ${ARTIFACT_DIR}/${ns}-${po}.log
+    oc logs -n $ns $po -c hive > ${ARTIFACT_DIR}/${ns}-${po}-hive.log
+    oc logs -n $ns $po -c installer > ${ARTIFACT_DIR}/${ns}-${po}-installer.log
+
   done
   oc get po -A -l hive.openshift.io/uninstall=true -o custom-columns=:.metadata.namespace,:.metadata.name --no-headers | while read ns po; do
     oc logs -n $ns $po > ${ARTIFACT_DIR}/${ns}-${po}.log
@@ -265,12 +267,12 @@ function capture_cluster_logs() {
     # Capture install logs
     if IMAGESET_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/imageset=true" -o name -n ${CLUSTER_NAMESPACE}) && [ "${IMAGESET_JOB_NAME}" ]
     then
-        oc logs -c hive -n ${CLUSTER_NAMESPACE} ${IMAGESET_JOB_NAME} &> "${ARTIFACT_DIR}/hive_imageset_job.log" || true
+        oc logs -c installer -n ${CLUSTER_NAMESPACE} ${IMAGESET_JOB_NAME} &> "${ARTIFACT_DIR}/hive_imageset_job.log" || true
         oc get ${IMAGESET_JOB_NAME} -n ${CLUSTER_NAMESPACE} -o yaml &> "${ARTIFACT_DIR}/hive_imageset_job.yaml" || true
     fi
     if INSTALL_JOB_NAME=$(oc get job -l "hive.openshift.io/cluster-deployment-name=${CLUSTER_NAME},hive.openshift.io/install=true" -o name -n ${CLUSTER_NAMESPACE}) && [ "${INSTALL_JOB_NAME}" ]
     then
-        oc logs -c hive -n ${CLUSTER_NAMESPACE} ${INSTALL_JOB_NAME} &> "${ARTIFACT_DIR}/hive_install_job.log" || true
+        oc logs -c installer -n ${CLUSTER_NAMESPACE} ${INSTALL_JOB_NAME} &> "${ARTIFACT_DIR}/hive_install_job.log" || true
         oc get ${INSTALL_JOB_NAME} -n ${CLUSTER_NAMESPACE} -o yaml &> "${ARTIFACT_DIR}/hive_install_job.yaml" || true
     fi
     echo "************* INSTALL JOB LOG *************"

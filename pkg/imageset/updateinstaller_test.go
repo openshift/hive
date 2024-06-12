@@ -47,8 +47,8 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			name:                      "successful execution",
 			existingClusterDeployment: testClusterDeployment(),
 			images: map[string]string{
-				"installer": testInstallerImage,
-				"cli":       testCLIImage,
+				"baremetal-installer": testInstallerImage,
+				"cli":                 testCLIImage,
 			},
 			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
 		},
@@ -56,7 +56,7 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			name:                      "failure execution missing cli",
 			existingClusterDeployment: testClusterDeployment(),
 			images: map[string]string{
-				"installer": testInstallerImage,
+				"baremetal-installer": testInstallerImage,
 			},
 			validateClusterDeployment: validateFailureExecution("could not get cli image"),
 			expectError:               true,
@@ -65,23 +65,10 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			name:                      "successful execution after failure",
 			existingClusterDeployment: testClusterDeploymentWithErrorCondition(),
 			images: map[string]string{
-				"installer": testInstallerImage,
-				"cli":       testCLIImage,
-			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, installerImageResolvedReason),
-		},
-		{
-			name: "successful execution baremetal platform",
-			existingClusterDeployment: func() *hivev1.ClusterDeployment {
-				cd := testClusterDeployment()
-				cd.Spec.Platform.BareMetal = &baremetal.Platform{}
-				return cd
-			}(),
-			images: map[string]string{
 				"baremetal-installer": testInstallerImage,
 				"cli":                 testCLIImage,
 			},
-			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
+			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, installerImageResolvedReason),
 		},
 		{
 			name: "installer image name override",
@@ -118,8 +105,8 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			name:                      "successful execution with version in release metadata",
 			existingClusterDeployment: testClusterDeployment(),
 			images: map[string]string{
-				"installer": testInstallerImage,
-				"cli":       testCLIImage,
+				"baremetal-installer": testInstallerImage,
+				"cli":                 testCLIImage,
 			},
 			version:                   testReleaseVersion,
 			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, testCLIImage, ""),
@@ -137,8 +124,8 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			name:                      "CLI image domain copied from installer image",
 			existingClusterDeployment: testClusterDeploymentWithCLIDomainCopy(),
 			images: map[string]string{
-				"installer": testInstallerImage,
-				"cli":       cliImageWithDifferentDomain,
+				"baremetal-installer": testInstallerImage,
+				"cli":                 cliImageWithDifferentDomain,
 			},
 			validateClusterDeployment: validateSuccessfulExecution(testInstallerImage, "registry.io/foo/cli:blah", ""),
 		},
@@ -146,8 +133,8 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			name:                      "copy requested, invalid installer image",
 			existingClusterDeployment: testClusterDeploymentWithCLIDomainCopy(),
 			images: map[string]string{
-				"installer": "invalid image",
-				"cli":       cliImageWithDifferentDomain,
+				"baremetal-installer": "invalid image",
+				"cli":                 cliImageWithDifferentDomain,
 			},
 			validateClusterDeployment: validateFailureExecution("invalid installer image"),
 			expectError:               true,
@@ -156,8 +143,8 @@ func TestUpdateInstallerImageCommand(t *testing.T) {
 			name:                      "copy requested, invalid cli image",
 			existingClusterDeployment: testClusterDeploymentWithCLIDomainCopy(),
 			images: map[string]string{
-				"installer": testInstallerImage,
-				"cli":       "invalid image",
+				"baremetal-installer": testInstallerImage,
+				"cli":                 "invalid image",
 			},
 			validateClusterDeployment: validateFailureExecution("invalid cli image"),
 			expectError:               true,

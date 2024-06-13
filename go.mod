@@ -57,10 +57,10 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.14.3
 	github.com/vmware/govmomi v0.34.2
-	golang.org/x/crypto v0.21.0
+	golang.org/x/crypto v0.24.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-	golang.org/x/mod v0.15.0
-	golang.org/x/net v0.23.0 // indirect
+	golang.org/x/mod v0.17.0
+	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/oauth2 v0.18.0
 	golang.org/x/time v0.5.0
 	google.golang.org/api v0.167.0
@@ -109,7 +109,7 @@ require (
 	github.com/go-openapi/spec v0.20.12 // indirect
 	github.com/go-openapi/validate v0.22.4 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.0.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
@@ -338,11 +338,11 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.17.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/term v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240205150955-31a09d347014 // indirect
@@ -380,10 +380,10 @@ require (
 	cloud.google.com/go/compute v1.24.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	github.com/Antonboom/nilnil v0.1.7 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.9.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.4.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v1.5.1 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.6.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.8.0 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
 	github.com/blizzy78/varnamelen v0.8.0 // indirect
 	github.com/breml/bidichk v0.2.4 // indirect
 	github.com/butuzov/ireturn v0.2.0 // indirect
@@ -415,7 +415,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20240209174835-d141fa11b2e9
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
-	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/quasilyte/gogrep v0.5.0 // indirect
 	github.com/quasilyte/stdinfo v0.0.0-20220114132959-f7386bf02567 // indirect
 	github.com/rivo/uniseg v0.4.2 // indirect

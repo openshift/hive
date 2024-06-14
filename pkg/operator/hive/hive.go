@@ -137,7 +137,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
 
-	if machinePoolPollInterval := instance.Spec.MachinePoolPollInterval; machinePoolPollInterval != "" {
+	machinePoolPollInterval := instance.Spec.MachinePoolPollInterval
+	if machinePoolPollInterval != "" {
 		machinePoolPollIntervalEnvVar := corev1.EnvVar{
 			Name:  constants.MachinePoolPollIntervalEnvVar,
 			Value: machinePoolPollInterval,
@@ -256,7 +257,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		return err
 	}
 
-	r.includeGlobalPullSecret(hLog, h, instance, hiveContainer)
+	r.includeGlobalPullSecret(hLog, instance, hiveContainer)
 
 	if instance.Spec.MaintenanceMode != nil && *instance.Spec.MaintenanceMode {
 		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-controllers replicas to 0")
@@ -274,9 +275,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 	utils.SetProxyEnvVars(&hiveDeployment.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
 
-	// Include the proxy vars in the hash so we redeploy if they change
+	// Include the proxy vars and machinepool poll interval in the hash so we redeploy if they change
 	hiveDeployment.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash(
-		httpProxy+httpsProxy+noProxy, configHashes...)
+		httpProxy+httpsProxy+noProxy+machinePoolPollInterval, configHashes...)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
@@ -436,7 +437,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 	return nil
 }
 
-func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
+func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
 	if instance.Spec.GlobalPullSecretRef == nil || instance.Spec.GlobalPullSecretRef.Name == "" {
 		hLog.Debug("GlobalPullSecret is not provided in HiveConfig, it will not be deployed")
 		return

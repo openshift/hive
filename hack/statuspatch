@@ -117,7 +117,7 @@ fi
 
 # Proxy through a unix socket so we don't have to dork with ports
 socket=$patchfile.sock
-python -c "import os, socket as s; s.socket(s.AF_UNIX).bind('$socket')"
+/usr/bin/env python3 -c "import os, socket as s; s.socket(s.AF_UNIX).bind('$socket')"
 oc proxy -u $socket &
 # TODO: Better way to wait for the socket to spin up
 sleep 1

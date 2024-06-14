@@ -525,6 +525,16 @@ const (
 	// OverrideInstallerImageNameAnnotation specifies the name of the image within release metadata containing the
 	// `openshift-install` command. By default we look for the image named `installer`.
 	OverrideInstallerImageNameAnnotation = "hive.openshift.io/installer-image-name-override"
+
+	// SyncSetReapplyIntervalEnvVar is a Duration string indicating the interval (plus jitter) between full reapplies
+	// of remote objects corresponding to [Selector]SyncSets. It is how we plumb HiveConfig.Spec.SyncSetReapplyInterval
+	// from hive-operator through to the clustersync controller.
+	SyncSetReapplyIntervalEnvVar = "SYNCSET_REAPPLY_INTERVAL"
+
+	// MachinePoolPollIntervalEnvVar is a Duration string indicating the interval (plus jitter) between polls
+	// of remote objects corresponding to MachinePools. It is how we plumb HiveConfig.Spec.MachinePoolPollInterval
+	// from hive-operator through to the machinepool controller.
+	MachinePoolPollIntervalEnvVar = "MACHINEPOOL_POLL_INTERVAL"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

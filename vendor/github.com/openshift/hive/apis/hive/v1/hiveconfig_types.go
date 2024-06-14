@@ -66,6 +66,12 @@ type HiveConfigSpec struct {
 	// The default reapply interval is two hours.
 	SyncSetReapplyInterval string `json:"syncSetReapplyInterval,omitempty"`
 
+	// MachinePoolPollInterval is a string duration indicating how much time must pass before checking whether
+	// remote resources related to MachinePools need to be reapplied. Set to zero to disable polling -- we'll
+	// only reconcile when hub objects change.
+	// The default interval is 30m.
+	MachinePoolPollInterval string `json:"machinePoolPollInterval,omitempty"`
+
 	// MaintenanceMode can be set to true to disable the hive controllers in situations where we need to ensure
 	// nothing is running that will add or act upon finalizers on Hive types. This should rarely be needed.
 	// Sets replicas to 0 for the hive-controllers deployment to accomplish this.

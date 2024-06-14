@@ -126,13 +126,24 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Args = append(hiveContainer.Args, "--log-level", level)
 	}
 
+	// TODO: Can this be removed? Is it still possible to deploy the clustersync controller in-band with
+	// hive-controllers?
 	if syncSetReapplyInterval := instance.Spec.SyncSetReapplyInterval; syncSetReapplyInterval != "" {
 		syncsetReapplyIntervalEnvVar := corev1.EnvVar{
-			Name:  "SYNCSET_REAPPLY_INTERVAL",
+			Name:  constants.SyncSetReapplyIntervalEnvVar,
 			Value: syncSetReapplyInterval,
 		}
 
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
+	}
+
+	if machinePoolPollInterval := instance.Spec.MachinePoolPollInterval; machinePoolPollInterval != "" {
+		machinePoolPollIntervalEnvVar := corev1.EnvVar{
+			Name:  constants.MachinePoolPollIntervalEnvVar,
+			Value: machinePoolPollInterval,
+		}
+
+		hiveContainer.Env = append(hiveContainer.Env, machinePoolPollIntervalEnvVar)
 	}
 
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, managedDomainsConfigMapInfo, hiveContainer)

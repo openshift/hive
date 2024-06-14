@@ -56,6 +56,7 @@ const (
 	machinePoolNameLabel       = "hive.openshift.io/machine-pool"
 	finalizer                  = "hive.openshift.io/remotemachineset"
 	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
+	defaultPollInterval        = 30 * time.Minute
 )
 
 var (
@@ -128,10 +129,23 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	// Periodically watch MachinePools for syncing status from external clusters
-	err = c.Watch(newPeriodicSource(r.Client, 30*time.Minute, r.logger), &handler.EnqueueRequestForObject{})
-	if err != nil {
-		return err
+	pollInterval := defaultPollInterval
+	if envPollInterval := os.Getenv(constants.MachinePoolPollIntervalEnvVar); len(envPollInterval) > 0 {
+		var err error
+		pollInterval, err = time.ParseDuration(envPollInterval)
+		if err != nil {
+			log.WithError(err).WithField("reapplyInterval", envPollInterval).Errorf("unable to parse %s", constants.SyncSetReapplyIntervalEnvVar)
+			return err
+		}
+	}
+
+	// Periodically watch MachinePools for syncing status from external clusters -- but allow this to be
+	// disabled via HiveConfig.Spec.MachinePoolPollInterval <= 0
+	if pollInterval > 0 {
+		err = c.Watch(newPeriodicSource(r.Client, pollInterval, r.logger), &handler.EnqueueRequestForObject{})
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -47,7 +47,6 @@ import (
 const (
 	ControllerName         = hivev1.ClustersyncControllerName
 	defaultReapplyInterval = 2 * time.Hour
-	reapplyIntervalEnvKey  = "SYNCSET_REAPPLY_INTERVAL"
 	reapplyIntervalJitter  = 0.1
 	secretAPIVersion       = "v1"
 	secretKind             = "Secret"
@@ -150,11 +149,11 @@ func Add(mgr manager.Manager) error {
 func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*ReconcileClusterSync, error) {
 	logger := log.WithField("controller", ControllerName)
 	reapplyInterval := defaultReapplyInterval
-	if envReapplyInterval := os.Getenv(reapplyIntervalEnvKey); len(envReapplyInterval) > 0 {
+	if envReapplyInterval := os.Getenv(constants.SyncSetReapplyIntervalEnvVar); len(envReapplyInterval) > 0 {
 		var err error
 		reapplyInterval, err = time.ParseDuration(envReapplyInterval)
 		if err != nil {
-			log.WithError(err).WithField("reapplyInterval", envReapplyInterval).Errorf("unable to parse %s", reapplyIntervalEnvKey)
+			log.WithError(err).WithField("reapplyInterval", envReapplyInterval).Errorf("unable to parse %s", constants.SyncSetReapplyIntervalEnvVar)
 			return nil, err
 		}
 	}

@@ -1392,21 +1392,35 @@ func TestUpdateOwnedLabelsTaints(t *testing.T) {
 			name: "Carry over labels from spec",
 			machinePool: testMachinePoolWithoutLabelsTaints(
 				testmp.WithLabels(map[string]string{
-					"test-label": "test-value",
+					"test-label":              "test-value",
+					"a-smaller-sorting-label": "z-bigger-value",
 				}),
 			),
-			expectedOwnedLabels: []string{"test-label"},
+			expectedOwnedLabels: []string{"a-smaller-sorting-label", "test-label"},
 		},
 		{
 			name: "Carry over taints from spec",
 			machinePool: testMachinePoolWithoutLabelsTaints(
-				testmp.WithTaints(corev1.Taint{
-					Key:    "test-taint",
-					Value:  "test-value",
-					Effect: "NoSchedule",
-				}),
+				testmp.WithTaints(
+					corev1.Taint{
+						Key:    "test-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					},
+				),
+				testmp.WithTaints(
+					corev1.Taint{
+						Key:    "another-taint",
+						Value:  "test-value",
+						Effect: "NoSchedule",
+					},
+				),
 			),
 			expectedOwnedTaints: []hivev1.TaintIdentifier{
+				{
+					Key:    "another-taint",
+					Effect: "NoSchedule",
+				},
 				{
 					Key:    "test-taint",
 					Effect: "NoSchedule",

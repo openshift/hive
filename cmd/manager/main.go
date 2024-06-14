@@ -154,11 +154,13 @@ func newRootCommand() *cobra.Command {
 			defer cancel()
 
 			run := func(ctx context.Context) {
+				mgrLogger := log.StandardLogger()
+				mgrLogger.SetLevel(level)
 				// Create a new Cmd to provide shared dependencies and start components
 				mgr, err := manager.New(cfg, manager.Options{
 					Scheme:  scheme.GetScheme(),
 					Metrics: metricsserver.Options{BindAddress: ":2112"},
-					Logger:  utillogrus.NewLogr(log.StandardLogger()),
+					Logger:  utillogrus.NewLogr(mgrLogger),
 				})
 				if err != nil {
 					log.Fatal(err)

@@ -12,6 +12,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -78,7 +79,7 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 
 	if syncSetReapplyInterval := hiveconfig.Spec.SyncSetReapplyInterval; syncSetReapplyInterval != "" {
 		syncsetReapplyIntervalEnvVar := corev1.EnvVar{
-			Name:  "SYNCSET_REAPPLY_INTERVAL",
+			Name:  constants.SyncSetReapplyIntervalEnvVar,
 			Value: syncSetReapplyInterval,
 		}
 

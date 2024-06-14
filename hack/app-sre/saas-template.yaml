@@ -4479,6 +4479,13 @@ objects:
                     fatal, error, warn, info, debug, and trace. The default level
                     is info.
                   type: string
+                machinePoolPollInterval:
+                  description: MachinePoolPollInterval is a string duration indicating
+                    how much time must pass before checking whether remote resources
+                    related to MachinePools need to be reapplied. Set to zero to disable
+                    polling -- we'll only reconcile when hub objects change. The default
+                    interval is 30m.
+                  type: string
                 maintenanceMode:
                   description: MaintenanceMode can be set to true to disable the hive
                     controllers in situations where we need to ensure nothing is running

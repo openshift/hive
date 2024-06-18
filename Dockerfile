@@ -14,15 +14,16 @@ RUN make build
 
 FROM registry.redhat.io/rhel9-4-els/rhel:9.4
 
-ARG DNF=dnf
-
-RUN $DNF -y update && $DNF clean all
+RUN dnf -y update && dnf clean all
 
 # ssh-agent required for gathering logs in some situations:
-RUN if ! rpm -q openssh-clients; then $DNF install -y openssh-clients && $DNF clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
 # libvirt libraries required for running bare metal installer.
-RUN if ! rpm -q libvirt-libs; then $DNF install -y libvirt-libs && $DNF clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q libvirt-libs; then dnf install -y libvirt-libs && dnf clean all && rm -rf /var/cache/dnf/*; fi
+
+# tar is needed to package must-gathers on install failure
+RUN if ! which tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/

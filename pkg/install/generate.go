@@ -77,7 +77,7 @@ func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, en
 // AWSAssumeRoleCLIConfig creates a secret that can assume the role using the hiveutil
 // credential_process helper.
 func AWSAssumeRoleCLIConfig(client client.Client, role *hivev1aws.AssumeRole, secretName, secretNamespace string, owner metav1.Object, scheme *runtime.Scheme) error {
-	cmd := "/usr/bin/hiveutil"
+	cmd := "/output/hiveutil"
 	args := []string{"install-manager", "aws-credentials"}
 	args = append(args, []string{"--namespace", secretNamespace}...)
 	args = append(args, []string{"--role-arn", role.RoleARN}...)
@@ -352,7 +352,7 @@ func InstallerPodSpec(
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
 			// so it doesn't try to run a partially copied binary.
-			Args:         []string{fmt.Sprintf("cp -v /bin/openshift-install /output/openshift-install && major_version=$(sed -n 's/.*release \\([0-9]*\\).*/\\1/p' /etc/redhat-release) && /output/hiveutil.rhel${major_version} install-manager --work-dir /output --log-level debug %s %s", cd.Namespace, provisionName)},
+			Args:         []string{fmt.Sprintf("cp -v /bin/openshift-install /output/openshift-install && major_version=$(sed -n 's/.*release \\([0-9]*\\).*/\\1/p' /etc/redhat-release) && ln -s /output/hiveutil.rhel${major_version} /output/hiveutil && /output/hiveutil install-manager --work-dir /output --log-level debug %s %s", cd.Namespace, provisionName)},
 			VolumeMounts: volumeMounts,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{

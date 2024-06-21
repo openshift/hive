@@ -4,32 +4,25 @@
 
 set -exv
 
-GIT_HASH=`git rev-parse --short=10 HEAD`
+GIT_HASH=$(git rev-parse --short=10 HEAD)
 IMG="quay.io/app-sre/hive:${GIT_HASH}"
 
-### Accommodate docker or podman
-#
 # The docker/podman creds cache needs to be in a location unique to this
 # invocation; otherwise it could collide across jenkins jobs. We'll use
 # a .docker folder relative to pwd (the repo root).
 CONTAINER_ENGINE_CONFIG_DIR=.docker
 mkdir -p ${CONTAINER_ENGINE_CONFIG_DIR}
-# But docker and podman use different options to configure it :eyeroll:
-# ==> Podman uses --authfile=PATH *after* the `login` subcommand; but
-# also accepts REGISTRY_AUTH_FILE from the env. See
-# https://www.mankier.com/1/podman-login#Options---authfile=path
 export REGISTRY_AUTH_FILE=${CONTAINER_ENGINE_CONFIG_DIR}/config.json
-# ==> Docker uses --config=PATH *before* (any) subcommand; so we'll glue
-# that to the CONTAINER_ENGINE variable itself. (NOTE: I tried half a
-# dozen other ways to do this. This was the least ugly one that actually
-# works.)
-CONTAINER_ENGINE=$(command -v podman 2>/dev/null || echo docker --config=${CONTAINER_ENGINE_CONFIG_DIR})
+#
+# Copy the node container auth file so that we get access to the registries the
+# parent node has access to
+cp /var/lib/jenkins/.docker/config.json "$REGISTRY_AUTH_FILE"
 # Build Schema v2 compatible images. Recent versions of docker should do this
 # automatically; if we're running podman, it should pick up this env var.
 export BUILDAH_FORMAT=docker
 
 # Make sure we can log into quay; otherwise we won't be able to push
-${CONTAINER_ENGINE} login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io
+podman login -u="${QUAY_USER}" -p="${QUAY_TOKEN}" quay.io
 
 ## image_exits_in_repo IMAGE_URI
 #
@@ -99,7 +92,7 @@ else
 fi
 
 # build the image
-CONTAINER_BUILD_FLAGS="--file ./Dockerfile" make IMG="$IMG" GO_REQUIRED_MIN_VERSION:= docker-build
+make IMG="$IMG" podman-dev-build
 
 # push the image
-make IMG="$IMG" docker-push
+podman push "$IMG"

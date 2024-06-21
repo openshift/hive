@@ -154,6 +154,14 @@ func InstallerPodSpec(
 			Name:  "PULLSECRET_SECRET_NAME",
 			Value: constants.GetMergedPullSecretName(cd),
 		},
+		{
+			Name:  "SSL_CERT_DIR",
+			Value: "/etc/ssl/certs/:/output/hive-trusted-cabundle/",
+		},
+		{
+			Name:  "HOME",
+			Value: "/home/hive",
+		},
 	}
 
 	env = append(env, extraEnvVars...)
@@ -164,6 +172,7 @@ func InstallerPodSpec(
 		"logs":          "/logs",
 		"installconfig": "/installconfig",
 		"pullsecret":    "/pullsecret",
+		"hive":          "/home/hive",
 	}
 
 	var credentialRef, certificateRef string
@@ -308,14 +317,14 @@ func InstallerPodSpec(
 	// where our container will run them. This is effectively downloading the all-in-one installer.
 	initContainers := []corev1.Container{
 		{
-			Name:            "installer",
-			Image:           installerImage,
-			ImagePullPolicy: corev1.PullIfNotPresent,
+			Name:            "hive",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: corev1.PullAlways,
 			Env:             env,
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
 			// so it doesn't try to run a partially copied binary.
-			Args:         []string{"cp -v /bin/openshift-install /output/openshift-install.tmp && mv -v /output/openshift-install.tmp /output/openshift-install && ls -la /output"},
+			Args:         []string{"cp -v /usr/bin/hiveutil.rhel8 /output/hiveutil8.tmp && mv -v /output/hiveutil8.tmp /output/hiveutil.rhel8 && cp -v /usr/bin/hiveutil /output/hiveutil9.tmp && mv -v /output/hiveutil9.tmp /output/hiveutil.rhel9"},
 			VolumeMounts: volumeMounts,
 		},
 	}
@@ -333,19 +342,17 @@ func InstallerPodSpec(
 			VolumeMounts: volumeMounts,
 		})
 	}
+
 	containers := []corev1.Container{
 		{
-			Name:            "hive",
-			Image:           images.GetHiveImage(),
-			ImagePullPolicy: images.GetHiveClusterProvisionImagePullPolicy(),
+			Name:            "installer",
+			Image:           installerImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Env:             append(env, cd.Spec.Provisioning.InstallerEnv...),
-			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"install-manager",
-				"--work-dir", "/output",
-				"--log-level", "debug",
-				cd.Namespace, provisionName,
-			},
+			Command:         []string{"/bin/sh", "-c"},
+			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
+			// so it doesn't try to run a partially copied binary.
+			Args:         []string{fmt.Sprintf("cp -v /bin/openshift-install /output/openshift-install && major_version=$(sed -n 's/.*release \\([0-9]*\\).*/\\1/p' /etc/redhat-release) && /output/hiveutil.rhel${major_version} install-manager --work-dir /output --log-level debug %s %s", cd.Namespace, provisionName)},
 			VolumeMounts: volumeMounts,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -542,6 +549,10 @@ func envAndVolumes(ns, credsVolName, credsDir, credsName, certsVolName, certsDir
 		{
 			Name:  "CLUSTERDEPLOYMENT_NAMESPACE",
 			Value: ns,
+		},
+		{
+			Name:  "SSL_CERT_DIR",
+			Value: "/etc/ssl/certs/:/output/hive-trusted-cabundle/",
 		},
 	}
 	if credsName != "" {

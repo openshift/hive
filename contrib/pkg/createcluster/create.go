@@ -167,6 +167,7 @@ type Options struct {
 	AdditionalTrustBundle             string
 	Internal                          bool
 	FeatureSet                        string
+	PrivateLink                       bool
 
 	// AWS
 	AWSUserTags           []string
@@ -314,6 +315,7 @@ This option is redundant (but permitted) for following clouds, which always use 
 	flags.BoolVar(&opt.Internal, "internal", false, `When set, it configures the install-config.yaml's publish field to Internal.
 OpenShift Installer publishes all the services of the cluster like API server and ingress to internal network and not the Internet.`)
 	flags.StringVar(&opt.FeatureSet, "featureset", "", "FeatureSet to pass to the installer.")
+	flags.BoolVar(&opt.PrivateLink, "private-link", false, "Enables access to cluster using AWS PrivateLink or GCP Private Service Connect")
 
 	// Flags related to adoption.
 	flags.BoolVar(&opt.Adopt, "adopt", false, "Enable adoption mode for importing a pre-existing cluster into Hive. Will require additional flags for adoption info.")
@@ -325,7 +327,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 
 	// AWS flags
 	flags.StringSliceVar(&opt.AWSUserTags, "aws-user-tags", nil, "Additional tags to add to resources. Must be in the form \"key=value\"")
-	flags.BoolVar(&opt.AWSPrivateLink, "aws-private-link", false, "Enables access to cluster using AWS PrivateLink")
+	flags.BoolVar(&opt.AWSPrivateLink, "aws-private-link", false, "(Deprecated) See --private-link")
 	flags.StringVar(&opt.AWSInstanceType, "aws-instance-type", clusterresource.AWSInstanceTypeDefault, "AWS cloud instance type for masters and workers (unless the latter is overridden by --aws-worker-instance-type)")
 	flags.StringVar(&opt.AWSWorkerInstanceType, "aws-worker-instance-type", "", "AWS cloud instance type for workers only. If unset, --aws-instance-type is used.")
 
@@ -445,6 +447,10 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 	if o.AWSPrivateLink && o.Cloud != cloudAWS {
 		return fmt.Errorf("--aws-private-link can only be enabled when using --cloud=%q", cloudAWS)
+	}
+
+	if o.PrivateLink && o.Cloud != cloudAWS && o.Cloud != cloudGCP {
+		return fmt.Errorf("--private-link can only be enabled when using --cloud={%q,%q}", cloudAWS, cloudGCP)
 	}
 
 	if o.Adopt {
@@ -645,7 +651,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			InstanceType:    o.AWSInstanceType,
 			// Will default to above if unset
 			WorkerInstanceType: o.AWSWorkerInstanceType,
-			PrivateLink:        o.AWSPrivateLink,
+			PrivateLink:        o.PrivateLink || o.AWSPrivateLink,
 		}
 		builder.CloudBuilder = awsProvider
 	case cloudAzure:
@@ -674,9 +680,10 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		}
 
 		gcpProvider := &clusterresource.GCPCloudBuilder{
-			ProjectID:      projectID,
-			ServiceAccount: creds,
-			Region:         o.Region,
+			ProjectID:             projectID,
+			ServiceAccount:        creds,
+			Region:                o.Region,
+			PrivateServiceConnect: o.PrivateLink,
 		}
 		builder.CloudBuilder = gcpProvider
 	case cloudOpenStack:

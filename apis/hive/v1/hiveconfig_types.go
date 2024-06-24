@@ -100,6 +100,10 @@ type HiveConfigSpec struct {
 	// +optional
 	DeploymentConfig *[]DeploymentConfig `json:"deploymentConfig,omitempty"`
 
+	// PrivateLink is used to configure the privatelink controller.
+	// +optional
+	PrivateLink *PrivateLinkConfig `json:"privateLink,omitempty"`
+
 	// AWSPrivateLink defines the configuration for the aws-private-link controller.
 	// It provides 3 major pieces of information required by the controller,
 	// 1. The Credentials that should be used to create AWS PrivateLink resources other than
@@ -171,6 +175,13 @@ type ReleaseImageVerificationConfigMapReference struct {
 	Namespace string `json:"namespace"`
 	// Name of the ConfigMap
 	Name string `json:"name"`
+}
+
+// PrivateLinkConfig defines the configuration for the privatelink controller.
+type PrivateLinkConfig struct {
+	// GCP is the configuration for GCP hub and link resources.
+	// +optional
+	GCP *GCPPrivateServiceConnectConfig `json:"gcp,omitempty"`
 }
 
 // AWSPrivateLinkConfig defines the configuration for the aws-private-link controller.
@@ -266,6 +277,34 @@ type AWSServiceProviderCredentials struct {
 	// to assume the role in customer AWS accounts to manager clusters.
 	// +optional
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef,omitempty"`
+}
+
+// GCPPrivateServiceConnectConfig defines the gcp private service connect config for the private-link controller.
+type GCPPrivateServiceConnectConfig struct {
+	// CredentialsSecretRef references a secret in the TargetNamespace that will be used to authenticate with
+	// GCP for creating the resources for GCP Private Service Connect
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// EndpointVPCInventory is a list of VPCs and the corresponding subnets in various GCP regions.
+	// The controller uses this list to choose a VPC for creating GCP Endpoints. Since the VPC Endpoints
+	// must be in the same region as the ClusterDeployment, we must have VPCs in that region to be able
+	// to setup Private Service Connect.
+	// +optional
+	EndpointVPCInventory []GCPPrivateServiceConnectInventory `json:"endpointVPCInventory,omitempty"`
+}
+
+// GCPPrivateServiceConnectInventory is a VPC and its corresponding subnets.
+// This VPC will be used to create a GCP Endpoint whenever there is a Private Service Connect
+// service created for a ClusterDeployment.
+type GCPPrivateServiceConnectInventory struct {
+	Network string                           `json:"network"`
+	Subnets []GCPPrivateServiceConnectSubnet `json:"subnets"`
+}
+
+// GCPPrivateServiceConnectSubnet defines subnet and the corresponding GCP region.
+type GCPPrivateServiceConnectSubnet struct {
+	Subnet string `json:"subnet"`
+	Region string `json:"region"`
 }
 
 // FeatureSet defines the set of feature gates that should be used.
@@ -587,6 +626,7 @@ const (
 	MetricsControllerName              ControllerName = "metrics"
 	ClustersyncControllerName          ControllerName = "clustersync"
 	AWSPrivateLinkControllerName       ControllerName = "awsprivatelink"
+	PrivateLinkControllerName          ControllerName = "privatelink"
 	HiveControllerName                 ControllerName = "hive"
 
 	// DeprecatedRemoteMachinesetControllerName was deprecated but can be used to disable the

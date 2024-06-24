@@ -497,12 +497,40 @@ spec:
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
+                      privateServiceConnect:
+                        description: PrivateSericeConnect allows users to enable access
+                          to the cluster's API server using GCP Private Service Connect.
+                          It includes a forwarding rule paired with a Service Attachment
+                          across GCP accounts and allows clients to connect to services
+                          using GCP internal networking of using public load balancers.
+                        properties:
+                          enabled:
+                            description: Enabled specifies if Private Service Connect
+                              is to be enabled on the cluster.
+                            type: boolean
+                          serviceAttachment:
+                            description: ServiceAttachment configures the service
+                              attachment to be used by the cluster.
+                            properties:
+                              subnet:
+                                description: Subnet configures the subnetwork that
+                                  contains the service attachment.
+                                properties:
+                                  cidr:
+                                    description: Cidr configures the network cidr
+                                      of the subnetwork that contains the service
+                                      attachment.
+                                    type: string
+                                type: object
+                            type: object
+                        required:
+                        - enabled
+                        type: object
                       region:
                         description: Region specifies the GCP region where the cluster
                           will be created.
                         type: string
                     required:
-                    - credentialsSecretRef
                     - region
                     type: object
                   ibmcloud:

@@ -352,7 +352,7 @@ func InstallerPodSpec(
 			Command:         []string{"/bin/sh", "-c"},
 			// Large file copy here has shown to cause problems in clusters under load, safer to copy then rename to the file the install manager is waiting for
 			// so it doesn't try to run a partially copied binary.
-			Args:         []string{fmt.Sprintf("cp -v /bin/openshift-install /output/openshift-install.tmp && mv /output/openshift-install.tmp /output/openshift-install && major_version=$(sed -n 's/.*release \\([0-9]*\\).*/\\1/p' /etc/redhat-release) && ln -v /output/hiveutil.rhel${major_version} /output/hiveutil && /output/hiveutil install-manager --work-dir /output --log-level debug %s %s", cd.Namespace, provisionName)},
+			Args:         []string{fmt.Sprintf("cp -v /bin/openshift-install /output/openshift-install.tmp && mv /output/openshift-install.tmp /output/openshift-install && major_version=$(sed -n 's/.*release \\([0-9]*\\).*/\\1/p' /etc/redhat-release) && ln -s /output/hiveutil.rhel${major_version} /output/hiveutil && /output/hiveutil install-manager --work-dir /output --log-level debug %s %s", cd.Namespace, provisionName)},
 			VolumeMounts: volumeMounts,
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
@@ -627,6 +627,30 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s=owned", req.Spec.InfraID),
 	)
 
+	// Set up /output emptydir and copy hiveutil there for credential_process compatibility with provisioning
+	volumes = append(volumes, corev1.Volume{
+		Name: "output",
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{},
+		},
+	})
+	mounts = append(mounts, corev1.VolumeMount{
+		Name:      "output",
+		MountPath: "/output",
+	})
+
+	initContainers := []corev1.Container{
+		{
+			Name:            "hive",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: corev1.PullAlways,
+			Env:             env,
+			Command:         []string{"/bin/sh", "-c"},
+			Args:            []string{"cp /usr/bin/hiveutil /output/hiveutil.tmp && mv /output/hiveutil.tmp /output/hiveutil"},
+			VolumeMounts:    mounts,
+		},
+	}
+
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -642,6 +666,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		// Also cleanup anything with the tag for the legacy cluster ID (credentials still using this for example)
 		containers[0].Args = append(containers[0].Args, fmt.Sprintf("openshiftClusterID=%s", req.Spec.ClusterID))
 	}
+	job.Spec.Template.Spec.InitContainers = initContainers
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
 }

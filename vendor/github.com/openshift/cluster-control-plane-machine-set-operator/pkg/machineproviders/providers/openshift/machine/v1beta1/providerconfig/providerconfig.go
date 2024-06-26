@@ -244,7 +244,7 @@ func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 	case configv1.OpenStackPlatformType:
 		return deep.Equal(p.openstack.providerConfig, other.OpenStack().providerConfig), nil
 	case configv1.VSpherePlatformType:
-		return deep.Equal(p.vsphere.providerConfig, other.VSphere().providerConfig), nil
+		return p.VSphere().Diff(other.VSphere().providerConfig)
 	case configv1.NonePlatformType:
 		return nil, errUnsupportedPlatformType
 	default:

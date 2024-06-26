@@ -17,10 +17,13 @@ limitations under the License.
 package providerconfig
 
 import (
+	"encoding/json"
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/go-test/deep"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -33,12 +36,15 @@ import (
 type VSphereProviderConfig struct {
 	providerConfig machinev1beta1.VSphereMachineProviderSpec
 	infrastructure *configv1.Infrastructure
+	logger         logr.Logger
 }
 
 func (v VSphereProviderConfig) getFailureDomainFromInfrastructure(fd machinev1.VSphereFailureDomain) (*configv1.VSpherePlatformFailureDomainSpec, error) {
-	for _, failureDomain := range v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains {
-		if failureDomain.Name == fd.Name {
-			return &failureDomain, nil
+	if v.infrastructure.Spec.PlatformSpec.VSphere != nil {
+		for _, failureDomain := range v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains {
+			if failureDomain.Name == fd.Name {
+				return &failureDomain, nil
+			}
 		}
 	}
 
@@ -50,7 +56,7 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	workspace := &machinev1beta1.Workspace{}
 
 	if len(topology.ComputeCluster) > 0 {
-		workspace.ResourcePool = fmt.Sprintf("/%s/resources", topology.ComputeCluster)
+		workspace.ResourcePool = path.Clean(fmt.Sprintf("/%s/Resources", topology.ComputeCluster))
 	}
 
 	if len(topology.ResourcePool) > 0 {
@@ -78,6 +84,31 @@ func (v VSphereProviderConfig) getWorkspaceFromFailureDomain(failureDomain *conf
 	return workspace
 }
 
+// getTemplateName returns the name of the name of the template.
+func getTemplateName(template string) string {
+	if strings.Contains(template, "/") {
+		return template[strings.LastIndex(template, "/")+1:]
+	}
+
+	return template
+}
+
+// Diff compares two ProviderConfigs and returns a list of differences,
+// or nil if there are none.
+func (v VSphereProviderConfig) Diff(other machinev1beta1.VSphereMachineProviderSpec) ([]string, error) {
+	// Templates can be provided either with an absolute path or relative.
+	// This can result in the control plane nodes rolling out when they dont need to.
+	// As long as the OVA name matches that will be considered a match.
+	otherTemplate := getTemplateName(other.Template)
+	currentTemplate := getTemplateName(v.providerConfig.Template)
+
+	if otherTemplate == currentTemplate {
+		other.Template = v.providerConfig.Template
+	}
+
+	return deep.Equal(v.providerConfig, other), nil
+}
+
 // InjectFailureDomain returns a new VSphereProviderConfig configured with the failure domain.
 func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDomain) (VSphereProviderConfig, error) {
 	newVSphereProviderConfig := v
@@ -89,21 +120,36 @@ func (v VSphereProviderConfig) InjectFailureDomain(fd machinev1.VSphereFailureDo
 
 	newVSphereProviderConfig.providerConfig.Workspace = newVSphereProviderConfig.getWorkspaceFromFailureDomain(failureDomain)
 	topology := failureDomain.Topology
+	network := newVSphereProviderConfig.providerConfig.Network
+
+	logNetworkInfo(newVSphereProviderConfig.providerConfig.Network, "control plane machine set network before failure domain: %v", v.logger)
 
 	if len(topology.Networks) > 0 {
-		newVSphereProviderConfig.providerConfig.Network = machinev1beta1.NetworkSpec{
-			Devices: []machinev1beta1.NetworkDeviceSpec{
-				{
-					NetworkName: topology.Networks[0],
-				},
-			},
+		networkSpec := machinev1beta1.NetworkSpec{}
+		// If original has AddressesFromPools, that means static IP is desired for the CPMS.  Keep that and just add the FD info.
+		// Note, CPMS may have no network devices defined relying on FD to provide.
+		if len(network.Devices) > 0 && len(network.Devices[0].AddressesFromPools) > 0 {
+			networkSpec.Devices = newVSphereProviderConfig.providerConfig.Network.Devices
 		}
+
+		// Set the network name for the device from FD.
+		for index, network := range topology.Networks {
+			if len(networkSpec.Devices) <= index {
+				networkSpec.Devices = append(networkSpec.Devices, machinev1beta1.NetworkDeviceSpec{})
+			}
+
+			networkSpec.Devices[index].NetworkName = network
+		}
+
+		newVSphereProviderConfig.providerConfig.Network = networkSpec
 	}
+
+	logNetworkInfo(newVSphereProviderConfig.providerConfig.Network, "control plane machine set network after failure domain: %v", v.logger)
 
 	if len(topology.Template) > 0 {
 		newVSphereProviderConfig.providerConfig.Template = topology.Template[strings.LastIndex(topology.Template, "/")+1:]
 	} else if len(v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains) > 0 {
-		newVSphereProviderConfig.providerConfig.Template = fmt.Sprintf("/%s/vm/%s/%s-rhcos-%s-%s", failureDomain.Topology.Datacenter, v.infrastructure.Status.InfrastructureName, v.infrastructure.Status.InfrastructureName, failureDomain.Region, failureDomain.Zone)
+		newVSphereProviderConfig.providerConfig.Template = fmt.Sprintf("%s-rhcos-%s-%s", v.infrastructure.Status.InfrastructureName, failureDomain.Region, failureDomain.Zone)
 	}
 
 	return newVSphereProviderConfig, nil
@@ -124,7 +170,7 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 		if workspace.Datacenter == topology.Datacenter &&
 			workspace.Datastore == topology.Datastore &&
 			workspace.Server == failureDomain.Server &&
-			workspace.ResourcePool == topology.ResourcePool {
+			path.Clean(workspace.ResourcePool) == path.Clean(topology.ResourcePool) {
 			return machinev1.VSphereFailureDomain{
 				Name: failureDomain.Name,
 			}
@@ -181,6 +227,7 @@ func newVSphereProviderConfig(logger logr.Logger, raw *runtime.RawExtension, inf
 	VSphereProviderConfig := VSphereProviderConfig{
 		providerConfig: vsphereMachineProviderSpec,
 		infrastructure: infrastructure,
+		logger:         logger,
 	}
 
 	// For networking, we only need to compare the network name.  For static IPs, we can ignore all ip configuration;
@@ -203,4 +250,17 @@ func newVSphereProviderConfig(logger logr.Logger, raw *runtime.RawExtension, inf
 	}
 
 	return config, nil
+}
+
+// logNetworkInfo log network info as json for better debugging of data being processed.
+func logNetworkInfo(network machinev1beta1.NetworkSpec, msg string, logger logr.Logger) {
+	// To limit marshalling to only when log level > 4.
+	if logger.GetV() >= 4 {
+		jsonOutput, err := json.Marshal(network)
+		if err != nil {
+			logger.Error(err, "Got error Marshalling NetworkSpec")
+		}
+
+		logger.V(4).Info(msg, string(jsonOutput))
+	}
 }

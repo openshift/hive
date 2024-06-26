@@ -609,6 +609,10 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 		return rfd.AWS().Placement.AvailabilityZone == gfd.AWS().Placement.AvailabilityZone, nil
 	}
 
+	if rfdtype == configv1.VSpherePlatformType {
+		return rfd.VSphere().Name == gfd.VSphere().Name, nil
+	}
+
 	// Otherwise the FailureDomain should be unambiguous and we can just compare them.
 	return rfd.Equal(gfd), nil
 }

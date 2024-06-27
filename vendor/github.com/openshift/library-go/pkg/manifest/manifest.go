@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	configv1 "github.com/openshift/api/config/v1"
+	features "github.com/openshift/api/features"
+
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,16 +28,19 @@ const (
 	featureSetAnnotation  = "release.openshift.io/feature-set"
 )
 
-var knownFeatureSets = sets.String{}
+var knownFeatureSets = sets.Set[string]{}
 
 func init() {
-	for featureSet := range configv1.FeatureSets {
-		if len(featureSet) == 0 {
-			knownFeatureSets.Insert("Default")
-			continue
+	for _, featureSets := range features.AllFeatureSets() {
+		for featureSet := range featureSets {
+			if len(featureSet) == 0 {
+				knownFeatureSets.Insert("Default")
+				continue
+			}
+			knownFeatureSets.Insert(string(featureSet))
 		}
-		knownFeatureSets.Insert(string(featureSet))
 	}
+	knownFeatureSets.Insert(string(configv1.CustomNoUpgrade))
 }
 
 // resourceId uniquely identifies a Kubernetes resource.
@@ -145,8 +150,8 @@ func (m *Manifest) populateFromObj() error {
 	return validateResourceId(m.id)
 }
 
-func getFeatureSets(annotations map[string]string) (sets.String, bool, error) {
-	ret := sets.String{}
+func getFeatureSets(annotations map[string]string) (sets.Set[string], bool, error) {
+	ret := sets.Set[string]{}
 	specified := false
 	for _, featureSetAnnotation := range []string{featureSetAnnotation} {
 		featureSetAnnotationValue, featureSetAnnotationExists := annotations[featureSetAnnotation]
@@ -156,7 +161,7 @@ func getFeatureSets(annotations map[string]string) (sets.String, bool, error) {
 			for _, manifestFeatureSet := range featureSetAnnotationValues {
 				if !knownFeatureSets.Has(manifestFeatureSet) {
 					// never include the manifest if the feature-set annotation is outside of known values
-					return nil, specified, fmt.Errorf("unrecognized value %q in %s=%s; known values are: %v", manifestFeatureSet, featureSetAnnotation, featureSetAnnotationValue, strings.Join(knownFeatureSets.List(), ","))
+					return nil, specified, fmt.Errorf("unrecognized value %q in %s=%s; known values are: %v", manifestFeatureSet, featureSetAnnotation, featureSetAnnotationValue, strings.Join(sets.List(knownFeatureSets), ","))
 				}
 			}
 			ret.Insert(featureSetAnnotationValues...)
@@ -176,7 +181,7 @@ func checkFeatureSets(requiredFeatureSet string, annotations map[string]string) 
 		return err
 	}
 	if manifestSpecifiesFeatureSets && !manifestFeatureSets.Has(requiredAnnotationValue) {
-		return fmt.Errorf("%q is required, and %s=%s", requiredAnnotationValue, featureSetAnnotation, strings.Join(manifestFeatureSets.List(), ","))
+		return fmt.Errorf("%q is required, and %s=%s", requiredAnnotationValue, featureSetAnnotation, strings.Join(sets.List(manifestFeatureSets), ","))
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,10 +52,19 @@ func getNetworkInventoryPath(vcenterContext vsphere.VCenterContext, networkName 
 		if _, networkInContext := clusterNetworkMap.NetworkNames[networkName]; !networkInContext {
 			continue
 		}
+
 		for _, resourcePool := range clusterNetworkMap.ResourcePools {
 			if resourcePool.InventoryPath == providerSpec.Workspace.ResourcePool {
 				return clusterNetworkMap.NetworkNames[networkName], nil
 			}
+		}
+
+		// This is a case for UPI (terraform or powercli) the resource pool will not exist
+		// prior to running openshift-install create manifests.
+		// This also will keep backward compatibility as this was not required to CAPI implementation.
+		if strings.Contains(providerSpec.Workspace.ResourcePool, clusterNetworkMap.Cluster) {
+			logrus.Debugf("using cluster %s as selector for network device path %s", clusterNetworkMap.Cluster, networkName)
+			return clusterNetworkMap.NetworkNames[networkName], nil
 		}
 	}
 	return "", fmt.Errorf("unable to find network %s in resource pool %s", networkName, providerSpec.Workspace.ResourcePool)
@@ -125,15 +135,16 @@ func GenerateMachines(ctx context.Context, clusterID string, config *types.Insta
 					Network: capv.NetworkSpec{
 						Devices: capvNetworkDevices,
 					},
-					Folder:       providerSpec.Workspace.Folder,
-					Template:     providerSpec.Template,
-					Datacenter:   providerSpec.Workspace.Datacenter,
-					Server:       providerSpec.Workspace.Server,
-					NumCPUs:      providerSpec.NumCPUs,
-					MemoryMiB:    providerSpec.MemoryMiB,
-					DiskGiB:      providerSpec.DiskGiB,
-					Datastore:    providerSpec.Workspace.Datastore,
-					ResourcePool: resourcePool,
+					Folder:            providerSpec.Workspace.Folder,
+					Template:          providerSpec.Template,
+					Datacenter:        providerSpec.Workspace.Datacenter,
+					Server:            providerSpec.Workspace.Server,
+					NumCPUs:           providerSpec.NumCPUs,
+					NumCoresPerSocket: providerSpec.NumCoresPerSocket,
+					MemoryMiB:         providerSpec.MemoryMiB,
+					DiskGiB:           providerSpec.DiskGiB,
+					Datastore:         providerSpec.Workspace.Datastore,
+					ResourcePool:      resourcePool,
 				},
 			},
 		}

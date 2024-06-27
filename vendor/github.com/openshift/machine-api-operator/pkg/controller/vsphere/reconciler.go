@@ -115,9 +115,37 @@ func (r *Reconciler) create() error {
 
 	// We only clone the VM template if we have no taskRef.
 	if r.providerStatus.TaskRef == "" {
+		klog.V(4).Infof("%v: ProviderStatus does not have TaskRef", r.machine.GetName())
 		if !r.machineScope.session.IsVC() {
 			return fmt.Errorf("%v: not connected to a vCenter", r.machine.GetName())
 		}
+
+		// Attempt to power on instance in situation where we alredy cloned the instance and lost taskRef.
+		klog.V(4).Infof("%v: InstanceState is: %q", r.machine.GetName(), ptr.Deref(r.machineScope.providerStatus.InstanceState, ""))
+		if types.VirtualMachinePowerState(ptr.Deref(r.machineScope.providerStatus.InstanceState, "")) == types.VirtualMachinePowerStatePoweredOff {
+			klog.Infof("Powering on cloned machine without taskID: %v", r.machine.Name)
+
+			task, err := powerOn(r.machineScope)
+			if err != nil {
+				metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+					Name:      r.machine.Name,
+					Namespace: r.machine.Namespace,
+					Reason:    "PowerOn task finished with error",
+				})
+
+				conditionFailed := conditionFailed()
+				conditionFailed.Message = err.Error()
+				statusError := setProviderStatus(task, conditionFailed, r.machineScope, nil)
+				if statusError != nil {
+					return fmt.Errorf("failed to set provider status: %w", err)
+				}
+
+				return fmt.Errorf("%v: failed to power on machine: %w", r.machine.GetName(), err)
+			}
+
+			return setProviderStatus(task, conditionSuccess(), r.machineScope, nil)
+		}
+
 		klog.Infof("%v: cloning", r.machine.GetName())
 		task, err := clone(r.machineScope)
 		if err != nil {
@@ -170,8 +198,12 @@ func (r *Reconciler) create() error {
 		} else {
 			return fmt.Errorf("failed to check task status: %w", err)
 		}
-	} else if !taskIsFinished {
-		return fmt.Errorf("%v task %v has not finished", moTask.Info.DescriptionId, moTask.Reference().Value)
+	} else {
+		if taskIsFinished {
+			klog.V(4).Infof("%v task %v has completed", moTask.Info.DescriptionId, moTask.Reference().Value)
+		} else {
+			return fmt.Errorf("%v task %v has not finished", moTask.Info.DescriptionId, moTask.Reference().Value)
+		}
 	}
 
 	// if clone task finished successfully, power on the vm
@@ -250,7 +282,7 @@ func (r *Reconciler) update() error {
 		Ref:     vmRef,
 	}
 
-	if err := vm.reconcileTags(r.Context, r.session, r.machine); err != nil {
+	if err := vm.reconcileTags(r.Context, r.session, r.machine, r.providerSpec); err != nil {
 		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 			Name:      r.machine.Name,
 			Namespace: r.machine.Namespace,
@@ -287,10 +319,9 @@ func (r *Reconciler) exists() (bool, error) {
 	}
 
 	// Check if machine was powered on after clone.
-	// If it is powered off and in "Provisioning" phase, treat machine as non-existed yet and requeue for proceed
-	// with creation procedure.
+	// If it is powered off and in "Provisioning" phase, treat machine as non-existed yet and proceed with creation procedure.
 	powerState := types.VirtualMachinePowerState(ptr.Deref(r.machineScope.providerStatus.InstanceState, ""))
-	if powerState == "" {
+	if powerState == "" || ptr.Deref(r.machine.Status.Phase, "") == machinev1.PhaseProvisioning {
 		vm := &virtualMachine{
 			Context: r.machineScope.Context,
 			Obj:     object.NewVirtualMachine(r.machineScope.session.Client.Client, vmRef),
@@ -303,7 +334,11 @@ func (r *Reconciler) exists() (bool, error) {
 	}
 
 	if ptr.Deref(r.machine.Status.Phase, "") == machinev1.PhaseProvisioning && powerState == types.VirtualMachinePowerStatePoweredOff {
-		klog.Infof("%v: already exists, but was not powered on after clone, requeue ", r.machine.GetName())
+		klog.Infof("%v: already exists, but was not powered on after clone", r.machine.GetName())
+		r.machineScope.providerStatus.InstanceState = ptr.To(string(powerState))
+		if err := r.machineScope.PatchMachine(); err != nil {
+			return false, fmt.Errorf("%v: failed to patch machine: %w", r.machine.GetName(), err)
+		}
 		return false, nil
 	}
 
@@ -330,11 +365,11 @@ func (r *Reconciler) delete() error {
 						Namespace: r.machine.Namespace,
 						Reason:    "Task finished with error",
 					})
-					klog.Errorf("Delete task finished with error: %w", err)
+					klog.Errorf("Delete task finished with error: %v", err)
 					return fmt.Errorf("%v task %v finished with error: %w", moTask.Info.DescriptionId, moTask.Reference().Value, err)
 				} else {
 					klog.Warningf(
-						"TaskRef points to clone task which finished with error: %w. Proceeding with machine deletion", err,
+						"TaskRef points to clone task which finished with error: %v. Proceeding with machine deletion", err,
 					)
 				}
 			} else if !taskIsFinished {
@@ -474,7 +509,7 @@ func (r *Reconciler) nodeHasVolumesAttached(ctx context.Context, nodeName string
 	node := &corev1.Node{}
 	if err := r.apiReader.Get(ctx, apimachinerytypes.NamespacedName{Name: nodeName}, node); err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.Errorf("Could not find node from noderef, it may have already been deleted: %w", err)
+			klog.Errorf("Could not find node from noderef, it may have already been deleted: %v", err)
 			return false, nil
 		}
 		return true, err
@@ -835,7 +870,7 @@ func clone(s *machineScope) (string, error) {
 			fmt.Sprintf(
 				"Hardware lower than %d is not supported, clone stopped. "+
 					"Detected machine template version is %d. "+
-					"Please update machine template: https://access.redhat.com/articles/6090681",
+					"Please update machine template: https://docs.openshift.com/container-platform/latest/updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.html",
 				minimumHWVersion, hwVersion,
 			),
 		)
@@ -1314,25 +1349,28 @@ func (vm *virtualMachine) getPowerState() (types.VirtualMachinePowerState, error
 
 // reconcileTags ensures that the required tags are present on the virtual machine, eg the Cluster ID
 // that is used by the installer on cluster deletion to ensure ther are no leaked resources.
-func (vm *virtualMachine) reconcileTags(ctx context.Context, sessionInstance *session.Session, machine *machinev1.Machine) error {
+func (vm *virtualMachine) reconcileTags(ctx context.Context, sessionInstance *session.Session, machine *machinev1.Machine, providerSpec *machinev1.VSphereMachineProviderSpec) error {
 	if err := sessionInstance.WithCachingTagsManager(vm.Context, func(c *session.CachingTagsManager) error {
 		klog.Infof("%v: Reconciling attached tags", machine.GetName())
 
 		clusterID := machine.Labels[machinev1.MachineClusterIDLabel]
-
-		attached, err := vm.checkAttachedTag(ctx, clusterID, c)
-		if err != nil {
-			return err
-		}
-
-		if !attached {
-			klog.Infof("%v: Attaching %s tag to vm", machine.GetName(), clusterID)
-			// the tag should already be created by installer
-			if err := c.AttachTag(ctx, clusterID, vm.Ref); err != nil {
+		tagIDs := []string{clusterID}
+		tagIDs = append(tagIDs, providerSpec.TagIDs...)
+		klog.Infof("%v: Reconciling %s tags to vm", machine.GetName(), tagIDs)
+		for _, tagID := range tagIDs {
+			attached, err := vm.checkAttachedTag(ctx, tagID, c)
+			if err != nil {
 				return err
 			}
-		}
 
+			if !attached {
+				klog.Infof("%v: Attaching %s tag to vm", machine.GetName(), tagID)
+				// the tag should already be created by installer or the administrator
+				if err := c.AttachTag(ctx, tagID, vm.Ref); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -1359,9 +1397,16 @@ func (vm *virtualMachine) checkAttachedTag(ctx context.Context, tagName string, 
 	}
 
 	for _, tag := range tags {
-		if tag.Name == tagName {
-			return true, nil
+		if session.IsName(tagName) {
+			if tag.Name == tagName {
+				return true, nil
+			}
+		} else {
+			if tag.ID == tagName {
+				return true, nil
+			}
 		}
+
 	}
 
 	return false, nil
@@ -1377,22 +1422,34 @@ func tagToCategoryName(tagName string) string {
 }
 
 func (vm *virtualMachine) foundTag(ctx context.Context, tagName string, m *session.CachingTagsManager) (bool, error) {
-	tags, err := m.ListTagsForCategory(ctx, tagToCategoryName(tagName))
-	if err != nil {
-		if isNotFoundErr(err) {
-			return false, nil
-		}
-		return false, err
-	}
+	var tags []string
+	var err error
 
+	if session.IsName(tagName) {
+		tags, err = m.ListTagsForCategory(ctx, tagToCategoryName(tagName))
+		if err != nil {
+			if isNotFoundErr(err) {
+				return false, nil
+			}
+			return false, err
+		}
+	} else {
+		tags = []string{tagName}
+	}
+	klog.V(4).Infof("validating the presence of tags: %+v", tags)
 	for _, id := range tags {
 		tag, err := m.GetTag(ctx, id)
 		if err != nil {
 			return false, err
 		}
-
-		if tag.Name == tagName {
-			return true, nil
+		if session.IsName(tagName) {
+			if tag.Name == tagName {
+				return true, nil
+			}
+		} else {
+			if tag.ID == tagName {
+				return true, nil
+			}
 		}
 	}
 

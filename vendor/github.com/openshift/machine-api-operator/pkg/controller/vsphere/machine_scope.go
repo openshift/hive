@@ -11,6 +11,7 @@ import (
 	apicorev1 "k8s.io/api/core/v1"
 	apimachineryerrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachineryutilerrors "k8s.io/apimachinery/pkg/util/errors"
+	vsphere "k8s.io/cloud-provider-vsphere/pkg/common/config"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -26,6 +27,7 @@ type machineScopeParams struct {
 	apiReader                  runtimeclient.Reader
 	machine                    *machinev1.Machine
 	StaticIPFeatureGateEnabled bool
+	openshiftConfigNameSpace   string
 }
 
 // machineScope defines a scope defined around a machine and its cluster.
@@ -38,7 +40,7 @@ type machineScope struct {
 	// client reader that bypasses the manager's cache
 	apiReader runtimeclient.Reader
 	// vSphere cloud-provider config
-	vSphereConfig *vSphereConfig
+	vSphereConfig *vsphere.Config
 	// machine resource
 	machine                    *machinev1.Machine
 	providerSpec               *machinev1.VSphereMachineProviderSpec
@@ -54,7 +56,7 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 		return nil, fmt.Errorf("%v: machine scope require a context", params.machine.GetName())
 	}
 
-	vSphereConfig, err := getVSphereConfig(params.apiReader)
+	vSphereConfig, err := getVSphereConfig(params.apiReader, params.openshiftConfigNameSpace)
 	if err != nil {
 		klog.Errorf("Failed to fetch vSphere config: %v", err)
 	}
@@ -77,10 +79,10 @@ func newMachineScope(params machineScopeParams) (*machineScope, error) {
 		return nil, fmt.Errorf("%v: no workspace provided", params.machine.GetName())
 	}
 
-	server := fmt.Sprintf("%s:%s", providerSpec.Workspace.Server, getPortFromConfig(vSphereConfig))
+	server := fmt.Sprintf("%s:%s", providerSpec.Workspace.Server, getVCenterPortFromConfig(vSphereConfig, providerSpec.Workspace.Server))
 	authSession, err := session.GetOrCreate(params.Context,
 		server, providerSpec.Workspace.Datacenter,
-		user, password, getInsecureFlagFromConfig(vSphereConfig))
+		user, password, getVCenterInsecureFlagFromConfig(vSphereConfig, providerSpec.Workspace.Server))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vSphere session: %w", err)
 	}

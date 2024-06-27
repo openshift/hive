@@ -81,9 +81,9 @@ type Platform struct {
 	PropagateUserTag bool `json:"propagateUserTags,omitempty"`
 
 	// LBType is an optional field to specify a load balancer type.
-	//
-	// When this field is specified, the default ingresscontroller will be
-	// created using the specified load-balancer type.
+	// When this field is specified, all ingresscontrollers (including the
+	// default ingresscontroller) will be created using the specified load-balancer
+	// type by default.
 	//
 	// Following are the accepted values:
 	//
@@ -102,10 +102,15 @@ type Platform struct {
 	// +optional
 	LBType configv1.AWSLBType `json:"lbType,omitempty"`
 
-	// PreserveBootstrapIgnition is an optional field that can be used to make the S3 deletion optional
-	// during bootstrap destroy.
+	// PreserveBootstrapIgnition is deprecated. Use bestEffortDeleteIgnition instead.
 	// +optional
 	PreserveBootstrapIgnition bool `json:"preserveBootstrapIgnition,omitempty"`
+
+	// BestEffortDeleteIgnition is an optional field that can be used to ignore errors from S3 deletion of ignition
+	// objects during cluster bootstrap. The default behavior is to fail the installation if ignition objects cannot be
+	// deleted. Enable this functionality when there are known reasons disallowing their deletion.
+	// +optional
+	BestEffortDeleteIgnition bool `json:"bestEffortDeleteIgnition,omitempty"`
 
 	// PublicIpv4Pool is an optional field that can be used to tell the installation process to use
 	// Public IPv4 address that you bring to your AWS account with BYOIP.

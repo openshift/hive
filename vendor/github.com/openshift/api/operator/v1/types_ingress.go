@@ -14,6 +14,10 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.availableReplicas,selectorpath=.status.selector
+// +kubebuilder:resource:path=ingresscontrollers,scope=Namespaced
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/616
+// +openshift:capability=Ingress
+// +openshift:file-pattern=cvoRunLevel=0000_50,operatorName=ingress,operatorOrdering=00
 
 // IngressController describes a managed ingress controller for the cluster. The
 // controller can service OpenShift Route and Kubernetes Ingress resources.
@@ -338,6 +342,7 @@ type NodePlacement struct {
 	// See https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 	//
 	// +optional
+	// +listType=atomic
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
@@ -409,6 +414,7 @@ type LoadBalancerStrategy struct {
 	//
 	// +nullable
 	// +optional
+	// +listType=atomic
 	AllowedSourceRanges []CIDR `json:"allowedSourceRanges,omitempty"`
 
 	// providerParameters holds desired load balancer information specific to
@@ -1125,6 +1131,7 @@ type IngressControllerCaptureHTTPHeaders struct {
 	//
 	// +nullable
 	// +optional
+	// +listType=atomic
 	Request []IngressControllerCaptureHTTPHeader `json:"request,omitempty"`
 
 	// response specifies which HTTP response headers to capture.
@@ -1133,6 +1140,7 @@ type IngressControllerCaptureHTTPHeaders struct {
 	//
 	// +nullable
 	// +optional
+	// +listType=atomic
 	Response []IngressControllerCaptureHTTPHeader `json:"response,omitempty"`
 }
 
@@ -1259,6 +1267,7 @@ type AccessLogging struct {
 	// +nullable
 	// +optional
 	// +kubebuilder:validation:MaxItems=1
+	// +listType=atomic
 	HTTPCaptureCookies []IngressControllerCaptureHTTPCookie `json:"httpCaptureCookies,omitempty"`
 
 	// logEmptyRequests specifies how connections on which no request is
@@ -1398,6 +1407,7 @@ type IngressControllerHTTPHeaders struct {
 	//
 	// +nullable
 	// +optional
+	// +listType=atomic
 	HeaderNameCaseAdjustments []IngressControllerHTTPHeaderNameCaseAdjustment `json:"headerNameCaseAdjustments,omitempty"`
 
 	// actions specifies options for modifying headers and their values.
@@ -1645,6 +1655,23 @@ type IngressControllerTuningOptions struct {
 	// +optional
 	TunnelTimeout *metav1.Duration `json:"tunnelTimeout,omitempty"`
 
+	// ConnectTimeout defines the maximum time to wait for
+	// a connection attempt to a server/backend to succeed.
+	//
+	// This field expects an unsigned duration string of decimal numbers, each with optional
+	// fraction and a unit suffix, e.g. "300ms", "1.5h" or "2h45m".
+	// Valid time units are "ns", "us" (or "µs" U+00B5 or "μs" U+03BC), "ms", "s", "m", "h".
+	//
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose a reasonable default. This default is subject to change over time.
+	// The current default is 5s.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Pattern=^(0|([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+)$
+	// +kubebuilder:validation:Type:=string
+	// +optional
+	ConnectTimeout *metav1.Duration `json:"connectTimeout,omitempty"`
+
 	// tlsInspectDelay defines how long the router can hold data to find a
 	// matching route.
 	//
@@ -1844,6 +1871,8 @@ type IngressControllerStatus struct {
 	//     * DNS is managed.
 	//     * DNS records have been successfully created.
 	//   - False if any of those conditions are unsatisfied.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []OperatorCondition `json:"conditions,omitempty"`
 
 	// tlsProfile is the TLS connection configuration that is in effect.
@@ -1864,7 +1893,6 @@ type IngressControllerStatus struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
 
 // IngressControllerList contains a list of IngressControllers.
 //

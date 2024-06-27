@@ -83,10 +83,16 @@ func GenerateMachines(platform *azure.Platform, pool *types.MachinePool, userDat
 		ManagedDisk: &capz.ManagedDiskParameters{
 			StorageAccountType: mpool.DiskType,
 		},
+		CachingType: "ReadWrite",
 	}
 	ultrassd := mpool.UltraSSDCapability == "Enabled"
 	additionalCapabilities := &capz.AdditionalCapabilities{
 		UltraSSDEnabled: &ultrassd,
+	}
+	if pool.Platform.Azure.DiskEncryptionSet != nil {
+		osDisk.ManagedDisk.DiskEncryptionSet = &capz.DiskEncryptionSetParameters{
+			ID: mpool.OSDisk.DiskEncryptionSet.ToID(),
+		}
 	}
 
 	machineProfile := generateSecurityProfile(mpool)
@@ -126,6 +132,7 @@ func GenerateMachines(platform *azure.Platform, pool *types.MachinePool, userDat
 				AdditionalCapabilities: additionalCapabilities,
 				AllocatePublicIP:       false,
 				EnableIPForwarding:     false,
+				SecurityProfile:        securityProfile,
 			},
 		}
 		azureMachine.SetGroupVersionKind(capz.GroupVersion.WithKind("AzureMachine"))
@@ -161,6 +168,7 @@ func GenerateMachines(platform *azure.Platform, pool *types.MachinePool, userDat
 		})
 	}
 
+	osDisk.ManagedDisk.DiskEncryptionSet = nil
 	bootstrapAzureMachine := &capz.AzureMachine{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: capiutils.GenerateBoostrapMachineName(clusterID),
@@ -171,12 +179,18 @@ func GenerateMachines(platform *azure.Platform, pool *types.MachinePool, userDat
 			},
 		},
 		Spec: capz.AzureMachineSpec{
-			VMSize:                 mpool.InstanceType,
-			Image:                  image,
-			FailureDomain:          ptr.To(mpool.Zones[0]),
-			OSDisk:                 osDisk,
-			AdditionalTags:         tags,
-			AllocatePublicIP:       true,
+			VMSize:         mpool.InstanceType,
+			Image:          image,
+			FailureDomain:  ptr.To(mpool.Zones[0]),
+			OSDisk:         osDisk,
+			AdditionalTags: tags,
+			// Do not allocate a public IP since it isn't
+			// accessible as we are using an outbound LB for the
+			// control plane. This is temporary until we have a
+			// workaround for accessing SSH	(Most likely port
+			// forwarding SSH off the LB until the bootstrap node
+			// is destroyed).
+			AllocatePublicIP:       false,
 			AdditionalCapabilities: additionalCapabilities,
 			SecurityProfile:        securityProfile,
 		},

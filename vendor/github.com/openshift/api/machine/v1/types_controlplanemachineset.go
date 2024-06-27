@@ -8,10 +8,9 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ControlPlaneMachineSet ensures that a specified number of control plane machine replicas are running at any given time.
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=controlplanemachinesets,scope=Namespaced
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas
 // +kubebuilder:printcolumn:name="Desired",type="integer",JSONPath=".spec.replicas",description="Desired Replicas"
@@ -21,6 +20,13 @@ import (
 // +kubebuilder:printcolumn:name="Unavailable",type="integer",JSONPath=".status.unavailableReplicas",description="Observed number of unavailable replicas"
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=".spec.state",description="ControlPlaneMachineSet state"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="ControlPlaneMachineSet age"
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1112
+// +openshift:file-pattern=cvoRunLevel=0000_10,operatorName=control-plane-machine-set,operatorOrdering=01
+// +openshift:capability=MachineAPI
+// +kubebuilder:metadata:annotations="exclude.release.openshift.io/internal-openshift-hosted=true"
+// +kubebuilder:metadata:annotations=include.release.openshift.io/self-managed-high-availability=true
+
+// ControlPlaneMachineSet ensures that a specified number of control plane machine replicas are running at any given time.
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 type ControlPlaneMachineSet struct {
@@ -241,14 +247,17 @@ type FailureDomains struct {
 	Platform configv1.PlatformType `json:"platform"`
 
 	// AWS configures failure domain information for the AWS platform.
+	// +listType=atomic
 	// +optional
 	AWS *[]AWSFailureDomain `json:"aws,omitempty"`
 
 	// Azure configures failure domain information for the Azure platform.
+	// +listType=atomic
 	// +optional
 	Azure *[]AzureFailureDomain `json:"azure,omitempty"`
 
 	// GCP configures failure domain information for the GCP platform.
+	// +listType=atomic
 	// +optional
 	GCP *[]GCPFailureDomain `json:"gcp,omitempty"`
 
@@ -266,6 +275,7 @@ type FailureDomains struct {
 	// + Some OpenStack deployments may not have availability zones or root volumes.
 	// + Therefore we'll check the length of the list to determine if it's empty instead
 	// + of nil if it would be a pointer.
+	// +listType=atomic
 	// +optional
 	OpenStack []OpenStackFailureDomain `json:"openstack,omitempty"`
 

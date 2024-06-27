@@ -419,6 +419,10 @@ const (
 	// file that includes configuration for aws-private-link-controller
 	AWSPrivateLinkControllerConfigFileEnvVar = "AWS_PRIVATELINK_CONTROLLER_CONFIG_FILE"
 
+	// PrivateLinkControllerConfigFileEnvVar if present, points to a simple text
+	// file that includes configuration for the privatelink controller
+	PrivateLinkControllerConfigFileEnvVar = "PRIVATELINK_CONTROLLER_CONFIG_FILE"
+
 	// FailedProvisionConfigFileEnvVar points to a text file containing configuration for
 	// desired behavior when provisions fail. See HiveConfig.Spec.FailedProvisionConfig.
 	FailedProvisionConfigFileEnvVar = "FAILED_PROVISION_CONFIG_FILE"

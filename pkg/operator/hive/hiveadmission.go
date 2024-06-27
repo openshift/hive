@@ -142,6 +142,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, managedDomainsConfigMapInfo, hiveAdmContainer)
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, awsPrivateLinkConfigMapInfo, hiveAdmContainer)
+	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, privateLinkConfigMapInfo, hiveAdmContainer)
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(), hiveAdmContainer)
 	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 

@@ -1,6 +1,6 @@
 # Base OS image for Hive development containers FROM on Fedora.
 
-FROM fedora:33
+FROM fedora:41
 
 # ssh-agent required for gathering logs in some situations:
 RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi

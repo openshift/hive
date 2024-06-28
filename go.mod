@@ -1,6 +1,6 @@
 module github.com/openshift/hive
 
-go 1.22
+go 1.22.0
 
 toolchain go1.22.4
 
@@ -68,11 +68,11 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.3
 	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/apimachinery v0.29.3
+	k8s.io/apimachinery v0.30.2
 	k8s.io/cli-runtime v0.29.3
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/cluster-registry v0.0.6
-	k8s.io/code-generator v0.29.3
+	k8s.io/code-generator v0.30.2
 	k8s.io/klog v1.0.0
 	k8s.io/kube-aggregator v0.29.1
 	k8s.io/kubectl v0.29.3
@@ -362,7 +362,6 @@ require (
 	honnef.co/go/tools v0.4.5 // indirect
 	k8s.io/apiserver v0.29.3 // indirect
 	k8s.io/component-base v0.29.3 // indirect
-	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect

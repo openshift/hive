@@ -22,16 +22,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
-	"k8s.io/klog/v2"
-
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	informergenargs "k8s.io/code-generator/cmd/informer-gen/args"
+	"k8s.io/code-generator/cmd/informer-gen/args"
 	genutil "k8s.io/code-generator/pkg/util"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
+	"k8s.io/klog/v2"
 )
 
 // NameSystems returns the name system used by the generators in this package.
@@ -85,37 +84,34 @@ func isInternal(m types.Member) bool {
 	return !strings.Contains(m.Tags, "json")
 }
 
-func packageForInternalInterfaces(base string) string {
-	return filepath.Join(base, "internalinterfaces")
-}
+const subdirForInternalInterfaces = "internalinterfaces"
 
-// Packages makes the client package definition.
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+// GetTargets makes the client target definition.
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, "", gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	customArgs, ok := arguments.CustomArgs.(*informergenargs.CustomArgs)
-	if !ok {
-		klog.Fatalf("Wrong CustomArgs type: %T", arguments.CustomArgs)
+	internalVersionOutputDir := args.OutputDir
+	internalVersionOutputPkg := args.OutputPkg
+	externalVersionOutputDir := args.OutputDir
+	externalVersionOutputPkg := args.OutputPkg
+	if !args.SingleDirectory {
+		internalVersionOutputDir = filepath.Join(internalVersionOutputDir, "internalversion")
+		internalVersionOutputPkg = path.Join(internalVersionOutputPkg, "internalversion")
+		externalVersionOutputDir = filepath.Join(externalVersionOutputDir, "externalversions")
+		externalVersionOutputPkg = path.Join(externalVersionOutputPkg, "externalversions")
 	}
 
-	internalVersionPackagePath := filepath.Join(arguments.OutputPackagePath)
-	externalVersionPackagePath := filepath.Join(arguments.OutputPackagePath)
-	if !customArgs.SingleDirectory {
-		internalVersionPackagePath = filepath.Join(arguments.OutputPackagePath, "internalversion")
-		externalVersionPackagePath = filepath.Join(arguments.OutputPackagePath, "externalversions")
-	}
-
-	var packageList generator.Packages
+	var targetList []generator.Target
 	typesForGroupVersion := make(map[clientgentypes.GroupVersion][]*types.Type)
 
 	externalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	internalGroupVersions := make(map[string]clientgentypes.GroupVersions)
 	groupGoNames := make(map[string]string)
-	for _, inputDir := range arguments.InputDirs {
-		p := context.Universe.Package(genutil.Vendorless(inputDir))
+	for _, inputPkg := range context.Inputs {
+		p := context.Universe.Package(inputPkg)
 
 		objectMeta, internal, err := objectMetaForPackage(p)
 		if err != nil {
@@ -148,14 +144,14 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
-		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
+		if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			gv.Group = clientgentypes.Group(override[0])
 		}
 
 		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
 		// the Go group identifier in CamelCase. It defaults
 		groupGoNames[groupPackageName] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
-		if override := types.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
+		if override := gengo.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
 			groupGoNames[groupPackageName] = namer.IC(override[0])
 		}
 
@@ -191,57 +187,80 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		typesToGenerate = orderer.OrderTypes(typesToGenerate)
 
 		if internal {
-			packageList = append(packageList, versionPackage(internalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, customArgs.InternalClientSetPackage, customArgs.ListersPackage))
+			targetList = append(targetList,
+				versionTarget(
+					internalVersionOutputDir, internalVersionOutputPkg,
+					groupPackageName, gv, groupGoNames[groupPackageName],
+					boilerplate, typesToGenerate,
+					args.InternalClientSetPackage, args.ListersPackage))
 		} else {
-			packageList = append(packageList, versionPackage(externalVersionPackagePath, groupPackageName, gv, groupGoNames[groupPackageName], boilerplate, typesToGenerate, customArgs.VersionedClientSetPackage, customArgs.ListersPackage))
+			targetList = append(targetList,
+				versionTarget(
+					externalVersionOutputDir, externalVersionOutputPkg,
+					groupPackageName, gv, groupGoNames[groupPackageName],
+					boilerplate, typesToGenerate,
+					args.VersionedClientSetPackage, args.ListersPackage))
 		}
 	}
 
 	if len(externalGroupVersions) != 0 {
-		packageList = append(packageList, factoryInterfacePackage(externalVersionPackagePath, boilerplate, customArgs.VersionedClientSetPackage))
-		packageList = append(packageList, factoryPackage(externalVersionPackagePath, boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions), externalGroupVersions,
-			customArgs.VersionedClientSetPackage,
-			typesForGroupVersion))
+		targetList = append(targetList,
+			factoryInterfaceTarget(
+				externalVersionOutputDir, externalVersionOutputPkg,
+				boilerplate, args.VersionedClientSetPackage))
+		targetList = append(targetList,
+			factoryTarget(
+				externalVersionOutputDir, externalVersionOutputPkg,
+				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(args.PluralExceptions),
+				externalGroupVersions, args.VersionedClientSetPackage, typesForGroupVersion))
 		for _, gvs := range externalGroupVersions {
-			packageList = append(packageList, groupPackage(externalVersionPackagePath, gvs, boilerplate))
+			targetList = append(targetList,
+				groupTarget(externalVersionOutputDir, externalVersionOutputPkg, gvs, boilerplate))
 		}
 	}
 
 	if len(internalGroupVersions) != 0 {
-		packageList = append(packageList, factoryInterfacePackage(internalVersionPackagePath, boilerplate, customArgs.InternalClientSetPackage))
-		packageList = append(packageList, factoryPackage(internalVersionPackagePath, boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(customArgs.PluralExceptions), internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion))
+		targetList = append(targetList,
+			factoryInterfaceTarget(internalVersionOutputDir, internalVersionOutputPkg, boilerplate, args.InternalClientSetPackage))
+		targetList = append(targetList,
+			factoryTarget(
+				internalVersionOutputDir, internalVersionOutputPkg,
+				boilerplate, groupGoNames, genutil.PluralExceptionListToMapOrDie(args.PluralExceptions),
+				internalGroupVersions, args.InternalClientSetPackage, typesForGroupVersion))
 		for _, gvs := range internalGroupVersions {
-			packageList = append(packageList, groupPackage(internalVersionPackagePath, gvs, boilerplate))
+			targetList = append(targetList,
+				groupTarget(internalVersionOutputDir, internalVersionOutputPkg, gvs, boilerplate))
 		}
 	}
 
-	return packageList
+	return targetList
 }
 
-func factoryPackage(basePackage string, boilerplate []byte, groupGoNames, pluralExceptions map[string]string, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string,
-	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
-	return &generator.DefaultPackage{
-		PackageName: filepath.Base(basePackage),
-		PackagePath: basePackage,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+func factoryTarget(outputDirBase, outputPkgBase string, boilerplate []byte, groupGoNames, pluralExceptions map[string]string, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string,
+	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Target {
+	return &generator.SimpleTarget{
+		PkgName:       path.Base(outputDirBase),
+		PkgPath:       outputPkgBase,
+		PkgDir:        outputDirBase,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "factory",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "factory.go",
 				},
-				outputPackage:             basePackage,
+				outputPackage:             outputPkgBase,
 				imports:                   generator.NewImportTracker(),
 				groupVersions:             groupVersions,
 				clientSetPackage:          clientSetPackage,
-				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
+				internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
 				gvGoNames:                 groupGoNames,
 			})
 
 			generators = append(generators, &genericGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "generic",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "generic.go",
 				},
-				outputPackage:        basePackage,
+				outputPackage:        outputPkgBase,
 				imports:              generator.NewImportTracker(),
 				groupVersions:        groupVersions,
 				pluralExceptions:     pluralExceptions,
@@ -254,19 +273,21 @@ func factoryPackage(basePackage string, boilerplate []byte, groupGoNames, plural
 	}
 }
 
-func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPackage string) generator.Package {
-	packagePath := packageForInternalInterfaces(basePackage)
+func factoryInterfaceTarget(outputDirBase, outputPkgBase string, boilerplate []byte, clientSetPackage string) generator.Target {
+	outputDir := filepath.Join(outputDirBase, subdirForInternalInterfaces)
+	outputPkg := path.Join(outputPkgBase, subdirForInternalInterfaces)
 
-	return &generator.DefaultPackage{
-		PackageName: filepath.Base(packagePath),
-		PackagePath: packagePath,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+	return &generator.SimpleTarget{
+		PkgName:       path.Base(outputDir),
+		PkgPath:       outputPkg,
+		PkgDir:        outputDir,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &factoryInterfaceGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "factory_interfaces",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "factory_interfaces.go",
 				},
-				outputPackage:    packagePath,
+				outputPackage:    outputPkg,
 				imports:          generator.NewImportTracker(),
 				clientSetPackage: clientSetPackage,
 			})
@@ -276,23 +297,25 @@ func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPa
 	}
 }
 
-func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Package {
-	packagePath := filepath.Join(basePackage, groupVersions.PackageName)
+func groupTarget(outputDirBase, outputPackageBase string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Target {
+	outputDir := filepath.Join(outputDirBase, groupVersions.PackageName)
+	outputPkg := path.Join(outputPackageBase, groupVersions.PackageName)
 	groupPkgName := strings.Split(string(groupVersions.PackageName), ".")[0]
 
-	return &generator.DefaultPackage{
-		PackageName: groupPkgName,
-		PackagePath: packagePath,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+	return &generator.SimpleTarget{
+		PkgName:       groupPkgName,
+		PkgPath:       outputPkg,
+		PkgDir:        outputDir,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &groupInterfaceGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "interface",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "interface.go",
 				},
-				outputPackage:             packagePath,
+				outputPackage:             outputPkg,
 				groupVersions:             groupVersions,
 				imports:                   generator.NewImportTracker(),
-				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
+				internalInterfacesPackage: path.Join(outputPackageBase, subdirForInternalInterfaces),
 			})
 			return generators
 		},
@@ -303,30 +326,33 @@ func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions
 	}
 }
 
-func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Package {
-	packagePath := filepath.Join(basePackage, groupPkgName, strings.ToLower(gv.Version.NonEmpty()))
+func versionTarget(outputDirBase, outputPkgBase string, groupPkgName string, gv clientgentypes.GroupVersion, groupGoName string, boilerplate []byte, typesToGenerate []*types.Type, clientSetPackage, listersPackage string) generator.Target {
+	subdir := []string{groupPkgName, strings.ToLower(gv.Version.NonEmpty())}
+	outputDir := filepath.Join(outputDirBase, filepath.Join(subdir...))
+	outputPkg := path.Join(outputPkgBase, path.Join(subdir...))
 
-	return &generator.DefaultPackage{
-		PackageName: strings.ToLower(gv.Version.NonEmpty()),
-		PackagePath: packagePath,
-		HeaderText:  boilerplate,
-		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
+	return &generator.SimpleTarget{
+		PkgName:       strings.ToLower(gv.Version.NonEmpty()),
+		PkgPath:       outputPkg,
+		PkgDir:        outputDir,
+		HeaderComment: boilerplate,
+		GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 			generators = append(generators, &versionInterfaceGenerator{
-				DefaultGen: generator.DefaultGen{
-					OptionalName: "interface",
+				GoGenerator: generator.GoGenerator{
+					OutputFilename: "interface.go",
 				},
-				outputPackage:             packagePath,
+				outputPackage:             outputPkg,
 				imports:                   generator.NewImportTracker(),
 				types:                     typesToGenerate,
-				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
+				internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
 			})
 
 			for _, t := range typesToGenerate {
 				generators = append(generators, &informerGenerator{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: strings.ToLower(t.Name.Name),
+					GoGenerator: generator.GoGenerator{
+						OutputFilename: strings.ToLower(t.Name.Name) + ".go",
 					},
-					outputPackage:             packagePath,
+					outputPackage:             outputPkg,
 					groupPkgName:              groupPkgName,
 					groupVersion:              gv,
 					groupGoName:               groupGoName,
@@ -334,7 +360,7 @@ func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.G
 					imports:                   generator.NewImportTracker(),
 					clientSetPackage:          clientSetPackage,
 					listersPackage:            listersPackage,
-					internalInterfacesPackage: packageForInternalInterfaces(basePackage),
+					internalInterfacesPackage: path.Join(outputPkgBase, subdirForInternalInterfaces),
 				})
 			}
 			return generators

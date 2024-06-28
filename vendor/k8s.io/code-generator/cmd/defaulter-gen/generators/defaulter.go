@@ -21,25 +21,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
+	"path"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
-
+	"k8s.io/code-generator/cmd/defaulter-gen/args"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
-
-// CustomArgs is used tby the go2idl framework to pass args specific to this
-// generator.
-type CustomArgs struct {
-	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
-}
 
 var typeZeroValue = map[string]interface{}{
 	"uint":        0.,
@@ -71,19 +65,19 @@ const inputTagName = "k8s:defaulter-gen-input"
 const defaultTagName = "default"
 
 func extractDefaultTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[defaultTagName]
+	return gengo.ExtractCommentTags("+", comments)[defaultTagName]
 }
 
 func extractTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[tagName]
+	return gengo.ExtractCommentTags("+", comments)[tagName]
 }
 
 func extractInputTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[inputTagName]
+	return gengo.ExtractCommentTags("+", comments)[inputTagName]
 }
 
 func checkTag(comments []string, require ...string) bool {
-	values := types.ExtractCommentTags("+", comments)[tagName]
+	values := gengo.ExtractCommentTags("+", comments)[tagName]
 	if len(require) == 0 {
 		return len(values) == 1 && values[0] == ""
 	}
@@ -227,14 +221,13 @@ func getManualDefaultingFunctions(context *generator.Context, pkg *types.Package
 	}
 }
 
-func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
-	boilerplate, err := arguments.LoadGoBoilerplate()
+func GetTargets(context *generator.Context, args *args.Args) []generator.Target {
+	boilerplate, err := gengo.GoBoilerplate(args.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
 	if err != nil {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	packages := generator.Packages{}
-	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
+	targets := []generator.Target{}
 
 	// Accumulate pre-existing default functions.
 	// TODO: This is too ad-hoc.  We need a better way.
@@ -243,36 +236,77 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 
-	// We are generating defaults only for packages that are explicitly
-	// passed as InputDir.
+	// First load other "input" packages.  We do this as a single call because
+	// it is MUCH faster.
+	inputPkgs := make([]string, 0, len(context.Inputs))
+	pkgToInput := map[string]string{}
 	for _, i := range context.Inputs {
 		klog.V(5).Infof("considering pkg %q", i)
+
 		pkg := context.Universe[i]
-		if pkg == nil {
-			// If the input had no Go files, for example.
-			continue
+
+		// if the types are not in the same package where the defaulter functions to be generated
+		inputTags := extractInputTag(pkg.Comments)
+		if len(inputTags) > 1 {
+			panic(fmt.Sprintf("there may only be one input tag, got %#v", inputTags))
 		}
+		if len(inputTags) == 1 {
+			inputPath := inputTags[0]
+			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
+				// this is a relative dir, which will not work under gomodules.
+				// join with the local package path, but warn
+				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
+				inputPath = path.Join(pkg.Path, inputTags[0])
+			}
+
+			klog.V(5).Infof("  input pkg %v", inputPath)
+			inputPkgs = append(inputPkgs, inputPath)
+			pkgToInput[i] = inputPath
+		} else {
+			pkgToInput[i] = i
+		}
+	}
+
+	// Make sure explicit peer-packages are added.
+	var peerPkgs []string
+	for _, pkg := range args.ExtraPeerDirs {
+		// In case someone specifies a peer as a path into vendor, convert
+		// it to its "real" package path.
+		if i := strings.Index(pkg, "/vendor/"); i != -1 {
+			pkg = pkg[i+len("/vendor/"):]
+		}
+		peerPkgs = append(peerPkgs, pkg)
+	}
+	if expanded, err := context.FindPackages(peerPkgs...); err != nil {
+		klog.Fatalf("cannot find peer packages: %v", err)
+	} else {
+		peerPkgs = expanded // now in fully canonical form
+	}
+	inputPkgs = append(inputPkgs, peerPkgs...)
+
+	if len(inputPkgs) > 0 {
+		if _, err := context.LoadPackages(inputPkgs...); err != nil {
+			klog.Fatalf("cannot load packages: %v", err)
+		}
+	}
+	// update context.Order to the latest context.Universe
+	orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
+	context.Order = orderer.OrderUniverse(context.Universe)
+
+	for _, i := range context.Inputs {
+		pkg := context.Universe[i]
+
 		// typesPkg is where the types that needs defaulter are defined.
 		// Sometimes it is different from pkg. For example, kubernetes core/v1
-		// types are defined in vendor/k8s.io/api/core/v1, while pkg is at
-		// pkg/api/v1.
+		// types are defined in k8s.io/api/core/v1, while the pkg which holds
+		// defaulter code is at k/k/pkg/api/v1.
 		typesPkg := pkg
 
 		// Add defaulting functions.
 		getManualDefaultingFunctions(context, pkg, existingDefaulters)
 
-		var peerPkgs []string
-		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
-			for _, pkg := range customArgs.ExtraPeerDirs {
-				if i := strings.Index(pkg, "/vendor/"); i != -1 {
-					pkg = pkg[i+len("/vendor/"):]
-				}
-				peerPkgs = append(peerPkgs, pkg)
-			}
-		}
-		// Make sure our peer-packages are added and fully parsed.
+		// Also look for defaulting functions in peer-packages.
 		for _, pp := range peerPkgs {
-			context.AddDir(pp)
 			getManualDefaultingFunctions(context, context.Universe[pp], existingDefaulters)
 		}
 
@@ -312,30 +346,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			return false
 		}
 
-		// if the types are not in the same package where the defaulter functions to be generated
-		inputTags := extractInputTag(pkg.Comments)
-		if len(inputTags) > 1 {
-			panic(fmt.Sprintf("there could only be one input tag, got %#v", inputTags))
-		}
-		if len(inputTags) == 1 {
-			var err error
-
-			inputPath := inputTags[0]
-			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
-				// this is a relative dir, which will not work under gomodules.
-				// join with the local package path, but warn
-				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
-				inputPath = filepath.Join(pkg.Path, inputTags[0])
-			}
-
-			typesPkg, err = context.AddDirectory(inputPath)
-			if err != nil {
-				klog.Fatalf("cannot import package %s", inputPath)
-			}
-			// update context.Order to the latest context.Universe
-			orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
-			context.Order = orderer.OrderUniverse(context.Universe)
-		}
+		// Find the right input pkg, which might not be this one.
+		inputPath := pkgToInput[i]
+		typesPkg = context.Universe[inputPath]
 
 		newDefaulters := defaulterFuncMap{}
 		for _, t := range typesPkg.Types {
@@ -394,37 +407,25 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			klog.V(5).Infof("no defaulters in package %s", pkg.Name)
 		}
 
-		path := pkg.Path
-		// if the source path is within a /vendor/ directory (for example,
-		// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-		// generation to output to the proper relative path (under vendor).
-		// Otherwise, the generator will create the file in the wrong location
-		// in the output directory.
-		// TODO: build a more fundamental concept in gengo for dealing with modifications
-		// to vendored packages.
-		if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
-			expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
-			if strings.Contains(expandedPath, "/vendor/") {
-				path = expandedPath
-			}
-		}
+		targets = append(targets,
+			&generator.SimpleTarget{
+				PkgName:       path.Base(pkg.Path),
+				PkgPath:       pkg.Path,
+				PkgDir:        pkg.Dir, // output pkg is the same as the input
+				HeaderComment: boilerplate,
 
-		packages = append(packages,
-			&generator.DefaultPackage{
-				PackageName: filepath.Base(pkg.Path),
-				PackagePath: path,
-				HeaderText:  header,
-				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
-					return []generator.Generator{
-						NewGenDefaulter(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, existingDefaulters, newDefaulters, peerPkgs),
-					}
-				},
 				FilterFunc: func(c *generator.Context, t *types.Type) bool {
 					return t.Name.Package == typesPkg.Path
 				},
+
+				GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
+					return []generator.Generator{
+						NewGenDefaulter(args.OutputFile, typesPkg.Path, pkg.Path, existingDefaulters, newDefaulters, peerPkgs),
+					}
+				},
 			})
 	}
-	return packages
+	return targets
 }
 
 // callTreeForType contains fields necessary to build a tree for types.
@@ -513,39 +514,16 @@ func getNestedDefault(t *types.Type) string {
 	return ""
 }
 
-func mustEnforceDefault(t *types.Type, depth int, omitEmpty bool) (interface{}, error) {
-	if depth > 0 {
-		return nil, nil
-	}
-	switch t.Kind {
-	case types.Pointer, types.Map, types.Slice, types.Array, types.Interface:
-		return nil, nil
-	case types.Struct:
-		return map[string]interface{}{}, nil
-	case types.Builtin:
-		if !omitEmpty {
-			if zero, ok := typeZeroValue[t.String()]; ok {
-				return zero, nil
-			} else {
-				return nil, fmt.Errorf("please add type %v to typeZeroValue struct", t)
-			}
-		}
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("not sure how to enforce default for %v", t.Kind)
-	}
-}
-
 var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
 var refREIdentIndex = refRE.SubexpIndex("reference")
 
-// ParseSymbolReference looks for strings that match one of the following:
+// parseSymbolReference looks for strings that match one of the following:
 //   - ref(Ident)
 //   - ref(pkgpath.Ident)
 //     If the input string matches either of these, it will return the (optional)
 //     pkgpath, the Ident, and true.  Otherwise it will return empty strings and
 //     false.
-func ParseSymbolReference(s, sourcePackage string) (types.Name, bool) {
+func parseSymbolReference(s, sourcePackage string) (types.Name, bool) {
 	matches := refRE.FindStringSubmatch(s)
 	if len(matches) < refREIdentIndex || matches[refREIdentIndex] == "" {
 		return types.Name{}, false
@@ -578,26 +556,19 @@ func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLin
 	}
 	var symbolReference types.Name
 	var defaultValue interface{}
-	if id, ok := ParseSymbolReference(defaultString, commentPackage); ok {
+	if id, ok := parseSymbolReference(defaultString, commentPackage); ok {
 		symbolReference = id
 		defaultString = ""
 	} else if err := json.Unmarshal([]byte(defaultString), &defaultValue); err != nil {
 		klog.Fatalf("Failed to unmarshal default: %v", err)
 	}
 
-	omitEmpty := strings.Contains(reflect.StructTag(tags).Get("json"), "omitempty")
-	if enforced, err := mustEnforceDefault(baseT, depth, omitEmpty); err != nil {
-		klog.Fatal(err)
-	} else if enforced != nil {
-		if defaultValue != nil {
-			if reflect.DeepEqual(defaultValue, enforced) {
-				// If the default value annotation matches the default value for the type,
-				// do not generate any defaulting function
-				return node
-			} else {
-				enforcedJSON, _ := json.Marshal(enforced)
-				klog.Fatalf("Invalid default value (%#v) for non-pointer/non-omitempty. If specified, must be: %v", defaultValue, string(enforcedJSON))
-			}
+	if defaultValue != nil {
+		zero := typeZeroValue[t.String()]
+		if reflect.DeepEqual(defaultValue, zero) {
+			// If the default value annotation matches the default value for the type,
+			// do not generate any defaulting function
+			return node
 		}
 	}
 
@@ -632,7 +603,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		parent.elem = true
 	}
 
-	defaults, _ := c.existingDefaulters[t]
+	defaults := c.existingDefaulters[t]
 	newDefaults, generated := c.newDefaulters[t]
 	switch {
 	case !root && generated && newDefaults.object != nil:
@@ -725,7 +696,7 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 		}
 	}
 	if len(parent.children) == 0 && len(parent.call) == 0 {
-		//klog.V(6).Infof("decided type %s needs no generation", t.Name)
+		// klog.V(6).Infof("decided type %s needs no generation", t.Name)
 		return nil
 	}
 	return parent
@@ -738,7 +709,7 @@ const (
 
 // genDefaulter produces a file with a autogenerated conversions.
 type genDefaulter struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	typesPackage       string
 	outputPackage      string
 	peerPackages       []string
@@ -748,10 +719,10 @@ type genDefaulter struct {
 	typesForInit       []*types.Type
 }
 
-func NewGenDefaulter(sanitizedName, typesPackage, outputPackage string, existingDefaulters, newDefaulters defaulterFuncMap, peerPkgs []string) generator.Generator {
+func NewGenDefaulter(outputFilename, typesPackage, outputPackage string, existingDefaulters, newDefaulters defaulterFuncMap, peerPkgs []string) generator.Generator {
 	return &genDefaulter{
-		DefaultGen: generator.DefaultGen{
-			OptionalName: sanitizedName,
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: outputFilename,
 		},
 		typesPackage:       typesPackage,
 		outputPackage:      outputPackage,
@@ -1015,7 +986,7 @@ func (n *callNode) writeCalls(varName string, isVarPointer bool, sw *generator.S
 func getTypeZeroValue(t string) (interface{}, error) {
 	defaultZero, ok := typeZeroValue[t]
 	if !ok {
-		return nil, fmt.Errorf("Cannot find zero value for type %v in typeZeroValue", t)
+		return nil, fmt.Errorf("cannot find zero value for type %v in typeZeroValue", t)
 	}
 
 	// To generate the code for empty string, they must be quoted
@@ -1230,13 +1201,13 @@ func (path callPath) String() string {
 			}
 		case p.index:
 			if len(parts) > 0 {
-				parts[last] = parts[last] + "[i]"
+				parts[last] += "[i]"
 			} else {
 				parts = append(parts, "[i]")
 			}
 		case p.key:
 			if len(parts) > 0 {
-				parts[last] = parts[last] + "[key]"
+				parts[last] += "[key]"
 			} else {
 				parts = append(parts, "[key]")
 			}

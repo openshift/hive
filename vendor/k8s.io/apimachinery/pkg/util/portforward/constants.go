@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package path
+package portforward
 
-import "strings"
-
-// Vendorless removes the longest match of "*/vendor/" from the front of p.
-// It is useful if a package locates in vendor/, e.g.,
-// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1, because gengo
-// indexes the package with its import path, e.g.,
-// k8s.io/apimachinery/pkg/apis/meta/v1,
-func Vendorless(p string) string {
-	if pos := strings.LastIndex(p, "/vendor/"); pos != -1 {
-		return p[pos+len("/vendor/"):]
-	}
-	return p
-}
+const (
+	PortForwardV1Name                    = "portforward.k8s.io"
+	WebsocketsSPDYTunnelingPrefix        = "SPDY/3.1+"
+	KubernetesSuffix                     = ".k8s.io"
+	WebsocketsSPDYTunnelingPortForwardV1 = WebsocketsSPDYTunnelingPrefix + PortForwardV1Name
+)

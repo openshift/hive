@@ -25,6 +25,7 @@ import (
 	"github.com/IBM/platform-services-go-sdk/resourcemanagerv2"
 	"github.com/IBM/vpc-go-sdk/vpcv1"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 
 	"github.com/openshift/installer/pkg/types"
@@ -39,13 +40,15 @@ type API interface {
 	GetDNSZoneIDByName(ctx context.Context, name string, publish types.PublishingStrategy) (string, error)
 	GetDNSZones(ctx context.Context, publish types.PublishingStrategy) ([]DNSZoneResponse, error)
 	GetDNSInstancePermittedNetworks(ctx context.Context, dnsID string, dnsZone string) ([]string, error)
-	CreateDNSRecord(ctx context.Context, crnstr string, baseDomain string, hostname string, cname string) error
+	GetDNSCustomResolverIP(ctx context.Context, dnsID string, vpcID string) (string, error)
+	CreateDNSRecord(ctx context.Context, publish types.PublishingStrategy, crnstr string, baseDomain string, hostname string, cname string) error
 
 	// VPC
 	GetVPCByName(ctx context.Context, vpcName string) (*vpcv1.VPC, error)
 	GetPublicGatewayByVPC(ctx context.Context, vpcName string) (*vpcv1.PublicGateway, error)
 	SetVPCServiceURLForRegion(ctx context.Context, region string) error
 	GetVPCs(ctx context.Context, region string) ([]vpcv1.VPC, error)
+	GetVPCSubnets(ctx context.Context, vpcID string) ([]vpcv1.Subnet, error)
 
 	// TG
 	GetTGConnectionVPC(ctx context.Context, gatewayID string, vpcSubnetID string) (string, error)
@@ -75,6 +78,9 @@ type API interface {
 
 	// SSH
 	CreateSSHKey(ctx context.Context, serviceInstance string, zone string, sshKeyName string, sshKey string) error
+
+	// Load Balancer
+	AddIPToLoadBalancerPool(ctx context.Context, lbID string, poolName string, port int64, ip string) error
 }
 
 // Client makes calls to the PowerVS API.
@@ -250,7 +256,6 @@ func (c *Client) GetDNSRecordsByName(ctx context.Context, crnstr string, zoneID 
 
 // GetInstanceCRNByName finds the CRN of the instance with the specified name.
 func (c *Client) GetInstanceCRNByName(ctx context.Context, name string, publish types.PublishingStrategy) (string, error) {
-
 	zones, err := c.GetDNSZones(ctx, publish)
 	if err != nil {
 		return "", err
@@ -265,9 +270,33 @@ func (c *Client) GetInstanceCRNByName(ctx context.Context, name string, publish 
 	return "", fmt.Errorf("DNS zone %q not found", name)
 }
 
+// GetDNSCustomResolverIP gets the DNS Server IP of a custom resolver associated with the specified VPC subnet in the specified DNS zone.
+func (c *Client) GetDNSCustomResolverIP(ctx context.Context, dnsID string, vpcID string) (string, error) {
+	listCustomResolversOptions := c.dnsServicesAPI.NewListCustomResolversOptions(dnsID)
+	customResolvers, _, err := c.dnsServicesAPI.ListCustomResolversWithContext(ctx, listCustomResolversOptions)
+	if err != nil {
+		return "", err
+	}
+
+	subnets, err := c.GetVPCSubnets(ctx, vpcID)
+	if err != nil {
+		return "", err
+	}
+
+	for _, customResolver := range customResolvers.CustomResolvers {
+		for _, location := range customResolver.Locations {
+			for _, subnet := range subnets {
+				if *subnet.CRN == *location.SubnetCrn {
+					return *location.DnsServerIp, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("DNS server IP of custom resolver for %q not found", dnsID)
+}
+
 // GetDNSZoneIDByName gets the CIS zone ID from its domain name.
 func (c *Client) GetDNSZoneIDByName(ctx context.Context, name string, publish types.PublishingStrategy) (string, error) {
-
 	zones, err := c.GetDNSZones(ctx, publish)
 	if err != nil {
 		return "", err
@@ -369,7 +398,7 @@ func (c *Client) GetDNSZones(ctx context.Context, publish types.PublishingStrate
 	return allZones, nil
 }
 
-// GetDNSInstancePermittedNetworks gets the permitted VPC networks for a DNS Services instance
+// GetDNSInstancePermittedNetworks gets the permitted VPC networks for a DNS Services instance.
 func (c *Client) GetDNSInstancePermittedNetworks(ctx context.Context, dnsID string, dnsZone string) ([]string, error) {
 	_, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
@@ -388,8 +417,19 @@ func (c *Client) GetDNSInstancePermittedNetworks(ctx context.Context, dnsID stri
 }
 
 // CreateDNSRecord Creates a DNS CNAME record in the given base domain and CRN.
-func (c *Client) CreateDNSRecord(ctx context.Context, crnstr string, baseDomain string, hostname string, cname string) error {
-	logrus.Debugf("CreateDNSRecord: crnstr = %s, hostname = %s, cname = %s", crnstr, hostname, cname)
+func (c *Client) CreateDNSRecord(ctx context.Context, publish types.PublishingStrategy, crnstr string, baseDomain string, hostname string, cname string) error {
+	switch publish {
+	case types.InternalPublishingStrategy:
+		return c.createPrivateDNSRecord(ctx, crnstr, baseDomain, hostname, cname)
+	case types.ExternalPublishingStrategy:
+		return c.createPublicDNSRecord(ctx, crnstr, baseDomain, hostname, cname)
+	default:
+		return fmt.Errorf("publish strategy %q not supported", publish)
+	}
+}
+
+func (c *Client) createPublicDNSRecord(ctx context.Context, crnstr string, baseDomain string, hostname string, cname string) error {
+	logrus.Debugf("createDNSRecord: crnstr = %s, hostname = %s, cname = %s", crnstr, hostname, cname)
 
 	var (
 		zoneID           string
@@ -405,7 +445,7 @@ func (c *Client) CreateDNSRecord(ctx context.Context, crnstr string, baseDomain 
 		logrus.Errorf("c.GetDNSZoneIDByName returns %v", err)
 		return err
 	}
-	logrus.Debugf("CreateDNSRecord: zoneID = %s", zoneID)
+	logrus.Debugf("CreatePublicDNSRecord: zoneID = %s", zoneID)
 
 	authenticator = &core.IamAuthenticator{
 		ApiKey: c.APIKey,
@@ -420,7 +460,7 @@ func (c *Client) CreateDNSRecord(ctx context.Context, crnstr string, baseDomain 
 		logrus.Errorf("dnsrecordsv1.NewDnsRecordsV1 returns %v", err)
 		return err
 	}
-	logrus.Debugf("CreateDNSRecord: dnsRecordService = %+v", dnsRecordService)
+	logrus.Debugf("CreatePublicDNSRecord: dnsRecordService = %+v", dnsRecordService)
 
 	createOptions := dnsRecordService.NewCreateDnsRecordOptions()
 	createOptions.SetName(hostname)
@@ -432,7 +472,41 @@ func (c *Client) CreateDNSRecord(ctx context.Context, crnstr string, baseDomain 
 		logrus.Errorf("dnsRecordService.CreateDnsRecord returns %v", err)
 		return err
 	}
-	logrus.Debugf("CreateDNSRecord: Result.ID = %v, RawResult = %v", *result.Result.ID, response.RawResult)
+	logrus.Debugf("createPublicDNSRecord: Result.ID = %v, RawResult = %v", *result.Result.ID, response.RawResult)
+
+	return nil
+}
+
+func (c *Client) createPrivateDNSRecord(ctx context.Context, crnstr string, baseDomain string, hostname string, cname string) error {
+	logrus.Debugf("createPrivateDNSRecord: crnstr = %s, hostname = %s, cname = %s", crnstr, hostname, cname)
+
+	zoneID, err := c.GetDNSZoneIDByName(ctx, baseDomain, types.InternalPublishingStrategy)
+	if err != nil {
+		logrus.Errorf("c.GetDNSZoneIDByName returns %v", err)
+		return err
+	}
+	logrus.Debugf("createPrivateDNSRecord: zoneID = %s", zoneID)
+
+	dnsCRN, err := crn.Parse(crnstr)
+	if err != nil {
+		return fmt.Errorf("failed to parse DNSInstanceCRN: %w", err)
+	}
+
+	rdataCnameRecord, err := c.dnsServicesAPI.NewResourceRecordInputRdataRdataCnameRecord(cname)
+	if err != nil {
+		return fmt.Errorf("NewResourceRecordInputRdataRdataCnameRecord failed: %w", err)
+	}
+	createOptions := c.dnsServicesAPI.NewCreateResourceRecordOptions(dnsCRN.ServiceInstance, zoneID)
+	createOptions.SetRdata(rdataCnameRecord)
+	createOptions.SetTTL(120)
+	createOptions.SetName(hostname)
+	createOptions.SetType("CNAME")
+	result, resp, err := c.dnsServicesAPI.CreateResourceRecord(createOptions)
+	if err != nil {
+		logrus.Errorf("dnsRecordService.CreateResourceRecord returns %v", err)
+		return err
+	}
+	logrus.Debugf("createPrivateDNSRecord: result.ID = %v, resp.RawResult = %v", *result.ID, resp.RawResult)
 
 	return nil
 }
@@ -505,6 +579,18 @@ func (c *Client) GetPublicGatewayByVPC(ctx context.Context, vpcName string) (*vp
 	}
 
 	return nil, nil
+}
+
+// GetVPCSubnets retrieves all subnets in the given VPC.
+func (c *Client) GetVPCSubnets(ctx context.Context, vpcID string) ([]vpcv1.Subnet, error) {
+	listSubnetsOptions := c.vpcAPI.NewListSubnetsOptions()
+	listSubnetsOptions.VPCID = &vpcID
+	subnets, _, err := c.vpcAPI.ListSubnetsWithContext(ctx, listSubnetsOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return subnets.Subnets, nil
 }
 
 // GetSubnetByName gets a VPC Subnet by its name and region.
@@ -1177,4 +1263,116 @@ func (c *Client) CreateSSHKey(ctx context.Context, serviceInstance string, zone 
 	}
 
 	return nil
+}
+
+// AddIPToLoadBalancerPool adds a server to a load balancer pool for the specified port.
+// @TODO Remove once https://github.com/kubernetes-sigs/cluster-api-provider-ibmcloud/issues/1679 is fixed.
+func (c *Client) AddIPToLoadBalancerPool(ctx context.Context, lbID string, poolName string, port int64, ip string) error {
+	var (
+		glbOptions    *vpcv1.GetLoadBalancerOptions
+		llbpOptions   *vpcv1.ListLoadBalancerPoolsOptions
+		llbpmOptions  *vpcv1.ListLoadBalancerPoolMembersOptions
+		clbpmOptions  *vpcv1.CreateLoadBalancerPoolMemberOptions
+		lb            *vpcv1.LoadBalancer
+		lbPools       *vpcv1.LoadBalancerPoolCollection
+		lbPool        vpcv1.LoadBalancerPool
+		lbPoolMembers *vpcv1.LoadBalancerPoolMemberCollection
+		lbpmtp        *vpcv1.LoadBalancerPoolMemberTargetPrototypeIP
+		lbpm          *vpcv1.LoadBalancerPoolMember
+		response      *core.DetailedResponse
+		err           error
+	)
+
+	// Make sure the load balancer exists
+	glbOptions = c.vpcAPI.NewGetLoadBalancerOptions(lbID)
+
+	lb, response, err = c.vpcAPI.GetLoadBalancerWithContext(ctx, glbOptions)
+	if err != nil {
+		return fmt.Errorf("failed to get load balancer and the response = %+v, err = %w", response, err)
+	}
+	logrus.Debugf("AddIPToLoadBalancerPool: GLBWC lb = %+v", lb)
+
+	// Query the existing load balancer pools
+	llbpOptions = c.vpcAPI.NewListLoadBalancerPoolsOptions(lbID)
+
+	lbPools, response, err = c.vpcAPI.ListLoadBalancerPoolsWithContext(ctx, llbpOptions)
+	if err != nil {
+		return fmt.Errorf("failed to list the load balancer pools and the response = %+v, err = %w",
+			response,
+			err)
+	}
+
+	// Find the pool with the specified name
+	for _, pool := range lbPools.Pools {
+		logrus.Debugf("AddIPToLoadBalancerPool: pool.ID = %v", *pool.ID)
+		logrus.Debugf("AddIPToLoadBalancerPool: pool.Name = %v", *pool.Name)
+
+		if *pool.Name == poolName {
+			lbPool = pool
+			break
+		}
+	}
+	if lbPool.ID == nil {
+		return fmt.Errorf("could not find loadbalancer pool with name %s", poolName)
+	}
+
+	// Query the load balancer pool members
+	llbpmOptions = c.vpcAPI.NewListLoadBalancerPoolMembersOptions(lbID, *lbPool.ID)
+
+	lbPoolMembers, response, err = c.vpcAPI.ListLoadBalancerPoolMembersWithContext(ctx, llbpmOptions)
+	if err != nil {
+		return fmt.Errorf("failed to list load balancer pool members and the response = %+v, err = %w",
+			response,
+			err)
+	}
+
+	// See if a member already exists with that IP
+	for _, poolMember := range lbPoolMembers.Members {
+		logrus.Debugf("AddIPToLoadBalancerPool: poolMember.ID = %s", *poolMember.ID)
+
+		switch pmt := poolMember.Target.(type) {
+		case *vpcv1.LoadBalancerPoolMemberTarget:
+			logrus.Debugf("AddIPToLoadBalancerPool: pmt.Address = %+v", *pmt.Address)
+			if ip == *pmt.Address {
+				logrus.Debugf("AddIPToLoadBalancerPool: found %s", ip)
+				return nil
+			}
+		case *vpcv1.LoadBalancerPoolMemberTargetIP:
+			logrus.Debugf("AddIPToLoadBalancerPool: pmt.Address = %+v", *pmt.Address)
+			if ip == *pmt.Address {
+				logrus.Debugf("AddIPToLoadBalancerPool: found %s", ip)
+				return nil
+			}
+		case *vpcv1.LoadBalancerPoolMemberTargetInstanceReference:
+			// No IP address, ignore
+		default:
+			logrus.Debugf("AddIPToLoadBalancerPool: unhandled type %T", poolMember.Target)
+		}
+	}
+
+	// Create a new member
+	lbpmtp, err = c.vpcAPI.NewLoadBalancerPoolMemberTargetPrototypeIP(ip)
+	if err != nil {
+		return fmt.Errorf("could not create a new load balancer pool member, err = %w", err)
+	}
+	logrus.Debugf("AddIPToLoadBalancerPool: lbpmtp = %+v", *lbpmtp)
+
+	// Add that member to the pool
+	clbpmOptions = c.vpcAPI.NewCreateLoadBalancerPoolMemberOptions(lbID, *lbPool.ID, port, lbpmtp)
+	logrus.Debugf("AddIPToLoadBalancerPool: clbpmOptions = %+v", clbpmOptions)
+
+	return wait.PollUntilContextCancel(ctx,
+		time.Second*10,
+		false,
+		func(ctx context.Context) (bool, error) {
+			lbpm, response, err = c.vpcAPI.CreateLoadBalancerPoolMemberWithContext(ctx, clbpmOptions)
+			if err != nil {
+				logrus.Debugf("AddIPToLoadBalancerPool: could not add the load balancer pool member yet, err = %v", err)
+				return false, nil
+			}
+
+			logrus.Debugf("AddIPToLoadBalancerPool: CLBPMWC lbpm = %+v", lbpm)
+
+			return true, nil
+		})
 }

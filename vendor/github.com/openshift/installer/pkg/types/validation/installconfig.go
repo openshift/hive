@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	dockerref "github.com/containers/image/docker/reference"
+	dockerref "github.com/containers/image/v5/docker/reference"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -20,6 +20,7 @@ import (
 	utilsnet "k8s.io/utils/net"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	operv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/installer/pkg/hostcrypt"
 	"github.com/openshift/installer/pkg/ipnet"
@@ -50,6 +51,9 @@ import (
 	vspherevalidation "github.com/openshift/installer/pkg/types/vsphere/validation"
 	"github.com/openshift/installer/pkg/validate"
 )
+
+// hostCryptBypassedAnnotation is set if the host crypt check was bypassed via environment variable.
+const hostCryptBypassedAnnotation = "install.openshift.io/hostcrypt-check-bypassed"
 
 // list of known plugins that require hostPrefix to be set
 var pluginsUsingHostPrefix = sets.NewString(string(operv1.NetworkTypeOVNKubernetes))
@@ -229,6 +233,11 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 				allErrs = append(allErrs, field.Invalid(field.NewPath("capabilities"), c.Capabilities,
 					"disabling CloudControllerManager on External platform supported only with cloudControllerManager value none"))
 			}
+		}
+
+		if !enabledCaps.Has(configv1.ClusterVersionCapabilityIngress) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("capabilities"), c.Capabilities,
+				"the Ingress capability is required"))
 		}
 	}
 
@@ -1171,7 +1180,15 @@ func validateFIPSconfig(c *types.InstallConfig) field.ErrorList {
 	}
 
 	if err := hostcrypt.VerifyHostTargetState(c.FIPS); err != nil {
-		logrus.Warnf("%v", err)
+		if skip, ok := os.LookupEnv("OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION"); ok && skip != "" {
+			logrus.Warnf("%v", err)
+			if c.Annotations == nil {
+				c.Annotations = make(map[string]string)
+			}
+			c.Annotations[hostCryptBypassedAnnotation] = "true"
+		} else {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("fips"), err.Error()))
+		}
 	}
 	return allErrs
 }
@@ -1217,12 +1234,19 @@ func validateAdditionalCABundlePolicy(c *types.InstallConfig) error {
 func ValidateFeatureSet(c *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if _, ok := configv1.FeatureSets[c.FeatureSet]; !ok {
+	clusterProfile := types.GetClusterProfileName()
+	featureSets, ok := features.AllFeatureSets()[clusterProfile]
+	if !ok {
+		logrus.Warnf("no feature sets for cluster profile %q", clusterProfile)
+	}
+	if _, ok := featureSets[c.FeatureSet]; c.FeatureSet != configv1.CustomNoUpgrade && !ok {
 		sortedFeatureSets := func() []string {
 			v := []string{}
-			for n := range configv1.FeatureSets {
+			for n := range features.AllFeatureSets()[clusterProfile] {
 				v = append(v, string(n))
 			}
+			// Add CustomNoUpgrade since it is not part of features sets for profiles
+			v = append(v, string(configv1.CustomNoUpgrade))
 			sort.Strings(v)
 			return v
 		}()

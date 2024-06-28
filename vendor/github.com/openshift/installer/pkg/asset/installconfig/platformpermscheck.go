@@ -98,6 +98,14 @@ func (a *PlatformPermsCheck) Generate(dependencies asset.Parents) error {
 			}
 		}
 
+		if ic.Config.AWS.PublicIpv4Pool != "" {
+			permissionGroups = append(permissionGroups, awsconfig.PermissionPublicIpv4Pool)
+		}
+
+		if !ic.Config.AWS.BestEffortDeleteIgnition {
+			permissionGroups = append(permissionGroups, awsconfig.PermissionDeleteIgnitionObjects)
+		}
+
 		ssn, err := ic.AWS.Session(ctx)
 		if err != nil {
 			return err

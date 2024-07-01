@@ -1,7 +1,7 @@
 // Code generated for package assets by go-bindata DO NOT EDIT. (@generated)
 // sources:
-// config/clustersync/service.yaml
-// config/clustersync/statefulset.yaml
+// config/sharded_controllers/service.yaml
+// config/sharded_controllers/statefulset.yaml
 // config/hiveadmission/apiservice.yaml
 // config/hiveadmission/clusterdeployment-webhook.yaml
 // config/hiveadmission/clusterimageset-webhook.yaml
@@ -83,7 +83,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _configClustersyncServiceYaml = []byte(`apiVersion: v1
+var _configSharded_controllersServiceYaml = []byte(`apiVersion: v1
 kind: Service
 metadata:
   name: hive-clustersync
@@ -106,22 +106,22 @@ spec:
     protocol: TCP
 `)
 
-func configClustersyncServiceYamlBytes() ([]byte, error) {
-	return _configClustersyncServiceYaml, nil
+func configSharded_controllersServiceYamlBytes() ([]byte, error) {
+	return _configSharded_controllersServiceYaml, nil
 }
 
-func configClustersyncServiceYaml() (*asset, error) {
-	bytes, err := configClustersyncServiceYamlBytes()
+func configSharded_controllersServiceYaml() (*asset, error) {
+	bytes, err := configSharded_controllersServiceYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/clustersync/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/sharded_controllers/service.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _configClustersyncStatefulsetYaml = []byte(`apiVersion: apps/v1
+var _configSharded_controllersStatefulsetYaml = []byte(`apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: hive-clustersync
@@ -208,17 +208,17 @@ spec:
         emptyDir: {}
 `)
 
-func configClustersyncStatefulsetYamlBytes() ([]byte, error) {
-	return _configClustersyncStatefulsetYaml, nil
+func configSharded_controllersStatefulsetYamlBytes() ([]byte, error) {
+	return _configSharded_controllersStatefulsetYaml, nil
 }
 
-func configClustersyncStatefulsetYaml() (*asset, error) {
-	bytes, err := configClustersyncStatefulsetYamlBytes()
+func configSharded_controllersStatefulsetYaml() (*asset, error) {
+	bytes, err := configSharded_controllersStatefulsetYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "config/clustersync/statefulset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "config/sharded_controllers/statefulset.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -2093,8 +2093,8 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"config/clustersync/service.yaml":                           configClustersyncServiceYaml,
-	"config/clustersync/statefulset.yaml":                       configClustersyncStatefulsetYaml,
+	"config/sharded_controllers/service.yaml":                   configSharded_controllersServiceYaml,
+	"config/sharded_controllers/statefulset.yaml":               configSharded_controllersStatefulsetYaml,
 	"config/hiveadmission/apiservice.yaml":                      configHiveadmissionApiserviceYaml,
 	"config/hiveadmission/clusterdeployment-webhook.yaml":       configHiveadmissionClusterdeploymentWebhookYaml,
 	"config/hiveadmission/clusterimageset-webhook.yaml":         configHiveadmissionClusterimagesetWebhookYaml,
@@ -2169,10 +2169,6 @@ type bintree struct {
 
 var _bintree = &bintree{nil, map[string]*bintree{
 	"config": {nil, map[string]*bintree{
-		"clustersync": {nil, map[string]*bintree{
-			"service.yaml":     {configClustersyncServiceYaml, map[string]*bintree{}},
-			"statefulset.yaml": {configClustersyncStatefulsetYaml, map[string]*bintree{}},
-		}},
 		"configmaps": {nil, map[string]*bintree{
 			"install-log-regexes-configmap.yaml": {configConfigmapsInstallLogRegexesConfigmapYaml, map[string]*bintree{}},
 		}},
@@ -2208,6 +2204,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hive_frontend_serviceaccount.yaml": {configRbacHive_frontend_serviceaccountYaml, map[string]*bintree{}},
 			"hive_reader_role.yaml":             {configRbacHive_reader_roleYaml, map[string]*bintree{}},
 			"hive_reader_role_binding.yaml":     {configRbacHive_reader_role_bindingYaml, map[string]*bintree{}},
+		}},
+		"sharded_controllers": {nil, map[string]*bintree{
+			"service.yaml":     {configSharded_controllersServiceYaml, map[string]*bintree{}},
+			"statefulset.yaml": {configSharded_controllersStatefulsetYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

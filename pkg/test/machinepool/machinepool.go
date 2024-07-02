@@ -6,6 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/aws"
@@ -118,6 +119,14 @@ func WithInitializedStatusConditions() Option {
 				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
 			},
 		}
+	}
+}
+
+// WithInitializedStatusConditions returns an Option that *replaces* status conditions
+// with the set of initialized ("Unknown") conditions.
+func WithControllerOrdinal(ordinalID int64) Option {
+	return func(mp *hivev1.MachinePool) {
+		mp.Status.ControlledByReplica = ptr.To(ordinalID)
 	}
 }
 

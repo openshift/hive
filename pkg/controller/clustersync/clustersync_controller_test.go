@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/pointer"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,7 +77,7 @@ type reconcileTest struct {
 	expectNoWorkDone              bool
 }
 
-func newReconcileTest(t *testing.T, mockCtrl *gomock.Controller, scheme *runtime.Scheme, existing ...runtime.Object) *reconcileTest {
+func newReconcileTest(mockCtrl *gomock.Controller, existing ...runtime.Object) *reconcileTest {
 	logger := log.New()
 	logger.SetLevel(log.DebugLevel)
 
@@ -243,13 +242,13 @@ func areSyncStatusesEqual(t *testing.T, syncSetType string, expectedStatuses, ac
 func TestReconcileClusterSync_NewClusterDeployment(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	scheme := scheme.GetScheme()
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-	)
+	rt := func() *reconcileTest {
+		var (
+			_        *runtime.Scheme  = scheme
+			existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3))}
+		)
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	reconcileRequest := reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: testNamespace,
@@ -317,7 +316,7 @@ func TestReconcileClusterSync_NoWorkToDo(t *testing.T) {
 						teststatefulset.WithReplicas(3),
 					))
 			}
-			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
+			rt := newReconcileTest(mockCtrl, existing...)
 			rt.expectNoWorkDone = true
 			rt.run(t)
 		})
@@ -349,14 +348,10 @@ func TestReconcileClusterSync_ApplyResource(t *testing.T) {
 				testsyncset.WithApplyMode(tc.applyMode),
 				testsyncset.WithResources(resourceToApply),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				clusterSyncBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				syncSet)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
 			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
 			if tc.includeResourcesToDelete {
@@ -366,183 +361,6 @@ func TestReconcileClusterSync_ApplyResource(t *testing.T) {
 			}
 			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			rt.run(t)
-		})
-	}
-}
-
-func TestGetAndCheckClustersyncStatefulSet(t *testing.T) {
-	scheme := scheme.GetScheme()
-
-	cases := []struct {
-		name                string
-		existingObjects     []runtime.Object
-		expectedStatefulSet *appsv1.StatefulSet
-		expectedErr         bool
-	}{
-		{
-			name:            "missing sts",
-			expectedErr:     true,
-			existingObjects: []runtime.Object{},
-		},
-		{
-			name:        "sts replicas not set",
-			expectedErr: true,
-			existingObjects: []runtime.Object{
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(),
-			},
-		},
-		{
-			name:        "sts replicas not same as currentReplicas",
-			expectedErr: true,
-			existingObjects: []runtime.Object{
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(1),
-					teststatefulset.WithReplicas(3),
-				),
-			},
-		},
-		{
-			name:        "correct sts",
-			expectedErr: false,
-			expectedStatefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(1),
-				teststatefulset.WithReplicas(1)),
-			existingObjects: []runtime.Object{
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(1),
-					teststatefulset.WithReplicas(1),
-				),
-			},
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Arrange
-			mockCtrl := gomock.NewController(t)
-			rt := newReconcileTest(t, mockCtrl, scheme, tc.existingObjects...)
-
-			// Act
-			actualStatefulset, actualErr := rt.r.getAndCheckClusterSyncStatefulSet(rt.logger)
-
-			// Assert
-			assert.Equal(t, tc.expectedStatefulSet, actualStatefulset)
-			if tc.expectedErr {
-				assert.Error(t, actualErr, "Didn't error when was expected to.")
-			} else {
-				assert.NoError(t, actualErr, "Got error when not expected.")
-			}
-		})
-	}
-}
-
-func TestIsSyncAssignedToMe(t *testing.T) {
-	scheme := scheme.GetScheme()
-
-	cases := []struct {
-		name              string
-		ordinalID         int64
-		expectedOrdinalID int64
-		statefulSet       *appsv1.StatefulSet
-		clusterDeployment *hivev1.ClusterDeployment
-		expectedErr       bool
-	}{
-		{
-			name:      "assigned to me - ordinal 0",
-			ordinalID: 0,
-			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(3),
-				teststatefulset.WithReplicas(3),
-			),
-			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800195")),
-			),
-			expectedOrdinalID: 0,
-			expectedErr:       false,
-		},
-		{
-			name:              "not assigned to me - ordinal 0",
-			ordinalID:         0,
-			expectedOrdinalID: 1,
-			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(3),
-				teststatefulset.WithReplicas(3),
-			),
-			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800196")),
-			),
-			expectedErr: false,
-		},
-		{
-			name:              "assigned to me - ordinal 1",
-			ordinalID:         1,
-			expectedOrdinalID: 1,
-			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(3),
-				teststatefulset.WithReplicas(3),
-			),
-			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800196")),
-			),
-			expectedErr: false,
-		},
-		{
-			name:              "not assigned to me - ordinal 1",
-			ordinalID:         1,
-			expectedOrdinalID: 2,
-			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(3),
-				teststatefulset.WithReplicas(3),
-			),
-			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800197")),
-			),
-			expectedErr: false,
-		},
-		{
-			name:              "assigned to me - ordinal 2",
-			ordinalID:         2,
-			expectedOrdinalID: 2,
-			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(3),
-				teststatefulset.WithReplicas(3),
-			),
-			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800197")),
-			),
-			expectedErr: false,
-		},
-		{
-			name:              "not assigned to me - ordinal 2",
-			ordinalID:         2,
-			expectedOrdinalID: 0,
-			statefulSet: teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-				teststatefulset.WithCurrentReplicas(3),
-				teststatefulset.WithReplicas(3),
-			),
-			clusterDeployment: testcd.FullBuilder(testNamespace, testCDName, scheme).Build(
-				testcd.Generic(testgeneric.WithUID("1138528c-c36e-11e9-a1a7-42010a800198")),
-			),
-			expectedErr: false,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Arrange
-			mockCtrl := gomock.NewController(t)
-			rt := newReconcileTest(t, mockCtrl, scheme)
-			rt.r.ordinalID = tc.ordinalID
-
-			// Act
-			actualAssignedToMe, actualOrdinalID, actualErr := rt.r.isSyncAssignedToMe(tc.statefulSet, tc.clusterDeployment, rt.logger)
-
-			// Assert
-			assert.Equal(t, tc.ordinalID == tc.expectedOrdinalID, actualAssignedToMe, "Unexpected assigned-to-me")
-			assert.Equal(t, tc.expectedOrdinalID, actualOrdinalID)
-			if tc.expectedErr {
-				assert.Error(t, actualErr, "Didn't error when was expected to.")
-			} else {
-				assert.NoError(t, actualErr, "Got error when not expected.")
-			}
 		})
 	}
 }
@@ -576,15 +394,10 @@ func TestReconcileClusterSync_ApplySecret(t *testing.T) {
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				clusterSyncBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				syncSet,
-				srcSecret)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, srcSecret}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			secretToApply := testsecret.BasicBuilder().GenericOptions(
 				testgeneric.WithNamespace("dest-namespace"),
 				testgeneric.WithName("dest-name"),
@@ -629,14 +442,10 @@ func TestReconcileClusterSync_ApplyPatch(t *testing.T) {
 					Patch:      "test-patch",
 				}),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				clusterSyncBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				syncSet)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			rt.mockResourceHelper.EXPECT().Patch(
 				types.NamespacedName{Namespace: "dest-namespace", Name: "dest-name"},
 				"ConfigMap",
@@ -689,15 +498,10 @@ func TestReconcileClusterSync_ApplyAllTypes(t *testing.T) {
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				clusterSyncBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				syncSet,
-				srcSecret)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, srcSecret}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			secretToApply := testsecret.BasicBuilder().GenericOptions(
 				testgeneric.WithNamespace("secret-namespace"),
 				testgeneric.WithName("secret-name"),
@@ -783,7 +587,7 @@ func TestReconcileClusterSync_Reapply(t *testing.T) {
 			if !tc.noSyncLease {
 				existing = append(existing, buildSyncLease(tc.renewTime))
 			}
-			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
+			rt := newReconcileTest(mockCtrl, existing...)
 			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
 				buildSyncStatus("test-syncset", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
 			}
@@ -816,16 +620,10 @@ func TestReconcileClusterSync_NewSyncSetApplied(t *testing.T) {
 		buildSyncStatus("existing-syncset", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
 	))
 	lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		existingSyncSet,
-		newSyncSet,
-		clusterSync,
-		lease)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), existingSyncSet, newSyncSet, clusterSync, lease}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(newResource)).Return(resource.CreatedApplyResult, nil)
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
 		buildSyncStatus("existing-syncset", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
@@ -859,15 +657,10 @@ func TestReconcileClusterSync_SyncSetRenamed(t *testing.T) {
 	)
 
 	lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet,
-		clusterSync,
-		lease)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, clusterSync, lease}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 
 	// Configmap managed by original syncset is deleted
 	deleteCall := rt.mockResourceHelper.EXPECT().
@@ -921,14 +714,10 @@ func TestReconcileClusterSync_SyncSetDeleted(t *testing.T) {
 			}
 			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatusBuilder.Build()))
 			lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				clusterSync,
-				lease)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), clusterSync, lease}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			if tc.expectDelete {
 				rt.mockResourceHelper.EXPECT().
 					Delete("v1", "ConfigMap", "dest-namespace", "dest-name").
@@ -1000,16 +789,10 @@ func TestReconcileClusterSync_ResourceRemovedFromSyncSet(t *testing.T) {
 				testcs.WithSyncSetStatus(existingSyncStatusBuilder2.Build()),
 			)
 			lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				syncSet,
-				syncSet2,
-				clusterSync,
-				lease)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, syncSet2, clusterSync, lease}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply2)).Return(resource.CreatedApplyResult, nil)
 			if tc.expectDelete {
@@ -1052,14 +835,10 @@ func TestReconcileClusterSync_ErrorApplyingResource(t *testing.T) {
 		testsyncset.WithGeneration(1),
 		testsyncset.WithResources(resourceToApply),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).
 		Return(resource.ApplyResult(""), errors.New("test apply error"))
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
@@ -1079,14 +858,10 @@ func TestReconcileClusterSync_ErrorDecodingResource(t *testing.T) {
 		testsyncset.WithGeneration(1),
 	)
 	syncSet.Spec.Resources = []runtime.RawExtension{{Raw: []byte("{}")}}
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 		withFailureResult("failed to decode resource 0: error unmarshaling JSON: while decoding JSON: Object 'Kind' is missing in '{}'"),
@@ -1108,15 +883,10 @@ func TestReconcileClusterSync_ErrorApplyingSecret(t *testing.T) {
 	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet,
-		srcSecret)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, srcSecret}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	secretToApply := testsecret.BasicBuilder().GenericOptions(
 		testgeneric.WithNamespace("dest-namespace"),
 		testgeneric.WithName("dest-name"),
@@ -1150,14 +920,10 @@ func TestReconcileClusterSync_ErrorApplyingPatch(t *testing.T) {
 			Patch:      "test-patch",
 		}),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().Patch(
 		types.NamespacedName{Namespace: "dest-namespace", Name: "dest-name"},
 		"ConfigMap",
@@ -1303,7 +1069,7 @@ func TestReconcileClusterSync_SkipAfterFailingResource(t *testing.T) {
 			for _, s := range srcSecrets {
 				existing = append(existing, s)
 			}
-			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
+			rt := newReconcileTest(mockCtrl, existing...)
 			var resourceHelperCalls []*gomock.Call
 			for i := 0; i < tc.successfulResources; i++ {
 				resourceHelperCalls = append(resourceHelperCalls,
@@ -1433,15 +1199,10 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 						withFirstSuccessTimeInThePast(),
 					)),
 				)
-				rt := newReconcileTest(t, mockCtrl, scheme,
-					cdBuilder(scheme).Build(),
-					teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-						teststatefulset.WithCurrentReplicas(3),
-						teststatefulset.WithReplicas(3),
-					),
-					clusterSync,
-					syncSet,
-					srcSecret)
+				rt := func() *reconcileTest {
+					var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), clusterSync, syncSet, srcSecret}
+					return newReconcileTest(mockCtrl, existing...)
+				}()
 				var resourceHelperCalls []*gomock.Call
 				for _, r := range resourcesToApply {
 					resourceHelperCalls = append(resourceHelperCalls,
@@ -1557,7 +1318,7 @@ func TestReconcileClusterSync_FailingSyncSetDoesNotBlockOtherSyncSets(t *testing
 			for _, s := range syncSets {
 				existing = append(existing, s)
 			}
-			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
+			rt := newReconcileTest(mockCtrl, existing...)
 			for i, r := range resourcesToApply {
 				if i == tc.failingSyncSet {
 					rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(r)).
@@ -1648,7 +1409,7 @@ func TestReconcileClusterSync_FailureMessage(t *testing.T) {
 			}
 			existing = append(existing, syncSets...)
 			existing = append(existing, selectorSyncSets...)
-			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
+			rt := newReconcileTest(mockCtrl, existing...)
 			rt.mockResourceHelper.EXPECT().Apply(gomock.Any()).
 				Return(resource.ApplyResult(""), errors.New("test apply error")).
 				Times(tc.failingSyncSets + tc.failingSelectorSyncSets)
@@ -1719,14 +1480,10 @@ func TestReconcileClusterSync_PartialApply(t *testing.T) {
 			)
 			clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(tc.existingSyncStatus))
 			syncLease := buildSyncLease(time.Now())
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				), syncSet,
-				clusterSync,
-				syncLease)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, clusterSync, syncLease}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).Return(resource.CreatedApplyResult, nil)
 			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{tc.expectedSyncStatus}
 			rt.expectUnchangedLeaseRenewTime = true
@@ -1745,14 +1502,10 @@ func TestReconcileClusterSync_ErrorDeleting(t *testing.T) {
 	)
 	clusterSync := clusterSyncBuilder(scheme).Build(testcs.WithSyncSetStatus(existingSyncStatus))
 	lease := buildSyncLease(time.Now().Add(-1 * time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		clusterSync,
-		lease)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), clusterSync, lease}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().
 		Delete("v1", "ConfigMap", "dest-namespace", "dest-name").
 		Return(errors.New("error deleting resource"))
@@ -1813,7 +1566,7 @@ func TestReconcileClusterSync_DeleteErrorDoesNotBlockOtherDeletes(t *testing.T) 
 					),
 				)
 			}
-			rt := newReconcileTest(t, mockCtrl, scheme, existing...)
+			rt := newReconcileTest(mockCtrl, existing...)
 			rt.mockResourceHelper.EXPECT().
 				Delete("v1", "ConfigMap", "dest-namespace", "failing-resource").
 				Return(errors.New("error deleting resource"))
@@ -1880,15 +1633,10 @@ func TestReconcileClusterSync_ApplyBehavior(t *testing.T) {
 			srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 				testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 			)
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cdBuilder(scheme).Build(),
-				clusterSyncBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				syncSet,
-				srcSecret)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, srcSecret}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			secretToApply := testsecret.BasicBuilder().GenericOptions(
 				testgeneric.WithNamespace("secret-namespace"),
 				testgeneric.WithName("secret-name"),
@@ -1949,18 +1697,10 @@ func TestReconcileClusterSync_IgnoreNotApplicableSyncSets(t *testing.T) {
 			testConfigMap("dest-namespace", "resource-from-non-applicable-selectorsyncset"),
 		),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value")),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		applicableSyncSet,
-		nonApplicableSyncSet,
-		applicableSelectorSyncSet,
-		nonApplicableSelectorSyncSet,
-	)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(testcd.WithLabel("test-label-key", "test-label-value")), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), applicableSyncSet, nonApplicableSyncSet, applicableSelectorSyncSet, nonApplicableSelectorSyncSet}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(syncSetResourceToApply)).Return(resource.CreatedApplyResult, nil)
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(selectorSyncSetResourceToApply)).Return(resource.CreatedApplyResult, nil)
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("applicable-syncset")}
@@ -1985,15 +1725,10 @@ func TestReconcileClusterSync_ApplySecretForSelectorSyncSet(t *testing.T) {
 	srcSecret := testsecret.FullBuilder("src-namespace", "src-name", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cd,
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		selectorSyncSet,
-		srcSecret)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cd, clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), selectorSyncSet, srcSecret}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	secretToApply := testsecret.BasicBuilder().GenericOptions(
 		testgeneric.WithNamespace("dest-namespace"),
 		testgeneric.WithName("dest-name"),
@@ -2020,15 +1755,10 @@ func TestReconcileClusterSync_MissingSecretNamespaceForSelectorSyncSet(t *testin
 	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cd,
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		selectorSyncSet,
-		srcSecret)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cd, clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), selectorSyncSet, srcSecret}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.expectedFailedMessage = "SelectorSyncSet test-selectorsyncset is failing"
 	rt.expectedSelectorSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-selectorsyncset",
 		withFailureResult("source namespace missing for secret 0"),
@@ -2053,15 +1783,10 @@ func TestReconcileClusterSync_ValidSecretNamespaceForSyncSet(t *testing.T) {
 	srcSecret := testsecret.FullBuilder(testNamespace, "test-secret", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet,
-		srcSecret)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, srcSecret}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	secretToApply := testsecret.BasicBuilder().GenericOptions(
 		testgeneric.WithNamespace("dest-namespace"),
 		testgeneric.WithName("dest-name"),
@@ -2090,15 +1815,10 @@ func TestReconcileClusterSync_InvalidSecretNamespaceForSyncSet(t *testing.T) {
 	srcSecret := testsecret.FullBuilder("src-namespace", "src-name", scheme).Build(
 		testsecret.WithDataKeyValue("test-key", []byte("test-data")),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet,
-		srcSecret)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, srcSecret}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 		withFailureResult("source in wrong namespace for secret 0"),
@@ -2117,14 +1837,10 @@ func TestReconcileClusterSync_MissingSourceSecret(t *testing.T) {
 			testSecretMapping("test-secret", "dest-namespace", "dest-name"),
 		),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		clusterSyncBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{buildSyncStatus("test-syncset",
 		withFailureResult(`failed to read secret 0: secrets "test-secret" not found`),
@@ -2157,14 +1873,10 @@ func TestReconcileClusterSync_ConditionNotMutatedWhenMessageNotChanged(t *testin
 			LastProbeTime:      timeInThePast,
 		}),
 	)
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		existingClusterSync,
-		syncSet)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), existingClusterSync, syncSet}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourceToApply)).
 		Return(resource.ApplyResult(""), errors.New("test apply error"))
 	rt.expectedFailedMessage = "SyncSet test-syncset is failing"
@@ -2214,16 +1926,10 @@ func TestReconcileClusterSync_FirstSuccessTime(t *testing.T) {
 		testcs.WithSyncSetStatus(existingNewSyncStatus),
 	)
 	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		cd,
-		syncSetOld,
-		syncSetNew,
-		clusterSync,
-		syncLease)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), cd, syncSetOld, syncSetNew, clusterSync, syncLease}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
 		buildSyncStatus("test-syncset-new", withTransitionInThePast(), withFirstSuccessTimeInThePast()),
 		buildSyncStatus("test-syncset-old", withTransitionInThePast(), withFirstSuccessTime(oldFirstSuccessTime)),
@@ -2258,15 +1964,10 @@ func TestReconcileClusterSync_NoFirstSuccessTimeSet(t *testing.T) {
 		testcs.WithSyncSetStatus(existingSyncStatus),
 	)
 	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		cd,
-		syncSet,
-		clusterSync,
-		syncLease)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), cd, syncSet, clusterSync, syncLease}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
 		buildSyncStatus("test-syncset",
 			withNoFirstSuccessTime(),
@@ -2294,15 +1995,10 @@ func TestReconcileClusterSync_FirstSuccessTimeSetWithNoSyncSets(t *testing.T) {
 	cd := cdBuilder(scheme).Options(testcd.InstalledTimestamp(timeInThePast.Time.Add(-time.Minute * 15).Truncate(time.Second))).Build()
 	clusterSync := clusterSyncBuilder(scheme).Build()
 	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cd,
-		clusterSync,
-		syncLease,
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-	)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cd, clusterSync, syncLease, teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3))}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.expectUnchangedLeaseRenewTime = true
 	rt.expectRequeue = false
 	rt.run(t)
@@ -2341,15 +2037,10 @@ func TestReconcileClusterSync_SyncToUpsertResourceApplyMode(t *testing.T) {
 		testcs.WithSyncSetStatus(existingSyncStatus),
 	)
 	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet,
-		clusterSync,
-		syncLease)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, clusterSync, syncLease}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourcesToApply)).Return(resource.CreatedApplyResult, nil)
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
 		buildSyncStatus("test-syncset",
@@ -2390,15 +2081,10 @@ func TestReconcileClusterSync_UpsertToSyncResourceApplyMode(t *testing.T) {
 		testcs.WithSyncSetStatus(existingSyncStatus),
 	)
 	syncLease := buildSyncLease(time.Now().Add(-time.Hour))
-	rt := newReconcileTest(t, mockCtrl, scheme,
-		cdBuilder(scheme).Build(),
-		teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-			teststatefulset.WithCurrentReplicas(3),
-			teststatefulset.WithReplicas(3),
-		),
-		syncSet,
-		clusterSync,
-		syncLease)
+	rt := func() *reconcileTest {
+		var existing []runtime.Object = []runtime.Object{cdBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet, clusterSync, syncLease}
+		return newReconcileTest(mockCtrl, existing...)
+	}()
 	rt.mockResourceHelper.EXPECT().Apply(newApplyMatcher(resourcesToApply)).Return(resource.CreatedApplyResult, nil)
 	rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{
 		buildSyncStatus("test-syncset",
@@ -2535,14 +2221,10 @@ spec:
 			cd := cdBuilder(scheme).Build()
 			// cdLabels may be `nil`
 			cd.SetLabels(tc.cdLabels)
-			rt := newReconcileTest(t, mockCtrl, scheme,
-				cd,
-				clusterSyncBuilder(scheme).Build(),
-				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
-					teststatefulset.WithCurrentReplicas(3),
-					teststatefulset.WithReplicas(3),
-				),
-				syncSet)
+			rt := func() *reconcileTest {
+				var existing []runtime.Object = []runtime.Object{cd, clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+				return newReconcileTest(mockCtrl, existing...)
+			}()
 			rt.mockResourceHelper.EXPECT().Apply(newYamlApplyMatcher(t, tc.expectedResourceApplied)).Return(resource.CreatedApplyResult, nil)
 			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
 			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}

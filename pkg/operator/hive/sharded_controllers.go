@@ -9,7 +9,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -20,52 +20,108 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 )
 
-const (
-	defaultClustersyncReplicas = 1
+type ssCfg struct {
+	name                   hivev1.ControllerName
+	deploymentName         hivev1.DeploymentName
+	defaultReplicas        int32
+	hashAnnotation         string
+	containerCustomization func(*hivev1.HiveConfig, *corev1.Container)
+}
+
+var (
+	clusterSyncCfg = ssCfg{
+		name:            hivev1.ClustersyncControllerName,
+		deploymentName:  hivev1.DeploymentNameClustersync,
+		defaultReplicas: 1,
+		hashAnnotation:  "hive.openshift.io/clustersync-statefulset-spec-hash",
+		containerCustomization: func(hiveconfig *hivev1.HiveConfig, container *corev1.Container) {
+			if syncSetReapplyInterval := hiveconfig.Spec.SyncSetReapplyInterval; syncSetReapplyInterval != "" {
+				syncsetReapplyIntervalEnvVar := corev1.EnvVar{
+					Name:  constants.SyncSetReapplyIntervalEnvVar,
+					Value: syncSetReapplyInterval,
+				}
+
+				container.Env = append(container.Env, syncsetReapplyIntervalEnvVar)
+			}
+		},
+	}
+
+	machinePoolCfg = ssCfg{
+		name:            hivev1.MachinePoolControllerName,
+		deploymentName:  hivev1.DeploymentNameMachinepool,
+		defaultReplicas: 1,
+		hashAnnotation:  "hive.openshift.io/machinepool-statefulset-spec-hash",
+	}
 )
 
-func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource.Helper, hiveconfig *hivev1.HiveConfig, hiveControllersConfigHash string, namespacesToClean []string) error {
-	ssAsset := "config/clustersync/statefulset.yaml"
-	namespacedAssets := []string{
-		"config/clustersync/service.yaml",
+type asset struct {
+	path      string
+	processed []byte
+}
+
+func newAsset(path string, values map[string]string) (asset, error) {
+	var err error
+	ret := asset{
+		path: path,
 	}
+	ret.processed, err = controllerutils.ProcessAssetTemplate(assets.MustAsset(ret.path), values)
+	return ret, errors.Wrapf(err, "unable to process asset template %s", path)
+}
+
+func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h resource.Helper, hiveconfig *hivev1.HiveConfig, hiveControllersConfigHash string, namespacesToClean []string) error {
+	templateValues := map[string]string{
+		"ControllerName": string(c.name),
+	}
+	ssAsset, err := newAsset("config/sharded_controllers/statefulset.yaml", templateValues)
+	if err != nil {
+		return err
+	}
+	namespacedAssets := []asset{}
+	for _, path := range []string{"config/sharded_controllers/service.yaml"} {
+		a, err := newAsset(path, templateValues)
+		if err != nil {
+			return err
+		}
+		namespacedAssets = append(namespacedAssets, a)
+	}
+
 	// Delete the assets from previous target namespaces
 	assetsToClean := append(namespacedAssets, ssAsset)
 	for _, ns := range namespacesToClean {
-		for _, asset := range assetsToClean {
-			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
-			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := util.DeleteAssetWithNSOverride(h, asset, ns, hiveconfig); err != nil {
-				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
+		for _, a := range assetsToClean {
+			hLog.Infof("Deleting asset %s from old target namespace %s", a.path, ns)
+			// DeleteAsset*WithNSOverride already no-ops for IsNotFound
+			if err := util.DeleteAssetBytesWithNSOverride(h, a.processed, ns, hiveconfig); err != nil {
+				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", a.path, ns)
 			}
 		}
 	}
 
-	asset := assets.MustAsset(ssAsset)
 	hLog.Debug("reading statefulset")
-	newClusterSyncStatefulSet := controllerutils.ReadStatefulsetOrDie(asset)
-	clusterSyncContainer, err := containerByName(&newClusterSyncStatefulSet.Spec.Template.Spec, "clustersync")
+	// Safe to ignore error because we processed this asset above
+	newStatefulSet := controllerutils.ReadStatefulsetOrDie(ssAsset.processed)
+	container, err := containerByName(&newStatefulSet.Spec.Template.Spec, string(c.name))
 	if err != nil {
 		return err
 	}
-	applyDeploymentConfig(hiveconfig, hivev1.DeploymentNameClustersync, clusterSyncContainer, hLog)
+	applyDeploymentConfig(hiveconfig, c.deploymentName, container, hLog)
 
 	hLog.Infof("hive image: %s", r.hiveImage)
 	if r.hiveImage != "" {
-		clusterSyncContainer.Image = r.hiveImage
+		container.Image = r.hiveImage
 		hiveImageEnvVar := corev1.EnvVar{
 			Name:  images.HiveImageEnvVar,
 			Value: r.hiveImage,
 		}
 
-		clusterSyncContainer.Env = append(clusterSyncContainer.Env, hiveImageEnvVar)
+		container.Env = append(container.Env, hiveImageEnvVar)
 	}
 
 	if r.hiveImagePullPolicy != "" {
-		clusterSyncContainer.ImagePullPolicy = r.hiveImagePullPolicy
+		container.ImagePullPolicy = r.hiveImagePullPolicy
 
-		clusterSyncContainer.Env = append(
-			clusterSyncContainer.Env,
+		container.Env = append(
+			container.Env,
 			corev1.EnvVar{
 				Name:  images.HiveImagePullPolicyEnvVar,
 				Value: string(r.hiveImagePullPolicy),
@@ -74,89 +130,85 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	}
 
 	if level := hiveconfig.Spec.LogLevel; level != "" {
-		clusterSyncContainer.Args = append(clusterSyncContainer.Args, "--log-level", level)
+		container.Args = append(container.Args, "--log-level", level)
 	}
 
-	if syncSetReapplyInterval := hiveconfig.Spec.SyncSetReapplyInterval; syncSetReapplyInterval != "" {
-		syncsetReapplyIntervalEnvVar := corev1.EnvVar{
-			Name:  constants.SyncSetReapplyIntervalEnvVar,
-			Value: syncSetReapplyInterval,
-		}
-
-		clusterSyncContainer.Env = append(clusterSyncContainer.Env, syncsetReapplyIntervalEnvVar)
+	if c.containerCustomization != nil {
+		c.containerCustomization(hiveconfig, container)
 	}
 
 	hiveNSName := GetHiveNamespace(hiveconfig)
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
-	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, hiveconfig); err != nil {
-			hLog.WithError(err).Error("error applying object with namespace override")
+	for _, a := range namespacedAssets {
+		// YOU ARE ALSO HERE: convert this func to take bytes, like you did for delete
+		if err := util.ApplyAssetBytesWithNSOverrideAndGC(h, a.processed, hiveNSName, hiveconfig); err != nil {
+			hLog.WithError(err).WithField("asset", a.path).Error("error applying object with namespace override")
 			return err
 		}
-		hLog.WithField("asset", assetPath).Info("applied asset with namespace override")
+		hLog.WithField("asset", a.path).Info("applied asset with namespace override")
 	}
 
 	if hiveconfig.Spec.MaintenanceMode != nil && *hiveconfig.Spec.MaintenanceMode {
-		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-clustersync replicas to 0")
+		hLog.Warnf("maintenanceMode enabled in HiveConfig, setting %s replicas to 0", c.deploymentName)
 		replicas := int32(0)
-		newClusterSyncStatefulSet.Spec.Replicas = &replicas
+		newStatefulSet.Spec.Replicas = &replicas
 	} else {
-		// Default replicas to defaultClustersyncReplicas and only change if they specify in hiveconfig.
-		newClusterSyncStatefulSet.Spec.Replicas = pointer.Int32Ptr(defaultClustersyncReplicas)
+		// Default replicas and only change if they specify in hiveconfig.
+		newStatefulSet.Spec.Replicas = ptr.To(c.defaultReplicas)
 
 		if hiveconfig.Spec.ControllersConfig != nil {
 			// Set the number of replicas that was given in the hiveconfig
-			clusterSyncControllerConfig, found := getHiveControllerConfig(hivev1.ClustersyncControllerName, hiveconfig.Spec.ControllersConfig.Controllers)
-			if found && clusterSyncControllerConfig.Replicas != nil {
-				newClusterSyncStatefulSet.Spec.Replicas = clusterSyncControllerConfig.Replicas
+			controllerConfig, found := getHiveControllerConfig(c.name, hiveconfig.Spec.ControllersConfig.Controllers)
+			if found && controllerConfig.Replicas != nil {
+				newStatefulSet.Spec.Replicas = controllerConfig.Replicas
 			}
 
-			if found && clusterSyncControllerConfig.Resources != nil {
-				clusterSyncContainer.Resources = *clusterSyncControllerConfig.Resources
+			if found && controllerConfig.Resources != nil {
+				container.Resources = *controllerConfig.Resources
 			}
 		}
 	}
 
-	newClusterSyncStatefulSetSpecHash, err := controllerutils.CalculateStatefulSetSpecHash(newClusterSyncStatefulSet)
+	newStatefulSetSpecHash, err := controllerutils.CalculateStatefulSetSpecHash(newStatefulSet)
 	if err != nil {
 		hLog.WithError(err).Error("error calculating new statefulset hash")
 		return err
 	}
 
-	if newClusterSyncStatefulSet.Annotations == nil {
-		newClusterSyncStatefulSet.Annotations = make(map[string]string, 1)
+	if newStatefulSet.Annotations == nil {
+		newStatefulSet.Annotations = make(map[string]string, 1)
 	}
-	newClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation] = newClusterSyncStatefulSetSpecHash
+	newStatefulSet.Annotations[c.hashAnnotation] = newStatefulSetSpecHash
 
 	httpProxy, httpsProxy, noProxy, err := r.discoverProxyVars()
 	if err != nil {
 		return err
 	}
-	controllerutils.SetProxyEnvVars(&newClusterSyncStatefulSet.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
+	controllerutils.SetProxyEnvVars(&newStatefulSet.Spec.Template.Spec, httpProxy, httpsProxy, noProxy)
 
-	if newClusterSyncStatefulSet.Spec.Template.Annotations == nil {
-		newClusterSyncStatefulSet.Spec.Template.Annotations = make(map[string]string, 1)
+	if newStatefulSet.Spec.Template.Annotations == nil {
+		newStatefulSet.Spec.Template.Annotations = make(map[string]string, 1)
 	}
 	// Include the proxy vars in the hash so we redeploy if they change
-	newClusterSyncStatefulSet.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash(
+	newStatefulSet.Spec.Template.Annotations[hiveConfigHashAnnotation] = computeHash(
 		httpProxy+httpsProxy+noProxy, hiveControllersConfigHash)
 
-	existingClusterSyncStatefulSet := &appsv1.StatefulSet{}
-	existingClusterSyncStatefulSetNamespacedName := apitypes.NamespacedName{Name: newClusterSyncStatefulSet.Name, Namespace: newClusterSyncStatefulSet.Namespace}
-	err = r.Get(context.TODO(), existingClusterSyncStatefulSetNamespacedName, existingClusterSyncStatefulSet)
+	existingStatefulSet := &appsv1.StatefulSet{}
+	existingStatefulSetNamespacedName := apitypes.NamespacedName{Name: newStatefulSet.Name, Namespace: newStatefulSet.Namespace}
+	err = r.Get(context.TODO(), existingStatefulSetNamespacedName, existingStatefulSet)
 	if err == nil {
-		if existingClusterSyncStatefulSet.DeletionTimestamp != nil {
-			hLog.Info("clustersync statefulset is in a deleting state. Not reconciling the statefulset")
+		if existingStatefulSet.DeletionTimestamp != nil {
+			hLog.Infof("%s statefulset is in a deleting state. Not reconciling the statefulset", c.name)
 			return nil
 		}
 
-		if hasStatefulSetSpecChanged(existingClusterSyncStatefulSet, newClusterSyncStatefulSet, hLog) {
+		if hasStatefulSetSpecChanged(c, existingStatefulSet, newStatefulSet, hLog) {
 			// The statefulset spec.selector changed. Trying to apply this new statefulset will error with:
 			//     invalid: spec: Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
 			// The only fix is to delete the statefulset and have the apply below recreate it.
-			hLog.Info("deleting the existing clustersync statefulset because spec has changed")
-			err := h.Delete(existingClusterSyncStatefulSet.APIVersion, existingClusterSyncStatefulSet.Kind, existingClusterSyncStatefulSet.Namespace, existingClusterSyncStatefulSet.Name)
+			hLog.Infof("deleting the existing %s statefulset because spec has changed", c.name)
+			err := h.Delete(existingStatefulSet.APIVersion, existingStatefulSet.Kind, existingStatefulSet.Namespace, existingStatefulSet.Name)
 			if err != nil {
 				hLog.WithError(err).Error("error deleting statefulset")
 			}
@@ -169,45 +221,45 @@ func (r *ReconcileHiveConfig) deployClusterSync(hLog log.FieldLogger, h resource
 	}
 
 	// Apply nodeSelector and tolerations passed through from the operator deployment
-	newClusterSyncStatefulSet.Spec.Template.Spec.NodeSelector = r.nodeSelector
-	newClusterSyncStatefulSet.Spec.Template.Spec.Tolerations = r.tolerations
+	newStatefulSet.Spec.Template.Spec.NodeSelector = r.nodeSelector
+	newStatefulSet.Spec.Template.Spec.Tolerations = r.tolerations
 
-	newClusterSyncStatefulSet.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObjectWithGC(h, newClusterSyncStatefulSet, hiveconfig)
+	newStatefulSet.Namespace = hiveNSName
+	result, err := util.ApplyRuntimeObjectWithGC(h, newStatefulSet, hiveconfig)
 	if err != nil {
 		hLog.WithError(err).Error("error applying statefulset")
 		return err
 	}
-	hLog.Infof("clustersync statefulset applied (%s)", result)
+	hLog.Infof("%s statefulset applied (%s)", c.name, result)
 
-	hLog.Info("all clustersync components successfully reconciled")
+	hLog.Infof("all %s components successfully reconciled", c.name)
 	return nil
 }
 
-func hasStatefulSetSpecChanged(existingClusterSyncStatefulSet, newClusterSyncStatefulSet *appsv1.StatefulSet, hLog log.FieldLogger) bool {
+func hasStatefulSetSpecChanged(c ssCfg, existingStatefulSet, newStatefulSet *appsv1.StatefulSet, hLog log.FieldLogger) bool {
 	// hash doesn't exist, assume the spec has changed.
-	if existingClusterSyncStatefulSet == nil {
-		hLog.Debug("existing clustersync statefulset is nil, so the spec didn't change.")
+	if existingStatefulSet == nil {
+		hLog.Debugf("existing %s statefulset is nil, so the spec didn't change.", c.name)
 		return false
 	}
 
-	if existingClusterSyncStatefulSet.Annotations == nil {
-		hLog.Debug("existing clustersync statefulset Annotations is nil, assuming spec changed.")
+	if existingStatefulSet.Annotations == nil {
+		hLog.Debugf("existing %s statefulset Annotations is nil, assuming spec changed.", c.name)
 		return true
 	}
 
-	existingClusterSyncStatefulSetSpecHash, found := existingClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation]
+	existingStatefulSetSpecHash, found := existingStatefulSet.Annotations[c.hashAnnotation]
 	if !found {
-		hLog.Debug("existing clustersync statefulset Annotations doesn't contain the spec hash, assuming spec changed.")
+		hLog.Debugf("existing %s statefulset Annotations doesn't contain the spec hash, assuming spec changed.", c.name)
 		return true
 	}
 
-	newClusterSyncStatefulSetSpecHash := newClusterSyncStatefulSet.Annotations[hiveClusterSyncStatefulSetSpecHashAnnotation]
-	if existingClusterSyncStatefulSetSpecHash != newClusterSyncStatefulSetSpecHash {
-		hLog.Debug("existing clustersync statefulset Spec changed")
+	newStatefulSetSpecHash := newStatefulSet.Annotations[c.hashAnnotation]
+	if existingStatefulSetSpecHash != newStatefulSetSpecHash {
+		hLog.Debugf("existing %s statefulset Spec changed", c.name)
 		return true
 	}
 
-	hLog.Debug("existing clustersync statefulset Spec hasn't changed")
+	hLog.Debugf("existing %s statefulset Spec hasn't changed", c.name)
 	return false
 }

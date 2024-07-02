@@ -623,6 +623,7 @@ type DeploymentName string
 const (
 	DeploymentNameControllers DeploymentName = "hive-controllers"
 	DeploymentNameClustersync DeploymentName = "hive-clustersync"
+	DeploymentNameMachinepool DeploymentName = "hive-machinepool"
 	DeploymentNameAdmission   DeploymentName = "hiveadmission"
 )
 

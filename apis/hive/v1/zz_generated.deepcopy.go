@@ -3041,6 +3041,11 @@ func (in *MachinePoolStatus) DeepCopyInto(out *MachinePoolStatus) {
 		*out = make([]TaintIdentifier, len(*in))
 		copy(*out, *in)
 	}
+	if in.ControlledByReplica != nil {
+		in, out := &in.ControlledByReplica, &out.ControlledByReplica
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 

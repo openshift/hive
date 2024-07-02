@@ -66,7 +66,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		for _, asset := range assetsToClean {
 			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
 			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := util.DeleteAssetWithNSOverride(h, asset, ns, instance); err != nil {
+			if err := util.DeleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
 				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
 			}
 		}
@@ -76,7 +76,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
+		if err := util.ApplyAssetByPathWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}

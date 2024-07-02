@@ -225,6 +225,7 @@ function run_hive_controllers_locally {
         get_incluster_config
         resolved_envs["HIVE_NS"]="HIVE_NS=$hive_controllers_ns"
         resolved_envs["HIVE_CLUSTERSYNC_POD_NAME"]="HIVE_CLUSTERSYNC_POD_NAME=hive-clustersync-0"
+        resolved_envs["HIVE_MACHINEPOOL_POD_NAME"]="HIVE_MACHINEPOOL_POD_NAME=hive-machinepool-0"
 
         # Enable maintenance mode and wait for the controllers to be scaled down
         enable_maintenance_mode

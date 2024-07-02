@@ -4,6 +4,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/test/generic"
 	appsv1 "k8s.io/api/apps/v1"
 )
@@ -33,13 +34,13 @@ func BasicBuilder() Builder {
 	return &builder{}
 }
 
-func FullBuilder(namespace, name string, typer runtime.ObjectTyper) Builder {
+func FullBuilder(namespace string, name hivev1.DeploymentName, typer runtime.ObjectTyper) Builder {
 	b := &builder{}
 	return b.GenericOptions(
 		generic.WithTypeMeta(typer),
 		generic.WithResourceVersion("1"),
 		generic.WithNamespace(namespace),
-		generic.WithName(name),
+		generic.WithName(string(name)),
 	)
 }
 

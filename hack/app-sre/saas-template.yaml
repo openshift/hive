@@ -5471,6 +5471,15 @@ objects:
                     - type
                     type: object
                   type: array
+                controlledByReplica:
+                  description: ControlledByReplica indicates which replica of the
+                    hive-machinepool StatefulSet is responsible for this MachinePool.
+                    Note that this value indicates the replica that most recently
+                    handled the MachinePool. If the hive-machinepool statefulset is
+                    scaled up or down, the controlling replica can change, potentially
+                    causing logs to be spread across multiple pods.
+                  format: int64
+                  type: integer
                 machineSets:
                   description: MachineSets is the status of the machine sets for the
                     machine pool on the remote cluster.

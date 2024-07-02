@@ -1,34 +1,37 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: hive-clustersync
+  # For searchability:
+  # hive-clustersync
+  # hive-machinepool
+  name: hive- {{- .ControllerName}}
   namespace: hive
   labels:
-    control-plane: clustersync
+    control-plane: {{.ControllerName}}
     controller-tools.k8s.io: "1.0"
 spec:
   selector:
     matchLabels:
-      control-plane: clustersync
+      control-plane: {{.ControllerName}}
       controller-tools.k8s.io: "1.0"
   template:
     metadata:
       labels:
-        control-plane: clustersync
+        control-plane: {{.ControllerName}}
         controller-tools.k8s.io: "1.0"
     spec:
-      topologySpreadConstraints: # this forces the clustersync pods to be on separate nodes.
+      topologySpreadConstraints: # this forces the pods to be on separate nodes.
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: DoNotSchedule
         labelSelector:
           matchLabels:
-            control-plane: clustersync
+            control-plane: {{.ControllerName}}
             controller-tools.k8s.io: "1.0"
       serviceAccount: hive-controllers
       serviceAccountName: hive-controllers
       containers:
-      - name: clustersync
+      - name: {{.ControllerName}}
         resources:
           requests:
             cpu: 50m
@@ -37,7 +40,7 @@ spec:
         - "/opt/services/manager"
         args:
         - "--controllers"
-        - "clustersync"
+        - "{{.ControllerName}}"
         envFrom:
         - configMapRef:
             name: hive-controllers-config
@@ -47,7 +50,10 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.namespace
-        - name: HIVE_CLUSTERSYNC_POD_NAME
+        # For searchability:
+        # HIVE_CLUSTERSYNC_POD_NAME
+        # HIVE_MACHINEPOOL_POD_NAME
+        - name: HIVE_ {{- toUpper .ControllerName -}} _POD_NAME
           valueFrom:
             fieldRef:
               apiVersion: v1

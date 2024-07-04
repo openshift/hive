@@ -1,36 +1,29 @@
-#!/bin/bash -xe
+#!/bin/bash
 
-SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
-CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../../../k8s.io/code-generator)}
+set -x
+set -o errexit
+set -o nounset
+set -o pipefail
 
-# use gsed for MAC env
-SED_CMD=sed
-if [[ `uname` == 'Darwin' ]]; then
-  SED_CMD=gsed
-fi
+REPO_ROOT=$(realpath $(dirname ${BASH_SOURCE[0]})/..)
 
-# HACK: For some reason this script is not executable.
-${SED_CMD} -i 's,^exec \(.*/generate-internal-groups.sh\),bash \1,g' ${CODEGEN_PKG}/generate-groups.sh
-# ...but we have to put it back, or `verify` will puke.
-trap "git checkout ${CODEGEN_PKG}/generate-groups.sh" EXIT
+GO111MODULE=on go install k8s.io/code-generator/cmd/deepcopy-gen@release-1.29
 
-cd "${SCRIPT_ROOT}"
-
-###
-# NOTE: Keep Makefile's `verify-codegen` in sync with the paths in these commands (the second and third arg)
-###
-
-GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "deepcopy" \
-  github.com/openshift/hive/pkg/client \
-  github.com/openshift/hive/apis \
-  "hive:v1 hiveinternal:v1alpha1" \
-  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
-  --trim-path-prefix github.com/openshift/hive
-
-# Generate deepcopy for platform-specific types.
-GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "deepcopy" \
-  github.com/openshift/hive/pkg/client \
-  github.com/openshift/hive/apis \
-  "hive:v1/agent hive:v1/aws hive:v1/azure hive:v1/baremetal hive:v1/gcp hive:v1/metricsconfig hive:v1/none hive:v1/openstack hive:v1/ovirt hive:v1/vsphere hive:v1/ibmcloud hivecontracts:v1alpha1" \
-  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt \
-  --trim-path-prefix github.com/openshift/hive
+deepcopy-gen \
+  -O zz_generated.deepcopy \
+  --trim-path-prefix github.com/openshift/hive \
+  --go-header-file "/dev/null" \
+  --input-dirs github.com/openshift/hive/apis/hivecontracts/v1alpha1 \
+  --input-dirs github.com/openshift/hive/apis/hiveinternal/v1alpha1 \
+  --input-dirs github.com/openshift/hive/apis/hive/v1 \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/agent \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/aws \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/azure \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/baremetal \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/gcp \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/ibmcloud \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/metricsconfig \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/none \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/openstack \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/ovirt \
+  --input-dirs github.com/openshift/hive/apis/hive/v1/vsphere

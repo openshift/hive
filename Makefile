@@ -74,7 +74,6 @@ $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindat
 $(call build-image,hive,$(IMG),./Dockerfile,.)
 $(call build-image,hive-fedora-dev-base,hive-fedora-dev-base,./build/fedora-dev/Dockerfile.devbase,.)
 $(call build-image,hive-fedora-dev,$(IMG),./build/fedora-dev/Dockerfile.dev,.)
-$(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
 
 clean:
 	rm -rf $(GO_BUILD_BINDIR)

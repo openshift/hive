@@ -325,6 +325,11 @@ lint: install-tools
 # Remove the golangci-lint from the verify until a fix is in place for permisions for writing to the /.cache directory.
 #verify: lint
 
+# Target to build only hiveutil. This is used so that on the dual build RHEL8/RHEL9, RHEL8 stage only needs to build hiveutil.
+.PHONY: build-hiveutil
+build-hiveutil:
+	$(call build-package, ./contrib/cmd/hiveutil)
+
 .PHONY: modcheck
 modcheck:
 	go run ./hack/modcheck.go

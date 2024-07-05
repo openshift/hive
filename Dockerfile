@@ -3,7 +3,7 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN dnf -y install git python3-pip
-RUN make build
+RUN make build-hiveutil
 
 FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16 as builder_rhel9
 RUN mkdir -p /go/src/github.com/openshift/hive

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/json"
@@ -8,10 +9,13 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
+	"text/template"
 	"time"
 
 	"golang.org/x/time/rate"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -404,4 +408,24 @@ func GetThisPod(cl client.Client) (*corev1.Pod, error) {
 		return nil, err
 	}
 	return po, nil
+}
+
+var assetTemplate = template.New("tpl").Funcs(
+	template.FuncMap{
+		"toUpper": strings.ToUpper,
+	},
+)
+
+func ProcessAssetTemplate(assetBytes []byte, values map[string]string) ([]byte, error) {
+	parsed, err := assetTemplate.Parse(string(assetBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	if err = parsed.Execute(buf, values); err != nil {
+		return nil, errors.Wrapf(err, "unable to execute template with values: %v", values)
+	}
+
+	return buf.Bytes(), nil
 }

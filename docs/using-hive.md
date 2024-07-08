@@ -37,7 +37,7 @@
 - [Configuration Management](#configuration-management)
   - [Vertical Scaling](#vertical-scaling)
   - [SyncSet](#syncset)
-  - [Scaling ClusterSync](#scaling-clustersync)
+  - [Scaling ClusterSync and MachinePool](#scaling-clustersync-and-machinepool)
   - [Identity Provider Management](#identity-provider-management)
 - [Cluster Deprovisioning](#cluster-deprovisioning)
 
@@ -1097,7 +1097,7 @@ If you wish to transfer ownership of a cluster which is already managed by hive,
 ## Configuration Management
 
 ### Vertical Scaling
-hive-operator deploys each component (the [hive-controllers](../config/controllers/deployment.yaml) and [hiveadmission](../config/hiveadmission/deployment.yaml) Deployments; and the [hive-clustersync](../config/clustersync/statefulset.yaml) StatefulSet) with default resource requests.
+hive-operator deploys each component (the [hive-controllers](../config/controllers/deployment.yaml) and [hiveadmission](../config/hiveadmission/deployment.yaml) Deployments; and the hive-clustersync and hive-machinepool [StatefulSets](../config/sharded_controllers/statefulset.yaml)) with default resource requests.
 If you need to scale any of these components vertically, you may add one or more `deploymentConfig` sections to HiveConfig's `spec`. For example:
 
 ```yaml
@@ -1122,7 +1122,7 @@ If you need to scale any of these components vertically, you may add one or more
 For each entry, the `deploymentName` must match the `metadata.name` of the Deployment/StatefulSet.
 The `resources` is a standard corev1.ResourceRequirements.
 
-See [below](#scaling-clustersync) for information on _horizontally_ scaling the clustersync controller.
+See [below](#scaling-clustersync-and-machinepool) for information on _horizontally_ scaling the clustersync or machinepool controller.
 
 Note: The hive-operator itself must be scaled by directly editing its Deployment.
 
@@ -1132,10 +1132,10 @@ Hive offers two CRDs for applying configuration in a cluster once it is installe
 
 For more information please see the [SyncSet](syncset.md) documentation.
 
-### Scaling ClusterSync
-The clustersync controller is designed to scale horizontally, so increasing the number of clustersync controller replicas will scale the number of clustersync pods running, thereby increasing the number of simultaneous clusters getting syncsets applied to them.
+### Scaling ClusterSync and MachinePool
+The clustersync and machinepool controllers are designed to scale horizontally, so increasing the number of controller replicas will scale the number of pods running, thereby increasing the number of simultaneous clusters getting syncsets or machinepools applied to them.
 
-In order to scale the clustersync controller, a section like the following should be added to HiveConfig:
+In order to scale these controllers, a section like the following should be added to HiveConfig:
 
 ```yaml
 spec:
@@ -1146,6 +1146,7 @@ spec:
       name: clustersync
 ```
 
+The above example scales the clustersync controller. Use a (separate) section with `name: machinepool` to scale the machinepool controller.
 
 
 ### Identity Provider Management

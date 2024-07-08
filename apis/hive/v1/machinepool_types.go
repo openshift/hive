@@ -111,6 +111,12 @@ type MachinePoolStatus struct {
 	// the MachinePool's spec.taints.
 	// +optional
 	OwnedTaints []TaintIdentifier `json:"ownedTaints,omitempty"`
+
+	// ControlledByReplica indicates which replica of the hive-machinepool StatefulSet is responsible
+	// for this MachinePool. Note that this value indicates the replica that most recently handled the
+	// MachinePool. If the hive-machinepool statefulset is scaled up or down, the controlling replica
+	// can change, potentially causing logs to be spread across multiple pods.
+	ControlledByReplica *int64 `json:"controlledByReplica,omitempty"`
 }
 
 // TaintIdentifier uniquely identifies a Taint. (It turns out taints are mutually exclusive by

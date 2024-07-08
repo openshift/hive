@@ -543,10 +543,17 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployClusterSync(hLog, h, instance, confighash, namespacesToClean)
+	err = r.deployStatefulSet(clusterSyncCfg, hLog, h, instance, confighash, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying ClusterSync")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingClusterSync", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+	err = r.deployStatefulSet(machinePoolCfg, hLog, h, instance, confighash, namespacesToClean)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying MachinePool")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingMachinePool", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}

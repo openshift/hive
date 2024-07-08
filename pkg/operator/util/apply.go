@@ -6,12 +6,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/utils/pointer"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/operator/assets"
@@ -55,31 +55,55 @@ func ApplyAssetWithGC(h resource.Helper, assetPath string, hc *hivev1.HiveConfig
 	return nil
 }
 
-// ApplyAssetWithNSOverrideAndGC loads the given asset, overrides the namespace, adds an owner reference to
+// ApplyAssetByPathWithNSOverrideAndGC loads the given asset, overrides the namespace, adds an owner reference to
 // HiveConfig for uninstall, and applies it to the cluster.
-func ApplyAssetWithNSOverrideAndGC(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
+func ApplyAssetByPathWithNSOverrideAndGC(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
 	requiredObj, err := readRuntimeObject(assetPath)
 	if err != nil {
 		return errors.Wrapf(err, "unable to decode asset: %s", assetPath)
 	}
+	return ApplyRuntimeObjectWithNSOverrideAndGC(h, requiredObj, namespaceOverride, hiveConfig)
+}
+
+func ApplyAssetBytesWithNSOverrideAndGC(h resource.Helper, assetBytes []byte, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
+	rtObj, err := decodeRuntimeObject(assetBytes)
+	if err != nil {
+		return errors.Wrap(err, "unable to decode asset")
+	}
+	return ApplyRuntimeObjectWithNSOverrideAndGC(h, rtObj, namespaceOverride, hiveconfig)
+}
+
+func ApplyRuntimeObjectWithNSOverrideAndGC(h resource.Helper, requiredObj runtime.Object, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
 	obj, _ := meta.Accessor(requiredObj)
 	obj.SetNamespace(namespaceOverride)
-	_, err = ApplyRuntimeObjectWithGC(h, requiredObj, hiveConfig)
-	if err != nil {
-		return errors.Wrapf(err, "unable to apply asset: %s", assetPath)
+
+	if _, err := ApplyRuntimeObjectWithGC(h, requiredObj, hiveConfig); err != nil {
+		return errors.Wrap(err, "unable to apply asset")
 	}
 	return nil
 }
 
-func DeleteAssetWithNSOverride(h resource.Helper, assetPath, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
+func DeleteAssetByPathWithNSOverride(h resource.Helper, assetPath, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
 	requiredObj, err := readRuntimeObject(assetPath)
 	if err != nil {
 		return errors.Wrapf(err, "unable to decode asset: %s", assetPath)
 	}
+	return DeleteRuntimeObjectWithNSOverride(h, requiredObj, namespaceOverride, hiveconfig)
+}
+
+func DeleteAssetBytesWithNSOverride(h resource.Helper, assetBytes []byte, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
+	rtObj, err := decodeRuntimeObject(assetBytes)
+	if err != nil {
+		return errors.Wrap(err, "unable to decode asset")
+	}
+	return DeleteRuntimeObjectWithNSOverride(h, rtObj, namespaceOverride, hiveconfig)
+}
+
+func DeleteRuntimeObjectWithNSOverride(h resource.Helper, requiredObj runtime.Object, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
 	objA, _ := meta.Accessor(requiredObj)
 	objT, _ := meta.TypeAccessor(requiredObj)
 	if err := h.Delete(objT.GetAPIVersion(), objT.GetKind(), namespaceOverride, objA.GetName()); err != nil {
-		return errors.Wrapf(err, "unable to delete asset: %s", assetPath)
+		return errors.Wrapf(err, "unable to delete asset")
 	}
 	return nil
 }
@@ -112,7 +136,7 @@ func ApplyRuntimeObjectWithGC(h resource.Helper, runtimeObj runtime.Object, hc *
 		Kind:               hc.Kind,
 		Name:               hc.Name,
 		UID:                hc.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}
 	// This assumes we have full control of owner references for these resources the operator creates.
 	obj.SetOwnerReferences([]v1.OwnerReference{ownerRef})
@@ -120,8 +144,11 @@ func ApplyRuntimeObjectWithGC(h resource.Helper, runtimeObj runtime.Object, hc *
 }
 
 func readRuntimeObject(assetPath string) (runtime.Object, error) {
-	obj, _, err := serializer.NewCodecFactory(scheme.GetScheme()).UniversalDeserializer().
-		Decode(assets.MustAsset(assetPath), nil, nil)
+	return decodeRuntimeObject(assets.MustAsset(assetPath))
+}
+
+func decodeRuntimeObject(assetBytes []byte) (runtime.Object, error) {
+	obj, _, err := serializer.NewCodecFactory(scheme.GetScheme()).UniversalDeserializer().Decode(assetBytes, nil, nil)
 	return obj, err
 }
 

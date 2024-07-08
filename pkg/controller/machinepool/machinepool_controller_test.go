@@ -39,6 +39,7 @@ import (
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 	testfake "github.com/openshift/hive/pkg/test/fake"
 	testmp "github.com/openshift/hive/pkg/test/machinepool"
+	teststatefulset "github.com/openshift/hive/pkg/test/statefulset"
 )
 
 const (
@@ -1233,14 +1234,19 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			localExisting := []runtime.Object{}
+			scheme := scheme.GetScheme()
+			localExisting := []runtime.Object{
+				teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+					teststatefulset.WithCurrentReplicas(3),
+					teststatefulset.WithReplicas(3),
+				),
+			}
 			if test.clusterDeployment != nil {
 				localExisting = append(localExisting, test.clusterDeployment)
 			}
 			if test.machinePool != nil {
 				localExisting = append(localExisting, test.machinePool)
 			}
-			scheme := scheme.GetScheme()
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(localExisting...).Build()
 			infra := &configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1575,6 +1581,7 @@ func testMachinePool(opts ...testmp.Option) *hivev1.MachinePool {
 			},
 		),
 		testmp.WithInitializedStatusConditions(),
+		testmp.WithControllerOrdinal(0),
 	}, opts...)...)
 }
 

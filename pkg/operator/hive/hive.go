@@ -42,8 +42,6 @@ const (
 	// hiveConfigHashAnnotation is annotation on hivedeployment that contains
 	// the hash of the contents of the hive-controllers-config configmap
 	hiveConfigHashAnnotation = "hive.openshift.io/hiveconfig-hash"
-
-	hiveClusterSyncStatefulSetSpecHashAnnotation = "hive.openshift.io/clustersync-statefulset-spec-hash"
 )
 
 var (
@@ -64,7 +62,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		for _, asset := range assetsToClean {
 			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
 			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := util.DeleteAssetWithNSOverride(h, asset, ns, instance); err != nil {
+			if err := util.DeleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
 				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
 			}
 		}
@@ -118,8 +116,12 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		)
 	}
 
-	// Always add clustersync to the list of disabled controllers since clustersync is running in a statefulset now.
-	disabledControllers := append(instance.Spec.DisabledControllers, "clustersync")
+	// Always add clustersync and machinepool to the list of disabled controllers since they are
+	// running in statefulsets now.
+	disabledControllers := append(
+		instance.Spec.DisabledControllers,
+		string(hivev1.ClustersyncControllerName),
+		string(hivev1.MachinePoolControllerName))
 	hiveContainer.Args = append(hiveContainer.Args, "--disabled-controllers", strings.Join(disabledControllers, ","))
 
 	if level := instance.Spec.LogLevel; level != "" {
@@ -256,7 +258,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		return err
 	}
 
-	r.includeGlobalPullSecret(hLog, h, instance, hiveContainer)
+	r.includeGlobalPullSecret(hLog, instance, hiveContainer)
 
 	if instance.Spec.MaintenanceMode != nil && *instance.Spec.MaintenanceMode {
 		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-controllers replicas to 0")
@@ -280,7 +282,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
+		if err := util.ApplyAssetByPathWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -436,7 +438,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 	return nil
 }
 
-func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
+func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
 	if instance.Spec.GlobalPullSecretRef == nil || instance.Spec.GlobalPullSecretRef.Name == "" {
 		hLog.Debug("GlobalPullSecret is not provided in HiveConfig, it will not be deployed")
 		return

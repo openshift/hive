@@ -58,6 +58,7 @@ const (
 	finalizer                  = "hive.openshift.io/remotemachineset"
 	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
 	defaultPollInterval        = 30 * time.Minute
+	stsName                    = hivev1.DeploymentNameMachinepool
 )
 
 var (
@@ -86,11 +87,17 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
+	ordinalID, err := controllerutils.GetMyOrdinalID(ControllerName, logger)
+	if err != nil {
+		return err
+	}
+
 	r := &ReconcileMachinePool{
 		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
 		scheme:       scheme,
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
+		ordinalID:    ordinalID,
 	}
 	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
 		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, logger)
@@ -206,6 +213,9 @@ type ReconcileMachinePool struct {
 	// A TTLCache of machinepoolnamelease creates each machinepool expects to see. Note that not all actuators make use
 	// of expectations.
 	expectations controllerutils.ExpectationsInterface
+
+	// Which hive-machinepool StatefulSet replica this reconciler instance is running in.
+	ordinalID int64
 }
 
 // Reconcile reads that state of the cluster for a MachinePool object and makes changes to the
@@ -232,8 +242,24 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 	// NOTE: This may be sparse if we haven't yet synced from the ClusterDeployment (below)
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: pool}, logger)
 
+	me, err := controllerutils.IsUIDAssignedToMe(r.Client, stsName, pool.UID, r.ordinalID, logger)
+	if !me || err != nil {
+		if err != nil {
+			logger.WithError(err).Error("failed determining which instance is assigned to sync this MachinePool")
+			return reconcile.Result{}, err
+		}
+
+		logger.Debug("not syncing because this MachinePool is not assigned to me")
+		recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeSkippedSync)
+		return reconcile.Result{}, nil
+	}
+
 	// Initialize machine pool conditions if not present
 	newConditions, changed := controllerutils.InitializeMachinePoolConditions(pool.Status.Conditions, machinePoolConditions)
+	if pool.Status.ControlledByReplica == nil || r.ordinalID != *pool.Status.ControlledByReplica {
+		pool.Status.ControlledByReplica = &r.ordinalID
+		changed = true
+	}
 	if changed {
 		pool.Status.Conditions = newConditions
 		logger.Info("initializing remote machineset controller conditions")

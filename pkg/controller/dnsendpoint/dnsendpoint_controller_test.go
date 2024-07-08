@@ -505,6 +505,9 @@ func (*fakeManager) SetFields(interface{}) error {
 func (*fakeManager) AddMetricsExtraHandler(path string, handler http.Handler) error {
 	panic("not implemented")
 }
+func (*fakeManager) AddMetricsServerExtraHandler(path string, handler http.Handler) error {
+	panic("not implemented")
+}
 func (*fakeManager) AddHealthzCheck(name string, check healthz.Checker) error {
 	panic("not implemented")
 }

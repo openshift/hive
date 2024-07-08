@@ -775,24 +775,24 @@ func (r *ReconcileClusterDeployment) setupAWSCredentialForAssumeRole(cd *hivev1.
 
 func (r *ReconcileClusterDeployment) watchClusterProvisions(mgr manager.Manager, c controller.Controller) error {
 	handler := &clusterProvisionEventHandler{
-		EventHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()),
-		reconciler:   r,
+		TypedEventHandler: handler.TypedEnqueueRequestForOwner[*hivev1.ClusterProvision](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()),
+		reconciler:        r,
 	}
-	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterProvision{}), handler)
+	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterProvision{}, handler))
 }
 
-var _ handler.EventHandler = &clusterProvisionEventHandler{}
+var _ handler.TypedEventHandler[*hivev1.ClusterProvision] = &clusterProvisionEventHandler{}
 
 type clusterProvisionEventHandler struct {
-	handler.EventHandler
+	handler.TypedEventHandler[*hivev1.ClusterProvision]
 	reconciler *ReconcileClusterDeployment
 }
 
 // Create implements handler.EventHandler
-func (h *clusterProvisionEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *clusterProvisionEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.ClusterProvision], q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("ClusterProvision created")
 	h.reconciler.trackClusterProvisionAdd(e.Object)
-	h.EventHandler.Create(ctx, e, q)
+	h.TypedEventHandler.Create(ctx, e, q)
 }
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,

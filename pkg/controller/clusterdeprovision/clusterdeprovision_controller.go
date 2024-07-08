@@ -116,15 +116,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, 
 	}
 
 	// Watch for changes to ClusterDeprovision
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeprovision{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeprovision{}, &handler.TypedEnqueueRequestForObject[*hivev1.ClusterDeprovision]{}))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching changes to clusterdeprovision")
 		return err
 	}
 
 	// Watch for uninstall jobs created for ClusterDeprovisions
-	err = c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}),
-		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeprovision{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, handler.TypedEnqueueRequestForOwner[*batchv1.Job](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeprovision{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching  uninstall jobs created for clusterdeprovisionreques")
 		return err

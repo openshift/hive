@@ -23,39 +23,35 @@ import (
 
 func (r *ReconcileMachinePool) watchMachinePoolNameLeases(mgr manager.Manager, c controller.Controller) error {
 	h := &machinePoolNameLeaseEventHandler{
-		EventHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.MachinePool{}, handler.OnlyControllerOwner()),
-		reconciler:   r,
+		TypedEventHandler: handler.TypedEnqueueRequestForOwner[*hivev1.MachinePoolNameLease](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.MachinePool{}, handler.OnlyControllerOwner()),
+		reconciler:        r,
 	}
-	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePoolNameLease{}), h)
+	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePoolNameLease{}, h))
 }
 
-var _ handler.EventHandler = &machinePoolNameLeaseEventHandler{}
+var _ handler.TypedEventHandler[*hivev1.MachinePoolNameLease] = &machinePoolNameLeaseEventHandler{}
 
 type machinePoolNameLeaseEventHandler struct {
-	handler.EventHandler
+	handler.TypedEventHandler[*hivev1.MachinePoolNameLease]
 	reconciler *ReconcileMachinePool
 }
 
 // Create implements handler.EventHandler
-func (h *machinePoolNameLeaseEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *machinePoolNameLeaseEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.MachinePoolNameLease], q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("running Create handler for MachinePoolNameLease")
 	h.reconciler.trackLeaseAdd(e.Object)
-	h.EventHandler.Create(ctx, e, q)
+	h.TypedEventHandler.Create(ctx, e, q)
 }
 
 // Delete implements handler.EventHandler
-func (h *machinePoolNameLeaseEventHandler) Delete(ctx context.Context, e event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (h *machinePoolNameLeaseEventHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*hivev1.MachinePoolNameLease], q workqueue.RateLimitingInterface) {
 	logger := h.reconciler.logger
 	logger.Info("running Delete handler for MachinePoolNameLease, requeuing all pools for cluster")
-	lease, ok := e.Object.(*hivev1.MachinePoolNameLease)
-	if !ok {
-		logger.Warn("Delete handler called for non-MachinePoolNameLease: %v", e.Object)
-		return
-	}
-	if _, ok := lease.Labels[constants.ClusterDeploymentNameLabel]; !ok {
+	// FIXME Handle deletion for non MachinePoolNameLease event
+	if _, ok := e.Object.Labels[constants.ClusterDeploymentNameLabel]; !ok {
 		logger.WithFields(log.Fields{
-			"lease":     lease.Name,
-			"namespace": lease.Namespace,
+			"lease":     e.Object.Name,
+			"namespace": e.Object.Namespace,
 		}).Warnf("deleted lease has no %s label, unable to requeue all pools for cluster", constants.ClusterDeploymentNameLabel)
 		return
 	}
@@ -65,7 +61,7 @@ func (h *machinePoolNameLeaseEventHandler) Delete(ctx context.Context, e event.D
 	// TODO: we do not currently label machine pools as belonging to the cluster, when we do we could use this to filter
 	// during the query itself.
 	clusterMachinePools := &hivev1.MachinePoolList{}
-	err := h.reconciler.List(context.TODO(), clusterMachinePools, client.InNamespace(lease.Namespace))
+	err := h.reconciler.List(context.TODO(), clusterMachinePools, client.InNamespace(e.Object.Namespace))
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err),
 			"unable to list machine pools for cluster")
@@ -73,7 +69,7 @@ func (h *machinePoolNameLeaseEventHandler) Delete(ctx context.Context, e event.D
 	}
 	logger.Debugf("found %d MachinePools for cluster", len(clusterMachinePools.Items))
 	for _, mp := range clusterMachinePools.Items {
-		if mp.Spec.ClusterDeploymentRef.Name != lease.Labels[constants.ClusterDeploymentNameLabel] {
+		if mp.Spec.ClusterDeploymentRef.Name != e.Object.Labels[constants.ClusterDeploymentNameLabel] {
 			continue
 		}
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{

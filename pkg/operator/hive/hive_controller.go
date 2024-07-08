@@ -88,6 +88,28 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 }
 
+func mapToHiveConfig[T client.Object](r reconcile.Reconciler, src string) func(context.Context, T) []reconcile.Request {
+	return func(ctx context.Context, _ T) []reconcile.Request {
+		retval := []reconcile.Request{}
+
+		configList := &hivev1.HiveConfigList{}
+		err := r.(*ReconcileHiveConfig).List(ctx, configList, "", metav1.ListOptions{}) // reconcile all HiveConfigs
+		if err != nil {
+			log.WithError(err).Errorf("error listing hive configs for %s reconcile", src)
+			return retval
+		}
+
+		for _, config := range configList.Items {
+			retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
+				Name: config.Name,
+			}})
+		}
+		log.WithField("configs", retval).Debugf("reconciled for change in %s", src)
+		return retval
+
+	}
+}
+
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
@@ -148,7 +170,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		mgr.Add(&informerRunnable{informer: configMapInformer})
 
 		// Watch for changes to cm/kube-apiserver-aggregator-client-ca in the OpenShift managed namespace
-		err = c.Watch(&source.Informer{Informer: configMapInformer}, handler.EnqueueRequestsFromMapFunc(handler.MapFunc(aggregatorCAConfigMapHandler)))
+		err = c.Watch(&source.Informer{Informer: configMapInformer, Handler: handler.EnqueueRequestsFromMapFunc(handler.MapFunc(aggregatorCAConfigMapHandler))}) // FIXME confirm
 		if err != nil {
 			return err
 		}
@@ -159,7 +181,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to HiveConfig:
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.HiveConfig{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.HiveConfig{}, &handler.TypedEnqueueRequestForObject[*hivev1.HiveConfig]{}))
 	if err != nil {
 		return err
 	}
@@ -181,53 +203,32 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Monitor changes to DaemonSets:
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.DaemonSet{}, handler.TypedEnqueueRequestForOwner[*appsv1.DaemonSet](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{})))
 	if err != nil {
 		return err
 	}
 
 	// Monitor changes to Deployments:
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}, handler.TypedEnqueueRequestForOwner[*appsv1.Deployment](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{})))
 	if err != nil {
 		return err
 	}
 
 	// Monitor changes to Services:
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Service{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Service{}, handler.TypedEnqueueRequestForOwner[*corev1.Service](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{})))
 	if err != nil {
 		return err
 	}
 
 	// Monitor changes to StatefulSets:
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}, handler.TypedEnqueueRequestForOwner[*appsv1.StatefulSet](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.HiveConfig{})))
 	if err != nil {
 		return err
 	}
 
-	mapToHiveConfig := func(src string) func(context.Context, client.Object) []reconcile.Request {
-		return func(ctx context.Context, _ client.Object) []reconcile.Request {
-			retval := []reconcile.Request{}
-
-			configList := &hivev1.HiveConfigList{}
-			err := r.(*ReconcileHiveConfig).List(ctx, configList, "", metav1.ListOptions{}) // reconcile all HiveConfigs
-			if err != nil {
-				log.WithError(err).Errorf("error listing hive configs for %s reconcile", src)
-				return retval
-			}
-
-			for _, config := range configList.Items {
-				retval = append(retval, reconcile.Request{NamespacedName: types.NamespacedName{
-					Name: config.Name,
-				}})
-			}
-			log.WithField("configs", retval).Debugf("reconciled for change in %s", src)
-			return retval
-		}
-	}
-
 	// Monitor CRDs so that we can keep latest list of supported contracts
-	err = c.Watch(source.Kind(mgr.GetCache(), &apiextv1.CustomResourceDefinition{}),
-		handler.EnqueueRequestsFromMapFunc(mapToHiveConfig("CRD")))
+	err = c.Watch(source.Kind(mgr.GetCache(), &apiextv1.CustomResourceDefinition{},
+		handler.TypedEnqueueRequestsFromMapFunc[*apiextv1.CustomResourceDefinition](mapToHiveConfig[*apiextv1.CustomResourceDefinition](r, "CRD")))) // FIXME
 	if err != nil {
 		return err
 	}
@@ -236,8 +237,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// There's just one Proxy object; and there's just one HiveConfig -- map any activity on the
 	// former to the latter. Note that Proxy is Openshift-specific.
 	if r.(*ReconcileHiveConfig).isOpenShift {
-		err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Proxy{}),
-			handler.EnqueueRequestsFromMapFunc(mapToHiveConfig("Proxy")))
+		err = c.Watch(source.Kind(mgr.GetCache(), &configv1.Proxy{},
+			handler.TypedEnqueueRequestsFromMapFunc[*configv1.Proxy](mapToHiveConfig[*configv1.Proxy](r, "Proxy"))))
 		if err != nil {
 			return err
 		}
@@ -245,10 +246,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Monitor the hive namespace so we can reconcile labels for monitoring. We do this with a map
 	// func instead of an owner reference because we can't be sure we'll be the one to create it.
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Namespace{}),
-		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Namespace{},
+		handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, ns *corev1.Namespace) []reconcile.Request {
 			retval := []reconcile.Request{}
-			nsName := o.GetName()
+			nsName := ns.GetName()
 
 			configList := &hivev1.HiveConfigList{}
 			err := r.(*ReconcileHiveConfig).List(context.TODO(), configList, "", metav1.ListOptions{})
@@ -280,7 +281,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			log.WithField("configs", retval).Debugf("reconciled for change in namespace %s", nsName)
 			return retval
 
-		}))
+		})))
 	if err != nil {
 		return err
 	}
@@ -621,7 +622,10 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 
 		// Watch Secrets in hive namespace, so we can detect changes to the hiveadmission serving cert secret and
 		// force a deployment rollout.
-		err := r.ctrlr.Watch(&source.Informer{Informer: secretsInformer}, handler.Funcs{
+		src := &source.Informer{
+			Informer: secretsInformer,
+		}
+		src.Handler = handler.Funcs{
 			CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 				hLog.Debug("eventHandler CreateFunc")
 				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
@@ -630,7 +634,8 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 				hLog.Debug("eventHandler UpdateFunc")
 				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
 			},
-		}, predicate.Funcs{
+		}
+		src.Predicates = append(src.Predicates, predicate.TypedFuncs[client.Object]{
 			CreateFunc: func(e event.CreateEvent) bool {
 				hLog.WithField("predicateResponse", e.Object.GetName() == hiveAdmissionServingCertSecretName).Debug("secret CreateEvent")
 				return e.Object.GetName() == hiveAdmissionServingCertSecretName
@@ -640,13 +645,16 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 				return e.ObjectNew.GetName() == hiveAdmissionServingCertSecretName
 			},
 		})
+
+		err := r.ctrlr.Watch(src)
 		if err != nil {
 			hLog.WithError(err).Error("error establishing secret watch")
 			return err
 		}
 
 		// Watch secrets in HiveConfig that should trigger reconcile on change.
-		err = r.ctrlr.Watch(&source.Informer{Informer: secretsInformer}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
+		src = &source.Informer{Informer: secretsInformer}
+		src.Handler = handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			retval := []reconcile.Request{}
 			secret, ok := a.(*corev1.Secret)
 			if !ok {
@@ -668,7 +676,8 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 			}
 			hLog.WithField("secretName", secret.Name).WithField("configs", retval).Debug("secret change trigger reconcile for HiveConfigs")
 			return retval
-		}))
+		})
+		err = r.ctrlr.Watch(src)
 		if err != nil {
 			return err
 		}

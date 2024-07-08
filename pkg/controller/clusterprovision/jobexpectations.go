@@ -18,24 +18,30 @@ import (
 
 func (r *ReconcileClusterProvision) watchJobs(mgr manager.Manager, c controller.Controller) error {
 	handler := &jobEventHandler{
-		EventHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterProvision{}, handler.OnlyControllerOwner()),
-		reconciler:   r,
+		TypedEventHandler: handler.TypedEnqueueRequestForOwner[*batchv1.Job](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterProvision{}, handler.OnlyControllerOwner()),
+		reconciler:        r,
 	}
-	return c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), handler)
+	return c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, handler))
 }
 
-var _ handler.EventHandler = &jobEventHandler{}
+var _ handler.TypedEventHandler[*batchv1.Job] = &jobEventHandler{}
 
 type jobEventHandler struct {
-	handler.EventHandler
+	handler.TypedEventHandler[*batchv1.Job]
 	reconciler *ReconcileClusterProvision
 }
 
-// Create implements handler.EventHandler
-func (h *jobEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+// Create implements handler.TypedEventHandler
+func (h *jobEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*batchv1.Job], q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("Job created")
 	h.reconciler.trackJobAdd(e.Object)
-	h.EventHandler.Create(ctx, e, q)
+	h.TypedEventHandler.Create(ctx, e, q)
+}
+
+// Delete implements handler.TypedEventHandler
+func (h *jobEventHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*batchv1.Job], q workqueue.RateLimitingInterface) {
+	h.reconciler.logger.Info("Job deleted")
+	h.TypedEventHandler.Delete(ctx, e, q)
 }
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,

@@ -324,7 +324,7 @@ func (r *ReconcileClusterDeployment) watchClusterInstall(gvk schema.GroupVersion
 
 	obj := &unstructured.Unstructured{}
 	obj.SetGroupVersionKind(gvk)
-	err := r.watcher.Watch(source.Kind(r.Manager.GetCache(), obj), handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+	err := r.watcher.Watch(source.Kind(r.Manager.GetCache(), obj, handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, o *unstructured.Unstructured) []reconcile.Request {
 		retval := []reconcile.Request{}
 
 		cdList := &hivev1.ClusterDeploymentList{}
@@ -344,7 +344,7 @@ func (r *ReconcileClusterDeployment) watchClusterInstall(gvk schema.GroupVersion
 		logger.WithField("retval", retval).Debug("trigger reconcile for clusterdeployments for cluster install objects")
 
 		return retval
-	}))
+	})))
 	if err != nil {
 		return err
 	}

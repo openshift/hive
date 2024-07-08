@@ -62,7 +62,7 @@ func invalidOpenStackClusterPool() *hivev1.ClusterPool {
 }
 
 func TestClusterPoolInitialize(t *testing.T) {
-	data := NewClusterPoolValidatingAdmissionHook(createDecoder(t))
+	data := NewClusterPoolValidatingAdmissionHook(*createDecoder(t))
 	err := data.Initialize(nil, nil)
 	assert.Nil(t, err)
 }
@@ -228,7 +228,7 @@ func TestClusterPoolValidate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
 			data := ClusterPoolValidatingAdmissionHook{
-				decoder: createDecoder(t),
+				decoder: *createDecoder(t),
 			}
 
 			if tc.gvr == nil {

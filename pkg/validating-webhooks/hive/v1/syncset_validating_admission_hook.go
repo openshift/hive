@@ -60,11 +60,11 @@ var (
 
 // SyncSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type SyncSetValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewSyncSetValidatingAdmissionHook constructs a new SyncSetValidatingAdmissionHook
-func NewSyncSetValidatingAdmissionHook(decoder *admission.Decoder) *SyncSetValidatingAdmissionHook {
+func NewSyncSetValidatingAdmissionHook(decoder admission.Decoder) *SyncSetValidatingAdmissionHook {
 	return &SyncSetValidatingAdmissionHook{decoder: decoder}
 }
 

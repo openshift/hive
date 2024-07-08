@@ -25,11 +25,11 @@ const (
 
 // DNSZoneValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type DNSZoneValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewDNSZoneValidatingAdmissionHook constructs a new DNSZoneValidatingAdmissionHook
-func NewDNSZoneValidatingAdmissionHook(decoder *admission.Decoder) *DNSZoneValidatingAdmissionHook {
+func NewDNSZoneValidatingAdmissionHook(decoder admission.Decoder) *DNSZoneValidatingAdmissionHook {
 	return &DNSZoneValidatingAdmissionHook{decoder: decoder}
 }
 

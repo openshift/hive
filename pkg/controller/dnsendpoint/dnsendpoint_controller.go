@@ -66,21 +66,19 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
-	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &hivev1.DNSZone{}), &handler.EnqueueRequestForObject{}); err != nil {
+	if err := ctrl.Watch(source.Kind(mgr.GetCache(), &hivev1.DNSZone{}, &handler.TypedEnqueueRequestForObject[*hivev1.DNSZone]{})); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	if err := ctrl.Watch(
-		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
-		controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(reconciler, reconciler.logger),
-	); err != nil {
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, controllerutils.EnqueueDNSZonesOwnedByClusterDeployment(reconciler, reconciler.logger))); err != nil {
 		return err
 	}
 
 	// Reconcile DNSZones enqueued by nameServerScraper.
 	if nameServerChangeNotifier != nil {
-		if err := ctrl.Watch(&source.Channel{Source: nameServerChangeNotifier}, &handler.EnqueueRequestForObject{}); err != nil {
+		if err := ctrl.Watch(source.Channel(nameServerChangeNotifier, &handler.TypedEnqueueRequestForObject[client.Object]{})); err != nil {
 			log.WithField("controller", ControllerName).WithError(err).Error("unable to set up watch for name server changes")
 			return err
 		}

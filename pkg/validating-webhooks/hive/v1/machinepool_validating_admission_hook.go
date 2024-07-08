@@ -41,11 +41,11 @@ const (
 
 // MachinePoolValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type MachinePoolValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewMachinePoolValidatingAdmissionHook constructs a new MachinePoolValidatingAdmissionHook
-func NewMachinePoolValidatingAdmissionHook(decoder *admission.Decoder) *MachinePoolValidatingAdmissionHook {
+func NewMachinePoolValidatingAdmissionHook(decoder admission.Decoder) *MachinePoolValidatingAdmissionHook {
 	return &MachinePoolValidatingAdmissionHook{decoder: decoder}
 }
 

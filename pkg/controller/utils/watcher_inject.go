@@ -2,8 +2,6 @@ package utils
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -12,7 +10,7 @@ import (
 // that only provides function to add watches.
 // This allows reconcilers to start new watches when required.
 type Watcher interface {
-	Watch(src source.Source, eventhandler handler.EventHandler, predicates ...predicate.Predicate) error
+	Watch(src source.Source) error
 }
 
 // watcherInjectable interface allows controller to be injected

@@ -14,7 +14,7 @@ import (
 
 func TestClusterImageSetValidatingResource(t *testing.T) {
 	// Arrange
-	data := NewClusterImageSetValidatingAdmissionHook(createDecoder(t))
+	data := NewClusterImageSetValidatingAdmissionHook(*createDecoder(t))
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1",
@@ -32,7 +32,7 @@ func TestClusterImageSetValidatingResource(t *testing.T) {
 
 func TestClusterImageSetInitialize(t *testing.T) {
 	// Arrange
-	data := NewClusterImageSetValidatingAdmissionHook(createDecoder(t))
+	data := NewClusterImageSetValidatingAdmissionHook(*createDecoder(t))
 
 	// Act
 	err := data.Initialize(nil, nil)
@@ -156,7 +156,7 @@ func TestClusterImageSetValidate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			data := NewClusterImageSetValidatingAdmissionHook(createDecoder(t))
+			data := NewClusterImageSetValidatingAdmissionHook(*createDecoder(t))
 			newObject := &hivev1.ClusterImageSet{
 				Spec: tc.newSpec,
 			}

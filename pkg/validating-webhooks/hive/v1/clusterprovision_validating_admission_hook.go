@@ -44,11 +44,11 @@ var (
 
 // ClusterProvisionValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterProvisionValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewClusterProvisionValidatingAdmissionHook constructs a new ClusterProvisionValidatingAdmissionHook
-func NewClusterProvisionValidatingAdmissionHook(decoder *admission.Decoder) *ClusterProvisionValidatingAdmissionHook {
+func NewClusterProvisionValidatingAdmissionHook(decoder admission.Decoder) *ClusterProvisionValidatingAdmissionHook {
 	return &ClusterProvisionValidatingAdmissionHook{decoder: decoder}
 }
 

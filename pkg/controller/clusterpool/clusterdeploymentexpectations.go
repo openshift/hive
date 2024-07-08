@@ -5,7 +5,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -19,9 +18,9 @@ import (
 
 func (r *ReconcileClusterPool) watchClusterDeployments(mgr manager.Manager, c controller.Controller) error {
 	h := &clusterDeploymentEventHandler{
-		EventHandler: handler.EnqueueRequestsFromMapFunc(
-			func(ctx context.Context, a client.Object) []reconcile.Request {
-				cpKey := clusterPoolKey(a.(*hivev1.ClusterDeployment))
+		TypedEventHandler: handler.TypedEnqueueRequestsFromMapFunc(
+			func(ctx context.Context, cd *hivev1.ClusterDeployment) []reconcile.Request {
+				cpKey := clusterPoolKey(cd)
 				if cpKey == nil {
 					return nil
 				}
@@ -30,22 +29,21 @@ func (r *ReconcileClusterPool) watchClusterDeployments(mgr manager.Manager, c co
 		),
 		reconciler: r,
 	}
-	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
-		controllerutils.NewRateLimitedUpdateEventHandler(h, controllerutils.IsClusterDeploymentErrorUpdateEvent))
+	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, controllerutils.NewTypedRateLimitedUpdateEventHandler(h, controllerutils.IsClusterDeploymentErrorUpdateEvent)))
 }
 
-var _ handler.EventHandler = &clusterDeploymentEventHandler{}
+var _ handler.TypedEventHandler[*hivev1.ClusterDeployment] = &clusterDeploymentEventHandler{}
 
 type clusterDeploymentEventHandler struct {
-	handler.EventHandler
+	handler.TypedEventHandler[*hivev1.ClusterDeployment]
 	reconciler *ReconcileClusterPool
 }
 
 // Create implements handler.EventHandler
-func (h *clusterDeploymentEventHandler) Create(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (h *clusterDeploymentEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.ClusterDeployment], q workqueue.RateLimitingInterface) {
 	h.reconciler.logger.Info("ClusterDeployment created")
 	h.trackClusterDeploymentAdd(e.Object)
-	h.EventHandler.Create(context.TODO(), e, q)
+	h.TypedEventHandler.Create(context.TODO(), e, q)
 }
 
 // When a ClusterDeployment is created, update the expectations of the ClusterPool that owns the ClusterDeployment.

@@ -33,7 +33,7 @@ func main() {
 	)
 }
 
-func createDecoder() *admission.Decoder {
+func createDecoder() admission.Decoder {
 	scheme := scheme.GetScheme()
 	decoder := admission.NewDecoder(scheme)
 	return decoder

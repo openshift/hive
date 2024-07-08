@@ -142,13 +142,12 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 func (r *ReconcileBackup) registerHiveObjectWatches(mgr manager.Manager, c controller.Controller) error {
 	for _, t := range hiveNamespaceScopedTypesToWatch {
-		err := c.Watch(source.Kind(mgr.GetCache(), t.DeepCopyObject().(client.Object)), handler.EnqueueRequestsFromMapFunc(
+		err := c.Watch(source.Kind(mgr.GetCache(), t.DeepCopyObject().(client.Object), handler.TypedEnqueueRequestsFromMapFunc(
 			func(ctx context.Context, mapObj client.Object) []reconcile.Request {
 				// Queue up the NS for this Hive Object
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{Namespace: mapObj.GetNamespace()}}}
 			},
-		),
-		)
+		)))
 		if err != nil {
 			return err
 		}

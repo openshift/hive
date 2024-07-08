@@ -24,11 +24,11 @@ const (
 
 // SelectorSyncSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type SelectorSyncSetValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewSelectorSyncSetValidatingAdmissionHook constructs a new SelectorSyncSetValidatingAdmissionHook
-func NewSelectorSyncSetValidatingAdmissionHook(decoder *admission.Decoder) *SelectorSyncSetValidatingAdmissionHook {
+func NewSelectorSyncSetValidatingAdmissionHook(decoder admission.Decoder) *SelectorSyncSetValidatingAdmissionHook {
 	return &SelectorSyncSetValidatingAdmissionHook{decoder: decoder}
 }
 

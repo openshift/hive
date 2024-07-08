@@ -1,0 +1,233 @@
+############################################################
+# Variable section
+############################################################
+ifndef CONTAINER_RUNTIME
+	ifneq (, $(shell command -v podman))
+		CONTAINER_RUNTIME := podman
+		CONTAINER_BUILD_FLAGS := --ulimit nofile=10239:10240
+	else ifneq (, $(shell command -v docker))
+		CONTAINER_RUNTIME := docker
+	endif
+endif
+
+#GO=GO111MODULE=on GOFLAGS=-mod=vendor go
+GO ?=go
+GOFMT ?= gofmt
+GOFMT_FLAGS ?= -s -l
+GO_MOD_FLAGS ?= -mod=vendor
+GO_FILES ?= $(shell find . -name '*.go' -not -path '*/vendor/*' -not -path '*/_output/*' -print)
+GO_BUILD_BINDIR := $(abspath bin)
+go_files_count := $(words $(GO_FILES))
+
+GO_SUB_MODULES :=./apis
+
+# This is always set on macos, so it should be safe to invoke systemd-path here for
+# linux users that do not have TMPDIR set. Used by mktemp
+TMPDIR ?= $(systemd-path user-runtime)
+
+# Image URL to use all building/pushing image targets
+IMG ?= hive-controller:latest
+
+# In openshift ci (Prow), we need to set $HOME to a writable directory else tests will fail
+# because they don't have permissions to create /.local or /.cache directories
+# as $HOME is set to "/" by default.
+ifeq ($(HOME),/)
+HOME=/tmp/home
+endif
+
+############################################################
+# Targets section
+############################################################
+.PHONY: all
+all: vendor update test build
+
+############################################################
+# Build targets subsection
+############################################################
+$(GO_BUILD_BINDIR)/manager:
+
+$(GO_BUILD_BINDIR)/operator:
+
+
+############################################################
+# Image targets subsection
+############################################################
+
+# Runtime check for the targets that need a container runtime
+define check-for-container-runtime
+@if [ -z "$(CONTAINER_RUNTIME)" ]; then \
+	>&2 echo Failed to automatically detect a container runtime. You can specify one setting the environment variable CONTAINER_RUNTIME; \
+	exit 1; \
+fi
+endef
+
+.PHONY: buildah-image podman-image
+buildah-image podman-image:
+	$(call check-for-container-runtime)
+	$(info Building image with $(subst -image,,$@))
+	@if [ "$(subst -image,,$@)" = "buildah" ]; then \
+		CMD="buildah bud" ;\
+	else \
+		CMD="podman build" ;\
+	fi; \
+	$$CMD --tag ${IMG} --ulimit nofile=10239:10240 -f ./Dockerfile .
+
+
+# TODO(celebdor): put an ignorefile so binaries in developer ./bin do not get
+# copied to the container build environment
+.PHONY: image
+image:
+	$(call check-for-container-runtime)
+	$(CONTAINER_RUNTIME) build --tag $(IMG) --file ./Dockerfile $(CONTAINER_BUILD_FLAGS) $(IMAGE_BUILD_EXTRA_FLAGS) .
+
+.PHONY: image-push
+image-push:
+	$(call check-for-container-runtime)
+	$(CONTAINER_RUNTIME) push ${IMG}
+
+############################################################
+# utils targets subsection
+############################################################
+$(GO_BUILD_BINDIR)/golint:
+	GOBIN=$(GO_BUILD_BINDIR) $(GO) install $(GO_MOD_FLAGS) golang.org/x/lint/golint
+
+$(GO_BUILD_BINDIR)/golangci-lint:
+	GOBIN=$(GO_BUILD_BINDIR) $(GO) install $(GO_MOD_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint
+
+# Not in vendor and can't find the way to add it, since we do not import it
+$(GO_BUILD_BINDIR)/kustomize:
+	GOBIN=$(GO_BUILD_BINDIR) $(GO) install sigs.k8s.io/kustomize/kustomize/v5@v5.3.0
+
+############################################################
+# Vendoring targets subsection
+############################################################
+# TODO(celebdor): Do we need this? Unravel!
+.PHONY: vendor-apis
+vendor-apis:
+	cd apis; \
+		$(GO) mod tidy; \
+		$(GO) mod vendor
+	
+
+.PHONY: vendor
+vendor: vendor-apis
+	$(GO) mod tidy
+	$(GO) mod vendor
+
+############################################################
+# Update targets subsection
+############################################################
+.PHONY: update-gofmt
+update-gofmt:
+	$(info Running `$(GOFMT) $(GOFMT_FLAGS) -w` on $(go_files_count) file(s).)
+	$(GOFMT) $(GOFMT_FLAGS) -w $(GO_FILES)
+
+.PHONY: update-codegen
+update-codegen:
+	hack/update-codegen.sh
+
+# Build the template file used for direct (OLM-less) deploy by app-sre
+build-app-sre-template: $(GO_BUILD_BINDIR)/kustomize
+	# Sync CRDs into kustomize resources
+	cd hack/app-sre && $(GO_BUILD_BINDIR)/kustomize edit add resource ../../config/crds/*.yaml
+	# Generate temporary saas object file
+	$(GO_BUILD_BINDIR)/kustomize build --load-restrictor=LoadRestrictionsNone hack/app-sre --output hack/app-sre/saas-objects.yaml
+	# Generate saas template
+	./hack/app-sre/generate-saas-template.py hack/app-sre/saas-template-stub.yaml hack/app-sre/saas-objects.yaml hack/app-sre/saas-template.yaml
+	# Remove temporary saas object file
+	rm hack/app-sre/saas-objects.yaml
+
+
+update: update-gofmt update-codegen build-app-sre-template
+
+############################################################
+# Verify targets subsection
+############################################################
+.PHONY: verify-gofmt
+verify-gofmt:
+	$(info Running `$(GOFMT) $(GOFMT_FLAGS)` on $(go_files_count) file(s).)
+	@TMP=$$( mktemp ); \
+	$(GOFMT) $(GOFMT_FLAGS) $(GO_FILES) | tee $${TMP}; \
+	if [ -s $${TMP} ]; then \
+		echo "$@ failed - please run \`make update-gofmt\`"; \
+		exit 1; \
+	fi;
+
+.PHONY: verify-golang-version
+verify-golang-version:
+	$(info checking that $$GO version matches the one used for the Dockerfile build.)
+	@GO_BUILD_VERSION=$$(grep -oP -m 1 'golang-\K[^-]+' Dockerfile); \
+	GO_VERSION=$$($(GO) version); \
+	if ! grep -q "$$GO_BUILD_VERSION" <<< "$$GO_VERSION"; then \
+		echo "$@ failed - please set GO to version $$GO_BUILD_VERSION"; \
+		exit 1; \
+	fi;
+
+.PHONY: verify-govet
+verify-govet:
+	$(GO) vet $(GO_MOD_FLAGS) $(GO_PACKAGES)
+
+# This comes from a OpenShift 3.11 compatibility work in 2020. We need to review whether this can be dropped
+.PHONY: verify-crd
+verify-crd: ensure-controller-gen ensure-yq
+	./hack/verify-crd.sh
+
+# NOTE: Keep the paths checked below in sync with those passed to the generators in `hack/update-codegen.sh`
+.PHONY: verify-codegen
+verify-codegen: update-codegen
+	git diff --exit-code pkg/client
+	git diff --exit-code apis
+
+.PHONY: verify-vendor
+verify-vendor: vendor
+	git diff --exit-code vendor/
+
+.PHONY:
+verify-app-sre-template: build-app-sre-template
+	git diff --exit-code hack/app-sre/
+
+# TODO(celebdor): we should probably split this from hiveutil
+.PHONY: verify-imports
+verify-imports: $(BINDIR)/hiveutil
+	@echo "Verifying import naming"
+	@for file in $(GOFILES) ; do \
+		$(BINDIR)/hiveutil verify-imports -c $(VERIFY_IMPORTS_CONFIG) $$file || exit 1 ; \
+	done
+
+.PHONY: verify-lint
+verify-lint: $(GO_BUILD_BINDIR)/golint
+	@echo Verifying golint
+	@for file in $(GOFILES) ; do \
+		$(GO_BUILD_BINDIR)/golint --set_exit_status $$file || exit 1 ; \
+	done
+
+# Not enabled as it is currently not passing. It should replace lint, fmt and vet
+.PHONY: lint
+lint: $(GO_BUILD_BINDIR)/golangci-lint
+	$(GO_BUILD_BINDIR)/golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
+
+.PHONY: coverage
+coverage:
+	hack/codecov.sh
+
+.PHONY: verify-modcheck
+verify-modcheck:
+	$(GO) run ./hack/modcheck.go
+
+.PHONY: verify
+verify: verify-gofmt verify-lint verify-govet verify-golang-version verify-crd verify-codegen verify-vendor verify-app-sre-template verify-imports verify-modcheck
+
+############################################################
+# Development convenience targets subsection
+############################################################
+# Run against the configured cluster in ~/.kube/config
+run: $(GO_BUILD_BINDIR)/manager
+	./bin/manager --log-level=${LOG_LEVEL}
+
+# Run against the configured cluster in ~/.kube/config
+run-operator: $(GO_BUILD_BINDIR)/operator
+	./bin/operator --log-level=${LOG_LEVEL}
+
+# Install CRDs into a cluster
+install: crd
+	oc apply -f config/crds

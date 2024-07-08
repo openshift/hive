@@ -71,6 +71,7 @@ SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -m ensurepip >&2; python3
 BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
+# TODO(toni): Figure out if anybody uses any of those targets and imagebuilder
 $(call build-image,hive,$(IMG),./Dockerfile,.)
 $(call build-image,hive-fedora-dev-base,hive-fedora-dev-base,./build/fedora-dev/Dockerfile.devbase,.)
 $(call build-image,hive-fedora-dev,$(IMG),./build/fedora-dev/Dockerfile.dev,.)
@@ -176,10 +177,12 @@ test-e2e-destroycluster:
 test-e2e-uninstallhive:
 	go test $(GO_MOD_FLAGS) -v -timeout 0 -count=1 ./test/e2e/uninstallhive/...
 
+# NOTE: DONE
 # Run against the configured cluster in ~/.kube/config
 run: build
 	./bin/manager --log-level=${LOG_LEVEL}
 
+# NOTE: DONE
 # Run against the configured cluster in ~/.kube/config
 run-operator: build
 	./bin/operator --log-level=${LOG_LEVEL}
@@ -207,16 +210,19 @@ verify-codegen: update-codegen
 	git diff --exit-code apis
 verify: verify-codegen
 
+# NOTE: DONE
 update-codegen:
 	hack/update-codegen.sh
 update: update-codegen
 
+# NOTE: DONE
 # This needs to come after codegen to copy zz_generated.deepcopy files down into vendor/
 .PHONY: verify-vendor
 verify-vendor: vendor
 	git diff --exit-code vendor/
 verify: verify-vendor
 
+# NOTE: DONE
 # Build the template file used for direct (OLM-less) deploy by app-sre
 build-app-sre-template: ensure-kustomize
 	# Sync CRDs into kustomize resources
@@ -229,6 +235,7 @@ build-app-sre-template: ensure-kustomize
 	rm hack/app-sre/saas-objects.yaml
 
 
+# NOTE: DONE
 # This needs to go after codegen so the CRDs are up to date
 verify-app-sre-template: build-app-sre-template
 	git diff --exit-code hack/app-sre/
@@ -237,6 +244,7 @@ verify: verify-app-sre-template
 # This needs to go after codegen so the CRDs are up to date
 update: build-app-sre-template
 
+# NOTE: DONE
 # Check import naming
 .PHONY: verify-imports
 verify-imports: build
@@ -247,6 +255,7 @@ verify-imports: build
 	   done'
 verify: verify-imports
 
+# NOTE: DONE
 # Check lint
 .PHONY: verify-lint
 verify-lint: install-tools
@@ -283,41 +292,49 @@ $(addprefix generate-submodules-,$(GO_SUB_MODULES)):
 	# hande go generate for submodule
 	(cd $(subst generate-submodules-,,$@); $(GOFLAGS_FOR_GENERATE) $(GO) generate ./...)
 
+# NOTE: Ignored
 # Build the image using docker
 .PHONY: docker-build
 docker-build:
 	@echo "*** DEPRECATED: Use the image-hive target instead ***"
 	$(DOCKER_CMD) build $(CONTAINER_BUILD_FLAGS) -t ${IMG} .
 
+# NOTE: DONE
 # Push the image using docker
 .PHONY: docker-push
 docker-push:
 	$(DOCKER_CMD) push ${IMG}
 
+# NOTE: Ignored
 # Build and push the dev image
 .PHONY: docker-dev-push
 docker-dev-push: build image-hive-fedora-dev docker-push
 
+# NOTE: DONE
 # Build the dev image using builah
 .PHONY: buildah-dev-build
 buildah-dev-build:
 	buildah bud --ulimit nofile=10239:10240 -f ./Dockerfile --tag ${IMG}
 
+# NOTE: DONE
 .PHONY: podman-dev-build
 podman-dev-build:
 	podman build --tag ${IMG} --ulimit nofile=10239:10240 -f ./Dockerfile .
 
+# NOTE: Ignored
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push
 buildah-dev-push: buildah-dev-build
 	buildah push --tls-verify=false ${IMG}
 
+# NOTE: Ignored
 # Push the image using buildah
 .PHONY: buildah-push
 buildah-push:
 	$(SUDO_CMD) buildah pull ${IMG}
 	$(SUDO_CMD) buildah push ${IMG}
 
+# NOTE: DONE
 # Run golangci-lint against code
 # TODO replace verify (except verify-generated), vet, fmt targets with lint as it covers all of it
 .PHONY: lint
@@ -326,17 +343,20 @@ lint: install-tools
 # Remove the golangci-lint from the verify until a fix is in place for permisions for writing to the /.cache directory.
 #verify: lint
 
+# NOTE: DONE
 .PHONY: modcheck
 modcheck:
 	go run ./hack/modcheck.go
 verify: modcheck
 
+# NOTE: DONE
 .PHONY: install-tools
 install-tools:
 	go install $(GO_MOD_FLAGS) github.com/golang/mock/mockgen
 	go install $(GO_MOD_FLAGS) golang.org/x/lint/golint
 	go install $(GO_MOD_FLAGS) github.com/golangci/golangci-lint/cmd/golangci-lint
 
+# NOTE: DONE
 .PHONY: coverage
 coverage:
 	hack/codecov.sh

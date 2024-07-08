@@ -120,10 +120,10 @@ func IsUIDAssignedToMe(c client.Client, deploymentName hivev1.DeploymentName, ui
 	var uidAsBigInt big.Int
 	uidAsBigInt.SetString(hexUID, 16)
 
-	// For test purposes, if we've scaled down clustersync so we can run locally, this will be zero; spoof it to one:
+	// For test purposes, if we've scaled down the controller so we can run locally, this will be zero; spoof it to one:
 	replicas := int64(*sts.Spec.Replicas)
 	if replicas == 0 {
-		l.Warning("ClusterSync StatefulSet has zero replicas! Hope you're running locally!")
+		l.Warningf("%s StatefulSet has zero replicas! Hope you're running locally!", deploymentName)
 		replicas = 1
 	}
 

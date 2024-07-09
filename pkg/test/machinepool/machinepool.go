@@ -122,8 +122,9 @@ func WithInitializedStatusConditions() Option {
 	}
 }
 
-// WithInitializedStatusConditions returns an Option that *replaces* status conditions
-// with the set of initialized ("Unknown") conditions.
+// WithControllerOrdinal returns an Option that sets the
+// MachinePool.Status.ControlledByReplica to the specified ordinal. Useful to
+// preconfigure a MachinePool so it doesn't short-cycle when reconciling.
 func WithControllerOrdinal(ordinalID int64) Option {
 	return func(mp *hivev1.MachinePool) {
 		mp.Status.ControlledByReplica = ptr.To(ordinalID)

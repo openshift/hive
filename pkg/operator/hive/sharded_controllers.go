@@ -51,6 +51,14 @@ var (
 		deploymentName:  hivev1.DeploymentNameMachinepool,
 		defaultReplicas: 1,
 		hashAnnotation:  "hive.openshift.io/machinepool-statefulset-spec-hash",
+		containerCustomization: func(hc *hivev1.HiveConfig, c *corev1.Container) {
+			if awssp := hc.Spec.ServiceProviderCredentialsConfig.AWS; awssp != nil && awssp.CredentialsSecretRef.Name != "" {
+				c.Env = append(c.Env, corev1.EnvVar{
+					Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
+					Value: awssp.CredentialsSecretRef.Name,
+				})
+			}
+		},
 	}
 )
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -513,7 +514,10 @@ func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Sessio
 
 	// Special case to not use a secret to gather credentials.
 	if secret != nil {
-		config := awsCLIConfigFromSecret(secret)
+		config, err := awsCLIConfigFromSecret(secret)
+		if err != nil {
+			return nil, err
+		}
 		f, err := os.CreateTemp("", "hive-aws-config")
 		if err != nil {
 			return nil, err
@@ -542,18 +546,30 @@ func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Sessio
 	return s, nil
 }
 
+var credentialProcessRE = regexp.MustCompile(`\bcredential_process\b`)
+
+func ContainsCredentialProcess(config []byte) bool {
+	return len(credentialProcessRE.Find(config)) != 0
+}
+
 // awsCLIConfigFromSecret returns an AWS CLI config using the data available in the secret.
-func awsCLIConfigFromSecret(secret *corev1.Secret) []byte {
+func awsCLIConfigFromSecret(secret *corev1.Secret) ([]byte, error) {
 	if config, ok := secret.Data[constants.AWSConfigSecretKey]; ok {
-		return config
+		if ContainsCredentialProcess(config) {
+			return nil, errors.New("credential_process is insecure and thus forbidden")
+		}
+		return config, nil
 	}
 
 	buf := &bytes.Buffer{}
 	fmt.Fprint(buf, "[default]\n")
 	for k, v := range secret.Data {
+		if k == "credential_process" {
+			return nil, errors.New("credential_process is insecure and thus forbidden")
+		}
 		fmt.Fprintf(buf, "%s = %s\n", k, v)
 	}
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
 func awsChinaEndpointResolver(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {

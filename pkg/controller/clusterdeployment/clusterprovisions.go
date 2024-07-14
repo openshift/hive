@@ -209,12 +209,8 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	}
 
 	if err := r.setupAWSCredentialForAssumeRole(cd); err != nil {
-		if !apierrors.IsAlreadyExists(err) {
-			// Couldn't create the assume role credential secret for a reason other than it already exists.
-			// If the secret already exists, then we should just use that secret.
-			logger.WithError(err).Error("could not create AWS assume role credential secret")
-			return reconcile.Result{}, err
-		}
+		logger.WithError(err).Error("could not create or update AWS assume role credential secret")
+		return reconcile.Result{}, err
 	}
 
 	r.expectations.ExpectCreations(types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(), 1)
@@ -626,7 +622,7 @@ func getInstallLogEnvVars(secretPrefix string) ([]corev1.EnvVar, error) {
 
 func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeployment, secretPrefix string) []corev1.EnvVar {
 	var extraEnvVars []corev1.EnvVar
-	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
+	spSecretName := controllerutils.AWSServiceProviderSecretName(secretPrefix)
 	if spSecretName == "" {
 		return extraEnvVars
 	}
@@ -637,7 +633,7 @@ func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeployment, secretPrefix str
 
 	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
 		Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
-		Value: secretPrefix + "-" + spSecretName,
+		Value: spSecretName,
 	})
 	return extraEnvVars
 }

@@ -1,10 +1,12 @@
 package aws
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	ini "gopkg.in/ini.v1"
@@ -45,6 +47,16 @@ func GetAWSCreds(credsFile, defaultCredsFile string) (string, string, error) {
 	return accessKeyIDValue.String(), secretAccessKeyValue.String(), nil
 }
 
+var awsConfigForbidCredentialProcess utils.ProjectToDirFileFilter = func(key string, contents []byte) (basename string, newContents []byte, err error) {
+	// First, only process aws_config
+	bn, newContents, err := utils.ProjectOnlyTheseKeys(constants.AWSConfigSecretKey)(key, contents)
+	// If that passed, scrub for credential_process
+	if err == nil && bn != "" && awsclient.ContainsCredentialProcess(newContents) {
+		return "", nil, errors.New("credential_process is insecure and thus forbidden")
+	}
+	return bn, newContents, err
+}
+
 // ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE
 // and CREDS_SECRET_NAME and configures AWS credential environment variables and config files
 // accordingly.
@@ -61,10 +73,12 @@ func ConfigureCreds(c client.Client) {
 		os.Setenv("AWS_SECRET_ACCESS_KEY", secret)
 	}
 	if config := credsSecret.Data[constants.AWSConfigSecretKey]; len(config) != 0 {
-		// Lay this down as a file
-		utils.ProjectToDir(credsSecret, constants.AWSCredsMount, constants.AWSConfigSecretKey)
+		// Lay this down as a file, but forbid credential_process
+		utils.ProjectToDir(credsSecret, constants.AWSCredsMount, awsConfigForbidCredentialProcess)
 		os.Setenv("AWS_CONFIG_FILE", filepath.Join(constants.AWSCredsMount, constants.AWSConfigSecretKey))
 	}
+	// This would normally allow credential_process in the config file, but we checked for that above.
+	os.Setenv("AWS_SDK_LOAD_CONFIG", "true")
 	// Install cluster proxy trusted CA bundle
 	utils.InstallCerts(constants.TrustedCABundleDir)
 }

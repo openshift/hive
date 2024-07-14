@@ -1268,7 +1268,7 @@ func newAWSClient(r *ReconcileAWSPrivateLink, cd *hivev1.ClusterDeployment) (*aw
 			},
 			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
 				SecretRef: corev1.SecretReference{
-					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Name:      controllerutils.AWSServiceProviderSecretName(""),
 					Namespace: controllerutils.GetHiveNamespace(),
 				},
 				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,

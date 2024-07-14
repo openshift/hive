@@ -1,8 +1,6 @@
 package clusterdeprovision
 
 import (
-	"os"
-
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -11,7 +9,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
-	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -61,7 +58,7 @@ func getAWSClient(cd *hivev1.ClusterDeprovision, c client.Client, logger log.Fie
 			},
 			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
 				SecretRef: corev1.SecretReference{
-					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Name:      controllerutils.AWSServiceProviderSecretName(""),
 					Namespace: controllerutils.GetHiveNamespace(),
 				},
 				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,

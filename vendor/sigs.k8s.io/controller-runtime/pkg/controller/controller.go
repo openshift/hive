@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/internal/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/ratelimiter"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -160,7 +161,8 @@ func NewUnmanaged(name string, mgr manager.Manager, options Options) (Controller
 		Do: options.Reconciler,
 		MakeQueue: func() workqueue.RateLimitingInterface {
 			return workqueue.NewRateLimitingQueueWithConfig(options.RateLimiter, workqueue.RateLimitingQueueConfig{
-				Name: name,
+				Name:            name,
+				MetricsProvider: metrics.WorkqueueMetricsProvider,
 			})
 		},
 		MaxConcurrentReconciles: options.MaxConcurrentReconciles,

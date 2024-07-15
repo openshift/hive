@@ -85,6 +85,8 @@ var (
 		Name:      RetriesKey,
 		Help:      "Total number of retries handled by workqueue",
 	}, []string{"name"})
+
+	WorkqueueMetricsProvider = workqueueMetricsProvider{}
 )
 
 func init() {
@@ -96,7 +98,7 @@ func init() {
 	Registry.MustRegister(longestRunningProcessor)
 	Registry.MustRegister(retries)
 
-	workqueue.SetProvider(workqueueMetricsProvider{})
+	workqueue.SetProvider(WorkqueueMetricsProvider)
 }
 
 type workqueueMetricsProvider struct{}

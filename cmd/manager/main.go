@@ -23,8 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	_ "github.com/openshift/generic-admission-server/pkg/cmd"
-
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	cmdutil "github.com/openshift/hive/cmd/util"
 	"github.com/openshift/hive/pkg/constants"

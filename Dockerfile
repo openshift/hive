@@ -3,7 +3,7 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN dnf -y install git python3-pip
-RUN make build
+RUN make build-hiveutil
 
 FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16 as builder_rhel9
 RUN mkdir -p /go/src/github.com/openshift/hive
@@ -13,8 +13,6 @@ RUN dnf -y install git python3-pip
 RUN make build
 
 FROM registry.redhat.io/rhel9-4-els/rhel:9.4
-
-RUN dnf -y update && dnf clean all
 
 # ssh-agent required for gathering logs in some situations:
 RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi

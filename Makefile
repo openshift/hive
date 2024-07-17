@@ -74,7 +74,6 @@ $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindat
 $(call build-image,hive,$(IMG),./Dockerfile,.)
 $(call build-image,hive-fedora-dev-base,hive-fedora-dev-base,./build/fedora-dev/Dockerfile.devbase,.)
 $(call build-image,hive-fedora-dev,$(IMG),./build/fedora-dev/Dockerfile.dev,.)
-$(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
 
 clean:
 	rm -rf $(GO_BUILD_BINDIR)
@@ -325,6 +324,11 @@ lint: install-tools
 	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
 # Remove the golangci-lint from the verify until a fix is in place for permisions for writing to the /.cache directory.
 #verify: lint
+
+# Target to build only hiveutil. This is used so that on the dual build RHEL8/RHEL9, RHEL8 stage only needs to build hiveutil.
+.PHONY: build-hiveutil
+build-hiveutil:
+	$(call build-package, ./contrib/cmd/hiveutil)
 
 .PHONY: modcheck
 modcheck:

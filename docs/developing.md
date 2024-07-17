@@ -129,19 +129,11 @@ kind delete cluster --name hive
 
 The most resilient method of deploying Hive is to build and publish a container from scratch, and deploy manifests to the cluster currently referenced by your kubeconfig.
 
-This method is quite slow, but reliable.
+This method is quite slow, but reliable. If CONTAINER_RUNTIME is not set, it will chose podman over docker for the build step
 
-Podman:
 ```bash
 export IMG="quay.io/{username}/hive:latest"
-make buildah-dev-push deploy
-oc delete pods -n hive --all
-```
-
-Docker:
-```bash
-export IMG="quay.io/{username}/hive:latest"
-make image-hive docker-push deploy
+make image image-push deploy
 oc delete pods -n hive --all
 ```
 

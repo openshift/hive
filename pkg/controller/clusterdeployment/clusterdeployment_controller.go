@@ -456,7 +456,14 @@ func (r *ReconcileClusterDeployment) addAdditionalKubeconfigCAs(cd *hivev1.Clust
 	cdLog log.FieldLogger) error {
 
 	adminKubeconfigSecret := &corev1.Secret{}
-	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name}, adminKubeconfigSecret); err != nil {
+	if err := r.Get(
+		context.Background(),
+		types.NamespacedName{
+			Namespace: cd.Namespace,
+			// HIVE-2485: No need to scrub here
+			Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name,
+		},
+		adminKubeconfigSecret); err != nil {
 		cdLog.WithError(err).Error("failed to get admin kubeconfig secret")
 		return err
 	}
@@ -658,6 +665,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			}
 
 			// Add cluster deployment as additional owner reference to admin secrets
+			// HIVE-2485: No need to scrub here
 			if err := r.addOwnershipToSecret(cd, cdLog, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name); err != nil {
 				return reconcile.Result{}, err
 			}

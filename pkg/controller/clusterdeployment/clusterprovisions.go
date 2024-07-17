@@ -423,7 +423,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 			clusterMetadata.ClusterID = *provision.Spec.ClusterID
 		}
 		if provision.Spec.AdminKubeconfigSecretRef != nil {
-			clusterMetadata.AdminKubeconfigSecretRef = *provision.Spec.AdminKubeconfigSecretRef
+			clusterMetadata.AdminKubeconfigSecretRef = *provision.Spec.AdminKubeconfigSecretRef // HIVE-2485: via ClusterMetadata
 		}
 		if provision.Spec.AdminPasswordSecretRef != nil {
 			clusterMetadata.AdminPasswordSecretRef = provision.Spec.AdminPasswordSecretRef

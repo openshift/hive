@@ -26,7 +26,7 @@ Let's create a Secret in `hive` (target namespace in HiveConfig) with credential
 
 ```console
 $ cat aws-service-provider-config
-[default]
+[profile source]
 aws_access_key_id = XXXXXX
 aws_secret_access_key = XXXXX
 role_arn = arn:aws:iam::123456:role/hive-aws-service-provider

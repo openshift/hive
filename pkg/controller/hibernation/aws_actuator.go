@@ -3,7 +3,6 @@ package hibernation
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -18,7 +17,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
-	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -261,7 +259,7 @@ func getAWSClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.Fiel
 			},
 			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
 				SecretRef: corev1.SecretReference{
-					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Name:      controllerutils.AWSServiceProviderSecretName(""),
 					Namespace: controllerutils.GetHiveNamespace(),
 				},
 				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,

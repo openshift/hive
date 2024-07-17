@@ -211,7 +211,7 @@ func (r *ArgoCDRegisterController) reconcileCluster(cd *hivev1.ClusterDeployment
 		return reconcile.Result{}, nil
 	}
 
-	kubeConfigSecretName := cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name
+	kubeConfigSecretName := cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name // HIVE-2485 ✓
 	argoCDServerConfigBytes, err := r.generateArgoCDServerConfig(kubeConfigSecretName, cd.Namespace, argoCDNamespace, cdLog)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -320,7 +320,7 @@ func (r *ArgoCDRegisterController) loadArgoCDServiceAccountToken(argoCDNamespace
 }
 
 func (r *ArgoCDRegisterController) generateArgoCDServerConfig(kubeconfigSecretName, kubeConfigSecretNamespace, argoCDNamespace string, cdLog log.FieldLogger) ([]byte, error) {
-	kubeconfig, err := r.loadSecretData(kubeconfigSecretName, kubeConfigSecretNamespace, adminKubeConfigKey)
+	kubeconfig, err := controllerutils.LoadSecretData(r.Client, kubeconfigSecretName, kubeConfigSecretNamespace, adminKubeConfigKey)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to load cluster admin kubeconfig")
 		return nil, err
@@ -373,19 +373,6 @@ func tlsClientConfigBuilderFunc(kubeConfig clientcmd.ClientConfig, cdLog log.Fie
 	}
 
 	return tlsClientConfig, nil
-}
-
-func (r *ArgoCDRegisterController) loadSecretData(secretName, namespace, dataKey string) (string, error) {
-	s := &corev1.Secret{}
-	err := r.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, s)
-	if err != nil {
-		return "", err
-	}
-	retStr, ok := s.Data[dataKey]
-	if !ok {
-		return "", fmt.Errorf("secret %s did not contain key %s", secretName, dataKey)
-	}
-	return string(retStr), nil
 }
 
 // getPredictableSecretName generates a unique secret name by hashing the server API URL,

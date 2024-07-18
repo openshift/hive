@@ -10,7 +10,8 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 RUN dnf -y install git python3-pip
-RUN make build
+RUN make build-hiveadmission build-manager build-operator && \
+  make build-hiveutil
 
 FROM registry.redhat.io/rhel9-4-els/rhel:9.4
 
@@ -38,12 +39,12 @@ COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bi
 # by default so we must setup some permissions here.
 ENV HOME /home/hive
 RUN mkdir -p /home/hive && \
-    chgrp -R 0 /home/hive && \
-    chmod -R g=u /home/hive
+  chgrp -R 0 /home/hive && \
+  chmod -R g=u /home/hive
 
 RUN mkdir -p /output/hive-trusted-cabundle && \
-    chgrp -R 0 /output/hive-trusted-cabundle && \
-    chmod -R g=u /output/hive-trusted-cabundle
+  chgrp -R 0 /output/hive-trusted-cabundle && \
+  chmod -R g=u /output/hive-trusted-cabundle
 
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

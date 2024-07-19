@@ -2,6 +2,9 @@ FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-open
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
+RUN mount
+RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+
 RUN dnf -y install git python3-pip
 RUN make build-hiveutil
 
@@ -9,11 +12,16 @@ FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-open
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
+RUN mount
+RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN dnf -y install git python3-pip
 RUN make build-hiveadmission build-manager build-operator && \
   make build-hiveutil
 
 FROM registry.redhat.io/rhel9-4-els/rhel:9.4
+
+RUN mount
+RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 # ssh-agent required for gathering logs in some situations:
 RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi

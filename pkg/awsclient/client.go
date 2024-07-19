@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -546,7 +547,7 @@ func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Sessio
 	return s, nil
 }
 
-var credentialProcessRE = regexp.MustCompile(`\bcredential_process\b`)
+var credentialProcessRE = regexp.MustCompile(`(?i)\bcredential_process\b`)
 
 func ContainsCredentialProcess(config []byte) bool {
 	return len(credentialProcessRE.Find(config)) != 0
@@ -564,7 +565,7 @@ func awsCLIConfigFromSecret(secret *corev1.Secret) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	fmt.Fprint(buf, "[default]\n")
 	for k, v := range secret.Data {
-		if k == "credential_process" {
+		if strings.ToLower(k) == "credential_process" {
 			return nil, errors.New("credential_process is insecure and thus forbidden")
 		}
 		fmt.Fprintf(buf, "%s = %s\n", k, v)

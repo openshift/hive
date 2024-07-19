@@ -53,5 +53,4 @@ RUN mkdir -p /output/hive-trusted-cabundle && \
   chgrp -R 0 /output/hive-trusted-cabundle && \
   chmod -R g=u /output/hive-trusted-cabundle
 
-# TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

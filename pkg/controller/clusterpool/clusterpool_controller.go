@@ -760,6 +760,7 @@ func (r *ReconcileClusterPool) createCluster(
 		Annotations:           annotations,
 		InstallConfigTemplate: installConfigTemplate,
 		InstallAttemptsLimit:  clp.Spec.InstallAttemptsLimit,
+		InstallerEnv:          clp.Spec.InstallerEnv,
 		SkipMachinePools:      clp.Spec.SkipMachinePools,
 	}
 

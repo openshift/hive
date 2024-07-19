@@ -146,6 +146,12 @@ func WithInstallAttemptsLimit(ial int32) Option {
 	}
 }
 
+func WithInstallerEnv(ie []corev1.EnvVar) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.InstallerEnv = ie
+	}
+}
+
 func WithMaxSize(size int) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
 		clusterPool.Spec.MaxSize = pointer.Int32Ptr(int32(size))

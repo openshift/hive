@@ -107,11 +107,11 @@ func newTagsCachingClient(tagsManager *tags.Manager, sessionKey string) *Caching
 	}
 }
 
-// isName returns true if the id is not an urn.
+// IsName returns true if the id is not an urn.
 // this method came from vSphere sdk,
 // see https://github.com/vmware/govmomi/blob/a2fb82dc55a8eb00932233aa8028ce97140df784/vapi/tags/tags.go#L121 for
 // more context.
-func isName(id string) bool {
+func IsName(id string) bool {
 	return !strings.HasPrefix(id, "urn:")
 }
 
@@ -128,7 +128,7 @@ func isObjectNotFoundErr(err error) bool {
 //
 // In case if a tag was not found in vCenter, this would be cached for 12 hours and lookup won't happen till cache expiration.
 func (t *CachingTagsManager) GetTag(ctx context.Context, id string) (*tags.Tag, error) {
-	if !isName(id) { // if id is passed no cache check needed, use original GetTag method instantly
+	if !IsName(id) { // if id is passed no cache check needed, use original GetTag method instantly
 		return t.Manager.GetTag(ctx, id)
 	}
 
@@ -181,7 +181,7 @@ func (t *CachingTagsManager) GetTag(ctx context.Context, id string) (*tags.Tag, 
 //
 // In case if a tag was not found in vCenter, this would be cached for 12 hours and lookup won't happen till cache expiration.
 func (t *CachingTagsManager) GetCategory(ctx context.Context, id string) (*tags.Category, error) {
-	if !isName(id) { // if id is passed no cache check needed, use original GetTag method instantly
+	if !IsName(id) { // if id is passed no cache check needed, use original GetTag method instantly
 		return t.Manager.GetCategory(ctx, id)
 	}
 
@@ -230,7 +230,7 @@ func (t *CachingTagsManager) GetCategory(ctx context.Context, id string) (*tags.
 // The id parameter can be a Category ID or Category Name.
 // Uses caching GetCategory method.
 func (t *CachingTagsManager) ListTagsForCategory(ctx context.Context, id string) ([]string, error) {
-	if isName(id) {
+	if IsName(id) {
 		category, err := t.GetCategory(ctx, id)
 		if err != nil {
 			return nil, err

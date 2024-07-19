@@ -250,7 +250,7 @@ func (r *Reconciler) update() error {
 		Ref:     vmRef,
 	}
 
-	if err := vm.reconcileTags(r.Context, r.session, r.machine); err != nil {
+	if err := vm.reconcileTags(r.Context, r.session, r.machine, r.providerSpec); err != nil {
 		metrics.RegisterFailedInstanceUpdate(&metrics.MachineLabels{
 			Name:      r.machine.Name,
 			Namespace: r.machine.Namespace,
@@ -330,11 +330,11 @@ func (r *Reconciler) delete() error {
 						Namespace: r.machine.Namespace,
 						Reason:    "Task finished with error",
 					})
-					klog.Errorf("Delete task finished with error: %w", err)
+					klog.Errorf("Delete task finished with error: %v", err)
 					return fmt.Errorf("%v task %v finished with error: %w", moTask.Info.DescriptionId, moTask.Reference().Value, err)
 				} else {
 					klog.Warningf(
-						"TaskRef points to clone task which finished with error: %w. Proceeding with machine deletion", err,
+						"TaskRef points to clone task which finished with error: %v. Proceeding with machine deletion", err,
 					)
 				}
 			} else if !taskIsFinished {
@@ -474,7 +474,7 @@ func (r *Reconciler) nodeHasVolumesAttached(ctx context.Context, nodeName string
 	node := &corev1.Node{}
 	if err := r.apiReader.Get(ctx, apimachinerytypes.NamespacedName{Name: nodeName}, node); err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.Errorf("Could not find node from noderef, it may have already been deleted: %w", err)
+			klog.Errorf("Could not find node from noderef, it may have already been deleted: %v", err)
 			return false, nil
 		}
 		return true, err
@@ -835,7 +835,7 @@ func clone(s *machineScope) (string, error) {
 			fmt.Sprintf(
 				"Hardware lower than %d is not supported, clone stopped. "+
 					"Detected machine template version is %d. "+
-					"Please update machine template: https://access.redhat.com/articles/6090681",
+					"Please update machine template: https://docs.openshift.com/container-platform/latest/updating/updating_a_cluster/updating-hardware-on-nodes-running-on-vsphere.html",
 				minimumHWVersion, hwVersion,
 			),
 		)
@@ -1314,25 +1314,28 @@ func (vm *virtualMachine) getPowerState() (types.VirtualMachinePowerState, error
 
 // reconcileTags ensures that the required tags are present on the virtual machine, eg the Cluster ID
 // that is used by the installer on cluster deletion to ensure ther are no leaked resources.
-func (vm *virtualMachine) reconcileTags(ctx context.Context, sessionInstance *session.Session, machine *machinev1.Machine) error {
+func (vm *virtualMachine) reconcileTags(ctx context.Context, sessionInstance *session.Session, machine *machinev1.Machine, providerSpec *machinev1.VSphereMachineProviderSpec) error {
 	if err := sessionInstance.WithCachingTagsManager(vm.Context, func(c *session.CachingTagsManager) error {
 		klog.Infof("%v: Reconciling attached tags", machine.GetName())
 
 		clusterID := machine.Labels[machinev1.MachineClusterIDLabel]
-
-		attached, err := vm.checkAttachedTag(ctx, clusterID, c)
-		if err != nil {
-			return err
-		}
-
-		if !attached {
-			klog.Infof("%v: Attaching %s tag to vm", machine.GetName(), clusterID)
-			// the tag should already be created by installer
-			if err := c.AttachTag(ctx, clusterID, vm.Ref); err != nil {
+		tagIDs := []string{clusterID}
+		tagIDs = append(tagIDs, providerSpec.TagIDs...)
+		klog.Infof("%v: Reconciling %s tags to vm", machine.GetName(), tagIDs)
+		for _, tagID := range tagIDs {
+			attached, err := vm.checkAttachedTag(ctx, tagID, c)
+			if err != nil {
 				return err
 			}
-		}
 
+			if !attached {
+				klog.Infof("%v: Attaching %s tag to vm", machine.GetName(), tagID)
+				// the tag should already be created by installer or the administrator
+				if err := c.AttachTag(ctx, tagID, vm.Ref); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	}); err != nil {
 		return err
@@ -1359,9 +1362,16 @@ func (vm *virtualMachine) checkAttachedTag(ctx context.Context, tagName string, 
 	}
 
 	for _, tag := range tags {
-		if tag.Name == tagName {
-			return true, nil
+		if session.IsName(tagName) {
+			if tag.Name == tagName {
+				return true, nil
+			}
+		} else {
+			if tag.ID == tagName {
+				return true, nil
+			}
 		}
+
 	}
 
 	return false, nil
@@ -1377,22 +1387,34 @@ func tagToCategoryName(tagName string) string {
 }
 
 func (vm *virtualMachine) foundTag(ctx context.Context, tagName string, m *session.CachingTagsManager) (bool, error) {
-	tags, err := m.ListTagsForCategory(ctx, tagToCategoryName(tagName))
-	if err != nil {
-		if isNotFoundErr(err) {
-			return false, nil
-		}
-		return false, err
-	}
+	var tags []string
+	var err error
 
+	if session.IsName(tagName) {
+		tags, err = m.ListTagsForCategory(ctx, tagToCategoryName(tagName))
+		if err != nil {
+			if isNotFoundErr(err) {
+				return false, nil
+			}
+			return false, err
+		}
+	} else {
+		tags = []string{tagName}
+	}
+	klog.V(4).Infof("validating the presence of tags: %+v", tags)
 	for _, id := range tags {
 		tag, err := m.GetTag(ctx, id)
 		if err != nil {
 			return false, err
 		}
-
-		if tag.Name == tagName {
-			return true, nil
+		if session.IsName(tagName) {
+			if tag.Name == tagName {
+				return true, nil
+			}
+		} else {
+			if tag.ID == tagName {
+				return true, nil
+			}
 		}
 	}
 

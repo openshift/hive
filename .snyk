@@ -6,3 +6,10 @@ exclude:
     - vendor/**
     - apis/vendor/**
     - "**/*_test.go"
+ignore:
+    'SNYK-GOLANG-K8SIOCLIENTGOUTILJSONPATH-7540854':
+     - '* > k8s.io/client-go/util/jsonpath':
+        reason: 'Snyk mistakent identifies v1.20.0-alpha.1 as newer than v0.29.7. client-go has a complicated history of versioning. Presumably, v1.20.0-alpha.1 referred to kubernetes-v1.20. kubernetes tags have since been prefaced by "kubernetes", whereas actual client-go versions resumed numbering from 0.x'
+    'SNYK-GOLANG-K8SIOCLIENTGOTRANSPORT-7538822':
+     - '* > k8s.io/client-go/transport':
+        reason: 'Snyk mistakent identifies v1.17.0-alpha.1 as newer than v0.29.7. client-go has a complicated history of versioning. Presumably, v1.20.0-alpha.1 referred to kubernetes-v1.20. kubernetes tags have since been prefaced by "kubernetes", whereas actual client-go versions resumed numbering from 0.x'

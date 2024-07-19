@@ -76,9 +76,17 @@ const (
 var DefaultActuator Actuator
 
 func AddWithActuator(mgr manager.Manager, actuator Actuator) error {
-	if err := add(mgr, newReconciler(mgr, actuator), "machine-controller"); err != nil {
+	return AddWithActuatorOpts(mgr, actuator, controller.Options{})
+}
+
+func AddWithActuatorOpts(mgr manager.Manager, actuator Actuator, opts controller.Options) error {
+	machineControllerOpts := opts
+	machineControllerOpts.Reconciler = newReconciler(mgr, actuator)
+
+	if err := addWithOpts(mgr, machineControllerOpts, "machine-controller"); err != nil {
 		return err
 	}
+
 	if err := addWithOpts(mgr, controller.Options{
 		Reconciler:  newDrainController(mgr),
 		RateLimiter: newDrainRateLimiter(),

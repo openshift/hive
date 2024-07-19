@@ -405,11 +405,17 @@ You can use security groups from peered VPCs to allow flow of traffic using [AWS
 
 1. Find the security group for workers in Hive Cluster
 
+For v4.16 and newer (CAPI based install)
+WORKER_SG_SUFFIX="node"
+
+For versions prior to 4.16
+WORKER_SG_SUFFIX="worker-sg"
+
 Use the Hive VPC id to list the security groups.
 
 ```
 aws --region us-east-1 ec2 describe-security-groups \
-  --filter Name=vpc-id,Values=$HIVE_VPC_ID Name=tag:Name,Values=$HIVE_CLUSTER_INFRA_ID-worker-sg \
+  --filter Name=vpc-id,Values=$HIVE_VPC_ID Name=tag:Name,Values=${HIVE_CLUSTER_INFRA_ID}-${WORKER_SG_SUFFIX} \
   --query "SecurityGroups[*].{GroupName:GroupName,GroupId:GroupId}"
 ```
 

@@ -182,7 +182,7 @@ func GetWorkerSGFromVpcId(awsClients awsclient.Client, vpcId *string) (string, e
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("tag:Name"),
-				Values: []*string{aws.String(infraID + "-worker-sg")},
+				Values: []*string{aws.String(infraID + "-worker-sg"), aws.String(infraID + "-node")},
 			},
 		},
 	})
@@ -190,7 +190,7 @@ func GetWorkerSGFromVpcId(awsClients awsclient.Client, vpcId *string) (string, e
 		return "", err
 	}
 	if len(describeSecurityGroupsOutput.SecurityGroups) == 0 {
-		return "", fmt.Errorf("default SG not found for VPC %v", vpcId)
+		return "", fmt.Errorf("worker SG not found for VPC %v", vpcId)
 	}
 
 	return *describeSecurityGroupsOutput.SecurityGroups[0].GroupId, err

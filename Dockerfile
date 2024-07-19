@@ -1,16 +1,25 @@
-FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16 as builder_rhel8
-RUN mkdir -p /go/src/github.com/openshift/hive
-WORKDIR /go/src/github.com/openshift/hive
+FROM registry.redhat.io/rhel8/go-toolset:1.21 as builder_rhel8
 COPY . .
-RUN dnf -y install git python3-pip
-RUN make build-hiveutil
+USER root
+RUN dnf install -y git python3-pip
+USER default
+RUN python3 -m venv ~/python-hive-venv && \
+  source ~/python-hive-venv/bin/activate && \
+  pip3 install GitPython && \
+  git config --global --add safe.directory "$PWD" && \
+  make build-hiveutil
 
-FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16 as builder_rhel9
-RUN mkdir -p /go/src/github.com/openshift/hive
-WORKDIR /go/src/github.com/openshift/hive
+FROM registry.redhat.io/rhel9/go-toolset:1.21 as builder_rhel9
 COPY . .
-RUN dnf -y install git python3-pip
-RUN make build-hiveadmission build-manager build-operator && \
+USER root
+RUN dnf install -y git python3-pip
+USER default
+RUN python3 -m venv ~/python-hive-venv && \
+  source ~/python-hive-venv/bin/activate && \
+  pip3 install GitPython && \
+  git config --global --add safe.directory "$PWD" && \
+  make build-hiveadmission build-manager build-operator && \
+  # Separate section for hiveutil to keep open files in check
   make build-hiveutil
 
 FROM registry.redhat.io/rhel9-4-els/rhel:9.4
@@ -24,12 +33,12 @@ RUN if ! rpm -q libvirt-libs; then dnf install -y libvirt-libs && dnf clean all 
 # tar is needed to package must-gathers on install failure
 RUN if ! which tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
-COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/manager /opt/services/
-COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
-COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/operator /opt/services/hive-operator
+COPY --from=builder_rhel9 /opt/app-root/src//bin/manager /opt/services/
+COPY --from=builder_rhel9 /opt/app-root/src//bin/hiveadmission /opt/services/
+COPY --from=builder_rhel9 /opt/app-root/src//bin/operator /opt/services/hive-operator
 
-COPY --from=builder_rhel8 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin/hiveutil.rhel8
-COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin/hiveutil
+COPY --from=builder_rhel8 /opt/app-root/src//bin/hiveutil /usr/bin/hiveutil.rhel8
+COPY --from=builder_rhel9 /opt/app-root/src//bin/hiveutil /usr/bin
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
 # Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as

@@ -167,7 +167,18 @@ func TestReconcileClusterPool(t *testing.T) {
 				// needs to a) set those fields in the pool spec, and b) have a nonzero size so the
 				// pool actually creates CDs to compare.
 				// TODO: Add coverage for more "copyover fields".
-				initializedPoolBuilder.Build(testcp.WithSize(2), testcp.WithInstallAttemptsLimit(5)),
+				initializedPoolBuilder.Build(
+					testcp.WithSize(2),
+					testcp.WithInstallAttemptsLimit(5),
+					testcp.WithInstallerEnv(
+						[]corev1.EnvVar{
+							{
+								Name:  "ENV1",
+								Value: "VAL1",
+							},
+						},
+					),
+				),
 			},
 			expectedTotalClusters: 2,
 		},
@@ -2121,6 +2132,9 @@ func TestReconcileClusterPool(t *testing.T) {
 						if assert.NotNil(t, cd.Spec.InstallAttemptsLimit, "expected InstallAttemptsLimit to be set") {
 							assert.Equal(t, *pool.Spec.InstallAttemptsLimit, *cd.Spec.InstallAttemptsLimit, "expected InstallAttemptsLimit to match")
 						}
+					}
+					if len(pool.Spec.InstallerEnv) != 0 {
+						assert.Equal(t, pool.Spec.InstallerEnv, cd.Spec.Provisioning.InstallerEnv, "expected InstallerEnv to match")
 					}
 				}
 				switch powerState := cd.Spec.PowerState; powerState {

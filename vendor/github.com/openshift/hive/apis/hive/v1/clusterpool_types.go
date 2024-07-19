@@ -97,6 +97,11 @@ type ClusterPoolSpec struct {
 	// to customize the default ClusterDeployment.
 	// +optional
 	Inventory []InventoryEntry `json:"inventory,omitempty"`
+
+	// InstallerEnv are extra environment variables to pass through to the installer. This may be used to enable
+	// additional features of the installer.
+	// +optional
+	InstallerEnv []corev1.EnvVar `json:"installerEnv,omitempty"`
 }
 
 type HibernationConfig struct {

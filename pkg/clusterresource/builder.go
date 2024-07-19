@@ -143,6 +143,10 @@ type Builder struct {
 
 	// PublishStrategy defines the publishing strategy for the install-config.
 	PublishStrategy string
+
+	// InstallerEnv are extra environment variables to pass through to the installer. This may be used to enable
+	// additional features of the installer.
+	InstallerEnv []corev1.EnvVar
 }
 
 // Validate ensures that the builder's fields are logically configured and usable to generate the cluster resources.
@@ -327,6 +331,8 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 	}
 
 	cd.Spec.InstallAttemptsLimit = o.InstallAttemptsLimit
+
+	cd.Spec.Provisioning.InstallerEnv = o.InstallerEnv
 
 	if o.Adopt {
 		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{

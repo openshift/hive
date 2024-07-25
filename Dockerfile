@@ -6,7 +6,7 @@ COPY . .
 ## debugging
 # https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
  RUN mount 
- RUN ls/etc/pki/entitlement 
+ RUN ls /etc/pki/entitlement 
  RUN ls /run/secrets/rhsm 
  RUN unlink /etc/rhsm-host
 ##

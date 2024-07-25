@@ -22,10 +22,12 @@ FROM registry.redhat.io/rhel9-4-els/rhel:9.4
 
 ## debugging
 # https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
-RUN mount && \
-    ls /etc/pki/entitlement && \
-    ls /run/serets/rhsm
- 
+RUN mount 
+RUN ls /etc/pki/entitlement 
+RUN ls /run/serets/rhsm
+RUN rmdir /run/secrets/rhsm
+
+
 RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 

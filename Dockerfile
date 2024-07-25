@@ -3,16 +3,9 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
-## debugging
-# https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
- RUN mount 
- RUN ls /etc/pki/entitlement 
- RUN ls /run/secrets/rhsm 
- RUN unlink /etc/rhsm-host
-##
 
+RUN unlink /etc/rhsm-host
 RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
-
 RUN dnf -y install git python3-pip
 RUN make build-hiveutil
 
@@ -21,14 +14,7 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
-## debugging
-# https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
-RUN mount && \
-  ls /etc/pki/entitlement && \ 
-  ls /run/serets/rhsm && \ 
-  unlink /etc/rhsm-host
-##
-
+RUN unlink /etc/rhsm-host
 RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN dnf -y install git python3-pip
 RUN make build-hiveadmission build-manager build-operator && \
@@ -36,14 +22,8 @@ RUN make build-hiveadmission build-manager build-operator && \
 
 FROM registry.redhat.io/rhel9-4-els/rhel:9.4
 
-## debugging
-# https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
-RUN mount && \
-  ls /etc/pki/entitlement && \ 
-  ls /run/serets/rhsm && \ 
-  unlink /etc/rhsm-host
-##
 
+RUN unlink /etc/rhsm-host
 RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 
@@ -76,6 +56,9 @@ RUN mkdir -p /home/hive && \
 RUN mkdir -p /output/hive-trusted-cabundle && \
   chgrp -R 0 /output/hive-trusted-cabundle && \
   chmod -R g=u /output/hive-trusted-cabundle
+
+# replace removed symlink
+RUN ln -s /etc/rhsm-host /run/secrets/rhsm
 
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

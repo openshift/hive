@@ -2,7 +2,15 @@ FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-open
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
-RUN mount
+
+## debugging
+# https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
+RUN mount && \
+  ls /etc/pki/entitlement && \ 
+  ls /run/serets/rhsm && \ 
+RUN rmdir /run/secrets/rhsm
+##
+
 RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 RUN dnf -y install git python3-pip
@@ -12,7 +20,15 @@ FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-open
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
-RUN mount
+
+## debugging
+# https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
+RUN mount && \
+  ls /etc/pki/entitlement && \ 
+  ls /run/serets/rhsm && \ 
+RUN rmdir /run/secrets/rhsm
+##
+
 RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN dnf -y install git python3-pip
 RUN make build-hiveadmission build-manager build-operator && \
@@ -22,11 +38,11 @@ FROM registry.redhat.io/rhel9-4-els/rhel:9.4
 
 ## debugging
 # https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
-RUN mount 
-RUN ls /etc/pki/entitlement 
-RUN ls /run/serets/rhsm
+RUN mount && \
+  ls /etc/pki/entitlement && \ 
+  ls /run/serets/rhsm && \ 
 RUN rmdir /run/secrets/rhsm
-
+##
 
 RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 

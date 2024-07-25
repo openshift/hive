@@ -7,7 +7,7 @@ COPY . .
 # https://redhat-internal.slack.com/archives/C04PZ7H0VA8/p1721932345729919?thread_ts=1717698403.965519&cid=C04PZ7H0VA8
 RUN mount && \
   ls /etc/pki/entitlement && \ 
-  ls /run/serets/rhsm && \ 
+  ls /run/secrets/rhsm && \ 
 RUN rmdir /run/secrets/rhsm
 ##
 

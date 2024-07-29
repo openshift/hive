@@ -233,6 +233,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
+        - CONTAINER_SUB_MANAGER_OFF=1
       - name: BUILD_ARGS_FILE
         value: $(params.build-args-file)
       runAfter:

@@ -1,20 +1,38 @@
+ARG CONTAINER_SUB_MANAGER_OFF=0
+
 FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16 as builder_rhel8
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
+
+
+RUN unlink /etc/rhsm-host
+RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN dnf -y install git python3-pip
 RUN make build-hiveutil
 
 FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16 as builder_rhel9
+ARG CONTAINER_SUB_MANAGER_OFF
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
+
+RUN unlink /etc/rhsm-host
+ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
+RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN dnf -y install git python3-pip
 RUN make build-hiveadmission build-manager build-operator && \
   make build-hiveutil
 
 FROM registry.redhat.io/rhel9-4-els/rhel:9.4
+ARG CONTAINER_SUB_MANAGER_OFF
+ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 
+RUN unlink /etc/rhsm-host
+RUN if [ -e "/activation-key/org" ]; then subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+
+
+##
 # ssh-agent required for gathering logs in some situations:
 RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
@@ -43,6 +61,9 @@ RUN mkdir -p /home/hive && \
 RUN mkdir -p /output/hive-trusted-cabundle && \
   chgrp -R 0 /output/hive-trusted-cabundle && \
   chmod -R g=u /output/hive-trusted-cabundle
+
+# replace removed symlink
+RUN ln -s /etc/rhsm-host /run/secrets/rhsm
 
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]

@@ -20,6 +20,9 @@ spec:
     - jsonPath: .status.conditions[0].reason
       name: Status
       type: string
+    - jsonPath: .status.controlledByReplica
+      name: ControllerReplica
+      type: string
     - jsonPath: .status.conditions[?(@.type=="Failed")].message
       name: Message
       priority: 1

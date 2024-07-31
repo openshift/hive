@@ -14,6 +14,7 @@ import (
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=clustersyncs,shortName=csync,scope=Namespaced
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[0].reason`
+// +kubebuilder:printcolumn:name="ControllerReplica",type=string,JSONPath=`.status.controlledByReplica`
 // +kubebuilder:printcolumn:name="Message",type=string,priority=1,JSONPath=`.status.conditions[?(@.type=="Failed")].message`
 type ClusterSync struct {
 	metav1.TypeMeta   `json:",inline"`

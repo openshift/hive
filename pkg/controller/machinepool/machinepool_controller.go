@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1049,19 +1050,27 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 // updateOwnedLabelsAndTaints updates OwnedLabels and OwnedTaints in the MachinePool.Status, by fetching the relevant entries sans duplicates from MachinePool.Spec.
 func updateOwnedLabelsAndTaints(pool *hivev1.MachinePool) hivev1.MachinePoolStatus {
 	// Update our tracked labels...
-	pool.Status.OwnedLabels = make([]string, len(pool.Spec.Labels))
+	ownedLabels := make([]string, len(pool.Spec.Labels))
 	i := 0
 	for labelKey := range pool.Spec.Labels {
-		pool.Status.OwnedLabels[i] = labelKey
+		ownedLabels[i] = labelKey
 		i++
 	}
+	sort.Strings(ownedLabels)
+	pool.Status.OwnedLabels = ownedLabels
 
 	// ...and taints
 	uniqueTaints := *controllerutils.GetUniqueTaints(&pool.Spec.Taints)
-	pool.Status.OwnedTaints = make([]hivev1.TaintIdentifier, len(uniqueTaints))
+	ownedTaints := make([]hivev1.TaintIdentifier, len(uniqueTaints))
 	for i, taint := range uniqueTaints {
-		pool.Status.OwnedTaints[i] = controllerutils.IdentifierForTaint(&taint)
+		ownedTaints[i] = controllerutils.IdentifierForTaint(&taint)
 	}
+	sort.Slice(ownedTaints, func(i, j int) bool {
+		// It is not important that these be actually "sorted" -- just that they are
+		// ordered deterministically.
+		return fmt.Sprintf("%v", ownedTaints[i]) < fmt.Sprintf("%v", ownedTaints[j])
+	})
+	pool.Status.OwnedTaints = ownedTaints
 	return pool.Status
 }
 

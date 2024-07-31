@@ -486,10 +486,18 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	plConfigHash, err := r.deployConfigMap(hLog, h, instance, awsPrivateLinkConfigMapInfo, namespacesToClean)
+	awsPlConfigHash, err := r.deployConfigMap(hLog, h, instance, awsPrivateLinkConfigMapInfo, namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying aws privatelink configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingAWSPrivatelinkConfigmap", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	plConfigHash, err := r.deployConfigMap(hLog, h, instance, privateLinkConfigMapInfo, namespacesToClean)
+	if err != nil {
+		hLog.WithError(err).Error("error deploying privatelink configmap")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingPrivatelinkConfigmap", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
@@ -524,8 +532,9 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}
-	// Incorporate the AWSPrivateLink configmap hash
-	confighash = computeHash("", confighash, plConfigHash)
+
+	// Incorporate the PrivateLink configmap hash
+	confighash = computeHash("", confighash, plConfigHash, awsPlConfigHash)
 
 	fgConfigHash, err := r.deployConfigMap(hLog, h, instance, featureGatesConfigMapInfo, namespacesToClean)
 	if err != nil {
@@ -563,7 +572,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHiveAdmission(hLog, h, instance, namespacesToClean, managedDomainsConfigHash, fgConfigHash, plConfigHash, scConfigHash)
+	err = r.deployHiveAdmission(hLog, h, instance, namespacesToClean, managedDomainsConfigHash, fgConfigHash, awsPlConfigHash, plConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying HiveAdmission")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHiveAdmission", err.Error())

@@ -33,6 +33,9 @@ type GCPCloudBuilder struct {
 
 	// Region is the GCP region to which to install the cluster.
 	Region string
+
+	// PrivateServiceConncet is true if the cluster should use GCP Private Service Connect
+	PrivateServiceConnect bool
 }
 
 func NewGCPCloudBuilderFromSecret(credsSecret *corev1.Secret) (*GCPCloudBuilder, error) {
@@ -71,6 +74,9 @@ func (p *GCPCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 				Name: p.CredsSecretName(o),
 			},
 			Region: p.Region,
+			PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{
+				Enabled: p.PrivateServiceConnect,
+			},
 		},
 	}
 }

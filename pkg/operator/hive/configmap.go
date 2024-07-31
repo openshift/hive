@@ -93,6 +93,17 @@ var awsPrivateLinkConfigMapInfo = configMapInfo{
 	},
 }
 
+var privateLinkConfigMapInfo = configMapInfo{
+	name:                 "private-link",
+	nameKey:              "private-link",
+	mountPath:            "/data/private-link-config",
+	envVar:               constants.PrivateLinkControllerConfigFileEnvVar,
+	volumeSourceOptional: true,
+	getData: func(instance *hivev1.HiveConfig) (interface{}, error) {
+		return instance.Spec.PrivateLink, nil
+	},
+}
+
 var failedProvisionConfigMapInfo = configMapInfo{
 	name:                 "hive-failed-provision-config",
 	nameKey:              "hive-failed-provision-config",

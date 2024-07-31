@@ -50,6 +50,51 @@ func (mr *MockClientMockRecorder) AddResourceRecordSet(managedZone, recordSet in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddResourceRecordSet", reflect.TypeOf((*MockClient)(nil).AddResourceRecordSet), managedZone, recordSet)
 }
 
+// CreateAddress mocks base method.
+func (m *MockClient) CreateAddress(addressName, region, subnetwork string) (*compute.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAddress", addressName, region, subnetwork)
+	ret0, _ := ret[0].(*compute.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateAddress indicates an expected call of CreateAddress.
+func (mr *MockClientMockRecorder) CreateAddress(addressName, region, subnetwork interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAddress", reflect.TypeOf((*MockClient)(nil).CreateAddress), addressName, region, subnetwork)
+}
+
+// CreateFirewall mocks base method.
+func (m *MockClient) CreateFirewall(firewall string, allowed []*compute.FirewallAllowed, direction, network string, sourceRanges, targetTags []string) (*compute.Firewall, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateFirewall", firewall, allowed, direction, network, sourceRanges, targetTags)
+	ret0, _ := ret[0].(*compute.Firewall)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateFirewall indicates an expected call of CreateFirewall.
+func (mr *MockClientMockRecorder) CreateFirewall(firewall, allowed, direction, network, sourceRanges, targetTags interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateFirewall", reflect.TypeOf((*MockClient)(nil).CreateFirewall), firewall, allowed, direction, network, sourceRanges, targetTags)
+}
+
+// CreateForwardingRule mocks base method.
+func (m *MockClient) CreateForwardingRule(forwardingRule, ipAddress, region, subnet, target string) (*compute.ForwardingRule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateForwardingRule", forwardingRule, ipAddress, region, subnet, target)
+	ret0, _ := ret[0].(*compute.ForwardingRule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateForwardingRule indicates an expected call of CreateForwardingRule.
+func (mr *MockClientMockRecorder) CreateForwardingRule(forwardingRule, ipAddress, region, subnet, target interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateForwardingRule", reflect.TypeOf((*MockClient)(nil).CreateForwardingRule), forwardingRule, ipAddress, region, subnet, target)
+}
+
 // CreateManagedZone mocks base method.
 func (m *MockClient) CreateManagedZone(managedZone *dns.ManagedZone) (*dns.ManagedZone, error) {
 	m.ctrl.T.Helper()
@@ -63,6 +108,78 @@ func (m *MockClient) CreateManagedZone(managedZone *dns.ManagedZone) (*dns.Manag
 func (mr *MockClientMockRecorder) CreateManagedZone(managedZone interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateManagedZone", reflect.TypeOf((*MockClient)(nil).CreateManagedZone), managedZone)
+}
+
+// CreateServiceAttachment mocks base method.
+func (m *MockClient) CreateServiceAttachment(serviceAttachment, region, forwardingRule string, subnets, acceptList []string) (*compute.ServiceAttachment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateServiceAttachment", serviceAttachment, region, forwardingRule, subnets, acceptList)
+	ret0, _ := ret[0].(*compute.ServiceAttachment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateServiceAttachment indicates an expected call of CreateServiceAttachment.
+func (mr *MockClientMockRecorder) CreateServiceAttachment(serviceAttachment, region, forwardingRule, subnets, acceptList interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateServiceAttachment", reflect.TypeOf((*MockClient)(nil).CreateServiceAttachment), serviceAttachment, region, forwardingRule, subnets, acceptList)
+}
+
+// CreateSubnet mocks base method.
+func (m *MockClient) CreateSubnet(subnet, network, region, ipCidr, purpose string) (*compute.Subnetwork, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSubnet", subnet, network, region, ipCidr, purpose)
+	ret0, _ := ret[0].(*compute.Subnetwork)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSubnet indicates an expected call of CreateSubnet.
+func (mr *MockClientMockRecorder) CreateSubnet(subnet, network, region, ipCidr, purpose interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSubnet", reflect.TypeOf((*MockClient)(nil).CreateSubnet), subnet, network, region, ipCidr, purpose)
+}
+
+// DeleteAddress mocks base method.
+func (m *MockClient) DeleteAddress(addressName, region string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAddress", addressName, region)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAddress indicates an expected call of DeleteAddress.
+func (mr *MockClientMockRecorder) DeleteAddress(addressName, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAddress", reflect.TypeOf((*MockClient)(nil).DeleteAddress), addressName, region)
+}
+
+// DeleteFirewall mocks base method.
+func (m *MockClient) DeleteFirewall(firewall string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteFirewall", firewall)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteFirewall indicates an expected call of DeleteFirewall.
+func (mr *MockClientMockRecorder) DeleteFirewall(firewall interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteFirewall", reflect.TypeOf((*MockClient)(nil).DeleteFirewall), firewall)
+}
+
+// DeleteForwardingRule mocks base method.
+func (m *MockClient) DeleteForwardingRule(forwardingRule, region string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteForwardingRule", forwardingRule, region)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteForwardingRule indicates an expected call of DeleteForwardingRule.
+func (mr *MockClientMockRecorder) DeleteForwardingRule(forwardingRule, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteForwardingRule", reflect.TypeOf((*MockClient)(nil).DeleteForwardingRule), forwardingRule, region)
 }
 
 // DeleteManagedZone mocks base method.
@@ -107,6 +224,79 @@ func (mr *MockClientMockRecorder) DeleteResourceRecordSets(managedZone, recordSe
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteResourceRecordSets", reflect.TypeOf((*MockClient)(nil).DeleteResourceRecordSets), managedZone, recordSet)
 }
 
+// DeleteServiceAttachment mocks base method.
+func (m *MockClient) DeleteServiceAttachment(serviceAttachment, region string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteServiceAttachment", serviceAttachment, region)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteServiceAttachment indicates an expected call of DeleteServiceAttachment.
+func (mr *MockClientMockRecorder) DeleteServiceAttachment(serviceAttachment, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceAttachment", reflect.TypeOf((*MockClient)(nil).DeleteServiceAttachment), serviceAttachment, region)
+}
+
+// DeleteSubnet mocks base method.
+func (m *MockClient) DeleteSubnet(subnet, region string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSubnet", subnet, region)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSubnet indicates an expected call of DeleteSubnet.
+func (mr *MockClientMockRecorder) DeleteSubnet(subnet, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSubnet", reflect.TypeOf((*MockClient)(nil).DeleteSubnet), subnet, region)
+}
+
+// GetAddress mocks base method.
+func (m *MockClient) GetAddress(addressName, region string) (*compute.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAddress", addressName, region)
+	ret0, _ := ret[0].(*compute.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAddress indicates an expected call of GetAddress.
+func (mr *MockClientMockRecorder) GetAddress(addressName, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAddress", reflect.TypeOf((*MockClient)(nil).GetAddress), addressName, region)
+}
+
+// GetFirewall mocks base method.
+func (m *MockClient) GetFirewall(firewall string) (*compute.Firewall, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFirewall", firewall)
+	ret0, _ := ret[0].(*compute.Firewall)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFirewall indicates an expected call of GetFirewall.
+func (mr *MockClientMockRecorder) GetFirewall(firewall interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFirewall", reflect.TypeOf((*MockClient)(nil).GetFirewall), firewall)
+}
+
+// GetForwardingRule mocks base method.
+func (m *MockClient) GetForwardingRule(forwardingRule, region string) (*compute.ForwardingRule, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetForwardingRule", forwardingRule, region)
+	ret0, _ := ret[0].(*compute.ForwardingRule)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetForwardingRule indicates an expected call of GetForwardingRule.
+func (mr *MockClientMockRecorder) GetForwardingRule(forwardingRule, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetForwardingRule", reflect.TypeOf((*MockClient)(nil).GetForwardingRule), forwardingRule, region)
+}
+
 // GetManagedZone mocks base method.
 func (m *MockClient) GetManagedZone(managedZone string) (*dns.ManagedZone, error) {
 	m.ctrl.T.Helper()
@@ -120,6 +310,80 @@ func (m *MockClient) GetManagedZone(managedZone string) (*dns.ManagedZone, error
 func (mr *MockClientMockRecorder) GetManagedZone(managedZone interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetManagedZone", reflect.TypeOf((*MockClient)(nil).GetManagedZone), managedZone)
+}
+
+// GetNetwork mocks base method.
+func (m *MockClient) GetNetwork(name string) (*compute.Network, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNetwork", name)
+	ret0, _ := ret[0].(*compute.Network)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNetwork indicates an expected call of GetNetwork.
+func (mr *MockClientMockRecorder) GetNetwork(name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetwork", reflect.TypeOf((*MockClient)(nil).GetNetwork), name)
+}
+
+// GetProjectName mocks base method.
+func (m *MockClient) GetProjectName() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectName")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetProjectName indicates an expected call of GetProjectName.
+func (mr *MockClientMockRecorder) GetProjectName() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectName", reflect.TypeOf((*MockClient)(nil).GetProjectName))
+}
+
+// GetServiceAttachment mocks base method.
+func (m *MockClient) GetServiceAttachment(serviceAttachment, region string) (*compute.ServiceAttachment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServiceAttachment", serviceAttachment, region)
+	ret0, _ := ret[0].(*compute.ServiceAttachment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceAttachment indicates an expected call of GetServiceAttachment.
+func (mr *MockClientMockRecorder) GetServiceAttachment(serviceAttachment, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceAttachment", reflect.TypeOf((*MockClient)(nil).GetServiceAttachment), serviceAttachment, region)
+}
+
+// GetSubnet mocks base method.
+func (m *MockClient) GetSubnet(name, region string) (*compute.Subnetwork, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnet", name, region)
+	ret0, _ := ret[0].(*compute.Subnetwork)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnet indicates an expected call of GetSubnet.
+func (mr *MockClientMockRecorder) GetSubnet(name, region interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnet", reflect.TypeOf((*MockClient)(nil).GetSubnet), name, region)
+}
+
+// ListAddresses mocks base method.
+func (m *MockClient) ListAddresses(region string, opts gcpclient.ListAddressesOptions) (*compute.AddressList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAddresses", region, opts)
+	ret0, _ := ret[0].(*compute.AddressList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAddresses indicates an expected call of ListAddresses.
+func (mr *MockClientMockRecorder) ListAddresses(region, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAddresses", reflect.TypeOf((*MockClient)(nil).ListAddresses), region, opts)
 }
 
 // ListComputeImages mocks base method.

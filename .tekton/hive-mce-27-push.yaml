@@ -6,8 +6,10 @@ metadata:
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "mce-2.7"
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "push"
+      && target_branch == "master"
+      && !files.all.all(x, x.matches('^docs/|\\.md$|^(?:.*/)?(?:\\.gitignore|OWNERS|PROJECT|LICENSE)$'))
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: release-mce-27
@@ -228,6 +230,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
+        - CONTAINER_SUB_MANAGER_OFF=1
       - name: BUILD_ARGS_FILE
         value: $(params.build-args-file)
       runAfter:
@@ -235,9 +238,9 @@ spec:
       taskRef:
         params:
         - name: name
-          value: buildah
+          value: buildah-20gb
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.1@sha256:72e4ddd9b543e2766830e3a513da5c2fec26ea7a72a50e8c85be642912caa603
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah-20gb:0.2
         - name: kind
           value: task
         resolver: bundles
@@ -253,8 +256,6 @@ spec:
       params:
       - name: BINARY_IMAGE
         value: $(params.output-image)
-      - name: BASE_IMAGES
-        value: $(tasks.build-container.results.BASE_IMAGES_DIGESTS)
       runAfter:
       - build-container
       taskRef:
@@ -280,8 +281,6 @@ spec:
         workspace: workspace
     - name: deprecated-base-image-check
       params:
-      - name: BASE_IMAGES_DIGESTS
-        value: $(tasks.build-container.results.BASE_IMAGES_DIGESTS)
       - name: IMAGE_URL
         value: $(tasks.build-container.results.IMAGE_URL)
       - name: IMAGE_DIGEST

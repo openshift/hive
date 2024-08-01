@@ -7,7 +7,7 @@ COPY . .
 
 
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
-RUN dnf -y install git python3-pip
+RUN python3 -m ensurepip
 RUN make build-hiveutil
 
 FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16 as builder_rhel9
@@ -18,7 +18,7 @@ COPY . .
 
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
-RUN dnf -y install git python3-pip
+RUN python3 -m ensurepip
 RUN make build-hiveadmission build-manager build-operator && \
   make build-hiveutil
 

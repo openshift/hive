@@ -291,12 +291,8 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 	}
 
 	if err := r.setupAWSCredentialForAssumeRole(instance); err != nil {
-		if !errors.IsAlreadyExists(err) {
-			// Couldn't create the assume role credentials secret for a reason other than it already exists.
-			// If the secret already exists, then we should just use that secret.
-			rLog.WithError(err).Error("could not create assume role AWS secret")
-			return reconcile.Result{}, err
-		}
+		rLog.WithError(err).Error("could not create or update assume role AWS secret")
+		return reconcile.Result{}, err
 	}
 
 	if err := controllerutils.SetupClusterUninstallServiceAccount(r, cd.Namespace, rLog); err != nil {
@@ -454,7 +450,7 @@ func (r *ReconcileClusterDeprovision) getActuator(cd *hivev1.ClusterDeprovision)
 
 func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeprovision, secretPrefix string) []corev1.EnvVar {
 	var extraEnvVars []corev1.EnvVar
-	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
+	spSecretName := controllerutils.AWSServiceProviderSecretName(secretPrefix)
 	if spSecretName == "" {
 		return extraEnvVars
 	}
@@ -465,7 +461,7 @@ func getAWSServiceProviderEnvVars(cd *hivev1.ClusterDeprovision, secretPrefix st
 
 	extraEnvVars = append(extraEnvVars, corev1.EnvVar{
 		Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,
-		Value: secretPrefix + "-" + spSecretName,
+		Value: spSecretName,
 	})
 	return extraEnvVars
 }
@@ -478,6 +474,6 @@ func (r *ReconcileClusterDeprovision) setupAWSCredentialForAssumeRole(cd *hivev1
 		return nil
 	}
 
-	return install.AWSAssumeRoleCLIConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
+	return install.AWSAssumeRoleConfig(r.Client, cd.Spec.Platform.AWS.CredentialsAssumeRole, install.AWSAssumeRoleSecretName(cd.Name), cd.Namespace, cd, r.scheme)
 
 }

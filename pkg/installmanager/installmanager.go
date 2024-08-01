@@ -207,7 +207,6 @@ SSH_PRIV_KEY_PATH: File system path of a file containing the SSH private key cor
 	flags.StringVar(&im.WorkDir, "work-dir", "/output", "directory to use for all input and output")
 	flags.StringVar(&im.LogsDir, "logs-dir", "/logs", "directory to use for all installer logs")
 
-	cmd.AddCommand(NewInstallManagerAWSCredentials())
 	return cmd
 }
 
@@ -551,26 +550,28 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 	}
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.
-	contributils.ProjectToDir(contributils.LoadSecretOrDie(m.DynamicClient, "INSTALLCONFIG_SECRET_NAME"), "/installconfig")
-	contributils.ProjectToDir(contributils.LoadSecretOrDie(m.DynamicClient, "PULLSECRET_SECRET_NAME"), "/pullsecret")
+	contributils.ProjectToDir(contributils.LoadSecretOrDie(m.DynamicClient, "INSTALLCONFIG_SECRET_NAME"), "/installconfig", nil)
+	contributils.ProjectToDir(contributils.LoadSecretOrDie(m.DynamicClient, "PULLSECRET_SECRET_NAME"), "/pullsecret", nil)
 
 	// Additional manifests? Could come in on a Secret or a ConfigMap
 	if manSecret := contributils.LoadSecretOrDie(m.DynamicClient, "MANIFESTS_SECRET_NAME"); manSecret != nil {
-		contributils.ProjectToDir(manSecret, "/manifests")
+		contributils.ProjectToDir(manSecret, "/manifests", nil)
 	} else if manCM := contributils.LoadConfigMapOrDie(m.DynamicClient, "MANIFESTS_CONFIGMAP_NAME"); manCM != nil {
-		contributils.ProjectToDir(manCM, "/manifests")
+		contributils.ProjectToDir(manCM, "/manifests", nil)
 	}
 
 	// Custom BoundServiceAccountSigningKey
 	if bsask := contributils.LoadSecretOrDie(m.DynamicClient, "BOUND_TOKEN_SIGNING_KEY_SECRET_NAME"); bsask != nil {
-		contributils.ProjectToDir(bsask, constants.BoundServiceAccountSigningKeyDir, constants.BoundServiceAccountSigningKeyFile)
+		contributils.ProjectToDir(
+			bsask, constants.BoundServiceAccountSigningKeyDir,
+			contributils.ProjectOnlyTheseKeys(constants.BoundServiceAccountSigningKeyFile))
 		os.Setenv(constants.BoundServiceAccountSigningKeyEnvVar,
 			constants.BoundServiceAccountSigningKeyDir+"/"+constants.BoundServiceAccountSigningKeyFile)
 	}
 
 	// SSH private key
 	if sshkey := contributils.LoadSecretOrDie(m.DynamicClient, "SSH_PRIVATE_KEY_SECRET_PATH"); sshkey != nil {
-		contributils.ProjectToDir(sshkey, constants.SSHPrivateKeyDir)
+		contributils.ProjectToDir(sshkey, constants.SSHPrivateKeyDir, nil)
 		// TODO: Collapse this in initSSHKey
 		os.Setenv(constants.SSHPrivKeyPathEnvVar,
 			constants.SSHPrivateKeyDir+"/"+constants.SSHPrivateKeySecretKey)
@@ -578,7 +579,7 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 
 	// BareMetal Libvirt SSH private key
 	if sshkey := contributils.LoadSecretOrDie(m.DynamicClient, "LIBVIRT_SSH_KEYS_SECRET_NAME"); sshkey != nil {
-		contributils.ProjectToDir(sshkey, constants.LibvirtSSHPrivateKeyDir)
+		contributils.ProjectToDir(sshkey, constants.LibvirtSSHPrivateKeyDir, nil)
 		os.Setenv(constants.LibvirtSSHPrivKeyPathEnvVar,
 			constants.LibvirtSSHPrivateKeyDir+"/"+constants.SSHPrivateKeySecretKey)
 	}

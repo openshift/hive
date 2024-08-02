@@ -66,7 +66,7 @@ endif
 # v{major}.{minor}.{commitcount}-{sha}
 # Note that building against a local commit may result in {major}.{minor} being rendered as
 # `UnknownBranch`. However, the {commitcount} and {sha} should still be accurate.
-SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -m ensurepip >&2; python3 -mpip install --user gitpython pyyaml >&2; hack/version2.py)
+SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -m ensurepip >&2; python3 -mpip --no-cache install --user gitpython pyyaml >&2; hack/version2.py)
 
 BINDATA_INPUTS :=./config/sharded_controllers/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)

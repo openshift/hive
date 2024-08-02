@@ -31,11 +31,11 @@ const (
 
 // ClusterDeploymentCustomizationlValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterDeploymentCustomizationValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewClusterDeploymentCustomizationValidatingAdmissionHook constructs a new ClusterDeploymentCustomizationValidatingAdmissionHook
-func NewClusterDeploymentCustomizationValidatingAdmissionHook(decoder *admission.Decoder) *ClusterDeploymentCustomizationValidatingAdmissionHook {
+func NewClusterDeploymentCustomizationValidatingAdmissionHook(decoder admission.Decoder) *ClusterDeploymentCustomizationValidatingAdmissionHook {
 	return &ClusterDeploymentCustomizationValidatingAdmissionHook{
 		decoder: decoder,
 	}

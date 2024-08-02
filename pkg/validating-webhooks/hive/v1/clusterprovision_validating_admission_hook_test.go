@@ -54,7 +54,7 @@ func Test_ClusterProvisionAdmission_Validate_Kind(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -92,7 +92,7 @@ func Test_ClusterProvisionAdmission_Validate_Operation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -248,7 +248,7 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
 			cut.Initialize(nil, nil)
 			rawProvision, err := json.Marshal(tc.provision)
 			if !assert.NoError(t, err, "unexpected error marshalling provision") {
@@ -479,7 +479,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
 			cut.Initialize(nil, nil)
 			oldAsJSON, err := json.Marshal(tc.old)
 			if !assert.NoError(t, err, "unexpected error marshalling old provision") {
@@ -532,7 +532,7 @@ func Test_ClusterProvisionAdmission_Validate_Update_StageTransition(t *testing.T
 			t.Run(
 				fmt.Sprintf("%s to %s", oldStage, newStage),
 				func(t *testing.T) {
-					cut := NewClusterProvisionValidatingAdmissionHook(createDecoder(t))
+					cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
 					cut.Initialize(nil, nil)
 					oldProvision := testCompletedClusterProvision()
 					oldProvision.Spec.Stage = oldStage

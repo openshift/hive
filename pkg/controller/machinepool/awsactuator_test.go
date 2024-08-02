@@ -59,12 +59,11 @@ func TestAWSActuator(t *testing.T) {
 		expectedEC2MetadataAuth      string
 		expectedAMI                  *machineapi.AWSResourceReference
 		expectExtraSG                bool
-		// The first three security groups use Filters by tag:Name with Values:
-		// - $clusterID-$role-sg
+		// The first two security groups use Filters by tag:Name with Values:
 		// - $clusterID-node
 		// - $clusterID-lb
-		// Security groups identified by ID thus start with the *fourth*
-		// SecurityGroup ([3]) and do not use Filters.
+		// Security groups identified by ID thus start with the *third* (as of https://github.com/openshift/installer/pull/8567 )
+		// SecurityGroup ([2]) and do not use Filters.
 		expectedSGIDs    []string
 		expectedUserTags map[string]string
 	}
@@ -683,12 +682,11 @@ func TestAWSActuator(t *testing.T) {
 			}
 
 			defaultSGFilterValues := []string{
-				"foo-12345-worker-sg",
 				"foo-12345-node",
 				"foo-12345-lb",
 			}
 			// Check for the default security groups
-			if assert.GreaterOrEqual(t, len(awsProvider.SecurityGroups), 3, "expected at least the default three SecurityGroups") {
+			if assert.GreaterOrEqual(t, len(awsProvider.SecurityGroups), 2, "expected at least the default two SecurityGroups") {
 				for i, val := range defaultSGFilterValues {
 					expNumFilters := 1
 					if test.expectExtraSG {

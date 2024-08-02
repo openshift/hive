@@ -8,51 +8,21 @@ import (
 	"net/http"
 	"strings"
 
-	"gopkg.in/gcfg.v1"
-
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	vsphere "k8s.io/cloud-provider-vsphere/pkg/common/config"
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
 	globalInfrastuctureName  = "cluster"
-	openshiftConfigNamespace = "openshift-config"
+	OpenshiftConfigNamespace = "openshift-config"
 )
-
-// vSphereConfig is a copy of the Kubernetes vSphere cloud provider config type
-// that contains the fields we need.  Unfortunately, we can't easily import
-// either the legacy or newer cloud provider code here, so we're just
-// duplicating part of the type and parsing it ourselves using the same gcfg
-// library for now.
-type vSphereConfig struct {
-	// Global is the vSphere cloud provider's global configuration.
-	Labels Labels `gcfg:"Labels"`
-	// Global is the vSphere cloud provider's global configuration.
-	Global Global `gcfg:"Global"`
-}
-
-// Labels is the vSphere cloud provider's zone and region configuration.
-type Labels struct {
-	// Zone is the zone in which VMs are created/located.
-	Zone string `gcfg:"zone"`
-	// Region is the region in which VMs are created/located.
-	Region string `gcfg:"region"`
-}
-
-// Global is the vSphere cloud provider's global configuration.
-type Global struct {
-	// Port is the port on which the vSphere endpoint is listening.
-	// Defaults to 443.
-	// Has string type because we need empty string value for formatting
-	Port         string `gcfg:"port"`
-	InsecureFlag string `gcfg:"insecure-flag"`
-}
 
 func getInfrastructure(c runtimeclient.Reader) (*configv1.Infrastructure, error) {
 	if c == nil {
@@ -69,7 +39,7 @@ func getInfrastructure(c runtimeclient.Reader) (*configv1.Infrastructure, error)
 	return infra, nil
 }
 
-func getVSphereConfig(c runtimeclient.Reader) (*vSphereConfig, error) {
+func getVSphereConfig(c runtimeclient.Reader, configNamespace string) (*vsphere.Config, error) {
 	if c == nil {
 		return nil, errors.New("no API reader -- will not fetch vSphere config")
 	}
@@ -90,7 +60,7 @@ func getVSphereConfig(c runtimeclient.Reader) (*vSphereConfig, error) {
 	cm := &corev1.ConfigMap{}
 	cmName := runtimeclient.ObjectKey{
 		Name:      infra.Spec.CloudConfig.Name,
-		Namespace: openshiftConfigNamespace,
+		Namespace: configNamespace,
 	}
 
 	if err := c.Get(context.Background(), cmName, cm); err != nil {
@@ -104,13 +74,7 @@ func getVSphereConfig(c runtimeclient.Reader) (*vSphereConfig, error) {
 		)
 	}
 
-	var vcfg vSphereConfig
-
-	if err := gcfg.FatalOnly(gcfg.ReadStringInto(&vcfg, cloudConfig)); err != nil {
-		return nil, err
-	}
-
-	return &vcfg, nil
+	return vsphere.ReadConfig([]byte(cloudConfig))
 }
 
 func setConditions(condition metav1.Condition, conditions []metav1.Condition) []metav1.Condition {
@@ -169,18 +133,33 @@ func conditionFailed() metav1.Condition {
 	}
 }
 
-func getPortFromConfig(config *vSphereConfig) string {
+func getVCenterPortFromConfig(config *vsphere.Config, vcenter string) string {
 	if config != nil {
-		return config.Global.Port
+		for _, vc := range config.VirtualCenter {
+			if vc.VCenterIP == vcenter {
+				if len(vc.VCenterPort) > 0 {
+					return vc.VCenterPort
+				} else {
+					return config.Global.VCenterPort
+				}
+			}
+		}
 	}
 	return ""
 }
 
-// getInsecureFlagFromConfig get insecure flag from config and default to false
-func getInsecureFlagFromConfig(config *vSphereConfig) bool {
-	if config != nil && config.Global.InsecureFlag == "1" {
-		return true
+func getVCenterInsecureFlagFromConfig(config *vsphere.Config, vcenter string) bool {
+	if config != nil {
+		for _, vc := range config.VirtualCenter {
+			if vc.VCenterIP == vcenter {
+				return vc.InsecureFlag
+			}
+		}
+
+		// Either vCenter is not found or config is missing.
+		return config.Global.InsecureFlag
 	}
+
 	return false
 }
 

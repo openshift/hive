@@ -77,7 +77,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, &handler.TypedEnqueueRequestForObject[*hivev1.ClusterDeployment]{}))
 	if err != nil {
 		log.WithField("controller", ControllerName).WithError(err).Error("Error watching cluster deployment")
 		return err

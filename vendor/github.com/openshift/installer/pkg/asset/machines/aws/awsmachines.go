@@ -2,8 +2,12 @@
 package aws
 
 import (
+	"bytes"
+	"encoding/pem"
 	"fmt"
+	"strings"
 
+	"github.com/vincent-petithory/dataurl"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -24,6 +28,7 @@ type MachineInput struct {
 	Subnets  map[string]string
 	Tags     capa.Tags
 	PublicIP bool
+	Ignition *capa.Ignition
 }
 
 // GenerateMachines returns manifests and runtime objects to provision the control plane (including bootstrap, if applicable) nodes using CAPI.
@@ -38,27 +43,37 @@ func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile,
 		total = *in.Pool.Replicas
 	}
 
+	imds := capa.HTTPTokensStateOptional
+	if mpool.EC2Metadata.Authentication == "Required" {
+		imds = capa.HTTPTokensStateRequired
+	}
+
 	var result []*asset.RuntimeFile
 
 	for idx := int64(0); idx < total; idx++ {
-		var subnet *capa.AWSResourceReference
-		// By not setting subnets for the machine, we let CAPA choose one for us
+		subnet := &capa.AWSResourceReference{}
+		zone := mpool.Zones[int(idx)%len(mpool.Zones)]
+
+		// BYO VPC deployments when subnet IDs are set on install-config.yaml
 		if len(in.Subnets) > 0 {
-			zone := mpool.Zones[int(idx)%len(mpool.Zones)]
 			subnetID, ok := in.Subnets[zone]
 			if len(in.Subnets) > 0 && !ok {
 				return nil, fmt.Errorf("no subnet for zone %s", zone)
 			}
-			subnet = &capa.AWSResourceReference{}
 			if subnetID == "" {
-				subnet.Filters = []capa.Filter{
-					{
-						Name:   "tag:Name",
-						Values: []string{fmt.Sprintf("%s-subnet-private-%s", clusterID, zone)},
-					},
-				}
-			} else {
-				subnet.ID = ptr.To(subnetID)
+				return nil, fmt.Errorf("invalid subnet ID for zone %s", zone)
+			}
+			subnet.ID = ptr.To(subnetID)
+		} else {
+			subnetInternetScope := "private"
+			if in.PublicIP {
+				subnetInternetScope = "public"
+			}
+			subnet.Filters = []capa.Filter{
+				{
+					Name:   "tag:Name",
+					Values: []string{fmt.Sprintf("%s-subnet-%s-%s", clusterID, subnetInternetScope, zone)},
+				},
 			}
 		}
 
@@ -70,13 +85,14 @@ func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile,
 				},
 			},
 			Spec: capa.AWSMachineSpec{
-				Ignition:             &capa.Ignition{Version: "3.2"},
+				Ignition:             in.Ignition,
 				UncompressedUserData: ptr.To(true),
 				InstanceType:         mpool.InstanceType,
 				AMI:                  capa.AMIReference{ID: ptr.To(mpool.AMIID)},
 				SSHKeyName:           ptr.To(""),
 				IAMInstanceProfile:   fmt.Sprintf("%s-master-profile", clusterID),
 				Subnet:               subnet,
+				PublicIP:             ptr.To(in.PublicIP),
 				AdditionalTags:       in.Tags,
 				RootVolume: &capa.Volume{
 					Size:          int64(mpool.EC2RootVolume.Size),
@@ -86,7 +102,7 @@ func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile,
 					EncryptionKey: mpool.KMSKeyARN,
 				},
 				InstanceMetadataOptions: &capa.InstanceMetadataOptions{
-					HTTPTokens:   capa.HTTPTokensState(mpool.EC2Metadata.Authentication),
+					HTTPTokens:   imds,
 					HTTPEndpoint: capa.InstanceMetadataEndpointStateEnabled,
 				},
 			},
@@ -163,4 +179,63 @@ func CapaTagsFromUserTags(clusterID string, usertags map[string]string) (capa.Ta
 		tags[k] = usertags[k]
 	}
 	return tags, nil
+}
+
+// CapaIgnitionWithCertBundleAndProxy generates CAPA ignition config with cert and proxy information.
+func CapaIgnitionWithCertBundleAndProxy(userCA string, proxy *types.Proxy) (*capa.Ignition, error) {
+	carefs, err := parseCertificateBundle([]byte(userCA))
+	if err != nil {
+		return nil, err
+	}
+	return &capa.Ignition{
+		Version: "3.2",
+		TLS: &capa.IgnitionTLS{
+			CASources: carefs,
+		},
+		Proxy: capaIgnitionProxy(proxy),
+	}, nil
+}
+
+// TODO: try to share this code with ignition.bootstrap package?
+// parseCertificateBundle loads each certificate in the bundle to the CAPA
+// carrier type, ignoring any invisible character before, after and in between
+// certificates.
+func parseCertificateBundle(userCA []byte) ([]capa.IgnitionCASource, error) {
+	userCA = bytes.TrimSpace(userCA)
+
+	var carefs []capa.IgnitionCASource
+	for len(userCA) > 0 {
+		var block *pem.Block
+		block, userCA = pem.Decode(userCA)
+		if block == nil {
+			return nil, fmt.Errorf("unable to parse certificate, please check the certificates")
+		}
+
+		carefs = append(carefs, capa.IgnitionCASource(dataurl.EncodeBytes(pem.EncodeToMemory(block))))
+
+		userCA = bytes.TrimSpace(userCA)
+	}
+
+	return carefs, nil
+}
+
+func capaIgnitionProxy(proxy *types.Proxy) *capa.IgnitionProxy {
+	capaProxy := &capa.IgnitionProxy{}
+	if proxy == nil {
+		return capaProxy
+	}
+	if httpProxy := proxy.HTTPProxy; httpProxy != "" {
+		capaProxy.HTTPProxy = &httpProxy
+	}
+	if httpsProxy := proxy.HTTPSProxy; httpsProxy != "" {
+		capaProxy.HTTPSProxy = &httpsProxy
+	}
+	capaProxy.NoProxy = make([]capa.IgnitionNoProxy, 0, len(proxy.NoProxy))
+	if noProxy := proxy.NoProxy; noProxy != "" {
+		noProxySplit := strings.Split(noProxy, ",")
+		for _, p := range noProxySplit {
+			capaProxy.NoProxy = append(capaProxy.NoProxy, capa.IgnitionNoProxy(p))
+		}
+	}
+	return capaProxy
 }

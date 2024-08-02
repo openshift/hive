@@ -104,14 +104,13 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to ClusterDeployment
-	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}), &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, &handler.TypedEnqueueRequestForObject[*hivev1.ClusterDeployment]{})); err != nil {
 		logger.WithError(err).Error("Error watching ClusterDeployment")
 		return err
 	}
 
 	// Watch for changes to ClusterRelocate
-	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterRelocate{}),
-		handler.EnqueueRequestsFromMapFunc(r.clusterRelocateHandlerFunc)); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterRelocate{}, handler.TypedEnqueueRequestsFromMapFunc(r.clusterRelocateHandlerFunc))); err != nil {
 		logger.WithError(err).Error("Error watching ClusterRelocate")
 		return err
 	}
@@ -119,8 +118,7 @@ func Add(mgr manager.Manager) error {
 	return nil
 }
 
-func (r *ReconcileClusterRelocate) clusterRelocateHandlerFunc(ctx context.Context, a client.Object) (requests []reconcile.Request) {
-	clusterRelocate := a.(*hivev1.ClusterRelocate)
+func (r *ReconcileClusterRelocate) clusterRelocateHandlerFunc(ctx context.Context, clusterRelocate *hivev1.ClusterRelocate) (requests []reconcile.Request) {
 
 	labelSelector, err := metav1.LabelSelectorAsSelector(&clusterRelocate.Spec.ClusterDeploymentSelector)
 	if err != nil {

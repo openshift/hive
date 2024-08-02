@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -49,4 +50,23 @@ var _ workqueue.RateLimitingInterface = &rateLimitedAddQueue{}
 // Add implements workqueue.Interface
 func (q *rateLimitedAddQueue) Add(item interface{}) {
 	q.RateLimitingInterface.AddRateLimited(item)
+}
+
+// NewTypedRateLimitedUpdateEventHandler wraps the specified typed event handler inside a new
+// event handler that will rate limit the incoming UPDATE events when the provided
+// shouldRateLimit function returns true.
+func NewTypedRateLimitedUpdateEventHandler[T runtime.Object](typedEventHandler handler.TypedEventHandler[T], shouldRateLimitFunc func(event.UpdateEvent) bool) handler.TypedEventHandler[T] {
+	return &typedRateLimitedUpdateEventHandler[T]{
+		TypedEventHandler: typedEventHandler,
+		shouldRateLimit:   shouldRateLimitFunc,
+	}
+}
+
+// typedRateLimitedUpdateEventHandler wraps the specified typed event handler such
+// that it will rate limit the incoming UPDATE events when the provided
+// shouldRateLimit function returns true.
+type typedRateLimitedUpdateEventHandler[T runtime.Object] struct {
+	handler.TypedEventHandler[T]
+
+	shouldRateLimit func(event.UpdateEvent) bool
 }

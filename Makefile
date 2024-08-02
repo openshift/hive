@@ -278,7 +278,7 @@ generate: generate-submodules
 
 
 .PHONY: $(addprefix generate-submodules-,$(GO_SUB_MODULES))
-$(addprefix generate-submodules-,$(GO_SUB_MODULES)):
+$(addprefix generate-submodules-,$(GO_SUB_MODULES)): $(addprefix vendor-submodules-,$(GO_SUB_MODULES))
 	# hande go generate for submodule
 	(cd $(subst generate-submodules-,,$@); $(GOFLAGS_FOR_GENERATE) $(GO) generate ./...)
 

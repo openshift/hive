@@ -14,7 +14,7 @@ import (
 
 func TestSelectorSyncSetValidatingResource(t *testing.T) {
 	// Arrange
-	data := NewSelectorSyncSetValidatingAdmissionHook(createDecoder(t))
+	data := NewSelectorSyncSetValidatingAdmissionHook(*createDecoder(t))
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1",
@@ -32,7 +32,7 @@ func TestSelectorSyncSetValidatingResource(t *testing.T) {
 
 func TestSelectorSyncSetInitialize(t *testing.T) {
 	// Arrange
-	data := NewSelectorSyncSetValidatingAdmissionHook(createDecoder(t))
+	data := NewSelectorSyncSetValidatingAdmissionHook(*createDecoder(t))
 
 	// Act
 	err := data.Initialize(nil, nil)
@@ -360,7 +360,7 @@ func TestSelectorSyncSetValidate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			data := NewSelectorSyncSetValidatingAdmissionHook(createDecoder(t))
+			data := NewSelectorSyncSetValidatingAdmissionHook(*createDecoder(t))
 
 			objectRaw, _ := json.Marshal(tc.selectorSyncSet)
 

@@ -10,5 +10,5 @@ import (
 func createDecoder(t *testing.T) *admission.Decoder {
 	scheme := scheme.GetScheme()
 	decoder := admission.NewDecoder(scheme)
-	return decoder
+	return &decoder
 }

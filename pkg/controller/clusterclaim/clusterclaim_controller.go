@@ -74,30 +74,27 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentRecon
 	}
 
 	// Watch for changes to ClusterClaim
-	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterClaim{}), &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterClaim{}, &handler.TypedEnqueueRequestForObject[*hivev1.ClusterClaim]{})); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeployment
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
-		controllerutils.NewRateLimitedUpdateEventHandler(
-			handler.EnqueueRequestsFromMapFunc(requestsForClusterDeployment),
-			controllerutils.IsClusterDeploymentErrorUpdateEvent)); err != nil {
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, controllerutils.NewTypedRateLimitedUpdateEventHandler(
+			handler.TypedEnqueueRequestsFromMapFunc(requestsForClusterDeployment),
+			controllerutils.IsClusterDeploymentErrorUpdateEvent))); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive-claim-owner Role
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &rbacv1.Role{}),
-		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleName, r.logger))); err != nil {
+		source.Kind(mgr.GetCache(), &rbacv1.Role{}, handler.TypedEnqueueRequestsFromMapFunc(requestsForRBACResourcesRole(r.Client, hiveClaimOwnerRoleName, r.logger)))); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive-claim-owner RoleBinding
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}),
-		handler.EnqueueRequestsFromMapFunc(requestsForRBACResources(r.Client, hiveClaimOwnerRoleBindingName, r.logger))); err != nil {
+		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}, handler.TypedEnqueueRequestsFromMapFunc(requestsForRBACResourcesRoleBinding(r.Client, hiveClaimOwnerRoleBindingName, r.logger)))); err != nil {
 		return err
 	}
 
@@ -117,11 +114,7 @@ func claimForClusterDeployment(cd *hivev1.ClusterDeployment) *types.NamespacedNa
 	}
 }
 
-func requestsForClusterDeployment(ctx context.Context, o client.Object) []reconcile.Request {
-	cd, ok := o.(*hivev1.ClusterDeployment)
-	if !ok {
-		return nil
-	}
+func requestsForClusterDeployment(ctx context.Context, cd *hivev1.ClusterDeployment) []reconcile.Request {
 	claim := claimForClusterDeployment(cd)
 	if claim == nil {
 		return nil
@@ -129,8 +122,27 @@ func requestsForClusterDeployment(ctx context.Context, o client.Object) []reconc
 	return []reconcile.Request{{NamespacedName: *claim}}
 }
 
-func requestsForRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
-	return func(ctx context.Context, o client.Object) []reconcile.Request {
+func requestsForRBACResourcesRole(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.Role] {
+	return func(ctx context.Context, o *rbacv1.Role) []reconcile.Request {
+		if o.GetName() != resourceName {
+			return nil
+		}
+		clusterName := o.GetNamespace()
+		cd := &hivev1.ClusterDeployment{}
+		if err := c.Get(context.Background(), client.ObjectKey{Namespace: clusterName, Name: clusterName}, cd); err != nil {
+			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to get ClusterDeployment for RBAC resource")
+			return nil
+		}
+		claim := claimForClusterDeployment(cd)
+		if claim == nil {
+			return nil
+		}
+		return []reconcile.Request{{NamespacedName: *claim}}
+	}
+}
+
+func requestsForRBACResourcesRoleBinding(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding] {
+	return func(ctx context.Context, o *rbacv1.RoleBinding) []reconcile.Request {
 		if o.GetName() != resourceName {
 			return nil
 		}

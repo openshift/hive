@@ -29,11 +29,11 @@ const (
 
 // ClusterPoolValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterPoolValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewClusterPoolValidatingAdmissionHook constructs a new ClusterPoolValidatingAdmissionHook
-func NewClusterPoolValidatingAdmissionHook(decoder *admission.Decoder) *ClusterPoolValidatingAdmissionHook {
+func NewClusterPoolValidatingAdmissionHook(decoder admission.Decoder) *ClusterPoolValidatingAdmissionHook {
 	return &ClusterPoolValidatingAdmissionHook{
 		decoder: decoder,
 	}

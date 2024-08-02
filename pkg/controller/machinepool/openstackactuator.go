@@ -124,10 +124,6 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		clientOptions.YAMLOpts = yamlOpts
 	}
 
-	trunkSupport, err := a.trunkSupportDiscoverer(cd.Spec.Platform.OpenStack.Cloud, "trunk", clientOptions)
-	if err != nil {
-		return nil, false, errors.Wrap(err, "failed to discover trunk support")
-	}
 	installerMachineSets, err := installosp.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
@@ -135,7 +131,6 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		a.osImage,
 		workerRole,
 		workerUserDataName,
-		trunkSupport,
 	)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")

@@ -172,5 +172,9 @@ func loadArmoredOrUnarmoredGPGKeyRing(data []byte) (openpgp.EntityList, error) {
 	if err == nil {
 		return keyring, nil
 	}
-	return openpgp.ReadKeyRing(bytes.NewReader(data))
+	keyring, err2 := openpgp.ReadKeyRing(bytes.NewReader(data))
+	if err2 == nil {
+		return keyring, nil
+	}
+	return nil, fmt.Errorf("unable to read keyring with armor (%w) or without armor (%w)", err, err2)
 }

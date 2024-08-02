@@ -14,9 +14,9 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 )
 
-func EnqueueDNSZonesOwnedByClusterDeployment(c client.Client, logger log.FieldLogger) handler.EventHandler {
+func EnqueueDNSZonesOwnedByClusterDeployment(c client.Client, logger log.FieldLogger) handler.TypedEventHandler[*hivev1.ClusterDeployment] {
 
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, mapObj client.Object) []reconcile.Request {
+	return handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, mapObj *hivev1.ClusterDeployment) []reconcile.Request {
 		dnsZones := &hivev1.DNSZoneList{}
 		if err := c.List(
 			context.TODO(),

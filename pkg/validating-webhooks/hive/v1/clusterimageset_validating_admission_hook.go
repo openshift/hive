@@ -28,11 +28,11 @@ const (
 
 // ClusterImageSetValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterImageSetValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NewClusterImageSetValidatingAdmissionHook constructs a new ClusterImageSetValidatingAdmissionHook
-func NewClusterImageSetValidatingAdmissionHook(decoder *admission.Decoder) *ClusterImageSetValidatingAdmissionHook {
+func NewClusterImageSetValidatingAdmissionHook(decoder admission.Decoder) *ClusterImageSetValidatingAdmissionHook {
 	return &ClusterImageSetValidatingAdmissionHook{decoder: decoder}
 }
 

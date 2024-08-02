@@ -14,7 +14,7 @@ import (
 
 func TestDNSZoneValidatingResource(t *testing.T) {
 	// Arrange
-	data := NewDNSZoneValidatingAdmissionHook(createDecoder(t))
+	data := NewDNSZoneValidatingAdmissionHook(*createDecoder(t))
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1",
@@ -32,7 +32,7 @@ func TestDNSZoneValidatingResource(t *testing.T) {
 
 func TestDNSZoneInitialize(t *testing.T) {
 	// Arrange
-	data := NewDNSZoneValidatingAdmissionHook(createDecoder(t))
+	data := NewDNSZoneValidatingAdmissionHook(*createDecoder(t))
 
 	// Act
 	err := data.Initialize(nil, nil)
@@ -141,7 +141,7 @@ func TestDNSZoneValidate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
-			data := NewDNSZoneValidatingAdmissionHook(createDecoder(t))
+			data := NewDNSZoneValidatingAdmissionHook(*createDecoder(t))
 			newObject := &hivev1.DNSZone{
 				Spec: hivev1.DNSZoneSpec{
 					Zone: tc.newZoneStr,

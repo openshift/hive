@@ -117,8 +117,7 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to MachinePools
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePool{}),
-		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, IsErrorUpdateEvent))
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePool{}, controllerutils.NewTypedRateLimitedUpdateEventHandler(&handler.TypedEnqueueRequestForObject[*hivev1.MachinePool]{}, IsErrorUpdateEvent)))
 	if err != nil {
 		return err
 	}
@@ -129,10 +128,9 @@ func Add(mgr manager.Manager) error {
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
-		controllerutils.NewRateLimitedUpdateEventHandler(
-			handler.EnqueueRequestsFromMapFunc(r.clusterDeploymentWatchHandler),
-			controllerutils.IsClusterDeploymentErrorUpdateEvent))
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, controllerutils.NewTypedRateLimitedUpdateEventHandler(
+		handler.TypedEnqueueRequestsFromMapFunc(r.clusterDeploymentWatchHandler),
+		controllerutils.IsClusterDeploymentErrorUpdateEvent)))
 	if err != nil {
 		return err
 	}
@@ -150,7 +148,7 @@ func Add(mgr manager.Manager) error {
 	// Periodically watch MachinePools for syncing status from external clusters -- but allow this to be
 	// disabled via HiveConfig.Spec.MachinePoolPollInterval <= 0
 	if pollInterval > 0 {
-		err = c.Watch(newPeriodicSource(r.Client, pollInterval, r.logger), &handler.EnqueueRequestForObject{})
+		err = c.Watch(newPeriodicSource(r.Client, pollInterval, r.logger)) // FIXME unsure how to handle this
 		if err != nil {
 			return err
 		}
@@ -159,21 +157,14 @@ func Add(mgr manager.Manager) error {
 	return nil
 }
 
-func (r *ReconcileMachinePool) clusterDeploymentWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
+func (r *ReconcileMachinePool) clusterDeploymentWatchHandler(ctx context.Context, cd *hivev1.ClusterDeployment) []reconcile.Request {
 	retval := []reconcile.Request{}
-
-	cd := a.(*hivev1.ClusterDeployment)
-	if cd == nil {
-		// Wasn't a clusterdeployment, bail out. This should not happen.
-		r.logger.Errorf("Error converting MapObject.Object to ClusterDeployment. Value: %+v", a)
-		return retval
-	}
 
 	pools := &hivev1.MachinePoolList{}
 	err := r.List(context.TODO(), pools)
 	if err != nil {
 		// Could not list machine pools
-		r.logger.Errorf("Error listing machine pools. Value: %+v", a)
+		r.logger.Errorf("Error listing machine pools. Value: %+v", cd)
 		return retval
 	}
 
@@ -1366,34 +1357,36 @@ func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool
 // this is useful to create a steady stream of reconcile requests
 // when some of the changes cannot be models in Watches.
 type periodicSource struct {
-	client   client.Client
-	duration time.Duration
-
-	logger log.FieldLogger
+	client     client.Client
+	duration   time.Duration
+	predicates []predicate.TypedPredicate[*hivev1.MachinePool]
+	logger     log.FieldLogger
 }
 
-func newPeriodicSource(c client.Client, d time.Duration, logger log.FieldLogger) *periodicSource {
-	return &periodicSource{
+func newPeriodicSource(c client.Client, d time.Duration, logger log.FieldLogger, prcts ...predicate.TypedPredicate[*hivev1.MachinePool]) *periodicSource {
+	ps := &periodicSource{
 		client:   c,
 		duration: d,
 		logger:   logger,
 	}
+	for _, p := range prcts {
+		ps.predicates = append(ps.predicates, p) // FIXME confirm how to use predicates and where to define
+	}
+	return ps
 }
 
 // Start is internal and should be called only by the Controller to register an EventHandler with the Informer
 // to enqueue reconcile.Requests.
 func (ps *periodicSource) Start(ctx context.Context,
-	handler handler.EventHandler,
-	queue workqueue.RateLimitingInterface,
-	prcts ...predicate.Predicate) error {
+	queue workqueue.RateLimitingInterface) error {
 
-	go wait.JitterUntilWithContext(ctx, ps.syncFunc(handler, queue, prcts...), ps.duration, 0.1, true)
+	go wait.JitterUntilWithContext(ctx, ps.syncFunc(&handler.TypedEnqueueRequestForObject[*hivev1.MachinePool]{}, queue, ps.predicates...), ps.duration, 0.1, true)
 	return nil
 }
 
-func (ps *periodicSource) syncFunc(handler handler.EventHandler,
+func (ps *periodicSource) syncFunc(handler handler.TypedEventHandler[*hivev1.MachinePool],
 	queue workqueue.RateLimitingInterface,
-	prcts ...predicate.Predicate) func(context.Context) {
+	prcts ...predicate.TypedPredicate[*hivev1.MachinePool]) func(context.Context) {
 
 	return func(ctx context.Context) {
 		mpList := &hivev1.MachinePoolList{}
@@ -1404,7 +1397,7 @@ func (ps *periodicSource) syncFunc(handler handler.EventHandler,
 		}
 
 		for idx := range mpList.Items {
-			evt := event.GenericEvent{Object: &mpList.Items[idx]}
+			evt := event.TypedGenericEvent[*hivev1.MachinePool]{Object: &mpList.Items[idx]}
 
 			shouldHandle := true
 			for _, p := range prcts {

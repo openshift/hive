@@ -52,7 +52,7 @@ var (
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.
 type ClusterDeploymentValidatingAdmissionHook struct {
-	decoder *admission.Decoder
+	decoder admission.Decoder
 
 	validManagedDomains  []string
 	fs                   *featureSet
@@ -61,7 +61,7 @@ type ClusterDeploymentValidatingAdmissionHook struct {
 }
 
 // NewClusterDeploymentValidatingAdmissionHook constructs a new ClusterDeploymentValidatingAdmissionHook
-func NewClusterDeploymentValidatingAdmissionHook(decoder *admission.Decoder) *ClusterDeploymentValidatingAdmissionHook {
+func NewClusterDeploymentValidatingAdmissionHook(decoder admission.Decoder) *ClusterDeploymentValidatingAdmissionHook {
 	logger := log.WithField("validatingWebhook", "clusterdeployment")
 	managedDomains, err := manageddns.ReadManagedDomainsFile()
 	if err != nil {
@@ -414,7 +414,7 @@ func validateAgentInstallStrategy(specPath *field.Path, cd *hivev1.ClusterDeploy
 }
 */
 
-func validatefeatureGates(decoder *admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
+func validatefeatureGates(decoder admission.Decoder, admissionSpec *admissionv1beta1.AdmissionRequest, fs *featureSet, contextLogger *log.Entry) *admissionv1beta1.AdmissionResponse {
 	obj := &unstructured.Unstructured{}
 	if err := decoder.DecodeRaw(admissionSpec.Object, obj); err != nil {
 		contextLogger.Errorf("Failed unmarshaling Object: %v", err.Error())

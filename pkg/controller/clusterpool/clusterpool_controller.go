@@ -133,7 +133,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	}
 
 	// Watch for changes to ClusterPool
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterPool{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterPool{}, &handler.TypedEnqueueRequestForObject[*hivev1.ClusterPool]{}))
 	if err != nil {
 		return err
 	}
@@ -144,12 +144,8 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	}
 
 	// Watch for changes to ClusterClaims
-	enqueuePoolForClaim := handler.EnqueueRequestsFromMapFunc(
-		func(ctx context.Context, o client.Object) []reconcile.Request {
-			claim, ok := o.(*hivev1.ClusterClaim)
-			if !ok {
-				return nil
-			}
+	enqueuePoolForClaim := handler.TypedEnqueueRequestsFromMapFunc(
+		func(ctx context.Context, claim *hivev1.ClusterClaim) []reconcile.Request {
 			return []reconcile.Request{{
 				NamespacedName: types.NamespacedName{
 					Namespace: claim.Namespace,
@@ -158,49 +154,41 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 			}}
 		},
 	)
-	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterClaim{}), enqueuePoolForClaim); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterClaim{}, enqueuePoolForClaim)); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive cluster pool admin RoleBindings
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}),
-		handler.EnqueueRequestsFromMapFunc(
+		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}, handler.TypedEnqueueRequestsFromMapFunc(
 			requestsForRBACResources(r.Client, r.logger)),
-	); err != nil {
+		)); err != nil {
 		return err
 	}
 
 	// Watch for changes to the hive-cluster-pool-admin-binding RoleBinding
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}),
-		handler.EnqueueRequestsFromMapFunc(
+		source.Kind(mgr.GetCache(), &rbacv1.RoleBinding{}, handler.TypedEnqueueRequestsFromMapFunc(
 			requestsForCDRBACResources(r.Client, clusterPoolAdminRoleBindingName, r.logger)),
-	); err != nil {
+		)); err != nil {
 		return err
 	}
 
 	// Watch for changes to ClusterDeploymentCustomizations
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &hivev1.ClusterDeploymentCustomization{}),
-		handler.EnqueueRequestsFromMapFunc(
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeploymentCustomization{}, handler.TypedEnqueueRequestsFromMapFunc(
 			requestsForCDCResources(r.Client, r.logger)),
-	); err != nil {
+		)); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
-	return func(ctx context.Context, o client.Object) []reconcile.Request {
-		cdc, ok := o.(*hivev1.ClusterDeploymentCustomization)
-		if !ok {
-			return nil
-		}
-
+func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*hivev1.ClusterDeploymentCustomization] {
+	return func(ctx context.Context, cdc *hivev1.ClusterDeploymentCustomization) []reconcile.Request {
 		cpList := &hivev1.ClusterPoolList{}
-		if err := c.List(context.Background(), cpList, client.InNamespace(o.GetNamespace())); err != nil {
+		if err := c.List(context.Background(), cpList, client.InNamespace(cdc.GetNamespace())); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to list cluster pools for CDC resource")
 			return nil
 		}
@@ -228,8 +216,8 @@ func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.Ma
 	}
 }
 
-func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.MapFunc {
-	return func(ctx context.Context, o client.Object) []reconcile.Request {
+func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding] {
+	return func(ctx context.Context, o *rbacv1.RoleBinding) []reconcile.Request {
 		if o.GetName() != resourceName {
 			return nil
 		}
@@ -247,18 +235,14 @@ func requestsForCDRBACResources(c client.Client, resourceName string, logger log
 	}
 }
 
-func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.MapFunc {
-	return func(ctx context.Context, o client.Object) []reconcile.Request {
-		binding, ok := o.(*rbacv1.RoleBinding)
-		if !ok {
-			return nil
-		}
+func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding] {
+	return func(ctx context.Context, binding *rbacv1.RoleBinding) []reconcile.Request {
 		if binding.RoleRef.Kind != "ClusterRole" || binding.RoleRef.Name != clusterPoolAdminRoleName {
 			return nil
 		}
 
 		cpList := &hivev1.ClusterPoolList{}
-		if err := c.List(context.Background(), cpList, client.InNamespace(o.GetNamespace())); err != nil {
+		if err := c.List(context.Background(), cpList, client.InNamespace(binding.GetNamespace())); err != nil {
 			logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to list cluster pools for RBAC resource")
 			return nil
 		}

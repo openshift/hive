@@ -195,8 +195,7 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for changes to ClusterDeployment
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}),
-		controllerutils.NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, controllerutils.IsClusterDeploymentErrorUpdateEvent))
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, controllerutils.NewTypedRateLimitedUpdateEventHandler(&handler.TypedEnqueueRequestForObject[*hivev1.ClusterDeployment]{}, controllerutils.IsClusterDeploymentErrorUpdateEvent)))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment")
 		return err
@@ -208,28 +207,28 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	}
 
 	// Watch for jobs created by a ClusterDeployment:
-	err = c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, handler.TypedEnqueueRequestForOwner[*batchv1.Job](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment job")
 		return err
 	}
 
 	// Watch for pods created by an install job
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), handler.EnqueueRequestsFromMapFunc(selectorPodWatchHandler))
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}, handler.TypedEnqueueRequestsFromMapFunc(selectorPodWatchHandler)))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment pods")
 		return err
 	}
 
 	// Watch for deprovision requests created by a ClusterDeployment
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeprovision{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeprovision{}, handler.TypedEnqueueRequestForOwner[*hivev1.ClusterDeprovision](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		logger.WithError(err).Error("Error watching deprovision request created by cluster deployment")
 		return err
 	}
 
 	// Watch for dnszones created by a ClusterDeployment
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.DNSZone{}), handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.DNSZone{}, handler.TypedEnqueueRequestForOwner[*hivev1.DNSZone](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		logger.WithError(err).Error("Error watching cluster deployment dnszones")
 		return err
@@ -237,8 +236,8 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 
 	// Watch for changes to ClusterSyncs
 	if err := c.Watch(
-		source.Kind(mgr.GetCache(), &hiveintv1alpha1.ClusterSync{}),
-		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{}),
+		source.Kind(mgr.GetCache(), &hiveintv1alpha1.ClusterSync{},
+			handler.TypedEnqueueRequestForOwner[*hiveintv1alpha1.ClusterSync](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{})),
 	); err != nil {
 		return errors.Wrap(err, "cannot start watch on ClusterSyncs")
 	}
@@ -1828,15 +1827,9 @@ func (r *ReconcileClusterDeployment) createManagedDNSZone(cd *hivev1.ClusterDepl
 	return nil
 }
 
-func selectorPodWatchHandler(ctx context.Context, a client.Object) []reconcile.Request {
+func selectorPodWatchHandler(ctx context.Context, pod *corev1.Pod) []reconcile.Request {
 	retval := []reconcile.Request{}
 
-	pod := a.(*corev1.Pod)
-	if pod == nil {
-		// Wasn't a Pod, bail out. This should not happen.
-		log.Errorf("Error converting MapObject.Object to Pod. Value: %+v", a)
-		return retval
-	}
 	if pod.Labels == nil {
 		return retval
 	}

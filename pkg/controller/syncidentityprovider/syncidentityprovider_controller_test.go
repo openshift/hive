@@ -159,8 +159,9 @@ func TestSyncIdentityProviderWatchHandler(t *testing.T) {
 		expectedRequestList  []reconcile.Request
 	}{
 		{
-			name:                "Empty",
-			expectedRequestList: []reconcile.Request{},
+			name:                 "Empty",
+			syncIdentityProvider: nil,
+			expectedRequestList:  []reconcile.Request{},
 		},
 		{
 			name: "Happy Path",
@@ -213,8 +214,9 @@ func TestSelectorSyncIdentityProviderWatchHandler(t *testing.T) {
 		expectedRequestList          []reconcile.Request
 	}{
 		{
-			name:                "Empty",
-			expectedRequestList: []reconcile.Request{},
+			name:                         "Empty",
+			selectorSyncIdentityProvider: nil,
+			expectedRequestList:          []reconcile.Request{},
 		},
 		{
 			name: "Happy Path",

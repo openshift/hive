@@ -347,6 +347,19 @@ func (a *AWSActuator) updateProviderConfig(machineSet *machineapi.MachineSet, in
 		}
 	}
 
+	// Adding worker-sg SG filter for pre-CAPI clusters
+	securityGroupsRepresentaiton := fmt.Sprintf("%v", providerConfig.SecurityGroups)
+	if !strings.Contains(securityGroupsRepresentaiton, "-worker-sg") {
+		providerConfig.SecurityGroups = append(providerConfig.SecurityGroups, machineapi.AWSResourceReference{
+			Filters: []machineapi.Filter{
+				{
+					Name:   "tag:Name",
+					Values: []string{fmt.Sprintf("%s-worker-sg", infraID)},
+				},
+			},
+		})
+	}
+
 	// Day 2: Hive MachinePools with an ExtraWorkerSecurityGroupAnnotation are configured with the additional
 	// security group value specified in the annotation. For details, see HIVE-1802.
 	//

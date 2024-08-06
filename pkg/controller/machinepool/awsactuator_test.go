@@ -686,7 +686,7 @@ func TestAWSActuator(t *testing.T) {
 				"foo-12345-lb",
 			}
 			// Check for the default security groups
-			if assert.GreaterOrEqual(t, len(awsProvider.SecurityGroups), 2, "expected at least the default two SecurityGroups") {
+			if assert.GreaterOrEqual(t, len(awsProvider.SecurityGroups), 3, "expected at least the default three SecurityGroups") {
 				for i, val := range defaultSGFilterValues {
 					expNumFilters := 1
 					if test.expectExtraSG {
@@ -710,8 +710,8 @@ func TestAWSActuator(t *testing.T) {
 				}
 			}
 			if test.expectedSGIDs != nil {
-				// SecurityGroups holds the defaults plus any specified by ID
-				if assert.Equal(t, len(test.expectedSGIDs), len(awsProvider.SecurityGroups)-len(defaultSGFilterValues), "unexpected number of non-default SecurityGroups") {
+				// SecurityGroups holds the expectedSGIDs + the terraform sg plus any specified by ID
+				if assert.Equal(t, len(test.expectedSGIDs)+1, len(awsProvider.SecurityGroups)-len(defaultSGFilterValues), "unexpected number of non-default SecurityGroups") {
 					for i := 0; i < len(test.expectedSGIDs); i++ {
 						assert.Equal(t, test.expectedSGIDs[i], *awsProvider.SecurityGroups[i+len(defaultSGFilterValues)].ID, "mismatched security group ID")
 					}

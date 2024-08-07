@@ -22,6 +22,12 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 DOCKER_CMD ?= docker
 CONTAINER_BUILD_FLAGS ?= --file ./Dockerfile
 
+GOCACHE ?= $(shell go env GOCACHE)
+
+ifneq ($(GOCACHE),)
+GOCACHE_VOL_ARG = --volume "${GOCACHE}:/go/.cache:z"
+endif
+
 # Namespace hive-operator will run:
 HIVE_OPERATOR_NS ?= hive
 
@@ -304,7 +310,7 @@ buildah-dev-build:
 
 .PHONY: podman-dev-build
 podman-dev-build:
-	podman build --tag ${IMG} -f ./Dockerfile .
+	podman build --tag ${IMG} $(GOCACHE_VOL_ARG) -f ./Dockerfile .
 
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push

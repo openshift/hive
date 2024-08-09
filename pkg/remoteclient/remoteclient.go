@@ -18,11 +18,9 @@ import (
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
@@ -286,23 +284,11 @@ func unadulteratedRESTConfig(c client.Client, cd *hivev1.ClusterDeployment) (*re
 	kubeconfigSecret := &corev1.Secret{}
 	if err := c.Get(
 		context.Background(),
+		// HIVE-2485 ✓
 		client.ObjectKey{Namespace: cd.Namespace, Name: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name},
 		kubeconfigSecret,
 	); err != nil {
 		return nil, errors.Wrap(err, "could not get admin kubeconfig secret")
 	}
-	return restConfigFromSecret(kubeconfigSecret)
-}
-
-func restConfigFromSecret(kubeconfigSecret *corev1.Secret) (*rest.Config, error) {
-	kubeconfigData, ok := kubeconfigSecret.Data[constants.KubeconfigSecretKey]
-	if !ok {
-		return nil, errors.Errorf("kubeconfig secret does not contain %q data", constants.KubeconfigSecretKey)
-	}
-	config, err := clientcmd.Load(kubeconfigData)
-	if err != nil {
-		return nil, err
-	}
-	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
-	return kubeConfig.ClientConfig()
+	return utils.RestConfigFromSecret(kubeconfigSecret, false)
 }

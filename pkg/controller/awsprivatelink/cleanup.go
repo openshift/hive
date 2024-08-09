@@ -61,7 +61,7 @@ func (r *ReconcileAWSPrivateLink) cleanupPreviousProvisionAttempt(cd *hivev1.Clu
 	}
 	metadata := &hivev1.ClusterMetadata{
 		InfraID:                  *cp.Spec.PrevInfraID,
-		AdminKubeconfigSecretRef: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef,
+		AdminKubeconfigSecretRef: cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef, // HIVE-2485: via ClusterMetadata
 	}
 
 	if err := r.cleanupPrivateLink(cd, metadata, logger); err != nil {
@@ -138,7 +138,7 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 
 	if hzID == "" { // since we don't have the hz ID, we try to discover it to prevent leaks
 		apiDomain, err := initialURL(r.Client,
-			client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name})
+			client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name}) // HIVE-2485 ✓
 		if apierrors.IsNotFound(err) {
 			logger.Info("no hostedZoneID in status and admin kubeconfig does not exist, skipping hosted zone cleanup")
 			return nil

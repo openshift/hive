@@ -36,11 +36,11 @@ func GetCreds(credsFile string) ([]byte, error) {
 // and config files accordingly.
 func ConfigureCreds(c client.Client) {
 	if credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME"); credsSecret != nil {
-		utils.ProjectToDir(credsSecret, constants.OvirtCredentialsDir)
+		utils.ProjectToDir(credsSecret, constants.OvirtCredentialsDir, nil)
 		os.Setenv(constants.OvirtConfigEnvVar, constants.OvirtCredentialsDir+"/"+constants.OvirtCredentialsName)
 	}
 	if certsSecret := utils.LoadSecretOrDie(c, "CERTS_SECRET_NAME"); certsSecret != nil {
-		utils.ProjectToDir(certsSecret, constants.OvirtCertificatesDir)
+		utils.ProjectToDir(certsSecret, constants.OvirtCertificatesDir, nil)
 		utils.InstallCerts(constants.OvirtCertificatesDir)
 	}
 	// Install cluster proxy trusted CA bundle

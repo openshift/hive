@@ -150,16 +150,56 @@ func loadOrDie(c client.Client, nameEnvKey string, obj client.Object) bool {
 
 }
 
+// ProjectToDirFileFilter is run by ProjectToDir for each key found in the obj.
+// If the second return is an error, ProjectToDir will panic with it. Otherwise:
+// If ProjectToDir should create the file, the first return should be the base
+// name of the file in which the newContents should be written.
+// If the file should be skipped, the first return should be the empty string.
+type ProjectToDirFileFilter func(key string, contents []byte) (basename string, newContents []byte, err error)
+
+// projectDefault is a ProjectToDirFileFilter that causes ProjectToDir to create
+// files for all keys in the obj, naming each file the same as its key.
+var projectDefault ProjectToDirFileFilter = func(key string, contents []byte) (string, []byte, error) {
+	return key, contents, nil
+}
+
+// ProjectOnlyTheseKeys returns a ProjectToDirFileFilter that instructs ProjectToDir
+// to create only the files with the specified keys. Each file's name will be the
+// same as the key. The error return is always nil.
+func ProjectOnlyTheseKeys(keys ...string) ProjectToDirFileFilter {
+	return func(key string, contents []byte) (string, []byte, error) {
+		if len(keys) == 0 {
+			// Caller should use nil (projectDefault) instead, but meh.
+			return key, contents, nil
+		}
+		if slice.ContainsString(keys, key, nil) {
+			// A match, project the file with the key as the basename and unchanged contents
+			return key, contents, nil
+		}
+		// No match; skip this file
+		return "", nil, nil
+	}
+}
+
 // ProjectToDir simulates what happens when you mount a secret or configmap as a volume on a pod, creating
 // files named after each key under `dir` and populating them with the contents represented by the values.
-func ProjectToDir(obj client.Object, dir string, keys ...string) {
-	write := func(filename string, bytes []byte) {
-		if len(keys) != 0 && !slice.ContainsString(keys, filename, nil) {
+// This default behavior can be modified by specifying a non-nil filter to validate, skip, and/or rename
+// the file corresponding to each key.
+func ProjectToDir(obj client.Object, dir string, filter ProjectToDirFileFilter) {
+	write := func(key string, bytes []byte) {
+		if filter == nil {
+			filter = projectDefault
+		}
+		filename, newBytes, err := filter(key, bytes)
+		if err != nil {
+			panic(err)
+		}
+		if filename == "" {
 			// Skip this key
 			return
 		}
 		path := filepath.Join(dir, filename)
-		if err := os.WriteFile(path, bytes, 0400); err != nil {
+		if err := os.WriteFile(path, newBytes, 0400); err != nil {
 			log.WithError(err).WithField("path", path).Fatal("Failed to write file")
 		}
 	}

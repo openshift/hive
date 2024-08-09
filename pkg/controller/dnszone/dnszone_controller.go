@@ -16,7 +16,6 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/azureclient"
-	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
@@ -399,7 +398,7 @@ func (r *ReconcileDNSZone) getActuator(dnsZone *hivev1.DNSZone, dnsLog log.Field
 			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
 				SecretRef: corev1.SecretReference{
 					Namespace: controllerutils.GetHiveNamespace(),
-					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Name:      controllerutils.AWSServiceProviderSecretName(""),
 				},
 				Role: dnsZone.Spec.AWS.CredentialsAssumeRole,
 			},

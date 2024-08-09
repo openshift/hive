@@ -39,10 +39,10 @@ func GetCreds(credsFile string) ([]byte, error) {
 // CREDS_SECRET_NAME, and CERTS_SECRET_NAME and configures OpenStack credential config files accordingly.
 func ConfigureCreds(c client.Client) {
 	if credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME"); credsSecret != nil {
-		utils.ProjectToDir(credsSecret, constants.OpenStackCredentialsDir)
+		utils.ProjectToDir(credsSecret, constants.OpenStackCredentialsDir, nil)
 	}
 	if certsSecret := utils.LoadSecretOrDie(c, "CERTS_SECRET_NAME"); certsSecret != nil {
-		utils.ProjectToDir(certsSecret, constants.OpenStackCertificatesDir)
+		utils.ProjectToDir(certsSecret, constants.OpenStackCertificatesDir, nil)
 		utils.InstallCerts(constants.OpenStackCertificatesDir)
 	}
 	// Install cluster proxy trusted CA bundle

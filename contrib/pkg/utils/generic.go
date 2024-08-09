@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	caTrustDir = "/etc/pki/ca-trust/source/anchors/"
+	caTrustDir = "/output/hive-trusted-cabundle/"
 )
 
 type releasePayload struct {
@@ -245,10 +245,4 @@ func InstallCerts(sourceDir string) {
 		logger.WithError(err).WithField("output", string(b)).Fatal("failed to copy certs")
 	}
 	logger.WithField("output", string(b)).Info("copied certs")
-
-	b, err = exec.Command("update-ca-trust").CombinedOutput()
-	if err != nil {
-		logger.WithError(err).WithField("output", string(b)).Fatal("failed to update CA trust")
-	}
-	logger.WithField("output", string(b)).Info("updated CA trust")
 }

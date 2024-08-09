@@ -627,7 +627,11 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 	}
 
 	// Otherwise the FailureDomain should be unambiguous and we can just compare them.
-	return rfd.Equal(gfd), nil
+	equal := rfd.Equal(gfd)
+	if !equal {
+		logger.WithField("failureDomainRemote", rfd).WithField("failureDomainGenerated", gfd).Info("failure domains not equal")
+	}
+	return equal, nil
 }
 
 // matchMachineSets decides whether gMS ("generated MachineSet") and rMS ("remote MachineSet" -- the one already extant

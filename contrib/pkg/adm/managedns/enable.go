@@ -379,12 +379,12 @@ func (o *Options) getResourceHelper() (resource.Helper, error) {
 		log.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
-	return resource.NewHelperFromRESTConfig(cfg, log.WithField("command", "adm manage-dns enable"))
+	return resource.NewHelperFromRESTConfig(cfg, "util-managedns-enable", log.WithField("command", "adm manage-dns enable"))
 }
 
 func (o *Options) setupLocalClients() error {
 	log.Debug("creating cluster client config")
-	hiveClient, err := hiveutils.GetClient()
+	hiveClient, err := hiveutils.GetClient("hiveutil-managedns-enable")
 	if err != nil {
 		log.WithError(err).Error("failed to create a hive config client")
 		return err

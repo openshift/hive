@@ -154,7 +154,10 @@ func (r *helper) createOnly(f cmdutil.Factory, obj []byte) (ApplyResult, error) 
 	}
 	// Object doesn't exist yet, create it
 	gvr := info.ResourceMapping().Resource
-	_, err = c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured), metav1.CreateOptions{})
+	_, err = c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured),
+		metav1.CreateOptions{
+			FieldManager: "hive4-" + string(r.controllerName),
+		})
 	if err != nil {
 		return "", err
 	}
@@ -177,7 +180,10 @@ func (r *helper) createOrUpdate(f cmdutil.Factory, obj []byte, errOut io.Writer)
 		}
 		// Object doesn't exist yet, create it
 		gvr := info.ResourceMapping().Resource
-		_, err := c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured), metav1.CreateOptions{})
+		_, err := c.Resource(gvr).Namespace(info.Namespace).Create(context.TODO(), info.Object.(*unstructured.Unstructured),
+			metav1.CreateOptions{
+				FieldManager: "hive5-" + string(r.controllerName),
+			})
 		if err != nil {
 			return "", err
 		}
@@ -224,6 +230,7 @@ func (r *helper) setupApplyCommand(f cmdutil.Factory, obj []byte, ioStreams gene
 		PrintFlags:        flags.PrintFlags,
 		Overwrite:         true,
 		OpenAPIPatch:      true,
+		FieldManager:      "hive6-" + string(r.controllerName),
 	}
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {

@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/resource"
@@ -50,13 +51,13 @@ func DetermineReleaseImageFromSource(sourceURL string) (string, error) {
 	return payload.PullSpec, nil
 }
 
-func GetResourceHelper(logger log.FieldLogger) (resource.Helper, error) {
+func GetResourceHelper(controllerName hivev1.ControllerName, logger log.FieldLogger) (resource.Helper, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
 		logger.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
-	return resource.NewHelperFromRESTConfig(cfg, logger)
+	return resource.NewHelperFromRESTConfig(cfg, controllerName, logger)
 }
 
 func DefaultNamespace() (string, error) {

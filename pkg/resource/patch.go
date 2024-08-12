@@ -3,6 +3,7 @@ package resource
 import (
 	"bytes"
 	"fmt"
+	"os"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,7 +51,11 @@ func (r *helper) Patch(name types.NamespacedName, kind, apiVersion string, patch
 }
 
 func (r *helper) setupPatchCommand(name, kind, apiVersion, patchType string, f cmdutil.Factory, patch string, ioStreams genericclioptions.IOStreams) (*kcmdpatch.PatchOptions, error) {
-
+	// This is bizarre and I don't know why it works, but it's the only way I could figure out
+	// to set the `manager` properly. HIVE-1744.
+	os.Args = []string{
+		"hive7-" + string(r.controllerName),
+	}
 	cmd := kcmdpatch.NewCmdPatch(f, ioStreams)
 	cmd.Flags().Parse([]string{})
 

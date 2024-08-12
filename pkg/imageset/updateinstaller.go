@@ -97,7 +97,7 @@ func (o *UpdateInstallerImageOptions) Complete() error {
 		log.WithError(err).Error("Cannot obtain client config")
 		return err
 	}
-	o.client, err = getClient(cfg)
+	o.client, err = getClient(cfg, "hiveutil-update-installer-image")
 	if err != nil {
 		log.WithError(err).Error("Cannot obtain API client")
 		return err
@@ -263,7 +263,7 @@ func (o *UpdateInstallerImageOptions) setImageResolutionErrorCondition(cd *hivev
 	}
 }
 
-func getClient(kubeConfig *rest.Config) (client.Client, error) {
+func getClient(kubeConfig *rest.Config, fieldManager string) (client.Client, error) {
 	scheme := scheme.GetScheme()
 
 	managerOptions := manager.Options{
@@ -285,7 +285,7 @@ func getClient(kubeConfig *rest.Config) (client.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kube client: %v", err)
 	}
-	return kubeClient, nil
+	return client.WithFieldOwner(kubeClient, fieldManager), nil
 }
 
 // cincinnatiMetadata is the compact version of the release metadata

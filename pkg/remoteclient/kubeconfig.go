@@ -1,6 +1,7 @@
 package remoteclient
 
 import (
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/util/scheme"
 	corev1 "k8s.io/api/core/v1"
@@ -12,16 +13,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func NewBuilderFromKubeconfig(c client.Client, secret *corev1.Secret) Builder {
+func NewBuilderFromKubeconfig(c client.Client, secret *corev1.Secret, controllerName hivev1.ControllerName) Builder {
 	return &kubeconfigBuilder{
-		c:      c,
-		secret: secret,
+		c:            c,
+		secret:       secret,
+		fieldManager: "hive3-" + string(controllerName),
 	}
 }
 
 type kubeconfigBuilder struct {
-	c      client.Client
-	secret *corev1.Secret
+	c            client.Client
+	secret       *corev1.Secret
+	fieldManager string
 }
 
 // Build is also responsible for verifying reachability of client
@@ -40,9 +43,13 @@ func (b *kubeconfigBuilder) Build() (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return client.New(cfg, client.Options{
+	c, err := client.New(cfg, client.Options{
 		Scheme: scheme.GetScheme(),
 	})
+	if err != nil {
+		return nil, err
+	}
+	return client.WithFieldOwner(c, b.fieldManager), nil
 }
 
 func (b *kubeconfigBuilder) BuildDynamic() (dynamic.Interface, error) {

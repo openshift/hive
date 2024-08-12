@@ -89,8 +89,8 @@ func Add(mgr manager.Manager) error {
 		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
 		logger: logger,
 	}
-	r.remoteClusterAPIClientBuilder = func(secret *corev1.Secret) remoteclient.Builder {
-		return remoteclient.NewBuilderFromKubeconfig(r.Client, secret)
+	r.remoteClusterAPIClientBuilder = func(secret *corev1.Secret, controllerName hivev1.ControllerName) remoteclient.Builder {
+		return remoteclient.NewBuilderFromKubeconfig(r.Client, secret, ControllerName)
 	}
 
 	c, err := controller.New("clusterrelocate-controller", mgr, controller.Options{
@@ -156,7 +156,7 @@ type ReconcileClusterRelocate struct {
 
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
-	remoteClusterAPIClientBuilder func(secret *corev1.Secret) remoteclient.Builder
+	remoteClusterAPIClientBuilder func(secret *corev1.Secret, controllerName hivev1.ControllerName) remoteclient.Builder
 }
 
 // Reconcile relocates ClusterDeployments matching with a ClusterRelocate to another Hive instance.
@@ -284,7 +284,7 @@ func (r *ReconcileClusterRelocate) reconcileSingleMatch(cd *hivev1.ClusterDeploy
 		return reconcile.Result{}, errors.Wrap(err, "failed to get kubeconfig secret")
 	}
 
-	destClient, err := r.remoteClusterAPIClientBuilder(kubeconfigSecret).Build()
+	destClient, err := r.remoteClusterAPIClientBuilder(kubeconfigSecret, ControllerName).Build()
 	if err != nil {
 		logger.WithError(err).Warn("could not create a client for the destination cluster")
 		r.setRelocationFailedCondition(

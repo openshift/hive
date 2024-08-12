@@ -36,7 +36,7 @@ spec:
 
   resourceApplyMode: Upsert
 
-  enableResourceTemplates  : false
+  enableResourceTemplates: false
 
   resources:
   - apiVersion: user.openshift.io/v1
@@ -54,7 +54,7 @@ spec:
     patch: |-
       { "data": { "foo": "new-bar" } }
     patchType: merge
-    
+
   secretMappings:
   - sourceRef:
       name: ad-bind-password

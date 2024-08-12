@@ -172,7 +172,7 @@ func resourceHelperBuilderFunc(
 		return nil, err
 	}
 
-	return resource.NewHelperFromRESTConfig(restConfig, logger)
+	return resource.NewHelperFromRESTConfig(restConfig, ControllerName, logger)
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler

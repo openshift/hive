@@ -20,15 +20,18 @@ import (
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 )
 
+type providerSpecValidator func(t *testing.T, providerSpec *machineapi.AzureMachineProviderSpec)
+
 func TestAzureActuator(t *testing.T) {
 	tests := []struct {
-		name                       string
-		mockAzureClient            func(*gomock.Controller, *mockazure.MockClient)
-		clusterDeployment          *hivev1.ClusterDeployment
-		pool                       *hivev1.MachinePool
-		expectedMachineSetReplicas map[string]int64
-		expectedImage              *machineapi.Image
-		expectedErr                bool
+		name                        string
+		mockAzureClient             func(*gomock.Controller, *mockazure.MockClient)
+		clusterDeployment           *hivev1.ClusterDeployment
+		pool                        *hivev1.MachinePool
+		expectedMachineSetReplicas  map[string]int64
+		expectedImage               *machineapi.Image
+		extraProviderSpecValidation providerSpecValidator
+		expectedErr                 bool
 	}{
 		// < 4.12
 		{
@@ -81,6 +84,34 @@ func TestAzureActuator(t *testing.T) {
 				generateAzureMachineSetName("zone1"): 1,
 				generateAzureMachineSetName("zone2"): 1,
 				generateAzureMachineSetName("zone3"): 1,
+			},
+		},
+		{
+			name:              "set custom network fields",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool: func() *hivev1.MachinePool {
+				pool := testAzurePool()
+				pool.Spec.Platform.Azure.NetworkResourceGroupName = "some-rg"
+				pool.Spec.Platform.Azure.ComputeSubnet = "some-subnet"
+				pool.Spec.Platform.Azure.VirtualNetwork = "some-vnet"
+				return pool
+			}(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetVMCapabilities(mockCtrl, client, "V1,V2")
+				mockListImagesByResourceGroup(mockCtrl, client, []compute.Image{
+					testAzureImage(compute.HyperVGenerationTypesV1),
+				})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+			extraProviderSpecValidation: func(t *testing.T, providerSpec *machineapi.AzureMachineProviderSpec) {
+				assert.Equal(t, "some-rg", providerSpec.NetworkResourceGroup, "unexpected ComputeSubnet => Subnet")
+				assert.Equal(t, "some-subnet", providerSpec.Subnet, "unexpected ComputeSubnet => Subnet")
+				assert.Equal(t, "some-vnet", providerSpec.Vnet, "unexpected VirtualNetwork => Vnet")
 			},
 		},
 		{
@@ -499,13 +530,13 @@ func TestAzureActuator(t *testing.T) {
 				assert.Error(t, err, "expected error for test case")
 			} else {
 				assert.NoError(t, err, "unexpected error for test case")
-				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage)
+				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage, test.extraProviderSpecValidation)
 			}
 		})
 	}
 }
 
-func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedImage *machineapi.Image) {
+func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expectedMSReplicas map[string]int64, expectedImage *machineapi.Image, epsv providerSpecValidator) {
 	assert.Equal(t, len(expectedMSReplicas), len(mSets), "different number of machine sets generated than expected")
 
 	for _, ms := range mSets {
@@ -517,9 +548,12 @@ func validateAzureMachineSets(t *testing.T, mSets []*machineapi.MachineSet, expe
 		azureProvider, ok := ms.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)
 		if assert.True(t, ok, "failed to convert to azureProviderSpec") {
 			assert.Equal(t, testInstanceType, azureProvider.VMSize, "unexpected instance type")
-		}
-		if expectedImage != nil {
-			assert.Equal(t, expectedImage, &azureProvider.Image)
+			if expectedImage != nil {
+				assert.Equal(t, expectedImage, &azureProvider.Image)
+			}
+			if epsv != nil {
+				epsv(t, azureProvider)
+			}
 		}
 	}
 }

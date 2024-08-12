@@ -43,6 +43,9 @@ type MachinePoolSpec struct {
 	Autoscaling *MachinePoolAutoscaling `json:"autoscaling,omitempty"`
 
 	// Platform is configuration for machine pool specific to the platform.
+	// When using a MachinePool to control the default worker machines
+	// created by installer, these must match the values provided in the
+	// install-config.
 	Platform MachinePoolPlatform `json:"platform"`
 
 	// Map of label string keys and values that will be applied to the created MachineSet's

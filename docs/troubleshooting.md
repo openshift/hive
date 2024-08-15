@@ -4,10 +4,13 @@
   - [Cluster Install fails](#cluster-install-fails)
   - [Hibernation](#hibernation)
 - [Cluster Install Failure Logs](#cluster-install-failure-logs)
-  - [Setup](#setup)
-  - [Listing stored install logs directories](#listing-stored-install-logs-directories)
-  - [Retrieving stored install logs for a specific cluster provision](#retrieving-stored-install-logs-for-a-specific-cluster-provision)
+  - [...in S3](#in-s3)
+    - [Setup](#setup)
+    - [Listing stored install logs directories](#listing-stored-install-logs-directories)
+    - [Retrieving stored install logs for a specific cluster provision](#retrieving-stored-install-logs-for-a-specific-cluster-provision)
 - [Deprovision](#deprovision)
+- [ClusterPools](#clusterpools)
+  - [Common Issues](#common-issues)
 - [HiveAdmission](#hiveadmission)
 - [Cluster's API Certificate Changed](#clusters-api-certificate-changed)
   - [Updating Certificate Authorities within the Admin Kubeconfig Secret](#updating-certificate-authorities-within-the-admin-kubeconfig-secret)
@@ -33,14 +36,21 @@ Note: when the cluster is hibernating, the `Unreachable` condition is expected t
 
 ## Cluster Install Failure Logs
 
-In the event a cluster is brought up but overall installation fails, either during bootstrap or cluster initialization, Hive will attempt to gather logs from the cluster itself. If configured, these logs are stored in an S3 compatible object store under a directory created for each cluster provision. If the install succeeds on the first attempt, then nothing will be stored. If the install has had any errors that cause an install log to be created, then it will uploaded to the configured object store.
+When cluster installation fails, the logs from the `openshift-install` process are often the best
+place to start triaging what went wrong. Each install attempt is run in a pod in the same namespace
+as the ClusterDeployment. You can use a filter like `-l hive.openshift.io/job-type=provision` to
+find such pods, and run `oc logs` as usual.
 
-### Setup
+### ...in S3
+
+If configured, logs from failed installations are stored in an S3 compatible object store under a directory created for each cluster provision. If the install succeeds on the first attempt, then nothing will be stored. If the install has had any errors that cause an install log to be created, then it will uploaded to the configured object store.
+
+#### Setup
 
 In order for Hive to gather and upload install logs on cluster provision failure, the object store must have a place for Hive to store data and Hive must be configured with the object store information.
 See [this section](using-hive.md#saving-logs-for-failed-provisions) for setup details.
 
-### Listing stored install logs directories
+#### Listing stored install logs directories
 
 The logs gathered from the cluster can be accessed with the `logextractor.sh` script found in the Hive git repository.
 
@@ -50,7 +60,7 @@ In order to sync down the correct install logs, it is necessary to know which di
 $ hack/logextractor.sh ls
 ```
 
-### Retrieving stored install logs for a specific cluster provision
+#### Retrieving stored install logs for a specific cluster provision
 
 To sync down the desired install logs, run the following command using the directory name determined in the command above. In this example, `cluster1-6a85a345-namespace` is used as an example directory name:
 
@@ -75,6 +85,52 @@ After deleting your cluster deployment you will see an uninstall job created. If
       ```bash
       $ bin/hiveutil aws-tag-deprovision --loglevel=debug kubernetes.io/cluster/<infraID>=owned sigs.k8s.io/cluster-api-provider-aws/cluster/<infraID>=owned
       ```
+
+## ClusterPools
+
+Common problems with ClusterPools may manifest as:
+- `ClusterPool.Status` counts (`Size`, `Ready`, `Standby`) stay at zero, or do not reach their expected values in steady state. (It is normal for these to fluctuate with activity such as incoming ClusterClaims.)
+- ClusterClaims sit forever without getting fulfilled.
+- ClusterPool-owned ClusterDeployments are being quickly replaced without the usual impetus of
+  being claimed and released.
+
+Most often such problems are the result of failed provisions. Because the ClusterPool controller
+will automatically deprovision and replace failed ClusterDeployments, you will need to catch one
+in action.
+
+You can discover all the ClusterDeployments associated with a ClusterPool in several ways,
+including via labels. For example, if you only have one ClusterPool named `mypool`:
+
+```
+$ oc get cd -A -l hive.openshift.io/clusterpool-name=mypool
+```
+
+If you have ClusterPools with the same name in different namespaces, you can disambiguate:
+
+```
+$ oc get cd -A -l hive.openshift.io/clusterpool-namespace=ns1,hive.openshift.io/clusterpool-name=mypool
+```
+
+Once you find a namespace with a provision pod in `Error` state, you can look for provision error
+logs as described [above](#cluster-install-failure-logs).
+
+### Common Issues
+Frequently seen causes of ClusterPool cluster installation failures include:
+- Incorrect configuration in the install-config.yaml in the Secret referenced by
+  `ClusterPool.Spec.InstallConfigSecretTemplateRef`.
+- Invalid credentials and/or certificates in the Secret(s) referenced under
+  `ClusterPool.Spec.Platform`.
+- Cloud quota or API rate limit exceeded. If you can't (or don't want to) fix these on the cloud
+  side, consider adjusting settings in `ClusterPool.Spec`:
+  - `MaxSize` is the total number of clusters managed by the pool, including claimed clusters. Your
+    cloud quotas must be able to accommodate resources for this many clusters.
+  - `MaxConcurrent` controls the number of _operations_ (provisions + deprovisions) that the
+    controller will perform simultaneously. If you are being rate limited, you may need to decrease
+    this setting.
+
+When troubleshooting quota or rate limiting issues, also consider that these are often scoped to
+an entire region or account. Do you have multiple ClusterPools using (credentials for) the same
+cloud account?
 
 ## HiveAdmission
 

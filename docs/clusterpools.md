@@ -8,6 +8,7 @@
 - [Install Config Template](#install-config-template)
 - [Time-based scaling of Cluster Pool](#time-based-scaling-of-cluster-pool)
 - [ClusterPool Deletion](#clusterpool-deletion)
+- [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -267,3 +268,6 @@ A `ClusterPool` can be deleted in the usual way (`oc delete` or the API equivale
 When a `ClusterPool` is deleted, hive will automatically initiate deletion of all *unclaimed* clusters in the pool.
 No new clusters will be created, and any new `ClusterClaim`s will not be fulfilled.
 However, *existing claimed* clusters will not be affected; and the `ClusterPool` itself will be held extant until those clusters have been deprovisioned through the normal means -- i.e. by deleting their `ClusterClaim`s.
+
+## Troubleshooting
+See [this doc](troubleshooting.md#clusterpools).

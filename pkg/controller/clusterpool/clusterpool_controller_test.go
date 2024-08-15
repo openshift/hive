@@ -1314,6 +1314,10 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedTotalClusters:              1,
 			expectedObservedSize:               0,
 			expectedObservedReady:              0,
+			// Wedge in a check for the default labels. We're doing this on a test case that ends
+			// up with at least one cluster, but where we don't prepopulate any (which we would
+			// have to label explicitly -- see note in the test driver).
+			expectedLabels: map[string]string{},
 		},
 		{
 			name: "max size should include the deleting unclaimed clusters",
@@ -2144,7 +2148,12 @@ func TestReconcileClusterPool(t *testing.T) {
 					actualHibernating++
 				}
 
+				// Many tests set up pre-existing pool clusters. Those won't have the default labels
+				// (and we don't want to add them because then we might miss a regression in the actual
+				// code) so only check for them if the test explicitly requests it.
 				if test.expectedLabels != nil {
+					assert.Equal(t, testNamespace, cd.Labels[clusterPoolNamespaceLabelKey], "unexpected namespace label")
+					assert.Equal(t, testLeasePoolName, cd.Labels[clusterPoolNameLabelKey], "unexpected name label")
 					for k, v := range test.expectedLabels {
 						assert.Equal(t, v, cd.Labels[k])
 					}

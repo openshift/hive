@@ -41,6 +41,8 @@ import (
 const (
 	ControllerName                  = hivev1.ClusterpoolControllerName
 	finalizer                       = "hive.openshift.io/clusters"
+	clusterPoolNamespaceLabelKey    = "hive.openshift.io/clusterpool-namespace"
+	clusterPoolNameLabelKey         = "hive.openshift.io/clusterpool-name"
 	imageSetDependent               = "cluster image set"
 	pullSecretDependent             = "pull secret"
 	credentialsSecretDependent      = "credentials secret"
@@ -730,6 +732,14 @@ func (r *ReconcileClusterPool) createCluster(
 	}
 	annotations[constants.ClusterDeploymentPoolSpecHashAnnotation] = poolVersion
 
+	labels := clp.Spec.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	// Add clusterpool ownership labels for easy searching
+	labels[clusterPoolNamespaceLabelKey] = clp.Namespace
+	labels[clusterPoolNameLabelKey] = clp.Name
+
 	// We will use this unique random namespace name for our cluster name.
 	builder := &clusterresource.Builder{
 		Name:                  ns.Name,
@@ -740,7 +750,7 @@ func (r *ReconcileClusterPool) createCluster(
 		MachineNetwork:        "10.0.0.0/16",
 		PullSecret:            pullSecret,
 		CloudBuilder:          cloudBuilder,
-		Labels:                clp.Spec.Labels,
+		Labels:                labels,
 		Annotations:           annotations,
 		InstallConfigTemplate: installConfigTemplate,
 		InstallAttemptsLimit:  clp.Spec.InstallAttemptsLimit,
@@ -781,7 +791,7 @@ func (r *ReconcileClusterPool) createCluster(
 		}
 	}
 
-	if err := r.patchInstallConfig(clp, cd, secret, cdcs, logger); err != nil {
+	if err := r.patchInstallConfig(clp, cd, secret, cdcs); err != nil {
 		return nil, err
 	}
 
@@ -810,7 +820,7 @@ func isInstallConfigSecret(obj interface{}) *corev1.Secret {
 }
 
 // patchInstallConfig responsible for applying ClusterDeploymentCustomization and its reservation
-func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *hivev1.ClusterDeployment, secret *corev1.Secret, cdcs *cdcCollection, logger log.FieldLogger) error {
+func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *hivev1.ClusterDeployment, secret *corev1.Secret, cdcs *cdcCollection) error {
 	if clp.Spec.Inventory == nil {
 		return nil
 	}

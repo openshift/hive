@@ -458,10 +458,14 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 	}
 
 	result := reconcile.Result{Requeue: true, RequeueAfter: r.timeUntilRenew(lease)}
+	err = nil
 	if syncSetsNeedRequeue || selectorSyncSetsNeedRequeue {
 		result.RequeueAfter = 0
+		// HIVE-2585: if any syncset errored, return a non-nil error so we get the advantage of exponential backoff
+		// TODO: Make sure this condition actually represents "any [s]ss failed"
+		err = errors.New("at least one [Selector]SyncSet failed")
 	}
-	return result, nil
+	return result, err
 }
 
 func (r *ReconcileClusterSync) applySyncSets(

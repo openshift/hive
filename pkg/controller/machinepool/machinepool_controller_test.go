@@ -332,6 +332,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			clusterDeployment: testClusterDeployment(),
 			machinePool: testMachinePool(
 				testmp.WithLabels(map[string]string{"test-label-2": "test-value-2"}),
+				testmp.WithMachineLabels(map[string]string{"mach-label-2": "mach-value-2"}),
 				testmp.WithTaints(corev1.Taint{
 					Key:    "test-taint-2",
 					Value:  "test-value-2",
@@ -343,6 +344,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				func() *machineapi.MachineSet {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
 					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Labels["mach-label"] = "mach-value"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",
@@ -359,6 +361,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
 					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
+					ms.Spec.Template.Labels["mach-label"] = "mach-value"
+					ms.Spec.Template.Labels["mach-label-2"] = "mach-value-2"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",
@@ -381,6 +385,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					// Allow empty string as value for labels
 					"test-label-2": "",
 					"test-label-1": "test-value-1",
+				}),
+				testmp.WithMachineLabels(map[string]string{
+					// Allow empty string as value for labels
+					"mach-label-2": "",
+					"mach-label-1": "mach-value-1",
 				}),
 				testmp.WithTaints(corev1.Taint{
 					Key:    "test-taint",
@@ -420,6 +429,12 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 								},
 							},
 							Template: machineapi.MachineTemplateSpec{
+								ObjectMeta: machineapi.ObjectMeta{
+									Labels: map[string]string{
+										capiClusterKey:    testInfraID,
+										capiMachineSetKey: "foo-12345-worker-us-east-1a",
+									},
+								},
 								Spec: machineapi.MachineSpec{
 									ProviderSpec: machineapi.ProviderSpec{
 										Value: rawAWSProviderSpec,
@@ -439,6 +454,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", false, 1, 1)
 					ms.Spec.Template.Spec.ObjectMeta.Labels["test-label-1"] = "test-value-1"
 					ms.Spec.Template.Spec.ObjectMeta.Labels["test-label-2"] = ""
+					ms.Spec.Template.ObjectMeta.Labels["mach-label-1"] = "mach-value-1"
+					ms.Spec.Template.ObjectMeta.Labels["mach-label-2"] = ""
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",
@@ -501,6 +518,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			machinePool: testMachinePool(
 				testmp.WithLabels(map[string]string{"test-label": "keep-me"}),
 				testmp.WithOwnedLabels("test-label-2"),
+				testmp.WithMachineLabels(map[string]string{"mach-label": "keep-me-too"}),
+				testmp.WithOwnedMachineLabels("mach-label-2"),
 				testmp.WithTaints(
 					corev1.Taint{
 						Key:    "test-taint",
@@ -524,6 +543,9 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms.Spec.Template.Spec.Labels["test-label"] = "keep-me"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "remove-me"
 					ms.Spec.Template.Spec.Labels["test-label-3"] = "preserve-me"
+					ms.Spec.Template.Labels["mach-label"] = "keep-me-too"
+					ms.Spec.Template.Labels["mach-label-2"] = "remove-me"
+					ms.Spec.Template.Labels["mach-label-3"] = "preserve-me-also"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "keep-me",
@@ -555,6 +577,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
 					ms.Spec.Template.Spec.Labels["test-label"] = "keep-me"
 					ms.Spec.Template.Spec.Labels["test-label-3"] = "preserve-me"
+					ms.Spec.Template.Labels["mach-label"] = "keep-me-too"
+					ms.Spec.Template.Labels["mach-label-3"] = "preserve-me-also"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "keep-me",
@@ -577,6 +601,13 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					"test-label-2": "test-value-2",
 					"test-label-1": "test-value-1",
 				}),
+				testmp.WithMachineLabels(map[string]string{
+					"mach-label-2": "mach-value-2",
+					"mach-label-1": "mach-value-1",
+					// Bonus: ignore conflicts with generated labels
+					capiClusterKey:    "bogus-cluster",
+					capiMachineSetKey: "bogus-machineset",
+				}),
 				testmp.WithTaints(corev1.Taint{
 					Key:    "test-taint",
 					Value:  "test-value",
@@ -589,6 +620,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
 					ms.Spec.Template.Spec.Labels["test-label-1"] = "test-value-1"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
+					ms.Spec.Template.Labels["mach-label-1"] = "mach-value-1"
+					ms.Spec.Template.Labels["mach-label-2"] = "mach-value-2"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",
@@ -605,6 +638,8 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
 					ms.Spec.Template.Spec.Labels["test-label-1"] = "test-value-1"
 					ms.Spec.Template.Spec.Labels["test-label-2"] = "test-value-2"
+					ms.Spec.Template.Labels["mach-label-1"] = "mach-value-1"
+					ms.Spec.Template.Labels["mach-label-2"] = "mach-value-2"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",
@@ -615,10 +650,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:              "Collapse of duplicate entries should result in an update",
+			name:              "Collapse of duplicate taints should result in an update",
 			clusterDeployment: testClusterDeployment(),
 			machinePool: testMachinePool(
 				testmp.WithLabels(map[string]string{"test-label": "test-value"}),
+				testmp.WithMachineLabels(map[string]string{"mach-label": "mach-value"}),
 				testmp.WithTaints(corev1.Taint{
 					Key:    "test-taint",
 					Value:  "test-value",
@@ -630,7 +666,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				func() *machineapi.MachineSet {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 0)
 					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
-					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Labels["mach-label"] = "mach-value"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",
@@ -651,6 +687,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				func() *machineapi.MachineSet {
 					ms := testMachineSet("foo-12345-worker-us-east-1a", "worker", true, 1, 1)
 					ms.Spec.Template.Spec.Labels["test-label"] = "test-value"
+					ms.Spec.Template.Labels["mach-label"] = "mach-value"
 					ms.Spec.Template.Spec.Taints = append(ms.Spec.Template.Spec.Taints, corev1.Taint{
 						Key:    "test-taint",
 						Value:  "test-value",
@@ -1329,6 +1366,13 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 							if !reflect.DeepEqual(eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels) {
 								t.Errorf("machineset %v machinespec has unexpected labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Labels, rMS.Spec.Template.Spec.Labels)
 							}
+							// Check machine labels.
+							// Account for nil vs empty map
+							if len(eMS.Spec.Template.Labels) != 0 && len(rMS.Spec.Template.Labels) != 0 {
+								if !reflect.DeepEqual(eMS.Spec.Template.Labels, rMS.Spec.Template.Labels) {
+									t.Errorf("machineset %v machinespec has unexpected machine labels:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Labels, rMS.Spec.Template.Labels)
+								}
+							}
 							// Taints are stored as a list, so sort them before comparing.
 							if !reflect.DeepEqual(sortedTaints(eMS.Spec.Template.Spec.Taints), sortedTaints(rMS.Spec.Template.Spec.Taints)) {
 								t.Errorf("machineset %v has unexpected taints:\nexpected: %v\nactual: %v", eMS.Name, eMS.Spec.Template.Spec.Taints, rMS.Spec.Template.Spec.Taints)
@@ -1389,10 +1433,11 @@ func sortedTaints(taints []corev1.Taint) []corev1.Taint {
 
 func TestUpdateOwnedLabelsTaints(t *testing.T) {
 	tests := []struct {
-		name                string
-		machinePool         *hivev1.MachinePool
-		expectedOwnedLabels []string
-		expectedOwnedTaints []hivev1.TaintIdentifier
+		name                       string
+		machinePool                *hivev1.MachinePool
+		expectedOwnedLabels        []string
+		expectedOwnedMachineLabels []string
+		expectedOwnedTaints        []hivev1.TaintIdentifier
 	}{
 		{
 			name: "Carry over labels from spec",
@@ -1401,8 +1446,13 @@ func TestUpdateOwnedLabelsTaints(t *testing.T) {
 					"test-label":              "test-value",
 					"a-smaller-sorting-label": "z-bigger-value",
 				}),
+				testmp.WithMachineLabels(map[string]string{
+					"mach-label":              "mach-value",
+					"a-smaller-sorting-label": "z-bigger-value",
+				}),
 			),
-			expectedOwnedLabels: []string{"a-smaller-sorting-label", "test-label"},
+			expectedOwnedLabels:        []string{"a-smaller-sorting-label", "test-label"},
+			expectedOwnedMachineLabels: []string{"a-smaller-sorting-label", "mach-label"},
 		},
 		{
 			name: "Carry over taints from spec",
@@ -1437,6 +1487,7 @@ func TestUpdateOwnedLabelsTaints(t *testing.T) {
 			name: "Remove duplicate taints",
 			machinePool: testMachinePoolWithoutLabelsTaints(
 				testmp.WithLabels(map[string]string{"test-label": "test-value"}),
+				testmp.WithMachineLabels(map[string]string{"mach-label": "mach-value"}),
 				testmp.WithTaints(
 					corev1.Taint{
 						Key:    "test-taint",
@@ -1450,7 +1501,8 @@ func TestUpdateOwnedLabelsTaints(t *testing.T) {
 					},
 				),
 			),
-			expectedOwnedLabels: []string{"test-label"},
+			expectedOwnedLabels:        []string{"test-label"},
+			expectedOwnedMachineLabels: []string{"mach-label"},
 			expectedOwnedTaints: []hivev1.TaintIdentifier{
 				{
 					Key:    "test-taint",
@@ -1467,6 +1519,12 @@ func TestUpdateOwnedLabelsTaints(t *testing.T) {
 			if assert.Equal(t, len(test.expectedOwnedLabels), len(actualMachinePoolStatus.OwnedLabels)) && len(actualMachinePoolStatus.OwnedLabels) > 0 {
 				if !reflect.DeepEqual(test.expectedOwnedLabels, actualMachinePoolStatus.OwnedLabels) {
 					t.Errorf("expected labels: %v, actual labels: %v", test.expectedOwnedLabels, actualMachinePoolStatus.OwnedLabels)
+				}
+			}
+			// Explicitly check the length to ensure there aren't any empty entries
+			if assert.Equal(t, len(test.expectedOwnedMachineLabels), len(actualMachinePoolStatus.OwnedMachineLabels)) && len(actualMachinePoolStatus.OwnedMachineLabels) > 0 {
+				if !reflect.DeepEqual(test.expectedOwnedMachineLabels, actualMachinePoolStatus.OwnedMachineLabels) {
+					t.Errorf("expected machine labels: %v, actual labels: %v", test.expectedOwnedMachineLabels, actualMachinePoolStatus.OwnedMachineLabels)
 				}
 			}
 			if assert.Equal(t, len(test.expectedOwnedTaints), len(actualMachinePoolStatus.OwnedTaints)) && len(actualMachinePoolStatus.OwnedTaints) > 0 {

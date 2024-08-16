@@ -5638,8 +5638,20 @@ objects:
                   additionalProperties:
                     type: string
                   description: Map of label string keys and values that will be applied
-                    to the created MachineSet's MachineSpec. This list will overwrite
-                    any modifications made to Node labels on an ongoing basis.
+                    to the created MachineSet's MachineSpec. This affects the labels
+                    that will end up on the *Nodes* (in contrast with the MachineLabels
+                    field). This list will overwrite any modifications made to Node
+                    labels on an ongoing basis.
+                  type: object
+                machineLabels:
+                  additionalProperties:
+                    type: string
+                  description: 'Map of label string keys and values that will be applied
+                    to the created MachineSet''s MachineTemplateSpec. This affects
+                    the labels that will end up on the *Machines* (in contrast with
+                    the Labels field). This list will overwrite any modifications
+                    made to Machine labels on an ongoing basis. Note: We ignore entries
+                    that conflict with generated labels.'
                   type: object
                 name:
                   description: Name is the name of the machine pool.
@@ -6230,9 +6242,19 @@ objects:
                   type: array
                 ownedLabels:
                   description: OwnedLabels lists the keys of labels this MachinePool
-                    created on the remote MachineSet. Used to identify labels to remove
-                    from the remote MachineSet when they are absent from the MachinePool's
+                    created on the remote MachineSet's MachineSpec. (In contrast with
+                    OwnedMachineLabels.) Used to identify labels to remove from the
+                    remote MachineSet when they are absent from the MachinePool's
                     spec.labels.
+                  items:
+                    type: string
+                  type: array
+                ownedMachineLabels:
+                  description: OwnedMachineLabels lists the keys of labels this MachinePool
+                    created on the remote MachineSet's MachineTemplateSpec. (In contrast
+                    with OwnedLabels.) Used to identify labels to remove from the
+                    remote MachineSet when they are absent from the MachinePool's
+                    spec.machineLabels.
                   items:
                     type: string
                   type: array

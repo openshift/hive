@@ -46,10 +46,19 @@ type MachinePoolSpec struct {
 	Platform MachinePoolPlatform `json:"platform"`
 
 	// Map of label string keys and values that will be applied to the created MachineSet's
-	// MachineSpec. This list will overwrite any modifications made to Node labels on an
-	// ongoing basis.
+	// MachineSpec. This affects the labels that will end up on the *Nodes* (in contrast with
+	// the MachineLabels field). This list will overwrite any modifications made to Node labels
+	// on an ongoing basis.
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
+
+	// Map of label string keys and values that will be applied to the created MachineSet's
+	// MachineTemplateSpec. This affects the labels that will end up on the *Machines* (in
+	// contrast with the Labels field). This list will overwrite any modifications made to
+	// Machine labels on an ongoing basis. Note: We ignore entries that conflict with
+	// generated labels.
+	// +optional
+	MachineLabels map[string]string `json:"machineLabels,omitempty"`
 
 	// List of taints that will be applied to the created MachineSet's MachineSpec.
 	// This list will overwrite any modifications made to Node taints on an ongoing basis.
@@ -101,11 +110,20 @@ type MachinePoolStatus struct {
 	// +optional
 	Conditions []MachinePoolCondition `json:"conditions,omitempty"`
 
-	// OwnedLabels lists the keys of labels this MachinePool created on the remote MachineSet.
+	// OwnedLabels lists the keys of labels this MachinePool created on the remote MachineSet's
+	// MachineSpec. (In contrast with OwnedMachineLabels.)
 	// Used to identify labels to remove from the remote MachineSet when they are absent from
 	// the MachinePool's spec.labels.
 	// +optional
 	OwnedLabels []string `json:"ownedLabels,omitempty"`
+
+	// OwnedMachineLabels lists the keys of labels this MachinePool created on the remote
+	// MachineSet's MachineTemplateSpec. (In contrast with OwnedLabels.)
+	// Used to identify labels to remove from the remote MachineSet when they are absent from
+	// the MachinePool's spec.machineLabels.
+	// +optional
+	OwnedMachineLabels []string `json:"ownedMachineLabels,omitempty"`
+
 	// OwnedTaints lists identifiers of taints this MachinePool created on the remote MachineSet.
 	// Used to identify taints to remove from the remote MachineSet when they are absent from
 	// the MachinePool's spec.taints.

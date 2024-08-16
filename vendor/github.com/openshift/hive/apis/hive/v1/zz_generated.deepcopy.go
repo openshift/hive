@@ -3067,6 +3067,13 @@ func (in *MachinePoolSpec) DeepCopyInto(out *MachinePoolSpec) {
 			(*out)[key] = val
 		}
 	}
+	if in.MachineLabels != nil {
+		in, out := &in.MachineLabels, &out.MachineLabels
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Taints != nil {
 		in, out := &in.Taints, &out.Taints
 		*out = make([]corev1.Taint, len(*in))
@@ -3106,6 +3113,11 @@ func (in *MachinePoolStatus) DeepCopyInto(out *MachinePoolStatus) {
 	}
 	if in.OwnedLabels != nil {
 		in, out := &in.OwnedLabels, &out.OwnedLabels
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.OwnedMachineLabels != nil {
+		in, out := &in.OwnedMachineLabels, &out.OwnedMachineLabels
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

@@ -52,6 +52,14 @@ var (
 		defaultReplicas: 1,
 		hashAnnotation:  "hive.openshift.io/machinepool-statefulset-spec-hash",
 		containerCustomization: func(hc *hivev1.HiveConfig, c *corev1.Container) {
+			if machinePoolPollInterval := hc.Spec.MachinePoolPollInterval; machinePoolPollInterval != "" {
+				machinePoolPollIntervalEnvVar := corev1.EnvVar{
+					Name:  constants.MachinePoolPollIntervalEnvVar,
+					Value: machinePoolPollInterval,
+				}
+
+				c.Env = append(c.Env, machinePoolPollIntervalEnvVar)
+			}
 			if awssp := hc.Spec.ServiceProviderCredentialsConfig.AWS; awssp != nil && awssp.CredentialsSecretRef.Name != "" {
 				c.Env = append(c.Env, corev1.EnvVar{
 					Name:  constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar,

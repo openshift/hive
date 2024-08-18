@@ -140,7 +140,7 @@ func Add(mgr manager.Manager) error {
 		var err error
 		pollInterval, err = time.ParseDuration(envPollInterval)
 		if err != nil {
-			log.WithError(err).WithField("reapplyInterval", envPollInterval).Errorf("unable to parse %s", constants.SyncSetReapplyIntervalEnvVar)
+			log.WithError(err).WithField("reapplyInterval", envPollInterval).Errorf("unable to parse %s", constants.MachinePoolPollIntervalEnvVar)
 			return err
 		}
 	}

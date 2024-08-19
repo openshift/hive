@@ -139,6 +139,8 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Env = append(hiveContainer.Env, syncsetReapplyIntervalEnvVar)
 	}
 
+	// TODO: Can this be removed? Is it still possible to deploy the machinepool controller in-band with
+	// hive-controllers?
 	if machinePoolPollInterval := instance.Spec.MachinePoolPollInterval; machinePoolPollInterval != "" {
 		machinePoolPollIntervalEnvVar := corev1.EnvVar{
 			Name:  constants.MachinePoolPollIntervalEnvVar,

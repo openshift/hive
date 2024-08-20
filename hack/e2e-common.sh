@@ -124,13 +124,17 @@ function wait_for_namespace {
 
 function save_hive_logs() {
   tmpf=$(mktemp)
-  for x in "hive-controllers ${HIVE_NS}" "hiveadmission ${HIVE_NS}" "hive-operator ${HIVE_OPERATOR_NS}"; do
-    read d n <<<$x
+  for x in  "deploy  hive-controllers  ${HIVE_NS}" \
+            "deploy  hiveadmission     ${HIVE_NS}" \
+            "sts     hive-clustersync  ${HIVE_NS}" \
+            "sts     hive-machinepool  ${HIVE_NS}" \
+            "deploy  hive-operator     ${HIVE_OPERATOR_NS}"; do
+    read k d n <<<$x
     # Don't save/overwrite the file unless log extraction succeeds
-    if oc logs -n $n deployment/$d > $tmpf; then
+    if oc logs -n $n $k/$d > $tmpf; then
       mv $tmpf "${ARTIFACT_DIR}/${d}.log"
     fi
-    # If deployments' pods didn't start, the above won't produce logs; but these statuses may hint why.
+    # If deployment/statefulset pods didn't start, the above won't produce logs; but these statuses may hint why.
     for n in ${HIVE_NS} ${HIVE_OPERATOR_NS}; do
       if oc describe po -n $n > $tmpf; then
         mv $tmpf "${ARTIFACT_DIR}/describe-po-in-ns-${n}.txt"

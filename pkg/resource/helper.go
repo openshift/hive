@@ -66,11 +66,12 @@ func (r *helper) cacheOpenAPISchema() error {
 }
 
 // NewHelperFromRESTConfig returns a new object that allows apply and patch operations
-func NewHelperFromRESTConfig(restConfig *rest.Config, logger log.FieldLogger) (Helper, error) {
+func NewHelperFromRESTConfig(restConfig *rest.Config, controllerName hivev1.ControllerName, logger log.FieldLogger) (Helper, error) {
 	r := &helper{
-		logger:     logger,
-		cacheDir:   getCacheDir(logger),
-		restConfig: restConfig,
+		logger:         logger,
+		cacheDir:       getCacheDir(logger),
+		restConfig:     restConfig,
+		controllerName: controllerName,
 	}
 	r.getFactory = r.getRESTConfigFactory
 	err := r.cacheOpenAPISchema()

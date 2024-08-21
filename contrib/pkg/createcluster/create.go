@@ -513,7 +513,7 @@ func (o *Options) Run() error {
 		printObjects(objs, scheme, printer)
 		return err
 	}
-	rh, err := utils.GetResourceHelper(o.log)
+	rh, err := utils.GetResourceHelper("util-create-cluster", o.log)
 	if err != nil {
 		return err
 	}

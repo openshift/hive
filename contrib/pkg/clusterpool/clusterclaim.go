@@ -54,7 +54,7 @@ func (o ClusterClaimOptions) run() error {
 	scheme := scheme.GetScheme()
 	claim := o.generateClaim()
 
-	rh, err := utils.GetResourceHelper(o.log)
+	rh, err := utils.GetResourceHelper("util-clusterpool-clusterclaim", o.log)
 	if err != nil {
 		return err
 	}

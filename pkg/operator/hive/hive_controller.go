@@ -148,6 +148,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+	// This client isn't currently used for write-y things, but future-proof it:
+	tempClient = client.WithFieldOwner(tempClient, hiveOperatorDeploymentName)
 
 	hiveOperatorNS := os.Getenv(HiveOperatorNamespaceEnvVar)
 	r.(*ReconcileHiveConfig).hiveOperatorNamespace = hiveOperatorNS
@@ -394,7 +396,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	h, err := resource.NewHelperFromRESTConfig(r.restConfig, hLog)
+	h, err := resource.NewHelperFromRESTConfig(r.restConfig, "operator", hLog)
 	if err != nil {
 		hLog.WithError(err).Error("error creating resource helper")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorCreatingResourceHelper", err.Error())
@@ -740,7 +742,9 @@ func (r *ReconcileHiveConfig) updateHiveConfigStatus(origHiveConfig, newHiveConf
 	}
 	var usNewHiveConfig unstructured.Unstructured
 	usNewHiveConfig.SetUnstructuredContent(content)
-	usUpdated, err := hiveConfigClient.UpdateStatus(context.TODO(), &usNewHiveConfig, metav1.UpdateOptions{})
+	usUpdated, err := hiveConfigClient.UpdateStatus(context.TODO(), &usNewHiveConfig, metav1.UpdateOptions{
+		FieldManager: hiveOperatorDeploymentName,
+	})
 	if err != nil {
 		logger.WithError(err).Error("failed to update HiveConfig status")
 		return err

@@ -74,7 +74,7 @@ func NewClientWithMetricsOrDie(mgr manager.Manager, ctrlrName hivev1.ControllerN
 		log.WithError(err).Fatal("unable to initialize metrics wrapped client")
 	}
 
-	return dc
+	return client.WithFieldOwner(dc, "hive1-"+string(ctrlrName))
 }
 
 // AddControllerMetricsTransportWrapper adds a transport wrapper to the given rest config which

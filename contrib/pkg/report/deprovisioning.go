@@ -37,7 +37,7 @@ func NewDeprovisioningReportCommand() *cobra.Command {
 				return
 			}
 
-			dynClient, err := contributils.GetClient()
+			dynClient, err := contributils.GetClient("hiveutil-report-deprovisioning")
 			if err != nil {
 				log.WithError(err).Fatal("error creating kube clients")
 			}

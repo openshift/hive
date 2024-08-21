@@ -67,7 +67,7 @@ func completeAzureUninstaller(logLevel, cloudName, resourceGroupName string, arg
 		return nil, err
 	}
 
-	client, err := utils.GetClient()
+	client, err := utils.GetClient("hiveutil-deprovision-azure")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get client")
 	}

@@ -64,7 +64,7 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []s
 		return err
 	}
 
-	client, err := utils.GetClient()
+	client, err := utils.GetClient("hiveutil-aws-tag-deprovision")
 	if err != nil {
 		o.Logger.Warnf("Failed to get client: %v\n"+
 			"This is expected when in standalone mode. "+

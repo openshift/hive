@@ -231,7 +231,7 @@ func (o *ClusterPoolOptions) run() error {
 		return err
 	}
 
-	rh, err := utils.GetResourceHelper(o.log)
+	rh, err := utils.GetResourceHelper("util-clusterpool", o.log)
 	if err != nil {
 		return err
 	}

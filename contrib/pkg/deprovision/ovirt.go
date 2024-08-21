@@ -48,7 +48,7 @@ func NewDeprovisionOvirtCommand() *cobra.Command {
 func (o *oVirtOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.infraID = args[0]
 
-	client, err := utils.GetClient()
+	client, err := utils.GetClient("hiveutil-deprovision-ovirt")
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}

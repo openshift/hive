@@ -73,7 +73,7 @@ func getDynamicClient() client.Client {
 		log.WithError(err).Fatal("Failed to add Openshift configv1 types to the default scheme")
 	}
 
-	dynClient, err := hiveutils.GetClient()
+	dynClient, err := hiveutils.GetClient("hiveutil-awsprivatelink")
 	if err != nil {
 		log.WithError(err).Fatal("Failed to create controller-runtime client")
 	}

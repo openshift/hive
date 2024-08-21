@@ -190,7 +190,7 @@ SSH_PRIV_KEY_PATH: File system path of a file containing the SSH private key cor
 			}
 
 			var err error
-			im.DynamicClient, err = contributils.GetClient()
+			im.DynamicClient, err = contributils.GetClient("hiveutil-installmanager")
 			if err != nil {
 				im.log.WithError(err).Fatal("error creating kube clients")
 			}

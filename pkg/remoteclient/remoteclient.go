@@ -212,9 +212,13 @@ func (b *builder) Build() (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return client.New(cfg, client.Options{
+	c, err := client.New(cfg, client.Options{
 		Scheme: scheme.GetScheme(),
 	})
+	if err != nil {
+		return nil, err
+	}
+	return client.WithFieldOwner(c, "hive2-"+string(b.controllerName)), nil
 }
 
 func (b *builder) BuildDynamic() (dynamic.Interface, error) {

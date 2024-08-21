@@ -832,7 +832,7 @@ func TestReconcileClusterRelocate_Reconcile_Movement(t *testing.T) {
 			reconciler := &ReconcileClusterRelocate{
 				Client: srcClient,
 				logger: logger,
-				remoteClusterAPIClientBuilder: func(secret *corev1.Secret) remoteclient.Builder {
+				remoteClusterAPIClientBuilder: func(secret *corev1.Secret, cn hivev1.ControllerName) remoteclient.Builder {
 					assert.Equal(t, kubeconfigSecret, secret, "unexpected secret passed to remote client builder")
 					return mockRemoteClientBuilder
 				},
@@ -1190,7 +1190,7 @@ func TestReconcileClusterRelocate_Reconcile_RelocateStatus(t *testing.T) {
 			reconciler := &ReconcileClusterRelocate{
 				Client: srcClient,
 				logger: logger,
-				remoteClusterAPIClientBuilder: func(secret *corev1.Secret) remoteclient.Builder {
+				remoteClusterAPIClientBuilder: func(secret *corev1.Secret, cn hivev1.ControllerName) remoteclient.Builder {
 					assert.Equal(t, kubeconfigSecret, secret, "unexpected secret passed to remote client builder")
 					return mockRemoteClientBuilder
 				},

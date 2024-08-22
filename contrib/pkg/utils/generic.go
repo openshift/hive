@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -199,6 +200,10 @@ func ProjectToDir(obj client.Object, dir string, filter ProjectToDirFileFilter) 
 			return
 		}
 		path := filepath.Join(dir, filename)
+		// Unlink if present, in case this is a recycled pod
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.WithError(err).WithField("path", path).Fatal("Failed to remove existing file")
+		}
 		if err := os.WriteFile(path, newBytes, 0400); err != nil {
 			log.WithError(err).WithField("path", path).Fatal("Failed to write file")
 		}

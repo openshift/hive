@@ -71,8 +71,11 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			Azure: &installertypesazure.Platform{
-				Region:            cd.Spec.Platform.Azure.Region,
-				ResourceGroupName: rg,
+				Region:                   cd.Spec.Platform.Azure.Region,
+				ResourceGroupName:        rg,
+				NetworkResourceGroupName: pool.Spec.Platform.Azure.NetworkResourceGroupName,
+				VirtualNetwork:           pool.Spec.Platform.Azure.VirtualNetwork,
+				ComputeSubnet:            pool.Spec.Platform.Azure.ComputeSubnet,
 			},
 		},
 	}

@@ -5646,7 +5646,9 @@ objects:
                   type: string
                 platform:
                   description: Platform is configuration for machine pool specific
-                    to the platform.
+                    to the platform. When using a MachinePool to control the default
+                    worker machines created by installer, these must match the values
+                    provided in the install-config.
                   properties:
                     aws:
                       description: AWS is the configuration used when installing on
@@ -5748,6 +5750,16 @@ objects:
                       description: Azure is the configuration used when installing
                         on Azure.
                       properties:
+                        computeSubnet:
+                          description: ComputeSubnet specifies an existing subnet
+                            for use by compute nodes. If omitted, the default (${infraID}-worker-subnet)
+                            will be used.
+                          type: string
+                        networkResourceGroupName:
+                          description: NetworkResourceGroupName specifies the network
+                            resource group that contains an existing VNet. Ignored
+                            unless VirtualNetwork is also specified.
+                          type: string
                         osDisk:
                           description: OSDisk defines the storage for instance.
                           properties:
@@ -5813,6 +5825,11 @@ objects:
                         type:
                           description: InstanceType defines the azure instance type.
                             eg. Standard_DS_V2
+                          type: string
+                        virtualNetwork:
+                          description: VirtualNetwork specifies the name of an existing
+                            VNet for the Machines to use If omitted, the default (${infraID}-vnet)
+                            will be used.
                           type: string
                         zones:
                           description: Zones is list of availability zones that can

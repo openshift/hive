@@ -59,6 +59,8 @@ const (
 	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
 	defaultPollInterval        = 30 * time.Minute
 	stsName                    = hivev1.DeploymentNameMachinepool
+	capiClusterKey             = "machine.openshift.io/cluster-api-cluster"
+	capiMachineSetKey          = "machine.openshift.io/cluster-api-machineset"
 )
 
 var (
@@ -497,6 +499,7 @@ func (r *ReconcileMachinePool) generateMachineSets(
 		ms.Labels[constants.HiveManagedLabel] = "true"
 
 		// Apply hive MachinePool labels to MachineSet MachineSpec.
+		// (These end up on *Nodes*.)
 		ms.Spec.Template.Spec.ObjectMeta.Labels = make(map[string]string, len(pool.Spec.Labels))
 		for key, value := range pool.Spec.Labels {
 			ms.Spec.Template.Spec.ObjectMeta.Labels[key] = value
@@ -504,6 +507,22 @@ func (r *ReconcileMachinePool) generateMachineSets(
 
 		// Apply hive MachinePool taints to MachineSet MachineSpec. Also collapse duplicates if present.
 		ms.Spec.Template.Spec.Taints = *controllerutils.GetUniqueTaints(&pool.Spec.Taints)
+
+		// Merge any user-specified labels to MachineSet MachineTemplateSpec.
+		// (These end up on *Machines*.)
+		if len(ms.Spec.Template.ObjectMeta.Labels) == 0 {
+			// This should never actually happen, as the generators (for all platforms)
+			// add labels and corresponding selectors used by MAPI.
+			ms.Spec.Template.ObjectMeta.Labels = pool.Spec.MachineLabels
+		} else {
+			for k, v := range pool.Spec.MachineLabels {
+				// Don't allow the user to shoot themselves in the foot by overriding generated labels.
+				if _, exists := ms.Spec.Template.ObjectMeta.Labels[k]; exists {
+					continue
+				}
+				ms.Spec.Template.ObjectMeta.Labels[k] = v
+			}
+		}
 	}
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
@@ -681,6 +700,11 @@ func (r *ReconcileMachinePool) syncMachineSets(
 	for labelKey := range pool.Spec.Labels {
 		labelsToDelete.Delete(labelKey)
 	}
+	machineLabelsToDelete := sets.Set[string]{}
+	machineLabelsToDelete.Insert(pool.Status.OwnedMachineLabels...)
+	for labelKey := range pool.Spec.MachineLabels {
+		machineLabelsToDelete.Delete(labelKey)
+	}
 	taintsToDelete := sets.Set[hivev1.TaintIdentifier]{}
 	taintsToDelete.Insert(pool.Status.OwnedTaints...)
 	for _, taint := range pool.Spec.Taints {
@@ -706,6 +730,7 @@ func (r *ReconcileMachinePool) syncMachineSets(
 				// Rename generated MachineSet if there is a name mismatch
 				// The rename doesn't currently serve a functional purpose, but may assist in future cases where it gets used.
 				// TODO: Determine how to handle a case where a remote machineSet has the same name as a different (non-matching) generated machineSet.
+				// In particular, this would result in a discrepancy in the machine.openshift.io/cluster-api-machineset label!
 				ms.Name = rMS.Name
 				resourcemerge.EnsureObjectMeta(&objectMetaModified, &rMS.ObjectMeta, ms.ObjectMeta)
 				msLog := logger.WithField("machineset", rMS.Name)
@@ -743,23 +768,39 @@ func (r *ReconcileMachinePool) syncMachineSets(
 					}
 				}
 
-				// Carry over the labels on the remote machineset from the generated machineset. Merging strategy preserves the unique labels of remote machineset.
-				if rMS.Spec.Template.Spec.Labels == nil {
-					rMS.Spec.Template.Spec.Labels = make(map[string]string)
-				}
-				// First delete the labels that need to be deleted, then sync the remoteMachineSet labels with that of the generatedMachineSet.
-				for key := range rMS.Spec.Template.Spec.Labels {
-					if labelsToDelete.Has(key) {
-						// Safe to delete while iterating as long as we're deleting the key for this iteration.
-						delete(rMS.Spec.Template.Spec.Labels, key)
-						objectMetaModified = true
+				mergeLabels := func(rLabels, gLabels map[string]string, labelsToDelete sets.Set[string]) (map[string]string, bool) {
+					mod := false
+					// Carry over the labels on the remote machineset from the generated machineset. Merging strategy preserves the unique labels of remote machineset.
+					if rLabels == nil {
+						rLabels = make(map[string]string)
 					}
-				}
-				for key, value := range ms.Spec.Template.Spec.Labels {
-					if val, ok := rMS.Spec.Template.Spec.Labels[key]; !ok || val != value {
-						rMS.Spec.Template.Spec.Labels[key] = value
-						objectModified = true
+					// First delete the labels that need to be deleted, then sync the remoteMachineSet labels with that of the generatedMachineSet.
+					for key := range rLabels {
+						if labelsToDelete.Has(key) {
+							// Safe to delete while iterating as long as we're deleting the key for this iteration.
+							delete(rLabels, key)
+							mod = true
+						}
 					}
+					for key, value := range gLabels {
+						if val, ok := rLabels[key]; !ok || val != value {
+							// Special case! If we matched despite a name conflict, do not update the cluster-api-machineset
+							// label, as it must match the *remote* machineset name.
+							if key == capiMachineSetKey {
+								continue
+							}
+							rLabels[key] = value
+							mod = true
+						}
+					}
+					return rLabels, mod
+				}
+				var mod bool
+				if rMS.Spec.Template.Spec.Labels, mod = mergeLabels(rMS.Spec.Template.Spec.Labels, ms.Spec.Template.Spec.Labels, labelsToDelete); mod {
+					objectModified = true
+				}
+				if rMS.Spec.Template.Labels, mod = mergeLabels(rMS.Spec.Template.Labels, ms.Spec.Template.Labels, machineLabelsToDelete); mod {
+					objectModified = true
 				}
 
 				// Carry over the taints on the remote machineset from the generated machineset. Merging strategy preserves the unique taints of remote machineset.
@@ -1111,14 +1152,20 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 // updateOwnedLabelsAndTaints updates OwnedLabels and OwnedTaints in the MachinePool.Status, by fetching the relevant entries sans duplicates from MachinePool.Spec.
 func updateOwnedLabelsAndTaints(pool *hivev1.MachinePool) hivev1.MachinePoolStatus {
 	// Update our tracked labels...
-	ownedLabels := make([]string, len(pool.Spec.Labels))
-	i := 0
-	for labelKey := range pool.Spec.Labels {
-		ownedLabels[i] = labelKey
-		i++
+	getOwnedLabels := func(labels map[string]string) []string {
+		ownedLabels := make([]string, len(labels))
+		i := 0
+		for labelKey := range labels {
+			ownedLabels[i] = labelKey
+			i++
+		}
+		sort.Strings(ownedLabels)
+		return ownedLabels
 	}
-	sort.Strings(ownedLabels)
-	pool.Status.OwnedLabels = ownedLabels
+	pool.Status.OwnedLabels = getOwnedLabels(pool.Spec.Labels)
+	// NOTE: This only claims "ownership" of user-specified labels. Generated labels
+	// will be asserted regardless.
+	pool.Status.OwnedMachineLabels = getOwnedLabels(pool.Spec.MachineLabels)
 
 	// ...and taints
 	uniqueTaints := *controllerutils.GetUniqueTaints(&pool.Spec.Taints)

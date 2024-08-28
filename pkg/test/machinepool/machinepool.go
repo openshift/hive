@@ -174,6 +174,22 @@ func WithLabels(labels map[string]string) Option {
 	}
 }
 
+// WithMachineLabels returns an Option that *adds* labels on the target MachinePool's
+// *Spec* (not its metadata!)
+// Existing labels are not removed. When keys conflict, those given in the most
+// recent WithMachineLabels will win.
+func WithMachineLabels(labels map[string]string) Option {
+	return func(mp *hivev1.MachinePool) {
+		if mp.Spec.MachineLabels == nil {
+			mp.Spec.MachineLabels = labels
+		} else {
+			for k, v := range labels {
+				mp.Spec.MachineLabels[k] = v
+			}
+		}
+	}
+}
+
 // WithOwnedLabels returns an Option that *appends* labelKeys to the target's
 // Status.OwnedLabels. Existing keys are not removed. You are responsible for
 // avoiding duplicates.
@@ -183,6 +199,19 @@ func WithOwnedLabels(labelKeys ...string) Option {
 			mp.Status.OwnedLabels = labelKeys
 		} else {
 			mp.Status.OwnedLabels = append(mp.Status.OwnedLabels, labelKeys...)
+		}
+	}
+}
+
+// WithOwnedMachineLabels returns an Option that *appends* labelKeys to the target's
+// Status.OwnedMachineLabels. Existing keys are not removed. You are responsible for
+// avoiding duplicates.
+func WithOwnedMachineLabels(labelKeys ...string) Option {
+	return func(mp *hivev1.MachinePool) {
+		if mp.Status.OwnedMachineLabels == nil {
+			mp.Status.OwnedMachineLabels = labelKeys
+		} else {
+			mp.Status.OwnedMachineLabels = append(mp.Status.OwnedMachineLabels, labelKeys...)
 		}
 	}
 }

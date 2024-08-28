@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
@@ -307,7 +305,13 @@ func (r *ReconcileAWSPrivateLink) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, nil
 	}
 
-	return r.reconcilePrivateLink(cd, &hivev1.ClusterMetadata{InfraID: *cp.Spec.InfraID, AdminKubeconfigSecretRef: *cp.Spec.AdminKubeconfigSecretRef}, logger)
+	return r.reconcilePrivateLink(
+		cd,
+		&hivev1.ClusterMetadata{
+			InfraID:                  *cp.Spec.InfraID,
+			AdminKubeconfigSecretRef: *cp.Spec.AdminKubeconfigSecretRef, // HIVE-2585: via ClusterMetadata
+		},
+		logger)
 }
 
 // shouldSync returns if we should sync the desired ClusterDeployment. If it returns false, it also returns
@@ -539,7 +543,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 
 	// Figure out the API address for cluster.
 	apiDomain, err := initialURL(r.Client,
-		client.ObjectKey{Namespace: cd.Namespace, Name: clusterMetadata.AdminKubeconfigSecretRef.Name})
+		client.ObjectKey{Namespace: cd.Namespace, Name: clusterMetadata.AdminKubeconfigSecretRef.Name}) // HIVE-2485 ✓
 	if err != nil {
 		logger.WithError(err).Error("could not get API URL from kubeconfig")
 
@@ -1274,7 +1278,7 @@ func newAWSClient(r *ReconcileAWSPrivateLink, cd *hivev1.ClusterDeployment) (*aw
 			},
 			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
 				SecretRef: corev1.SecretReference{
-					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Name:      controllerutils.AWSServiceProviderSecretName(""),
 					Namespace: controllerutils.GetHiveNamespace(),
 				},
 				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
@@ -1309,7 +1313,7 @@ func initialURL(c client.Client, key client.ObjectKey) (string, error) {
 	); err != nil {
 		return "", err
 	}
-	cfg, err := restConfigFromSecret(kubeconfigSecret)
+	cfg, err := controllerutils.RestConfigFromSecret(kubeconfigSecret, true)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to load the kubeconfig")
 	}
@@ -1319,22 +1323,6 @@ func initialURL(c client.Client, key client.ObjectKey) (string, error) {
 		return "", err
 	}
 	return strings.TrimSuffix(u.Hostname(), "."), nil
-}
-
-func restConfigFromSecret(kubeconfigSecret *corev1.Secret) (*rest.Config, error) {
-	kubeconfigData := kubeconfigSecret.Data[constants.RawKubeconfigSecretKey]
-	if len(kubeconfigData) == 0 {
-		kubeconfigData = kubeconfigSecret.Data[constants.KubeconfigSecretKey]
-	}
-	if len(kubeconfigData) == 0 {
-		return nil, errors.New("kubeconfig secret does not contain necessary data")
-	}
-	config, err := clientcmd.Load(kubeconfigData)
-	if err != nil {
-		return nil, err
-	}
-	kubeConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
-	return kubeConfig.ClientConfig()
 }
 
 // awsErrCodeEquals returns true if the error matches all these conditions:

@@ -1,6 +1,7 @@
 package remoteclient
 
 import (
+	"github.com/openshift/hive/pkg/controller/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
@@ -75,5 +76,5 @@ func (b *kubeconfigBuilder) UseSecondaryAPIURL() Builder {
 }
 
 func (b *kubeconfigBuilder) RESTConfig() (*rest.Config, error) {
-	return restConfigFromSecret(b.secret)
+	return utils.RestConfigFromSecret(b.secret, false)
 }

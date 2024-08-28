@@ -548,7 +548,7 @@ func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(claim *hivev1.ClusterCla
 				APIGroups: []string{corev1.GroupName},
 				Resources: []string{"secrets"},
 				ResourceNames: []string{
-					cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name,
+					cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, // HIVE-2485: n/a
 					cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name,
 				},
 				Verbs: []string{"get"},

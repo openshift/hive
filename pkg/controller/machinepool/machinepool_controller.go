@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -1111,7 +1110,7 @@ func (r *ReconcileMachinePool) createActuator(
 			AssumeRole: &awsclient.AssumeRoleCredentialsSource{
 				SecretRef: corev1.SecretReference{
 					Namespace: controllerutils.GetHiveNamespace(),
-					Name:      os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar),
+					Name:      controllerutils.AWSServiceProviderSecretName(""),
 				},
 				Role: cd.Spec.Platform.AWS.CredentialsAssumeRole,
 			},

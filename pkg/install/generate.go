@@ -3,7 +3,7 @@ package install
 import (
 	"context"
 	"fmt"
-	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -14,6 +14,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,7 +50,7 @@ func AWSAssumeRoleSecretName(secretPrefix string) string {
 func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, envVars []corev1.EnvVar, owner metav1.Object, scheme *runtime.Scheme) error {
 	hiveNS := controllerutils.GetHiveNamespace()
 
-	spSecretName := os.Getenv(constants.HiveAWSServiceProviderCredentialsSecretRefEnvVar)
+	spSecretName := controllerutils.AWSServiceProviderSecretName("")
 	if spSecretName == "" {
 		// If the src secret reference wasn't found, then don't attempt to copy the secret.
 		return nil
@@ -73,42 +74,79 @@ func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, en
 	return controllerutils.CopySecret(client, src, dest, owner, scheme)
 }
 
-// AWSAssumeRoleCLIConfig creates a secret that can assume the role using the hiveutil
-// credential_process helper.
-func AWSAssumeRoleCLIConfig(client client.Client, role *hivev1aws.AssumeRole, secretName, secretNamespace string, owner metav1.Object, scheme *runtime.Scheme) error {
-	cmd := "/usr/bin/hiveutil"
-	args := []string{"install-manager", "aws-credentials"}
-	args = append(args, []string{"--namespace", secretNamespace}...)
-	args = append(args, []string{"--role-arn", role.RoleARN}...)
-	if role.ExternalID != "" {
-		args = append(args, []string{"--external-id", role.ExternalID}...)
-	}
+// AWSAssumeRoleConfig creates or updates a secret with an AWS credentials file containing:
+// - Role configuration for AssumeRole, pointing to...
+// - A profile containing the source credentials for AssumeRole.
+func AWSAssumeRoleConfig(client client.Client, role *hivev1aws.AssumeRole, secretName, secretNamespace string, owner metav1.Object, scheme *runtime.Scheme) error {
 
-	cmd = fmt.Sprintf("%s %s", cmd, strings.Join(args, " "))
-
-	template := `[default]
-credential_process = %s
-`
-	data := fmt.Sprintf(template, cmd)
-
-	secret := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: corev1.SchemeGroupVersion.String(),
-			Kind:       "Secret",
-		},
-		ObjectMeta: metav1.ObjectMeta{
+	// Credentials source
+	credsSecret := &corev1.Secret{}
+	credsSecretName := controllerutils.AWSServiceProviderSecretName(owner.GetName())
+	if err := client.Get(
+		context.TODO(),
+		types.NamespacedName{
 			Namespace: secretNamespace,
-			Name:      secretName,
+			Name:      credsSecretName,
 		},
-		Data: map[string][]byte{
-			constants.AWSConfigSecretKey: []byte(data),
-		},
+		credsSecret); err != nil {
+		return errors.Wrapf(err, "failed to load credentials source secret %s", credsSecretName)
 	}
-	if err := controllerutil.SetOwnerReference(owner, secret, scheme); err != nil {
+	// The old credential_process flow documented creating this with [default].
+	// For backward compatibility, accept that, but convert to [profile source].
+	sourceProfile := strings.Replace(string(credsSecret.Data[constants.AWSConfigSecretKey]), `[default]`, `[profile source]`, 1)
+
+	extID := ""
+	if role.ExternalID != "" {
+		extID = fmt.Sprintf("external_id = %s\n", role.ExternalID)
+	}
+
+	// Build the config file
+	configFile := fmt.Sprintf(`[default]
+source_profile = source
+role_arn = %s
+%s
+%s
+`,
+		role.RoleARN, extID, sourceProfile)
+
+	// Load the config secret if it already exists
+	configSecret := &corev1.Secret{}
+	if err := client.Get(context.TODO(), types.NamespacedName{Namespace: secretNamespace, Name: secretName}, configSecret); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return errors.Wrapf(err, "failed to load config secret %s", secretName)
+		}
+		// Not found -- build it
+		configSecret = &corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: corev1.SchemeGroupVersion.String(),
+				Kind:       "Secret",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: secretNamespace,
+				Name:      secretName,
+			},
+			Data: map[string][]byte{
+				constants.AWSConfigSecretKey: []byte(configFile),
+			},
+		}
+		if err := controllerutil.SetOwnerReference(owner, configSecret, scheme); err != nil {
+			return err
+		}
+		return client.Create(context.TODO(), configSecret)
+	}
+
+	// Secret exists -- do we need to update it? Compare data and owner references.
+	origSecret := configSecret.DeepCopy()
+	configSecret.Data[constants.AWSConfigSecretKey] = []byte(configFile)
+	// SetOwnerReference is a no-op if the owner is already registered
+	if err := controllerutil.SetOwnerReference(owner, configSecret, scheme); err != nil {
+		return err
+	}
+	if reflect.DeepEqual(origSecret, configSecret) {
 		return nil
 	}
 
-	return client.Create(context.TODO(), secret)
+	return client.Update(context.TODO(), configSecret)
 }
 
 // InstallerPodSpec generates a spec for an installer pod.

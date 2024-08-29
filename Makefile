@@ -22,7 +22,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 DOCKER_CMD ?= docker
 CONTAINER_BUILD_FLAGS ?= --file ./Dockerfile
 
-GOCACHE ?= $(shell go env GOCACHE)
+GOCACHE ?= $(shell C=`go env GOCACHE`; [[ -d $$C ]] && echo $$C)
 
 ifneq ($(GOCACHE),)
 GOCACHE_VOL_ARG = --volume "${GOCACHE}:/go/.cache:z"

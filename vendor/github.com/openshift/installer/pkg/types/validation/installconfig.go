@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	dockerref "github.com/containers/image/docker/reference"
+	dockerref "github.com/containers/image/v5/docker/reference"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -21,6 +21,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operv1 "github.com/openshift/api/operator/v1"
+	"github.com/openshift/installer/pkg/hostcrypt"
 	"github.com/openshift/installer/pkg/ipnet"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/alibabacloud"
@@ -68,13 +69,11 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 		return field.ErrorList{field.Invalid(field.NewPath("apiVersion"), c.TypeMeta.APIVersion, fmt.Sprintf("install-config version must be %q", types.InstallConfigVersion))}
 	}
 
-	if c.SSHKey != "" {
-		if c.FIPS == true {
-			allErrs = append(allErrs, validateFIPSconfig(c)...)
-		} else {
-			if err := validate.SSHPublicKey(c.SSHKey); err != nil {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), c.SSHKey, err.Error()))
-			}
+	if c.FIPS {
+		allErrs = append(allErrs, validateFIPSconfig(c)...)
+	} else if c.SSHKey != "" {
+		if err := validate.SSHPublicKey(c.SSHKey); err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), c.SSHKey, err.Error()))
 		}
 	}
 
@@ -141,7 +140,7 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 		allErrs = append(allErrs, field.Invalid(field.NewPath("imageContentSources"), c.Publish, "cannot set imageContentSources and imageDigestSources at the same time"))
 	}
 	if len(c.DeprecatedImageContentSources) != 0 {
-		logrus.Warningln("imageContentSources is deprecated, please use ImageDigestSource")
+		logrus.Warningln("imageContentSources is deprecated, please use ImageDigestSources")
 	}
 	allErrs = append(allErrs, validateCloudCredentialsMode(c.CredentialsMode, field.NewPath("credentialsMode"), c.Platform)...)
 	if c.Capabilities != nil {
@@ -153,6 +152,16 @@ func ValidateInstallConfig(c *types.InstallConfig, usingAgentMethod bool) field.
 		case aws.Name, azure.Name, gcp.Name, alibabacloud.Name, ibmcloud.Name, powervs.Name:
 		default:
 			allErrs = append(allErrs, field.Invalid(field.NewPath("publish"), c.Publish, fmt.Sprintf("Internal publish strategy is not supported on %q platform", platformName)))
+		}
+	}
+
+	if c.Capabilities != nil {
+		if c.Capabilities.BaselineCapabilitySet == configv1.ClusterVersionCapabilitySetNone {
+			enabledCaps := sets.New[configv1.ClusterVersionCapability](c.Capabilities.AdditionalEnabledCapabilities...)
+			if enabledCaps.Has(configv1.ClusterVersionCapabilityBaremetal) && !enabledCaps.Has(configv1.ClusterVersionCapabilityMachineAPI) {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("additionalEnabledCapabilities"), c.Capabilities.AdditionalEnabledCapabilities,
+					"the baremetal capability requires the MachineAPI capability"))
+			}
 		}
 	}
 
@@ -315,8 +324,12 @@ func validateNetworking(n *types.Networking, singleNodeOpenShift bool, fldPath *
 		allErrs = append(allErrs, field.Required(fldPath.Child("networkType"), "network provider type required"))
 	}
 
-	if singleNodeOpenShift && n.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("networkType"), n.NetworkType, "networkType OpenShiftSDN is currently not supported on Single Node OpenShift"))
+	if n.NetworkType == string(operv1.NetworkTypeOpenShiftSDN) {
+		if singleNodeOpenShift {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("networkType"), n.NetworkType, "networkType OpenShiftSDN is currently not supported on Single Node OpenShift"))
+		} else {
+			logrus.Warnf("networkType OpenShiftSDN is deprecated, please consider using OVNKubernetes")
+		}
 	}
 
 	if len(n.MachineNetwork) > 0 {
@@ -731,7 +744,7 @@ func validatePlatform(platform *types.Platform, usingAgentMethod bool, fldPath *
 	}
 	if platform.Azure != nil {
 		validate(azure.Name, platform.Azure, func(f *field.Path) field.ErrorList {
-			return azurevalidation.ValidatePlatform(platform.Azure, c.Publish, f)
+			return azurevalidation.ValidatePlatform(platform.Azure, c.Publish, f, c)
 		})
 	}
 	if platform.GCP != nil {
@@ -980,15 +993,21 @@ func validateIPProxy(proxy string, n *types.Networking, fldPath *field.Path) fie
 // for ssh keys on FIPS.
 func validateFIPSconfig(c *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
-	sshParsedKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(c.SSHKey))
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), c.SSHKey, fmt.Sprintf("Fatal error trying to parse configured public key: %s", err)))
-	} else {
-		sshKeyType := sshParsedKey.Type()
-		re := regexp.MustCompile(`^ecdsa-sha2-nistp\d{3}$|^ssh-rsa$`)
-		if !re.MatchString(sshKeyType) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), c.SSHKey, fmt.Sprintf("SSH key type %s unavailable when FIPS is enabled. Please use rsa or ecdsa.", sshKeyType)))
+	if c.SSHKey != "" {
+		sshParsedKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(c.SSHKey))
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), c.SSHKey, fmt.Sprintf("Fatal error trying to parse configured public key: %s", err)))
+		} else {
+			sshKeyType := sshParsedKey.Type()
+			re := regexp.MustCompile(`^ecdsa-sha2-nistp\d{3}$|^ssh-rsa$`)
+			if !re.MatchString(sshKeyType) {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("sshKey"), c.SSHKey, fmt.Sprintf("SSH key type %s unavailable when FIPS is enabled. Please use rsa or ecdsa.", sshKeyType)))
+			}
 		}
+	}
+
+	if err := hostcrypt.VerifyHostTargetState(c.FIPS); err != nil {
+		logrus.Warnf("%v", err)
 	}
 	return allErrs
 }
@@ -1065,6 +1084,15 @@ func validateFeatureSet(c *types.InstallConfig) field.ErrorList {
 		if c.VSphere != nil {
 			if len(c.VSphere.Hosts) > 0 {
 				allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "vsphere", "hosts"), errMsg))
+			}
+		}
+
+		if c.GCP != nil {
+			if len(c.GCP.UserTags) > 0 {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "gcp", "userTags"), errMsg))
+			}
+			if len(c.GCP.UserLabels) > 0 {
+				allErrs = append(allErrs, field.Forbidden(field.NewPath("platform", "gcp", "userLabels"), errMsg))
 			}
 		}
 	}

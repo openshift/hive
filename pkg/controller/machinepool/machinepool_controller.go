@@ -47,6 +47,7 @@ import (
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/remoteclient"
+	"github.com/openshift/hive/pkg/util/logrus"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
@@ -544,12 +545,14 @@ func matchFailureDomains(gMS *machineapi.MachineSet, rMS machineapi.MachineSet, 
 		}
 	}
 
-	rMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(rSpec)
+	// - The provider config funcs take a different kind of logger. Convert.
+	logr := logrus.NewLogr(logger)
+	rMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, rSpec)
 	if err != nil {
 		logger.WithError(err).Errorf("unable to parse remote MachineSet %v provider config", rMS.Name)
 		return false, err
 	}
-	gMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(gSpec)
+	gMS_providerconfig, err := cpms.NewProviderConfigFromMachineSpec(logr, gSpec)
 	if err != nil {
 		logger.WithError(err).Errorf("unable to parse generated MachineSet %v provider config", gMS.Name)
 		return false, err

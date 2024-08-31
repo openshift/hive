@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
@@ -59,6 +60,9 @@ type FailureDomain interface {
 	// GCP returns the GCPFailureDomain if the platform type is GCP.
 	GCP() machinev1.GCPFailureDomain
 
+	// OpenStack returns the OpenStackFailureDomain if the platform type is OpenStack.
+	OpenStack() machinev1.OpenStackFailureDomain
+
 	// Equal compares the underlying failure domain.
 	Equal(other FailureDomain) bool
 }
@@ -67,9 +71,10 @@ type FailureDomain interface {
 type failureDomain struct {
 	platformType configv1.PlatformType
 
-	aws   machinev1.AWSFailureDomain
-	azure machinev1.AzureFailureDomain
-	gcp   machinev1.GCPFailureDomain
+	aws       machinev1.AWSFailureDomain
+	azure     machinev1.AzureFailureDomain
+	gcp       machinev1.GCPFailureDomain
+	openstack machinev1.OpenStackFailureDomain
 }
 
 // String returns a string representation of the failure domain.
@@ -81,6 +86,8 @@ func (f failureDomain) String() string {
 		return azureFailureDomainToString(f.azure)
 	case configv1.GCPPlatformType:
 		return gcpFailureDomainToString(f.gcp)
+	case configv1.OpenStackPlatformType:
+		return openstackFailureDomainToString(f.openstack)
 	default:
 		return fmt.Sprintf("%sFailureDomain{}", f.platformType)
 	}
@@ -106,6 +113,11 @@ func (f failureDomain) GCP() machinev1.GCPFailureDomain {
 	return f.gcp
 }
 
+// OpenStack returns the OpenStackFailureDomain if the platform type is OpenStack.
+func (f failureDomain) OpenStack() machinev1.OpenStackFailureDomain {
+	return f.openstack
+}
+
 // Equal compares the underlying failure domain.
 func (f failureDomain) Equal(other FailureDomain) bool {
 	if other == nil {
@@ -123,6 +135,8 @@ func (f failureDomain) Equal(other FailureDomain) bool {
 		return f.azure == other.Azure()
 	case configv1.GCPPlatformType:
 		return f.gcp == other.GCP()
+	case configv1.OpenStackPlatformType:
+		return reflect.DeepEqual(f.openstack, other.OpenStack())
 	}
 
 	return true
@@ -138,6 +152,8 @@ func NewFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain
 		return newAzureFailureDomains(failureDomains)
 	case configv1.GCPPlatformType:
 		return newGCPFailureDomains(failureDomains)
+	case configv1.OpenStackPlatformType:
+		return newOpenStackFailureDomains(failureDomains)
 	case configv1.PlatformType(""):
 		// An empty failure domains definition is allowed.
 		return nil, nil
@@ -188,6 +204,21 @@ func newGCPFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDom
 	return foundFailureDomains, nil
 }
 
+// newOpenStackFailureDomains constructs a slice of OpenStack FailureDomain from machinev1.FailureDomains.
+func newOpenStackFailureDomains(failureDomains machinev1.FailureDomains) ([]FailureDomain, error) {
+	foundFailureDomains := []FailureDomain{}
+
+	if len(failureDomains.OpenStack) == 0 {
+		return foundFailureDomains, errMissingFailureDomain
+	}
+
+	for _, failureDomain := range failureDomains.OpenStack {
+		foundFailureDomains = append(foundFailureDomains, NewOpenStackFailureDomain(failureDomain))
+	}
+
+	return foundFailureDomains, nil
+}
+
 // NewAWSFailureDomain creates an AWS failure domain from the machinev1.AWSFailureDomain.
 // Note this is exported to allow other packages to construct individual failure domains
 // in tests.
@@ -211,6 +242,14 @@ func NewGCPFailureDomain(fd machinev1.GCPFailureDomain) FailureDomain {
 	return &failureDomain{
 		platformType: configv1.GCPPlatformType,
 		gcp:          fd,
+	}
+}
+
+// NewOpenStackFailureDomain creates an OpenStack failure domain from the machinev1.OpenStackFailureDomain.
+func NewOpenStackFailureDomain(fd machinev1.OpenStackFailureDomain) FailureDomain {
+	return &failureDomain{
+		platformType: configv1.OpenStackPlatformType,
+		openstack:    fd,
 	}
 }
 
@@ -275,4 +314,33 @@ func gcpFailureDomainToString(fd machinev1.GCPFailureDomain) string {
 	}
 
 	return unknownFailureDomain
+}
+
+// openstackFailureDomainToString converts the OpenStackFailureDomain into a string.
+func openstackFailureDomainToString(fd machinev1.OpenStackFailureDomain) string {
+	if fd.AvailabilityZone == "" && fd.RootVolume == nil {
+		return unknownFailureDomain
+	}
+
+	var failureDomain []string
+
+	if fd.AvailabilityZone != "" {
+		failureDomain = append(failureDomain, "AvailabilityZone:"+fd.AvailabilityZone)
+	}
+
+	if fd.RootVolume != nil {
+		var rootVolume []string
+
+		if fd.RootVolume.AvailabilityZone != "" {
+			rootVolume = append(rootVolume, "AvailabilityZone:"+fd.RootVolume.AvailabilityZone)
+		}
+
+		if fd.RootVolume.VolumeType != "" {
+			rootVolume = append(rootVolume, "VolumeType:"+fd.RootVolume.VolumeType)
+		}
+
+		failureDomain = append(failureDomain, "RootVolume:{"+strings.Join(rootVolume, ", ")+"}")
+	}
+
+	return "OpenStackFailureDomain{" + strings.Join(failureDomain, ", ") + "}"
 }

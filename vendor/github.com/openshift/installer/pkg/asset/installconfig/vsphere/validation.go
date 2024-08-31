@@ -283,15 +283,24 @@ func validateESXiVersion(validationCtx *validationContext, clusterPath string, v
 	}
 
 	for _, h := range hosts {
+		var esxiHostVersion *version.Version
 		var mh mo.HostSystem
-		err := h.Properties(context.TODO(), h.Reference(), []string{"config.product"}, &mh)
+		err := h.Properties(context.TODO(), h.Reference(), []string{"config.product", "runtime"}, &mh)
 		if err != nil {
 			return append(allErrs, field.InternalError(vSphereFldPath, err))
 		}
 
-		esxiHostVersion, err := version.NewVersion(mh.Config.Product.Version)
-		if err != nil {
-			return append(allErrs, field.InternalError(vSphereFldPath, err))
+		if mh.Runtime.InMaintenanceMode || mh.Runtime.ConnectionState == vim25types.HostSystemConnectionStateDisconnected || mh.Runtime.ConnectionState == vim25types.HostSystemConnectionStateNotResponding {
+			continue
+		}
+
+		if mh.Config != nil {
+			esxiHostVersion, err = version.NewVersion(mh.Config.Product.Version)
+			if err != nil {
+				return append(allErrs, field.InternalError(vSphereFldPath, err))
+			}
+		} else {
+			return append(allErrs, field.InternalError(vSphereFldPath, errors.Errorf("vCenter is failing to retrieve config product version information for the ESXi host: %s", h.Name())))
 		}
 
 		detail := fmt.Sprintf("The vSphere storage driver requires a minimum of vSphere 7 Update 2. The ESXi host: %s is version: %s and build: %s",

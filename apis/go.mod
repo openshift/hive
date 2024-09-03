@@ -4,10 +4,10 @@ go 1.20
 
 require (
 	// go get -u github.com/openshift/api@relase-4.13
-	github.com/openshift/api v0.0.0-20230720094506-afcbe27aec7c
+	github.com/openshift/api v0.0.0-20240805151103-d9c2a1dd30d2
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
+	k8s.io/api v0.27.3
+	k8s.io/apimachinery v0.27.3
 )
 
 require (

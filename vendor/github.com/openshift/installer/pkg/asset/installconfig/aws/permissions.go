@@ -38,6 +38,9 @@ const (
 
 	// PermissionDeleteHostedZone is a set of permissions required when the installer destroys a route53 hosted zone.
 	PermissionDeleteHostedZone PermissionGroup = "delete-hosted-zone"
+
+	// PermissionKMSEncryptionKeys is an additional set of permissions required when the installer uses user provided kms encryption keys.
+	PermissionKMSEncryptionKeys PermissionGroup = "kms-encryption-keys"
 )
 
 var permissions = map[PermissionGroup][]string{
@@ -72,6 +75,7 @@ var permissions = map[PermissionGroup][]string{
 		"ec2:DescribeRegions",
 		"ec2:DescribeRouteTables",
 		"ec2:DescribeSecurityGroups",
+		"ec2:DescribeSecurityGroupRules",
 		"ec2:DescribeSubnets",
 		"ec2:DescribeTags",
 		"ec2:DescribeVolumes",
@@ -242,6 +246,16 @@ var permissions = map[PermissionGroup][]string{
 	},
 	PermissionDeleteHostedZone: {
 		"route53:DeleteHostedZone",
+	},
+	PermissionKMSEncryptionKeys: {
+		"kms:Decrypt",
+		"kms:Encrypt",
+		"kms:GenerateDataKey",
+		"kms:GenerateDataKeyWithoutPlainText",
+		"kms:DescribeKey",
+		"kms:RevokeGrant",
+		"kms:CreateGrant",
+		"kms:ListGrants",
 	},
 }
 

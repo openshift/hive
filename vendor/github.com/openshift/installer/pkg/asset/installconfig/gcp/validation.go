@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -59,6 +60,7 @@ func Validate(client API, ic *types.InstallConfig) error {
 	allErrs = append(allErrs, validateCredentialMode(client, ic)...)
 	allErrs = append(allErrs, validatePreexistingServiceAccountXpn(client, ic)...)
 	allErrs = append(allErrs, validateServiceAccountPresent(client, ic)...)
+	allErrs = append(allErrs, validateMarketplaceImages(client, ic)...)
 
 	return allErrs.ToAggregate()
 }
@@ -67,20 +69,19 @@ func Validate(client API, ic *types.InstallConfig) error {
 func ValidateInstanceType(client API, fieldPath *field.Path, project, region string, zones []string, instanceType string, req resourceRequirements) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	typeMeta, instanceZones, err := client.GetMachineTypeWithZones(context.TODO(), project, region, instanceType)
+	typeMeta, typeZones, err := client.GetMachineTypeWithZones(context.TODO(), project, region, instanceType)
 	if err != nil {
-		var gErr *googleapi.Error
-		if errors.As(err, &gErr) {
-			return append(allErrs, field.Invalid(fieldPath.Child("type"), instanceType, gErr.Message))
+		if _, ok := err.(*googleapi.Error); ok {
+			return append(allErrs, field.Invalid(fieldPath.Child("type"), instanceType, err.Error()))
 		}
 		return append(allErrs, field.InternalError(nil, err))
 	}
 
 	userZones := sets.New(zones...)
 	if len(userZones) == 0 {
-		userZones = instanceZones
+		userZones = typeZones
 	}
-	if diff := userZones.Difference(instanceZones); len(diff) > 0 {
+	if diff := userZones.Difference(typeZones); len(diff) > 0 {
 		errMsg := fmt.Sprintf("instance type not available in zones: %v", sets.List(diff))
 		allErrs = append(allErrs, field.Invalid(fieldPath.Child("type"), instanceType, errMsg))
 	}
@@ -112,32 +113,96 @@ func validateServiceAccountPresent(client API, ic *types.InstallConfig) field.Er
 	return allErrs
 }
 
+// DefaultInstanceTypeForArch returns the appropriate instance type based on the target architecture.
+func DefaultInstanceTypeForArch(arch types.Architecture) string {
+	if arch == types.ArchitectureARM64 {
+		return "t2a-standard-4"
+	}
+	return "n2-standard-4"
+}
+
 // validateInstanceTypes checks that the user-provided instance types are valid.
 func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	defaultInstanceType := ""
+	defaultZones := []string{}
+
 	// Default requirements need to be sufficient to support Control Plane instances.
 	defaultInstanceReq := controlPlaneReq
-
 	if ic.ControlPlane != nil && ic.ControlPlane.Platform.GCP != nil && ic.ControlPlane.Platform.GCP.InstanceType != "" {
 		// Default requirements can be relaxed when the controlPlane type is set explicitly.
 		defaultInstanceReq = computeReq
-
-		allErrs = append(allErrs, ValidateInstanceType(client, field.NewPath("controlPlane", "platform", "gcp"), ic.GCP.ProjectID, ic.GCP.Region, ic.ControlPlane.Platform.GCP.Zones,
-			ic.ControlPlane.Platform.GCP.InstanceType, controlPlaneReq)...)
 	}
 
-	if ic.Platform.GCP.DefaultMachinePlatform != nil && ic.Platform.GCP.DefaultMachinePlatform.InstanceType != "" {
-		allErrs = append(allErrs, ValidateInstanceType(client, field.NewPath("platform", "gcp", "defaultMachinePlatform"), ic.GCP.ProjectID, ic.GCP.Region, ic.Platform.GCP.DefaultMachinePlatform.Zones,
-			ic.Platform.GCP.DefaultMachinePlatform.InstanceType, defaultInstanceReq)...)
+	if ic.GCP.DefaultMachinePlatform != nil {
+		defaultZones = ic.GCP.DefaultMachinePlatform.Zones
+		defaultInstanceType = ic.GCP.DefaultMachinePlatform.InstanceType
+		if ic.GCP.DefaultMachinePlatform.InstanceType != "" {
+			allErrs = append(allErrs,
+				ValidateInstanceType(
+					client,
+					field.NewPath("platform", "gcp", "defaultMachinePlatform"),
+					ic.GCP.ProjectID,
+					ic.GCP.Region,
+					ic.GCP.DefaultMachinePlatform.Zones,
+					ic.GCP.DefaultMachinePlatform.InstanceType,
+					defaultInstanceReq,
+				)...)
+		}
 	}
+
+	zones := defaultZones
+	instanceType := defaultInstanceType
+	if ic.ControlPlane != nil {
+		if instanceType == "" {
+			instanceType = DefaultInstanceTypeForArch(ic.ControlPlane.Architecture)
+		}
+		if ic.ControlPlane.Platform.GCP != nil {
+			if ic.ControlPlane.Platform.GCP.InstanceType != "" {
+				instanceType = ic.ControlPlane.Platform.GCP.InstanceType
+			}
+			if len(ic.ControlPlane.Platform.GCP.Zones) > 0 {
+				zones = ic.ControlPlane.Platform.GCP.Zones
+			}
+		}
+	}
+	allErrs = append(allErrs,
+		ValidateInstanceType(
+			client,
+			field.NewPath("controlPlane", "platform", "gcp"),
+			ic.GCP.ProjectID,
+			ic.GCP.Region,
+			zones,
+			instanceType,
+			controlPlaneReq,
+		)...)
 
 	for idx, compute := range ic.Compute {
 		fieldPath := field.NewPath("compute").Index(idx)
-		if compute.Platform.GCP != nil && compute.Platform.GCP.InstanceType != "" {
-			allErrs = append(allErrs, ValidateInstanceType(client, fieldPath.Child("platform", "gcp"), ic.GCP.ProjectID, ic.GCP.Region, compute.Platform.GCP.Zones,
-				compute.Platform.GCP.InstanceType, computeReq)...)
+		zones := defaultZones
+		instanceType := defaultInstanceType
+		if instanceType == "" {
+			instanceType = DefaultInstanceTypeForArch(compute.Architecture)
 		}
+		if compute.Platform.GCP != nil {
+			if compute.Platform.GCP.InstanceType != "" {
+				instanceType = compute.Platform.GCP.InstanceType
+			}
+			if len(compute.Platform.GCP.Zones) > 0 {
+				zones = compute.Platform.GCP.Zones
+			}
+		}
+		allErrs = append(allErrs,
+			ValidateInstanceType(
+				client,
+				fieldPath.Child("platform", "gcp"),
+				ic.GCP.ProjectID,
+				ic.GCP.Region,
+				zones,
+				instanceType,
+				computeReq,
+			)...)
 	}
 
 	return allErrs
@@ -474,4 +539,78 @@ func validateZones(client API, ic *types.InstallConfig) field.ErrorList {
 	}
 
 	return allErrs
+}
+
+func validateMarketplaceImages(client API, ic *types.InstallConfig) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	const errorMessage string = "could not find the boot image: %v"
+	var err error
+	var defaultImage *compute.Image
+	var defaultOsImage *gcp.OSImage
+
+	if ic.GCP.DefaultMachinePlatform != nil && ic.GCP.DefaultMachinePlatform.OSImage != nil {
+		defaultOsImage = ic.GCP.DefaultMachinePlatform.OSImage
+		defaultImage, err = client.GetImage(context.TODO(), defaultOsImage.Name, defaultOsImage.Project)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("platform", "gcp", "defaultMachinePlatform", "osImage"), *defaultOsImage, fmt.Sprintf(errorMessage, err)))
+		}
+	}
+
+	if ic.ControlPlane != nil {
+		image := defaultImage
+		osImage := defaultOsImage
+		if ic.ControlPlane.Platform.GCP != nil && ic.ControlPlane.Platform.GCP.OSImage != nil {
+			osImage = ic.ControlPlane.Platform.GCP.OSImage
+			image, err = client.GetImage(context.TODO(), osImage.Name, osImage.Project)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("controlPlane", "platform", "gcp", "osImage"), *osImage, fmt.Sprintf(errorMessage, err)))
+			}
+		}
+		if image != nil {
+			if errMsg := checkArchitecture(image.Architecture, ic.ControlPlane.Architecture, "controlPlane"); errMsg != "" {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("controlPlane", "platform", "gcp", "osImage"), *osImage, errMsg))
+			}
+		}
+	}
+
+	for idx, compute := range ic.Compute {
+		image := defaultImage
+		osImage := defaultOsImage
+		fieldPath := field.NewPath("compute").Index(idx)
+		if compute.Platform.GCP != nil && compute.Platform.GCP.OSImage != nil {
+			osImage = compute.Platform.GCP.OSImage
+			image, err = client.GetImage(context.TODO(), osImage.Name, osImage.Project)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("platform", "gcp", "osImage"), *osImage, fmt.Sprintf(errorMessage, err)))
+			}
+		}
+		if image != nil {
+			if errMsg := checkArchitecture(image.Architecture, compute.Architecture, "compute"); errMsg != "" {
+				allErrs = append(allErrs, field.Invalid(fieldPath.Child("platform", "gcp", "osImage"), *osImage, errMsg))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+func checkArchitecture(imageArch string, icArch types.Architecture, role string) string {
+	const unspecifiedArch string = "ARCHITECTURE_UNSPECIFIED"
+	// The possible architecture names from image.Architecture are of type string hence we cannot directly obtain the possible values
+	// In the docs the possible values are ARM64, X86_64, and ARCHITECTURE_UNSPECIFIED
+	// There is no simple translation between the architecture values from Google and the architecture names used in the install config so a map is used
+	var (
+		translateArchName = map[string]types.Architecture{
+			"ARM64":  types.ArchitectureARM64,
+			"X86_64": types.ArchitectureAMD64,
+		}
+	)
+
+	if imageArch == "" || imageArch == unspecifiedArch {
+		logrus.Warn(fmt.Sprintf("Boot image architecture is unspecified and might not be compatible with %s %s nodes", icArch, role))
+	} else if translateArchName[imageArch] != icArch {
+		return fmt.Sprintf("image architecture %s does not match %s node architecture %s", imageArch, role, icArch)
+	}
+	return ""
 }

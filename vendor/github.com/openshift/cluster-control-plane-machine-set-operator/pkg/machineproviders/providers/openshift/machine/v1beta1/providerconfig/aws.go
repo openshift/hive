@@ -17,9 +17,9 @@ limitations under the License.
 package providerconfig
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -63,14 +63,15 @@ func (a AWSProviderConfig) Config() machinev1beta1.AWSMachineProviderConfig {
 // newAWSProviderConfig creates an AWS type ProviderConfig from the raw extension.
 // It should return an error if the provided RawExtension does not represent
 // an AWSMachineProviderConfig.
-func newAWSProviderConfig(raw *runtime.RawExtension) (ProviderConfig, error) {
+func newAWSProviderConfig(logger logr.Logger, raw *runtime.RawExtension) (ProviderConfig, error) {
 	if raw == nil {
 		return nil, errNilProviderSpec
 	}
 
 	awsMachineProviderConfig := machinev1beta1.AWSMachineProviderConfig{}
-	if err := json.Unmarshal(raw.Raw, &awsMachineProviderConfig); err != nil {
-		return nil, fmt.Errorf("could not unmarshal provider spec: %w", err)
+
+	if err := checkForUnknownFieldsInProviderSpecAndUnmarshal(logger, raw, &awsMachineProviderConfig); err != nil {
+		return nil, fmt.Errorf("failed to check for unknown fields in the provider spec: %w", err)
 	}
 
 	awsProviderConfig := AWSProviderConfig{

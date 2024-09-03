@@ -179,13 +179,25 @@ func (a *AWSActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 	userTags := map[string]string{}
 
 	installerMachineSets, err := installaws.MachineSets(
-		cd.Spec.ClusterMetadata.InfraID,
-		cd.Spec.Platform.AWS.Region,
-		subnets,
-		computePool,
-		pool.Spec.Name,
-		workerUserDataName,
-		userTags,
+		&installaws.MachineSetInput{
+			ClusterID: cd.Spec.ClusterMetadata.InfraID,
+			InstallConfigPlatformAWS: &installertypesaws.Platform{
+				// TODO: This sucks. We're cherry-picking which fields to populate
+				// based on reading the vendored code to discover what they're using.
+				// The broader problem is that most of the mset generators expect an
+				// "install-config", which we don't (reliably) have because this is
+				// day 2.
+				Region:   cd.Spec.Platform.AWS.Region,
+				UserTags: userTags,
+			},
+			Subnets: subnets,
+			// TODO: Zones will be needed here when we add support for edge
+			// (computePool.Name == "edge"). Apparently these aren't the same as the
+			// computePool.Platform.AWS.Zones?
+			Pool:           computePool,
+			Role:           pool.Spec.Name,
+			UserDataSecret: workerUserDataName,
+		},
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "no subnet for zone") {
@@ -565,14 +577,6 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 	return "", false
 }
 
-func stringDereference(s *string) string {
-
-	if s != nil {
-		return *s
-	}
-	return ""
-}
-
 // validateSubnets ensures there's exactly one subnet per availability zone, and returns
 // the mapping of subnets by availability zone
 func (a *AWSActuator) validateSubnets(subnets []*ec2.Subnet, pool *hivev1.MachinePool) (icaws.Subnets, error) {
@@ -584,12 +588,12 @@ func (a *AWSActuator) validateSubnets(subnets []*ec2.Subnet, pool *hivev1.Machin
 			conflictingSubnets.Insert(oldSubnet.ID)
 			continue
 		}
-		az := stringDereference(subnet.AvailabilityZone)
+		az := aws.StringValue(subnet.AvailabilityZone)
 		subnetsByAvailabilityZone[az] = icaws.Subnet{
-			ID:   stringDereference(subnet.SubnetId),
-			ARN:  stringDereference(subnet.SubnetArn),
-			Zone: az,
-			CIDR: stringDereference(subnet.CidrBlock),
+			ID:   aws.StringValue(subnet.SubnetId),
+			ARN:  aws.StringValue(subnet.SubnetArn),
+			Zone: &icaws.Zone{Name: aws.StringValue(subnet.AvailabilityZone)},
+			CIDR: aws.StringValue(subnet.CidrBlock),
 			// TODO: populate local zone fields, Public, ZoneType, ZoneGroupName
 		}
 	}

@@ -95,7 +95,7 @@ type AzureMachineProviderSpec struct {
 	// Availability Zone for the virtual machine.
 	// If nil, the virtual machine should be deployed to no zone
 	// +optional
-	Zone *string `json:"zone,omitempty"`
+	Zone string `json:"zone,omitempty"`
 	// NetworkResourceGroup is the resource group for the virtual machine's network
 	// +optional
 	NetworkResourceGroup string `json:"networkResourceGroup,omitempty"`
@@ -145,6 +145,13 @@ type AzureMachineProviderSpec struct {
 	// This is useful for debugging software based launch issues.
 	// +optional
 	Diagnostics AzureDiagnostics `json:"diagnostics,omitempty"`
+	// capacityReservationGroupID specifies the capacity reservation group resource id that should be
+	// used for allocating the virtual machine.
+	// The field size should be greater than 0 and the field input must start with '/'.
+	// The input for capacityReservationGroupID must be similar to '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Compute/capacityReservationGroups/{capacityReservationGroupName}'.
+	// The keys which are used should be among 'subscriptions', 'providers' and 'resourcegroups' followed by valid ID or names respectively.
+	// +optional
+	CapacityReservationGroupID string `json:"capacityReservationGroupID,omitempty"`
 }
 
 // SpotVMOptions defines the options relevant to running the Machine on Spot VMs

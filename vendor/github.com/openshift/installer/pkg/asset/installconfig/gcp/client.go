@@ -44,6 +44,7 @@ type API interface {
 	GetEnabledServices(ctx context.Context, project string) ([]string, error)
 	GetServiceAccount(ctx context.Context, project, serviceAccount string) (string, error)
 	GetCredentials() *googleoauth.Credentials
+	GetImage(ctx context.Context, name string, project string) (*compute.Image, error)
 	GetProjectPermissions(ctx context.Context, project string, permissions []string) (sets.Set[string], error)
 	GetProjectByID(ctx context.Context, project string) (*cloudresourcemanager.Project, error)
 	ValidateServiceAccountHasPermissions(ctx context.Context, project string, permissions []string) (bool, error)
@@ -88,7 +89,7 @@ func (c *Client) GetMachineType(ctx context.Context, project, zone, machineType 
 func GetMachineTypeList(ctx context.Context, svc *compute.Service, project, region, machineType, fields string) ([]*compute.MachineType, error) {
 	var machines []*compute.MachineType
 
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	filter := fmt.Sprintf("name = \"%s\" AND zone : %s-*", machineType, region)
@@ -96,15 +97,13 @@ func GetMachineTypeList(ctx context.Context, svc *compute.Service, project, regi
 	if len(fields) > 0 {
 		req.Fields(googleapi.Field(fields))
 	}
+
 	err := req.Pages(ctx, func(page *compute.MachineTypeAggregatedList) error {
 		for _, scopedList := range page.Items {
 			machines = append(machines, scopedList.MachineTypes...)
 		}
 		return nil
 	})
-	if len(machines) == 0 {
-		return nil, errors.New("failed to fetch instance type, this error usually occurs if the region or the instance type is not found")
-	}
 
 	return machines, err
 }
@@ -116,17 +115,6 @@ func (c *Client) GetMachineTypeWithZones(ctx context.Context, project, region, m
 		return nil, nil, err
 	}
 
-	machines, err := GetMachineTypeList(ctx, svc, project, region, machineType, "")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	zones := sets.New[string]()
-	for _, machine := range machines {
-		zones.Insert(machine.Zone)
-	}
-
-	// Restrict to zones available in the project
 	pz, err := GetZones(ctx, svc, project, fmt.Sprintf("region eq .*%s", region))
 	if err != nil {
 		return nil, nil, err
@@ -135,6 +123,30 @@ func (c *Client) GetMachineTypeWithZones(ctx context.Context, project, region, m
 	for _, zone := range pz {
 		projZones.Insert(zone.Name)
 	}
+
+	machines, err := GetMachineTypeList(ctx, svc, project, region, machineType, "")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Custom machine types are not included in aggregated lists, so let's try
+	// to get the machine type directly before returning an error. Also
+	// fallback to all the zones in the project
+	if len(machines) == 0 {
+		cctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+		defer cancel()
+		machine, err := svc.MachineTypes.Get(project, pz[0].Name, machineType).Context(cctx).Do()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch instance type: %w", err)
+		}
+		return machine, projZones, nil
+	}
+
+	zones := sets.New[string]()
+	for _, machine := range machines {
+		zones.Insert(machine.Zone)
+	}
+	// Restrict to zones avaialable in the project
 	zones = zones.Intersection(projZones)
 
 	return machines[0], zones, nil
@@ -353,7 +365,7 @@ func (c *Client) GetRegions(ctx context.Context, project string) ([]string, erro
 	return computeRegions, nil
 }
 
-// GetZones retrieves the available zones for the project.
+// GetZones uses the GCP Compute Service API to get a list of zones from a project.
 func GetZones(ctx context.Context, svc *compute.Service, project, filter string) ([]*compute.Zone, error) {
 	req := svc.Zones.List(project)
 	if filter != "" {
@@ -447,6 +459,19 @@ func (c *Client) GetServiceAccount(ctx context.Context, project, serviceAccount 
 // GetCredentials returns the credentials used to authenticate the GCP session.
 func (c *Client) GetCredentials() *googleoauth.Credentials {
 	return c.ssn.Credentials
+}
+
+// GetImage returns the marketplace image specified by the user.
+func (c *Client) GetImage(ctx context.Context, name string, project string) (*compute.Image, error) {
+	svc, err := c.getComputeService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+
+	return svc.Images.Get(project, name).Context(ctx).Do()
 }
 
 func (c *Client) getPermissions(ctx context.Context, project string, permissions []string) ([]string, error) {

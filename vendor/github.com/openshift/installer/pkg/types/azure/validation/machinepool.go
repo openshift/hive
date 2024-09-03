@@ -1,10 +1,34 @@
 package validation
 
 import (
+	"fmt"
+	"sort"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/installer/pkg/types/azure"
+	"github.com/openshift/installer/pkg/types/azure/defaults"
+)
+
+const (
+	enabled = "Enabled"
+)
+
+var (
+	validSecurityEncryptionTypes = map[azure.SecurityEncryptionTypes]bool{
+		azure.SecurityEncryptionTypesVMGuestStateOnly:     true,
+		azure.SecurityEncryptionTypesDiskWithVMGuestState: true,
+	}
+
+	validSecurityEncryptionTypeValues = func() []string {
+		v := make([]string, 0, len(validSecurityEncryptionTypes))
+		for n := range validSecurityEncryptionTypes {
+			v = append(v, string(n))
+		}
+		sort.Strings(v)
+		return v
+	}()
 )
 
 // ValidateMachinePool checks that the specified machine pool is valid.
@@ -13,6 +37,8 @@ func ValidateMachinePool(p *azure.MachinePool, poolName string, platform *azure.
 
 	if p.OSDisk.DiskSizeGB < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("diskSizeGB"), p.OSDisk.DiskSizeGB, "Storage DiskSizeGB must be positive"))
+	} else if platform.CloudName == azure.StackCloud && p.OSDisk.DiskSizeGB != 0 && (p.OSDisk.DiskSizeGB < defaults.AzurestackMinimumDiskSize || p.OSDisk.DiskSizeGB > defaults.AzurestackMaximumDiskSize) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("diskSizeGB"), p.OSDisk.DiskSizeGB, "Storage DiskSizeGB must be between 128 and 1023 inclusive for Azure Stack"))
 	}
 
 	if p.OSDisk.DiskType != "" {
@@ -44,6 +70,8 @@ func ValidateMachinePool(p *azure.MachinePool, poolName string, platform *azure.
 		allErrs = append(allErrs, ValidateDiskEncryption(p, platform.CloudName, fldPath.Child("defaultMachinePlatform"))...)
 	}
 
+	allErrs = append(allErrs, validateSecurityProfile(p, platform.CloudName, fldPath.Child("defaultMachinePlatform"))...)
+
 	if p.VMNetworkingType != "" {
 		acceleratedNetworkingOptions := sets.NewString(string(azure.VMnetworkingTypeAccelerated), string(azure.VMNetworkingTypeBasic))
 		if !acceleratedNetworkingOptions.Has(p.VMNetworkingType) {
@@ -53,25 +81,27 @@ func ValidateMachinePool(p *azure.MachinePool, poolName string, platform *azure.
 		}
 	}
 
-	allErrs = append(allErrs, validateOSImage(p, poolName, fldPath)...)
+	allErrs = append(allErrs, validateOSImage(p, fldPath)...)
 
 	return allErrs
 }
 
-func validateOSImage(p *azure.MachinePool, poolName string, fldPath *field.Path) field.ErrorList {
+func validateOSImage(p *azure.MachinePool, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
 	osImageFldPath := fldPath.Child("osImage")
 
 	emptyOSImage := azure.OSImage{}
 	if p.OSImage != emptyOSImage {
-		// The control plane cannot use the marketplace image. Don't let the default machine pool specify the
-		// marketplace image either.
-		if poolName == "" || poolName == "master" {
-			allErrs = append(allErrs, field.Invalid(osImageFldPath, p.OSImage, "cannot specify the OS image for the master machines"))
-			return allErrs
+		if p.OSImage.Plan != "" {
+			planOptions := sets.NewString(
+				string(azure.ImageNoPurchasePlan),
+				string(azure.ImageWithPurchasePlan),
+			)
+			if !planOptions.Has(string(p.OSImage.Plan)) {
+				allErrs = append(allErrs, field.NotSupported(osImageFldPath.Child("plan"), p.OSImage.Plan, planOptions.List()))
+			}
 		}
-
 		if p.OSImage.Publisher == "" {
 			allErrs = append(allErrs, field.Required(osImageFldPath.Child("publisher"), "must specify publisher for the OS image"))
 		}
@@ -87,4 +117,100 @@ func validateOSImage(p *azure.MachinePool, poolName string, fldPath *field.Path)
 	}
 
 	return allErrs
+}
+
+func validateSecurityProfile(p *azure.MachinePool, cloudName azure.CloudEnvironment, fieldPath *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	if p.Settings == nil && p.OSDisk.SecurityProfile == nil {
+		return errs
+	}
+	if p.Settings == nil && p.OSDisk.SecurityProfile.SecurityEncryptionType != "" {
+		return append(errs, field.Required(fieldPath.Child("settings"),
+			"settings should be set when osDisk.securityProfile.securityEncryptionType is defined."))
+	}
+
+	switch p.Settings.SecurityType {
+	case azure.SecurityTypesConfidentialVM:
+		if cloudName == azure.StackCloud {
+			return append(errs, field.Invalid(fieldPath.Child("settings").Child("securityType"),
+				p.Settings.SecurityType,
+				fmt.Sprintf("securityType %s is not supported on %s.", azure.SecurityTypesConfidentialVM, azure.StackCloud)))
+		}
+
+		if p.OSDisk.SecurityProfile == nil || p.OSDisk.SecurityProfile.SecurityEncryptionType == "" {
+			securityProfileFieldPath := fieldPath.Child("osDisk").Child("securityProfile")
+			return append(errs, field.Required(securityProfileFieldPath.Child("securityEncryptionType"),
+				fmt.Sprintf("securityEncryptionType should be set when securityType is set to %s.",
+					azure.SecurityTypesConfidentialVM)))
+		}
+
+		if !validSecurityEncryptionTypes[p.OSDisk.SecurityProfile.SecurityEncryptionType] {
+			securityProfileFieldPath := fieldPath.Child("osDisk").Child("securityProfile")
+			return append(errs, field.NotSupported(securityProfileFieldPath.Child("securityEncryptionType"),
+				p.OSDisk.SecurityProfile.SecurityEncryptionType, validSecurityEncryptionTypeValues))
+		}
+
+		if p.Settings.ConfidentialVM == nil {
+			return append(errs, field.Required(fieldPath.Child("settings").Child("confidentialVM"),
+				fmt.Sprintf("confidentialVM should be set when securityType is set to %s.",
+					azure.SecurityTypesConfidentialVM)))
+		}
+
+		if p.Settings.ConfidentialVM.UEFISettings == nil {
+			return append(errs, field.Required(fieldPath.Child("settings").Child("confidentialVM").Child("uefiSettings"),
+				fmt.Sprintf("uefiSettings should be set when securityType is set to %s.",
+					azure.SecurityTypesConfidentialVM)))
+		}
+
+		if p.Settings.ConfidentialVM.UEFISettings.VirtualizedTrustedPlatformModule != nil &&
+			*p.Settings.ConfidentialVM.UEFISettings.VirtualizedTrustedPlatformModule != enabled {
+			uefiSettingsFieldPath := fieldPath.Child("settings").Child("confidentialVM").Child("uefiSettings")
+			return append(errs, field.Invalid(uefiSettingsFieldPath.Child("virtualizedTrustedPlatformModule"),
+				*p.Settings.ConfidentialVM.UEFISettings.VirtualizedTrustedPlatformModule,
+				fmt.Sprintf("virtualizedTrustedPlatformModule should be enabled when securityType is set to %s.",
+					azure.SecurityTypesConfidentialVM)))
+		}
+
+		if p.OSDisk.SecurityProfile.SecurityEncryptionType == azure.SecurityEncryptionTypesDiskWithVMGuestState {
+			if p.EncryptionAtHost {
+				return append(errs, field.Invalid(fieldPath.Child("encryptionAtHost"), p.EncryptionAtHost,
+					fmt.Sprintf("encryptionAtHost cannot be set to true when securityEncryptionType is set to %s.",
+						azure.SecurityEncryptionTypesDiskWithVMGuestState)))
+			}
+
+			if p.Settings.ConfidentialVM.UEFISettings.SecureBoot != nil &&
+				*p.Settings.ConfidentialVM.UEFISettings.SecureBoot != enabled {
+				uefiSettingsFieldPath := fieldPath.Child("settings").Child("confidentialVM").Child("uefiSettings")
+				return append(errs, field.Invalid(uefiSettingsFieldPath.Child("secureBoot"),
+					*p.Settings.ConfidentialVM.UEFISettings.SecureBoot,
+					fmt.Sprintf("secureBoot should be enabled when securityEncryptionType is set to %s.",
+						azure.SecurityEncryptionTypesDiskWithVMGuestState)))
+			}
+		}
+	case azure.SecurityTypesTrustedLaunch:
+		if p.Settings.TrustedLaunch == nil {
+			return append(errs, field.Required(fieldPath.Child("settings").Child("trustedLaunch"),
+				fmt.Sprintf("trustedLaunch should be set when securityType is set to %s.",
+					azure.SecurityTypesTrustedLaunch)))
+		}
+	default:
+		if p.OSDisk.SecurityProfile != nil && p.OSDisk.SecurityProfile.SecurityEncryptionType != "" {
+			return append(errs, field.Invalid(fieldPath.Child("settings").Child("securityType"),
+				p.Settings.SecurityType,
+				fmt.Sprintf("securityType should be set to %s when securityEncryptionType is defined.",
+					azure.SecurityTypesConfidentialVM)))
+		}
+
+		if p.Settings.TrustedLaunch != nil && p.Settings.TrustedLaunch.UEFISettings != nil &&
+			((p.Settings.TrustedLaunch.UEFISettings.SecureBoot != nil && *p.Settings.TrustedLaunch.UEFISettings.SecureBoot == enabled) ||
+				(p.Settings.TrustedLaunch.UEFISettings.VirtualizedTrustedPlatformModule != nil && *p.Settings.TrustedLaunch.UEFISettings.VirtualizedTrustedPlatformModule == enabled)) {
+			return append(errs, field.Invalid(fieldPath.Child("settings").Child("securityType"),
+				p.Settings.SecurityType,
+				fmt.Sprintf("securityType should be set to %s when uefiSettings are enabled.",
+					azure.SecurityTypesTrustedLaunch)))
+		}
+	}
+
+	return errs
 }

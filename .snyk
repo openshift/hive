@@ -6,3 +6,7 @@ exclude:
     - vendor/**
     - apis/vendor/**
     - "**/*_test.go"
+ignore:
+  'SNYK-GOLANG-GITHUBCOMAZUREAZURESDKFORGOSDKAZIDENTITY-7246767':
+  - '* > github.com/Azure/azure-sdk-for-go/sdk/azidentity':
+    reason: 'Updated azidentity lib incompatible with vendored installer code; and revendoring is hard here; and this is fixed in mce-2.6 and later, which is acceptable for a Moderate issue.'

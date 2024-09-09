@@ -71,27 +71,41 @@ spec:
 |-------|-------|
 | `clusterDeploymentRefs` | List of `ClusterDeployment` names in the current namespace which the `SyncSet` will apply to. |
 | `resourceApplyMode` | Defaults to `"Upsert"`, which indicates that objects will be created and updated to match the `SyncSet`. Existing `SyncSet` resources that are not listed in the `SyncSet` are not deleted. Specify `"Sync"` to allow deleting existing objects that were previously in the resources list. This includes deleting _all_ resources when the entire SyncSet is deleted. |
-| `applyBehavior` | One of `Apply` (the default), `CreateOnly`, `CreateOrUpdate`. Affects how the controller computes the patch to apply to resources. More details [below](#how-to-use-applybehavior). |
+| `applyBehavior` | One of `Apply` (the default), `CreateOnly`, `CreateOrUpdate`. Affects how the controller computes the patch to apply to `resources` and `secretMappings` (but not `patches`). More details [below](#how-to-use-applybehavior). |
 | `enableResourceTemplates  ` | If true, special use of golang's `text/templates` is allowed in `resources`. More details [below](#resource-parameters). |
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
 | `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. By default, the `patch` `applyMode` value is `"AlwaysApply"`, which applies the patch every 2 hours. |
 | `secretMappings` | A list of secret mappings. The secrets will be copied from the existing sources to the target resources in the referenced clusters |
 
 ### How to use `applyBehavior`
-The `applyBehavior` setting affects how the controller computes and applies resources to the target cluster.
+The `applyBehavior` setting affects how the controller computes and applies `resources` and `secretMappings` to the target cluster.
 The default, `Apply`, causes us to use `kubectl apply`, which [uses](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-apply-calculates-differences-and-merges-changes) the `kubectl.kubernetes.io/last-applied-configuration` annotation to decide whether fields _absent_ from the syncset resource should be *deleted* or *ignored* if they are present on the target object.
 This is a complex topic, but in summary:
 - `Apply` (the default): Asserts the `kubectl.kubernetes.io/last-applied-configuration` annotation on the target object, and uses it on subsequent reconciles.
 - `CreateOrUpdate`: If the object is initially absent, it is created *without* the `kubectl.kubernetes.io/last-applied-configuration` annotation; and hive will not add the annotation.
   However, if the annotation is added some other way (e.g. the user runs `kubectl apply` on the object), hive will not remove it; and subsequent syncs *will* honor it.
-- `CreateOnly`: The object is created without the `kubectl.kubernetes.io/last-applied-configuration` annotation, and that annotation is *ignored* even if it is subsequently added.
+  The behavior here is quirky:
+  - Hive will always assert the presence/value of all fields in the syncset resource.
+  - If the `last-applied-configuration` annotation is *absent*, hive will never delete fields.
+  - If the annotation is *present*, the behavior is the same as `Apply` -- i.e. fields present in the annotation but absent from the syncset resource will be *removed*.
+- `CreateOnly`: If initially absent, the object is created (without the `kubectl.kubernetes.io/last-applied-configuration` annotation).
+  If the object is already present, it is ignored.
 
 As a rule of thumb:
-- If you want users of the spoke cluster to be able to add map values (e.g. labels) to the target object and have their changes persist, use `applyBehavior: CreateOnly`.
-- If you want to assert the exact version of the object in your [Selector]SyncSet, reverting any additions made externally, use `applyBehavior: Apply` (or omit `applyBehavior` to get this behavior as the default).
+- If you want users of the spoke cluster to be able to edit the object and have their changes persist, use `applyBehavior: CreateOnly`.
+- If you want to assert the exact version of the object in your [Selector]SyncSet, reverting any changes or additions made externally, use `applyBehavior: Apply` (or omit `applyBehavior` to get this behavior as the default).
 - Since the behavior of `CreateOrUpdate` differs based on factors outside of your control -- i.e. whether the user adds/removes the `kubectl.kubernetes.io/last-applied-configuration` annotation from the target object -- this `applyBehavior` should probably be avoided.
   (If you come up with a good use case for it, please [open an issue](https://github.com/openshift/hive/issues/new) and tell us about it!)
 
+This can present a special conundrum when you want to create a resource with certain attributes that should be "sticky", but allow updates elsewhere.
+In such cases, you may wish to combine `resources` and `patches`:
+- Create your [Selector]SyncSet with `applyBehavior: CreateOnly`
+- Include a `resources` entry with the initial version of the object.
+- Include `patches` to assert the fields whose values you wish to be "sticky" (i.e. revert if they are edited/removed externally).
+
+It is safe to put these into the same [Selector]SyncSet because:
+- `patches` in a given [Selector]SyncSet are applied after `resources`.
+- `applyBehavior` only applies to `resources` and `secretMappings` -- it does not affect `patches`.
 
 ### Resource Parameters
 By setting `spec.enableResourceTemplates: true`, it is possible to use golang
@@ -239,6 +253,11 @@ Hive will process [Selector]SyncSets and their resources in the following order:
       The order in which deletions are processed is not guaranteed.
    1. SelectorSyncSets are processed in alpha order by SelectorSyncSet name.
       Resources within a SelectorSyncSet are processed in the order in which they are supplied in the SelectorSyncSet.
+
+Within a given [Selector]SyncSet, sections are processed in the following order:
+1. `resources`
+2. `secretMappings`
+3. `patches`
 
 ## Diagnosing SyncSet Failures
 

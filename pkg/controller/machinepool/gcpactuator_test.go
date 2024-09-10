@@ -814,7 +814,7 @@ func mockListComputeZones(gClient *mockgcp.MockClient, zones []string, region st
 	}
 
 	filter := gcpclient.ListComputeZonesOptions{
-		Filter: fmt.Sprintf("(region eq '.*%s.*') (status eq UP)", region),
+		Filter: fmt.Sprintf("(region eq '.*/%s') (status eq UP)", region),
 	}
 	gClient.EXPECT().ListComputeZones(gomock.Eq(filter)).Return(
 		zoneList, nil,

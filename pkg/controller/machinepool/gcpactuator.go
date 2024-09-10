@@ -237,8 +237,15 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 func (a *GCPActuator) getZones(region string) ([]string, error) {
 	zones := []string{}
 
-	// Filter to regions matching '.*<region>.*' (where the zone is actually UP)
-	zoneFilter := fmt.Sprintf("(region eq '.*%s.*') (status eq UP)", region)
+	// Filter to UP zones by region, which is a URI, so:
+	// - Bind the left side to a path delimiter.
+	// - The right side is implicitly bound to the end of the string. (At this time, the URI ends
+	//   with the region. If this changes at some point in the future -- e.g. a querystring is
+	//   added -- it will break.)
+	// Notably, it is important that the neither side be allowed to match [\w-], as this could
+	// cause us to retrieve zones for regions whose names are a substring of the region we're
+	// actually in. HIVE-2610.
+	zoneFilter := fmt.Sprintf("(region eq '.*/%s') (status eq UP)", region)
 
 	pageToken := ""
 

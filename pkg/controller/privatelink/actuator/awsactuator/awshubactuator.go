@@ -212,7 +212,12 @@ func (a *AWSHubActuator) ensureHostedZone(cd *hivev1.ClusterDeployment, metadata
 
 	hzID, err := a.findHostedZone(associatedVPCs, apiDomain)
 	if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
-		newHzID, err := a.createHostedZone(&associatedVPCs[0], apiDomain)
+		selectedVPC, err := a.selectHostedZoneVPC(cd, metadata, logger)
+		if err != nil {
+			return false, "", err
+		}
+
+		newHzID, err := a.createHostedZone(&selectedVPC, apiDomain)
 		if err != nil {
 			return false, "", err
 		}
@@ -257,6 +262,10 @@ func (a *AWSHubActuator) createHostedZone(associatedVPC *hivev1.AWSAssociatedVPC
 // If no such hosted zone exists, it return an errNoHostedZoneFoundForVPC error.
 func (a *AWSHubActuator) findHostedZone(associatedVPCs []hivev1.AWSAssociatedVPC, apiDomain string) (string, error) {
 	for _, vpc := range associatedVPCs {
+		// Skip VPCs that are not in the primary account because they are not accessible and cause an error.
+		if vpc.CredentialsSecretRef != nil && *vpc.CredentialsSecretRef != a.config.CredentialsSecretRef {
+			continue
+		}
 
 		input := &route53.ListHostedZonesByVPCInput{
 			VPCId:     aws.String(vpc.VPCID),
@@ -567,27 +576,71 @@ func (a *AWSHubActuator) getAssociatedVPCs(
 		cd.Status.Platform.AWS.PrivateLink != nil &&
 		cd.Status.Platform.AWS.PrivateLink.VPCEndpointID != "" {
 
-		endpointResp, err := a.awsClientHub.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-			Filters: []*ec2.Filter{ec2FilterForCluster(metadata)},
-		})
+		endpointVPC, err := a.getEndpointVPC(cd, metadata)
 		if err != nil {
-			return associatedVPCs, errors.Wrap(err, "error getting the VPC Endpoint")
+			return associatedVPCs, err
 		}
 
-		if len(endpointResp.VpcEndpoints) == 0 {
-			return associatedVPCs, nil // no vpc endpoint
+		if endpointVPC.VPCID != "" {
+			logger.Debugf("adding VpcEndpoint VPC %s", endpointVPC.VPCID)
+			associatedVPCs = append(associatedVPCs, endpointVPC)
 		}
-
-		logger.Debugf("adding VpcEndpoint [%s] VPC [%s]", *endpointResp.VpcEndpoints[0].VpcEndpointId, *endpointResp.VpcEndpoints[0].VpcId)
-		endpointVPC := hivev1.AWSAssociatedVPC{
-			AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
-				VPCID:  *endpointResp.VpcEndpoints[0].VpcId,
-				Region: cd.Spec.Platform.AWS.Region,
-			},
-		}
-
-		associatedVPCs = append(associatedVPCs, endpointVPC)
 	}
 
 	return associatedVPCs, nil
+}
+
+func (a *AWSHubActuator) getEndpointVPC(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata) (hivev1.AWSAssociatedVPC, error) {
+	endpointVPC := hivev1.AWSAssociatedVPC{}
+	endpointResp, err := a.awsClientHub.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
+		Filters: []*ec2.Filter{ec2FilterForCluster(metadata)},
+	})
+	if err != nil {
+		return endpointVPC, errors.Wrap(err, "error getting the VPC Endpoint")
+	}
+
+	if len(endpointResp.VpcEndpoints) >= 0 {
+		endpointVPC.VPCID = *endpointResp.VpcEndpoints[0].VpcId
+		endpointVPC.Region = cd.Spec.Platform.AWS.Region
+	}
+
+	return endpointVPC, nil
+}
+
+func (a *AWSHubActuator) selectHostedZoneVPC(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger log.FieldLogger) (hivev1.AWSAssociatedVPC, error) {
+	selectedVPC := hivev1.AWSAssociatedVPC{}
+
+	// For clusterdeployments that are on AWS, use the VPCEndpoint VPC
+	if cd.Status.Platform != nil &&
+		cd.Status.Platform.AWS != nil &&
+		cd.Status.Platform.AWS.PrivateLink != nil &&
+		cd.Status.Platform.AWS.PrivateLink.VPCEndpointID != "" {
+
+		endpointVPC, err := a.getEndpointVPC(cd, metadata)
+		if err != nil {
+			return selectedVPC, errors.Wrap(err, "error getting Endpoint VPC")
+		}
+
+		if endpointVPC.VPCID == "" {
+			return selectedVPC, errors.New("unable to select Endpoint VPC: Endpoint not found")
+		}
+
+		return endpointVPC, nil
+	}
+
+	associatedVPCS, err := a.getAssociatedVPCs(cd, metadata, logger)
+	if err != nil {
+		return selectedVPC, errors.Wrap(err, "error getting associated VPCs")
+	}
+
+	// Select the first associatedVPC that uses the primary AWS PrivateLink credential.
+	// This is necessary because a Hosted Zone can only be created using a VPC owned by the same account.
+	for _, associatedVPC := range associatedVPCS {
+		if associatedVPC.CredentialsSecretRef == nil || *associatedVPC.CredentialsSecretRef == a.config.CredentialsSecretRef {
+			return associatedVPC, nil
+		}
+	}
+
+	// No VPCs found that match the criteria, return an error.
+	return selectedVPC, errors.New("unable to find an associatedVPC that uses the primary AWS PrivateLink credentials")
 }

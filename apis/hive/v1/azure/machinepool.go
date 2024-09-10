@@ -32,6 +32,15 @@ type MachinePool struct {
 	// If omitted, the default (${infraID}-vnet) will be used.
 	// +optional
 	VirtualNetwork string `json:"virtualNetwork,omitempty"`
+
+	// VMNetworkingType specifies whether to enable accelerated networking.
+	// Accelerated networking enables single root I/O virtualization (SR-IOV) to a VM, greatly improving its
+	// networking performance.
+	// eg. values: "Accelerated", "Basic"
+	//
+	// +kubebuilder:validation:Enum="Accelerated"; "Basic"
+	// +optional
+	VMNetworkingType string `json:"vmNetworkingType,omitempty"`
 }
 
 // OSImage is the image to use for the OS of a machine.

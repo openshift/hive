@@ -82,6 +82,27 @@ func TestAzureActuator(t *testing.T) {
 			},
 		},
 		{
+			name:              "default network fields",
+			clusterDeployment: testAzureClusterDeployment(),
+			pool:              testAzurePool(),
+			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
+				mockListResourceSKUs(mockCtrl, client, []string{"zone1", "zone2", "zone3"})
+				mockGetVMCapabilities(client, "V1,V2")
+				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName("zone1"): 1,
+				generateAzureMachineSetName("zone2"): 1,
+				generateAzureMachineSetName("zone3"): 1,
+			},
+			extraProviderSpecValidation: func(t *testing.T, providerSpec *machineapi.AzureMachineProviderSpec) {
+				assert.Equal(t, testInfraID+"-rg", providerSpec.NetworkResourceGroup, "unexpected ComputeSubnet => Subnet")
+				assert.Equal(t, testInfraID+"-worker-subnet", providerSpec.Subnet, "unexpected ComputeSubnet => Subnet")
+				assert.Equal(t, testInfraID+"-vnet", providerSpec.Vnet, "unexpected VirtualNetwork => Vnet")
+				assert.False(t, providerSpec.AcceleratedNetworking, "expected basic networking")
+			},
+		},
+		{
 			name:              "set custom network fields",
 			clusterDeployment: testAzureClusterDeployment(),
 			pool: func() *hivev1.MachinePool {
@@ -89,6 +110,7 @@ func TestAzureActuator(t *testing.T) {
 				pool.Spec.Platform.Azure.NetworkResourceGroupName = "some-rg"
 				pool.Spec.Platform.Azure.ComputeSubnet = "some-subnet"
 				pool.Spec.Platform.Azure.VirtualNetwork = "some-vnet"
+				pool.Spec.Platform.Azure.VMNetworkingType = "Accelerated"
 				return pool
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -105,6 +127,7 @@ func TestAzureActuator(t *testing.T) {
 				assert.Equal(t, "some-rg", providerSpec.NetworkResourceGroup, "unexpected ComputeSubnet => Subnet")
 				assert.Equal(t, "some-subnet", providerSpec.Subnet, "unexpected ComputeSubnet => Subnet")
 				assert.Equal(t, "some-vnet", providerSpec.Vnet, "unexpected VirtualNetwork => Vnet")
+				assert.True(t, providerSpec.AcceleratedNetworking, "expected accelerated networking")
 			},
 		},
 		{

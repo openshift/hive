@@ -87,6 +87,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		OSDisk: installertypesazure.OSDisk{
 			DiskSizeGB: pool.Spec.Platform.Azure.OSDisk.DiskSizeGB,
 		},
+		VMNetworkingType: pool.Spec.Platform.Azure.VMNetworkingType,
 	}
 
 	if pool.Spec.Platform.Azure.OSDisk.DiskType != "" {

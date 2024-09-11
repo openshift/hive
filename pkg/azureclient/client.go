@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/Azure/go-autorest/autorest/to"
+	installerazure "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 
@@ -204,24 +205,22 @@ func newClient(authJSONSource func() ([]byte, error), environmentName string) (*
 	if err != nil {
 		return nil, err
 	}
-	var authMap map[string]string
-	if err := json.Unmarshal(authJSON, &authMap); err != nil {
+	var creds installerazure.Credentials
+	// json.Unmarshal is case-insensitive. ACM-14248.
+	if err := json.Unmarshal(authJSON, &creds); err != nil {
 		return nil, err
 	}
-	clientID, ok := authMap["clientId"]
-	if !ok {
+	// TODO: Installer supports cert and MSI auth as well; we currently only support client secret.
+	if creds.ClientID == "" {
 		return nil, errors.New("missing clientId in auth")
 	}
-	clientSecret, ok := authMap["clientSecret"]
-	if !ok {
+	if creds.ClientSecret == "" {
 		return nil, errors.New("missing clientSecret in auth")
 	}
-	tenantID, ok := authMap["tenantId"]
-	if !ok {
+	if creds.TenantID == "" {
 		return nil, errors.New("missing tenantId in auth")
 	}
-	subscriptionID, ok := authMap["subscriptionId"]
-	if !ok {
+	if creds.SubscriptionID == "" {
 		return nil, errors.New("missing subscriptionId in auth")
 	}
 
@@ -234,24 +233,24 @@ func newClient(authJSONSource func() ([]byte, error), environmentName string) (*
 		return nil, err
 	}
 
-	authorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env)
+	authorizer, err := getAuthorizer(creds.ClientID, creds.ClientSecret, creds.TenantID, env)
 	if err != nil {
 		return nil, err
 	}
 
-	resourceSKUsClient := compute.NewResourceSkusClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
+	resourceSKUsClient := compute.NewResourceSkusClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)
 	resourceSKUsClient.Authorizer = authorizer
 
-	recordSetsClient := dns.NewRecordSetsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
+	recordSetsClient := dns.NewRecordSetsClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)
 	recordSetsClient.Authorizer = authorizer
 
-	zonesClient := dns.NewZonesClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
+	zonesClient := dns.NewZonesClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)
 	zonesClient.Authorizer = authorizer
 
-	virtualMachinesClient := compute.NewVirtualMachinesClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
+	virtualMachinesClient := compute.NewVirtualMachinesClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)
 	virtualMachinesClient.Authorizer = authorizer
 
-	imagesClient := compute.NewImagesClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
+	imagesClient := compute.NewImagesClientWithBaseURI(env.ResourceManagerEndpoint, creds.SubscriptionID)
 	imagesClient.Authorizer = authorizer
 
 	return &azureClient{

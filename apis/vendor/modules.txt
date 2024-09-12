@@ -1,7 +1,7 @@
 # github.com/fxamacker/cbor/v2 v2.7.0-beta
 ## explicit; go 1.17
 github.com/fxamacker/cbor/v2
-# github.com/go-logr/logr v1.4.1
+# github.com/go-logr/logr v1.4.2
 ## explicit; go 1.18
 github.com/go-logr/logr
 # github.com/gogo/protobuf v1.3.2
@@ -21,7 +21,7 @@ github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.2
 ## explicit; go 1.12
 github.com/modern-go/reflect2
-# github.com/openshift/api v0.0.0-20240708071937-c9a91940bf0f
+# github.com/openshift/api v0.0.0-20240809035623-d6942fb7294e
 ## explicit; go 1.22.0
 github.com/openshift/api/config/v1
 # github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
@@ -30,7 +30,7 @@ github.com/openshift/custom-resource-status/conditions/v1
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
-# golang.org/x/net v0.26.0
+# golang.org/x/net v0.27.0
 ## explicit; go 1.18
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2

@@ -461,6 +461,16 @@ type VPCSpec struct {
 	// the API Server.
 	// +optional
 	ElasticIPPool *ElasticIPPool `json:"elasticIpPool,omitempty"`
+
+	// SubnetSchema specifies how CidrBlock should be divided on subnets in the VPC depending on the number of AZs.
+	// PreferPrivate - one private subnet for each AZ plus one other subnet that will be further sub-divided for the public subnets.
+	// PreferPublic - have the reverse logic of PreferPrivate, one public subnet for each AZ plus one other subnet
+	// that will be further sub-divided for the private subnets.
+	// Defaults to PreferPrivate
+	// +optional
+	// +kubebuilder:default=PreferPrivate
+	// +kubebuilder:validation:Enum=PreferPrivate;PreferPublic
+	SubnetSchema *SubnetSchemaType `json:"subnetSchema,omitempty"`
 }
 
 // String returns a string representation of the VPC.
@@ -930,6 +940,10 @@ type IngressRule struct {
 	// The field will be combined with source security group IDs if specified.
 	// +optional
 	SourceSecurityGroupRoles []SecurityGroupRole `json:"sourceSecurityGroupRoles,omitempty"`
+
+	// NatGatewaysIPsSource use the NAT gateways IPs as the source for the ingress rule.
+	// +optional
+	NatGatewaysIPsSource bool `json:"natGatewaysIPsSource,omitempty"`
 }
 
 // String returns a string representation of the ingress rule.

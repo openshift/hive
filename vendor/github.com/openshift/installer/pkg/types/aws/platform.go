@@ -1,6 +1,8 @@
 package aws
 
 import (
+	"os"
+
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -16,8 +18,9 @@ const (
 // Platform stores all the global configuration that all machinesets
 // use.
 type Platform struct {
-	// AMIID is the AMI that should be used to boot machines for the cluster.
-	// If set, the AMI should belong to the same region as the cluster.
+	// The field is deprecated. AMIID is the AMI that should be used to boot
+	// machines for the cluster. If set, the AMI should belong to the same
+	// region as the cluster.
 	//
 	// +optional
 	AMIID string `json:"amiID,omitempty"`
@@ -144,4 +147,11 @@ func IsSecretRegion(region string) bool {
 		return true
 	}
 	return false
+}
+
+// IsPublicOnlySubnetsEnabled returns whether the public-only subnets feature has been enabled via env var.
+func IsPublicOnlySubnetsEnabled() bool {
+	// Even though this looks too simple for a function, it's better than having to update the logic everywhere it's
+	// used in case we decide to check for specific values set in the env var.
+	return os.Getenv("OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY") != ""
 }

@@ -52,17 +52,15 @@ type Platform struct {
 
 	// userLabels has additional keys and values that the installer will add as
 	// labels to all resources that it creates on GCP. Resources created by the
-	// cluster itself may not include these labels. This is a TechPreview feature
-	// and requires setting CustomNoUpgrade featureSet with GCPLabelsTags featureGate
-	// enabled or TechPreviewNoUpgrade featureSet to configure labels.
+	// cluster itself may not include these labels. GCPLabelsTags featureGate is
+	// defined for managing this feature and is enabled by default.
 	UserLabels []UserLabel `json:"userLabels,omitempty"`
 
 	// userTags has additional keys and values that the installer will add as
 	// tags to all resources that it creates on GCP. Resources created by the
 	// cluster itself may not include these tags. Tag key and tag value should
-	// be the shortnames of the tag key and tag value resource. This is a TechPreview
-	// feature and requires setting CustomNoUpgrade featureSet with GCPLabelsTags
-	// featureGate enabled or TechPreviewNoUpgrade featureSet to configure tags.
+	// be the shortnames of the tag key and tag value resource. GCPLabelsTags featureGate
+	// is defined for managing this feature and is enabled by default.
 	UserTags []UserTag `json:"userTags,omitempty"`
 
 	// UserProvisionedDNS indicates if the customer is providing their own DNS solution in place of the default
@@ -113,4 +111,22 @@ type UserTag struct {
 // DefaultSubnetName sets a default name for the subnet.
 func DefaultSubnetName(infraID, role string) string {
 	return fmt.Sprintf("%s-%s-subnet", infraID, role)
+}
+
+// GetConfiguredServiceAccount returns the service account email from a configured service account for
+// a control plane or compute node. Returns empty string if not configured.
+func GetConfiguredServiceAccount(platform *Platform, mpool *MachinePool) string {
+	if mpool != nil && mpool.ServiceAccount != "" {
+		return mpool.ServiceAccount
+	} else if platform.DefaultMachinePlatform != nil {
+		return platform.DefaultMachinePlatform.ServiceAccount
+	}
+
+	return ""
+}
+
+// GetDefaultServiceAccount returns the default service account email to use based on role.
+// The default should be used when an existing service account is not configured.
+func GetDefaultServiceAccount(platform *Platform, clusterID string, role string) string {
+	return fmt.Sprintf("%s-%s@%s.iam.gserviceaccount.com", clusterID, role[0:1], platform.ProjectID)
 }

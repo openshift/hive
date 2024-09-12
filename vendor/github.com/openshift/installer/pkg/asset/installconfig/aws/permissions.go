@@ -7,8 +7,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/types/aws"
 )
 
 // PermissionGroup is the group of permissions needed by cluster creation, operation, or teardown.
@@ -30,9 +33,19 @@ const (
 	// PermissionDeleteSharedNetworking is a set of permissions required when the installer destroys resources from a shared-network cluster.
 	PermissionDeleteSharedNetworking PermissionGroup = "delete-shared-networking"
 
+	// PermissionCreateInstanceRole is a set of permissions required when the installer creates instance roles.
+	PermissionCreateInstanceRole PermissionGroup = "create-instance-role"
+
 	// PermissionDeleteSharedInstanceRole is a set of permissions required when the installer destroys resources from a
 	// cluster with user-supplied IAM roles for instances.
 	PermissionDeleteSharedInstanceRole PermissionGroup = "delete-shared-instance-role"
+
+	// PermissionCreateInstanceProfile is a set of permission required when the installer creates instance profiles.
+	PermissionCreateInstanceProfile PermissionGroup = "create-instance-profile"
+
+	// PermissionDeleteSharedInstanceProfile is a set of permissions required when the installer destroys resources from
+	// a cluster with user-supplied IAM instance profiles for instances.
+	PermissionDeleteSharedInstanceProfile PermissionGroup = "delete-shared-instance-profile"
 
 	// PermissionCreateHostedZone is a set of permissions required when the installer creates a route53 hosted zone.
 	PermissionCreateHostedZone PermissionGroup = "create-hosted-zone"
@@ -127,12 +140,6 @@ var permissions = map[PermissionGroup][]string{
 		"elasticloadbalancing:SetSecurityGroups",
 
 		// IAM related perms
-		"iam:AddRoleToInstanceProfile",
-		"iam:CreateInstanceProfile",
-		"iam:CreateRole",
-		"iam:DeleteInstanceProfile",
-		"iam:DeleteRole",
-		"iam:DeleteRolePolicy",
 		"iam:GetInstanceProfile",
 		"iam:GetRole",
 		"iam:GetRolePolicy",
@@ -141,8 +148,6 @@ var permissions = map[PermissionGroup][]string{
 		"iam:ListRoles",
 		"iam:ListUsers",
 		"iam:PassRole",
-		"iam:PutRolePolicy",
-		"iam:RemoveRoleFromInstanceProfile",
 		"iam:SimulatePrincipalPolicy",
 		"iam:TagInstanceProfile",
 		"iam:TagRole",
@@ -246,9 +251,27 @@ var permissions = map[PermissionGroup][]string{
 	PermissionDeleteSharedNetworking: {
 		"tag:UnTagResources",
 	},
+	// Permissions required for creating an instance role
+	PermissionCreateInstanceRole: {
+		"iam:CreateRole",
+		"iam:DeleteRole",
+		"iam:DeleteRolePolicy",
+		"iam:PutRolePolicy",
+	},
 	// Permissions required for deleting a cluster with shared instance roles
 	PermissionDeleteSharedInstanceRole: {
 		"iam:UntagRole",
+	},
+	// Permissions required for creating an instance profile
+	PermissionCreateInstanceProfile: {
+		"iam:AddRoleToInstanceProfile",
+		"iam:CreateInstanceProfile",
+		"iam:DeleteInstanceProfile",
+		"iam:RemoveRoleFromInstanceProfile",
+	},
+	// Permissions required for deleting a cluster with shared instance profiles
+	PermissionDeleteSharedInstanceProfile: {
+		"iam:UntagInstanceProfile",
 	},
 	PermissionCreateHostedZone: {
 		"route53:CreateHostedZone",
@@ -285,14 +308,9 @@ var permissions = map[PermissionGroup][]string{
 // as either capable of creating new credentials for components that interact with the cloud or
 // being able to be passed through as-is to the components that need cloud credentials
 func ValidateCreds(ssn *session.Session, groups []PermissionGroup, region string) error {
-	// Compile a list of permissions based on the permission groups provided
-	requiredPermissions := []string{}
-	for _, group := range groups {
-		groupPerms, ok := permissions[group]
-		if !ok {
-			return fmt.Errorf("unable to access permissions group %s", group)
-		}
-		requiredPermissions = append(requiredPermissions, groupPerms...)
+	requiredPermissions, err := PermissionsList(groups)
+	if err != nil {
+		return err
 	}
 
 	client := ccaws.NewClientFromSession(ssn)
@@ -331,4 +349,190 @@ func ValidateCreds(ssn *session.Session, groups []PermissionGroup, region string
 	}
 
 	return errors.New("AWS credentials cannot be used to either create new creds or use as-is")
+}
+
+// RequiredPermissionGroups returns a set of required permissions for a given cluster configuration.
+func RequiredPermissionGroups(ic *types.InstallConfig) []PermissionGroup {
+	permissionGroups := []PermissionGroup{PermissionCreateBase}
+	usingExistingVPC := len(ic.AWS.Subnets) != 0
+	usingExistingPrivateZone := len(ic.AWS.HostedZone) != 0
+
+	if !usingExistingVPC {
+		permissionGroups = append(permissionGroups, PermissionCreateNetworking)
+	}
+
+	if !usingExistingPrivateZone {
+		permissionGroups = append(permissionGroups, PermissionCreateHostedZone)
+	}
+
+	if includesKMSEncryptionKey(ic) {
+		logrus.Debugf("Adding %s to the group of permissions", PermissionKMSEncryptionKeys)
+		permissionGroups = append(permissionGroups, PermissionKMSEncryptionKeys)
+	}
+
+	// Add delete permissions for non-C2S installs.
+	if !aws.IsSecretRegion(ic.AWS.Region) {
+		permissionGroups = append(permissionGroups, PermissionDeleteBase)
+		if usingExistingVPC {
+			permissionGroups = append(permissionGroups, PermissionDeleteSharedNetworking)
+		} else {
+			permissionGroups = append(permissionGroups, PermissionDeleteNetworking)
+		}
+		if !usingExistingPrivateZone {
+			permissionGroups = append(permissionGroups, PermissionDeleteHostedZone)
+		}
+	}
+
+	if ic.AWS.PublicIpv4Pool != "" {
+		permissionGroups = append(permissionGroups, PermissionPublicIpv4Pool)
+	}
+
+	if !ic.AWS.BestEffortDeleteIgnition {
+		permissionGroups = append(permissionGroups, PermissionDeleteIgnitionObjects)
+	}
+
+	if includesCreateInstanceRole(ic) {
+		permissionGroups = append(permissionGroups, PermissionCreateInstanceRole)
+	}
+
+	if includesExistingInstanceRole(ic) {
+		permissionGroups = append(permissionGroups, PermissionDeleteSharedInstanceRole)
+	}
+
+	if includesExistingInstanceProfile(ic) {
+		permissionGroups = append(permissionGroups, PermissionDeleteSharedInstanceProfile)
+	}
+
+	if includesCreateInstanceProfile(ic) {
+		permissionGroups = append(permissionGroups, PermissionCreateInstanceProfile)
+	}
+
+	return permissionGroups
+}
+
+// PermissionsList compiles a list of permissions based on the permission groups provided.
+func PermissionsList(required []PermissionGroup) ([]string, error) {
+	requiredPermissions := sets.New[string]()
+	for _, group := range required {
+		groupPerms, ok := permissions[group]
+		if !ok {
+			return nil, fmt.Errorf("unable to access permissions group %s", group)
+		}
+		requiredPermissions.Insert(groupPerms...)
+	}
+
+	return sets.List(requiredPermissions), nil
+}
+
+// includesExistingInstanceRole checks if at least one BYO instance role is included in the install-config.
+func includesExistingInstanceRole(installConfig *types.InstallConfig) bool {
+	mpool := aws.MachinePool{}
+	mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+
+	if mp := installConfig.ControlPlane; mp != nil {
+		mpool.Set(mp.Platform.AWS)
+	}
+
+	for _, compute := range installConfig.Compute {
+		mpool.Set(compute.Platform.AWS)
+	}
+
+	return len(mpool.IAMRole) > 0
+}
+
+// includesCreateInstanceRole checks if at least one instance role will be created by the installer.
+// Note: instance profiles have a role attached to them.
+func includesCreateInstanceRole(installConfig *types.InstallConfig) bool {
+	{
+		mpool := aws.MachinePool{}
+		mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+		if mp := installConfig.ControlPlane; mp != nil {
+			mpool.Set(mp.Platform.AWS)
+		}
+		if len(mpool.IAMRole) == 0 && len(mpool.IAMProfile) == 0 {
+			return true
+		}
+	}
+
+	for _, compute := range installConfig.Compute {
+		mpool := aws.MachinePool{}
+		mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+		mpool.Set(compute.Platform.AWS)
+		if len(mpool.IAMRole) == 0 && len(mpool.IAMProfile) == 0 {
+			return true
+		}
+	}
+
+	if len(installConfig.Compute) > 0 {
+		return false
+	}
+
+	// If compute stanza is not defined, we know it'll inherit the value from DefaultMachinePlatform
+	mpool := aws.MachinePool{}
+	mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+	return len(mpool.IAMRole) == 0 && len(mpool.IAMProfile) == 0
+}
+
+// includesKMSEncryptionKey checks if any KMS encryption keys are included in the install-config.
+func includesKMSEncryptionKey(installConfig *types.InstallConfig) bool {
+	mpool := aws.MachinePool{}
+	mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+
+	if mp := installConfig.ControlPlane; mp != nil {
+		mpool.Set(mp.Platform.AWS)
+	}
+
+	for _, compute := range installConfig.Compute {
+		mpool.Set(compute.Platform.AWS)
+	}
+
+	return len(mpool.KMSKeyARN) > 0
+}
+
+// includesExistingInstanceProfile checks if at least one BYO instance profile is included in the install-config.
+func includesExistingInstanceProfile(installConfig *types.InstallConfig) bool {
+	mpool := aws.MachinePool{}
+	mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+
+	if mp := installConfig.ControlPlane; mp != nil {
+		mpool.Set(mp.Platform.AWS)
+	}
+
+	for _, compute := range installConfig.Compute {
+		mpool.Set(compute.Platform.AWS)
+	}
+
+	return len(mpool.IAMProfile) > 0
+}
+
+// includesCreateInstanceProfile checks if at least one instance profile will be created by the Installer.
+func includesCreateInstanceProfile(installConfig *types.InstallConfig) bool {
+	{
+		mpool := aws.MachinePool{}
+		mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+		if mp := installConfig.ControlPlane; mp != nil {
+			mpool.Set(mp.Platform.AWS)
+		}
+		if len(mpool.IAMProfile) == 0 {
+			return true
+		}
+	}
+
+	for _, compute := range installConfig.Compute {
+		mpool := aws.MachinePool{}
+		mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+		mpool.Set(compute.Platform.AWS)
+		if len(mpool.IAMProfile) == 0 {
+			return true
+		}
+	}
+
+	if len(installConfig.Compute) > 0 {
+		return false
+	}
+
+	// If compute stanza is not defined, we know it'll inherit the value from DefaultMachinePlatform
+	mpool := aws.MachinePool{}
+	mpool.Set(installConfig.AWS.DefaultMachinePlatform)
+	return len(mpool.IAMProfile) == 0
 }

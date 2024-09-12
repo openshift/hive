@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	configv1 "github.com/openshift/api/config/v1"
 	features "github.com/openshift/api/features"
@@ -17,7 +18,6 @@ import (
 	"github.com/openshift/installer/pkg/types/featuregates"
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
-	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/nutanix"
 	"github.com/openshift/installer/pkg/types/openstack"
@@ -281,10 +281,6 @@ type Platform struct {
 	// +optional
 	IBMCloud *ibmcloud.Platform `json:"ibmcloud,omitempty"`
 
-	// Libvirt is the configuration used when installing on libvirt.
-	// +optional
-	Libvirt *libvirt.Platform `json:"libvirt,omitempty"`
-
 	// None is the empty configuration used when installing on an unsupported
 	// platform.
 	None *none.Platform `json:"none,omitempty"`
@@ -347,8 +343,6 @@ func (p *Platform) Name() string {
 		return gcp.Name
 	case p.IBMCloud != nil:
 		return ibmcloud.Name
-	case p.Libvirt != nil:
-		return libvirt.Name
 	case p.None != nil:
 		return none.Name
 	case p.External != nil:
@@ -380,8 +374,7 @@ type Networking struct {
 	// MachineNetwork is the list of IP address pools for machines.
 	// This field replaces MachineCIDR, and if set MachineCIDR must
 	// be empty or match the first entry in the list.
-	// Default is 10.0.0.0/16 for all platforms other than libvirt and Power VS.
-	// For libvirt, the default is 192.168.126.0/24.
+	// Default is 10.0.0.0/16 for all platforms other than Power VS.
 	// For Power VS, the default is 192.168.0.0/24.
 	//
 	// +optional
@@ -528,6 +521,32 @@ type Capabilities struct {
 	AdditionalEnabledCapabilities []configv1.ClusterVersionCapability `json:"additionalEnabledCapabilities,omitempty"`
 }
 
+// GetEnabledCapabilities returns a set of enabled ClusterVersionCapabilities.
+func (c *InstallConfig) GetEnabledCapabilities() sets.Set[configv1.ClusterVersionCapability] {
+	enabledCaps := sets.Set[configv1.ClusterVersionCapability]{}
+	if c.Capabilities == nil || c.Capabilities.BaselineCapabilitySet == "" {
+		// when Capabilities and/or BaselineCapabilitySet is not specified, default is vCurrent
+		baseSet := configv1.ClusterVersionCapabilitySets[configv1.ClusterVersionCapabilitySetCurrent]
+		for _, cap := range baseSet {
+			enabledCaps.Insert(cap)
+		}
+	}
+	if c.Capabilities != nil {
+		if c.Capabilities.BaselineCapabilitySet != "" {
+			baseSet := configv1.ClusterVersionCapabilitySets[c.Capabilities.BaselineCapabilitySet]
+			for _, cap := range baseSet {
+				enabledCaps.Insert(cap)
+			}
+		}
+		if c.Capabilities.AdditionalEnabledCapabilities != nil {
+			for _, cap := range c.Capabilities.AdditionalEnabledCapabilities {
+				enabledCaps.Insert(cap)
+			}
+		}
+	}
+	return enabledCaps
+}
+
 // WorkerMachinePool retrieves the worker MachinePool from InstallConfig.Compute
 func (c *InstallConfig) WorkerMachinePool() *MachinePool {
 	for _, machinePool := range c.Compute {
@@ -569,24 +588,24 @@ func ClusterAPIFeatureGateEnabled(platform string, fgs featuregates.FeatureGate)
 
 	// Check if CAPI install is enabled for individual platforms.
 	switch platform {
-	case aws.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallAWS)
+	case aws.Name, azure.Name, gcp.Name, nutanix.Name, openstack.Name, powervs.Name, vsphere.Name:
+		return true
 	case azure.StackTerraformName, azure.StackCloud.Name():
 		return false
-	case azure.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallAzure)
-	case gcp.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallGCP)
 	case ibmcloud.Name:
 		return fgs.Enabled(features.FeatureGateClusterAPIInstallIBMCloud)
-	case nutanix.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallNutanix)
-	case openstack.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallOpenStack)
-	case powervs.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallPowerVS)
-	case vsphere.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallVSphere)
+	default:
+		return false
+	}
+}
+
+// MultiArchFeatureGateEnabled checks whether feature gate enabling multi-arch clusters is enabled.
+func MultiArchFeatureGateEnabled(platform string, fgs featuregates.FeatureGate) bool {
+	switch platform {
+	case aws.Name:
+		return fgs.Enabled(features.FeatureGateMultiArchInstallAWS)
+	case gcp.Name:
+		return fgs.Enabled(features.FeatureGateMultiArchInstallGCP)
 	default:
 		return false
 	}

@@ -189,6 +189,7 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 			DiskType:   defaultGCPDiskType,
 			DiskSizeGB: defaultGCPDiskSizeGB,
 		},
+		ServiceAccount: poolGCP.ServiceAccount,
 	}
 	if secureBoot := poolGCP.SecureBoot; secureBoot != "" {
 		computePool.Platform.GCP.SecureBoot = secureBoot

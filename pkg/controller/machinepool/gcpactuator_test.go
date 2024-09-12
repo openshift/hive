@@ -239,6 +239,20 @@ func TestGCPActuator(t *testing.T) {
 				generateGCPMachineSetName("worker", "zone1"): 3,
 			},
 		},
+		{
+			name: "generate machinesets with custom ServiceAccount",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.ServiceAccount = "custom@service.account"
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -340,6 +354,15 @@ func TestGCPActuator(t *testing.T) {
 					// OnHostMaintenance
 					if ohm := platform.OnHostMaintenance; ohm != "" {
 						assert.Equal(t, ohm, string(gcpProvider.OnHostMaintenance))
+					}
+
+					// ServiceAccount
+					if assert.Equal(t, 1, len(gcpProvider.ServiceAccounts), "expected exactly one service account") {
+						if sa := platform.ServiceAccount; sa != "" {
+							assert.Equal(t, sa, gcpProvider.ServiceAccounts[0].Email, "unexpected custom service account")
+						} else {
+							assert.Equal(t, testInfraID+"-w@test-gcp-project-id.iam.gserviceaccount.com", gcpProvider.ServiceAccounts[0].Email, "unexpected custom service account")
+						}
 					}
 				}
 			}

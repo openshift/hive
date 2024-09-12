@@ -33,6 +33,14 @@ type MachinePool struct {
 	// +kubebuilder:validation:Enum=Migrate;Terminate;
 	// +optional
 	OnHostMaintenance string `json:"onHostMaintenance,omitempty"`
+
+	// ServiceAccount is the email of a gcp service account to be attached to worker nodes
+	// in order to provide the permissions required by the cloud provider. For the default
+	// worker MachinePool, it is the user's responsibility to match this to the value
+	// provided in the install-config.
+	//
+	// +optional
+	ServiceAccount string `json:"serviceAccount,omitempty"`
 }
 
 // OSDisk defines the disk for machines on GCP.

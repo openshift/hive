@@ -1,6 +1,7 @@
 package machinepool
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -21,7 +22,7 @@ import (
 	testfake "github.com/openshift/hive/pkg/test/fake"
 	testmp "github.com/openshift/hive/pkg/test/machinepool"
 
-	clientconfig "github.com/gophercloud/utils/openstack/clientconfig"
+	clientconfig "github.com/gophercloud/utils/v2/openstack/clientconfig"
 )
 
 const (
@@ -87,7 +88,7 @@ func TestOpenStackActuator(t *testing.T) {
 			actuator := &OpenStackActuator{
 				logger:     log.WithField("actuator", "openstackactuator_test"),
 				kubeClient: remoteFakeClient,
-				trunkSupportDiscoverer: func(cloud, alias string, opts *clientconfig.ClientOpts) (bool, error) {
+				trunkSupportDiscoverer: func(ctx context.Context, cloud, alias string, opts *clientconfig.ClientOpts) (bool, error) {
 					return true, nil
 				},
 			}

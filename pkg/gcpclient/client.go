@@ -385,12 +385,13 @@ func (c *gcpClient) CreateForwardingRule(
 	defer cancel()
 
 	newForwardingRule := &compute.ForwardingRule{
-		Name:        forwardingRule,
-		Description: "",
-		IPAddress:   ipAddress,
-		Region:      region,
-		Subnetwork:  subnet,
-		Target:      target,
+		Name:                 forwardingRule,
+		AllowPscGlobalAccess: true,
+		Description:          "",
+		IPAddress:            ipAddress,
+		Region:               region,
+		Subnetwork:           subnet,
+		Target:               target,
 	}
 
 	op, err := c.computeClient.ForwardingRules.Insert(c.projectName, region, newForwardingRule).Context(ctx).Do()

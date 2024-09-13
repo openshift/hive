@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gophercloud/utils/openstack/clientconfig"
+	"github.com/gophercloud/utils/v2/openstack/clientconfig"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -33,7 +33,7 @@ type OpenStackActuator struct {
 	logger                 log.FieldLogger
 	osImage                string
 	kubeClient             client.Client
-	trunkSupportDiscoverer func(cloud, alias string, opts *clientconfig.ClientOpts) (bool, error)
+	trunkSupportDiscoverer func(ctx context.Context, cloud, alias string, opts *clientconfig.ClientOpts) (bool, error)
 }
 
 var _ Actuator = &OpenStackActuator{}
@@ -125,6 +125,7 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 	}
 
 	installerMachineSets, err := installosp.MachineSets(
+		context.TODO(),
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,

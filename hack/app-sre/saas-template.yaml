@@ -5953,6 +5953,13 @@ objects:
                           - Enabled
                           - Disabled
                           type: string
+                        serviceAccount:
+                          description: ServiceAccount is the email of a gcp service
+                            account to be attached to worker nodes in order to provide
+                            the permissions required by the cloud provider. For the
+                            default worker MachinePool, it is the user's responsibility
+                            to match this to the value provided in the install-config.
+                          type: string
                         type:
                           description: InstanceType defines the GCP instance type.
                             eg. n1-standard-4

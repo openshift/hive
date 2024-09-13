@@ -84,26 +84,23 @@ func ValidatePlatform(p *vsphere.Platform, agentBasedInstallation bool, fldPath 
 
 func validateVCenters(p *vsphere.Platform, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(p.VCenters) > 1 {
-		return field.ErrorList{field.TooMany(fldPath, len(p.VCenters), 1)}
-	}
 
-	for _, vCenter := range p.VCenters {
+	for index, vCenter := range p.VCenters {
 		if len(vCenter.Server) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("server"), "must be the domain name or IP address of the vCenter"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(index).Child("server"), "must be the domain name or IP address of the vCenter"))
 		} else {
 			if err := validate.Host(vCenter.Server); err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("server"), vCenter.Server, "must be the domain name or IP address of the vCenter"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(index).Child("server"), vCenter.Server, "must be the domain name or IP address of the vCenter"))
 			}
 		}
 		if len(vCenter.Username) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("username"), "must specify the username"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(index).Child("username"), "must specify the username"))
 		}
 		if len(vCenter.Password) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("password"), "must specify the password"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(index).Child("password"), "must specify the password"))
 		}
 		if len(vCenter.Datacenters) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("datacenters"), "must specify at least one datacenter"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(index).Child("datacenters"), "must specify at least one datacenter"))
 		}
 	}
 	return allErrs
@@ -186,6 +183,10 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			}
 		}
 
+		if len(failureDomain.Topology.Networks) > 1 {
+			allErrs = append(allErrs, field.Required(topologyFld.Child("networks"), "must specify a single network"))
+		}
+
 		// Folder in failuredomain is optional
 		if len(failureDomain.Topology.Folder) != 0 {
 			folderPathRegexp := regexp.MustCompile(`^/(.*?)/vm/(.*?)$`)
@@ -214,7 +215,7 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			}
 			datacenterName := clusterPathParts[1]
 
-			if len(failureDomain.Topology.Datacenter) != 0 && datacenterName != failureDomain.Topology.Datacenter {
+			if len(failureDomain.Topology.Datacenter) != 0 && !strings.Contains(failureDomain.Topology.Datacenter, datacenterName) {
 				return append(allErrs, field.Invalid(topologyFld.Child("computeCluster"), computeCluster, fmt.Sprintf("compute cluster must be in datacenter %s", failureDomain.Topology.Datacenter)))
 			}
 			p.FailureDomains[index].Topology.ComputeCluster = filepath.Clean(p.FailureDomains[index].Topology.ComputeCluster)
@@ -229,7 +230,7 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			}
 			datacenterName := resourcePoolPathParts[1]
 			clusterName := resourcePoolPathParts[2]
-			if len(failureDomain.Topology.Datacenter) != 0 && datacenterName != failureDomain.Topology.Datacenter {
+			if len(failureDomain.Topology.Datacenter) != 0 && !strings.Contains(failureDomain.Topology.Datacenter, datacenterName) {
 				return append(allErrs, field.Invalid(topologyFld.Child("resourcePool"), resourcePool, fmt.Sprintf("resource pool must be in datacenter %s", failureDomain.Topology.Datacenter)))
 			}
 			if len(failureDomain.Topology.ComputeCluster) != 0 && !strings.Contains(failureDomain.Topology.ComputeCluster, clusterName) {

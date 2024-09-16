@@ -167,13 +167,9 @@ func (o *UpdateInstallerImageOptions) Run() (returnErr error) {
 		o.log.WithField("installerImage", installerImage).Info("installer image overridden")
 	} else {
 		// Glean the installer image from the release metadata
-		installerTagName := "installer"
-		// If this is a bare metal install, we need to get the openshift-install binary from a different image with
-		// bare metal functionality compiled in. The binary is named the same and in the same location, so after swapping
-		// out what image to get it from, we can proceed with the code as we normally would.
-		if cd.Spec.Platform.BareMetal != nil {
-			installerTagName = "baremetal-installer"
-		}
+		// "baremetal-installer" is the legacy name for the fips compliant installer image
+		installerTagName := "baremetal-installer"
+
 		// Override annotation is allowed to override baremetal-installer too
 		if cd.Annotations != nil {
 			if override := cd.Annotations[constants.OverrideInstallerImageNameAnnotation]; override != "" {

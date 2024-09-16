@@ -30,6 +30,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		Version: ref.Version,
 		Kind:    ref.Kind,
 	}
+	var updated bool
 
 	logger = logger.WithField("clusterinstall", ref.Name).WithField("gvk", gvk)
 	logger.Debug("reconciling existing clusterinstall")
@@ -83,7 +84,6 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			continue
 		}
 
-		updated := false
 		conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 			hivev1.ClusterDeploymentConditionType("ClusterInstall"+cond.Type), // this transformation is part of the contract
 			cond.Status,
@@ -98,7 +98,6 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	// additionally copy failed to provision failed condition
 	// dereference the condition so that the reference isn't clobbered by other updates to the conditions array
 	clusterInstallFailed := *controllerutils.FindCondition(conditions, hivev1.ClusterInstallFailedClusterDeploymentCondition)
-	updated := false
 	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 		hivev1.ProvisionFailedCondition, // this transformation is part of the contract
 		clusterInstallFailed.Status,
@@ -118,7 +117,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 
 	clusterInstallRequirementsMet := controllerutils.FindCondition(conditions, hivev1.ClusterInstallRequirementsMetClusterDeploymentCondition)
 	if clusterInstallRequirementsMet.Status == corev1.ConditionTrue {
-		if !reflect.DeepEqual(cd.Status.InstallStartedTimestamp, &clusterInstallRequirementsMet.LastTransitionTime) {
+		if !cd.Status.InstallStartedTimestamp.Equal(&clusterInstallRequirementsMet.LastTransitionTime) {
 			cd.Status.InstallStartedTimestamp = &clusterInstallRequirementsMet.LastTransitionTime
 			statusModified = true
 
@@ -141,71 +140,76 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		msg = "Install attempts limit reached"
 	}
 
-	changedClusterDeploymentStoppedCondition := false
 	// Fun extra variable to keep track of whether we should increment metricProvisionFailedTerminal
 	// later; because we only want to do that if (we change that status and) the status update succeeds.
 	provisionFailedTerminal := false
-	conditions, changedClusterDeploymentStoppedCondition = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
+	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 		hivev1.ProvisionStoppedCondition,
 		clusterInstallStopped.Status,
 		reason,
 		msg,
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
-
-	if clusterInstallStopped.Status == corev1.ConditionTrue && !changedClusterDeploymentStoppedCondition {
-		// they are stopped, we are already stopped, exit early
-		return reconcile.Result{}, nil
+	if updated {
+		statusModified = true
 	}
 
 	// if we are still provisioning...
 	if clusterInstallStopped.Status != corev1.ConditionTrue && clusterInstallCompleted.Status != corev1.ConditionTrue && clusterInstallFailed.Status != corev1.ConditionTrue {
 		// let the end user know
-		changedProvisionedCondition := false
-		conditions, changedProvisionedCondition = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
+		conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionFalse,
 			hivev1.ProvisionedReasonProvisioning,
 			"Provisioning in progress",
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
-		if changedProvisionedCondition {
+		if updated {
 			statusModified = true
 		}
 	}
 
-	// if the cluster install has very recently become stopped...
-	if clusterInstallStopped.Status == corev1.ConditionTrue && changedClusterDeploymentStoppedCondition {
+	// if the cluster install is stopped...
+	if clusterInstallStopped.Status == corev1.ConditionTrue {
 
 		// ...and is also failed...
 		if clusterInstallFailed.Status == corev1.ConditionTrue {
 			// terminal state, we are not retrying anymore
-			statusModified = true
-			provisionFailedTerminal = true
-			conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+			conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 				hivev1.ProvisionedCondition,
 				corev1.ConditionFalse,
 				hivev1.ProvisionedReasonProvisionStopped,
 				"Provisioning failed terminally (see the ProvisionStopped condition for details)",
 				controllerutils.UpdateConditionIfReasonOrMessageChange,
 			)
+			if updated {
+				statusModified = true
+				provisionFailedTerminal = true
+			}
 		}
 
 		// ...and is complete...
 		if clusterInstallCompleted.Status == corev1.ConditionTrue {
 			// we are done provisioning
-			cd.Spec.Installed = true
-			cd.Status.InstalledTimestamp = &clusterInstallCompleted.LastTransitionTime
-			conditions = controllerutils.SetClusterDeploymentCondition(
+			if !cd.Spec.Installed {
+				cd.Spec.Installed = true
+				specModified = true
+			}
+			if !cd.Status.InstalledTimestamp.Equal(&clusterInstallCompleted.LastTransitionTime) {
+				cd.Status.InstalledTimestamp = &clusterInstallCompleted.LastTransitionTime
+				statusModified = true
+			}
+			conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 				conditions,
 				hivev1.ProvisionedCondition,
 				corev1.ConditionTrue,
 				hivev1.ProvisionedReasonProvisioned,
 				"Cluster is provisioned",
-				controllerutils.UpdateConditionAlways,
+				controllerutils.UpdateConditionIfReasonOrMessageChange,
 			)
-			specModified = true
-			statusModified = true
+			if updated {
+				statusModified = true
+			}
 
 			installStartTime := ci.CreationTimestamp
 			if cd.Status.InstallStartedTimestamp != nil {
@@ -235,47 +239,61 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		// ...and is not failed or completed...
 		if clusterInstallFailed.Status != corev1.ConditionTrue && clusterInstallCompleted.Status != corev1.ConditionTrue {
 			// terminal state, cluster install contract has been violated
-			statusModified = true
-			provisionFailedTerminal = true
-			conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+			conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 				hivev1.ProvisionedCondition,
 				corev1.ConditionUnknown,
 				"Error",
 				"Invalid ClusterInstall conditions. Please report this bug.",
 				controllerutils.UpdateConditionIfReasonOrMessageChange,
 			)
+			if updated {
+				statusModified = true
+				provisionFailedTerminal = true
+			}
 		}
 	}
 
 	// if the cluster install is completed without being stopped...
 	if clusterInstallStopped.Status != corev1.ConditionTrue && clusterInstallCompleted.Status == corev1.ConditionTrue {
 		// terminal state, cluster install contract has been violated
-		statusModified = true
-		provisionFailedTerminal = true
-		conditions = controllerutils.SetClusterDeploymentCondition(conditions,
+		conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
 			hivev1.ProvisionedCondition,
 			corev1.ConditionUnknown,
 			"Error",
 			"Invalid ClusterInstall conditions. Please report this bug.",
 			controllerutils.UpdateConditionIfReasonOrMessageChange,
 		)
-	}
-
-	if specModified {
-		if err := r.Update(context.TODO(), cd); err != nil {
-			logger.WithError(err).Error("failed to update the spec of clusterdeployment")
-			return reconcile.Result{}, err
+		if updated {
+			statusModified = true
+			provisionFailedTerminal = true
 		}
 	}
+
 	if statusModified {
 		cd.Status.Conditions = conditions
+		// Status update overwrites the whole object with what's returned from the server,
+		// which reverts spec changes made above. Make a copy so we can reinstate our spec
+		// changes.
+		specSave := cd.Spec.DeepCopy()
 		if err := r.Status().Update(context.TODO(), cd); err != nil {
 			logger.WithError(err).Error("failed to update the status of clusterdeployment")
 			return reconcile.Result{}, err
 		}
+		// reinstate our spec changes
+		cd.Spec = *specSave
 		// If we declared the provision terminally failed, bump our metric
 		if provisionFailedTerminal {
 			incProvisionFailedTerminal(cd)
+		}
+	}
+	// Do the spec update after the status update. Otherwise, if the former succeeded but the
+	// latter failed, we could be setting cd.Spec.Installed to true, making subsequent reconciles
+	// skip this routine, thus never syncing the status correctly.
+	// ACM-13064
+	if specModified {
+		if err := r.Update(context.TODO(), cd); err != nil {
+			logger.WithError(err).Error("failed to update the spec of clusterdeployment")
+			return reconcile.Result{}, err
 		}
 	}
 

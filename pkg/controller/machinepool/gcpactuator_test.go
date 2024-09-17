@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
+	installerplatform "github.com/openshift/installer/pkg/types/gcp"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
@@ -253,6 +254,31 @@ func TestGCPActuator(t *testing.T) {
 				generateGCPMachineSetName("worker", "zone1"): 3,
 			},
 		},
+		{
+			name: "generate machinesets with custom UserTags",
+			pool: func() *hivev1.MachinePool {
+				pool := testGCPPool(testPoolName)
+				pool.Spec.Platform.GCP.UserTags = []installerplatform.UserTag{
+					{
+						ParentID: "bparent",
+						Key:      "bkey",
+						Value:    "bvalue",
+					},
+					{
+						ParentID: "aparent",
+						Key:      "akey",
+						Value:    "avalue",
+					},
+				}
+				return pool
+			}(),
+			mockGCPClient: func(client *mockgcp.MockClient) {
+				mockListComputeZones(client, []string{"zone1"}, testRegion)
+			},
+			expectedMachineSetReplicas: map[string]int64{
+				generateGCPMachineSetName("worker", "zone1"): 3,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -362,6 +388,22 @@ func TestGCPActuator(t *testing.T) {
 							assert.Equal(t, sa, gcpProvider.ServiceAccounts[0].Email, "unexpected custom service account")
 						} else {
 							assert.Equal(t, testInfraID+"-w@test-gcp-project-id.iam.gserviceaccount.com", gcpProvider.ServiceAccounts[0].Email, "unexpected custom service account")
+						}
+					}
+
+					// UserTags
+					if eTags := platform.UserTags; len(eTags) != 0 {
+						if aTags := gcpProvider.ResourceManagerTags; assert.Equal(t, len(eTags), len(aTags), "unexpected number of userTags") {
+							uta := make([]string, len(eTags))
+							for _, ut := range eTags {
+								uta = append(uta, fmt.Sprintf("%s|%s|%s", ut.ParentID, ut.Key, ut.Value))
+							}
+							rmta := make([]string, len(aTags))
+							for _, rmt := range aTags {
+								rmta = append(rmta, fmt.Sprintf("%s|%s|%s", rmt.ParentID, rmt.Key, rmt.Value))
+							}
+							// We don't particularly care about the order
+							assert.ElementsMatch(t, uta, rmta, "mismatched userTags")
 						}
 					}
 				}
@@ -813,7 +855,12 @@ func TestGetNetwork(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			scheme := scheme.GetScheme()
-			network, subnet, actualErr := getNetwork(tc.remoteMachineSets, scheme, log.StandardLogger())
+			var _ *runtime.Scheme = scheme
+			var (
+				network, subnet string
+				actualErr       error
+			)
+			network, subnet, actualErr = getNetwork(tc.remoteMachineSets, log.FieldLogger(log.StandardLogger()))
 			if tc.expectError {
 				assert.Error(t, actualErr, "expected an error")
 			} else {

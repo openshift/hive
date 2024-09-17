@@ -1,5 +1,7 @@
 package gcp
 
+import installerplatform "github.com/openshift/installer/pkg/types/gcp"
+
 // MachinePool stores the configuration for a machine pool installed on GCP.
 type MachinePool struct {
 	// Zones is list of availability zones that can be used.
@@ -41,6 +43,12 @@ type MachinePool struct {
 	//
 	// +optional
 	ServiceAccount string `json:"serviceAccount,omitempty"`
+
+	// userTags has additional keys and values that we will add as tags to the providerSpec of
+	// MachineSets that we creates on GCP. Tag key and tag value should be the shortnames of the
+	// tag key and tag value resource. Consumer is responsible for using this only for spokes
+	// where custom tags are supported.
+	UserTags []installerplatform.UserTag `json:"userTags,omitempty"`
 }
 
 // OSDisk defines the disk for machines on GCP.

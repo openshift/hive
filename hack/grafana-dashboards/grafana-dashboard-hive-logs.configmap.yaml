@@ -1,0 +1,325 @@
+apiVersion: v1
+data:
+  Hive-logs.json: |-
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": 936510,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "P1A97A9592CB7F392"
+          },
+          "gridPos": {
+            "h": 29,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": true,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": false,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "P1A97A9592CB7F392"
+              },
+              "dimensions": {},
+              "expression": "fields @timestamp, @message, level |\nfilter kubernetes.pod_name like /$pod/ |\nfilter level like /(?i)$log_level/ |\nparse message \"controller=* \" as @controller |\nfilter @controller like /(?i)$controller/ |\nparse message \"clusterDeployment=*/* \" as @namespace, @name |\nfilter @name like /(?i)$name/ |\nfilter @namespace like /(?i)$namespace/ |\nfilter message like /(?i)$text/ |\ndisplay @timestamp, message, level |\nsort @timestamp desc |\nlimit 20",
+              "id": "",
+              "label": "",
+              "logGroups": [
+                {
+                  "arn": "$log_group",
+                  "name": "$log_group"
+                }
+              ],
+              "matchExact": true,
+              "metricEditorMode": 0,
+              "metricName": "",
+              "metricQueryType": 0,
+              "namespace": "",
+              "period": "",
+              "queryMode": "Logs",
+              "refId": "A",
+              "region": "$region",
+              "sqlExpression": "",
+              "statistic": "Average",
+              "statsGroups": []
+            }
+          ],
+          "title": "Logs",
+          "type": "logs"
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": [],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "selected": false,
+              "text": "us-east-1",
+              "value": "us-east-1"
+            },
+            "description": "Region of the hive shard",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Region",
+            "multi": false,
+            "name": "region",
+            "options": [
+              {
+                "selected": true,
+                "text": "us-east-1",
+                "value": "us-east-1"
+              },
+              {
+                "selected": false,
+                "text": "us-east-2",
+                "value": "us-east-2"
+              },
+              {
+                "selected": false,
+                "text": "us-west-1",
+                "value": "us-west-1"
+              },
+              {
+                "selected": false,
+                "text": "us-west-2",
+                "value": "us-west-2"
+              },
+              {
+                "selected": false,
+                "text": "eu-west-2",
+                "value": "eu-west-2"
+              }
+            ],
+            "query": "us-east-1, us-east-2, us-west-1, us-west-2, eu-west-2",
+            "queryValue": "",
+            "skipUrlSync": false,
+            "type": "custom"
+          },
+          {
+            "current": {
+              "selected": true,
+              "text": "hivep01ue1.hive",
+              "value": "hivep01ue1.hive"
+            },
+            "datasource": {
+              "type": "cloudwatch",
+              "uid": "P1A97A9592CB7F392"
+            },
+            "definition": "",
+            "description": "The log groups of hive shards available for the selected region.",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Log Group",
+            "multi": false,
+            "name": "log_group",
+            "options": [],
+            "query": {
+              "logGroupPrefix": "hive",
+              "queryType": "logGroups",
+              "refId": "CloudWatchVariableQueryEditor-VariableQuery",
+              "region": "$region"
+            },
+            "refresh": 2,
+            "regex": "/.*log-group:(.+[.]hive)/",
+            "skipUrlSync": false,
+            "sort": 0,
+            "type": "query"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "hive-controllers",
+              "value": "hive-controllers"
+            },
+            "description": "Hive pod for which the logs will be displayed",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Pod",
+            "multi": false,
+            "name": "pod",
+            "options": [
+              {
+                "selected": false,
+                "text": "hive-operator",
+                "value": "hive-operator"
+              },
+              {
+                "selected": true,
+                "text": "hive-controllers",
+                "value": "hive-controllers"
+              },
+              {
+                "selected": false,
+                "text": "hive-clustersync",
+                "value": "hive-clustersync"
+              },
+              {
+                "selected": false,
+                "text": "hive-machinepool",
+                "value": "hive-machinepool"
+              }
+            ],
+            "query": "hive-operator, hive-controllers, hive-clustersync, hive-machinepool",
+            "queryValue": "",
+            "skipUrlSync": false,
+            "type": "custom"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "",
+              "value": ""
+            },
+            "description": "Use this to filter logs of a certain type (info, debug, error etc)",
+            "hide": 0,
+            "label": "Log Level",
+            "name": "log_level",
+            "options": [
+              {
+                "selected": true,
+                "text": "",
+                "value": ""
+              }
+            ],
+            "query": "",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "",
+              "value": ""
+            },
+            "description": "Display the logs by a particular controller.",
+            "hide": 0,
+            "label": "Controller",
+            "name": "controller",
+            "options": [
+              {
+                "selected": true,
+                "text": "",
+                "value": ""
+              }
+            ],
+            "query": "",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "",
+              "value": ""
+            },
+            "description": "Namespace of the clusterdeployment. If provided, only the logs pertaining to that namespace will be displayed.",
+            "hide": 0,
+            "label": "Namespace",
+            "name": "namespace",
+            "options": [
+              {
+                "selected": true,
+                "text": "",
+                "value": ""
+              }
+            ],
+            "query": "",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "",
+              "value": ""
+            },
+            "description": "Name of the clusterdeployment. If present, only the logs pertaining to that clusterdeployment will be displayed",
+            "hide": 0,
+            "label": "CD Name",
+            "name": "name",
+            "options": [
+              {
+                "selected": true,
+                "text": "",
+                "value": ""
+              }
+            ],
+            "query": "",
+            "skipUrlSync": false,
+            "type": "textbox"
+          },
+          {
+            "current": {
+              "selected": false,
+              "text": "",
+              "value": ""
+            },
+            "description": "Any text that you would want to be filtered. Not case sensitive. Some special characters might need to be escaped",
+            "hide": 0,
+            "label": "Text",
+            "name": "text",
+            "options": [
+              {
+                "selected": true,
+                "text": "",
+                "value": ""
+              }
+            ],
+            "query": "",
+            "skipUrlSync": false,
+            "type": "textbox"
+          }
+        ]
+      },
+      "time": {
+        "from": "now-5m",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Hive Logs",
+      "uid": "edy3mdkcmzfnkb",
+      "version": 13,
+      "weekStart": ""
+    }
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-hive-logs
+  labels:
+    grafana_dashboard: "true"
+  annotations:
+    # refers to the folder in which your dashboard is stored in the Grafana Dashboards UI
+    grafana-folder: /grafana-dashboard-definitions/Hive

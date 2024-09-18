@@ -85,13 +85,15 @@ func NewGCPActuator(
 		return nil, err
 	}
 
-	imageID, err := getGCPImageID(masterMachine, pool, scheme, logger)
+	var imageID string
+	imageID, err = getGCPImageID(masterMachine, pool, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting image ID from master machine")
 		return nil, err
 	}
 
-	network, subnet, err := getNetwork(remoteMachineSets, scheme, logger)
+	var network, subnet string
+	network, subnet, err = getNetwork(remoteMachineSets, logger)
 	if err != nil {
 		logger.WithError(err).Error("error getting network information from remote machines")
 		return nil, err
@@ -175,6 +177,7 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 				ComputeSubnet:    a.subnet,
 				Network:          a.network,
 				NetworkProjectID: poolGCP.NetworkProjectID,
+				UserTags:         poolGCP.UserTags,
 			},
 		},
 	}
@@ -377,7 +380,7 @@ func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDe
 					Kind:       "MachinePool",
 					Name:       pool.Name,
 					UID:        pool.UID,
-					Controller: pointer.BoolPtr(true),
+					Controller: pointer.Bool(true),
 				},
 			},
 		},
@@ -460,7 +463,7 @@ func requireLeases(clusterVersion string, remoteMachineSets []machineapi.Machine
 }
 
 // Get the image ID from an existing master machine *or* the override annotation.
-func getGCPImageID(masterMachine *machineapi.Machine, pool *hivev1.MachinePool, scheme *runtime.Scheme, logger log.FieldLogger) (string, error) {
+func getGCPImageID(masterMachine *machineapi.Machine, pool *hivev1.MachinePool, logger log.FieldLogger) (string, error) {
 	imageID, ok := pool.Annotations[hivev1.MachinePoolImageIDOverrideAnnotation]
 	if ok && imageID != "" {
 		logger.
@@ -485,8 +488,7 @@ func getGCPImageID(masterMachine *machineapi.Machine, pool *hivev1.MachinePool, 
 
 // getNetwork retrieves the network information (Network name and subnet)
 // from existing machines on the remote cluster.
-func getNetwork(remoteMachineSets []machineapi.MachineSet,
-	scheme *runtime.Scheme, logger log.FieldLogger) (string, string, error) {
+func getNetwork(remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (string, string, error) {
 	if len(remoteMachineSets) == 0 {
 		return "", "", nil
 	}

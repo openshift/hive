@@ -72,6 +72,11 @@ type HiveConfigSpec struct {
 	// The default interval is 30m.
 	MachinePoolPollInterval string `json:"machinePoolPollInterval,omitempty"`
 
+	// ClusterVersionPollInterval is a string duration indicating how much time must pass before checking
+	// whether we need to update the hive.openshift.io/version* labels on ClusterDeployment. If zero or unset,
+	// we'll only reconcile when the ClusterDeployment changes.
+	ClusterVersionPollInterval string `json:"clusterVersionPollInterval,omitempty"`
+
 	// MaintenanceMode can be set to true to disable the hive controllers in situations where we need to ensure
 	// nothing is running that will add or act upon finalizers on Hive types. This should rarely be needed.
 	// Sets replicas to 0 for the hive-controllers deployment to accomplish this.

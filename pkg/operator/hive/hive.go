@@ -150,6 +150,15 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hiveContainer.Env = append(hiveContainer.Env, machinePoolPollIntervalEnvVar)
 	}
 
+	if clusterVersionPollInterval := instance.Spec.ClusterVersionPollInterval; clusterVersionPollInterval != "" {
+		clusterVersionPollIntervalEnvVar := corev1.EnvVar{
+			Name:  constants.ClusterVersionPollIntervalEnvVar,
+			Value: clusterVersionPollInterval,
+		}
+
+		hiveContainer.Env = append(hiveContainer.Env, clusterVersionPollIntervalEnvVar)
+	}
+
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, managedDomainsConfigMapInfo, hiveContainer)
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, awsPrivateLinkConfigMapInfo, hiveContainer)
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, privateLinkConfigMapInfo, hiveContainer)

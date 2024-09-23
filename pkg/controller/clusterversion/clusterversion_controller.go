@@ -3,7 +3,10 @@ package clusterversion
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/blang/semver/v4"
 	log "github.com/sirupsen/logrus"
@@ -155,8 +158,23 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
+	var requeueAfter time.Duration
+	if envPollInterval := os.Getenv(constants.ClusterVersionPollIntervalEnvVar); len(envPollInterval) > 0 {
+		var err error
+		requeueAfter, err = time.ParseDuration(envPollInterval)
+		if err != nil {
+			cdLog.WithError(err).WithField("pollInterval", envPollInterval).Errorf("unable to parse %s, disabling poll interval", constants.ClusterVersionPollIntervalEnvVar)
+			os.Setenv(constants.ClusterVersionPollIntervalEnvVar, "")
+			// Deliberately not returning an error here to avoid an extra reconcile
+		} else if requeueAfter > 0 {
+			// Add a random fraction of a second jitter to reduce bunching
+			requeueAfter += time.Duration(rand.Float64() * float64(time.Second))
+			cdLog.WithField("requeueAfter", requeueAfter).Debug("using requeue time")
+		}
+	}
+
 	cdLog.Debug("reconcile complete")
-	return reconcile.Result{}, nil
+	return reconcile.Result{RequeueAfter: requeueAfter}, nil
 }
 
 func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {

@@ -539,6 +539,11 @@ const (
 	// of remote objects corresponding to MachinePools. It is how we plumb HiveConfig.Spec.MachinePoolPollInterval
 	// from hive-operator through to the machinepool controller.
 	MachinePoolPollIntervalEnvVar = "MACHINEPOOL_POLL_INTERVAL"
+
+	// ClusterVersionPollIntervalEnvVar is a Duration string indicating the interval (plus jitter) between polls
+	// of the clusterversion controller, which syncs hive.openshift.io/version* labels. It is how we plumb
+	// HiveConfig.Spec.ClusterVersionPollInterval from hive-operator through to the clusterversion controller.
+	ClusterVersionPollIntervalEnvVar = "CLUSTERVERSION_POLL_INTERVAL"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

@@ -218,6 +218,12 @@ spec:
                         type: string
                     type: object
                 type: object
+              clusterVersionPollInterval:
+                description: ClusterVersionPollInterval is a string duration indicating
+                  how much time must pass before checking whether we need to update
+                  the hive.openshift.io/version* labels on ClusterDeployment. If zero
+                  or unset, we'll only reconcile when the ClusterDeployment changes.
+                type: string
               controllersConfig:
                 description: ControllersConfig is used to configure different hive
                   controllers

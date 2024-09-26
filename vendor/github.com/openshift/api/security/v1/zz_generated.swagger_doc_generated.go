@@ -178,6 +178,7 @@ var map_SecurityContextConstraints = map[string]string{
 	"allowHostPorts":                  "AllowHostPorts determines if the policy allows host ports in the containers.",
 	"allowHostPID":                    "AllowHostPID determines if the policy allows host pid in the containers.",
 	"allowHostIPC":                    "AllowHostIPC determines if the policy allows host ipc in the containers.",
+	"userNamespaceLevel":              "userNamespaceLevel determines if the policy allows host users in containers. Valid values are \"AllowHostLevel\", \"RequirePodLevel\", and omitted. When \"AllowHostLevel\" is set, a pod author may set `hostUsers` to either `true` or `false`. When \"RequirePodLevel\" is set, a pod author must set `hostUsers` to `false`. When omitted, the default value is \"AllowHostLevel\".",
 	"defaultAllowPrivilegeEscalation": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
 	"allowPrivilegeEscalation":        "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
 	"seLinuxContext":                  "SELinuxContext is the strategy that will dictate what labels will be set in the SecurityContext.",

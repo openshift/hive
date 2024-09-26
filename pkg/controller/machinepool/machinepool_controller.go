@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"reflect"
 	"sort"
@@ -23,15 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -94,12 +92,24 @@ func Add(mgr manager.Manager) error {
 		return err
 	}
 
+	pollInterval := defaultPollInterval
+	if envPollInterval := os.Getenv(constants.MachinePoolPollIntervalEnvVar); len(envPollInterval) > 0 {
+		var err error
+		pollInterval, err = time.ParseDuration(envPollInterval)
+		if err != nil {
+			log.WithError(err).WithField("reapplyInterval", envPollInterval).Errorf("unable to parse %s", constants.MachinePoolPollIntervalEnvVar)
+			return err
+		}
+	}
+	logger.Infof("using poll interval of %s", pollInterval)
+
 	r := &ReconcileMachinePool{
 		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
 		scheme:       scheme,
 		logger:       logger,
 		expectations: controllerutils.NewExpectations(logger),
 		ordinalID:    ordinalID,
+		pollInterval: pollInterval,
 	}
 	r.actuatorBuilder = func(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, masterMachine *machineapi.Machine, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) (Actuator, error) {
 		return r.createActuator(cd, pool, masterMachine, remoteMachineSets, logger)
@@ -135,25 +145,6 @@ func Add(mgr manager.Manager) error {
 		controllerutils.IsClusterDeploymentErrorUpdateEvent)))
 	if err != nil {
 		return err
-	}
-
-	pollInterval := defaultPollInterval
-	if envPollInterval := os.Getenv(constants.MachinePoolPollIntervalEnvVar); len(envPollInterval) > 0 {
-		var err error
-		pollInterval, err = time.ParseDuration(envPollInterval)
-		if err != nil {
-			log.WithError(err).WithField("reapplyInterval", envPollInterval).Errorf("unable to parse %s", constants.MachinePoolPollIntervalEnvVar)
-			return err
-		}
-	}
-
-	// Periodically watch MachinePools for syncing status from external clusters -- but allow this to be
-	// disabled via HiveConfig.Spec.MachinePoolPollInterval <= 0
-	if pollInterval > 0 {
-		err = c.Watch(newPeriodicSource(r.Client, pollInterval, r.logger)) // FIXME unsure how to handle this
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -209,6 +200,10 @@ type ReconcileMachinePool struct {
 
 	// Which hive-machinepool StatefulSet replica this reconciler instance is running in.
 	ordinalID int64
+
+	// pollInterval is the maximum time we'll wait before re-reconciling a given MachinePool.
+	// Zero to disable (re-reconcile will be prompted by the usual things, e.g. CR updates).
+	pollInterval time.Duration
 }
 
 // Reconcile reads that state of the cluster for a MachinePool object and makes changes to the
@@ -329,6 +324,15 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
+	ret, err := r.reconcile(pool, cd, logger)
+	if err == nil && r.pollInterval > 0 && ret.RequeueAfter == 0 {
+		ret.RequeueAfter = r.pollInterval + time.Duration(rand.Float64()*float64(time.Second))
+		logger.WithField("RequeueAfter", ret.RequeueAfter).Info("requeueing with interval")
+	}
+	return ret, err
+}
+
+func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
 	remoteClusterAPIClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
 		cd,
 		r.remoteClusterAPIClientBuilder(cd),
@@ -341,7 +345,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 
 	logger.Info("reconciling machine pool for cluster deployment")
 
-	masterMachine, err := r.getMasterMachine(cd, remoteClusterAPIClient, logger)
+	masterMachine, err := r.getMasterMachine(remoteClusterAPIClient, logger)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -383,7 +387,7 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineAutoscalers")
 		return reconcile.Result{}, err
 	}
-	if err := r.syncClusterAutoscaler(pool, cd, remoteClusterAPIClient, logger); err != nil {
+	if err := r.syncClusterAutoscaler(pool, remoteClusterAPIClient, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncClusterAutoscaler")
 		return reconcile.Result{}, err
 	}
@@ -413,7 +417,6 @@ func (r *ReconcileMachinePool) getInfrastructure(remoteClusterAPIClient client.C
 }
 
 func (r *ReconcileMachinePool) getMasterMachine(
-	cd *hivev1.ClusterDeployment,
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
 ) (*machineapi.Machine, error) {
@@ -1044,7 +1047,6 @@ func (r *ReconcileMachinePool) syncMachineAutoscalers(
 
 func (r *ReconcileMachinePool) syncClusterAutoscaler(
 	pool *hivev1.MachinePool,
-	cd *hivev1.ClusterDeployment,
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
 ) error {
@@ -1400,72 +1402,6 @@ func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool
 	}
 
 	return false
-}
-
-// periodicSource uses the client to list the machinepools
-// every duration (including some jitter) and creates a Generic
-// event for each object.
-// this is useful to create a steady stream of reconcile requests
-// when some of the changes cannot be models in Watches.
-type periodicSource struct {
-	client     client.Client
-	duration   time.Duration
-	predicates []predicate.TypedPredicate[*hivev1.MachinePool]
-	logger     log.FieldLogger
-}
-
-func newPeriodicSource(c client.Client, d time.Duration, logger log.FieldLogger, prcts ...predicate.TypedPredicate[*hivev1.MachinePool]) *periodicSource {
-	ps := &periodicSource{
-		client:   c,
-		duration: d,
-		logger:   logger,
-	}
-	for _, p := range prcts {
-		ps.predicates = append(ps.predicates, p) // FIXME confirm how to use predicates and where to define
-	}
-	return ps
-}
-
-// Start is internal and should be called only by the Controller to register an EventHandler with the Informer
-// to enqueue reconcile.Requests.
-func (ps *periodicSource) Start(ctx context.Context,
-	queue workqueue.RateLimitingInterface) error {
-
-	go wait.JitterUntilWithContext(ctx, ps.syncFunc(&handler.TypedEnqueueRequestForObject[*hivev1.MachinePool]{}, queue, ps.predicates...), ps.duration, 0.1, true)
-	return nil
-}
-
-func (ps *periodicSource) syncFunc(handler handler.TypedEventHandler[*hivev1.MachinePool],
-	queue workqueue.RateLimitingInterface,
-	prcts ...predicate.TypedPredicate[*hivev1.MachinePool]) func(context.Context) {
-
-	return func(ctx context.Context) {
-		mpList := &hivev1.MachinePoolList{}
-		err := ps.client.List(ctx, mpList)
-		if err != nil {
-			ps.logger.WithError(err).Error("failed to list MachinePools")
-			return
-		}
-
-		for idx := range mpList.Items {
-			evt := event.TypedGenericEvent[*hivev1.MachinePool]{Object: &mpList.Items[idx]}
-
-			shouldHandle := true
-			for _, p := range prcts {
-				if !p.Generic(evt) {
-					shouldHandle = false
-				}
-			}
-
-			if shouldHandle {
-				handler.Generic(ctx, evt, queue)
-			}
-		}
-	}
-}
-
-func (ps *periodicSource) String() string {
-	return fmt.Sprintf("periodic source for MachinePools every %s", ps.duration)
 }
 
 // IsErrorUpdateEvent returns true when the update event for MachinePool is from

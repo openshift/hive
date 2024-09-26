@@ -20,6 +20,11 @@ import (
 	"github.com/openshift/hive/pkg/gcpclient"
 )
 
+const (
+	// Default cidr to use for the service attachment subnet.
+	defaultServiceAttachmentSubnetCidr = "192.168.0.0/29"
+)
+
 // Ensure GCPLinkActuator implements the Actuator interface. This will fail at compile time when false.
 var _ actuator.Actuator = &GCPLinkActuator{}
 
@@ -81,6 +86,11 @@ func (a *GCPLinkActuator) Cleanup(cd *hivev1.ClusterDeployment, metadata *hivev1
 		return errors.Wrap(err, "error cleaning up service attachment")
 	}
 
+	// Skip the remaining subnet components when using a preexisting subnet.
+	if subnetName := getServiceAttachmentSubnetExistingName(cd); subnetName != "" {
+		return nil
+	}
+
 	if err := a.cleanupServiceAttachmentFirewall(cd, metadata, logger); err != nil {
 		return errors.Wrap(err, "error cleaning up service attachment firewall")
 	}
@@ -111,11 +121,14 @@ func (a *GCPLinkActuator) CleanupRequired(cd *hivev1.ClusterDeployment) bool {
 		return false
 	}
 
+	// The subnet resources do not need to be cleaned up if a preexisting subnet was used.
+	shouldCleanupSubnet := getServiceAttachmentSubnetExistingName(cd) == ""
+
 	return cd.Status.Platform.GCP.PrivateServiceConnect.Endpoint != "" ||
 		cd.Status.Platform.GCP.PrivateServiceConnect.EndpointAddress != "" ||
 		cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachment != "" ||
-		cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentFirewall != "" ||
-		cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentSubnet != ""
+		(shouldCleanupSubnet && cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentFirewall != "") ||
+		(shouldCleanupSubnet && cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentSubnet != "")
 }
 
 // Reconcile is the actuator interface for reconciling the cloud resources.
@@ -127,15 +140,6 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 		return reconcile.Result{}, errors.Wrap(err, "error choosing a Subnet for the Endpoint")
 	}
 
-	network, err := a.gcpClientSpoke.GetNetwork(metadata.InfraID + "-network")
-	if isNotFound(err) {
-		logger.Debug("waiting for cluster network to be provisioned, will retry soon.")
-		return requeueLater, nil
-	}
-	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "failed to find the cluster Network")
-	}
-
 	forwardingRule, err := a.gcpClientSpoke.GetForwardingRule(metadata.InfraID+"-api-internal", cd.Spec.Platform.GCP.Region)
 	if isNotFound(err) {
 		logger.Debug("waiting for cluster api forwarding rule to be provisioned, will retry soon.")
@@ -145,45 +149,61 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 		return reconcile.Result{}, errors.Wrap(err, "failed to find the cluster api Forwarding Rule")
 	}
 
-	logger.Debug("reconciling Service Attachment Subnet")
-	subnetModified, subnet, err := a.ensureServiceAttachmentSubnet(cd, metadata, network)
-	if err != nil {
-		logger.WithError(err).Error("failed to reconcile the Service Attachment Subnet")
-
-		err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentSubnetReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
+	var subnet *compute.Subnetwork
+	// Use a preexisting subnet if configured.
+	if subnetName := getServiceAttachmentSubnetExistingName(cd); subnetName != "" {
+		subnet, err = a.gcpClientSpoke.GetSubnet(subnetName, cd.Spec.Platform.GCP.Region, getServiceAttachmentSubnetExistingProject(cd))
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			return reconcile.Result{}, errors.Wrap(err, "failed to find the specified service attachment subnet")
 		}
-		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Service Attachment Subnet")
-	}
-	if subnetModified {
-		err := conditions.SetReadyConditionWithRetry(*a.client, cd, corev1.ConditionFalse,
-			"ReconciledServiceAttachmentSubnet",
-			"reconciled the Service Attachment Subnet",
-			logger)
+		logger.WithField("subnetName", subnet.Name).Debug("reconciling Service Attachment Subnet: using existing subnet")
+	} else { // Otherwise create a new subnet
+		network, err := a.gcpClientSpoke.GetNetwork(metadata.InfraID + "-network")
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			return reconcile.Result{}, errors.Wrap(err, "failed to find the cluster Network")
 		}
-	}
 
-	logger.Debug("reconciling Service Attachment Firewall")
-	firewallModified, _, err := a.ensureServiceAttachmentFirewall(cd, metadata, network)
-	if err != nil {
-		logger.WithError(err).Error("failed to reconcile the Service Attachment Firewall")
-
-		err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentFirewallReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
+		logger.Debug("reconciling Service Attachment Subnet")
+		subnetModified, newSubnet, err := a.ensureServiceAttachmentSubnet(cd, metadata, network)
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			logger.WithError(err).Error("failed to reconcile the Service Attachment Subnet")
+
+			err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentSubnetReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
+			if err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			}
+			return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Service Attachment Subnet")
 		}
-		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Service Attachment Firwall")
-	}
-	if firewallModified {
-		err := conditions.SetReadyConditionWithRetry(*a.client, cd, corev1.ConditionFalse,
-			"ReconciledServiceAttachmentFirewall",
-			"reconciled the Service Attachment Firewall",
-			logger)
+		if subnetModified {
+			err := conditions.SetReadyConditionWithRetry(*a.client, cd, corev1.ConditionFalse,
+				"ReconciledServiceAttachmentSubnet",
+				"reconciled the Service Attachment Subnet",
+				logger)
+			if err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			}
+		}
+		subnet = newSubnet
+
+		logger.Debug("reconciling Service Attachment Firewall")
+		firewallModified, _, err := a.ensureServiceAttachmentFirewall(cd, metadata, network)
 		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			logger.WithError(err).Error("failed to reconcile the Service Attachment Firewall")
+
+			err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentFirewallReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
+			if err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			}
+			return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Service Attachment Firwall")
+		}
+		if firewallModified {
+			err := conditions.SetReadyConditionWithRetry(*a.client, cd, corev1.ConditionFalse,
+				"ReconciledServiceAttachmentFirewall",
+				"reconciled the Service Attachment Firewall",
+				logger)
+			if err != nil {
+				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			}
 		}
 	}
 
@@ -258,14 +278,16 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 
 // ShouldSync is the actuator interface to determine if there are changes that need to be made.
 func (a *GCPLinkActuator) ShouldSync(cd *hivev1.ClusterDeployment) bool {
+	shouldCreateSubnet := getServiceAttachmentSubnetExistingName(cd) == ""
+
 	return cd.Status.Platform == nil ||
 		cd.Status.Platform.GCP == nil ||
 		cd.Status.Platform.GCP.PrivateServiceConnect == nil ||
 		cd.Status.Platform.GCP.PrivateServiceConnect.Endpoint == "" ||
 		cd.Status.Platform.GCP.PrivateServiceConnect.EndpointAddress == "" ||
 		cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachment == "" ||
-		cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentFirewall == "" ||
-		cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentSubnet == ""
+		(shouldCreateSubnet && cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentFirewall == "") ||
+		(shouldCreateSubnet && cd.Status.Platform.GCP.PrivateServiceConnect.ServiceAttachmentSubnet == "")
 }
 
 // ensureServiceAttachmentSubnet creates the service attachment subnet if it does not already exist.
@@ -273,7 +295,7 @@ func (a *GCPLinkActuator) ensureServiceAttachmentSubnet(cd *hivev1.ClusterDeploy
 	modified := false
 
 	subnetName := metadata.InfraID + "-psc"
-	subnet, err := a.gcpClientSpoke.GetSubnet(subnetName, cd.Spec.Platform.GCP.Region)
+	subnet, err := a.gcpClientSpoke.GetSubnet(subnetName, cd.Spec.Platform.GCP.Region, "")
 	if isNotFound(err) {
 		cidr := getServiceAttachmentSubnetCIDR(cd)
 		newSubnet, err := a.createServiceAttachmentSubnet(subnetName, cidr, network.SelfLink, cd.Spec.Platform.GCP.Region)
@@ -299,7 +321,6 @@ func (a *GCPLinkActuator) ensureServiceAttachmentSubnet(cd *hivev1.ClusterDeploy
 }
 
 func getServiceAttachmentSubnetCIDR(cd *hivev1.ClusterDeployment) string {
-	cidr := "192.168.0.0/24"
 	if cd != nil &&
 		cd.Spec.Platform.GCP != nil &&
 		cd.Spec.Platform.GCP.PrivateServiceConnect != nil &&
@@ -307,9 +328,35 @@ func getServiceAttachmentSubnetCIDR(cd *hivev1.ClusterDeployment) string {
 		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet != nil &&
 		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet.Cidr != "" {
 
-		cidr = cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet.Cidr
+		return cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet.Cidr
 	}
-	return cidr
+	return defaultServiceAttachmentSubnetCidr
+}
+
+func getServiceAttachmentSubnetExistingName(cd *hivev1.ClusterDeployment) string {
+	if cd != nil &&
+		cd.Spec.Platform.GCP != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet.Existing != nil {
+
+		return cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet.Existing.Name
+	}
+	return ""
+}
+
+func getServiceAttachmentSubnetExistingProject(cd *hivev1.ClusterDeployment) string {
+	if cd != nil &&
+		cd.Spec.Platform.GCP != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet != nil &&
+		cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet.Existing != nil {
+
+		return cd.Spec.Platform.GCP.PrivateServiceConnect.ServiceAttachment.Subnet.Existing.Project
+	}
+	return ""
 }
 
 // createServiceAttachmentSubnet creates the service attachment subnet.
@@ -628,7 +675,7 @@ func filterSubnetInventory(gcpClient gcpclient.Client, input []hivev1.GCPPrivate
 	for _, network := range input {
 		for _, cand := range network.Subnets {
 			if cand.Region == region {
-				subnet, err := gcpClient.GetSubnet(cand.Subnet, cand.Region)
+				subnet, err := gcpClient.GetSubnet(cand.Subnet, cand.Region, "")
 				if isNotFound(err) {
 					// Ignoring subnets that are not found
 					continue

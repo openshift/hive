@@ -357,18 +357,18 @@ func (mr *MockClientMockRecorder) GetServiceAttachment(serviceAttachment, region
 }
 
 // GetSubnet mocks base method.
-func (m *MockClient) GetSubnet(name, region string) (*compute.Subnetwork, error) {
+func (m *MockClient) GetSubnet(name, region, project string) (*compute.Subnetwork, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnet", name, region)
+	ret := m.ctrl.Call(m, "GetSubnet", name, region, project)
 	ret0, _ := ret[0].(*compute.Subnetwork)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetSubnet indicates an expected call of GetSubnet.
-func (mr *MockClientMockRecorder) GetSubnet(name, region interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetSubnet(name, region, project interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnet", reflect.TypeOf((*MockClient)(nil).GetSubnet), name, region)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnet", reflect.TypeOf((*MockClient)(nil).GetSubnet), name, region, project)
 }
 
 // ListAddresses mocks base method.

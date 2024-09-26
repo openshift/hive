@@ -79,7 +79,7 @@ type Client interface {
 
 	DeleteSubnet(subnet string, region string) error
 
-	GetSubnet(name string, region string) (*compute.Subnetwork, error)
+	GetSubnet(name string, region string, project string) (*compute.Subnetwork, error)
 
 	CreateAddress(addressName string, region string, subnetwork string) (*compute.Address, error)
 
@@ -629,11 +629,15 @@ func (c *gcpClient) DeleteSubnet(subnet string, region string) error {
 	return nil
 }
 
-func (c *gcpClient) GetSubnet(subnet string, region string) (*compute.Subnetwork, error) {
+func (c *gcpClient) GetSubnet(subnet string, region string, project string) (*compute.Subnetwork, error) {
 	ctx, cancel := contextWithTimeout(context.TODO())
 	defer cancel()
 
-	return c.computeClient.Subnetworks.Get(c.projectName, region, subnet).Context(ctx).Do()
+	if project == "" {
+		project = c.projectName
+	}
+
+	return c.computeClient.Subnetworks.Get(project, region, subnet).Context(ctx).Do()
 }
 
 func (c *gcpClient) GetProjectName() string {

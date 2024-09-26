@@ -124,8 +124,8 @@ github.com/openshift/api v0.0.0-20240809035623-d6942fb7294e h1:gEw+Gxu4r3g9WAYOI
 github.com/openshift/api v0.0.0-20240809035623-d6942fb7294e/go.mod h1:OOh6Qopf21pSzqNVCB5gomomBXb8o5sGKZxG2KNpaXM=
 github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87 h1:cHyxR+Y8rAMT6m1jQCaYGRwikqahI0OjjUDhFNf3ySQ=
 github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87/go.mod h1:DB/Mf2oTeiAmVVX1gN+NEqweonAPY0TKUwADizj8+ZA=
-github.com/openshift/installer v0.9.0-master.0.20240912103450-dcf8320c8c4e h1:U3L33gBLBNaQvefq/S/8KyfCa3sDV6LtJO1rxRabSBI=
-github.com/openshift/installer v0.9.0-master.0.20240912103450-dcf8320c8c4e/go.mod h1:PSL94uUGGsuOvuqfQ4wv9I4reGGiQk1PajnfU7N71Xo=
+github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721 h1:R7PJ171uREaK1dXIPSIaFDWMBDKWcTzt4o5VbPAD5Ao=
+github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721/go.mod h1:PSL94uUGGsuOvuqfQ4wv9I4reGGiQk1PajnfU7N71Xo=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=

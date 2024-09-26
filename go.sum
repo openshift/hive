@@ -1822,8 +1822,8 @@ github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87/go.mod h1:DB/Mf2oTeiAmVVX1gN+NEqweonAPY0TKUwADizj8+ZA=
 github.com/openshift/generic-admission-server v1.14.1-0.20231020105858-8dcc3c9b298f h1:LzKRLvLJkWW4+4KsuvMmXJQ81ZZJSm2xxu6jwtn5gN0=
 github.com/openshift/generic-admission-server v1.14.1-0.20231020105858-8dcc3c9b298f/go.mod h1:/CLsleDcQ6AFTGKJe9VL3Y4rB9DqX3fQwQv47q2/ZJc=
-github.com/openshift/installer v0.9.0-master.0.20240912103450-dcf8320c8c4e h1:U3L33gBLBNaQvefq/S/8KyfCa3sDV6LtJO1rxRabSBI=
-github.com/openshift/installer v0.9.0-master.0.20240912103450-dcf8320c8c4e/go.mod h1:PSL94uUGGsuOvuqfQ4wv9I4reGGiQk1PajnfU7N71Xo=
+github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721 h1:R7PJ171uREaK1dXIPSIaFDWMBDKWcTzt4o5VbPAD5Ao=
+github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721/go.mod h1:PSL94uUGGsuOvuqfQ4wv9I4reGGiQk1PajnfU7N71Xo=
 github.com/openshift/library-go v0.0.0-20210811133500-5e31383de2a7/go.mod h1:3GagmGg6gikg+hAqma7E7axBzs2pjx4+GrAbdl4OYdY=
 github.com/openshift/library-go v0.0.0-20240715191351-e0aa70d55678 h1:H08EzrqjY63m1jlZ+D4sTy9fSGlHsPwViyxFrWTIh4A=
 github.com/openshift/library-go v0.0.0-20240715191351-e0aa70d55678/go.mod h1:PdASVamWinll2BPxiUpXajTwZxV8A1pQbWEsCN1od7I=

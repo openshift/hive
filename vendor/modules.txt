@@ -1468,7 +1468,7 @@ github.com/openshift/hive/apis/hive/v1/vsphere
 github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
 github.com/openshift/hive/apis/scheme
-# github.com/openshift/installer v0.9.0-master.0.20240912103450-dcf8320c8c4e
+# github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721
 ## explicit; go 1.22.0
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset

@@ -13,7 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,24 +40,33 @@ const (
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager) error {
 	logger := log.WithField("controller", ControllerName)
+
 	concurrentReconciles, clientRateLimiter, queueRateLimiter, err := controllerutils.GetControllerConfig(mgr.GetClient(), ControllerName)
 	if err != nil {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
 	}
-	return AddToManager(mgr, NewReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
-}
 
-// NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) reconcile.Reconciler {
+	var pollInterval time.Duration
+	if envPollInterval := os.Getenv(constants.ClusterVersionPollIntervalEnvVar); len(envPollInterval) > 0 {
+		var err error
+		pollInterval, err = time.ParseDuration(envPollInterval)
+		if err != nil {
+			log.WithError(err).WithField("reapplyInterval", envPollInterval).Errorf("unable to parse %s", constants.ClusterVersionPollIntervalEnvVar)
+			return err
+		}
+	}
+	logger.Infof("using poll interval of %s", pollInterval)
+
 	r := &ReconcileClusterVersion{
-		Client: controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &rateLimiter),
-		scheme: mgr.GetScheme(),
+		Client:       controllerutils.NewClientWithMetricsOrDie(mgr, ControllerName, &clientRateLimiter),
+		scheme:       mgr.GetScheme(),
+		pollInterval: pollInterval,
 	}
 	r.remoteClusterAPIClientBuilder = func(cd *hivev1.ClusterDeployment) remoteclient.Builder {
 		return remoteclient.NewBuilder(r.Client, cd, ControllerName)
 	}
-	return r
+	return AddToManager(mgr, r, concurrentReconciles, queueRateLimiter)
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -92,6 +100,10 @@ type ReconcileClusterVersion struct {
 	// remoteClusterAPIClientBuilder is a function pointer to the function that gets a builder for building a client
 	// for the remote cluster's API server
 	remoteClusterAPIClientBuilder func(cd *hivev1.ClusterDeployment) remoteclient.Builder
+
+	// pollInterval is the maximum time we'll wait before re-reconciling a given ClusterDeployment.
+	// Zero to disable (re-reconcile will be prompted by the usual things, e.g. CR updates).
+	pollInterval time.Duration
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and syncs the remote ClusterVersion status
@@ -159,18 +171,10 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 	}
 
 	var requeueAfter time.Duration
-	if envPollInterval := os.Getenv(constants.ClusterVersionPollIntervalEnvVar); len(envPollInterval) > 0 {
-		var err error
-		requeueAfter, err = time.ParseDuration(envPollInterval)
-		if err != nil {
-			cdLog.WithError(err).WithField("pollInterval", envPollInterval).Errorf("unable to parse %s, disabling poll interval", constants.ClusterVersionPollIntervalEnvVar)
-			os.Setenv(constants.ClusterVersionPollIntervalEnvVar, "")
-			// Deliberately not returning an error here to avoid an extra reconcile
-		} else if requeueAfter > 0 {
-			// Add a random fraction of a second jitter to reduce bunching
-			requeueAfter += time.Duration(rand.Float64() * float64(time.Second))
-			cdLog.WithField("requeueAfter", requeueAfter).Debug("using requeue time")
-		}
+	if r.pollInterval > 0 {
+		// Add a random fraction of a second jitter to reduce bunching
+		requeueAfter = r.pollInterval + time.Duration(rand.Float64()*float64(time.Second))
+		cdLog.WithField("requeueAfter", requeueAfter).Debug("using requeue time")
 	}
 
 	cdLog.Debug("reconcile complete")

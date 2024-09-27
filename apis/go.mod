@@ -11,7 +11,7 @@ require (
 	// !WARNING! We intend this to pull in *only* pkg/types. Bringing in anything
 	// else could cause a dependency explosion, which we must avoid in this apis/
 	// package for the sake of our downstream consumers.
-	github.com/openshift/installer v0.9.0-master.0.20240912103450-dcf8320c8c4e
+	github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721
 	k8s.io/api v0.31.0-alpha.2
 	k8s.io/apimachinery v0.31.0-alpha.2
 )

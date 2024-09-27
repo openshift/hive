@@ -1,0 +1,23 @@
+docs_dir: ./docs
+site_name: Hive Documentation
+
+markdown_extensions: 
+  - toc:
+      permalink: "#"
+
+nav:
+- Developing: developing.md
+- User guide: using-hive.md
+- Quick start: quick_start.md
+- Architecture: arquitecture.md
+- Scaling Hive: scaling-hive.md
+- FAQs: faqs.md
+- Metrics: hive_metrics.md
+- Annotations: annotations.md
+- Monitoring: monitoring.md
+- Cluster relocation: cluster-relocation.md
+- Moving Hive managed clusters: move_clusters.md
+- Release Image verification: releaseimageverify.md
+- Managed DNS Internals: managed-dns.md
+- Running aggregated API Server: apiserver.md
+- AWS AssumeRole credentials for clusters: awsassumerolecreds.md

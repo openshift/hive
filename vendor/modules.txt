@@ -9283,7 +9283,7 @@ github.com/openshift/hive/apis/hive/v1/vsphere
 github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
 github.com/openshift/hive/apis/scheme
-# github.com/openshift/installer v0.9.0-master.0.20240405164943-304af6735c65
+# github.com/openshift/installer v0.90.100-0.20240406213052-b5ed3cde2669
 ## explicit; go 1.21
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset

@@ -177,9 +177,18 @@ func (a *GCPActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hi
 				ComputeSubnet:    a.subnet,
 				Network:          a.network,
 				NetworkProjectID: poolGCP.NetworkProjectID,
-				UserTags:         poolGCP.UserTags,
 			},
 		},
+	}
+	if numTags := len(pool.Spec.Platform.GCP.UserTags); numTags != 0 {
+		ic.Platform.GCP.UserTags = make([]installertypesgcp.UserTag, numTags)
+		for i, ut := range pool.Spec.Platform.GCP.UserTags {
+			ic.Platform.GCP.UserTags[i] = installertypesgcp.UserTag{
+				ParentID: ut.ParentID,
+				Key:      ut.Key,
+				Value:    ut.Value,
+			}
+		}
 	}
 
 	computePool := baseMachinePool(pool)

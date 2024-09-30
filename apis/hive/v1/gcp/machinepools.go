@@ -1,7 +1,5 @@
 package gcp
 
-import installerplatform "github.com/openshift/installer/pkg/types/gcp"
-
 // MachinePool stores the configuration for a machine pool installed on GCP.
 type MachinePool struct {
 	// Zones is list of availability zones that can be used.
@@ -40,7 +38,7 @@ type MachinePool struct {
 	// MachineSets that we creates on GCP. Tag key and tag value should be the shortnames of the
 	// tag key and tag value resource. Consumer is responsible for using this only for spokes
 	// where custom tags are supported.
-	UserTags []installerplatform.UserTag `json:"userTags,omitempty"`
+	UserTags []UserTag `json:"userTags,omitempty"`
 }
 
 // OSDisk defines the disk for machines on GCP.
@@ -99,4 +97,28 @@ type EncryptionKeyReference struct {
 	//
 	// +optional
 	KMSKeyServiceAccount string `json:"kmsKeyServiceAccount,omitempty"`
+}
+
+// UserTag is a tag to apply to GCP resources created for the cluster.
+type UserTag struct {
+	// parentID is the ID of the hierarchical resource where the tags are defined,
+	// e.g. at the Organization or the Project level. To find the Organization ID or Project ID refer to the following pages:
+	// https://cloud.google.com/resource-manager/docs/creating-managing-organization#retrieving_your_organization_id,
+	// https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects.
+	// An OrganizationID must consist of decimal numbers, and cannot have leading zeroes.
+	// A ProjectID must be 6 to 30 characters in length, can only contain lowercase letters,
+	// numbers, and hyphens, and must start with a letter, and cannot end with a hyphen.
+	ParentID string `json:"parentID"`
+
+	// key is the key part of the tag. A tag key can have a maximum of 63 characters and
+	// cannot be empty. Tag key must begin and end with an alphanumeric character, and
+	// must contain only uppercase, lowercase alphanumeric characters, and the following
+	// special characters `._-`.
+	Key string `json:"key"`
+
+	// value is the value part of the tag. A tag value can have a maximum of 63 characters
+	// and cannot be empty. Tag value must begin and end with an alphanumeric character, and
+	// must contain only uppercase, lowercase alphanumeric characters, and the following
+	// special characters `_-.@%=+:,*#&(){}[]` and spaces.
+	Value string `json:"value"`
 }

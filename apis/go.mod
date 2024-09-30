@@ -8,10 +8,6 @@ require (
 	// go get -u github.com/openshift/api@relase-4.16
 	github.com/openshift/api v0.0.0-20240809035623-d6942fb7294e
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
-	// !WARNING! We intend this to pull in *only* pkg/types. Bringing in anything
-	// else could cause a dependency explosion, which we must avoid in this apis/
-	// package for the sake of our downstream consumers.
-	github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721
 	k8s.io/api v0.31.0-alpha.2
 	k8s.io/apimachinery v0.31.0-alpha.2
 )

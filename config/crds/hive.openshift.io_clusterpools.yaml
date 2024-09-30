@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.16.1
   name: clusterpools.hive.openshift.io
 spec:
   group: hive.openshift.io
@@ -34,19 +34,24 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: ClusterPool represents a pool of clusters that should be kept
-          ready to be given out to users. Clusters are removed from the pool once
-          claimed and then automatically replaced with a new one.
+        description: |-
+          ClusterPool represents a pool of clusters that should be kept ready to be given out to users. Clusters are removed
+          from the pool once claimed and then automatically replaced with a new one.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -56,9 +61,9 @@ spec:
               annotations:
                 additionalProperties:
                   type: string
-                description: Annotations to be applied to new ClusterDeployments created
-                  for the pool. ClusterDeployments that have already been claimed
-                  will not be affected when this value is modified.
+                description: |-
+                  Annotations to be applied to new ClusterDeployments created for the pool. ClusterDeployments that have already been
+                  claimed will not be affected when this value is modified.
                 type: object
               baseDomain:
                 description: BaseDomain is the base domain to use for all clusters
@@ -69,38 +74,39 @@ spec:
                   cluster pool.
                 properties:
                   default:
-                    description: 'Default is the default lifetime of the claim when
-                      no lifetime is set on the claim itself. This is a Duration value;
-                      see https://pkg.go.dev/time#ParseDuration for accepted formats.
-                      Note: due to discrepancies in validation vs parsing, we use
-                      a Pattern instead of `Format=duration`. See https://bugzilla.redhat.com/show_bug.cgi?id=2050332
-                      https://github.com/kubernetes/apimachinery/issues/131 https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                    description: |-
+                      Default is the default lifetime of the claim when no lifetime is set on the claim itself.
+                      This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                      Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+                      https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+                      https://github.com/kubernetes/apimachinery/issues/131
+                      https://github.com/kubernetes/apiextensions-apiserver/issues/56
                     pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                     type: string
                   maximum:
-                    description: 'Maximum is the maximum lifetime of the claim after
-                      it is assigned a cluster. If the claim still exists when the
-                      lifetime has elapsed, the claim will be deleted by Hive. The
-                      lifetime of a claim is the mimimum of the lifetimes set by the
-                      cluster pool and the claim itself. This is a Duration value;
-                      see https://pkg.go.dev/time#ParseDuration for accepted formats.
-                      Note: due to discrepancies in validation vs parsing, we use
-                      a Pattern instead of `Format=duration`. See https://bugzilla.redhat.com/show_bug.cgi?id=2050332
-                      https://github.com/kubernetes/apimachinery/issues/131 https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                    description: |-
+                      Maximum is the maximum lifetime of the claim after it is assigned a cluster. If the claim still exists
+                      when the lifetime has elapsed, the claim will be deleted by Hive.
+                      The lifetime of a claim is the mimimum of the lifetimes set by the cluster pool and the claim itself.
+                      This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                      Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+                      https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+                      https://github.com/kubernetes/apimachinery/issues/131
+                      https://github.com/kubernetes/apiextensions-apiserver/issues/56
                     pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                     type: string
                 type: object
               hibernateAfter:
-                description: 'HibernateAfter will be applied to new ClusterDeployments
-                  created for the pool. HibernateAfter will transition clusters in
-                  the clusterpool to hibernating power state after it has been running
-                  for the given duration. The time that a cluster has been running
-                  is the time since the cluster was installed or the time since the
-                  cluster last came out of hibernation. This is a Duration value;
-                  see https://pkg.go.dev/time#ParseDuration for accepted formats.
-                  Note: due to discrepancies in validation vs parsing, we use a Pattern
-                  instead of `Format=duration`. See https://bugzilla.redhat.com/show_bug.cgi?id=2050332
-                  https://github.com/kubernetes/apimachinery/issues/131 https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                description: |-
+                  HibernateAfter will be applied to new ClusterDeployments created for the pool. HibernateAfter will transition
+                  clusters in the clusterpool to hibernating power state after it has been running for the given duration. The time
+                  that a cluster has been running is the time since the cluster was installed or the time since the cluster last came
+                  out of hibernation.
+                  This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                  Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+                  https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+                  https://github.com/kubernetes/apimachinery/issues/131
+                  https://github.com/kubernetes/apiextensions-apiserver/issues/56
                 pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                 type: string
               hibernationConfig:
@@ -108,24 +114,23 @@ spec:
                   of ClusterDeployments owned by the ClusterPool.
                 properties:
                   resumeTimeout:
-                    description: 'ResumeTimeout is the maximum amount of time we will
-                      wait for an unclaimed ClusterDeployment to resume from hibernation
-                      (e.g. at the behest of runningCount, or in preparation for being
-                      claimed). If this time is exceeded, the ClusterDeployment will
-                      be considered Broken and we will replace it. The default (unspecified
-                      or zero) means no timeout -- we will allow the ClusterDeployment
-                      to continue trying to resume "forever". This is a Duration value;
-                      see https://pkg.go.dev/time#ParseDuration for accepted formats.
-                      Note: due to discrepancies in validation vs parsing, we use
-                      a Pattern instead of `Format=duration`. See https://bugzilla.redhat.com/show_bug.cgi?id=2050332
-                      https://github.com/kubernetes/apimachinery/issues/131 https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                    description: |-
+                      ResumeTimeout is the maximum amount of time we will wait for an unclaimed ClusterDeployment to resume from
+                      hibernation (e.g. at the behest of runningCount, or in preparation for being claimed). If this time is
+                      exceeded, the ClusterDeployment will be considered Broken and we will replace it. The default (unspecified
+                      or zero) means no timeout -- we will allow the ClusterDeployment to continue trying to resume "forever".
+                      This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+                      Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+                      https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+                      https://github.com/kubernetes/apimachinery/issues/131
+                      https://github.com/kubernetes/apiextensions-apiserver/issues/56
                     pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
                     type: string
                 type: object
               imageSetRef:
-                description: ImageSetRef is a reference to a ClusterImageSet. The
-                  release image specified in the ClusterImageSet will be used by clusters
-                  created for this cluster pool.
+                description: |-
+                  ImageSetRef is a reference to a ClusterImageSet. The release image specified in the ClusterImageSet will be used
+                  by clusters created for this cluster pool.
                 properties:
                   name:
                     description: Name is the name of the ClusterImageSet that this
@@ -140,28 +145,26 @@ spec:
                 format: int32
                 type: integer
               installConfigSecretTemplateRef:
-                description: InstallConfigSecretTemplateRef is a secret with the key
-                  install-config.yaml consisting of the content of the install-config.yaml
-                  to be used as a template for all clusters in this pool. Cluster
-                  specific settings (name, basedomain) will be injected dynamically
-                  when the ClusterDeployment install-config Secret is generated.
+                description: |-
+                  InstallConfigSecretTemplateRef is a secret with the key install-config.yaml consisting of the content of the install-config.yaml
+                  to be used as a template for all clusters in this pool.
+                  Cluster specific settings (name, basedomain) will be injected dynamically when the ClusterDeployment install-config Secret is generated.
                 properties:
                   name:
                     default: ""
-                    description: 'Name of the referent. This field is effectively
-                      required, but due to backwards compatibility is allowed to be
-                      empty. Instances of this type with an empty value here are almost
-                      certainly wrong. TODO: Add other useful fields. apiVersion,
-                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
-                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
               installerEnv:
-                description: InstallerEnv are extra environment variables to pass
-                  through to the installer. This may be used to enable additional
-                  features of the installer.
+                description: |-
+                  InstallerEnv are extra environment variables to pass through to the installer. This may be used to enable
+                  additional features of the installer.
                 items:
                   description: EnvVar represents an environment variable present in
                     a Container.
@@ -170,15 +173,16 @@ spec:
                       description: Name of the environment variable. Must be a C_IDENTIFIER.
                       type: string
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using
-                        the previously defined environment variables in the container
-                        and any service environment variables. If a variable cannot
-                        be resolved, the reference in the input string will be unchanged.
-                        Double $$ are reduced to a single $, which allows for escaping
-                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
-                        string literal "$(VAR_NAME)". Escaped references will never
-                        be expanded, regardless of whether the variable exists or
-                        not. Defaults to "".'
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
                       type: string
                     valueFrom:
                       description: Source for the environment variable's value. Cannot
@@ -192,13 +196,12 @@ spec:
                               type: string
                             name:
                               default: ""
-                              description: 'Name of the referent. This field is effectively
-                                required, but due to backwards compatibility is allowed
-                                to be empty. Instances of this type with an empty
-                                value here are almost certainly wrong. TODO: Add other
-                                useful fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Drop `kubebuilder:default` when controller-gen
-                                doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -209,10 +212,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         fieldRef:
-                          description: 'Selects a field of the pod: supports metadata.name,
-                            metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
-                            spec.nodeName, spec.serviceAccountName, status.hostIP,
-                            status.podIP, status.podIPs.'
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                           properties:
                             apiVersion:
                               description: Version of the schema the FieldPath is
@@ -227,10 +229,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceFieldRef:
-                          description: 'Selects a resource of the container: only
-                            resources limits and requests (limits.cpu, limits.memory,
-                            limits.ephemeral-storage, requests.cpu, requests.memory
-                            and requests.ephemeral-storage) are currently supported.'
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
                           properties:
                             containerName:
                               description: 'Container name: required for volumes,
@@ -260,13 +261,12 @@ spec:
                               type: string
                             name:
                               default: ""
-                              description: 'Name of the referent. This field is effectively
-                                required, but due to backwards compatibility is allowed
-                                to be empty. Instances of this type with an empty
-                                value here are almost certainly wrong. TODO: Add other
-                                useful fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Drop `kubebuilder:default` when controller-gen
-                                doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -282,8 +282,9 @@ spec:
                   type: object
                 type: array
               inventory:
-                description: Inventory maintains a list of entries consumed by the
-                  ClusterPool to customize the default ClusterDeployment.
+                description: |-
+                  Inventory maintains a list of entries consumed by the ClusterPool
+                  to customize the default ClusterDeployment.
                 items:
                   description: InventoryEntry maintains a reference to a custom resource
                     consumed by a clusterpool to customize the cluster deployment.
@@ -300,45 +301,50 @@ spec:
                     name:
                       description: Name is the name of the referenced resource.
                       type: string
+                  required:
+                  - name
                   type: object
                 type: array
               labels:
                 additionalProperties:
                   type: string
-                description: Labels to be applied to new ClusterDeployments created
-                  for the pool. ClusterDeployments that have already been claimed
-                  will not be affected when this value is modified.
+                description: |-
+                  Labels to be applied to new ClusterDeployments created for the pool. ClusterDeployments that have already been
+                  claimed will not be affected when this value is modified.
                 type: object
               maxConcurrent:
-                description: MaxConcurrent is the maximum number of clusters that
-                  will be provisioned or deprovisioned at an time. This includes the
-                  claimed clusters being deprovisioned. By default there is no limit.
+                description: |-
+                  MaxConcurrent is the maximum number of clusters that will be provisioned or deprovisioned at an time. This includes the
+                  claimed clusters being deprovisioned.
+                  By default there is no limit.
                 format: int32
                 type: integer
               maxSize:
-                description: MaxSize is the maximum number of clusters that will be
-                  provisioned including clusters that have been claimed and ones waiting
-                  to be used. By default there is no limit.
+                description: |-
+                  MaxSize is the maximum number of clusters that will be provisioned including clusters that have been claimed
+                  and ones waiting to be used.
+                  By default there is no limit.
                 format: int32
                 type: integer
               platform:
                 description: Platform encompasses the desired platform for the cluster.
                 properties:
                   agentBareMetal:
-                    description: AgentBareMetal is the configuration used when performing
-                      an Assisted Agent based installation to bare metal.
+                    description: |-
+                      AgentBareMetal is the configuration used when performing an Assisted Agent based installation
+                      to bare metal.
                     properties:
                       agentSelector:
-                        description: AgentSelector is a label selector used for associating
-                          relevant custom resources with this cluster. (Agent, BareMetalHost,
-                          etc)
+                        description: |-
+                          AgentSelector is a label selector used for associating relevant custom resources with this cluster.
+                          (Agent, BareMetalHost, etc)
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector
                               requirements. The requirements are ANDed.
                             items:
-                              description: A label selector requirement is a selector
-                                that contains values, a key, and an operator that
+                              description: |-
+                                A label selector requirement is a selector that contains values, a key, and an operator that
                                 relates the key and values.
                               properties:
                                 key:
@@ -346,17 +352,16 @@ spec:
                                     applies to.
                                   type: string
                                 operator:
-                                  description: operator represents a key's relationship
-                                    to a set of values. Valid operators are In, NotIn,
-                                    Exists and DoesNotExist.
+                                  description: |-
+                                    operator represents a key's relationship to a set of values.
+                                    Valid operators are In, NotIn, Exists and DoesNotExist.
                                   type: string
                                 values:
-                                  description: values is an array of string values.
-                                    If the operator is In or NotIn, the values array
-                                    must be non-empty. If the operator is Exists or
-                                    DoesNotExist, the values array must be empty.
-                                    This array is replaced during a strategic merge
-                                    patch.
+                                  description: |-
+                                    values is an array of string values. If the operator is In or NotIn,
+                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                    the values array must be empty. This array is replaced during a strategic
+                                    merge patch.
                                   items:
                                     type: string
                                   type: array
@@ -370,11 +375,10 @@ spec:
                           matchLabels:
                             additionalProperties:
                               type: string
-                            description: matchLabels is a map of {key,value} pairs.
-                              A single {key,value} in the matchLabels map is equivalent
-                              to an element of matchExpressions, whose key field is
-                              "key", the operator is "In", and the values array contains
-                              only "value". The requirements are ANDed.
+                            description: |-
+                              matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                              map is equivalent to an element of matchExpressions, whose key field is "key", the
+                              operator is "In", and the values array contains only "value". The requirements are ANDed.
                             type: object
                         type: object
                         x-kubernetes-map-type: atomic
@@ -386,14 +390,15 @@ spec:
                       AWS.
                     properties:
                       credentialsAssumeRole:
-                        description: CredentialsAssumeRole refers to the IAM role
-                          that must be assumed to obtain AWS account access for the
-                          cluster operations.
+                        description: |-
+                          CredentialsAssumeRole refers to the IAM role that must be assumed to obtain
+                          AWS account access for the cluster operations.
                         properties:
                           externalID:
-                            description: 'ExternalID is random string generated by
-                              platform so that assume role is protected from confused
-                              deputy problem. more info: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html'
+                            description: |-
+                              ExternalID is random string generated by platform so that assume role
+                              is protected from confused deputy problem.
+                              more info: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
                             type: string
                           roleARN:
                             type: string
@@ -401,35 +406,34 @@ spec:
                         - roleARN
                         type: object
                       credentialsSecretRef:
-                        description: CredentialsSecretRef refers to a secret that
-                          contains the AWS account access credentials.
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the AWS account access
+                          credentials.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
                       privateLink:
-                        description: PrivateLink allows uses to enable access to the
-                          cluster's API server using AWS PrivateLink. AWS PrivateLink
-                          includes a pair of VPC Endpoint Service and VPC Endpoint
-                          accross AWS accounts and allows clients to connect to services
-                          using AWS's internal networking instead of the Internet.
+                        description: |-
+                          PrivateLink allows uses to enable access to the cluster's API server using AWS
+                          PrivateLink. AWS PrivateLink includes a pair of VPC Endpoint Service and VPC
+                          Endpoint accross AWS accounts and allows clients to connect to services using AWS's
+                          internal networking instead of the Internet.
                         properties:
                           additionalAllowedPrincipals:
-                            description: AdditionalAllowedPrincipals is a list of
-                              additional allowed principal ARNs to be configured for
-                              the Private Link cluster's VPC Endpoint Service. ARNs
-                              provided as AdditionalAllowedPrincipals will be configured
-                              for the cluster's VPC Endpoint Service in addition to
-                              the IAM entity used by Hive.
+                            description: |-
+                              AdditionalAllowedPrincipals is a list of additional allowed principal ARNs to be configured
+                              for the Private Link cluster's VPC Endpoint Service.
+                              ARNs provided as AdditionalAllowedPrincipals will be configured for the cluster's VPC Endpoint
+                              Service in addition to the IAM entity used by Hive.
                             items:
                               type: string
                             type: array
@@ -460,9 +464,10 @@ spec:
                           group where the azure DNS zone for the base domain is found
                         type: string
                       cloudName:
-                        description: cloudName is the name of the Azure cloud environment
-                          which can be used to configure the Azure SDK with the appropriate
-                          Azure API endpoints. If empty, the value is equal to "AzurePublicCloud".
+                        description: |-
+                          cloudName is the name of the Azure cloud environment which can be used to configure the Azure SDK
+                          with the appropriate Azure API endpoints.
+                          If empty, the value is equal to "AzurePublicCloud".
                         enum:
                         - ""
                         - AzurePublicCloud
@@ -471,18 +476,18 @@ spec:
                         - AzureGermanCloud
                         type: string
                       credentialsSecretRef:
-                        description: CredentialsSecretRef refers to a secret that
-                          contains the Azure account access credentials.
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the Azure account access
+                          credentials.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
@@ -499,21 +504,19 @@ spec:
                       on bare metal.
                     properties:
                       libvirtSSHPrivateKeySecretRef:
-                        description: LibvirtSSHPrivateKeySecretRef is the reference
-                          to the secret that contains the private SSH key to use for
-                          access to the libvirt provisioning host. The SSH private
-                          key is expected to be in the secret data under the "ssh-privatekey"
-                          key.
+                        description: |-
+                          LibvirtSSHPrivateKeySecretRef is the reference to the secret that contains the private SSH key to use
+                          for access to the libvirt provisioning host.
+                          The SSH private key is expected to be in the secret data under the "ssh-privatekey" key.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
@@ -530,22 +533,21 @@ spec:
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
                       privateServiceConnect:
-                        description: PrivateSericeConnect allows users to enable access
-                          to the cluster's API server using GCP Private Service Connect.
-                          It includes a forwarding rule paired with a Service Attachment
-                          across GCP accounts and allows clients to connect to services
-                          using GCP internal networking of using public load balancers.
+                        description: |-
+                          PrivateSericeConnect allows users to enable access to the cluster's API server using GCP
+                          Private Service Connect. It includes a forwarding rule paired with a Service Attachment
+                          across GCP accounts and allows clients to connect to services using GCP internal networking
+                          of using public load balancers.
                         properties:
                           enabled:
                             description: Enabled specifies if Private Service Connect
@@ -581,92 +583,101 @@ spec:
                       on IBM Cloud
                     properties:
                       accountID:
-                        description: AccountID is the IBM Cloud Account ID. AccountID
-                          is DEPRECATED and is gathered via the IBM Cloud API for
-                          the provided credentials. This field will be ignored.
+                        description: |-
+                          AccountID is the IBM Cloud Account ID.
+                          AccountID is DEPRECATED and is gathered via the IBM Cloud API for the provided
+                          credentials. This field will be ignored.
                         type: string
                       cisInstanceCRN:
-                        description: CISInstanceCRN is the IBM Cloud Internet Services
-                          Instance CRN CISInstanceCRN is DEPRECATED and gathered via
-                          the IBM Cloud API for the provided credentials and cluster
-                          deployment base domain. This field will be ignored.
+                        description: |-
+                          CISInstanceCRN is the IBM Cloud Internet Services Instance CRN
+                          CISInstanceCRN is DEPRECATED and gathered via the IBM Cloud API for the provided
+                          credentials and cluster deployment base domain. This field will be ignored.
                         type: string
                       credentialsSecretRef:
-                        description: CredentialsSecretRef refers to a secret that
-                          contains IBM Cloud account access credentials.
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains IBM Cloud account access
+                          credentials.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
                       region:
-                        description: Region specifies the IBM Cloud region where the
-                          cluster will be created.
+                        description: |-
+                          Region specifies the IBM Cloud region where the cluster will be
+                          created.
                         type: string
                     required:
                     - credentialsSecretRef
                     - region
                     type: object
                   none:
-                    description: None indicates platform-agnostic install. https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html
+                    description: |-
+                      None indicates platform-agnostic install.
+                      https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html
                     type: object
                   openstack:
                     description: OpenStack is the configuration used when installing
                       on OpenStack
                     properties:
                       certificatesSecretRef:
-                        description: "CertificatesSecretRef refers to a secret that
-                          contains CA certificates necessary for communicating with
-                          the OpenStack. There is additional configuration required
-                          for the OpenShift cluster to trust the certificates provided
-                          in this secret. The \"clouds.yaml\" file included in the
-                          credentialsSecretRef Secret must also include a reference
-                          to the certificate bundle file for the OpenShift cluster
-                          being created to trust the OpenStack endpoints. The \"clouds.yaml\"
-                          file must set the \"cacert\" field to either \"/etc/openstack-ca/<key
-                          name containing the trust bundle in credentialsSecretRef
-                          Secret>\" or \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\".
-                          \n For example, \"\"\"clouds.yaml clouds: shiftstack: auth:
-                          ... cacert: \"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\"
-                          \"\"\""
+                        description: |-
+                          CertificatesSecretRef refers to a secret that contains CA certificates
+                          necessary for communicating with the OpenStack.
+                          There is additional configuration required for the OpenShift cluster to trust
+                          the certificates provided in this secret.
+                          The "clouds.yaml" file included in the credentialsSecretRef Secret must also include
+                          a reference to the certificate bundle file for the OpenShift cluster being created to
+                          trust the OpenStack endpoints.
+                          The "clouds.yaml" file must set the "cacert" field to
+                          either "/etc/openstack-ca/<key name containing the trust bundle in credentialsSecretRef Secret>" or
+                          "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem".
+
+                          For example,
+                          """clouds.yaml
+                          clouds:
+                            shiftstack:
+                              auth: ...
+                              cacert: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
+                          """
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
                       cloud:
-                        description: Cloud will be used to indicate the OS_CLOUD value
-                          to use the right section from the clouds.yaml in the CredentialsSecretRef.
+                        description: |-
+                          Cloud will be used to indicate the OS_CLOUD value to use the right section
+                          from the clouds.yaml in the CredentialsSecretRef.
                         type: string
                       credentialsSecretRef:
-                        description: CredentialsSecretRef refers to a secret that
-                          contains the OpenStack account access credentials.
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the OpenStack account access
+                          credentials.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
@@ -683,36 +694,34 @@ spec:
                       oVirt
                     properties:
                       certificatesSecretRef:
-                        description: CertificatesSecretRef refers to a secret that
-                          contains the oVirt CA certificates necessary for communicating
-                          with oVirt.
+                        description: |-
+                          CertificatesSecretRef refers to a secret that contains the oVirt CA certificates
+                          necessary for communicating with oVirt.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
                       credentialsSecretRef:
-                        description: 'CredentialsSecretRef refers to a secret that
-                          contains the oVirt account access credentials with fields:
-                          ovirt_url, ovirt_username, ovirt_password, ovirt_ca_bundle'
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the oVirt account access
+                          credentials with fields: ovirt_url, ovirt_username, ovirt_password, ovirt_ca_bundle
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
@@ -720,9 +729,9 @@ spec:
                         description: The target cluster under which all VMs will run
                         type: string
                       ovirt_network_name:
-                        description: The target network of all the network interfaces
-                          of the nodes. Omitting defaults to ovirtmgmt network which
-                          is a default network for evert ovirt cluster.
+                        description: |-
+                          The target network of all the network interfaces of the nodes. Omitting defaults to ovirtmgmt
+                          network which is a default network for evert ovirt cluster.
                         type: string
                       storage_domain_id:
                         description: The target storage domain under which all VM
@@ -739,19 +748,18 @@ spec:
                       on vSphere
                     properties:
                       certificatesSecretRef:
-                        description: CertificatesSecretRef refers to a secret that
-                          contains the vSphere CA certificates necessary for communicating
-                          with the VCenter.
+                        description: |-
+                          CertificatesSecretRef refers to a secret that contains the vSphere CA certificates
+                          necessary for communicating with the VCenter.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
@@ -760,19 +768,18 @@ spec:
                           will be cloned into.
                         type: string
                       credentialsSecretRef:
-                        description: 'CredentialsSecretRef refers to a secret that
-                          contains the vSphere account access credentials: GOVC_USERNAME,
-                          GOVC_PASSWORD fields.'
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the vSphere account access
+                          credentials: GOVC_USERNAME, GOVC_PASSWORD fields.
                         properties:
                           name:
                             default: ""
-                            description: 'Name of the referent. This field is effectively
-                              required, but due to backwards compatibility is allowed
-                              to be empty. Instances of this type with an empty value
-                              here are almost certainly wrong. TODO: Add other useful
-                              fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                              TODO: Drop `kubebuilder:default` when controller-gen
-                              doesn''t need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
@@ -785,8 +792,9 @@ spec:
                           use for provisioning volumes.
                         type: string
                       folder:
-                        description: Folder is the name of the folder that will be
-                          used and/or created for virtual machines.
+                        description: |-
+                          Folder is the name of the folder that will be used and/or created for
+                          virtual machines.
                         type: string
                       network:
                         description: Network specifies the name of the network to
@@ -810,20 +818,19 @@ spec:
                 properties:
                   name:
                     default: ""
-                    description: 'Name of the referent. This field is effectively
-                      required, but due to backwards compatibility is allowed to be
-                      empty. Instances of this type with an empty value here are almost
-                      certainly wrong. TODO: Add other useful fields. apiVersion,
-                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
-                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
               runningCount:
-                description: RunningCount is the number of clusters we should keep
-                  running. The remainder will be kept hibernated until claimed. By
-                  default no clusters will be kept running (all will be hibernated).
+                description: |-
+                  RunningCount is the number of clusters we should keep running. The remainder will be kept hibernated until claimed.
+                  By default no clusters will be kept running (all will be hibernated).
                 format: int32
                 minimum: 0
                 type: integer

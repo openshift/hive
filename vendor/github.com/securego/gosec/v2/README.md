@@ -1,7 +1,7 @@
 
-# gosec - Golang Security Checker
+# gosec - Go Security Checker
 
-Inspects source code for security problems by scanning the Go AST.
+Inspects source code for security problems by scanning the Go AST and SSA code representation.
 
 <img src="https://securego.io/img/gosec.png" width="320">
 
@@ -105,7 +105,7 @@ jobs:
           # we let the report trigger content trigger a failure using the GitHub Security features.
           args: '-no-fail -fmt sarif -out results.sarif ./...'
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@v2
         with:
           # Path to SARIF file relative to the root of the repository
           sarif_file: results.sarif
@@ -113,16 +113,8 @@ jobs:
 
 ### Local Installation
 
-#### Go 1.16+
-
 ```bash
 go install github.com/securego/gosec/v2/cmd/gosec@latest
-```
-
-#### Go version < 1.16
-
-```bash
-go get -u github.com/securego/gosec/v2/cmd/gosec
 ```
 
 ## Usage
@@ -157,6 +149,7 @@ directory you can supply `./...` as the input argument.
 - G304: File path provided as taint input
 - G305: File traversal when extracting zip/tar archive
 - G306: Poor file permissions used when writing to a new file
+- G307: Poor file permissions used when creating a file with os.Create
 - G401: Detect the usage of DES, RC4, MD5 or SHA1
 - G402: Look for bad TLS connection settings
 - G403: Ensure minimum RSA key length of 2048 bits
@@ -166,7 +159,7 @@ directory you can supply `./...` as the input argument.
 - G503: Import blocklist: crypto/rc4
 - G504: Import blocklist: net/http/cgi
 - G505: Import blocklist: crypto/sha1
-- G601: Implicit memory aliasing of items from a range statement
+- G601: Implicit memory aliasing of items from a range statement (only for Go 1.21 or lower)
 - G602: Slice access out of bounds
 
 ### Retired rules
@@ -273,31 +266,33 @@ gosec -exclude-generated ./...
 
 ### Annotating code
 
-As with all automated detection tools, there will be cases of false positives. In cases where gosec reports a failure that has been manually verified as being safe,
+As with all automated detection tools, there will be cases of false positives.
+In cases where gosec reports a failure that has been manually verified as being safe,
 it is possible to annotate the code with a comment that starts with `#nosec`.
+
 The `#nosec` comment should have the format `#nosec [RuleList] [-- Justification]`.
 
-The annotation causes gosec to stop processing any further nodes within the
-AST so can apply to a whole block or more granularly to a single expression.
+The `#nosec` comment needs to be placed on the line where the warning is reported.
 
 ```go
+func main() {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // #nosec G402
+		},
+	}
 
-import "md5" //#nosec
-
-
-func main(){
-
-    /* #nosec */
-    if x > y {
-        h := md5.New() // this will also be ignored
-    }
-
+	client := &http.Client{Transport: tr}
+	_, err := client.Get("https://golang.org/")
+	if err != nil {
+		fmt.Println(err)
+	}
 }
-
 ```
 
-When a specific false positive has been identified and verified as safe, you may wish to suppress only that single rule (or a specific set of rules)
-within a section of code, while continuing to scan for other problems. To do this, you can list the rule(s) to be suppressed within
+When a specific false positive has been identified and verified as safe, you may
+wish to suppress only that single rule (or a specific set of rules) within a section of code,
+while continuing to scan for other problems. To do this, you can list the rule(s) to be suppressed within
 the `#nosec` annotation, e.g: `/* #nosec G401 */` or `//#nosec G201 G202 G203`
 
 You could put the description or justification text for the annotation. The
@@ -390,7 +385,7 @@ schema-generate -i sarif-schema-2.1.0.json -o mypath/types.go
 ```
 
 Most of the MarshallJSON/UnmarshalJSON are removed except the one for PropertyBag which is handy to inline the additional properties. The rest can be removed.
-The URI,ID, UUID, GUID were renamed so it fits the Golang convention defined [here](https://github.com/golang/lint/blob/master/lint.go#L700)
+The URI,ID, UUID, GUID were renamed so it fits the Go convention defined [here](https://github.com/golang/lint/blob/master/lint.go#L700)
 
 ### Tests
 

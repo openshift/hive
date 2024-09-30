@@ -60,7 +60,7 @@ func NewActuator(params ActuatorParams) *Actuator {
 // Set corresponding event based on error. It also returns the original error
 // for convenience, so callers can do "return handleMachineError(...)".
 func (a *Actuator) handleMachineError(machine *machinev1.Machine, err error, eventAction string) error {
-	klog.Errorf("%v error: %v", machine.GetName(), err)
+	klog.Errorf("%q error: %v", machine.GetName(), err)
 	if eventAction != noEventAction {
 		a.eventRecorder.Eventf(machine, corev1.EventTypeWarning, "Failed"+eventAction, "%v", err)
 	}

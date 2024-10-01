@@ -628,11 +628,11 @@ func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName s
 			Informer: secretsInformer,
 		}
 		src.Handler = handler.Funcs{
-			CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
+			CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 				hLog.Debug("eventHandler CreateFunc")
 				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
 			},
-			UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 				hLog.Debug("eventHandler UpdateFunc")
 				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
 			},

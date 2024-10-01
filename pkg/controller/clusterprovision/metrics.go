@@ -2,7 +2,6 @@ package clusterprovision
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
@@ -18,7 +17,7 @@ var (
 	metricInstallSuccessSeconds hivemetrics.HistogramVecWithDynamicLabels
 )
 
-func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) {
+func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 	mapClusterTypeLabelToValue := hivemetrics.GetOptionalClusterTypeLabels(mConfig)
 
 	metricClusterProvisionsTotal = *hivemetrics.NewCounterVecWithDynamicLabels(

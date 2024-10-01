@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -24,22 +25,22 @@ func (r *ReconcileClusterProvision) watchJobs(mgr manager.Manager, c controller.
 	return c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, handler))
 }
 
-var _ handler.TypedEventHandler[*batchv1.Job] = &jobEventHandler{}
+var _ handler.TypedEventHandler[*batchv1.Job, reconcile.Request] = &jobEventHandler{}
 
 type jobEventHandler struct {
-	handler.TypedEventHandler[*batchv1.Job]
+	handler.TypedEventHandler[*batchv1.Job, reconcile.Request]
 	reconciler *ReconcileClusterProvision
 }
 
 // Create implements handler.TypedEventHandler
-func (h *jobEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*batchv1.Job], q workqueue.RateLimitingInterface) {
+func (h *jobEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*batchv1.Job], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	h.reconciler.logger.Info("Job created")
 	h.reconciler.trackJobAdd(e.Object)
 	h.TypedEventHandler.Create(ctx, e, q)
 }
 
 // Delete implements handler.TypedEventHandler
-func (h *jobEventHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*batchv1.Job], q workqueue.RateLimitingInterface) {
+func (h *jobEventHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*batchv1.Job], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	h.reconciler.logger.Info("Job deleted")
 	h.TypedEventHandler.Delete(ctx, e, q)
 }

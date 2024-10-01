@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
-	installerplatform "github.com/openshift/installer/pkg/types/gcp"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
@@ -244,7 +243,7 @@ func TestGCPActuator(t *testing.T) {
 			name: "generate machinesets with custom UserTags",
 			pool: func() *hivev1.MachinePool {
 				pool := testGCPPool(testPoolName)
-				pool.Spec.Platform.GCP.UserTags = []installerplatform.UserTag{
+				pool.Spec.Platform.GCP.UserTags = []hivev1gcp.UserTag{
 					{
 						ParentID: "bparent",
 						Key:      "bkey",

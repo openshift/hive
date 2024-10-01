@@ -79,7 +79,7 @@ func AddLogFields[O AdditionalLogFieldHavinThing](obj O, logger *log.Entry) *log
 		logger.WithError(err).Warning("failed to extract additional log fields -- ignoring")
 	case kvmap == nil:
 		logger.Debug("no additional log fields found")
-	case kvmap != nil:
+	default:
 		logger = logger.WithFields(log.Fields(kvmap))
 	}
 	return logger

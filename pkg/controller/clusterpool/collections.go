@@ -1128,7 +1128,7 @@ func (cdcs *invalidCDCCollection) MarshalJSON() ([]byte, error) {
 
 // setCDsCurrentCondition idempotently sets the ClusterDeploymentsCurrent condition on the
 // ClusterPool according to whether all unassigned CDs have the same PoolVersion as the pool.
-func setCDsCurrentCondition(c client.Client, cds *cdCollection, clp *hivev1.ClusterPool, poolVersion string) error {
+func setCDsCurrentCondition(c client.Client, cds *cdCollection, clp *hivev1.ClusterPool) error {
 	var status corev1.ConditionStatus
 	var reason, message string
 	names := func(cdList []*hivev1.ClusterDeployment) string {

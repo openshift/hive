@@ -87,7 +87,7 @@ func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *Re
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r *ReconcileDNSZone, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func add(mgr manager.Manager, r *ReconcileDNSZone, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	// Create a new controller
 	c, err := controller.New(ControllerName.String(), mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, r.logger),

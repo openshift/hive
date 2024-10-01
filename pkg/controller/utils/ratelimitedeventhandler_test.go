@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +20,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	o := &hivev1.DNSZone{ObjectMeta: metav1.ObjectMeta{Namespace: "test-ns", Name: "test-name"}}
 
 	// always not rate limited
-	q := &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
+	q := &trackedQueue{TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())}
 	h := NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, func(_ event.UpdateEvent) bool { return false })
 	h.Update(context.TODO(), event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
@@ -29,7 +28,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	require.Equal(t, 0, len(q.ratelimitAdded))
 
 	// always rate limited
-	q = &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
+	q = &trackedQueue{TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())}
 	h = NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, func(_ event.UpdateEvent) bool { return true })
 	h.Update(context.TODO(), event.UpdateEvent{ObjectOld: o, ObjectNew: o}, q)
 
@@ -37,7 +36,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	require.Equal(t, 1, len(q.ratelimitAdded))
 
 	// always rate limited not UPDATE
-	q = &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
+	q = &trackedQueue{TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())}
 	h = NewRateLimitedUpdateEventHandler(&handler.EnqueueRequestForObject{}, func(_ event.UpdateEvent) bool { return true })
 	h.Generic(context.TODO(), event.GenericEvent{Object: o}, q)
 
@@ -45,7 +44,7 @@ func TestRateLimitedEventHandler(t *testing.T) {
 	require.Equal(t, 0, len(q.ratelimitAdded))
 
 	// always rate limited with complex handler
-	q = &trackedQueue{RateLimitingInterface: workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter())}
+	q = &trackedQueue{TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[reconcile.Request]())}
 	h = NewRateLimitedUpdateEventHandler(handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
 		return []reconcile.Request{{
 			NamespacedName: types.NamespacedName{
@@ -72,22 +71,22 @@ func TestRateLimitedEventHandler(t *testing.T) {
 }
 
 type trackedQueue struct {
-	workqueue.RateLimitingInterface
+	workqueue.TypedRateLimitingInterface[reconcile.Request]
 
 	added          []string
 	ratelimitAdded []string
 }
 
-var _ workqueue.RateLimitingInterface = &trackedQueue{}
+var _ workqueue.TypedRateLimitingInterface[reconcile.Request] = &trackedQueue{}
 
 // Add implements workqueue.Interface
-func (q *trackedQueue) Add(item interface{}) {
-	q.added = append(q.added, fmt.Sprintf("%s", item))
-	q.RateLimitingInterface.Add(item)
+func (q *trackedQueue) Add(item reconcile.Request) {
+	q.added = append(q.added, item.String())
+	q.TypedRateLimitingInterface.Add(item)
 }
 
 // AddRateLimited implements workqueue.RateLimitingInterface
-func (q *trackedQueue) AddRateLimited(item interface{}) {
-	q.ratelimitAdded = append(q.ratelimitAdded, fmt.Sprintf("%s", item))
-	q.RateLimitingInterface.AddRateLimited(item)
+func (q *trackedQueue) AddRateLimited(item reconcile.Request) {
+	q.ratelimitAdded = append(q.ratelimitAdded, item.String())
+	q.TypedRateLimitingInterface.AddRateLimited(item)
 }

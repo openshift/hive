@@ -129,7 +129,7 @@ func getClientRateLimiter(controllerName hivev1.ControllerName) (flowcontrol.Rat
 }
 
 // getQueueRateLimiter returns the workqueue rate limiter for the controller
-func getQueueRateLimiter(controllerName hivev1.ControllerName) (workqueue.RateLimiter, error) {
+func getQueueRateLimiter(controllerName hivev1.ControllerName) (workqueue.TypedRateLimiter[reconcile.Request], error) {
 	var err error
 	qps := defaultQueueQPS
 	if value, ok := getValueFromEnvVariable(controllerName, QueueQPSEnvVariableFormat); ok {
@@ -147,13 +147,13 @@ func getQueueRateLimiter(controllerName hivev1.ControllerName) (workqueue.RateLi
 		}
 	}
 
-	return workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(qps), burst)},
+	return workqueue.NewTypedMaxOfRateLimiter(
+		workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second),
+		&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(qps), burst)},
 	), nil
 }
 
-func GetControllerConfig(client client.Client, controllerName hivev1.ControllerName) (int, flowcontrol.RateLimiter, workqueue.RateLimiter, error) {
+func GetControllerConfig(client client.Client, controllerName hivev1.ControllerName) (int, flowcontrol.RateLimiter, workqueue.TypedRateLimiter[reconcile.Request], error) {
 	concurrentReconciles, err := getConcurrentReconciles(controllerName)
 	if err != nil {
 		return 0, nil, nil, err

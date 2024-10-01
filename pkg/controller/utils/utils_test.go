@@ -259,15 +259,15 @@ func TestGetQueueRateLimiter(t *testing.T) {
 	cases := []struct {
 		name                 string
 		environmentVariables map[string]string
-		expectedRateLimiter  workqueue.RateLimiter
+		expectedRateLimiter  workqueue.TypedRateLimiter[reconcile.Request]
 		expectedError        bool
 	}{
 		{
 			name:                 "No qps or burst is set",
 			environmentVariables: map[string]string{},
-			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
-				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
-				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(defaultQueueQPS), defaultQueueBurst)},
+			expectedRateLimiter: workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second),
+				&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(defaultQueueQPS), defaultQueueBurst)},
 			),
 		},
 		{
@@ -276,9 +276,9 @@ func TestGetQueueRateLimiter(t *testing.T) {
 				fmt.Sprintf(QueueQPSEnvVariableFormat, "default"):   "500",
 				fmt.Sprintf(QueueBurstEnvVariableFormat, "default"): "1000",
 			},
-			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
-				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
-				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(500), 1000)},
+			expectedRateLimiter: workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second),
+				&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(500), 1000)},
 			),
 		},
 		{
@@ -287,9 +287,9 @@ func TestGetQueueRateLimiter(t *testing.T) {
 				fmt.Sprintf(QueueQPSEnvVariableFormat, testControllerName):   "500",
 				fmt.Sprintf(QueueBurstEnvVariableFormat, testControllerName): "1000",
 			},
-			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
-				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
-				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(500), 1000)},
+			expectedRateLimiter: workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second),
+				&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(500), 1000)},
 			),
 		},
 		{
@@ -300,9 +300,9 @@ func TestGetQueueRateLimiter(t *testing.T) {
 				fmt.Sprintf(QueueBurstEnvVariableFormat, "default"):          "1000",
 				fmt.Sprintf(QueueBurstEnvVariableFormat, testControllerName): "1001",
 			},
-			expectedRateLimiter: workqueue.NewMaxOfRateLimiter(
-				workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
-				&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(501), 1001)},
+			expectedRateLimiter: workqueue.NewTypedMaxOfRateLimiter(
+				workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](5*time.Millisecond, 1000*time.Second),
+				&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(501), 1001)},
 			),
 		},
 		{

@@ -442,7 +442,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 	case hivev1.ClusterProvisionStageInitializing:
 		return r.reconcileInitializingProvision(cd, provision, logger)
 	case hivev1.ClusterProvisionStageProvisioning:
-		return r.reconcileProvisioningProvision(cd, provision, logger)
+		return r.reconcileProvisioningProvision(cd, logger)
 	case hivev1.ClusterProvisionStageFailed:
 		return r.reconcileFailedProvision(cd, provision, logger)
 	case hivev1.ClusterProvisionStageComplete:
@@ -502,7 +502,7 @@ func (r *ReconcileClusterDeployment) reconcileInitializingProvision(cd *hivev1.C
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterDeployment) reconcileProvisioningProvision(cd *hivev1.ClusterDeployment, provision *hivev1.ClusterProvision, cdLog log.FieldLogger) (reconcile.Result, error) {
+func (r *ReconcileClusterDeployment) reconcileProvisioningProvision(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
 	cdLog.Debug("still provisioning")
 	if err := r.updateCondition(cd, hivev1.InstallLaunchErrorCondition, corev1.ConditionFalse, "InstallLaunchSuccessful", "Successfully launched install pod", cdLog); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not update InstallLaunchErrorCondition")
@@ -528,7 +528,7 @@ func (r *ReconcileClusterDeployment) reconcileFailedProvision(cd *hivev1.Cluster
 
 	failedCond := controllerutils.FindCondition(provision.Status.Conditions, hivev1.ClusterProvisionFailedCondition)
 	if failedCond != nil && failedCond.Status == corev1.ConditionTrue {
-		nextProvisionTime = calculateNextProvisionTime(failedCond.LastTransitionTime.Time, cd.Status.InstallRestarts, cdLog)
+		nextProvisionTime = calculateNextProvisionTime(failedCond.LastTransitionTime.Time, cd.Status.InstallRestarts)
 		reason = failedCond.Reason
 		message = failedCond.Message
 	} else {
@@ -781,15 +781,15 @@ func (r *ReconcileClusterDeployment) watchClusterProvisions(mgr manager.Manager,
 	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterProvision{}, handler))
 }
 
-var _ handler.TypedEventHandler[*hivev1.ClusterProvision] = &clusterProvisionEventHandler{}
+var _ handler.TypedEventHandler[*hivev1.ClusterProvision, reconcile.Request] = &clusterProvisionEventHandler{}
 
 type clusterProvisionEventHandler struct {
-	handler.TypedEventHandler[*hivev1.ClusterProvision]
+	handler.TypedEventHandler[*hivev1.ClusterProvision, reconcile.Request]
 	reconciler *ReconcileClusterDeployment
 }
 
 // Create implements handler.EventHandler
-func (h *clusterProvisionEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.ClusterProvision], q workqueue.RateLimitingInterface) {
+func (h *clusterProvisionEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.ClusterProvision], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	h.reconciler.logger.Info("ClusterProvision created")
 	h.reconciler.trackClusterProvisionAdd(e.Object)
 	h.TypedEventHandler.Create(ctx, e, q)

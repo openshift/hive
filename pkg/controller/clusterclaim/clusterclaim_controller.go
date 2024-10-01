@@ -62,7 +62,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *Re
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r *ReconcileClusterClaim, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	// Create a new controller
 	c, err := controller.New("clusterclaim-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, r.logger),
@@ -122,7 +122,7 @@ func requestsForClusterDeployment(ctx context.Context, cd *hivev1.ClusterDeploym
 	return []reconcile.Request{{NamespacedName: *claim}}
 }
 
-func requestsForRBACResourcesRole(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.Role] {
+func requestsForRBACResourcesRole(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.Role, reconcile.Request] {
 	return func(ctx context.Context, o *rbacv1.Role) []reconcile.Request {
 		if o.GetName() != resourceName {
 			return nil
@@ -141,7 +141,7 @@ func requestsForRBACResourcesRole(c client.Client, resourceName string, logger l
 	}
 }
 
-func requestsForRBACResourcesRoleBinding(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding] {
+func requestsForRBACResourcesRoleBinding(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding, reconcile.Request] {
 	return func(ctx context.Context, o *rbacv1.RoleBinding) []reconcile.Request {
 		if o.GetName() != resourceName {
 			return nil
@@ -534,7 +534,7 @@ func (r *ReconcileClusterClaim) createRBAC(claim *hivev1.ClusterClaim, cd *hivev
 	if cd.Spec.ClusterMetadata == nil {
 		return errors.New("ClusterDeployment does not have ClusterMetadata")
 	}
-	if err := r.applyHiveClaimOwnerRole(claim, cd, logger); err != nil {
+	if err := r.applyHiveClaimOwnerRole(cd, logger); err != nil {
 		return err
 	}
 	if err := r.applyHiveClaimOwnerRoleBinding(claim, cd, logger); err != nil {
@@ -543,7 +543,7 @@ func (r *ReconcileClusterClaim) createRBAC(claim *hivev1.ClusterClaim, cd *hivev
 	return nil
 }
 
-func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(claim *hivev1.ClusterClaim, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
 	desiredRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cd.Namespace,

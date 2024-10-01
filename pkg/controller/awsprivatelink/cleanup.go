@@ -105,18 +105,18 @@ func (r *ReconcileAWSPrivateLink) cleanupPrivateLink(cd *hivev1.ClusterDeploymen
 		logger.WithError(err).Error("error cleaning up Hosted Zone")
 		return err
 	}
-	if err := r.cleanupVPCEndpoint(awsClient.hub, cd, metadata, logger); err != nil {
+	if err := r.cleanupVPCEndpoint(awsClient.hub, metadata, logger); err != nil {
 		logger.WithError(err).Error("error cleaning up VPCEndpoint")
 		return err
 	}
-	if err := r.cleanupVPCEndpointService(awsClient.user, cd, metadata, logger); err != nil {
+	if err := r.cleanupVPCEndpointService(awsClient.user, metadata, logger); err != nil {
 		logger.WithError(err).Error("error cleaning up VPCEndpoint Service")
 		return err
 	}
 
 	initPrivateLinkStatus(cd)
 	cd.Status.Platform.AWS.PrivateLink = nil
-	if err := r.updatePrivateLinkStatus(cd, logger); err != nil {
+	if err := r.updatePrivateLinkStatus(cd); err != nil {
 		logger.WithError(err).Error("error updating clusterdeployment after cleanup of private link")
 		return err
 	}
@@ -160,7 +160,7 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 		}
 
 		vpcEndpoint := endpointResp.VpcEndpoints[0]
-		hzID, err = findHostedZone(awsClient, *vpcEndpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain, logger)
+		hzID, err = findHostedZone(awsClient, *vpcEndpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain)
 		if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
 			return nil // no work
 		}
@@ -214,7 +214,7 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 }
 
 func (r *ReconcileAWSPrivateLink) cleanupVPCEndpoint(awsClient awsclient.Client,
-	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,
+	metadata *hivev1.ClusterMetadata,
 	logger log.FieldLogger) error {
 	idLog := logger.WithField("infraID", metadata.InfraID)
 	resp, err := awsClient.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
@@ -243,7 +243,7 @@ func (r *ReconcileAWSPrivateLink) cleanupVPCEndpoint(awsClient awsclient.Client,
 }
 
 func (r *ReconcileAWSPrivateLink) cleanupVPCEndpointService(awsClient awsclient.Client,
-	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,
+	metadata *hivev1.ClusterMetadata,
 	logger log.FieldLogger) error {
 	idLog := logger.WithField("infraID", metadata.InfraID)
 	resp, err := awsClient.DescribeVpcEndpointServiceConfigurations(&ec2.DescribeVpcEndpointServiceConfigurationsInput{

@@ -163,6 +163,11 @@ func (v VSphereProviderConfig) ExtractFailureDomain() machinev1.VSphereFailureDo
 		return machinev1.VSphereFailureDomain{}
 	}
 
+	// Older OCP installs will not have PlatformSpec set for infrastructure.
+	if v.infrastructure.Spec.PlatformSpec.VSphere == nil {
+		return machinev1.VSphereFailureDomain{}
+	}
+
 	failureDomains := v.infrastructure.Spec.PlatformSpec.VSphere.FailureDomains
 
 	for _, failureDomain := range failureDomains {

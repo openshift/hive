@@ -118,23 +118,19 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 	apiDomain, err := initialURL(*a.client,
 		client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name})
 	if err != nil {
-		logger.WithError(err).Error("could not get API URL from kubeconfig")
-
 		if err := conditions.SetErrConditionWithRetry(*a.client, cd, "CouldNotCalculateAPIDomain", err, logger); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, errors.Wrap(err, "could not get API URL from kubeconfig")
 	}
 
 	logger.Debug("reconciling Hosted Zone")
 	hzModified, hostedZoneID, err := a.ensureHostedZone(cd, metadata, apiDomain, logger)
 	if err != nil {
-		logger.WithError(err).Error("could not reconcile the Hosted Zone")
-
 		if err := conditions.SetErrConditionWithRetry(*a.client, cd, "PrivateHostedZoneReconcileFailed", err, logger); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Hosted Zone")
 	}
 	if hzModified {
 		err := conditions.SetReadyConditionWithRetry(*a.client, cd, corev1.ConditionFalse,
@@ -149,12 +145,10 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 	logger.Debug("reconciling Hosted Zone Records")
 	recordsModified, err := a.ReconcileHostedZoneRecords(cd, hostedZoneID, dnsRecord, apiDomain, logger)
 	if err != nil {
-		logger.WithError(err).Error("could not reconcile the Hosted Zone Records")
-
 		if err := conditions.SetErrConditionWithRetry(*a.client, cd, "PrivateHostedZoneRecordsReconcileFailed", err, logger); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Hosted Zone Records")
 	}
 	if recordsModified {
 		err := conditions.SetReadyConditionWithRetry(*a.client, cd, corev1.ConditionFalse,
@@ -169,12 +163,10 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 	logger.Debug("reconciling Hosted Zone Associations")
 	associationsModified, err := a.reconcileHostedZoneAssociations(cd, metadata, hostedZoneID, logger)
 	if err != nil {
-		logger.WithError(err).Error("could not reconcile the associations of the Hosted Zone")
-
 		if err := conditions.SetErrConditionWithRetry(*a.client, cd, "AssociatingVPCsToHostedZoneFailed", err, logger); err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 		}
-		return reconcile.Result{}, err
+		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Hosted Zone Associations")
 	}
 
 	if associationsModified {

@@ -166,11 +166,8 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 		logger.Debug("reconciling Service Attachment Subnet")
 		subnetModified, newSubnet, err := a.ensureServiceAttachmentSubnet(cd, metadata, network)
 		if err != nil {
-			logger.WithError(err).Error("failed to reconcile the Service Attachment Subnet")
-
-			err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentSubnetReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
-			if err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			if err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentSubnetReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger); err != nil {
+				logger.WithError(err).Error("failed to update condition on cluster deployment")
 			}
 			return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Service Attachment Subnet")
 		}
@@ -188,11 +185,8 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 		logger.Debug("reconciling Service Attachment Firewall")
 		firewallModified, _, err := a.ensureServiceAttachmentFirewall(cd, metadata, network)
 		if err != nil {
-			logger.WithError(err).Error("failed to reconcile the Service Attachment Firewall")
-
-			err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentFirewallReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
-			if err != nil {
-				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+			if err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentFirewallReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger); err != nil {
+				logger.WithError(err).Error("failed to update condition on cluster deployment")
 			}
 			return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Service Attachment Firwall")
 		}
@@ -210,11 +204,8 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 	logger.Debug("reconciling Service Attachment")
 	serviceAttachmentModified, serviceAttachment, err := a.ensureServiceAttachment(cd, metadata, forwardingRule, subnet)
 	if err != nil {
-		logger.WithError(err).Error("failed to reconcile the Service Attachment")
-
-		err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
-		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+		if err := conditions.SetErrConditionWithRetry(*a.client, cd, "ServiceAttachmentReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger); err != nil {
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 		}
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Service Attachment")
 	}
@@ -231,11 +222,8 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 	logger.Debug("reconciling Endpoint Address")
 	addressModified, ipAddress, err := a.ensureEndpointAddress(cd, metadata, endpointSubnet)
 	if err != nil {
-		logger.WithError(err).Error("failed to reconcile the Endpoint Address")
-
-		err := conditions.SetErrConditionWithRetry(*a.client, cd, "EndpointAddressReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
-		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+		if err := conditions.SetErrConditionWithRetry(*a.client, cd, "EndpointAddressReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger); err != nil {
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 		}
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Endpoint Address")
 	}
@@ -252,11 +240,8 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 	logger.Debug("reconciling Endpoint")
 	endpointModified, endpoint, err := a.ensureEndpoint(cd, metadata, ipAddress.SelfLink, ipAddress.Subnetwork, serviceAttachment.SelfLink)
 	if err != nil {
-		logger.WithError(err).Error("failed to reconcile the Endpoint")
-
-		err := conditions.SetErrConditionWithRetry(*a.client, cd, "EndpointReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger)
-		if err != nil {
-			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
+		if err := conditions.SetErrConditionWithRetry(*a.client, cd, "EndpointReconcileFailed", errors.New(controllerutils.ErrorScrub(err)), logger); err != nil {
+			logger.WithError(err).Error("failed to update condition on cluster deployment")
 		}
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the Endpoint")
 	}

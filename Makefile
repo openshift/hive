@@ -11,7 +11,6 @@ endif
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
-	targets/openshift/controller-gen.mk \
 	targets/openshift/yq.mk \
 	targets/openshift/bindata.mk \
 	targets/openshift/deps.mk \
@@ -120,11 +119,15 @@ define patch-crd-yq
 
 endef
 
+.PHONY: ensure-controller-gen
+ensure-controller-gen:
+	go install $(shell realpath vendor/sigs.k8s.io/controller-tools/cmd/controller-gen)
+
 # Generate CRD yaml from our api types:
 .PHONY: crd
 crd: ensure-controller-gen ensure-yq
 	rm -rf ./config/crds
-	(cd apis; '../$(CONTROLLER_GEN)' crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
+	(cd apis; controller-gen crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
 	@echo Stripping yaml breaks from CRD files
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 	@echo Patching CRD files for additional static information

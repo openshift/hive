@@ -7,8 +7,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: checkpoints.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -79,8 +78,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterclaims.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -244,8 +242,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterdeploymentcustomizations.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -388,8 +385,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterdeployments.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -1857,8 +1853,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterdeprovisions.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -2260,8 +2255,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterimagesets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -2318,8 +2312,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterpools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -3266,8 +3259,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'false'
     name: clusterprovisions.hive.openshift.io
@@ -3385,6 +3377,7 @@ objects:
                     We think because the thing it''s storing (ClusterMetadata from
                     installer) is not a runtime.Object, so can''t be put in a RawExtension.'
                   type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 metadataJSON:
                   description: MetadataJSON is a JSON representation of the ClusterMetadata
                     produced by the installer. We don't use a runtime.RawExtension
@@ -3480,8 +3473,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterrelocates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -3597,8 +3589,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clusterstates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -3698,8 +3689,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clustersyncleases.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -3749,8 +3739,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: clustersyncs.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -4002,8 +3991,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: dnszones.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4260,8 +4248,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'true'
     name: fakeclusterinstalls.hiveinternal.openshift.io
@@ -4302,6 +4289,7 @@ objects:
                     associated with this AgentClusterInstall.
                   properties:
                     name:
+                      default: ''
                       description: 'Name of the referent. This field is effectively
                         required, but due to backwards compatibility is allowed to
                         be empty. Instances of this type with an empty value here
@@ -4311,6 +4299,7 @@ objects:
                         need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
                       type: string
                   type: object
+                  x-kubernetes-map-type: atomic
                 clusterMetadata:
                   description: ClusterMetadata contains metadata information about
                     the installed cluster. It should be populated once the cluster
@@ -4465,8 +4454,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: hiveconfigs.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5546,8 +5534,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: machinepoolnameleases.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5606,8 +5593,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: machinepools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6423,8 +6409,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: selectorsyncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -7087,8 +7072,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: selectorsyncsets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -7307,8 +7291,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: syncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -7945,8 +7928,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: (devel)
-    creationTimestamp: null
+      controller-gen.kubebuilder.io/version: v0.13.0
     name: syncsets.hive.openshift.io
   spec:
     group: hive.openshift.io

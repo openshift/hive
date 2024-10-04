@@ -176,7 +176,7 @@ func resourceHelperBuilderFunc(
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r *ReconcileClusterSync, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	// Create a new controller
 	c, err := controller.New("clusterSync-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, r.logger),
@@ -230,7 +230,7 @@ func requestsForSyncSet(ctx context.Context, ss *hivev1.SyncSet) []reconcile.Req
 	return requests
 }
 
-func requestsForSelectorSyncSet(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*hivev1.SelectorSyncSet] {
+func requestsForSelectorSyncSet(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*hivev1.SelectorSyncSet, reconcile.Request] {
 	return func(ctx context.Context, sss *hivev1.SelectorSyncSet) []reconcile.Request {
 		logger := logger.WithField("selectorSyncSet", sss.Name)
 		labelSelector, err := metav1.LabelSelectorAsSelector(&sss.Spec.ClusterDeploymentSelector)
@@ -721,7 +721,7 @@ func decodeResources(syncSet CommonSyncSet, cd *hivev1.ClusterDeployment, logger
 		}
 		// Apply templates, if enabled
 		if syncSet.GetSpec().EnableResourceTemplates {
-			if err := processParameters(u, cd, logger); err != nil {
+			if err := processParameters(u, cd); err != nil {
 				logger.WithField("resourceIndex", i).WithError(err).Warn("error parameterizing object")
 				decodeErrors = append(decodeErrors, errors.Wrapf(err, "failed to parameterize resource %d", i))
 				continue

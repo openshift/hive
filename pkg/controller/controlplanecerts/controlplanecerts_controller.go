@@ -97,7 +97,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) rec
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	// Create a new controller
 	c, err := controller.New("controlplanecerts-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
@@ -196,7 +196,7 @@ func (r *ReconcileControlPlaneCerts) Reconcile(ctx context.Context, request reco
 	}
 
 	// clear condition if certs were found
-	updated, err := r.setCertsNotFoundCondition(cd, !secretsAvailable, cdLog)
+	updated, err := r.setCertsNotFoundCondition(cd, !secretsAvailable)
 	if err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "cannot update cluster deployment secrets not found condition")
 		return reconcile.Result{}, err
@@ -395,7 +395,7 @@ func (r *ReconcileControlPlaneCerts) getServingCertificatesJSONPatch(cd *hivev1.
 
 }
 
-func (r *ReconcileControlPlaneCerts) setCertsNotFoundCondition(cd *hivev1.ClusterDeployment, notFound bool, cdLog log.FieldLogger) (bool, error) {
+func (r *ReconcileControlPlaneCerts) setCertsNotFoundCondition(cd *hivev1.ClusterDeployment, notFound bool) (bool, error) {
 	status := corev1.ConditionFalse
 	reason := certsFoundReason
 	message := certsFoundMessage

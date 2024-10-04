@@ -222,7 +222,7 @@ func (p providerConfig) ExtractFailureDomain() failuredomain.FailureDomain {
 // Diff compares two ProviderConfigs and returns a list of differences,
 // or nil if there are none.
 //
-//nolint:dupl,cyclop
+//nolint:cyclop
 func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 	if other == nil {
 		return nil, nil
@@ -254,7 +254,7 @@ func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 
 // Equal compares two ProviderConfigs to determine whether or not they are equal.
 //
-//nolint:dupl,cyclop
+//nolint:cyclop
 func (p providerConfig) Equal(other ProviderConfig) (bool, error) {
 	if other == nil {
 		return false, nil

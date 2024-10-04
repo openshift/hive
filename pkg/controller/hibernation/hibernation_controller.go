@@ -127,7 +127,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) *hi
 }
 
 // AddToManager adds a new Controller to the controller manager
-func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r *hibernationReconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	c, err := controller.New("hibernation-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
 		MaxConcurrentReconciles: concurrentReconciles,
@@ -366,7 +366,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 		if shouldStopMachines(cd, hibernatingCondition) {
 			return r.stopMachines(cd, cdLog)
 		}
-		return r.checkClusterStopped(cd, false, cdLog)
+		return r.checkClusterStopped(cd, cdLog)
 	}
 	// If we get here, we're not supposed to be hibernating
 	if isFakeCluster {
@@ -449,7 +449,7 @@ func (r *hibernationReconciler) stopMachines(cd *hivev1.ClusterDeployment, logge
 	return reconcile.Result{}, err
 }
 
-func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, expectRunning bool, logger log.FieldLogger) (reconcile.Result, error) {
+func (r *hibernationReconciler) checkClusterStopped(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
 	actuator := r.getActuator(cd)
 	if actuator == nil {
 		logger.Warning("No compatible actuator found to check machine status")

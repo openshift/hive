@@ -94,7 +94,8 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 	// While the metrics need not be registered for this test suite, they still need to be defined to avoid panics
 	// during the tests
-	registerMetrics(&metricsconfig.MetricsConfig{}, log.WithField("controller", "clusterDeployment"))
+	var _ log.FieldLogger = log.WithField("controller", "clusterDeployment")
+	registerMetrics(&metricsconfig.MetricsConfig{})
 }
 
 func fakeReadFile(content string) func(string) ([]byte, error) {
@@ -3576,7 +3577,8 @@ func TestCalculateNextProvisionTime(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualNextTime := calculateNextProvisionTime(tc.failureTime, tc.attempt, log.WithField("controller", "clusterDeployment"))
+			var _ log.FieldLogger = log.WithField("controller", "clusterDeployment")
+			actualNextTime := calculateNextProvisionTime(tc.failureTime, tc.attempt)
 			assert.Equal(t, tc.expectedNextTime.String(), actualNextTime.String(), "unexpected next provision time")
 		})
 	}

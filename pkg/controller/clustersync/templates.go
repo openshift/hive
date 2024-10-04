@@ -6,7 +6,6 @@ import (
 	"text/template"
 
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -14,7 +13,7 @@ import (
 )
 
 // processParameters modifies `u`, appling text/template parameters found in string values therein.
-func processParameters(u *unstructured.Unstructured, cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+func processParameters(u *unstructured.Unstructured, cd *hivev1.ClusterDeployment) error {
 	resourceParamTemplate := template.New("resourceParams").Funcs(
 		template.FuncMap{
 			"fromCDLabel": fromCDLabel(cd),

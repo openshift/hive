@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.16.1
   labels:
     contracts.hive.openshift.io/clusterinstall: "false"
   name: clusterprovisions.hive.openshift.io
@@ -31,14 +31,19 @@ spec:
         description: ClusterProvision is the Schema for the clusterprovisions API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -52,13 +57,12 @@ spec:
                 properties:
                   name:
                     default: ""
-                    description: 'Name of the referent. This field is effectively
-                      required, but due to backwards compatibility is allowed to be
-                      empty. Instances of this type with an empty value here are almost
-                      certainly wrong. TODO: Add other useful fields. apiVersion,
-                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
-                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
@@ -68,13 +72,12 @@ spec:
                 properties:
                   name:
                     default: ""
-                    description: 'Name of the referent. This field is effectively
-                      required, but due to backwards compatibility is allowed to be
-                      empty. Instances of this type with an empty value here are almost
-                      certainly wrong. TODO: Add other useful fields. apiVersion,
-                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
-                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
@@ -88,13 +91,12 @@ spec:
                 properties:
                   name:
                     default: ""
-                    description: 'Name of the referent. This field is effectively
-                      required, but due to backwards compatibility is allowed to be
-                      empty. Instances of this type with an empty value here are almost
-                      certainly wrong. TODO: Add other useful fields. apiVersion,
-                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
-                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
@@ -111,19 +113,17 @@ spec:
                 description: InstallLog is the log from the installer.
                 type: string
               metadata:
-                description: 'Metadata is the metadata.json generated by the installer,
-                  providing metadata information about the cluster created. NOTE:
-                  This is not used because it didn''t work (it was always empty).
-                  We think because the thing it''s storing (ClusterMetadata from installer)
-                  is not a runtime.Object, so can''t be put in a RawExtension.'
+                description: |-
+                  Metadata is the metadata.json generated by the installer, providing metadata information about the cluster created.
+                  NOTE: This is not used because it didn't work (it was always empty). We think because the thing it's storing
+                  (ClusterMetadata from installer) is not a runtime.Object, so can't be put in a RawExtension.
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               metadataJSON:
-                description: MetadataJSON is a JSON representation of the ClusterMetadata
-                  produced by the installer. We don't use a runtime.RawExtension because
-                  ClusterMetadata isn't a runtime.Object. We don't use ClusterMetadata
-                  itself because we don't want our API consumers to need to pull in
-                  the installer code and its dependencies.
+                description: |-
+                  MetadataJSON is a JSON representation of the ClusterMetadata produced by the installer. We don't use a
+                  runtime.RawExtension because ClusterMetadata isn't a runtime.Object. We don't use ClusterMetadata itself
+                  because we don't want our API consumers to need to pull in the installer code and its dependencies.
                 format: byte
                 type: string
               prevClusterID:
@@ -192,13 +192,12 @@ spec:
                 properties:
                   name:
                     default: ""
-                    description: 'Name of the referent. This field is effectively
-                      required, but due to backwards compatibility is allowed to be
-                      empty. Instances of this type with an empty value here are almost
-                      certainly wrong. TODO: Add other useful fields. apiVersion,
-                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
-                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic

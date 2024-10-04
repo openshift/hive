@@ -70,7 +70,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
 	// read the hiveconfig, and we register them only once.
-	registerMetrics(mConfig, logger)
+	registerMetrics(mConfig)
 
 	return add(mgr, newReconciler(mgr, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
@@ -87,7 +87,7 @@ func newReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) rec
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func add(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	provisionReconciler, ok := r.(*ReconcileClusterProvision)
 	if !ok {
 		return errors.New("reconciler supplied is not a ReconcileClusterProvision")
@@ -297,7 +297,7 @@ func (r *ReconcileClusterProvision) reconcileRunningJob(instance *hivev1.Cluster
 			pLog.Error("install job completed without completing initialization")
 			return r.transitionStage(instance, hivev1.ClusterProvisionStageFailed, "InitializationNotComplete", "Install job completed without completing initialization", pLog)
 		}
-		return r.reconcileSuccessfulJob(instance, job, pLog)
+		return r.reconcileSuccessfulJob(instance, pLog)
 	case controllerutils.IsFailed(job):
 		return r.reconcileFailedJob(instance, job, pLog)
 	}
@@ -384,7 +384,7 @@ func (r *ReconcileClusterProvision) getInstallPod(job *batchv1.Job, pLog log.Fie
 	}
 }
 
-func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.ClusterProvision, job *batchv1.Job, pLog log.FieldLogger) (reconcile.Result, error) {
+func (r *ReconcileClusterProvision) reconcileSuccessfulJob(instance *hivev1.ClusterProvision, pLog log.FieldLogger) (reconcile.Result, error) {
 	pLog.Info("install job succeeded")
 	result, err := r.transitionStage(instance, hivev1.ClusterProvisionStageComplete, "InstallComplete", "Install job has completed successfully", pLog)
 	if err == nil {

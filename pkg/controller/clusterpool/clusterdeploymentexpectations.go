@@ -32,15 +32,15 @@ func (r *ReconcileClusterPool) watchClusterDeployments(mgr manager.Manager, c co
 	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.ClusterDeployment{}, controllerutils.NewTypedRateLimitedUpdateEventHandler(h, controllerutils.IsClusterDeploymentErrorUpdateEvent)))
 }
 
-var _ handler.TypedEventHandler[*hivev1.ClusterDeployment] = &clusterDeploymentEventHandler{}
+var _ handler.TypedEventHandler[*hivev1.ClusterDeployment, reconcile.Request] = &clusterDeploymentEventHandler{}
 
 type clusterDeploymentEventHandler struct {
-	handler.TypedEventHandler[*hivev1.ClusterDeployment]
+	handler.TypedEventHandler[*hivev1.ClusterDeployment, reconcile.Request]
 	reconciler *ReconcileClusterPool
 }
 
 // Create implements handler.EventHandler
-func (h *clusterDeploymentEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.ClusterDeployment], q workqueue.RateLimitingInterface) {
+func (h *clusterDeploymentEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.ClusterDeployment], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	h.reconciler.logger.Info("ClusterDeployment created")
 	h.trackClusterDeploymentAdd(e.Object)
 	h.TypedEventHandler.Create(context.TODO(), e, q)

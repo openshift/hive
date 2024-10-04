@@ -477,7 +477,7 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, test.expectedResult.RequeueAfter, result.RequeueAfter)
 			assert.Equal(t, test.expectedError, err)
 			assert.Nil(t, ssListErr)
-			assert.True(t, areSyncSetSpecsEqual(t, &test.expectedSyncSetList, ssList))
+			assert.True(t, areSyncSetSpecsEqual(&test.expectedSyncSetList, ssList))
 			assertSyncSetLabelsCorrect(t, ssList)
 		})
 	}
@@ -491,7 +491,7 @@ func assertSyncSetLabelsCorrect(t *testing.T, actual *hivev1.SyncSetList) {
 	}
 }
 
-func areSyncSetSpecsEqual(t *testing.T, expected, actual *hivev1.SyncSetList) bool {
+func areSyncSetSpecsEqual(expected, actual *hivev1.SyncSetList) bool {
 	if len(expected.Items) != len(actual.Items) {
 		// They aren't the same size, they can't be the same.
 		return false

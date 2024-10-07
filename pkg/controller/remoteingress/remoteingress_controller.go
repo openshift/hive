@@ -97,7 +97,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) rec
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	// Create a new controller
 	c, err := controller.New("remoteingress-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
@@ -251,7 +251,7 @@ func rawExtensionsFromClusterDeployment(rContext *reconcileContext) []runtime.Ra
 	rawList := []runtime.RawExtension{}
 
 	for _, ingress := range rContext.clusterDeployment.Spec.Ingress {
-		ingressObj := createIngressController(rContext.clusterDeployment, ingress, rContext.certBundleSecrets)
+		ingressObj := createIngressController(rContext.clusterDeployment, ingress)
 		raw := runtime.RawExtension{Object: ingressObj}
 		rawList = append(rawList, raw)
 	}
@@ -333,7 +333,7 @@ func (r *ReconcileRemoteClusterIngress) syncSyncSet(rContext *reconcileContext, 
 
 // createIngressController will return an ingressController based on a clusterDeployment's
 // spec.Ingress object
-func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.ClusterIngress, secrets []*corev1.Secret) *ingresscontroller.IngressController {
+func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.ClusterIngress) *ingresscontroller.IngressController {
 	newIngress := ingresscontroller.IngressController{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "IngressController",

@@ -94,7 +94,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*R
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r *ReconcileAWSPrivateLink, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r *ReconcileAWSPrivateLink, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	// Create a new controller
 	c, err := controller.New("awsprivatelink-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, log.WithField("controller", ControllerName)),
@@ -546,7 +546,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 	}
 
 	// Create the Private Hosted Zone for the VPC Endpoint.
-	hzModified, hostedZoneID, err := r.reconcileHostedZone(awsClient, cd, clusterMetadata, vpcEndpoint, apiDomain, logger)
+	hzModified, hostedZoneID, err := r.reconcileHostedZone(awsClient, cd, vpcEndpoint, apiDomain, logger)
 	if err != nil {
 		logger.WithError(err).Error("could not reconcile the Hosted Zone")
 
@@ -568,7 +568,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 	}
 
 	// Associate the VPCs to the hosted zone.
-	associationsModified, err := r.reconcileHostedZoneAssociations(awsClient, cd, hostedZoneID, vpcEndpoint, logger)
+	associationsModified, err := r.reconcileHostedZoneAssociations(awsClient, hostedZoneID, vpcEndpoint, logger)
 	if err != nil {
 		logger.WithError(err).Error("could not reconcile the associations of the Hosted Zone")
 
@@ -763,7 +763,7 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpointService(awsClient *awsClie
 			cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.AdditionalAllowedPrincipals = &desiredPermsSlice
 		}
 		cd.Status.Platform.AWS.PrivateLink.VPCEndpointService.DefaultAllowedPrincipal = &defaultARN
-		if err := r.updatePrivateLinkStatus(cd, logger); err != nil {
+		if err := r.updatePrivateLinkStatus(cd); err != nil {
 			logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointService additionalAllowedPrincipals")
 			return modified, nil, err
 		}
@@ -787,7 +787,7 @@ func (r *ReconcileAWSPrivateLink) ensureVPCEndpointService(awsClient awsclient.C
 	}
 	if len(resp.ServiceConfigurations) == 0 {
 		modified = true
-		serviceConfig, err = createVPCEndpointService(awsClient, cd, metadata, clusterNLB, logger)
+		serviceConfig, err = createVPCEndpointService(awsClient, metadata, clusterNLB, logger)
 		if err != nil {
 			logger.WithError(err).Error("failed to create VPC Endpoint Service for cluster")
 			return modified, nil, errors.Wrap(err, "failed to create VPC Endpoint Service for cluster")
@@ -801,7 +801,7 @@ func (r *ReconcileAWSPrivateLink) ensureVPCEndpointService(awsClient awsclient.C
 		ID:   *serviceConfig.ServiceId,
 		Name: *serviceConfig.ServiceName,
 	}
-	if err := r.updatePrivateLinkStatus(cd, logger); err != nil {
+	if err := r.updatePrivateLinkStatus(cd); err != nil {
 		logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointService")
 		return modified, nil, err
 	}
@@ -809,7 +809,7 @@ func (r *ReconcileAWSPrivateLink) ensureVPCEndpointService(awsClient awsclient.C
 	return modified, serviceConfig, nil
 }
 
-func createVPCEndpointService(awsClient awsclient.Client, cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, clusterNLB string, logger log.FieldLogger) (*ec2.ServiceConfiguration, error) {
+func createVPCEndpointService(awsClient awsclient.Client, metadata *hivev1.ClusterMetadata, clusterNLB string, logger log.FieldLogger) (*ec2.ServiceConfiguration, error) {
 	resp, err := awsClient.CreateVpcEndpointServiceConfiguration(&ec2.CreateVpcEndpointServiceConfigurationInput{
 		AcceptanceRequired:      aws.Bool(false),
 		NetworkLoadBalancerArns: aws.StringSlice([]string{clusterNLB}),
@@ -875,7 +875,7 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 
 	initPrivateLinkStatus(cd)
 	cd.Status.Platform.AWS.PrivateLink.VPCEndpointID = *vpcEndpoint.VpcEndpointId
-	if err := r.updatePrivateLinkStatus(cd, logger); err != nil {
+	if err := r.updatePrivateLinkStatus(cd); err != nil {
 		logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointID")
 		return modified, nil, err
 	}
@@ -931,7 +931,7 @@ func (r *ReconcileAWSPrivateLink) createVPCEndpoint(awsClient awsclient.Client,
 // where VPC endpoint was created. It also make sure the DNS zone has an ALIAS record pointing
 // to the regional DNS name of the VPC endpoint.
 func (r *ReconcileAWSPrivateLink) reconcileHostedZone(awsClient *awsClient,
-	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,
+	cd *hivev1.ClusterDeployment,
 	vpcEndpoint *ec2.VpcEndpoint, apiDomain string,
 	logger log.FieldLogger) (bool, string, error) {
 	modified, hostedZoneID, err := r.ensureHostedZone(awsClient.hub, cd, vpcEndpoint, apiDomain, logger)
@@ -1015,7 +1015,11 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 	endpoint *ec2.VpcEndpoint, apiDomain string,
 	logger log.FieldLogger) (bool, string, error) {
 	modified := false
-	hzID, err := findHostedZone(awsClient, *endpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain, logger)
+	var (
+		hzID string
+		err  error
+	)
+	hzID, err = findHostedZone(awsClient, *endpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain)
 	if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
 		modified = true
 		hzID, err = r.createHostedZone(awsClient, cd, endpoint, apiDomain, logger)
@@ -1030,7 +1034,7 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 
 	initPrivateLinkStatus(cd)
 	cd.Status.Platform.AWS.PrivateLink.HostedZoneID = hzID
-	if err := r.updatePrivateLinkStatus(cd, logger); err != nil {
+	if err := r.updatePrivateLinkStatus(cd); err != nil {
 		logger.WithError(err).Error("failed to update the hosted zone ID for cluster deployment")
 		return modified, "", err
 	}
@@ -1043,7 +1047,7 @@ var errNoHostedZoneFoundForVPC = errors.New("no hosted zone found")
 // findHostedZone finds a Private Hosted Zone for apiDomain that is associated with the given
 // VPC.
 // If no such hosted zone exists, it return an errNoHostedZoneFoundForVPC error.
-func findHostedZone(awsClient awsclient.Client, vpcID, vpcRegion, apiDomain string, logger log.FieldLogger) (string, error) {
+func findHostedZone(awsClient awsclient.Client, vpcID, vpcRegion, apiDomain string) (string, error) {
 	input := &route53.ListHostedZonesByVPCInput{
 		VPCId:     aws.String(vpcID),
 		VPCRegion: aws.String(vpcRegion),
@@ -1097,7 +1101,6 @@ func (r *ReconcileAWSPrivateLink) createHostedZone(awsClient awsclient.Client,
 // reconcileHostedZoneAssociations ensures that the all the VPCs in the associatedVPCs list from
 // the controller config are associated to the PHZ hostedZoneID.
 func (r *ReconcileAWSPrivateLink) reconcileHostedZoneAssociations(awsClient *awsClient,
-	cd *hivev1.ClusterDeployment,
 	hostedZoneID string, vpcEndpoint *ec2.VpcEndpoint,
 	logger log.FieldLogger) (bool, error) {
 	hzLog := logger.WithField("hostedZoneID", hostedZoneID)
@@ -1362,7 +1365,7 @@ var retryBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-func (r *ReconcileAWSPrivateLink) updatePrivateLinkStatus(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+func (r *ReconcileAWSPrivateLink) updatePrivateLinkStatus(cd *hivev1.ClusterDeployment) error {
 	return retry.RetryOnConflict(retryBackoff, func() error {
 		curr := &hivev1.ClusterDeployment{}
 		err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, curr)

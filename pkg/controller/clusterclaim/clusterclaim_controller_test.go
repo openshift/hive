@@ -802,10 +802,7 @@ func Test_getClaimLifetime(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var poolLifetime *hivev1.ClusterPoolClaimLifetime
 			if test.defaultLifetime != nil {
-				if poolLifetime == nil {
-					poolLifetime = &hivev1.ClusterPoolClaimLifetime{}
-				}
-				poolLifetime.Default = test.defaultLifetime
+				poolLifetime = &hivev1.ClusterPoolClaimLifetime{Default: test.defaultLifetime}
 			}
 			if test.maximumLifetime != nil {
 				if poolLifetime == nil {

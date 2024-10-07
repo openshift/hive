@@ -94,10 +94,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, "foo-lqmsh-admin-kubeconfig", "kubeconfig", "{}"),
-				testServiceAccount("argocd-server", argoCDDefaultNamespace,
-					corev1.ObjectReference{Kind: "Secret",
-						Name:      "argocd-token",
-						Namespace: argoCDDefaultNamespace}),
+				testServiceAccount("argocd-server", []corev1.ObjectReference{{Kind: "Secret", Name: "argocd-token", Namespace: argoCDDefaultNamespace}}...),
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "argocd-token", argoCDDefaultNamespace, "token", "{}"),
 			},
 			argoCDEnabled: true,
@@ -117,10 +114,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, "foo-lqmsh-admin-kubeconfig", "kubeconfig", "{}"),
-				testServiceAccount("argocd-server", argoCDDefaultNamespace,
-					corev1.ObjectReference{Kind: "Secret",
-						Name:      "argocd-token",
-						Namespace: argoCDDefaultNamespace}),
+				testServiceAccount("argocd-server", []corev1.ObjectReference{{Kind: "Secret", Name: "argocd-token", Namespace: argoCDDefaultNamespace}}...),
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "argocd-token", argoCDDefaultNamespace, "token", "{}"),
 				// Existing ArgoCD cluster secret
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "cluster-test-api.test.com-2774145043", argoCDDefaultNamespace, "test", "{}"),
@@ -148,10 +142,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, "foo-lqmsh-admin-kubeconfig", "kubeconfig", "{}"),
-				testServiceAccount("argocd-server", argoCDDefaultNamespace,
-					corev1.ObjectReference{Kind: "Secret",
-						Name:      "argocd-token",
-						Namespace: argoCDDefaultNamespace}),
+				testServiceAccount("argocd-server", []corev1.ObjectReference{{Kind: "Secret", Name: "argocd-token", Namespace: argoCDDefaultNamespace}}...),
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "argocd-token", argoCDDefaultNamespace, "token", "{}"),
 				// Existing ArgoCD cluster secret
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "cluster-test-api.test.com-2774145043", argoCDDefaultNamespace, corev1.DockerConfigJsonKey, "{}"),
@@ -173,10 +164,7 @@ func TestArgoCDRegisterReconcile(t *testing.T) {
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, credsSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, "foo-lqmsh-admin-kubeconfig", "kubeconfig", "{}"),
-				testServiceAccount("argocd-server", argoCDDefaultNamespace,
-					corev1.ObjectReference{Kind: "Secret",
-						Name:      "argocd-token",
-						Namespace: argoCDDefaultNamespace}),
+				testServiceAccount("argocd-server", []corev1.ObjectReference{{Kind: "Secret", Name: "argocd-token", Namespace: argoCDDefaultNamespace}}...),
 				testSecretWithNamespace(corev1.SecretTypeDockerConfigJson, "argocd-token", argoCDDefaultNamespace, "token", "{}"),
 			},
 			argoCDEnabled: false,
@@ -329,7 +317,7 @@ func testSecretWithNamespace(secretType corev1.SecretType, name, namespace, key,
 	return s
 }
 
-func testServiceAccount(name, namespace string, secrets ...corev1.ObjectReference) *corev1.ServiceAccount {
+func testServiceAccount(name string, secrets ...corev1.ObjectReference) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

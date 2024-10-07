@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.16.1
   name: machinepools.hive.openshift.io
 spec:
   group: hive.openshift.io
@@ -29,14 +29,19 @@ spec:
         description: MachinePool is the Schema for the machinepools API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -44,8 +49,9 @@ spec:
             description: MachinePoolSpec defines the desired state of MachinePool
             properties:
               autoscaling:
-                description: Autoscaling is the details for auto-scaling the machine
-                  pool. Replicas and autoscaling cannot be used together.
+                description: |-
+                  Autoscaling is the details for auto-scaling the machine pool.
+                  Replicas and autoscaling cannot be used together.
                 properties:
                   maxReplicas:
                     description: MaxReplicas is the maximum number of replicas for
@@ -62,57 +68,58 @@ spec:
                 - minReplicas
                 type: object
               clusterDeploymentRef:
-                description: ClusterDeploymentRef references the cluster deployment
-                  to which this machine pool belongs.
+                description: |-
+                  ClusterDeploymentRef references the cluster deployment to which this
+                  machine pool belongs.
                 properties:
                   name:
                     default: ""
-                    description: 'Name of the referent. This field is effectively
-                      required, but due to backwards compatibility is allowed to be
-                      empty. Instances of this type with an empty value here are almost
-                      certainly wrong. TODO: Add other useful fields. apiVersion,
-                      kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Drop `kubebuilder:default` when controller-gen doesn''t
-                      need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.'
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
               labels:
                 additionalProperties:
                   type: string
-                description: Map of label string keys and values that will be applied
-                  to the created MachineSet's MachineSpec. This affects the labels
-                  that will end up on the *Nodes* (in contrast with the MachineLabels
-                  field). This list will overwrite any modifications made to Node
-                  labels on an ongoing basis.
+                description: |-
+                  Map of label string keys and values that will be applied to the created MachineSet's
+                  MachineSpec. This affects the labels that will end up on the *Nodes* (in contrast with
+                  the MachineLabels field). This list will overwrite any modifications made to Node labels
+                  on an ongoing basis.
                 type: object
               machineLabels:
                 additionalProperties:
                   type: string
-                description: 'Map of label string keys and values that will be applied
-                  to the created MachineSet''s MachineTemplateSpec. This affects the
-                  labels that will end up on the *Machines* (in contrast with the
-                  Labels field). This list will overwrite any modifications made to
-                  Machine labels on an ongoing basis. Note: We ignore entries that
-                  conflict with generated labels.'
+                description: |-
+                  Map of label string keys and values that will be applied to the created MachineSet's
+                  MachineTemplateSpec. This affects the labels that will end up on the *Machines* (in
+                  contrast with the Labels field). This list will overwrite any modifications made to
+                  Machine labels on an ongoing basis. Note: We ignore entries that conflict with
+                  generated labels.
                 type: object
               name:
                 description: Name is the name of the machine pool.
                 type: string
               platform:
-                description: Platform is configuration for machine pool specific to
-                  the platform. When using a MachinePool to control the default worker
-                  machines created by installer, these must match the values provided
-                  in the install-config.
+                description: |-
+                  Platform is configuration for machine pool specific to the platform.
+                  When using a MachinePool to control the default worker machines
+                  created by installer, these must match the values provided in the
+                  install-config.
                 properties:
                   aws:
                     description: AWS is the configuration used when installing on
                       AWS.
                     properties:
                       additionalSecurityGroupIDs:
-                        description: AdditionalSecurityGroupIDs contains IDs of additional
-                          security groups for machines, where each ID is presented
-                          in the format sg-xxxx.
+                        description: |-
+                          AdditionalSecurityGroupIDs contains IDs of additional security groups for machines, where each ID
+                          is presented in the format sg-xxxx.
                         items:
                           type: string
                         type: array
@@ -121,17 +128,13 @@ spec:
                           options for EC2 instances in the machine pool.
                         properties:
                           authentication:
-                            description: Authentication determines whether or not
-                              the host requires the use of authentication when interacting
-                              with the metadata service. When using authentication,
-                              this enforces v2 interaction method (IMDSv2) with the
-                              metadata service. When omitted, this means the user
-                              has no opinion and the value is left to the platform
-                              to choose a good default, which is subject to change
-                              over time. The current default is optional. At this
-                              point this field represents `HttpTokens` parameter from
-                              `InstanceMetadataOptionsRequest` structure in AWS EC2
-                              API https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceMetadataOptionsRequest.html
+                            description: |-
+                              Authentication determines whether or not the host requires the use of authentication when interacting with the metadata service.
+                              When using authentication, this enforces v2 interaction method (IMDSv2) with the metadata service.
+                              When omitted, this means the user has no opinion and the value is left to the platform to choose a good
+                              default, which is subject to change over time. The current default is optional.
+                              At this point this field represents `HttpTokens` parameter from `InstanceMetadataOptionsRequest` structure in AWS EC2 API
+                              https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceMetadataOptionsRequest.html
                             type: string
                         type: object
                       rootVolume:
@@ -141,9 +144,10 @@ spec:
                             description: IOPS defines the iops for the storage.
                             type: integer
                           kmsKeyARN:
-                            description: The KMS key that will be used to encrypt
-                              the EBS volume. If no key is provided the default KMS
-                              key for the account will be used. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_GetEbsDefaultKmsKeyId.html
+                            description: |-
+                              The KMS key that will be used to encrypt the EBS volume.
+                              If no key is provided the default KMS key for the account will be used.
+                              https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_GetEbsDefaultKmsKeyId.html
                             type: string
                           size:
                             description: Size defines the size of the storage.
@@ -160,34 +164,36 @@ spec:
                           to be run using AWS Spot instances.
                         properties:
                           maxPrice:
-                            description: 'The maximum price the user is willing to
-                              pay for their instances Default: On-Demand price'
+                            description: |-
+                              The maximum price the user is willing to pay for their instances
+                              Default: On-Demand price
                             type: string
                         type: object
                       subnets:
-                        description: Subnets is the list of IDs of subnets to which
-                          to attach the machines. There must be exactly one subnet
-                          for each availability zone used. These subnets may be public
-                          or private. As a special case, for consistency with install-config,
-                          you may specify exactly one private and one public subnet
-                          for each availability zone. In this case, the public subnets
-                          will be filtered out and only the private subnets will be
-                          used. If empty/omitted, we will look for subnets in each
-                          availability zone tagged with Name=<clusterID>-private-<az>
-                          (legacy terraform) or <clusterID>-subnet-private-<az> (CAPA).
+                        description: |-
+                          Subnets is the list of IDs of subnets to which to attach the machines.
+                          There must be exactly one subnet for each availability zone used.
+                          These subnets may be public or private.
+                          As a special case, for consistency with install-config, you may specify exactly one
+                          private and one public subnet for each availability zone. In this case, the public
+                          subnets will be filtered out and only the private subnets will be used.
+                          If empty/omitted, we will look for subnets in each availability zone tagged with
+                          Name=<clusterID>-private-<az> (legacy terraform) or <clusterID>-subnet-private-<az>
+                          (CAPA).
                         items:
                           type: string
                         type: array
                       type:
-                        description: InstanceType defines the ec2 instance type. eg.
-                          m4-large
+                        description: |-
+                          InstanceType defines the ec2 instance type.
+                          eg. m4-large
                         type: string
                       userTags:
                         additionalProperties:
                           type: string
-                        description: UserTags contains the user defined tags to be
-                          supplied for the ec2 instance. Note that these will be merged
-                          with ClusterDeployment.Spec.Platform.AWS.UserTags, with
+                        description: |-
+                          UserTags contains the user defined tags to be supplied for the ec2 instance.
+                          Note that these will be merged with ClusterDeployment.Spec.Platform.AWS.UserTags, with
                           this field taking precedence when keys collide.
                         type: object
                       zones:
@@ -205,14 +211,14 @@ spec:
                       Azure.
                     properties:
                       computeSubnet:
-                        description: ComputeSubnet specifies an existing subnet for
-                          use by compute nodes. If omitted, the default (${infraID}-worker-subnet)
-                          will be used.
+                        description: |-
+                          ComputeSubnet specifies an existing subnet for use by compute nodes.
+                          If omitted, the default (${infraID}-worker-subnet) will be used.
                         type: string
                       networkResourceGroupName:
-                        description: NetworkResourceGroupName specifies the network
-                          resource group that contains an existing VNet. Ignored unless
-                          VirtualNetwork is also specified.
+                        description: |-
+                          NetworkResourceGroupName specifies the network resource group that contains an existing VNet.
+                          Ignored unless VirtualNetwork is also specified.
                         type: string
                       osDisk:
                         description: OSDisk defines the storage for instance.
@@ -226,12 +232,14 @@ spec:
                                   set.
                                 type: string
                               resourceGroup:
-                                description: ResourceGroup defines the Azure resource
-                                  group used by the disk encryption set.
+                                description: |-
+                                  ResourceGroup defines the Azure resource group used by the disk
+                                  encryption set.
                                 type: string
                               subscriptionId:
-                                description: SubscriptionID defines the Azure subscription
-                                  the disk encryption set is in.
+                                description: |-
+                                  SubscriptionID defines the Azure subscription the disk encryption
+                                  set is in.
                                 type: string
                             required:
                             - name
@@ -243,8 +251,9 @@ spec:
                             minimum: 0
                             type: integer
                           diskType:
-                            description: DiskType defines the type of disk. For control
-                              plane nodes, the valid values are Premium_LRS and StandardSSD_LRS.
+                            description: |-
+                              DiskType defines the type of disk.
+                              For control plane nodes, the valid values are Premium_LRS and StandardSSD_LRS.
                               Default is Premium_LRS.
                             enum:
                             - Standard_LRS
@@ -276,26 +285,29 @@ spec:
                         - version
                         type: object
                       type:
-                        description: InstanceType defines the azure instance type.
+                        description: |-
+                          InstanceType defines the azure instance type.
                           eg. Standard_DS_V2
                         type: string
                       virtualNetwork:
-                        description: VirtualNetwork specifies the name of an existing
-                          VNet for the Machines to use If omitted, the default (${infraID}-vnet)
-                          will be used.
+                        description: |-
+                          VirtualNetwork specifies the name of an existing VNet for the Machines to use
+                          If omitted, the default (${infraID}-vnet) will be used.
                         type: string
                       vmNetworkingType:
-                        description: 'VMNetworkingType specifies whether to enable
-                          accelerated networking. Accelerated networking enables single
-                          root I/O virtualization (SR-IOV) to a VM, greatly improving
-                          its networking performance. eg. values: "Accelerated", "Basic"'
+                        description: |-
+                          VMNetworkingType specifies whether to enable accelerated networking.
+                          Accelerated networking enables single root I/O virtualization (SR-IOV) to a VM, greatly improving its
+                          networking performance.
+                          eg. values: "Accelerated", "Basic"
                         enum:
                         - Accelerated
                         - Basic
                         type: string
                       zones:
-                        description: Zones is list of availability zones that can
-                          be used. eg. ["1", "2", "3"]
+                        description: |-
+                          Zones is list of availability zones that can be used.
+                          eg. ["1", "2", "3"]
                         items:
                           type: string
                         type: array
@@ -308,18 +320,16 @@ spec:
                       GCP.
                     properties:
                       networkProjectID:
-                        description: NetworkProjectID specifies which project the
-                          network and subnets exist in when they are not in the main
-                          ProjectID.
+                        description: |-
+                          NetworkProjectID specifies which project the network and subnets exist in when
+                          they are not in the main ProjectID.
                         type: string
                       onHostMaintenance:
-                        description: OnHostMaintenance determines the behavior when
-                          a maintenance event occurs that might cause the instance
-                          to reboot. This is required to be set to "Terminate" if
-                          you want to provision machine with attached GPUs. Otherwise,
-                          allowed values are "Migrate" and "Terminate". If omitted,
-                          the platform chooses a default, which is subject to change
-                          over time, currently that default is "Migrate".
+                        description: |-
+                          OnHostMaintenance determines the behavior when a maintenance event occurs that might cause the instance to reboot.
+                          This is required to be set to "Terminate" if you want to provision machine with attached GPUs.
+                          Otherwise, allowed values are "Migrate" and "Terminate".
+                          If omitted, the platform chooses a default, which is subject to change over time, currently that default is "Migrate".
                         enum:
                         - Migrate
                         - Terminate
@@ -328,16 +338,18 @@ spec:
                         description: OSDisk defines the storage for instances.
                         properties:
                           diskSizeGB:
-                            description: DiskSizeGB defines the size of disk in GB.
+                            description: |-
+                              DiskSizeGB defines the size of disk in GB.
                               Defaulted internally to 128.
                             format: int64
                             maximum: 65536
                             minimum: 16
                             type: integer
                           diskType:
-                            description: DiskType defines the type of disk. The valid
-                              values are pd-standard and pd-ssd. Defaulted internally
-                              to pd-ssd.
+                            description: |-
+                              DiskType defines the type of disk.
+                              The valid values are pd-standard and pd-ssd.
+                              Defaulted internally to pd-ssd.
                             enum:
                             - pd-ssd
                             - pd-standard
@@ -364,9 +376,9 @@ spec:
                                       encryption.
                                     type: string
                                   projectID:
-                                    description: ProjectID is the ID of the Project
-                                      in which the KMS Key Ring exists. Defaults to
-                                      the VM ProjectID if not set.
+                                    description: |-
+                                      ProjectID is the ID of the Project in which the KMS Key Ring exists.
+                                      Defaults to the VM ProjectID if not set.
                                     type: string
                                 required:
                                 - keyRing
@@ -374,73 +386,69 @@ spec:
                                 - name
                                 type: object
                               kmsKeyServiceAccount:
-                                description: KMSKeyServiceAccount is the service account
-                                  being used for the encryption request for the given
-                                  KMS key. If absent, the Compute Engine default service
-                                  account is used. See https://cloud.google.com/compute/docs/access/service-accounts#compute_engine_service_account
+                                description: |-
+                                  KMSKeyServiceAccount is the service account being used for the
+                                  encryption request for the given KMS key. If absent, the Compute
+                                  Engine default service account is used.
+                                  See https://cloud.google.com/compute/docs/access/service-accounts#compute_engine_service_account
                                   for details on the default service account.
                                 type: string
                             type: object
                         type: object
                       secureBoot:
-                        description: SecureBoot Defines whether the instance should
-                          have secure boot enabled. Verifies the digital signature
-                          of all boot components, and halts the boot process if signature
-                          verification fails. If omitted, the platform chooses a default,
-                          which is subject to change over time. Currently that default
-                          is "Disabled".
+                        description: |-
+                          SecureBoot Defines whether the instance should have secure boot enabled.
+                          Verifies the digital signature of all boot components, and halts the boot process if signature verification fails.
+                          If omitted, the platform chooses a default, which is subject to change over time. Currently that default is "Disabled".
                         enum:
                         - Enabled
                         - Disabled
                         type: string
                       serviceAccount:
-                        description: ServiceAccount is the email of a gcp service
-                          account to be attached to worker nodes in order to provide
-                          the permissions required by the cloud provider. For the
-                          default worker MachinePool, it is the user's responsibility
-                          to match this to the value provided in the install-config.
+                        description: |-
+                          ServiceAccount is the email of a gcp service account to be attached to worker nodes
+                          in order to provide the permissions required by the cloud provider. For the default
+                          worker MachinePool, it is the user's responsibility to match this to the value
+                          provided in the install-config.
                         type: string
                       type:
-                        description: InstanceType defines the GCP instance type. eg.
-                          n1-standard-4
+                        description: |-
+                          InstanceType defines the GCP instance type.
+                          eg. n1-standard-4
                         type: string
                       userTags:
-                        description: userTags has additional keys and values that
-                          we will add as tags to the providerSpec of MachineSets that
-                          we creates on GCP. Tag key and tag value should be the shortnames
-                          of the tag key and tag value resource. Consumer is responsible
-                          for using this only for spokes where custom tags are supported.
+                        description: |-
+                          userTags has additional keys and values that we will add as tags to the providerSpec of
+                          MachineSets that we creates on GCP. Tag key and tag value should be the shortnames of the
+                          tag key and tag value resource. Consumer is responsible for using this only for spokes
+                          where custom tags are supported.
                         items:
                           description: UserTag is a tag to apply to GCP resources
                             created for the cluster.
                           properties:
                             key:
-                              description: key is the key part of the tag. A tag key
-                                can have a maximum of 63 characters and cannot be
-                                empty. Tag key must begin and end with an alphanumeric
-                                character, and must contain only uppercase, lowercase
-                                alphanumeric characters, and the following special
-                                characters `._-`.
+                              description: |-
+                                key is the key part of the tag. A tag key can have a maximum of 63 characters and
+                                cannot be empty. Tag key must begin and end with an alphanumeric character, and
+                                must contain only uppercase, lowercase alphanumeric characters, and the following
+                                special characters `._-`.
                               type: string
                             parentID:
-                              description: 'parentID is the ID of the hierarchical
-                                resource where the tags are defined, e.g. at the Organization
-                                or the Project level. To find the Organization ID
-                                or Project ID refer to the following pages: https://cloud.google.com/resource-manager/docs/creating-managing-organization#retrieving_your_organization_id,
+                              description: |-
+                                parentID is the ID of the hierarchical resource where the tags are defined,
+                                e.g. at the Organization or the Project level. To find the Organization ID or Project ID refer to the following pages:
+                                https://cloud.google.com/resource-manager/docs/creating-managing-organization#retrieving_your_organization_id,
                                 https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects.
-                                An OrganizationID must consist of decimal numbers,
-                                and cannot have leading zeroes. A ProjectID must be
-                                6 to 30 characters in length, can only contain lowercase
-                                letters, numbers, and hyphens, and must start with
-                                a letter, and cannot end with a hyphen.'
+                                An OrganizationID must consist of decimal numbers, and cannot have leading zeroes.
+                                A ProjectID must be 6 to 30 characters in length, can only contain lowercase letters,
+                                numbers, and hyphens, and must start with a letter, and cannot end with a hyphen.
                               type: string
                             value:
-                              description: value is the value part of the tag. A tag
-                                value can have a maximum of 63 characters and cannot
-                                be empty. Tag value must begin and end with an alphanumeric
-                                character, and must contain only uppercase, lowercase
-                                alphanumeric characters, and the following special
-                                characters `_-.@%=+:,*#&(){}[]` and spaces.
+                              description: |-
+                                value is the value part of the tag. A tag value can have a maximum of 63 characters
+                                and cannot be empty. Tag value must begin and end with an alphanumeric character, and
+                                must contain only uppercase, lowercase alphanumeric characters, and the following
+                                special characters `_-.@%=+:,*#&(){}[]` and spaces.
                               type: string
                           required:
                           - key
@@ -466,10 +474,10 @@ spec:
                           boot volume.
                         properties:
                           encryptionKey:
-                            description: EncryptionKey is the CRN referencing a Key
-                              Protect or Hyper Protect Crypto Services key to use
-                              for volume encryption. If not specified, a provider
-                              managed encryption key will be used.
+                            description: |-
+                              EncryptionKey is the CRN referencing a Key Protect or Hyper Protect
+                              Crypto Services key to use for volume encryption. If not specified, a
+                              provider managed encryption key will be used.
                             type: string
                         type: object
                       dedicatedHosts:
@@ -480,14 +488,14 @@ spec:
                             the machine's dedicated host platform.
                           properties:
                             name:
-                              description: Name is the name of the dedicated host
-                                to provision the machine on. If specified, machines
-                                will be created on pre-existing dedicated host.
+                              description: |-
+                                Name is the name of the dedicated host to provision the machine on. If
+                                specified, machines will be created on pre-existing dedicated host.
                               type: string
                             profile:
-                              description: Profile is the profile ID for the dedicated
-                                host. If specified, new dedicated host will be created
-                                for machines.
+                              description: |-
+                                Profile is the profile ID for the dedicated host. If specified, new
+                                dedicated host will be created for machines.
                               type: string
                           type: object
                         type: array
@@ -506,24 +514,27 @@ spec:
                       on OpenStack.
                     properties:
                       flavor:
-                        description: Flavor defines the OpenStack Nova flavor. eg.
-                          m1.large The json key here differs from the installer which
-                          uses both "computeFlavor" and type "type" depending on which
-                          type you're looking at, and the resulting field on the MachineSet
-                          is "flavor". We are opting to stay consistent with the end
-                          result.
+                        description: |-
+                          Flavor defines the OpenStack Nova flavor.
+                          eg. m1.large
+                          The json key here differs from the installer which uses both "computeFlavor" and type "type" depending on which
+                          type you're looking at, and the resulting field on the MachineSet is "flavor". We are opting to stay consistent
+                          with the end result.
                         type: string
                       rootVolume:
-                        description: RootVolume defines the root volume for instances
-                          in the machine pool. The instances use ephemeral disks if
-                          not set.
+                        description: |-
+                          RootVolume defines the root volume for instances in the machine pool.
+                          The instances use ephemeral disks if not set.
                         properties:
                           size:
-                            description: Size defines the size of the volume in gibibytes
-                              (GiB). Required
+                            description: |-
+                              Size defines the size of the volume in gibibytes (GiB).
+                              Required
                             type: integer
                           type:
-                            description: Type defines the type of the volume. Required
+                            description: |-
+                              Type defines the type of the volume.
+                              Required
                             type: string
                         required:
                         - size
@@ -540,12 +551,14 @@ spec:
                         description: CPU defines the VM CPU.
                         properties:
                           cores:
-                            description: Cores is the number of cores per socket.
+                            description: |-
+                              Cores is the number of cores per socket.
                               Total CPUs is (Sockets * Cores)
                             format: int32
                             type: integer
                           sockets:
-                            description: Sockets is the number of sockets for a VM.
+                            description: |-
+                              Sockets is the number of sockets for a VM.
                               Total CPUs is (Sockets * Cores)
                             format: int32
                             type: integer
@@ -581,8 +594,9 @@ spec:
                       on vSphere
                     properties:
                       coresPerSocket:
-                        description: NumCoresPerSocket is the number of cores per
-                          socket in a vm. The number of vCPUs on the vm will be NumCPUs/NumCoresPerSocket.
+                        description: |-
+                          NumCoresPerSocket is the number of cores per socket in a vm. The number
+                          of vCPUs on the vm will be NumCPUs/NumCoresPerSocket.
                         format: int32
                         type: integer
                       cpus:
@@ -605,9 +619,9 @@ spec:
                         - diskSizeGB
                         type: object
                       resourcePool:
-                        description: ResourcePool is the name of the resource pool
-                          that will be used for virtual machines. If it is not present,
-                          a default value will be used.
+                        description: |-
+                          ResourcePool is the name of the resource pool that will be used for virtual machines.
+                          If it is not present, a default value will be used.
                         type: string
                     required:
                     - coresPerSocket
@@ -617,33 +631,37 @@ spec:
                     type: object
                 type: object
               replicas:
-                description: Replicas is the count of machines for this machine pool.
-                  Replicas and autoscaling cannot be used together. Default is 1,
-                  if autoscaling is not used.
+                description: |-
+                  Replicas is the count of machines for this machine pool.
+                  Replicas and autoscaling cannot be used together.
+                  Default is 1, if autoscaling is not used.
                 format: int64
                 type: integer
               taints:
-                description: List of taints that will be applied to the created MachineSet's
-                  MachineSpec. This list will overwrite any modifications made to
-                  Node taints on an ongoing basis. In case of duplicate entries, first
-                  encountered taint Value will be preserved, and the rest collapsed
-                  on the corresponding MachineSets. Note that taints are uniquely
-                  identified based on key+effect, not just key.
+                description: |-
+                  List of taints that will be applied to the created MachineSet's MachineSpec.
+                  This list will overwrite any modifications made to Node taints on an ongoing basis.
+                  In case of duplicate entries, first encountered taint Value will be preserved,
+                  and the rest collapsed on the corresponding MachineSets.
+                  Note that taints are uniquely identified based on key+effect, not just key.
                 items:
-                  description: The node this Taint is attached to has the "effect"
-                    on any pod that does not tolerate the Taint.
+                  description: |-
+                    The node this Taint is attached to has the "effect" on
+                    any pod that does not tolerate the Taint.
                   properties:
                     effect:
-                      description: Required. The effect of the taint on pods that
-                        do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule
-                        and NoExecute.
+                      description: |-
+                        Required. The effect of the taint on pods
+                        that do not tolerate the taint.
+                        Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
                       type: string
                     key:
                       description: Required. The taint key to be applied to a node.
                       type: string
                     timeAdded:
-                      description: TimeAdded represents the time at which the taint
-                        was added. It is only written for NoExecute taints.
+                      description: |-
+                        TimeAdded represents the time at which the taint was added.
+                        It is only written for NoExecute taints.
                       format: date-time
                       type: string
                     value:
@@ -698,12 +716,11 @@ spec:
                   type: object
                 type: array
               controlledByReplica:
-                description: ControlledByReplica indicates which replica of the hive-machinepool
-                  StatefulSet is responsible for this MachinePool. Note that this
-                  value indicates the replica that most recently handled the MachinePool.
-                  If the hive-machinepool statefulset is scaled up or down, the controlling
-                  replica can change, potentially causing logs to be spread across
-                  multiple pods.
+                description: |-
+                  ControlledByReplica indicates which replica of the hive-machinepool StatefulSet is responsible
+                  for this MachinePool. Note that this value indicates the replica that most recently handled the
+                  MachinePool. If the hive-machinepool statefulset is scaled up or down, the controlling replica
+                  can change, potentially causing logs to be spread across multiple pods.
                 format: int64
                 type: integer
               machineSets:
@@ -716,11 +733,12 @@ spec:
                     errorMessage:
                       type: string
                     errorReason:
-                      description: In the event that there is a terminal problem reconciling
-                        the replicas, both ErrorReason and ErrorMessage will be set.
-                        ErrorReason will be populated with a succinct value suitable
-                        for machine interpretation, while ErrorMessage will contain
-                        a more verbose string suitable for logging and human consumption.
+                      description: |-
+                        In the event that there is a terminal problem reconciling the
+                        replicas, both ErrorReason and ErrorMessage will be set. ErrorReason
+                        will be populated with a succinct value suitable for machine
+                        interpretation, while ErrorMessage will contain a more verbose
+                        string suitable for logging and human consumption.
                       type: string
                     maxReplicas:
                       description: MaxReplicas is the maximum number of replicas for
@@ -736,10 +754,10 @@ spec:
                       description: Name is the name of the machine set.
                       type: string
                     readyReplicas:
-                      description: The number of ready replicas for this MachineSet.
-                        A machine is considered ready when the node has been created
-                        and is "Ready". It is transferred as-is from the MachineSet
-                        from remote cluster.
+                      description: |-
+                        The number of ready replicas for this MachineSet. A machine is considered ready
+                        when the node has been created and is "Ready". It is transferred as-is from the
+                        MachineSet from remote cluster.
                       format: int32
                       type: integer
                     replicas:
@@ -755,30 +773,32 @@ spec:
                   type: object
                 type: array
               ownedLabels:
-                description: OwnedLabels lists the keys of labels this MachinePool
-                  created on the remote MachineSet's MachineSpec. (In contrast with
-                  OwnedMachineLabels.) Used to identify labels to remove from the
-                  remote MachineSet when they are absent from the MachinePool's spec.labels.
+                description: |-
+                  OwnedLabels lists the keys of labels this MachinePool created on the remote MachineSet's
+                  MachineSpec. (In contrast with OwnedMachineLabels.)
+                  Used to identify labels to remove from the remote MachineSet when they are absent from
+                  the MachinePool's spec.labels.
                 items:
                   type: string
                 type: array
               ownedMachineLabels:
-                description: OwnedMachineLabels lists the keys of labels this MachinePool
-                  created on the remote MachineSet's MachineTemplateSpec. (In contrast
-                  with OwnedLabels.) Used to identify labels to remove from the remote
-                  MachineSet when they are absent from the MachinePool's spec.machineLabels.
+                description: |-
+                  OwnedMachineLabels lists the keys of labels this MachinePool created on the remote
+                  MachineSet's MachineTemplateSpec. (In contrast with OwnedLabels.)
+                  Used to identify labels to remove from the remote MachineSet when they are absent from
+                  the MachinePool's spec.machineLabels.
                 items:
                   type: string
                 type: array
               ownedTaints:
-                description: OwnedTaints lists identifiers of taints this MachinePool
-                  created on the remote MachineSet. Used to identify taints to remove
-                  from the remote MachineSet when they are absent from the MachinePool's
-                  spec.taints.
+                description: |-
+                  OwnedTaints lists identifiers of taints this MachinePool created on the remote MachineSet.
+                  Used to identify taints to remove from the remote MachineSet when they are absent from
+                  the MachinePool's spec.taints.
                 items:
-                  description: TaintIdentifier uniquely identifies a Taint. (It turns
-                    out taints are mutually exclusive by key+effect, not simply by
-                    key.)
+                  description: |-
+                    TaintIdentifier uniquely identifies a Taint. (It turns out taints are mutually exclusive by
+                    key+effect, not simply by key.)
                   properties:
                     effect:
                       description: Effect matches corev1.Taint.Effect.

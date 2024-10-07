@@ -2,7 +2,6 @@ package clusterdeployment
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	log "github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
@@ -69,7 +68,7 @@ func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment) {
 	metricProvisionFailedTerminal.Observe(cd, fixedLabels, 1)
 }
 
-func registerMetrics(mConfig *metricsconfig.MetricsConfig, log log.FieldLogger) {
+func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 	mapClusterTypeLabelToValue := hivemetrics.GetOptionalClusterTypeLabels(mConfig)
 
 	metricCompletedInstallJobRestarts = *hivemetrics.NewHistogramVecWithDynamicLabels(

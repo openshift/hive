@@ -131,7 +131,7 @@ func Add(mgr manager.Manager) error {
 	}
 	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
 	// read the hiveconfig, and we register them only once.
-	registerMetrics(mConfig, logger)
+	registerMetrics(mConfig)
 	return AddToManager(mgr, NewReconciler(mgr, logger, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
@@ -168,7 +168,7 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flow
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	cdReconciler, ok := r.(*ReconcileClusterDeployment)
 	if !ok {
 		return errors.New("reconciler supplied is not a ReconcileClusterDeployment")
@@ -697,7 +697,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	// Sanity check the platform/cloud credentials and set hivev1.AuthenticationFailureClusterDeploymentCondition
 	validCreds, authError := r.validatePlatformCreds(cd, cdLog)
-	_, err := r.setAuthenticationFailure(cd, validCreds, authError, cdLog)
+	var err error
+	_, err = r.setAuthenticationFailure(cd, validCreds, authError)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to update clusterdeployment")
 		return reconcile.Result{}, err
@@ -717,7 +718,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
-	releaseImage := r.getReleaseImage(cd, imageSet, cdLog)
+	releaseImage := r.getReleaseImage(cd, imageSet)
 
 	cdLog.Debug("loading pull secrets")
 	pullSecret, err := r.mergePullSecrets(cd, cdLog)
@@ -929,7 +930,7 @@ func dnsZoneNotReadyMaybeTimedOut(cd *hivev1.ClusterDeployment, logger log.Field
 // getReleaseImage looks for a a release image in clusterdeployment or its corresponding imageset in the following order:
 // 1 - specified in the cluster deployment spec.images.releaseImage
 // 2 - referenced in the cluster deployment spec.imageSet
-func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet, cdLog log.FieldLogger) string {
+func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeployment, imageSet *hivev1.ClusterImageSet) string {
 	if cd.Spec.Provisioning != nil && cd.Spec.Provisioning.ReleaseImage != "" {
 		return cd.Spec.Provisioning.ReleaseImage
 	}
@@ -1147,7 +1148,7 @@ func (r *ReconcileClusterDeployment) updateCondition(
 	return r.Status().Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.ClusterDeployment, authSuccessful bool, authError error, cdLog log.FieldLogger) (bool, error) {
+func (r *ReconcileClusterDeployment) setAuthenticationFailure(cd *hivev1.ClusterDeployment, authSuccessful bool, authError error) (bool, error) {
 
 	var status corev1.ConditionStatus
 	var reason, message string
@@ -1437,7 +1438,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{}, errors.Wrap(err, "could not determine relocate status")
 	case relocateStatus == hivev1.RelocateComplete:
 		cdLog.Info("clusterdeployment relocated, removing finalizer")
-		err := r.removeClusterDeploymentFinalizer(cd, cdLog)
+		err := r.removeClusterDeploymentFinalizer(cd)
 		if err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 		}
@@ -1484,7 +1485,7 @@ func (r *ReconcileClusterDeployment) syncDeletedClusterDeployment(cd *hivev1.Clu
 		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	default:
 		cdLog.Infof("DNSZone gone, customization gone and deprovision request completed, removing deprovision finalizer")
-		if err := r.removeClusterDeploymentFinalizer(cd, cdLog); err != nil {
+		if err := r.removeClusterDeploymentFinalizer(cd); err != nil {
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error removing finalizer")
 			return reconcile.Result{}, err
 		}
@@ -1498,7 +1499,7 @@ func (r *ReconcileClusterDeployment) addClusterDeploymentFinalizer(cd *hivev1.Cl
 	return r.Update(context.TODO(), cd)
 }
 
-func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1.ClusterDeployment) error {
 
 	cd = cd.DeepCopy()
 	controllerutils.DeleteFinalizer(cd, hivev1.FinalizerDeprovision)
@@ -2054,7 +2055,7 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 	return true, nil
 }
 
-func configureTrustedCABundleConfigMap(cm *corev1.ConfigMap, cd *hivev1.ClusterDeployment) bool {
+func configureTrustedCABundleConfigMap(cm *corev1.ConfigMap) bool {
 	modified := false
 	if cm.Labels == nil {
 		cm.Labels = make(map[string]string)
@@ -2087,7 +2088,7 @@ func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(cd *hivev1.C
 			if cm.Labels == nil {
 				cm.Labels = make(map[string]string)
 			}
-			configureTrustedCABundleConfigMap(cm, cd)
+			configureTrustedCABundleConfigMap(cm)
 			if err := r.Create(context.TODO(), cm); err != nil {
 				deleted, err2 := r.namespaceTerminated(cd.Namespace)
 				if deleted {
@@ -2106,7 +2107,7 @@ func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(cd *hivev1.C
 			return errors.Wrap(err, "Failed to retrieve trusted CA bundle ConfigMap")
 		}
 	}
-	if configureTrustedCABundleConfigMap(cm, cd) {
+	if configureTrustedCABundleConfigMap(cm) {
 		if err := r.Update(context.TODO(), cm); err != nil {
 			return errors.Wrap(err, "Failed to update the trusted CA bundle ConfigMap")
 		}
@@ -2114,7 +2115,7 @@ func (r *ReconcileClusterDeployment) ensureTrustedCABundleConfigMap(cd *hivev1.C
 	return nil
 }
 
-func calculateNextProvisionTime(failureTime time.Time, retries int, cdLog log.FieldLogger) time.Time {
+func calculateNextProvisionTime(failureTime time.Time, retries int) time.Time {
 	// (2^currentRetries) * 60 seconds up to a max of 24 hours.
 	const sleepCap = 24 * time.Hour
 	const retryCap = 11 // log_2_(24*60)

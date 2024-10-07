@@ -107,7 +107,7 @@ func indexClusterClaimsByClusterPool(o client.Object) []string {
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	// Create a new controller
 	c, err := controller.New("clusterpool-controller", mgr, controller.Options{
 		Reconciler:              controllerutils.NewDelayingReconciler(r, r.logger),
@@ -187,7 +187,7 @@ func AddToManager(mgr manager.Manager, r *ReconcileClusterPool, concurrentReconc
 	return nil
 }
 
-func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*hivev1.ClusterDeploymentCustomization] {
+func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*hivev1.ClusterDeploymentCustomization, reconcile.Request] {
 	return func(ctx context.Context, cdc *hivev1.ClusterDeploymentCustomization) []reconcile.Request {
 		cpList := &hivev1.ClusterPoolList{}
 		if err := c.List(context.Background(), cpList, client.InNamespace(cdc.GetNamespace())); err != nil {
@@ -218,7 +218,7 @@ func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.Ty
 	}
 }
 
-func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding] {
+func requestsForCDRBACResources(c client.Client, resourceName string, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding, reconcile.Request] {
 	return func(ctx context.Context, o *rbacv1.RoleBinding) []reconcile.Request {
 		if o.GetName() != resourceName {
 			return nil
@@ -237,7 +237,7 @@ func requestsForCDRBACResources(c client.Client, resourceName string, logger log
 	}
 }
 
-func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding] {
+func requestsForRBACResources(c client.Client, logger log.FieldLogger) handler.TypedMapFunc[*rbacv1.RoleBinding, reconcile.Request] {
 	return func(ctx context.Context, binding *rbacv1.RoleBinding) []reconcile.Request {
 		if binding.RoleRef.Kind != "ClusterRole" || binding.RoleRef.Name != clusterPoolAdminRoleName {
 			return nil
@@ -456,7 +456,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	// One more (possible) status update: wait until the end to detect whether all unassigned CDs
 	// are current with the pool config, since assigning or deleting CDs may eliminate the last
 	// one that isn't.
-	if err := setCDsCurrentCondition(r.Client, cds, clp, poolVersion); err != nil {
+	if err := setCDsCurrentCondition(r.Client, cds, clp); err != nil {
 		log.WithError(err).Error("error updating 'ClusterDeployments current' status")
 		return reconcile.Result{}, err
 	}

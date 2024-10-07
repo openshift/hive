@@ -29,22 +29,22 @@ func (r *ReconcileMachinePool) watchMachinePoolNameLeases(mgr manager.Manager, c
 	return c.Watch(source.Kind(mgr.GetCache(), &hivev1.MachinePoolNameLease{}, h))
 }
 
-var _ handler.TypedEventHandler[*hivev1.MachinePoolNameLease] = &machinePoolNameLeaseEventHandler{}
+var _ handler.TypedEventHandler[*hivev1.MachinePoolNameLease, reconcile.Request] = &machinePoolNameLeaseEventHandler{}
 
 type machinePoolNameLeaseEventHandler struct {
-	handler.TypedEventHandler[*hivev1.MachinePoolNameLease]
+	handler.TypedEventHandler[*hivev1.MachinePoolNameLease, reconcile.Request]
 	reconciler *ReconcileMachinePool
 }
 
 // Create implements handler.EventHandler
-func (h *machinePoolNameLeaseEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.MachinePoolNameLease], q workqueue.RateLimitingInterface) {
+func (h *machinePoolNameLeaseEventHandler) Create(ctx context.Context, e event.TypedCreateEvent[*hivev1.MachinePoolNameLease], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	h.reconciler.logger.Info("running Create handler for MachinePoolNameLease")
 	h.reconciler.trackLeaseAdd(e.Object)
 	h.TypedEventHandler.Create(ctx, e, q)
 }
 
 // Delete implements handler.EventHandler
-func (h *machinePoolNameLeaseEventHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*hivev1.MachinePoolNameLease], q workqueue.RateLimitingInterface) {
+func (h *machinePoolNameLeaseEventHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[*hivev1.MachinePoolNameLease], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	logger := h.reconciler.logger
 	logger.Info("running Delete handler for MachinePoolNameLease, requeuing all pools for cluster")
 	// FIXME Handle deletion for non MachinePoolNameLease event

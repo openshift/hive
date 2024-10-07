@@ -78,7 +78,7 @@ func NewReconciler(mgr manager.Manager, rateLimiter flowcontrol.RateLimiter) (*P
 }
 
 // AddToManager adds a new Controller to mgr with r as the reconcile.Reconciler
-func AddToManager(mgr manager.Manager, r *PrivateLinkReconciler, concurrentReconciles int, rateLimiter workqueue.RateLimiter) error {
+func AddToManager(mgr manager.Manager, r *PrivateLinkReconciler, concurrentReconciles int, rateLimiter workqueue.TypedRateLimiter[reconcile.Request]) error {
 	logger := log.WithField("controller", ControllerName)
 	// Create a new controller
 	c, err := controller.New(string(ControllerName+"-controller"), mgr, controller.Options{

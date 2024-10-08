@@ -119,15 +119,17 @@ define patch-crd-yq
 
 endef
 
-.PHONY: ensure-controller-gen
-ensure-controller-gen:
-	go install $(shell realpath vendor/sigs.k8s.io/controller-tools/cmd/controller-gen)
+CONTROLLER_GEN_SRC := $(shell realpath vendor/sigs.k8s.io/controller-tools/cmd/controller-gen)
+CONTROLLER_GEN := $(shell go list -f '{{.Target}}' $(CONTROLLER_GEN_SRC))
+
+$(CONTROLLER_GEN): $(CONTROLLER_GEN_SRC)
+	go install $(CONTROLLER_GEN_SRC)
 
 # Generate CRD yaml from our api types:
 .PHONY: crd
-crd: ensure-controller-gen ensure-yq
+crd: $(CONTROLLER_GEN) ensure-yq
 	rm -rf ./config/crds
-	(cd apis; controller-gen crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
+	(cd apis; $(CONTROLLER_GEN) crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
 	@echo Stripping yaml breaks from CRD files
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 	@echo Patching CRD files for additional static information
@@ -147,7 +149,7 @@ crd: ensure-controller-gen ensure-yq
 update: crd
 
 .PHONY: verify-crd
-verify-crd: ensure-controller-gen ensure-yq
+verify-crd: $(CONTROLLER_GEN) ensure-yq
 	./hack/verify-crd.sh
 verify: verify-crd
 

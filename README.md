@@ -25,6 +25,7 @@ In the future Hive will support more cloud providers.
 * [Using Hive](./docs/using-hive.md)
   * [Cluster Hibernation](./docs/hibernating-clusters.md)
   * [Cluster Pools](./docs/clusterpools.md)
+  * [PrivateLink](./docs/privatelink.md)
 * [Hiveutil CLI](./docs/hiveutil.md)
 * [Scaling Hive](./docs/scaling-hive.md)
 * [Developing Hive](./docs/developing.md)

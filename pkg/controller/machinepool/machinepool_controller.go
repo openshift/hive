@@ -296,14 +296,6 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return r.removeFinalizer(pool, logger)
 	}
 
-	if controllerutils.IsFakeCluster(cd) {
-		logger.Info("skipping reconcile for fake cluster")
-		if pool.DeletionTimestamp != nil {
-			return r.removeFinalizer(pool, logger)
-		}
-		return reconcile.Result{}, nil
-	}
-
 	if !cd.Spec.Installed {
 		// Cluster isn't installed yet, return
 		logger.Debug("cluster installation is not complete")
@@ -324,7 +316,18 @@ func (r *ReconcileMachinePool) Reconcile(ctx context.Context, request reconcile.
 		return reconcile.Result{}, err
 	}
 
-	ret, err := r.reconcile(pool, cd, logger)
+	// Default "success" for fake clusters
+	ret, err := reconcile.Result{}, nil
+	if controllerutils.IsFakeCluster(cd) {
+		logger.Info("skipping reconcile for fake cluster")
+		if pool.DeletionTimestamp != nil {
+			return r.removeFinalizer(pool, logger)
+		}
+	} else {
+		// Real clusters
+		ret, err = r.reconcile(pool, cd, logger)
+	}
+
 	if err == nil && r.pollInterval > 0 && ret.RequeueAfter == 0 {
 		ret.RequeueAfter = r.pollInterval + time.Duration(rand.Float64()*float64(time.Second))
 		logger.WithField("RequeueAfter", ret.RequeueAfter).Info("requeueing with interval")

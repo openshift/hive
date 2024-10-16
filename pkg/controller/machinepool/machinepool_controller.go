@@ -361,7 +361,7 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		return reconcile.Result{}, err
 	}
 
-	generatedMachineSets, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
+	generatedMachineSets, generatedMachineLabels, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
 		return reconcile.Result{}, err
@@ -396,7 +396,7 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		return r.removeFinalizer(pool, logger)
 	}
 
-	return r.updatePoolStatusForMachineSets(pool, machineSets, remoteClusterAPIClient, logger)
+	return r.updatePoolStatusForMachineSets(pool, machineSets, generatedMachineLabels, remoteClusterAPIClient, logger)
 }
 
 func (r *ReconcileMachinePool) getInfrastructure(remoteClusterAPIClient client.Client, logger log.FieldLogger) (*configv1.Infrastructure, error) {
@@ -468,25 +468,28 @@ func (r *ReconcileMachinePool) generateMachineSets(
 	masterMachine *machineapi.Machine,
 	remoteMachineSets *machineapi.MachineSetList,
 	logger log.FieldLogger,
-) ([]*machineapi.MachineSet, bool, error) {
+) ([]*machineapi.MachineSet, sets.Set[string], bool, error) {
 	if pool.DeletionTimestamp != nil {
-		return nil, true, nil
+		return nil, nil, true, nil
 	}
 
 	actuator, err := r.actuatorBuilder(cd, pool, masterMachine, remoteMachineSets.Items, logger)
 	if err != nil {
 		logger.WithError(err).Error("unable to create actuator")
-		return nil, false, err
+		return nil, nil, false, err
 	}
 
 	// Generate expected MachineSets for Platform from InstallConfig
 	generatedMachineSets, proceed, err := actuator.GenerateMachineSets(cd, pool, logger)
 	if err != nil {
-		return nil, false, errors.Wrap(err, "could not generate machinesets")
+		return nil, nil, false, errors.Wrap(err, "could not generate machinesets")
 	} else if !proceed {
 		logger.Info("actuator indicated not to proceed, returning")
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
+
+	// HACK: Track generated machine labels so we don't add them to OwnedMachineLabels.
+	generatedMachineLabels := sets.Set[string]{}
 
 	for i, ms := range generatedMachineSets {
 		if pool.Spec.Autoscaling != nil {
@@ -516,21 +519,22 @@ func (r *ReconcileMachinePool) generateMachineSets(
 		if len(ms.Spec.Template.ObjectMeta.Labels) == 0 {
 			// This should never actually happen, as the generators (for all platforms)
 			// add labels and corresponding selectors used by MAPI.
-			ms.Spec.Template.ObjectMeta.Labels = pool.Spec.MachineLabels
-		} else {
-			for k, v := range pool.Spec.MachineLabels {
-				// Don't allow the user to shoot themselves in the foot by overriding generated labels.
-				if _, exists := ms.Spec.Template.ObjectMeta.Labels[k]; exists {
-					continue
-				}
-				ms.Spec.Template.ObjectMeta.Labels[k] = v
+			ms.Spec.Template.ObjectMeta.Labels = map[string]string{}
+		}
+		for k, v := range pool.Spec.MachineLabels {
+			// Don't allow the user to shoot themselves in the foot by overriding generated labels.
+			if _, exists := ms.Spec.Template.ObjectMeta.Labels[k]; exists {
+				logger.WithField("machineLabel", k).Warnf("conflict with generated label -- ignoring")
+				generatedMachineLabels.Insert(k)
+				continue
 			}
+			ms.Spec.Template.ObjectMeta.Labels[k] = v
 		}
 	}
 
 	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
 
-	return generatedMachineSets, true, nil
+	return generatedMachineSets, generatedMachineLabels, true, nil
 }
 
 // ensureEnoughReplicas ensures that the min replicas in the machine pool is
@@ -1096,6 +1100,7 @@ func (r *ReconcileMachinePool) syncClusterAutoscaler(
 func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 	pool *hivev1.MachinePool,
 	machineSets []*machineapi.MachineSet,
+	generatedMachineLabels sets.Set[string],
 	remoteClusterAPIClient client.Client,
 	logger log.FieldLogger,
 ) (reconcile.Result, error) {
@@ -1141,7 +1146,7 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 		}
 	}
 
-	pool.Status = updateOwnedLabelsAndTaints(pool)
+	pool.Status = updateOwnedLabelsAndTaints(pool, generatedMachineLabels)
 
 	if (len(origPool.Status.MachineSets) == 0 && len(pool.Status.MachineSets) == 0) ||
 		reflect.DeepEqual(origPool.Status, pool.Status) {
@@ -1152,22 +1157,23 @@ func (r *ReconcileMachinePool) updatePoolStatusForMachineSets(
 }
 
 // updateOwnedLabelsAndTaints updates OwnedLabels and OwnedTaints in the MachinePool.Status, by fetching the relevant entries sans duplicates from MachinePool.Spec.
-func updateOwnedLabelsAndTaints(pool *hivev1.MachinePool) hivev1.MachinePoolStatus {
+func updateOwnedLabelsAndTaints(pool *hivev1.MachinePool, generatedMachineLabels sets.Set[string]) hivev1.MachinePoolStatus {
 	// Update our tracked labels...
-	getOwnedLabels := func(labels map[string]string) []string {
-		ownedLabels := make([]string, len(labels))
-		i := 0
+	getOwnedLabels := func(labels map[string]string, excludes sets.Set[string]) []string {
+		ownedLabels := sets.Set[string]{}
 		for labelKey := range labels {
-			ownedLabels[i] = labelKey
-			i++
+			if excludes.Has(labelKey) {
+				continue
+			}
+			ownedLabels.Insert(labelKey)
 		}
-		sort.Strings(ownedLabels)
-		return ownedLabels
+		// sets.List sorts
+		return sets.List(ownedLabels)
 	}
-	pool.Status.OwnedLabels = getOwnedLabels(pool.Spec.Labels)
+	pool.Status.OwnedLabels = getOwnedLabels(pool.Spec.Labels, nil)
 	// NOTE: This only claims "ownership" of user-specified labels. Generated labels
 	// will be asserted regardless.
-	pool.Status.OwnedMachineLabels = getOwnedLabels(pool.Spec.MachineLabels)
+	pool.Status.OwnedMachineLabels = getOwnedLabels(pool.Spec.MachineLabels, generatedMachineLabels)
 
 	// ...and taints
 	uniqueTaints := *controllerutils.GetUniqueTaints(&pool.Spec.Taints)

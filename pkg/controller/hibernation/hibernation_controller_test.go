@@ -66,6 +66,7 @@ func TestReconcile(t *testing.T) {
 		setupRemote            func(builder *remoteclientmock.MockBuilder)
 		validate               func(t *testing.T, cd *hivev1.ClusterDeployment)
 		expectError            bool
+		expectRequeue          bool
 		expectRequeueAfter     time.Duration
 	}{
 		{
@@ -292,9 +293,9 @@ func TestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:        "clustersync not yet created",
-			cd:          cdBuilder.Options(o.shouldHibernate).Build(),
-			expectError: true,
+			name:          "clustersync not yet created",
+			cd:            cdBuilder.Options(o.shouldHibernate).Build(),
+			expectRequeue: true,
 		},
 		{
 			name: "start hibernating, no syncsets",
@@ -998,6 +999,9 @@ func TestReconcile(t *testing.T) {
 				NamespacedName: types.NamespacedName{Namespace: namespace, Name: cdName},
 			})
 
+			if test.expectRequeue {
+				assert.True(t, result.Requeue, "expected result.Requeue to be true")
+			}
 			// Need to do fuzzy requeue after matching
 			if test.expectRequeueAfter == 0 {
 				assert.Zero(t, result.RequeueAfter)

@@ -231,7 +231,11 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 	clusterSync := &hiveintv1alpha1.ClusterSync{}
 	if err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}, clusterSync); err != nil {
 		// This may be NotFound, which means the clustersync controller hasn't created the ClusterSync yet.
-		// Fail and requeue to wait for it to exist.
+		// It does so shortly after the cluster is marked as installed. Requeue immediately to "poll" for it.
+		if apierrors.IsNotFound(err) {
+			cdLog.Info("clustersync does not exist yet; requeueing")
+			return reconcile.Result{Requeue: true}, nil
+		}
 		return reconcile.Result{}, fmt.Errorf("could not get ClusterSync: %v", err)
 	}
 	syncSetsApplied := clusterSync.Status.FirstSuccessTime != nil

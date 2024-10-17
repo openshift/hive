@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -1435,6 +1436,7 @@ func TestUpdateOwnedLabelsTaints(t *testing.T) {
 	tests := []struct {
 		name                       string
 		machinePool                *hivev1.MachinePool
+		generatedMachineLabels     []string
 		expectedOwnedLabels        []string
 		expectedOwnedMachineLabels []string
 		expectedOwnedTaints        []hivev1.TaintIdentifier
@@ -1510,11 +1512,24 @@ func TestUpdateOwnedLabelsTaints(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Generated machineLabels are not owned",
+			machinePool: testMachinePoolWithoutLabelsTaints(
+				testmp.WithMachineLabels(map[string]string{
+					"b-label":         "b-value",
+					"generated-label": "another-value",
+					"a-label":         "a-value",
+					"generated-also":  "z-value",
+				}),
+			),
+			generatedMachineLabels:     []string{"generated-label", "generated-also"},
+			expectedOwnedMachineLabels: []string{"a-label", "b-label"},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actualMachinePoolStatus := updateOwnedLabelsAndTaints(test.machinePool)
+			actualMachinePoolStatus := updateOwnedLabelsAndTaints(test.machinePool, sets.New(test.generatedMachineLabels...))
 			// Explicitly check the length to ensure there aren't any empty entries
 			if assert.Equal(t, len(test.expectedOwnedLabels), len(actualMachinePoolStatus.OwnedLabels)) && len(actualMachinePoolStatus.OwnedLabels) > 0 {
 				if !reflect.DeepEqual(test.expectedOwnedLabels, actualMachinePoolStatus.OwnedLabels) {

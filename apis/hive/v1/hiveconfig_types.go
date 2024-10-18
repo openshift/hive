@@ -64,17 +64,41 @@ type HiveConfigSpec struct {
 	// SyncSetReapplyInterval is a string duration indicating how much time must pass before SyncSet resources
 	// will be reapplied.
 	// The default reapply interval is two hours.
+	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	SyncSetReapplyInterval string `json:"syncSetReapplyInterval,omitempty"`
 
 	// MachinePoolPollInterval is a string duration indicating how much time must pass before checking whether
 	// remote resources related to MachinePools need to be reapplied. Set to zero to disable polling -- we'll
 	// only reconcile when hub objects change.
 	// The default interval is 30m.
+	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	MachinePoolPollInterval string `json:"machinePoolPollInterval,omitempty"`
 
 	// ClusterVersionPollInterval is a string duration indicating how much time must pass before checking
 	// whether we need to update the hive.openshift.io/version* labels on ClusterDeployment. If zero or unset,
 	// we'll only reconcile when the ClusterDeployment changes.
+	// This is a Duration value; see https://pkg.go.dev/time#ParseDuration for accepted formats.
+	// Note: due to discrepancies in validation vs parsing, we use a Pattern instead of `Format=duration`. See
+	// https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+	// https://github.com/kubernetes/apimachinery/issues/131
+	// https://github.com/kubernetes/apiextensions-apiserver/issues/56
+	// +optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Pattern="^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
 	ClusterVersionPollInterval string `json:"clusterVersionPollInterval,omitempty"`
 
 	// MaintenanceMode can be set to true to disable the hive controllers in situations where we need to ensure

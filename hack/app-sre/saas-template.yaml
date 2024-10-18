@@ -5612,7 +5612,20 @@ objects:
                     whether we need to update the hive.openshift.io/version* labels
                     on ClusterDeployment. If zero or unset,
 
-                    we''ll only reconcile when the ClusterDeployment changes.'
+                    we''ll only reconcile when the ClusterDeployment changes.
+
+                    This is a Duration value; see https://pkg.go.dev/time#ParseDuration
+                    for accepted formats.
+
+                    Note: due to discrepancies in validation vs parsing, we use a
+                    Pattern instead of `Format=duration`. See
+
+                    https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+
+                    https://github.com/kubernetes/apimachinery/issues/131
+
+                    https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                  pattern: "^([0-9]+(\\.[0-9]+)?(ns|us|\xB5s|ms|s|m|h))+$"
                   type: string
                 controllersConfig:
                   description: ControllersConfig is used to configure different hive
@@ -6208,7 +6221,20 @@ objects:
 
                     only reconcile when hub objects change.
 
-                    The default interval is 30m.'
+                    The default interval is 30m.
+
+                    This is a Duration value; see https://pkg.go.dev/time#ParseDuration
+                    for accepted formats.
+
+                    Note: due to discrepancies in validation vs parsing, we use a
+                    Pattern instead of `Format=duration`. See
+
+                    https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+
+                    https://github.com/kubernetes/apimachinery/issues/131
+
+                    https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                  pattern: "^([0-9]+(\\.[0-9]+)?(ns|us|\xB5s|ms|s|m|h))+$"
                   type: string
                 maintenanceMode:
                   description: 'MaintenanceMode can be set to true to disable the
@@ -6628,7 +6654,20 @@ objects:
 
                     will be reapplied.
 
-                    The default reapply interval is two hours.'
+                    The default reapply interval is two hours.
+
+                    This is a Duration value; see https://pkg.go.dev/time#ParseDuration
+                    for accepted formats.
+
+                    Note: due to discrepancies in validation vs parsing, we use a
+                    Pattern instead of `Format=duration`. See
+
+                    https://bugzilla.redhat.com/show_bug.cgi?id=2050332
+
+                    https://github.com/kubernetes/apimachinery/issues/131
+
+                    https://github.com/kubernetes/apiextensions-apiserver/issues/56'
+                  pattern: "^([0-9]+(\\.[0-9]+)?(ns|us|\xB5s|ms|s|m|h))+$"
                   type: string
                 targetNamespace:
                   description: 'TargetNamespace is the namespace where the core Hive

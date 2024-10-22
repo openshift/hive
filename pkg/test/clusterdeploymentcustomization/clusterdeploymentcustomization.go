@@ -99,12 +99,29 @@ func Reserved() Option {
 	}
 }
 
-func WithPatch(path, op, value string) Option {
+func WithInstallConfigPatch(path, op, value string) Option {
 	return func(cdc *hivev1.ClusterDeploymentCustomization) {
 		cdc.Spec.InstallConfigPatches = append(cdc.Spec.InstallConfigPatches, hivev1.PatchEntity{
 			Path:  path,
 			Op:    op,
 			Value: value,
+		})
+	}
+}
+
+func WithManifestPatch(glob, path, op, value string) Option {
+	return func(cdc *hivev1.ClusterDeploymentCustomization) {
+		cdc.Spec.InstallerManifestPatches = append(cdc.Spec.InstallerManifestPatches, hivev1.InstallerManifestPatch{
+			ManifestSelector: hivev1.ManifestSelector{
+				Glob: glob,
+			},
+			Patches: []hivev1.PatchEntity{
+				{
+					Path:  path,
+					Op:    op,
+					Value: value,
+				},
+			},
 		})
 	}
 }

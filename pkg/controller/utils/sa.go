@@ -56,6 +56,11 @@ var (
 			Resources: []string{"machinepools"},
 			Verbs:     []string{"get", "list", "update"},
 		},
+		{
+			APIGroups: []string{"hive.openshift.io"},
+			Resources: []string{"clusterdeploymentcustomizations"},
+			Verbs:     []string{"get"},
+		},
 	}
 
 	uninstallRoleRules = []rbacv1.PolicyRule{

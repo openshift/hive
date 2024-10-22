@@ -95,6 +95,8 @@ const (
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason    = "ClusterImageSetFound"
 
+	custRefNotFoundReason = "CustomizationRefNotAvailable"
+
 	defaultDNSNotReadyTimeout     = 10 * time.Minute
 	dnsNotReadyReason             = "DNSNotReady"
 	dnsNotReadyTimedoutReason     = "DNSNotReadyTimedOut"
@@ -240,6 +242,43 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 			handler.TypedEnqueueRequestForOwner[*hiveintv1alpha1.ClusterSync](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{})),
 	); err != nil {
 		return errors.Wrap(err, "cannot start watch on ClusterSyncs")
+	}
+
+	// Watch for changes to ClusterDeploymentCustomizations. This covers the situation where
+	// CustomizationRef is in play, but the referenced CDC is created "after" the CD. We'll list
+	// all the CDs in the same namespace as the CDC and return Request{}s for those with a
+	// CustomizationRef pointing to this CDC (which may be none).
+	cl := r.(*ReconcileClusterDeployment).Client
+	if err := c.Watch(
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeploymentCustomization{},
+			handler.TypedEnqueueRequestsFromMapFunc(
+				func(ctx context.Context, cdc *hivev1.ClusterDeploymentCustomization) []reconcile.Request {
+					cds := &hivev1.ClusterDeploymentList{}
+					if err := cl.List(context.Background(), cds, client.InNamespace(cdc.Namespace)); err != nil {
+						logger.
+							WithError(err).
+							WithField("namespace", cdc.Namespace).
+							Log(controllerutils.LogLevel(err), "failed to list ClusterDeployments in namespace")
+						return nil
+					}
+					matchingCDs := []reconcile.Request{}
+					for _, cd := range cds.Items {
+						if (cd.Spec.Provisioning != nil &&
+							cd.Spec.Provisioning.CustomizationRef != nil &&
+							cd.Spec.Provisioning.CustomizationRef.Name == cdc.Name) ||
+							(cd.Spec.ClusterPoolRef != nil &&
+								cd.Spec.ClusterPoolRef.CustomizationRef != nil &&
+								cd.Spec.ClusterPoolRef.CustomizationRef.Name == cdc.Name) {
+							matchingCDs = append(
+								matchingCDs,
+								reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&cd)},
+							)
+						}
+					}
+					return matchingCDs
+				})),
+	); err != nil {
+		return errors.Wrap(err, "cannot start watch on ClusterDeploymentCustomizations")
 	}
 
 	return nil
@@ -815,6 +854,25 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				return reconcile.Result{}, r.Status().Update(context.TODO(), cd)
 			}
 			return reconcile.Result{}, nil
+		}
+
+		// Preflight check: make sure any referenced customizations exist
+		if _, err := controllerutils.LoadManifestPatches(r, cd, cdLog); err != nil {
+			cdLog.Info("CustomizationRef specified, but failed to load ClusterDeploymentCustomization")
+			conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.RequirementsMetCondition,
+				corev1.ConditionFalse,
+				custRefNotFoundReason,
+				"Customization reference could not be loaded",
+				controllerutils.UpdateConditionIfReasonOrMessageChange)
+			if changed {
+				cd.Status.Conditions = conditions
+				// This will trigger another reconcile whether it succeeds (update) or fails (error).
+				return reconcile.Result{}, r.Status().Update(context.TODO(), cd)
+			}
+			// It is important that we requeue, since we may just be waiting for the CDC to exist
+			return reconcile.Result{}, err
 		}
 
 		// If we made it this far, RequirementsMet condition should be True:

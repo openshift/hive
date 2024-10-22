@@ -339,27 +339,42 @@ objects:
                   description: InstallConfigPatches is a list of patches to be applied
                     to the install-config.
                   items:
-                    description: PatchEntity represent a json patch (RFC 6902) to
-                      be applied to the install-config
+                    description: PatchEntity represents a json patch (RFC 6902) to
+                      be applied
                     properties:
                       from:
                         description: From is the json path to copy or move the value
                           from
                         type: string
                       op:
-                        description: 'Op is the operation to perform: add, remove,
-                          replace, move, copy, test'
+                        description: Op is the operation to perform.
+                        enum:
+                        - add
+                        - remove
+                        - replace
+                        - move
+                        - copy
+                        - test
                         type: string
                       path:
                         description: Path is the json path to the value to be modified
                         type: string
                       value:
-                        description: Value is the value to be used in the operation
+                        description: 'Value is the *string* value to be used in the
+                          operation. For more complex values, use
+
+                          ValueJSON.'
+                        type: string
+                      valueJSON:
+                        description: 'ValueJSON is a string representing a JSON object
+                          to be used in the operation. As such,
+
+                          internal quotes must be escaped. If nonempty, Value is ignored.'
+                        format: byte
                         type: string
                     required:
                     - op
                     - path
-                    - value
                     type: object
                   type: array
               type: object

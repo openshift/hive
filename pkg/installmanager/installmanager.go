@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -1048,51 +1047,47 @@ func patchLabelMachineSetManifest(manifestBytes []byte, poolsByType map[string]*
 // The second return value indicates an error from which we should not proceed.
 // Of note, it is not an error if `manifestBytes` represents valid yaml that is not a worker MachineSet.
 func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePool, vpcID string, logger log.FieldLogger) ([]byte, error) {
-	c, err := yamlutils.Decode(manifestBytes)
-	// Decoding the yaml here shouldn't produce an error. An error indicates that the
-	// installer produced yaml that could not be decoded.
-	if err != nil {
-		logger.WithError(err).Error("unable to decode manifest bytes")
-		return nil, err
-	}
-
 	// Return if file is not a worker MachineSet manifest
-	if isMachineSet, _ := yamlutils.Test(c, "/kind", "MachineSet"); !isMachineSet {
+	if isMachineSet, _ := yamlutils.Test(manifestBytes, "/kind", "MachineSet"); !isMachineSet {
 		return nil, nil
 	}
 	// Note: We have to escape the `/` in the label key as `~1` per https://datatracker.ietf.org/doc/html/rfc6901#section-3
-	if isWorkerMachineSet, _ := yamlutils.Test(c, "/spec/template/metadata/labels/machine.openshift.io~1cluster-api-machine-type", "worker"); !isWorkerMachineSet {
+	if isWorkerMachineSet, _ := yamlutils.Test(manifestBytes, "/spec/template/metadata/labels/machine.openshift.io~1cluster-api-machine-type", "worker"); !isWorkerMachineSet {
 		return nil, nil
 	}
 
-	securityGroupFilterValue := interface{}(pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation])
+	securityGroupFilterValue := pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation]
 	var vpcIDFilterValue map[string]interface{} = map[string]interface{}{
 		"name":   "vpc-id",
 		"values": []string{vpcID},
 	}
-	vpcIDFilterValueInterface := interface{}(vpcIDFilterValue)
-	ops := func(idx int) yamlpatch.Patch {
-		return yamlpatch.Patch{
+	vpcIDFilterValueJSON, err := json.Marshal(vpcIDFilterValue)
+	if err != nil {
+		logger.WithError(err).Errorf("unable to marshal VPC ID filter %v", vpcIDFilterValue)
+		return nil, err
+	}
+	ops := func(idx int) []hivev1.PatchEntity {
+		return []hivev1.PatchEntity{
 			// Add the security group name obtained from the ExtraWorkerSecurityGroupAnnotation
 			// annotation found on the MachinePool to the existing tag:Name filter in the worker
 			// MachineSet manifest
-			yamlpatch.Operation{
+			{
 				Op:    "add",
-				Path:  yamlpatch.OpPath(fmt.Sprintf("/spec/template/spec/providerSpec/value/securityGroups/%d/filters/0/values/-", idx)),
-				Value: yamlpatch.NewNode(&securityGroupFilterValue),
+				Path:  fmt.Sprintf("/spec/template/spec/providerSpec/value/securityGroups/%d/filters/0/values/-", idx),
+				Value: securityGroupFilterValue,
 			},
 			// Add a filter for the vpcID since the names of security groups may be the same within a
 			// given AWS account. HIVE-1874
-			yamlpatch.Operation{
-				Op:    "add",
-				Path:  yamlpatch.OpPath(fmt.Sprintf("/spec/template/spec/providerSpec/value/securityGroups/%d/filters/-", idx)),
-				Value: yamlpatch.NewNode(&vpcIDFilterValueInterface),
+			{
+				Op:        "add",
+				Path:      fmt.Sprintf("/spec/template/spec/providerSpec/value/securityGroups/%d/filters/-", idx),
+				ValueJSON: vpcIDFilterValueJSON,
 			},
 		}
 	}
 
 	// Apply patch to manifest
-	modifiedBytes, err := ops(0).Apply(manifestBytes)
+	modifiedBytes, err := yamlutils.ApplyPatches(manifestBytes, ops(0))
 	if err != nil {
 		logger.WithError(err).Error("error applying patch")
 		return nil, err
@@ -1111,9 +1106,9 @@ func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePoo
 	// *other than* the one resulting from a given entry not existing. So we have to scrape and match
 	// that error specifically.
 	for i := 1; i <= 2; i++ {
-		modB, err := ops(i).Apply(modifiedBytes)
+		modB, err := yamlutils.ApplyPatches(modifiedBytes, ops(i))
 		if err != nil {
-			if strings.Contains(err.Error(), fmt.Sprintf("yamlpatch add operation does not apply: doc is missing path: /spec/template/spec/providerSpec/value/securityGroups/%d/filters/0/values/-", i)) {
+			if strings.Contains(err.Error(), fmt.Sprintf(`doc is missing path: "/spec/template/spec/providerSpec/value/securityGroups/%d/filters/0/values/-"`, i)) {
 				logger.Infof("Stopping after patching %d security groups", i)
 				return modifiedBytes, nil
 			}
@@ -1324,7 +1319,7 @@ func (m *InstallManager) gatherLogs(cd *hivev1.ClusterDeployment, sshPrivKeyPath
 			m.log.Warn("unable to fetch logs from bootstrap node as SSH agent was not configured")
 			return
 		}
-		if err := m.gatherBootstrapNodeLogs(cd, sshPrivKeyPath); err != nil {
+		if err := m.gatherBootstrapNodeLogs(sshPrivKeyPath); err != nil {
 			m.log.WithError(err).Warn("error fetching logs from bootstrap node")
 			return
 		}
@@ -1521,7 +1516,7 @@ func readInstallerLog(m *InstallManager, scrubInstallLog bool) (string, error) {
 	return consoleLog, nil
 }
 
-func (m *InstallManager) gatherBootstrapNodeLogs(cd *hivev1.ClusterDeployment, newSSHPrivKeyPath string) error {
+func (m *InstallManager) gatherBootstrapNodeLogs(newSSHPrivKeyPath string) error {
 
 	m.log.Info("attempting to gather logs with 'openshift-install gather bootstrap'")
 	err := m.runOpenShiftInstallCommand("gather", "bootstrap", "--key", newSSHPrivKeyPath)
@@ -2021,30 +2016,30 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 		return nil, fmt.Errorf("error reading from manifests, region=%s, clusterInfraConfig=%s", region, string(clusterInfraConfigJson))
 	}
 
-	regionBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(region)))
-	infraNameBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(infraName)))
-	resourceGroupNameBase64 := interface{}(base64.StdEncoding.EncodeToString([]byte(resourceGroupName)))
+	regionBase64 := base64.StdEncoding.EncodeToString([]byte(region))
+	infraNameBase64 := base64.StdEncoding.EncodeToString([]byte(infraName))
+	resourceGroupNameBase64 := base64.StdEncoding.EncodeToString([]byte(resourceGroupName))
 
-	ops := yamlpatch.Patch{
-		yamlpatch.Operation{
+	ops := []hivev1.PatchEntity{
+		{
 			Op:    "add", //ok even if /data/azure_region already exists
-			Path:  yamlpatch.OpPath("/data/azure_region"),
-			Value: yamlpatch.NewNode(&regionBase64),
+			Path:  "/data/azure_region",
+			Value: regionBase64,
 		},
-		yamlpatch.Operation{
+		{
 			Op:    "add",
-			Path:  yamlpatch.OpPath("/data/azure_resource_prefix"),
-			Value: yamlpatch.NewNode(&infraNameBase64),
+			Path:  "/data/azure_resource_prefix",
+			Value: infraNameBase64,
 		},
-		yamlpatch.Operation{
+		{
 			Op:    "add",
-			Path:  yamlpatch.OpPath("/data/azure_resourcegroup"),
-			Value: yamlpatch.NewNode(&resourceGroupNameBase64),
+			Path:  "/data/azure_resourcegroup",
+			Value: resourceGroupNameBase64,
 		},
 	}
 
 	// Apply patch to 99_cloud-creds-secret.yaml
-	modifiedBytes, err := ops.Apply(overrideCredsBytes)
+	modifiedBytes, err := yamlutils.ApplyPatches(overrideCredsBytes, ops)
 	if err != nil {
 		return nil, errors.Wrap(err, "error applying patch on 99_cloud-creds-secret.yaml")
 	}

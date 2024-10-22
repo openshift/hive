@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"fmt"
+
 	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,9 +45,10 @@ type ClusterDeploymentCustomizationSpec struct {
 	InstallConfigPatches []PatchEntity `json:"installConfigPatches,omitempty"`
 }
 
-// PatchEntity represent a json patch (RFC 6902) to be applied to the install-config
+// PatchEntity represents a json patch (RFC 6902) to be applied
 type PatchEntity struct {
-	// Op is the operation to perform: add, remove, replace, move, copy, test
+	// Op is the operation to perform.
+	// +kubebuilder:validation:Enum=add;remove;replace;move;copy;test
 	// +required
 	Op string `json:"op"`
 	// Path is the json path to the value to be modified
@@ -54,9 +57,50 @@ type PatchEntity struct {
 	// From is the json path to copy or move the value from
 	// +optional
 	From string `json:"from,omitempty"`
-	// Value is the value to be used in the operation
-	// +required
-	Value string `json:"value"`
+	// Value is the *string* value to be used in the operation. For more complex values, use
+	// ValueJSON.
+	// +optional
+	Value string `json:"value,omitempty"`
+	// ValueJSON is a string representing a JSON object to be used in the operation. As such,
+	// internal quotes must be escaped. If nonempty, Value is ignored.
+	// +optional
+	ValueJSON []byte `json:"valueJSON,omitempty"`
+}
+
+// Encode returns a string representation of the RFC6902 patching operation represented by the
+// PatchEntity.
+func (pe *PatchEntity) Encode() string {
+	var val string
+	// Prefer ValueJSON
+	if len(pe.ValueJSON) != 0 {
+		// ValueJSON will be a raw JSON object in the patch; don't quote it.
+		val = string(pe.ValueJSON)
+	} else {
+		// Value will be a JSON string value in the patch; quote it.
+		val = fmt.Sprintf("%q", pe.Value)
+	}
+	// Is this overkill? Should we just assemble the whole thing and let jsonpatch figure it out?
+	switch pe.Op {
+	case "copy", "move":
+		return fmt.Sprintf(
+			`{"op": %q, "from": %q, "path": %q}`,
+			pe.Op, pe.From, pe.Path)
+	case "remove":
+		return fmt.Sprintf(
+			`{"op": %q, "path": %q}`,
+			pe.Op, pe.Path)
+	case "test", "replace", "add":
+		return fmt.Sprintf(
+			// val is already quoted iff necessary
+			`{"op": %q, "path": %q, "value": %s}`,
+			pe.Op, pe.Path, val)
+	default:
+		// This should never happen, but...
+		return fmt.Sprintf(
+			// val is already quoted iff necessary
+			`{"op": %q, "path": %q, "from", %q, "value": %s}`,
+			pe.Op, pe.Path, pe.From, val)
+	}
 }
 
 // ClusterDeploymentCustomizationStatus defines the observed state of ClusterDeploymentCustomization.

@@ -28,7 +28,6 @@ require (
 	github.com/heptio/velero v1.0.0
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/json-iterator/go v1.1.12
-	github.com/krishicks/yaml-patch v0.0.11-0.20201210192933-7cea92d7f43e
 	github.com/miekg/dns v1.1.35
 	github.com/modern-go/reflect2 v1.0.2
 	github.com/onsi/ginkgo v1.16.5
@@ -130,7 +129,10 @@ require (
 	sigs.k8s.io/cluster-api-provider-gcp v1.7.1-0.20240724153512-c3b8b533143c // indirect
 )
 
-require github.com/gophercloud/utils/v2 v2.0.0-20240701101423-2401526caee5
+require (
+	github.com/gophercloud/utils/v2 v2.0.0-20240701101423-2401526caee5
+	gopkg.in/evanphx/json-patch.v4 v4.12.0
+)
 
 require (
 	4d63.com/gochecknoglobals v0.2.1 // indirect
@@ -362,7 +364,6 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
-	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/gcfg.v1 v1.2.3 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

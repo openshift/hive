@@ -10,6 +10,8 @@ spec:
     kind: ClusterDeploymentCustomization
     listKind: ClusterDeploymentCustomizationList
     plural: clusterdeploymentcustomizations
+    shortNames:
+    - cdc
     singular: clusterdeploymentcustomization
   scope: Namespaced
   versions:
@@ -77,6 +79,72 @@ spec:
                   required:
                   - op
                   - path
+                  type: object
+                type: array
+              installerManifestPatches:
+                description: InstallerManifestPatches is a list of patches to be applied
+                  to installer-generated manifests.
+                items:
+                  properties:
+                    manifestSelector:
+                      description: ManifestSelector identifies one or more manifests
+                        to patch
+                      properties:
+                        glob:
+                          description: |-
+                            Glob is a file glob (per https://pkg.go.dev/path/filepath#Glob) identifying one or more
+                            manifests. Paths should be relative to the installer's working directory. Examples:
+                            - openshift/99_role-cloud-creds-secret-reader.yaml
+                            - openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+                            - */*secret*
+                            It is an error if a glob matches zero manifests.
+                          type: string
+                      required:
+                      - glob
+                      type: object
+                    patches:
+                      description: Patches is a list of RFC6902 patches to apply to
+                        manifests identified by manifestSelector.
+                      items:
+                        description: PatchEntity represents a json patch (RFC 6902)
+                          to be applied
+                        properties:
+                          from:
+                            description: From is the json path to copy or move the
+                              value from
+                            type: string
+                          op:
+                            description: Op is the operation to perform.
+                            enum:
+                            - add
+                            - remove
+                            - replace
+                            - move
+                            - copy
+                            - test
+                            type: string
+                          path:
+                            description: Path is the json path to the value to be
+                              modified
+                            type: string
+                          value:
+                            description: |-
+                              Value is the *string* value to be used in the operation. For more complex values, use
+                              ValueJSON.
+                            type: string
+                          valueJSON:
+                            description: |-
+                              ValueJSON is a string representing a JSON object to be used in the operation. As such,
+                              internal quotes must be escaped. If nonempty, Value is ignored.
+                            type: string
+                        required:
+                        - op
+                        - path
+                        type: object
+                      type: array
+                  required:
+                  - manifestSelector
+                  - patches
                   type: object
                 type: array
             type: object

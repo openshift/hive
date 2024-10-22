@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -413,7 +413,7 @@ func (m *InstallManager) Run() error {
 		if err := m.updateClusterProvision(
 			m,
 			func(provision *hivev1.ClusterProvision) {
-				provision.Spec.InstallLog = pointer.String(installLog)
+				provision.Spec.InstallLog = ptr.To(installLog)
 			},
 		); err != nil {
 			m.log.WithError(err).Error("error updating cluster provision with asset generation log")
@@ -447,8 +447,8 @@ func (m *InstallManager) Run() error {
 		m,
 		func(provision *hivev1.ClusterProvision) {
 			provision.Spec.MetadataJSON = metadataBytes
-			provision.Spec.InfraID = pointer.String(metadata.InfraID)
-			provision.Spec.ClusterID = pointer.String(metadata.ClusterID)
+			provision.Spec.InfraID = ptr.To(metadata.InfraID)
+			provision.Spec.ClusterID = ptr.To(metadata.ClusterID)
 
 			provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{
 				Name: kubeconfigSecret.Name,
@@ -506,7 +506,7 @@ func (m *InstallManager) Run() error {
 		if err := m.updateClusterProvision(
 			m,
 			func(provision *hivev1.ClusterProvision) {
-				provision.Spec.InstallLog = pointer.String(installLog)
+				provision.Spec.InstallLog = ptr.To(installLog)
 			},
 		); err != nil {
 			m.log.WithError(err).Warning("error updating cluster provision with installer log")
@@ -942,6 +942,14 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, mapPoolsBy
 			m.log.WithError(err).Error("error overriding credentials mode on install config")
 			return err
 		}
+	}
+
+	// This needs to be done before `create ignition-configs`, as that thing
+	// consumes and removes manifests.
+	m.log.Info("applying customizations")
+	if err := m.applyCustomizations(cd); err != nil {
+		m.log.WithError(err).Error("error applying customizations")
+		return err
 	}
 
 	m.log.Info("running openshift-install create ignition-configs")
@@ -1596,7 +1604,7 @@ func uploadAdminKubeconfig(m *InstallManager) (*corev1.Secret, error) {
 		Kind:               provisionGVK.Kind,
 		Name:               m.ClusterProvision.Name,
 		UID:                m.ClusterProvision.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}}
 
 	if err := createWithRetries(kubeconfigSecret, m); err != nil {
@@ -1663,7 +1671,7 @@ func uploadAdminPassword(m *InstallManager) (*corev1.Secret, error) {
 		Kind:               provisionGVK.Kind,
 		Name:               m.ClusterProvision.Name,
 		UID:                m.ClusterProvision.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}}
 
 	if err := createWithRetries(s, m); err != nil {
@@ -2044,4 +2052,51 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 		return nil, errors.Wrap(err, "error applying patch on 99_cloud-creds-secret.yaml")
 	}
 	return &modifiedBytes, nil
+}
+
+func (m *InstallManager) applyCustomizations(cd *hivev1.ClusterDeployment) error {
+	imps, err := utils.LoadManifestPatches(m.DynamicClient, cd, m.log)
+	if err != nil || imps == nil || len(imps) == 0 {
+		// loadCustomization logged
+		// err may be nil if the CD doesn't reference a CDC.
+		return err
+	}
+
+	for i, imp := range imps {
+		glob := imp.ManifestSelector.Glob
+		matches, err := filepath.Glob(filepath.Join(m.WorkDir, glob))
+		if err != nil {
+			return fmt.Errorf("manifest patch glob %d (%s) failed: %w", i, glob, err)
+		}
+		if len(matches) == 0 {
+			return fmt.Errorf("manifest patch glob %d (%s) matched zero manifests", i, glob)
+		}
+		m.log.Infof("manifest patch glob %d (%s) matched %d files", i, glob, len(matches))
+		for _, p := range matches {
+			path, err := filepath.Abs(p)
+			if err != nil {
+				return fmt.Errorf("could not determine absolute path for %s: %w", p, err)
+			}
+			// m.WorkDir is already absolute
+			if !strings.HasPrefix(path, m.WorkDir) {
+				return fmt.Errorf(
+					"manifest patch glob %d (%s) yielded path %s which is not relative to working directory %s -- possible hack attempt",
+					i, glob, path, m.WorkDir)
+			}
+			m.log.Infof("patching manifest %s", path)
+			manifestBytes, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to load manifest %s: %w", path, err)
+			}
+			modifiedBytes, err := yamlutils.ApplyPatches(manifestBytes, imp.Patches)
+			if err != nil {
+				return fmt.Errorf("failed to apply patches to %s: %w", path, err)
+			}
+			// Perm arg is ignored for existing file
+			if err := os.WriteFile(path, modifiedBytes, 0); err != nil {
+				return fmt.Errorf("failed to write patched manifest %s to disk: %w", path, err)
+			}
+		}
+	}
+	return nil
 }

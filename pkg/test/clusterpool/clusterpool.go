@@ -6,7 +6,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
@@ -154,13 +154,13 @@ func WithInstallerEnv(ie []corev1.EnvVar) Option {
 
 func WithMaxSize(size int) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
-		clusterPool.Spec.MaxSize = pointer.Int32Ptr(int32(size))
+		clusterPool.Spec.MaxSize = ptr.To(int32(size))
 	}
 }
 
 func WithMaxConcurrent(size int) Option {
 	return func(clusterPool *hivev1.ClusterPool) {
-		clusterPool.Spec.MaxConcurrent = pointer.Int32Ptr(int32(size))
+		clusterPool.Spec.MaxConcurrent = ptr.To(int32(size))
 	}
 }
 
@@ -211,6 +211,14 @@ func WithInventory(cdcs []string) Option {
 				inventory = append(inventory, hivev1.InventoryEntry{Name: cdc})
 			}
 			clusterPool.Spec.Inventory = inventory
+		}
+	}
+}
+
+func WithCustomizationRef(cdcName string) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.CustomizationRef = &corev1.LocalObjectReference{
+			Name: cdcName,
 		}
 	}
 }

@@ -1,11 +1,11 @@
 package clusterresource
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/ghodss/yaml"
-	yamlpatch "github.com/krishicks/yaml-patch"
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/ipnet"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -18,6 +18,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
+	yamlpatch "github.com/openshift/hive/pkg/util/yaml"
 )
 
 const (
@@ -417,7 +418,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 
 	o.CloudBuilder.addInstallConfigPlatform(o, installConfig)
 
-	d, err := yaml.Marshal(installConfig)
+	d, err := json.Marshal(installConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -425,17 +426,17 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 	// Remove metadataService field from machinepool platform within installconfig.
 	// TODO: Remove this once https://bugzilla.redhat.com/show_bug.cgi?id=2098299 has been addressed.
 	if installConfig.Platform.AWS != nil {
-		ops := yamlpatch.Patch{
-			yamlpatch.Operation{
+		ops := []hivev1.PatchEntity{
+			{
 				Op:   "remove",
-				Path: yamlpatch.OpPath("/compute/0/platform/aws/metadataService"),
+				Path: "/compute/0/platform/aws/metadataService",
 			},
-			yamlpatch.Operation{
+			{
 				Op:   "remove",
-				Path: yamlpatch.OpPath("/controlPlane/platform/aws/metadataService"),
+				Path: "/controlPlane/platform/aws/metadataService",
 			},
 		}
-		modifiedBytes, err := ops.Apply(d)
+		modifiedBytes, err := yamlpatch.ApplyPatches(d, ops)
 		if err != nil {
 			return nil, errors.Wrap(err, "error patching install-config.yaml to remove metadataService field")
 		}
@@ -444,17 +445,17 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 
 	// Remove osImage field from machinepool platform within installconfig.
 	if installConfig.Platform.Azure != nil {
-		ops := yamlpatch.Patch{
-			yamlpatch.Operation{
+		ops := []hivev1.PatchEntity{
+			{
 				Op:   "remove",
-				Path: yamlpatch.OpPath("/compute/0/platform/azure/osImage"),
+				Path: "/compute/0/platform/azure/osImage",
 			},
-			yamlpatch.Operation{
+			{
 				Op:   "remove",
-				Path: yamlpatch.OpPath("/controlPlane/platform/azure/osImage"),
+				Path: "/controlPlane/platform/azure/osImage",
 			},
 		}
-		modifiedBytes, err := ops.Apply(d)
+		modifiedBytes, err := yamlpatch.ApplyPatches(d, ops)
 		if err != nil {
 			return nil, errors.Wrap(err, "error patching install-config.yaml to remove osImage field")
 		}

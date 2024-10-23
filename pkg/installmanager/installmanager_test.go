@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -84,10 +84,6 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
-func dummySleep(d time.Duration) {
-	return
-}
-
 func TestInstallManager(t *testing.T) {
 	tests := []struct {
 		name                          string
@@ -120,7 +116,7 @@ func TestInstallManager(t *testing.T) {
 		{
 			name:                   "failed cluster provision metadata update",
 			existing:               []runtime.Object{testClusterDeployment(), testClusterProvision()},
-			failedProvisionUpdate:  pointer.Int32Ptr(0),
+			failedProvisionUpdate:  ptr.To(int32(0)),
 			expectKubeconfigSecret: true,
 			expectPasswordSecret:   true,
 			expectError:            true,
@@ -128,7 +124,7 @@ func TestInstallManager(t *testing.T) {
 		{
 			name:                          "failed cluster provision log update", // a non-fatal error
 			existing:                      []runtime.Object{testClusterDeployment(), testClusterProvision()},
-			failedProvisionUpdate:         pointer.Int32Ptr(1),
+			failedProvisionUpdate:         ptr.To(int32(1)),
 			expectKubeconfigSecret:        true,
 			expectPasswordSecret:          true,
 			expectProvisionMetadataUpdate: true,
@@ -192,7 +188,7 @@ func TestInstallManager(t *testing.T) {
 
 			im := InstallManager{
 				LogLevel:               "debug",
-				sleep:                  dummySleep,
+				sleep:                  func(time.Duration) {},
 				WorkDir:                tempDir,
 				ClusterProvisionName:   testProvisionName,
 				Namespace:              testNamespace,
@@ -1218,13 +1214,11 @@ data:
 				assert.NoError(t, err, "unexpected error patching credential secret")
 			}
 			if tc.expectModified {
-				c, err := yamlutils.Decode(*modifiedBytes)
-				assert.NoError(t, err, "expected to be able to decode patched credential secret")
-				isRegionCorrect, _ := yamlutils.Test(c, "/data/azure_region", "Y2VudHJhbHVz")
+				isRegionCorrect, _ := yamlutils.Test(*modifiedBytes, "/data/azure_region", "Y2VudHJhbHVz")
 				assert.True(t, isRegionCorrect, "expected /data/azure_region filled correctly in patched credential secret")
-				isPrefixCorrect, _ := yamlutils.Test(c, "/data/azure_resource_prefix", "aGl2ZS1jbHVzdGVyLWc3ZnFi") //base64 for hive-cluster-g7fqb
+				isPrefixCorrect, _ := yamlutils.Test(*modifiedBytes, "/data/azure_resource_prefix", "aGl2ZS1jbHVzdGVyLWc3ZnFi") //base64 for hive-cluster-g7fqb
 				assert.True(t, isPrefixCorrect, "expected /data/azure_resource_prefix filled correctly in patched credential secret")
-				isGroupCorrect, _ := yamlutils.Test(c, "/data/azure_resourcegroup", "aGl2ZS1jbHVzdGVyLWc3ZnFiLXJn") //base64 for hive-cluster-g7fqb-rg
+				isGroupCorrect, _ := yamlutils.Test(*modifiedBytes, "/data/azure_resourcegroup", "aGl2ZS1jbHVzdGVyLWc3ZnFiLXJn") //base64 for hive-cluster-g7fqb-rg
 				assert.True(t, isGroupCorrect, "expected /data/azure_resourcegroup filled correctly in patched credential secret")
 			}
 		})

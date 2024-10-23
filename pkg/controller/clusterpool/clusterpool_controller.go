@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	yamlpatch "github.com/krishicks/yaml-patch"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -36,6 +35,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	yamlpatch "github.com/openshift/hive/pkg/util/yaml"
 )
 
 const (
@@ -836,18 +836,7 @@ func (r *ReconcileClusterPool) patchInstallConfig(clp *hivev1.ClusterPool, cd *h
 		return err
 	}
 
-	newPatch := yamlpatch.Patch{}
-	for _, patch := range cdc.Spec.InstallConfigPatches {
-		var value interface{} = patch.Value
-		newPatch = append(newPatch, yamlpatch.Operation{
-			Op:    yamlpatch.Op(patch.Op),
-			Path:  yamlpatch.OpPath(patch.Path),
-			From:  yamlpatch.OpPath(patch.From),
-			Value: yamlpatch.NewNode(&value),
-		})
-	}
-
-	installConfig, err := newPatch.Apply([]byte(secret.StringData["install-config.yaml"]))
+	installConfig, err := yamlpatch.ApplyPatches([]byte(secret.StringData["install-config.yaml"]), cdc.Spec.InstallConfigPatches)
 	if err != nil {
 		cdcs.BrokenBySyntax(r, cdc, fmt.Sprint(err))
 		cdcs.UpdateInventoryValidCondition(r, clp)

@@ -3,17 +3,13 @@ package v1
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
-	yamlpatch "github.com/krishicks/yaml-patch"
 	log "github.com/sirupsen/logrus"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -176,19 +172,6 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateCreate(a
 		}
 	}
 
-	allErrs := field.ErrorList{}
-	specPath := field.NewPath("spec")
-
-	allErrs = append(allErrs, validateInstallConfigPatches(specPath.Child("installConfigPatches"), cdc.Spec.InstallConfigPatches)...)
-
-	if len(allErrs) > 0 {
-		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result:  &status,
-		}
-	}
-
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
@@ -236,51 +219,9 @@ func (a *ClusterDeploymentCustomizationValidatingAdmissionHook) validateUpdate(a
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
-	allErrs := field.ErrorList{}
-	specPath := field.NewPath("spec")
-
-	allErrs = append(allErrs, validateInstallConfigPatches(specPath, newObject.Spec.InstallConfigPatches)...)
-
-	if len(allErrs) > 0 {
-		contextLogger.WithError(allErrs.ToAggregate()).Info("failed validation")
-		status := errors.NewInvalid(schemaGVK(admissionSpec.Kind).GroupKind(), admissionSpec.Name, allErrs).Status()
-		return &admissionv1beta1.AdmissionResponse{
-			Allowed: false,
-			Result:  &status,
-		}
-	}
-
 	// If we get here, then all checks passed, so the object is valid.
 	contextLogger.Info("Successful validation")
 	return &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 	}
-}
-
-func validateInstallConfigPatches(path *field.Path, patches []hivev1.PatchEntity) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	for i, patch := range patches {
-		if !isValidOP(yamlpatch.Op(patch.Op)) {
-			allErrs = append(allErrs, field.Invalid(path.Index(i), patch, "install config patch op must be a valid json patch operation"))
-		}
-		if len(patch.Path) == 0 || !strings.HasPrefix(patch.Path, "/") {
-			allErrs = append(allErrs, field.Invalid(path.Index(i), patch, "install config patch path must start with '/'"))
-		}
-	}
-	return allErrs
-}
-
-func isValidOP(op yamlpatch.Op) bool {
-	switch op {
-	case
-		yamlpatch.OpAdd,
-		yamlpatch.OpRemove,
-		yamlpatch.OpMove,
-		yamlpatch.OpCopy,
-		yamlpatch.OpTest,
-		yamlpatch.OpReplace:
-		return true
-	}
-	return false
 }

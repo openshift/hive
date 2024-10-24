@@ -422,6 +422,12 @@ func (m *InstallManager) Run() error {
 		return err
 	}
 
+	m.log.Info("applying customizations")
+	if err := m.applyCustomizations(cd); err != nil {
+		m.log.WithError(err).Error("error applying customizations")
+		return err
+	}
+
 	// We should now have cluster metadata.json we can parse for the infra ID,
 	// the kubeconfig, and the admin password. If we fail to read any of these or
 	// to extract the infra ID and upload it, this is a critical failure and we
@@ -1306,6 +1312,36 @@ func (m *InstallManager) loadMachinePools(cd *hivev1.ClusterDeployment) (map[str
 	return mapPoolsByType, nil
 }
 
+// loadCustomization attempts to load the ClusterDeploymentCustomization referenced by the ClusterDeployment.
+// If there is no such reference, we return a nil object and a nil error (this is not considered an error condition).
+// Any other error -- including if the referenced CDC doesn't exist -- is bubbled up.
+func (m *InstallManager) loadCustomization(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeploymentCustomization, error) {
+	// Leetle helper to avoid chains of conditionals checking for nils along object paths
+	safeGetField := func(accessor func() string) string {
+		defer func() { recover() }()
+		return accessor()
+	}
+
+	// Customizations live in a different spot for standalone vs ClusterPool CDs.
+	cdcName := safeGetField(func() string { return cd.Spec.Provisioning.CustomizationRef.Name })
+	if cdcName == "" {
+		cdcName = safeGetField(func() string { return cd.Spec.ClusterPoolRef.CustomizationRef.Name })
+	}
+
+	if cdcName == "" {
+		m.log.Info("no customizations to apply")
+		return nil, nil
+	}
+
+	cdc := &hivev1.ClusterDeploymentCustomization{}
+	if err := m.DynamicClient.Get(context.Background(), types.NamespacedName{Namespace: m.Namespace, Name: cdcName}, cdc); err != nil {
+		m.log.WithField("cdc", cdcName).WithError(err).Error("failed to retrieve ClusterDeploymentCustomization")
+		return nil, err
+	}
+
+	return cdc, nil
+}
+
 // gatherLogs will attempt to gather logs after a failed install. First we attempt
 // to gather logs from the bootstrap node. If this fails, we may have made it far enough
 // to teardown the bootstrap node, in which case we then attempt to gather with
@@ -2044,4 +2080,56 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 		return nil, errors.Wrap(err, "error applying patch on 99_cloud-creds-secret.yaml")
 	}
 	return &modifiedBytes, nil
+}
+
+func (m *InstallManager) applyCustomizations(cd *hivev1.ClusterDeployment) error {
+	cdc, err := m.loadCustomization(cd)
+	if err != nil || cdc == nil {
+		// loadCustomization logged
+		// err may be nil if the CD doesn't reference a CDC.
+		return err
+	}
+
+	if len(cdc.Spec.InstallerManifestPatches) == 0 {
+		m.log.Info("no manifest patches to apply")
+		return nil
+	}
+
+	for i, imp := range cdc.Spec.InstallerManifestPatches {
+		glob := imp.ManifestSelector.Glob
+		matches, err := filepath.Glob(filepath.Join(m.WorkDir, glob))
+		if err != nil {
+			return fmt.Errorf("manifest patch glob %d (%s) failed: %w", i, glob, err)
+		}
+		if len(matches) == 0 {
+			return fmt.Errorf("manifest patch glob %d (%s) matched zero manifests", i, glob)
+		}
+		m.log.Info("manifest patch glob %d (%s) matched %d files", i, glob, len(matches))
+		for _, p := range matches {
+			path, err := filepath.Abs(p)
+			if err != nil {
+				return fmt.Errorf("could not determine absolute path for %s: %w", p, err)
+			}
+			// m.WorkDir is already absolute
+			if !strings.HasPrefix(path, m.WorkDir) {
+				return fmt.Errorf(
+					"manifest patch glob %d (%s) yielded path %s which is not relative to working directory %s -- possible hack attempt",
+					i, glob, path, m.WorkDir)
+			}
+			m.log.Info("patching manifest %s", path)
+			manifestBytes, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to load manifest %s: %w", path, err)
+			}
+			modifiedBytes, err := yamlutils.ApplyPatches(manifestBytes, imp.Patches)
+			if err != nil {
+				return fmt.Errorf("failed to apply patches to %s: %w", path, err)
+			}
+			// Perm arg is ignored for existing file
+			if err := os.WriteFile(path, modifiedBytes, 0); err != nil {
+				return fmt.Errorf("failed to write patched manifest %s to disk: %w", path, err)
+			}
+		}
+	}
+	return nil
 }

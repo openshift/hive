@@ -10,13 +10,13 @@ Most importantly, be aware that Hive uses CRDs to store its state. The amount of
 
 # Horizontal vs. Vertical Scale
 
-With the exception of install pods (used only when clusters are installing), Hive 1.x is not horizontally scalable at the worker level with the exception of the [clustersync controller](using-hive.md#scaling-clustersync).
+With the exception of install pods (used only when clusters are installing), Hive 1.x is not horizontally scalable at the worker level with the exception of the [clustersync and machinepool controllers](using-hive.md#scaling-clustersync-and-machinepool).
 Most of the work Hive does happens in the hive-controllers pod, which is one single pod on one single worker.
 This means that when no installs are running, if you have a cluster with 10 workers, 9 of the workers are very bored.
 Hive clusters are prime candidates for using worker autoscaling.
 Keep the worker count as low as you can, but allow bursts of concurrent installs to call for temporary workers to spin up.
 
-See [using hive](using-hive.md#vertical-scaling) for information about vertically scaling the hive-controllers, hive-clustersync, and hiveadmission pods themselves.
+See [using hive](using-hive.md#vertical-scaling) for information about vertically scaling the hive-controllers, hive-clustersync, hive-machinepool, and hiveadmission pods themselves.
 
 In AWS, Hive performs best on C (CPU Optimized) instance types. Hive performs fine on M (General purpose) instances, but C instances are better.
 
@@ -32,7 +32,7 @@ Hive 1.x requests 800 Mib of memory for each install pod. If you use m5.xlarge w
 
 ## Blocking I/O
 
-hive-controllers (where the controllers run) uses blocking i/o. By default, each controller uses 5 goroutines (although this is configurable in HiveConfig). To use an example, if all 5 threads for the clustersync controller (the controller that applies SyncSets) are waiting on HTTP responses from remote managed clusters, then no other SyncSet work can be done until at least one of those requests returns to free up a thread.
+hive-controllers (where the controllers run) uses blocking i/o. By default, each controller uses 5 goroutines (although this is configurable in HiveConfig). To use an example, if all 5 threads for the hibernation controller (the controller that powers clusters on and off) are waiting on HTTP responses from remote managed clusters, then no other hibernation work can be done until at least one of those requests returns to free up a thread.
 
 As a potential scale improvement in the future, we may consider moving to scale-out or non-blocking i/o.
 
@@ -40,11 +40,12 @@ As a potential scale improvement in the future, we may consider moving to scale-
 
 Hive supports configuring the number of goroutines per controller by editing values in HiveConfig. See [Using Hive](using-hive.md) for documentation on this. The default is 5 goroutines per controller.
 
-In a busy Hive cluster, over the life of the cluster, the SyncSet controller (clustersync) is the controller that does most of the work. The other controllers are bored compared to clustersync. For that reason, it helps to simplify things and think mostly about the clustersync controller. The other controllers can be left to use the default 5 goroutines in most cases. If you have hundreds of SyncSets and hundreds of managed clusters, the default of 5 clustersync threads will probably not be enough.
+In a busy Hive cluster, over the life of the cluster, the SyncSet controller (clustersync) is the controller that does most of the work. The other controllers are bored compared to clustersync. For that reason, it helps to simplify things and think mostly about the clustersync controller. The other controllers can be left to use the default 5 goroutines in most cases. If you have hundreds of SyncSets and hundreds of managed clusters, the default of 5 clustersync threads in a single replica will probably not be enough.
 
 The goal of anyone looking to push Hive to its limits should be to the keep CPU utilization for the worker where hive-controllers runs as close to 100% as possible.
 
 We have found that we get the highest CPU utilization (and thus best overall performance) when we roughly match the number of clustersync threads to the number of vCPUs on the worker. If we use less, the CPU is bored. If you have only 10 clustersync goroutines but 100 vCPUs, 90 of the vCPUs will be mostly unused. If we have 36 CPUs but only 20 clustersync threads, CPU utilization is usually 50%. If we more closely match them (40 threads for 36 vCPU), CPU utilization tends to be in the high 90's. If we use too many threads (100 threads for 36 vCPU), we still get high CPU utilization, but the overall performance actually slows down. We assume this is golang overhead of too many threads / thread management. Don't just set clustersync goroutines to 1000 or some arbitrary high number, or performance will actually suffer.
+If vertical scaling is not sufficient, or if you simply wish to distribute the load of the clustersync controller, consider [scaling horizontally](using-hive.md#scaling-clustersync-and-machinepool).
  
 If Hive manages clusters that are on slow networks or have frequent connectivity issues, you may want to use a few extra clustersync goroutines to work around Hive's use of blocking i/o. If you manage clusters that are occasionally offline, a SyncSet request that takes 30 seconds to timeout means that a clustersync thread is doing nothing for 30 seconds. (Eventually Hive will mark that cluster as unreachable and stop attempting to apply SyncSets to it, so this is only real concern if you manage a large amount of slow or occasionally-offline clusters.)
 
@@ -70,7 +71,7 @@ The primary metric we judge SyncSet performance by is "applies per second". The 
 
 The secondary metric we judge SyncSet performance by is "apply time per syncset". Generally syncsets apply very quickly (seconds). In a properly loaded and scaled Hive cluster, Hive should be able to apply a newly-created SyncSet for a single cluster within seconds. Hive should also be able to apply a single newly-created SelectorSyncSet that applies to 1000 clusters in a few minutes.
 
-If you see SyncSet apply times taking much longer than this, Hive is probably thread-starved and needs more clustersync goroutines (and probably more vCPUs for its worker -- see above for the recommendation to roughly match vCPUs to clustersync goroutines).
+If you see SyncSet apply times taking much longer than this, Hive is probably thread-starved and needs more clustersync goroutines and/or replicas (and probably more vCPUs for its worker -- see above for the recommendation to roughly match vCPUs to clustersync goroutines).
 
 Here is an example graph from a scale test where Hive is running on an m5.xlarge instance in AWS, using the default of 5 clustersync goroutines. In this scale test, Hive contains 60 SelectorSyncSets for every managed cluster. The test creates a new cluster every 60 seconds over 5 hours. For the first few hours of the test, Hive applies SyncSets quickly -- within 2 minutes after installation is complete. However, a few hours into the test, we see SyncSet apply times start to degrade. Towards the end of the test, once 200+ clusters are installed, some SyncSet applies are taking 30 minutes or longer. This indicates thread starvation. Once Hive had to apply SyncSets to about 150 clusters, the clustersync controller no longer had enough threads to keep up.
 

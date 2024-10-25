@@ -151,6 +151,12 @@ const (
 	// the cluster) while the annotation is still set.
 	ReconcilePauseAnnotation = "hive.openshift.io/reconcile-pause"
 
+	// InfraDisabledAnnotation when true will disable controllers/codepaths that need to talk to the cloud
+	// infrastructure, causing them to pretend the "good path" as appropriate. For example, the hibernation
+	// controller will assume the cluster is Ready.
+	// Currently only affects Azure clusters.
+	InfraDisabledAnnotation = "hive.openshift.io/infra-disabled"
+
 	// HiveManagedLabel is a label added to any resources we sync to the remote cluster to help identify that they are
 	// managed by Hive, and any manual changes may be undone the next time the resource is reconciled.
 	HiveManagedLabel = "hive.openshift.io/managed"

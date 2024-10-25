@@ -219,6 +219,7 @@ func (r *hibernationReconciler) Reconcile(ctx context.Context, request reconcile
 			cd.Status.PowerState = hivev1.ClusterPowerStateRunning
 			return reconcile.Result{}, r.updateClusterDeploymentStatus(cd, cdLog)
 		}
+		return reconcile.Result{}, nil
 	} else if hibernatingCondition.Reason == hivev1.HibernatingReasonUnsupported {
 		// Clear any lingering unsupported hibernation condition
 		r.setCDCondition(cd, hivev1.ClusterHibernatingCondition, hivev1.HibernatingReasonResumingOrRunning, msg,
@@ -724,6 +725,11 @@ func (r *hibernationReconciler) getActuator(cd *hivev1.ClusterDeployment) Hibern
 }
 
 func (r *hibernationReconciler) hibernationSupported(cd *hivev1.ClusterDeployment) (bool, string) {
+	// Spoof Ready if infra disabled
+	if controllerutils.InfraDisabled(cd, ControllerName) {
+		return false, "Infrastructure disabled by annotation"
+	}
+
 	if r.getActuator(cd) == nil {
 		return false, "Unsupported platform: no actuator to handle it"
 	}

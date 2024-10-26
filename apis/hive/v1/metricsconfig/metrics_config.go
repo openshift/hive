@@ -17,4 +17,5 @@ type MetricsConfig struct {
 	// pkg/controller/metrics/metrics_with_dynamic_labels.go
 	// +optional
 	AdditionalClusterDeploymentLabels *map[string]string `json:"additionalClusterDeploymentLabels,omitempty"`
+	MetricsToReport                   []MetricsToReport  `json:"metricsToReport,omitempty"`
 }

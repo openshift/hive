@@ -81,6 +81,38 @@ func ClearRelocateAnnotation(obj metav1.Object) (changed bool) {
 	return true
 }
 
+// InfraDisabled answers whether cd has requested to disable controllers/codepaths that talk to the
+// cloud infrastructure.
+// Currently only works for Azure; always returns false for other platforms
+func InfraDisabled(cd *hivev1.ClusterDeployment, controllerName hivev1.ControllerName) bool {
+	// Only applicable to Azure for now.
+	if !func() bool {
+		defer recover()
+		return cd.Spec.Platform.Azure != nil
+	}() {
+		return false
+	}
+
+	disabled, err := strconv.ParseBool(cd.Annotations[constants.InfraDisabledAnnotation])
+	if err != nil || !disabled {
+		return false
+	}
+
+	// Only the following controllers talk to the infra.
+	// (This will eventually be a map keyed by platform.)
+	switch controllerName {
+	case
+		// NOTE: We can't actually disable this one! You just have to not use managed DNS.
+		hivev1.DNSEndpointControllerName,
+		hivev1.HibernationControllerName,
+		// NOTE: You shouldn't be using MachinePools in the first place.
+		hivev1.MachinePoolControllerName:
+		return true
+	}
+
+	return false
+}
+
 // CredentialsSecretName returns the name of the credentials secret for platforms
 // that have a CredentialsSecretRef. An empty string is returned if platform has none.
 func CredentialsSecretName(cd *hivev1.ClusterDeployment) string {

@@ -76,7 +76,8 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 		// get back a MachineSet.
 		// Providing the empty string will give back a MachineSet running on the default
 		// OpenStack Nova availability zone.
-		Zones: []string{""},
+		Zones:                      []string{""},
+		AdditionalSecurityGroupIDs: pool.Spec.Platform.OpenStack.AdditionalSecurityGroupIDs,
 	}
 
 	if pool.Spec.Platform.OpenStack.RootVolume != nil {

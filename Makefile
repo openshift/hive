@@ -120,10 +120,10 @@ define patch-crd-yq
 endef
 
 CONTROLLER_GEN_SRC := $(shell realpath vendor/sigs.k8s.io/controller-tools/cmd/controller-gen)
-CONTROLLER_GEN := $(shell go list -f '{{.Target}}' $(CONTROLLER_GEN_SRC))
+CONTROLLER_GEN := $(shell go list -f '{{.Target}}-{{.Module.Version}}' $(CONTROLLER_GEN_SRC))
 
 $(CONTROLLER_GEN): $(CONTROLLER_GEN_SRC)
-	go install $(CONTROLLER_GEN_SRC)
+	go build -o $(CONTROLLER_GEN) $(CONTROLLER_GEN_SRC)
 
 # Generate CRD yaml from our api types:
 .PHONY: crd

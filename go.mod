@@ -438,6 +438,8 @@ replace github.com/hashicorp/go-slug => github.com/hashicorp/go-slug v0.5.0
 // taken from https://github.com/openshift/installer/blob/21cd5218bb58288cd7b03018b9a2513aca3a13a5/terraform/providers/ibm/go.mod
 replace github.com/dgrijalva/jwt-go v3.2.0+incompatible => github.com/golang-jwt/jwt v3.2.1+incompatible
 
+replace vbom.ml/util => github.com/fvbommel/util v0.0.0-20180919145318-efcd4e0f9787
+
 // needed for fixing CVE-2018-1099
 exclude (
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738

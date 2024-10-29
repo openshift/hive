@@ -155,6 +155,115 @@ var (
 	// mapMetricToDurationGauges is a map of optional durationMetrics of type Gauge to their specific duration, if
 	// mentioned
 	mapMetricToDurationGauges map[*prometheus.GaugeVec]time.Duration
+
+	// Metrics reported by ClusterDeployment controller
+
+	MetricInstallJobDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_install_job_duration_seconds",
+			Help:    "Distribution of the runtime of completed install jobs.",
+			Buckets: []float64{1800, 2400, 3000, 3600, 4500, 5400, 7200},
+		},
+		nil,
+	)
+	MetricInstallDelaySeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_install_job_delay_seconds",
+			Help:    "Time between cluster deployment creation and creation of the job to install/provision the cluster.",
+			Buckets: []float64{60, 120, 180, 240, 300, 600, 1200, 1800, 2700, 3600},
+		},
+		nil,
+	)
+	MetricImageSetDelaySeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_imageset_job_delay_seconds",
+			Help:    "Time between cluster deployment creation and creation of the job which resolves the installer image to use for a ClusterImageSet.",
+			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
+		},
+		nil,
+	)
+	MetricDNSDelaySeconds = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_dns_delay_seconds",
+			Help:    "Time between cluster deployment with spec.manageDNS creation and the DNSZone becoming ready.",
+			Buckets: []float64{10, 30, 60, 300, 600, 1200, 1800},
+		},
+		nil,
+	)
+	// Metrics with additional label support. The dynamic labels will be set when we register these metrics after reading the metricsConfig.
+	MetricCompletedInstallJobRestarts = *NewHistogramVecWithDynamicLabels(
+		&prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_completed_install_restart",
+			Help:    "Distribution of the number of restarts for all completed cluster installations.",
+			Buckets: []float64{0, 2, 10, 20, 50},
+		},
+		nil,
+		map[string]string{},
+	)
+	MetricClustersCreated = *NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_created_total",
+			Help: "Counter incremented every time we observe a new cluster.",
+		},
+		nil,
+		map[string]string{},
+	)
+	MetricClustersInstalled = *NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_installed_total",
+			Help: "Counter incremented every time we observe a successful installation.",
+		},
+		nil,
+		map[string]string{},
+	)
+	MetricClustersDeleted = *NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_deleted_total",
+			Help: "Counter incremented every time we observe a deleted cluster.",
+		},
+		nil,
+		map[string]string{},
+	)
+	MetricProvisionFailedTerminal = *NewCounterVecWithDynamicLabels(
+		&prometheus.CounterOpts{
+			Name: "hive_cluster_deployments_provision_failed_terminal_total",
+			Help: "Counter incremented when a cluster provision has failed and won't be retried.",
+		},
+		[]string{"clusterpool_namespacedname", "failure_reason"},
+		map[string]string{},
+	)
+
+	// Metrics reported by ClusterDeprovision controller
+
+	MetricUninstallJobDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_uninstall_job_duration_seconds",
+			Help:    "Distribution of the runtime of completed uninstall jobs.",
+			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
+		},
+		nil,
+	)
+
+	// Some metrics reported by ClusterProvision controller, they support clusterDeploymentLabelSelector
+
+	MetricInstallFailureSeconds = *NewHistogramVecWithDynamicLabels(
+		&prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_install_failure_total",
+			Help:    "Time taken before a cluster provision failed to install",
+			Buckets: []float64{30, 120, 300, 600, 1800},
+		},
+		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
+		map[string]string{},
+	)
+	MetricInstallSuccessSeconds = *NewHistogramVecWithDynamicLabels(
+		&prometheus.HistogramOpts{
+			Name:    "hive_cluster_deployment_install_success_total",
+			Help:    "Time taken before a cluster provision succeeded to install",
+			Buckets: []float64{1800, 2400, 3000, 3600},
+		},
+		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
+		map[string]string{},
+	)
 )
 
 // ReconcileOutcome is used in controller "reconcile complete" log entries, and the metricControllerReconcileTime
@@ -186,6 +295,11 @@ func init() {
 	metrics.Registry.MustRegister(metricSyncSetsUnappliedTotal)
 	metrics.Registry.MustRegister(metricControllerReconcileTime)
 	metrics.Registry.MustRegister(metricClusterDeploymentSyncsetPaused)
+	metrics.Registry.MustRegister(MetricInstallJobDuration)
+	metrics.Registry.MustRegister(MetricInstallDelaySeconds)
+	metrics.Registry.MustRegister(MetricImageSetDelaySeconds)
+	metrics.Registry.MustRegister(MetricDNSDelaySeconds)
+	metrics.Registry.MustRegister(MetricUninstallJobDuration)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
@@ -251,9 +365,9 @@ func (mc *Calculator) Start(ctx context.Context) error {
 			}
 			for _, cd := range clusterDeployments.Items {
 				clusterType := GetLabelValue(&cd, hivev1.HiveClusterTypeLabel)
-				accumulator.processCluster(&cd)
+				accumulator.processCluster(&cd, mcLog)
 
-				if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused {
+				if paused, err := strconv.ParseBool(cd.Annotations[constants.SyncsetPauseAnnotation]); err == nil && paused && ShouldLogGaugeVec(metricClusterDeploymentSyncsetPaused, &cd, mcLog) {
 					metricClusterDeploymentSyncsetPaused.WithLabelValues(
 						cd.Name,
 						cd.Namespace,
@@ -308,7 +422,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				return
 			}
 			for _, cd := range clusterDeployments.Items {
-				accumulator.processCluster(&cd)
+				accumulator.processCluster(&cd, mcLog)
 			}
 
 			accumulator.setMetrics(metricClusterDeploymentsTotal,
@@ -389,6 +503,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 func (mc *Calculator) registerOptionalMetrics(mConfig *metricsconfig.MetricsConfig) {
 	mapMetricToDurationHistograms = make(map[*prometheus.HistogramVec]time.Duration)
 	mapMetricToDurationGauges = make(map[*prometheus.GaugeVec]time.Duration)
+	optionalLabels := GetOptionalClusterTypeLabels(mConfig)
 	for _, metric := range mConfig.MetricsWithDuration {
 		switch metric.Name {
 		// Histograms
@@ -409,9 +524,25 @@ func (mc *Calculator) registerOptionalMetrics(mConfig *metricsconfig.MetricsConf
 			mapMetricToDurationHistograms[MetricClusterReadyTransitionSeconds] = metric.Duration.Duration
 		// Gauges
 		case metricsconfig.CurrentClusterSyncFailing:
-			metrics.Registry.MustRegister(newClusterSyncFailingCollector(mc.Client, metric.Duration.Duration, GetOptionalClusterTypeLabels(mConfig)))
+			metrics.Registry.MustRegister(newClusterSyncFailingCollector(mc.Client, metric.Duration.Duration, optionalLabels))
 		}
 	}
+	// Set dynamic labels for metrics with additional label support and register them
+	MetricProvisionFailedTerminal.optionalLabels = optionalLabels
+	MetricCompletedInstallJobRestarts.optionalLabels = optionalLabels
+	MetricClustersCreated.optionalLabels = optionalLabels
+	MetricClustersInstalled.optionalLabels = optionalLabels
+	MetricClustersDeleted.optionalLabels = optionalLabels
+	MetricInstallFailureSeconds.optionalLabels = optionalLabels
+	MetricInstallSuccessSeconds.optionalLabels = optionalLabels
+
+	MetricProvisionFailedTerminal.Register()
+	MetricCompletedInstallJobRestarts.Register()
+	MetricClustersCreated.Register()
+	MetricClustersInstalled.Register()
+	MetricClustersDeleted.Register()
+	MetricInstallFailureSeconds.Register()
+	MetricInstallSuccessSeconds.Register()
 }
 
 // ShouldLogHistogramDurationMetric decides whether the corresponding duration metric of type histogram should be logged.
@@ -599,7 +730,7 @@ func (ca *clusterAccumulator) ensureClusterTypeBuckets(clusterType string, power
 	}
 }
 
-func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
+func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment, log log.FieldLogger) {
 	if ca.ageFilter != infinity && time.Since(cd.CreationTimestamp.Time) > ca.ageFilterDur {
 		return
 	}
@@ -609,9 +740,11 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 	ca.ensureClusterTypeBuckets(clusterType, powerState)
 	ca.clusterTypesSet[clusterType] = true
 
-	ca.total[powerState][clusterType]++
+	if ShouldLogGaugeVec(metricClusterDeploymentsTotal, cd, log) {
+		ca.total[powerState][clusterType]++
+	}
 
-	if cd.DeletionTimestamp != nil {
+	if cd.DeletionTimestamp != nil && ShouldLogGaugeVec(metricClusterDeploymentsDeprovisioningTotal, cd, log) {
 		// Sort deleted clusters into buckets based on how long since
 		// they were deleted. The larger the bucket the more serious the problem.
 		deletedDur := time.Since(cd.DeletionTimestamp.Time)
@@ -626,8 +759,10 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 	}
 
 	if cd.Spec.Installed {
-		ca.installed[clusterType]++
-	} else {
+		if ShouldLogGaugeVec(metricClusterDeploymentsInstalledTotal, cd, log) {
+			ca.installed[clusterType]++
+		}
+	} else if ShouldLogGaugeVec(metricClusterDeploymentsUninstalledTotal, cd, log) {
 		// Sort uninstall clusters into buckets based on how long since
 		// they were created. The larger the bucket the more serious the problem.
 		uninstalledDur := time.Since(cd.CreationTimestamp.Time)
@@ -641,10 +776,12 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 		}
 	}
 
-	// Process conditions regardless if installed or not:
-	for _, cond := range cd.Status.Conditions {
-		if !controllerutils.IsConditionInDesiredState(cond) {
-			ca.addConditionToMap(cond.Type, clusterType)
+	if ShouldLogGaugeVec(metricClusterDeploymentsWithConditionTotal, cd, log) {
+		// Process conditions regardless if installed or not:
+		for _, cond := range cd.Status.Conditions {
+			if !controllerutils.IsConditionInDesiredState(cond) {
+				ca.addConditionToMap(cond.Type, clusterType)
+			}
 		}
 	}
 }

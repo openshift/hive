@@ -626,9 +626,9 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 		r.logger.WithError(err).Error("error getting cluster deployment")
 		return
 	}
-	timeMetric := metricInstallFailureSeconds
+	timeMetric := hivemetrics.MetricInstallFailureSeconds
 	if stage == hivev1.ClusterProvisionStageComplete {
-		timeMetric = metricInstallSuccessSeconds
+		timeMetric = hivemetrics.MetricInstallSuccessSeconds
 	}
 	installVersion := constants.MetricLabelDefaultValue
 	// InstallVersion is set by the imageset job. Can be nil if we never ran that (e.g. minimal install mode).
@@ -642,5 +642,7 @@ func (r *ReconcileClusterProvision) logProvisionSuccessFailureMetric(
 		"workers":         r.getWorkers(*cd),
 		"install_attempt": strconv.Itoa(instance.Spec.Attempt),
 	}
-	timeMetric.Observe(cd, fixedLabels, time.Since(instance.CreationTimestamp.Time).Seconds())
+	if hivemetrics.ShouldLogHistogramOpts(timeMetric.HistogramOpts, cd, r.logger) {
+		timeMetric.Observe(cd, fixedLabels, time.Since(instance.CreationTimestamp.Time).Seconds())
+	}
 }

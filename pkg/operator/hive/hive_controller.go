@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/openshift/hive/pkg/constants"
+	controllerMetrics "github.com/openshift/hive/pkg/controller/metrics"
 	"github.com/openshift/hive/pkg/operator/metrics"
 	"github.com/openshift/hive/pkg/operator/util"
 )
@@ -509,6 +510,15 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	if err != nil {
 		hLog.WithError(err).Error("error deploying failed provision configmap")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingFailedProvisionConfigmap", err.Error())
+		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+		return reconcile.Result{}, err
+	}
+
+	// Read the metricsConfig section and fetch clusterDeploymentLabelSelectors, error out if it fails validation
+	err = controllerMetrics.GetClusterDeploymentLabelSelectors(hLog, origHiveConfig.Spec.MetricsConfig)
+	if err != nil {
+		hLog.WithError(err).Error("error in metricsConfig")
+		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorInMetricsConfig", err.Error())
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
 	}

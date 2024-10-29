@@ -675,7 +675,7 @@ func logCumulativeMetric(metric *prometheus.HistogramVec, cd *hivev1.ClusterDepl
 		return
 	}
 	time := time.Since(condition.LastTransitionTime.Time).Seconds()
-	if !hivemetrics.ShouldLogHistogramDurationMetric(metric, time) {
+	if !hivemetrics.ShouldLogHistogramDurationMetric(metric, time) || !hivemetrics.ShouldLogHistogramVec(metric, cd, logger) {
 		return
 	}
 	poolNS, poolName := "<none>", "<none>"

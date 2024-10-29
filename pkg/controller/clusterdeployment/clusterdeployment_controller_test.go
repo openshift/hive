@@ -19,7 +19,6 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/baremetal"
 	"github.com/openshift/hive/apis/hive/v1/gcp"
-	"github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -95,7 +94,6 @@ func init() {
 	// While the metrics need not be registered for this test suite, they still need to be defined to avoid panics
 	// during the tests
 	var _ log.FieldLogger = log.WithField("controller", "clusterDeployment")
-	registerMetrics(&metricsconfig.MetricsConfig{})
 }
 
 func fakeReadFile(content string) func(string) ([]byte, error) {

@@ -123,15 +123,6 @@ func Add(mgr manager.Manager) error {
 		logger.WithError(err).Error("could not get controller configurations")
 		return err
 	}
-	// Read the metrics config from hive config and set values for mapClusterTypeLabelToValue, if present
-	mConfig, err := hivemetrics.ReadMetricsConfig()
-	if err != nil {
-		log.WithError(err).Error("error reading metrics config")
-		return err
-	}
-	// Register the metrics. This is done here to ensure we define the metrics with optional label support after we have
-	// read the hiveconfig, and we register them only once.
-	registerMetrics(mConfig)
 	return AddToManager(mgr, NewReconciler(mgr, logger, clientRateLimiter), concurrentReconciles, queueRateLimiter)
 }
 
@@ -609,7 +600,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error adding finalizer")
 			return reconcile.Result{}, err
 		}
-		metricClustersCreated.Observe(cd, nil, 1)
+		if hivemetrics.ShouldLogCounterOpts(hivemetrics.MetricClustersCreated.CounterOpts, cd, cdLog) {
+			hivemetrics.MetricClustersCreated.Observe(cd, nil, 1)
+		}
 		return reconcile.Result{}, nil
 	}
 
@@ -1070,7 +1063,9 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		// kickstartDuration calculates the delay between creation of cd and start of imageset job
 		kickstartDuration := time.Since(cd.CreationTimestamp.Time)
 		cdLog.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to imageset job seconds")
-		metricImageSetDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+		if hivemetrics.ShouldLogHistogramVec(hivemetrics.MetricImageSetDelaySeconds, cd, cdLog) {
+			hivemetrics.MetricImageSetDelaySeconds.WithLabelValues().Observe(float64(kickstartDuration.Seconds()))
+		}
 		return &reconcile.Result{}, nil
 
 	// There was an error getting the job. Return the error.
@@ -1507,8 +1502,10 @@ func (r *ReconcileClusterDeployment) removeClusterDeploymentFinalizer(cd *hivev1
 		return err
 	}
 
-	// Increment the clusters deleted counter:
-	metricClustersDeleted.Observe(cd, nil, 1)
+	if hivemetrics.ShouldLogCounterOpts(hivemetrics.MetricClustersDeleted.CounterOpts, cd, r.logger) {
+		// Increment the clusters deleted counter:
+		hivemetrics.MetricClustersDeleted.Observe(cd, nil, 1)
+	}
 	return nil
 }
 
@@ -1582,7 +1579,9 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 		return false, err
 	}
 
-	metricDNSDelaySeconds.Observe(float64(dnsDelayDuration.Seconds()))
+	if hivemetrics.ShouldLogHistogramVec(hivemetrics.MetricDNSDelaySeconds, cd, cdLog) {
+		hivemetrics.MetricDNSDelaySeconds.WithLabelValues().Observe(float64(dnsDelayDuration.Seconds()))
+	}
 
 	return true, nil
 }
@@ -1625,7 +1624,7 @@ func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDeleteAndLogAnnotati
 // ensureManagedDNSZone
 // - Makes sure a DNSZone object exists for this CD, creating it if it does not already exist.
 // - Parlays the DNSZone's status conditions into the CD's DNSZoneNotReady condition.
-// - Observes metricDNSDelaySeconds.
+// - Observes MetricDNSDelaySeconds.
 // Returns:
 //   - bool: true if the caller should return from the reconcile loop, using the...
 //   - Result: suitable for returning from the reconcile loop. If the DNSZone is not ready, it will include a delay to retrigger once
@@ -1753,7 +1752,7 @@ func (r *ReconcileClusterDeployment) ensureManagedDNSZone(cd *hivev1.ClusterDepl
 	// Observe ProvisionFailedTerminal metric if we have set ProvisionStopped.
 	if controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition).Status == corev1.ConditionTrue &&
 		provisionStoppedConditionStatus != corev1.ConditionTrue {
-		incProvisionFailedTerminal(cd)
+		incProvisionFailedTerminal(cd, cdLog)
 	}
 
 	// Only attempt to record the delay metric if the DNSZone is ready
@@ -2667,4 +2666,23 @@ func LoadReleaseImageVerifier(config *rest.Config) (verify.Interface, error) {
 		Raw:              cmData,
 	}
 	return verify.NewFromManifests([]manifest.Manifest{m}, sigstore.NewCachedHTTPClientConstructor(sigstore.DefaultClient, nil).HTTPClient)
+}
+
+func incProvisionFailedTerminal(cd *hivev1.ClusterDeployment, log log.FieldLogger) {
+	poolNSName := ""
+	if poolRef := cd.Spec.ClusterPoolRef; poolRef != nil {
+		poolNSName = poolRef.Namespace + "/" + poolRef.PoolName
+	}
+	stoppedReason := "unknown"
+	stoppedCondition := controllerutils.FindCondition(cd.Status.Conditions, hivev1.ProvisionStoppedCondition)
+	if stoppedCondition != nil {
+		stoppedReason = stoppedCondition.Reason
+	}
+	fixedLabels := map[string]string{
+		"clusterpool_namespacedname": poolNSName,
+		"failure_reason":             stoppedReason,
+	}
+	if hivemetrics.ShouldLogCounterOpts(hivemetrics.MetricProvisionFailedTerminal.CounterOpts, cd, log) {
+		hivemetrics.MetricProvisionFailedTerminal.Observe(cd, fixedLabels, 1)
+	}
 }

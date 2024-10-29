@@ -54,7 +54,7 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 	clusterDeployments := &hivev1.ClusterDeploymentList{}
 	err := cc.client.List(context.Background(), clusterDeployments)
 	if err != nil {
-		log.WithError(err).Error("error listing cluster deployments")
+		ccLog.WithError(err).Error("error listing cluster deployments")
 		return
 	}
 	for _, cd := range clusterDeployments.Items {
@@ -62,6 +62,9 @@ func (cc provisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 		if cd.Spec.Installed {
+			continue
+		}
+		if !ShouldLogCustomMetric(metricClusterDeploymentProvisionUnderwaySecondsDesc, &cd, ccLog) {
 			continue
 		}
 
@@ -143,7 +146,7 @@ func (cc provisioningUnderwayInstallRestartsCollector) Collect(ch chan<- prometh
 	clusterDeployments := &hivev1.ClusterDeploymentList{}
 	err := cc.client.List(context.Background(), clusterDeployments)
 	if err != nil {
-		log.WithError(err).Error("error listing cluster deployments")
+		ccLog.WithError(err).Error("error listing cluster deployments")
 		return
 	}
 	for _, cd := range clusterDeployments.Items {
@@ -151,6 +154,9 @@ func (cc provisioningUnderwayInstallRestartsCollector) Collect(ch chan<- prometh
 			continue
 		}
 		if cd.Spec.Installed {
+			continue
+		}
+		if !ShouldLogCustomMetric(provisioningUnderwayInstallRestartsCollectorDesc, &cd, ccLog) {
 			continue
 		}
 
@@ -260,11 +266,14 @@ func (cc deprovisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 	clusterDeployments := &hivev1.ClusterDeploymentList{}
 	err := cc.client.List(context.Background(), clusterDeployments)
 	if err != nil {
-		log.WithError(err).Error("error listing cluster deployments")
+		ccLog.WithError(err).Error("error listing cluster deployments")
 		return
 	}
 	for _, cd := range clusterDeployments.Items {
 		if cd.DeletionTimestamp == nil {
+			continue
+		}
+		if !ShouldLogCustomMetric(metricClusterDeploymentDeprovisionUnderwaySecondsDesc, &cd, ccLog) {
 			continue
 		}
 
@@ -279,9 +288,7 @@ func (cc deprovisioningUnderwayCollector) Collect(ch chan<- prometheus.Metric) {
 			cd.Namespace,
 			GetLabelValue(&cd, hivev1.HiveClusterTypeLabel),
 		)
-
 	}
-
 }
 
 func (cc deprovisioningUnderwayCollector) Describe(ch chan<- *prometheus.Desc) {
@@ -331,14 +338,14 @@ func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
 	clusterSyncList := &hiveintv1alpha1.ClusterSyncList{}
 	err := cc.client.List(context.Background(), clusterSyncList)
 	if err != nil {
-		log.WithError(err).Error("error listing all ClusterSyncs")
+		ccLog.WithError(err).Error("error listing all ClusterSyncs")
 		return
 	}
 
 	clusterDeployments := &hivev1.ClusterDeploymentList{}
 	err = cc.client.List(context.Background(), clusterDeployments)
 	if err != nil {
-		log.WithError(err).Error("error listing cluster deployments")
+		ccLog.WithError(err).Error("error listing cluster deployments")
 		return
 	}
 
@@ -353,23 +360,25 @@ func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
 					break
 				}
 			}
-			fixedLabels := make(map[string]string, len(cc.dynamicLabels.fixedLabels))
-			fixedLabels["namespaced_name"] = cs.Namespace + "/" + cs.Name
-			if !reflect.ValueOf(cdRef).IsZero() {
-				if unreachableCondition := controllerutils.FindCondition(cdRef.Status.Conditions, hivev1.UnreachableCondition); unreachableCondition != nil {
-					fixedLabels["unreachable"] = string(unreachableCondition.Status)
+			if ShouldLogCustomMetric(metricClusterSyncFailingSeconds, &cdRef, ccLog) {
+				fixedLabels := make(map[string]string, len(cc.dynamicLabels.fixedLabels))
+				fixedLabels["namespaced_name"] = cs.Namespace + "/" + cs.Name
+				if !reflect.ValueOf(cdRef).IsZero() {
+					if unreachableCondition := controllerutils.FindCondition(cdRef.Status.Conditions, hivev1.UnreachableCondition); unreachableCondition != nil {
+						fixedLabels["unreachable"] = string(unreachableCondition.Status)
+					}
 				}
-			}
-			labelValues := cc.dynamicLabels.buildLabelSlice(fixedLabels, &cdRef)
-			seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
-			// check if duration crosses the threshold
-			if cc.minDuration.Seconds() <= seconds {
-				ch <- prometheus.MustNewConstMetric(
-					cc.metricClusterSyncFailingSeconds,
-					prometheus.GaugeValue,
-					seconds,
-					labelValues...,
-				)
+				labelValues := cc.dynamicLabels.buildLabelSlice(fixedLabels, &cdRef)
+				seconds := time.Since(cond.LastTransitionTime.Time).Seconds()
+				// check if duration crosses the threshold
+				if cc.minDuration.Seconds() <= seconds {
+					ch <- prometheus.MustNewConstMetric(
+						cc.metricClusterSyncFailingSeconds,
+						prometheus.GaugeValue,
+						seconds,
+						labelValues...,
+					)
+				}
 			}
 		}
 	}
@@ -378,6 +387,8 @@ func (cc clusterSyncFailingCollector) Collect(ch chan<- prometheus.Metric) {
 func (cc clusterSyncFailingCollector) Describe(ch chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(cc, ch)
 }
+
+var metricClusterSyncFailingSeconds *prometheus.Desc
 
 func newClusterSyncFailingCollector(client client.Client, minimum time.Duration, optionalLabels map[string]string) prometheus.Collector {
 	metricName := "hive_clustersync_failing_seconds"
@@ -394,15 +405,16 @@ func newClusterSyncFailingCollector(client client.Client, minimum time.Duration,
 		dynamicLabels: baseLabels,
 		labelList:     baseLabels.getLabelList(),
 	}
+	metricClusterSyncFailingSeconds = prometheus.NewDesc(
+		metricName,
+		"Length of time a clustersync has been failing",
+		labels.labelList,
+		nil,
+	)
 	return clusterSyncFailingCollector{
-		client: client,
-		metricClusterSyncFailingSeconds: prometheus.NewDesc(
-			metricName,
-			"Length of time a clustersync has been failing",
-			labels.labelList,
-			nil,
-		),
-		minDuration:   minimum,
-		dynamicLabels: labels,
+		client:                          client,
+		metricClusterSyncFailingSeconds: metricClusterSyncFailingSeconds,
+		minDuration:                     minimum,
+		dynamicLabels:                   labels,
 	}
 }

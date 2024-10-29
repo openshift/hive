@@ -12,9 +12,6 @@ var (
 	// They are defined later once the hive config has been read.
 	metricClusterProvisionsTotal hivemetrics.CounterVecWithDynamicLabels
 	metricInstallErrors          hivemetrics.CounterVecWithDynamicLabels
-
-	metricInstallFailureSeconds hivemetrics.HistogramVecWithDynamicLabels
-	metricInstallSuccessSeconds hivemetrics.HistogramVecWithDynamicLabels
 )
 
 func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
@@ -37,27 +34,6 @@ func registerMetrics(mConfig *metricsconfig.MetricsConfig) {
 		mapClusterTypeLabelToValue,
 	)
 
-	metricInstallFailureSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
-		&prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_install_failure_total",
-			Help:    "Time taken before a cluster provision failed to install",
-			Buckets: []float64{30, 120, 300, 600, 1800},
-		},
-		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
-		mapClusterTypeLabelToValue,
-	)
-	metricInstallSuccessSeconds = *hivemetrics.NewHistogramVecWithDynamicLabels(
-		&prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_install_success_total",
-			Help:    "Time taken before a cluster provision succeeded to install",
-			Buckets: []float64{1800, 2400, 3000, 3600},
-		},
-		[]string{"platform", "region", "cluster_version", "workers", "install_attempt"},
-		mapClusterTypeLabelToValue,
-	)
-
 	metricInstallErrors.Register()
 	metricClusterProvisionsTotal.Register()
-	metricInstallFailureSeconds.Register()
-	metricInstallSuccessSeconds.Register()
 }

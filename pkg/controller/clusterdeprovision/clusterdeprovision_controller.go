@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -23,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -43,14 +41,6 @@ const (
 )
 
 var (
-	metricUninstallJobDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "hive_cluster_deployment_uninstall_job_duration_seconds",
-			Help:    "Distribution of the runtime of completed uninstall jobs.",
-			Buckets: []float64{60, 300, 600, 1200, 1800, 2400, 3000, 3600},
-		},
-	)
-
 	// actuators is a list of available actuators for this controller
 	// It is populated via the registerActuator function
 	actuators []Actuator
@@ -61,10 +51,6 @@ var (
 // function.
 func registerActuator(a Actuator) {
 	actuators = append(actuators, a)
-}
-
-func init() {
-	metrics.Registry.MustRegister(metricUninstallJobDuration)
 }
 
 // Add creates a new ClusterDeprovision Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -373,7 +359,9 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 			rLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating request status")
 			return reconcile.Result{}, err
 		}
-		metricUninstallJobDuration.Observe(float64(jobDuration.Seconds()))
+		if hivemetrics.ShouldLogHistogramVec(hivemetrics.MetricUninstallJobDuration, cd, rLog) {
+			hivemetrics.MetricUninstallJobDuration.WithLabelValues().Observe(float64(jobDuration.Seconds()))
+		}
 		return reconcile.Result{}, nil
 	}
 

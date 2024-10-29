@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	log "github.com/sirupsen/logrus"
 	"testing"
 	"time"
 
@@ -78,7 +79,7 @@ func TestClusterAccumulator(t *testing.T) {
 
 	accumulator, _ := newClusterAccumulator(infinity, []string{"0h", "1h", "2h", "8h", "24h", "72h"})
 	for _, cd := range clusters {
-		accumulator.processCluster(&cd)
+		accumulator.processCluster(&cd, log.New())
 	}
 
 	assert.Equal(t, 12, accumulator.total["unspecified"]["managed"])
@@ -116,7 +117,7 @@ func TestClusterAccumulator(t *testing.T) {
 	// Also test with a cluster age filter:
 	accumulator, _ = newClusterAccumulator("8h", []string{"0h", "1h", "2h", "8h", "24h", "72h"})
 	for _, cd := range clusters {
-		accumulator.processCluster(&cd)
+		accumulator.processCluster(&cd, log.New())
 	}
 	assert.Equal(t, 7, accumulator.total["unspecified"]["managed"])
 	assert.Equal(t, 2, accumulator.total["Hibernating"]["managed"])

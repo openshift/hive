@@ -33,6 +33,7 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
@@ -97,7 +98,7 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update cluster deployment status")
 				return reconcile.Result{}, err
 			}
-			incProvisionFailedTerminal(cd)
+			incProvisionFailedTerminal(cd, logger)
 		}
 		return reconcile.Result{}, nil
 	}
@@ -242,7 +243,9 @@ func (r *ReconcileClusterDeployment) startNewProvision(
 	if cd.Status.InstallRestarts == 0 {
 		kickstartDuration := time.Since(cd.CreationTimestamp.Time)
 		logger.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to first provision seconds")
-		metricInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+		if metrics.ShouldLogHistogramVec(metrics.MetricInstallDelaySeconds, cd, logger) {
+			metrics.MetricInstallDelaySeconds.WithLabelValues().Observe(float64(kickstartDuration.Seconds()))
+		}
 	}
 
 	return reconcile.Result{}, nil
@@ -629,12 +632,18 @@ func (r *ReconcileClusterDeployment) reconcileCompletedProvision(cd *hivev1.Clus
 	}
 	jobDuration := time.Since(startTime.Time)
 	cdLog.WithField("duration", jobDuration.Seconds()).Debug("install job completed")
-	metricInstallJobDuration.Observe(float64(jobDuration.Seconds()))
+	if metrics.ShouldLogHistogramVec(metrics.MetricInstallJobDuration, cd, cdLog) {
+		metrics.MetricInstallJobDuration.WithLabelValues().Observe(float64(jobDuration.Seconds()))
+	}
 
-	// Report a metric for the total number of install restarts:
-	metricCompletedInstallJobRestarts.Observe(cd, nil, float64(cd.Status.InstallRestarts))
+	if metrics.ShouldLogHistogramOpts(metrics.MetricCompletedInstallJobRestarts.HistogramOpts, cd, cdLog) {
+		// Report a metric for the total number of install restarts:
+		metrics.MetricCompletedInstallJobRestarts.Observe(cd, nil, float64(cd.Status.InstallRestarts))
+	}
 
-	metricClustersInstalled.Observe(cd, nil, 1)
+	if metrics.ShouldLogCounterOpts(metrics.MetricClustersInstalled.CounterOpts, cd, cdLog) {
+		metrics.MetricClustersInstalled.Observe(cd, nil, 1)
+	}
 
 	return reconcile.Result{}, nil
 }

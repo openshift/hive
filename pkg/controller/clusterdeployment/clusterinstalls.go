@@ -20,6 +20,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -123,7 +124,9 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 
 			kickstartDuration := time.Since(ci.CreationTimestamp.Time)
 			logger.WithField("elapsed", kickstartDuration.Seconds()).Info("calculated time to first provision seconds")
-			metricInstallDelaySeconds.Observe(float64(kickstartDuration.Seconds()))
+			if metrics.ShouldLogHistogramVec(metrics.MetricInstallDelaySeconds, cd, logger) {
+				metrics.MetricInstallDelaySeconds.WithLabelValues().Observe(float64(kickstartDuration.Seconds()))
+			}
 		}
 	}
 
@@ -140,7 +143,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		msg = "Install attempts limit reached"
 	}
 
-	// Fun extra variable to keep track of whether we should increment metricProvisionFailedTerminal
+	// Fun extra variable to keep track of whether we should increment MetricProvisionFailedTerminal
 	// later; because we only want to do that if (we change that status and) the status update succeeds.
 	provisionFailedTerminal := false
 	conditions, updated = controllerutils.SetClusterDeploymentConditionWithChangeCheck(conditions,
@@ -217,11 +220,17 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 			}
 			installDuration := cd.Status.InstalledTimestamp.Sub(installStartTime.Time)
 			logger.WithField("duration", installDuration.Seconds()).Debug("install job completed")
-			metricInstallJobDuration.Observe(float64(installDuration.Seconds()))
+			if metrics.ShouldLogHistogramVec(metrics.MetricInstallJobDuration, cd, logger) {
+				metrics.MetricInstallJobDuration.WithLabelValues().Observe(float64(installDuration.Seconds()))
+			}
 
-			metricCompletedInstallJobRestarts.Observe(cd, nil, float64(cd.Status.InstallRestarts))
+			if metrics.ShouldLogHistogramOpts(metrics.MetricCompletedInstallJobRestarts.HistogramOpts, cd, logger) {
+				metrics.MetricCompletedInstallJobRestarts.Observe(cd, nil, float64(cd.Status.InstallRestarts))
+			}
 
-			metricClustersInstalled.Observe(cd, nil, 1)
+			if metrics.ShouldLogCounterOpts(metrics.MetricClustersInstalled.CounterOpts, cd, logger) {
+				metrics.MetricClustersInstalled.Observe(cd, nil, 1)
+			}
 
 			if r.protectedDelete {
 				// Set protected delete on for the ClusterDeployment.
@@ -283,7 +292,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		cd.Spec = *specSave
 		// If we declared the provision terminally failed, bump our metric
 		if provisionFailedTerminal {
-			incProvisionFailedTerminal(cd)
+			incProvisionFailedTerminal(cd, logger)
 		}
 	}
 	// Do the spec update after the status update. Otherwise, if the former succeeded but the

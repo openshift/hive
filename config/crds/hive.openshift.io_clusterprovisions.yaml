@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: (devel)
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.0
   labels:
     contracts.hive.openshift.io/clusterinstall: "false"
   name: clusterprovisions.hive.openshift.io
@@ -100,6 +99,7 @@ spec:
                   We think because the thing it''s storing (ClusterMetadata from installer)
                   is not a runtime.Object, so can''t be put in a RawExtension.'
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
               metadataJSON:
                 description: MetadataJSON is a JSON representation of the ClusterMetadata
                   produced by the installer. We don't use a runtime.RawExtension because

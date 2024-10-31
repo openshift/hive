@@ -11,7 +11,6 @@ endif
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
-	targets/openshift/controller-gen.mk \
 	targets/openshift/yq.mk \
 	targets/openshift/bindata.mk \
 	targets/openshift/deps.mk \
@@ -21,6 +20,12 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 
 DOCKER_CMD ?= docker
 CONTAINER_BUILD_FLAGS ?= --file ./Dockerfile
+
+GOCACHE ?= $(shell C=`go env GOCACHE`; [[ -d $$C ]] && echo $$C)
+
+ifneq ($(GOCACHE),)
+GOCACHE_VOL_ARG = --volume "${GOCACHE}:/go/.cache:z"
+endif
 
 # Namespace hive-operator will run:
 HIVE_OPERATOR_NS ?= hive
@@ -35,7 +40,7 @@ LOG_LEVEL ?= debug
 IMG ?= hive-controller:latest
 
 GO_PACKAGES :=./...
-GO_BUILD_PACKAGES :=./cmd/... ./contrib/cmd/hiveutil
+GO_BUILD_PACKAGES :=./cmd/...
 GO_BUILD_BINDIR :=bin
 # Exclude e2e tests from unit testing
 GO_TEST_PACKAGES :=./pkg/... ./cmd/... ./contrib/...
@@ -66,7 +71,7 @@ endif
 # v{major}.{minor}.{commitcount}-{sha}
 # Note that building against a local commit may result in {major}.{minor} being rendered as
 # `UnknownBranch`. However, the {commitcount} and {sha} should still be accurate.
-SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -mpip install --user gitpython >&2; hack/version2.py)
+SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -m ensurepip >&2; python3 -mpip --no-cache install --user gitpython pyyaml >&2; hack/version2.py)
 
 BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
@@ -74,7 +79,6 @@ $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindat
 $(call build-image,hive,$(IMG),./Dockerfile,.)
 $(call build-image,hive-fedora-dev-base,hive-fedora-dev-base,./build/fedora-dev/Dockerfile.devbase,.)
 $(call build-image,hive-fedora-dev,$(IMG),./build/fedora-dev/Dockerfile.dev,.)
-$(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
 
 clean:
 	rm -rf $(GO_BUILD_BINDIR)
@@ -115,11 +119,17 @@ define patch-crd-yq
 
 endef
 
+CONTROLLER_GEN_SRC := $(shell realpath vendor/sigs.k8s.io/controller-tools/cmd/controller-gen)
+CONTROLLER_GEN := $(shell go list -f '{{.Target}}-{{.Module.Version}}' $(CONTROLLER_GEN_SRC))
+
+$(CONTROLLER_GEN): $(CONTROLLER_GEN_SRC)
+	go build -o $(CONTROLLER_GEN) $(CONTROLLER_GEN_SRC)
+
 # Generate CRD yaml from our api types:
 .PHONY: crd
-crd: ensure-controller-gen ensure-yq
+crd: $(CONTROLLER_GEN) ensure-yq
 	rm -rf ./config/crds
-	(cd apis; '../$(CONTROLLER_GEN)' crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
+	(cd apis; $(CONTROLLER_GEN) crd:crdVersions=v1 paths=./hive/v1 paths=./hiveinternal/v1alpha1 output:dir=../config/crds)
 	@echo Stripping yaml breaks from CRD files
 	$(foreach p,$(wildcard ./config/crds/*.yaml),$(call strip-yaml-break,$(p)))
 	@echo Patching CRD files for additional static information
@@ -139,7 +149,7 @@ crd: ensure-controller-gen ensure-yq
 update: crd
 
 .PHONY: verify-crd
-verify-crd: ensure-controller-gen ensure-yq
+verify-crd: $(CONTROLLER_GEN) ensure-yq
 	./hack/verify-crd.sh
 verify: verify-crd
 
@@ -279,7 +289,7 @@ generate: generate-submodules
 
 
 .PHONY: $(addprefix generate-submodules-,$(GO_SUB_MODULES))
-$(addprefix generate-submodules-,$(GO_SUB_MODULES)):
+$(addprefix generate-submodules-,$(GO_SUB_MODULES)): $(addprefix vendor-submodules-,$(GO_SUB_MODULES))
 	# hande go generate for submodule
 	(cd $(subst generate-submodules-,,$@); $(GOFLAGS_FOR_GENERATE) $(GO) generate ./...)
 
@@ -301,7 +311,11 @@ docker-dev-push: build image-hive-fedora-dev docker-push
 # Build the dev image using builah
 .PHONY: buildah-dev-build
 buildah-dev-build:
-	buildah bud --ulimit nofile=10239:10240 -f ./Dockerfile --tag ${IMG}
+	buildah bud --tag ${IMG} -f ./Dockerfile .
+
+.PHONY: podman-dev-build
+podman-dev-build:
+	podman build --tag ${IMG} $(GOCACHE_VOL_ARG) -f ./Dockerfile .
 
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push
@@ -321,6 +335,29 @@ lint: install-tools
 	golangci-lint run -c ./golangci.yml ./pkg/... ./cmd/... ./contrib/...
 # Remove the golangci-lint from the verify until a fix is in place for permisions for writing to the /.cache directory.
 #verify: lint
+
+# Target to build only hiveadmission
+.PHONY: build-hiveadmission
+build-hiveadmission:
+	$(call build-package, ./cmd/hiveadmission)
+build: build-hiveadmission
+
+# Target to build only hiveutil. This is used so that on the dual build RHEL8/RHEL9, RHEL8 stage only needs to build hiveutil.
+.PHONY: build-hiveutil
+build-hiveutil:
+	$(call build-package, ./contrib/cmd/hiveutil)
+
+# Target to build only manager
+.PHONY: build-manager
+build-manager:
+	$(call build-package, ./cmd/manager)
+build: build-manager
+
+# Target to build only manager
+.PHONY: build-operator
+build-operator:
+	$(call build-package, ./cmd/operator)
+build: build-operator
 
 .PHONY: modcheck
 modcheck:

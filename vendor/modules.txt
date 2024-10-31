@@ -11064,3 +11064,4 @@ sigs.k8s.io/yaml
 # sigs.k8s.io/cluster-api-provider-azure => github.com/openshift/cluster-api-provider-azure v0.1.0-alpha.3.0.20210626224711-5d94c794092f
 # k8s.io/client-go => k8s.io/client-go v0.28.3
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible => github.com/golang-jwt/jwt v3.2.1+incompatible
+# vbom.ml/util => github.com/fvbommel/util v0.0.0-20180919145318-efcd4e0f9787

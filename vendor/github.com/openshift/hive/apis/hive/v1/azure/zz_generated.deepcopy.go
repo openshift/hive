@@ -56,6 +56,11 @@ func (in *Metadata) DeepCopyInto(out *Metadata) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.BaseDomainResourceGroupName != nil {
+		in, out := &in.BaseDomainResourceGroupName, &out.BaseDomainResourceGroupName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

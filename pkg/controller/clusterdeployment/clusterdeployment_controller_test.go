@@ -1001,7 +1001,7 @@ platform:
 			},
 		},
 		{
-			name: "Get Azure ResourceGroupName from provision metadata",
+			name: "Get Azure ResourceGroupName and BaseDomainResourceGroupName from provision metadata",
 			existing: []runtime.Object{
 				testInstallConfigSecret(`
 platform:
@@ -1018,7 +1018,7 @@ platform:
 					}
 					return testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(baseCD))
 				}(),
-				testSuccessfulProvision(tcp.WithMetadata(`{"azure": {"resourceGroupName": "infra-id-rg"}}`)),
+				testSuccessfulProvision(tcp.WithMetadata(`{"azure": {"resourceGroupName": "infra-id-rg", "baseDomainResourceGroupName": "os4-common"}}`)),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -1028,6 +1028,12 @@ platform:
 					if assert.Nil(t, err, "expected to find Azure resource group in CD") {
 						assert.Equal(t, "infra-id-rg", rg, "mismatched resource group name")
 					}
+					// Safe access nested field through possible nils
+					bdrg := func() string {
+						defer func() { recover() }() // return ""
+						return *cd.Spec.ClusterMetadata.Platform.Azure.BaseDomainResourceGroupName
+					}()
+					assert.Equal(t, "os4-common", bdrg, "mismatched base domain resource group name")
 				}
 			},
 		},
@@ -3394,6 +3400,7 @@ platform:
 	}
 
 	for _, test := range tests {
+		if test.name != "Get Azure ResourceGroupName and BaseDomainResourceGroupName from provision metadata" {continue}
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("controller", "clusterDeployment")
 			if test.retryReasons == nil {

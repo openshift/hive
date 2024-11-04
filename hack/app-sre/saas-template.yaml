@@ -721,11 +721,17 @@ objects:
                         azure:
                           description: Azure holds azure-specific cluster metadata
                           properties:
+                            baseDomainResourceGroupName:
+                              description: BaseDomainResourceGroupName is the name
+                                of the resource group in which the cluster's DNS records
+                                were created.
+                              type: string
                             resourceGroupName:
                               description: ResourceGroupName is the name of the resource
                                 group in which the cluster resources were created.
                               type: string
                           required:
+                          - baseDomainResourceGroupName
                           - resourceGroupName
                           type: object
                         gcp:
@@ -2380,6 +2386,13 @@ objects:
                     azure:
                       description: Azure contains Azure-specific deprovision settings
                       properties:
+                        baseDomainResourceGroupName:
+                          description: 'BaseDomainResourceGroupName is the name of
+                            the resource group where the cluster''s DNS records
+
+                            were created, if different from the default or the custom
+                            ResourceGroupName.'
+                          type: string
                         cloudName:
                           description: 'cloudName is the name of the Azure cloud environment
                             which can be used to configure the Azure SDK
@@ -5247,11 +5260,17 @@ objects:
                         azure:
                           description: Azure holds azure-specific cluster metadata
                           properties:
+                            baseDomainResourceGroupName:
+                              description: BaseDomainResourceGroupName is the name
+                                of the resource group in which the cluster's DNS records
+                                were created.
+                              type: string
                             resourceGroupName:
                               description: ResourceGroupName is the name of the resource
                                 group in which the cluster resources were created.
                               type: string
                           required:
+                          - baseDomainResourceGroupName
                           - resourceGroupName
                           type: object
                         gcp:

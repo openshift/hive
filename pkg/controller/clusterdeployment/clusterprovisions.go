@@ -317,12 +317,12 @@ func setAWSHostedZoneRoleFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.C
 	cm.Platform.AWS.HostedZoneRole = &hzr
 }
 
-// setAzureResourceGroupFromMetadata unmarshals `pm.Raw`, a representation of the installer ClusterMetadata type,
-// and looks for the Azure ResourceGroupName therein. If found, the value is copied into the Azure platform-specific
-// section of `cm`, hive's representation of the cluster metadata. The `cd` is only used to validate that we're
-// operating on an Azure cluster.
+// setAzureResourceGroupsFromMetadata unmarshals `pm.Raw`, a representation of the installer ClusterMetadata type,
+// and looks for the Azure ResourceGroupName and BaseDomainResourceGroupName therein. If either or both are found,
+// the value(s) is/are copied into the Azure platform-specific section of `cm`, hive's representation of the cluster
+// metadata. The `cd` is only used to validate that we're operating on an Azure cluster.
 // The caller is responsible for copying `cm` back into `cd` and Update()ing if/as necessary.
-func setAzureResourceGroupFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pmjson []byte, logger log.FieldLogger) {
+func setAzureResourceGroupsFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pmjson []byte, logger log.FieldLogger) {
 	if pmjson == nil {
 		return
 	}
@@ -362,6 +362,11 @@ func setAzureResourceGroupFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.
 		cm.Platform.Azure = &azure.Metadata{}
 	}
 	cm.Platform.Azure.ResourceGroupName = &rg
+
+	if bdrg := im.Azure.BaseDomainResourceGroupName; bdrg != "" {
+		log.WithField("baseDomainResourceGroupName", bdrg).Info("Found Azure BaseDomainResourceGroupName in ClusterMetadata")
+		cm.Platform.Azure.BaseDomainResourceGroupName = &bdrg
+	}
 }
 
 func setGCPNetworkProjectIDFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.ClusterMetadata, pmjson []byte, logger log.FieldLogger) {
@@ -425,7 +430,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 			clusterMetadata.AdminPasswordSecretRef = provision.Spec.AdminPasswordSecretRef
 		}
 		setAWSHostedZoneRoleFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
-		setAzureResourceGroupFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
+		setAzureResourceGroupsFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		setGCPNetworkProjectIDFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata

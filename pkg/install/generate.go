@@ -736,6 +736,9 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 	if req.Spec.Platform.Azure.ResourceGroupName != nil {
 		containers[0].Args = append(containers[0].Args, "--azure-resource-group-name", *req.Spec.Platform.Azure.ResourceGroupName)
 	}
+	if req.Spec.Platform.Azure.BaseDomainResourceGroupName != nil {
+		containers[0].Args = append(containers[0].Args, "--azure-base-domain-resource-group-name", *req.Spec.Platform.Azure.BaseDomainResourceGroupName)
+	}
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
 

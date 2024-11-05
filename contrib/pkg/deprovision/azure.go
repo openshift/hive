@@ -16,20 +16,21 @@ import (
 
 // AzureOptions is the set of options to deprovision an Azure cluster
 type AzureOptions struct {
-	logLevel          string
-	cloudName         string
-	resourceGroupName string
+	logLevel                    string
+	cloudName                   string
+	resourceGroupName           string
+	baseDomainResourceGroupName string
 }
 
 // NewDeprovisionAzureCommand is the entrypoint to create the azure deprovision subcommand
 func NewDeprovisionAzureCommand() *cobra.Command {
 	opt := &AzureOptions{}
 	cmd := &cobra.Command{
-		Use:   "azure INFRAID --azure-cloud-name CLOUDNAME",
+		Use:   "azure INFRAID [--azure-cloud-name CLOUDNAME] [--azure-resource-group-name RG] [--azure-base-domain-resource-group-name BDRG]",
 		Short: "Deprovision Azure assets (as created by openshift-installer)",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			uninstaller, err := completeAzureUninstaller(opt.logLevel, opt.cloudName, opt.resourceGroupName, args)
+			uninstaller, err := opt.completeAzureUninstaller(args)
 			if err != nil {
 				log.WithError(err).Error("Cannot complete command")
 				return
@@ -48,6 +49,7 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.cloudName, "azure-cloud-name", installertypesazure.PublicCloud.Name(), "The name of the Azure cloud environment used to configure the Azure SDK")
 	flags.StringVar(&opt.resourceGroupName, "azure-resource-group-name", "", "The name of the custom Azure resource group in which the cluster was created when not using the default installer-created resource group")
+	flags.StringVar(&opt.baseDomainResourceGroupName, "azure-base-domain-resource-group-name", "", "The name of the custom Azure resource group in which the cluster's DNS records were created when not using the default installer-created resource group or custom resource group")
 	return cmd
 }
 
@@ -60,9 +62,9 @@ func validate() error {
 	return nil
 }
 
-func completeAzureUninstaller(logLevel, cloudName, resourceGroupName string, args []string) (providers.Destroyer, error) {
+func (opt *AzureOptions) completeAzureUninstaller(args []string) (providers.Destroyer, error) {
 
-	logger, err := utils.NewLogger(logLevel)
+	logger, err := utils.NewLogger(opt.logLevel)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +79,9 @@ func completeAzureUninstaller(logLevel, cloudName, resourceGroupName string, arg
 		InfraID: args[0],
 		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
 			Azure: &installertypesazure.Metadata{
-				CloudName:         installertypesazure.CloudEnvironment(cloudName),
-				ResourceGroupName: resourceGroupName,
+				CloudName:                   installertypesazure.CloudEnvironment(opt.cloudName),
+				ResourceGroupName:           opt.resourceGroupName,
+				BaseDomainResourceGroupName: opt.baseDomainResourceGroupName,
 			},
 		},
 	}

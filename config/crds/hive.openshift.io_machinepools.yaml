@@ -513,6 +513,13 @@ spec:
                     description: OpenStack is the configuration used when installing
                       on OpenStack.
                     properties:
+                      additionalSecurityGroupIDs:
+                        description: |-
+                          AdditionalSecurityGroupIDs contains IDs of additional security groups for machines, where each ID
+                          is presented in the format sg-xxxx.
+                        items:
+                          type: string
+                        type: array
                       flavor:
                         description: |-
                           Flavor defines the OpenStack Nova flavor.

@@ -89,6 +89,10 @@ type AzureClusterDeprovision struct {
 	// Required for new deprovisions (schema notwithstanding).
 	// +optional
 	ResourceGroupName *string `json:"resourceGroupName,omitempty"`
+	// BaseDomainResourceGroupName is the name of the resource group where the cluster's DNS records
+	// were created, if different from the default or the custom ResourceGroupName.
+	// +optional
+	BaseDomainResourceGroupName *string `json:"baseDomainResourceGroupName,omitempty"`
 }
 
 // GCPClusterDeprovision contains GCP-specific configuration for a ClusterDeprovision

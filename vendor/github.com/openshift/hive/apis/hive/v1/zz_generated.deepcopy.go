@@ -278,6 +278,11 @@ func (in *AzureClusterDeprovision) DeepCopyInto(out *AzureClusterDeprovision) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.BaseDomainResourceGroupName != nil {
+		in, out := &in.BaseDomainResourceGroupName, &out.BaseDomainResourceGroupName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

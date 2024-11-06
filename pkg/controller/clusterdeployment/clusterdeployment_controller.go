@@ -1880,9 +1880,10 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			return nil, err
 		}
 		req.Spec.Platform.Azure = &hivev1.AzureClusterDeprovision{
-			CredentialsSecretRef: &cd.Spec.Platform.Azure.CredentialsSecretRef,
-			CloudName:            &cd.Spec.Platform.Azure.CloudName,
-			ResourceGroupName:    &rg,
+			CredentialsSecretRef:        &cd.Spec.Platform.Azure.CredentialsSecretRef,
+			CloudName:                   &cd.Spec.Platform.Azure.CloudName,
+			ResourceGroupName:           &rg,
+			BaseDomainResourceGroupName: &cd.Spec.Platform.Azure.BaseDomainResourceGroupName,
 		}
 	case cd.Spec.Platform.GCP != nil:
 		// If we haven't discovered the NetworkProjectID yet, fail

@@ -24,7 +24,7 @@ cat <<EOF | cfssl genkey - | cfssljson -bare server
 }
 EOF
 
-cat <<EOF | kubectl apply -f -
+cat <<EOF | oc apply -f -
 apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
 metadata:
@@ -38,14 +38,14 @@ spec:
   - server auth
 EOF
 
-kubectl certificate approve hiveadmission.${HIVE_NS}
+oc adm certificate approve hiveadmission.${HIVE_NS}
 
 sleep 5
-kubectl get csr hiveadmission.${HIVE_NS} -o jsonpath='{.status.certificate}' | base64 --decode > server.crt
+oc get csr hiveadmission.${HIVE_NS} -o jsonpath='{.status.certificate}' | base64 --decode > server.crt
 
 cat server.crt
 
-cat <<EOF | kubectl apply -f -
+cat <<EOF | oc apply -f -
 kind: Secret
 apiVersion: v1
 data:

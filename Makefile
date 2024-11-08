@@ -317,6 +317,10 @@ buildah-dev-build:
 podman-dev-build:
 	podman build --tag ${IMG} $(GOCACHE_VOL_ARG) -f ./Dockerfile .
 
+.PHONY: podman-dev-push
+podman-dev-push: podman-dev-build
+	podman push --tls-verify=false ${IMG}
+
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push
 buildah-dev-push: buildah-dev-build

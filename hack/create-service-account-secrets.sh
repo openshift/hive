@@ -5,7 +5,7 @@
 # - hiveadmission
 # - hive-controllers
 #
-cat <<EOF | kubectl apply -f -
+cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: List
 items:

@@ -78,3 +78,33 @@ func init() {
 func GetScheme() *runtime.Scheme {
 	return hive_scheme
 }
+
+// SafeGetNestedField is a convenience function designed to do things like:
+//
+//	 nestedVal := SafeGetNestedField(
+//			func() string { return *localObj.Some.Nested.Field.With.Pointers },
+//			"default",
+//	 )
+//
+// ...to avoid having to write annoying code like:
+//
+//	var nestedVal string = "default"
+//	if localObj.Some != nil &&
+//			localObj.Some.Nested != nil &&
+//			localObj.Some.Nested.Field != nil &&
+//			localObj.Some.Nested.Field.With != nil &&
+//			localObj.Some.Nested.Field.With.Pointers != nil {
+//		nestedVal = *localObj.Some.Nested.Field.With.Pointers
+//	}
+//
+// Note: This will return the result of fallback() on *any* panic of accessor(). So while it's
+// intended to trap nil pointer dereferences in nested fields, it could be (ab)used for other
+// purposes.
+//
+// Why is this in the scheme package? Because generally you want to use it to access a nested
+// field in a scheme-based kube object :shrug:
+func SafeGetNestedField[T any](accessor func() T, fallback T) (ret T) {
+	defer func() { recover() }()
+	ret = fallback
+	return accessor()
+}

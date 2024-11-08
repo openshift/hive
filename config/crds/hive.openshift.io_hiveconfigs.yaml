@@ -280,10 +280,8 @@ spec:
                               format: int32
                               type: integer
                             resources:
-                              description: |-
-                                Resources describes the compute resource requirements of the controller container.
-                                This is ONLY for controllers that have been split out into their own pods.
-                                This is ignored for all others.
+                              description: Resources describes the compute resource
+                                requirements of the controller container.
                               properties:
                                 claims:
                                   description: |-
@@ -381,6 +379,8 @@ spec:
                       default for client burst is 10
                       default for queue qps is 10
                       default for queue burst is 100
+                      default resource requests are 50m CPU, 512Mi memory
+                      There are no resource limits by default
                     properties:
                       clientBurst:
                         description: ClientBurst specifies client rate limiter burst
@@ -415,10 +415,8 @@ spec:
                         format: int32
                         type: integer
                       resources:
-                        description: |-
-                          Resources describes the compute resource requirements of the controller container.
-                          This is ONLY for controllers that have been split out into their own pods.
-                          This is ignored for all others.
+                        description: Resources describes the compute resource requirements
+                          of the controller container.
                         properties:
                           claims:
                             description: |-

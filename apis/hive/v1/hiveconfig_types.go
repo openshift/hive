@@ -605,8 +605,6 @@ type ControllerConfig struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 	// Resources describes the compute resource requirements of the controller container.
-	// This is ONLY for controllers that have been split out into their own pods.
-	// This is ignored for all others.
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
@@ -680,6 +678,8 @@ type ControllersConfig struct {
 	// default for client burst is 10
 	// default for queue qps is 10
 	// default for queue burst is 100
+	// default resource requests are 50m CPU, 512Mi memory
+	// There are no resource limits by default
 	// +optional
 	Default *ControllerConfig `json:"default,omitempty"`
 	// Controllers contains a list of configurations for different controllers

@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
@@ -114,6 +115,17 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 				Value: string(r.hiveImagePullPolicy),
 			},
 		)
+	}
+
+	resources := scheme.SafeGetNestedField(
+		func() *corev1.ResourceRequirements { return instance.Spec.ControllersConfig.Default.Resources },
+		nil,
+	)
+	if resources != nil {
+		// NOTE: If Resources was provided in hiveconfig, we'll ovewrite the whole default
+		// Resources section in the container. This means the default CPU and memory requests
+		// will be zeroed out if not supplied in the config.
+		hiveContainer.Resources = *resources
 	}
 
 	// Always add clustersync and machinepool to the list of disabled controllers since they are

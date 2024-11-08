@@ -5700,13 +5700,8 @@ objects:
                                 format: int32
                                 type: integer
                               resources:
-                                description: 'Resources describes the compute resource
+                                description: Resources describes the compute resource
                                   requirements of the controller container.
-
-                                  This is ONLY for controllers that have been split
-                                  out into their own pods.
-
-                                  This is ignored for all others.'
                                 properties:
                                   claims:
                                     description: 'Claims lists the names of resources,
@@ -5826,7 +5821,11 @@ objects:
 
                         default for queue qps is 10
 
-                        default for queue burst is 100'
+                        default for queue burst is 100
+
+                        default resource requests are 50m CPU, 512Mi memory
+
+                        There are no resource limits by default'
                       properties:
                         clientBurst:
                           description: ClientBurst specifies client rate limiter burst
@@ -5864,13 +5863,8 @@ objects:
                           format: int32
                           type: integer
                         resources:
-                          description: 'Resources describes the compute resource requirements
+                          description: Resources describes the compute resource requirements
                             of the controller container.
-
-                            This is ONLY for controllers that have been split out
-                            into their own pods.
-
-                            This is ignored for all others.'
                           properties:
                             claims:
                               description: 'Claims lists the names of resources, defined

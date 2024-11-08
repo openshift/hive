@@ -366,7 +366,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-playground/validator/v10 v10.13.0 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
 	github.com/google/cel-go v0.16.1 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect

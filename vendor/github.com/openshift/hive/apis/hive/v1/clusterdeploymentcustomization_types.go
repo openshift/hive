@@ -64,7 +64,7 @@ type PatchEntity struct {
 	// ValueJSON is a string representing a JSON object to be used in the operation. As such,
 	// internal quotes must be escaped. If nonempty, Value is ignored.
 	// +optional
-	ValueJSON []byte `json:"valueJSON,omitempty"`
+	ValueJSON string `json:"valueJSON,omitempty"`
 }
 
 // Encode returns a string representation of the RFC6902 patching operation represented by the
@@ -74,7 +74,7 @@ func (pe *PatchEntity) Encode() string {
 	// Prefer ValueJSON
 	if len(pe.ValueJSON) != 0 {
 		// ValueJSON will be a raw JSON object in the patch; don't quote it.
-		val = string(pe.ValueJSON)
+		val = pe.ValueJSON
 	} else {
 		// Value will be a JSON string value in the patch; quote it.
 		val = fmt.Sprintf("%q", pe.Value)

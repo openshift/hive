@@ -1081,7 +1081,7 @@ func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePoo
 			{
 				Op:        "add",
 				Path:      fmt.Sprintf("/spec/template/spec/providerSpec/value/securityGroups/%d/filters/-", idx),
-				ValueJSON: vpcIDFilterValueJSON,
+				ValueJSON: string(vpcIDFilterValueJSON),
 			},
 		}
 	}

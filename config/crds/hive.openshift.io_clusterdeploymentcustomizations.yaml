@@ -73,7 +73,6 @@ spec:
                       description: |-
                         ValueJSON is a string representing a JSON object to be used in the operation. As such,
                         internal quotes must be escaped. If nonempty, Value is ignored.
-                      format: byte
                       type: string
                   required:
                   - op

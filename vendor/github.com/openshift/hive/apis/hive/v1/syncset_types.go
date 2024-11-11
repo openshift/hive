@@ -44,20 +44,6 @@ const (
 	CreateOrUpdateSyncSetApplyBehavior SyncSetApplyBehavior = "CreateOrUpdate"
 )
 
-// SyncSetPatchApplyMode is a string representing the mode with which to apply
-// SyncSet Patches.
-type SyncSetPatchApplyMode string
-
-const (
-	// ApplyOncePatchApplyMode indicates that the patch should be applied
-	// only once.
-	ApplyOncePatchApplyMode SyncSetPatchApplyMode = "ApplyOnce"
-
-	// AlwaysApplyPatchApplyMode indicates that the patch should be
-	// continuously applied.
-	AlwaysApplyPatchApplyMode SyncSetPatchApplyMode = "AlwaysApply"
-)
-
 // SyncObjectPatch represents a patch to be applied to a specific object
 type SyncObjectPatch struct {
 	// APIVersion is the Group and Version of the object to be patched.

@@ -74,7 +74,7 @@ spec:
 | `applyBehavior` | One of `Apply` (the default), `CreateOnly`, `CreateOrUpdate`. Affects how the controller computes the patch to apply to `resources` and `secretMappings` (but not `patches`). More details [below](#how-to-use-applybehavior). |
 | `enableResourceTemplates  ` | If true, special use of golang's `text/templates` is allowed in `resources`. More details [below](#resource-parameters). |
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
-| `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. By default, the `patch` `applyMode` value is `"AlwaysApply"`, which applies the patch every 2 hours. |
+| `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. |
 | `secretMappings` | A list of secret mappings. The secrets will be copied from the existing sources to the target resources in the referenced clusters |
 
 ### How to use `applyBehavior`

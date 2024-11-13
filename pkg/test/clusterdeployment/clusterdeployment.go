@@ -144,6 +144,12 @@ func WithClusterPoolReference(namespace, poolName, claimName string) Option {
 	}
 }
 
+func WithClusterProvision(provisionName string) Option {
+	return func(cd *hivev1.ClusterDeployment) {
+		cd.Status.ProvisionRef = &corev1.LocalObjectReference{Name: provisionName}
+	}
+}
+
 func PreserveOnDelete() Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.PreserveOnDelete = true
@@ -228,6 +234,33 @@ func WithAzurePlatform(platform *hivev1azure.Platform) Option {
 func WithIBMCloudPlatform(platform *hivev1ibmcloud.Platform) Option {
 	return func(clusterDeployment *hivev1.ClusterDeployment) {
 		clusterDeployment.Spec.Platform.IBMCloud = platform
+	}
+}
+
+// WithAWSPlatformStatus sets the specified aws platform status on the supplied object.
+func WithEmptyPlatformStatus() Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		clusterDeployment.Status.Platform = &hivev1.PlatformStatus{}
+	}
+}
+
+// WithAWSPlatformStatus sets the specified aws platform on the supplied object.
+func WithAWSPlatformStatus(platformStatus *hivev1aws.PlatformStatus) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		if clusterDeployment.Status.Platform == nil {
+			clusterDeployment.Status.Platform = &hivev1.PlatformStatus{}
+		}
+		clusterDeployment.Status.Platform.AWS = platformStatus
+	}
+}
+
+// WithAWSPlatformStatus sets the specified aws platform on the supplied object.
+func WithGCPPlatformStatus(platformStatus *hivev1gcp.PlatformStatus) Option {
+	return func(clusterDeployment *hivev1.ClusterDeployment) {
+		if clusterDeployment.Status.Platform == nil {
+			clusterDeployment.Status.Platform = &hivev1.PlatformStatus{}
+		}
+		clusterDeployment.Status.Platform.GCP = platformStatus
 	}
 }
 

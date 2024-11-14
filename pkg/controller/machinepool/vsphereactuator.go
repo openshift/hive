@@ -64,6 +64,11 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		},
 	}
 
+	vCenterCluster := cd.Spec.Platform.VSphere.Cluster
+	if pool.Spec.Platform.VSphere.Cluster != "" {
+		vCenterCluster = pool.Spec.Platform.VSphere.Cluster
+	}
+
 	// Fake an install config as we do with other actuators. We only populate what we know is needed today.
 	// WARNING: changes to use more of installconfig in the MachineSets function can break here. Hopefully
 	// will be caught by unit tests.
@@ -89,7 +94,7 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 							Datacenter:     cd.Spec.Platform.VSphere.Datacenter,
 							Datastore:      setDatastorePath(cd.Spec.Platform.VSphere.DefaultDatastore, cd.Spec.Platform.VSphere.Datacenter, logger),
 							Folder:         setFolderPath(cd.Spec.Platform.VSphere.Folder, cd.Spec.Platform.VSphere.Datacenter, logger),
-							ComputeCluster: setComputeClusterPath(cd.Spec.Platform.VSphere.Cluster, cd.Spec.Platform.VSphere.Datacenter, logger),
+							ComputeCluster: setComputeClusterPath(vCenterCluster, cd.Spec.Platform.VSphere.Datacenter, logger),
 							Networks:       []string{cd.Spec.Platform.VSphere.Network},
 							Template:       a.osImage,
 							ResourcePool:   pool.Spec.Platform.VSphere.ResourcePool,

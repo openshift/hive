@@ -8,6 +8,11 @@ type MachinePool struct {
 	// +optional
 	ResourcePool string `json:"resourcePool,omitempty"`
 
+	// Cluster is the name of the cluster virtual machines will be cloned into.
+	// If it is not present, the value in the ClusterDeployment will be used.
+	// +optional
+	Cluster string `json:"cluster,omitempty"`
+
 	// NumCPUs is the total number of virtual processor cores to assign a vm.
 	NumCPUs int32 `json:"cpus"`
 

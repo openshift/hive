@@ -41,6 +41,8 @@ import (
 	"github.com/openshift/hive/pkg/resource"
 )
 
+type ResourceToSyncSetTracker map[hiveintv1alpha1.SyncResourceReference][]string
+
 const (
 	ControllerName         = hivev1.ClustersyncControllerName
 	defaultReapplyInterval = 2 * time.Hour
@@ -391,12 +393,15 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 	needToDoFullReapply := needToCreateLease || needToRenew
 	recobsrv.SetOutcome(hivemetrics.ReconcileOutcomeFullSync)
 
+	r2sTracker := ResourceToSyncSetTracker{}
+
 	// Apply SyncSets
 	syncStatusesForSyncSets, syncSetsNeedRequeue := r.applySyncSets(
 		cd,
 		"SyncSet",
 		syncSets,
 		clusterSync.Status.SyncSets,
+		r2sTracker,
 		needToDoFullReapply,
 		false, // no need to report SelectorSyncSet metrics if we're reconciling non-selector SyncSets
 		resourceHelper,
@@ -410,6 +415,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 		"SelectorSyncSet",
 		selectorSyncSets,
 		clusterSync.Status.SelectorSyncSets,
+		r2sTracker,
 		needToDoFullReapply,
 		clusterSync.Status.FirstSuccessTime == nil, // only report SelectorSyncSet metrics if we haven't reached first success
 		resourceHelper,
@@ -418,6 +424,7 @@ func (r *ReconcileClusterSync) Reconcile(ctx context.Context, request reconcile.
 	clusterSync.Status.SelectorSyncSets = syncStatusesForSelectorSyncSets
 
 	setFailedCondition(clusterSync)
+	setResourceConflicts(clusterSync, r2sTracker)
 
 	// Set clusterSync.Status.FirstSyncSetsSuccessTime
 	syncStatuses := append(syncStatusesForSyncSets, syncStatusesForSelectorSyncSets...)
@@ -469,6 +476,7 @@ func (r *ReconcileClusterSync) applySyncSets(
 	syncSetType string,
 	syncSets []CommonSyncSet,
 	syncStatuses []hiveintv1alpha1.SyncStatus,
+	r2sTracker ResourceToSyncSetTracker,
 	needToDoFullReapply bool,
 	reportSelectorSyncSetMetrics bool,
 	resourceHelper resource.Helper,
@@ -538,7 +546,7 @@ func (r *ReconcileClusterSync) applySyncSets(
 		}
 
 		// Apply the syncset
-		resourcesApplied, resourcesInSyncSet, syncSetNeedsRequeue, err := r.applySyncSet(syncSet, cd, resourceHelper, logger)
+		resourcesApplied, resourcesInSyncSet, syncSetNeedsRequeue, err := r.applySyncSet(syncSet, cd, r2sTracker, resourceHelper, logger)
 		newSyncStatus := hiveintv1alpha1.SyncStatus{
 			Name:               syncSet.AsMetaObject().GetName(),
 			ObservedGeneration: syncSet.AsMetaObject().GetGeneration(),
@@ -649,6 +657,7 @@ func getOldSyncStatus(syncSet CommonSyncSet, syncSetStatuses []hiveintv1alpha1.S
 func (r *ReconcileClusterSync) applySyncSet(
 	syncSet CommonSyncSet,
 	cd *hivev1.ClusterDeployment,
+	r2sTracker ResourceToSyncSetTracker,
 	resourceHelper resource.Helper,
 	logger log.FieldLogger,
 ) (
@@ -657,7 +666,7 @@ func (r *ReconcileClusterSync) applySyncSet(
 	requeue bool,
 	returnErr error,
 ) {
-	resources, referencesToResources, decodeErr := decodeResources(syncSet, cd, logger)
+	resources, referencesToResources, decodeErr := decodeResources(syncSet, cd, r2sTracker, logger)
 	referencesToSecrets := referencesToSecrets(syncSet)
 	resourcesInSyncSet = append(referencesToResources, referencesToSecrets...)
 	if decodeErr != nil {
@@ -708,7 +717,7 @@ func (r *ReconcileClusterSync) applySyncSet(
 	return
 }
 
-func decodeResources(syncSet CommonSyncSet, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (
+func decodeResources(syncSet CommonSyncSet, cd *hivev1.ClusterDeployment, r2sTracker ResourceToSyncSetTracker, logger log.FieldLogger) (
 	resources []*unstructured.Unstructured, references []hiveintv1alpha1.SyncResourceReference, returnErr error,
 ) {
 	var decodeErrors []error
@@ -728,12 +737,15 @@ func decodeResources(syncSet CommonSyncSet, cd *hivev1.ClusterDeployment, logger
 			}
 		}
 		resources = append(resources, u)
-		references = append(references, hiveintv1alpha1.SyncResourceReference{
+		ref := hiveintv1alpha1.SyncResourceReference{
 			APIVersion: u.GetAPIVersion(),
 			Kind:       u.GetKind(),
 			Namespace:  u.GetNamespace(),
 			Name:       u.GetName(),
-		})
+		}
+		references = append(references, ref)
+		r2sTracker[ref] = append(r2sTracker[ref], syncSet.AsMetaObject().GetName())
+		logger.Debugf("Tracking resource %v from syncset %s", ref, syncSet.AsMetaObject().GetName())
 	}
 	returnErr = utilerrors.NewAggregate(decodeErrors)
 	return
@@ -995,6 +1007,18 @@ func setFailedCondition(clusterSync *hiveintv1alpha1.ClusterSync) {
 		LastProbeTime:      metav1.Now(),
 		LastTransitionTime: metav1.Now(),
 	}}
+}
+
+func setResourceConflicts(clusterSync *hiveintv1alpha1.ClusterSync, r2sTracker ResourceToSyncSetTracker) {
+	clusterSync.Status.ResourceConflicts = []string{}
+	tpl := "Resource %v is mentioned by %d [Selector]SyncSets: %v"
+	for resource, syncsets := range r2sTracker {
+		if count := len(syncsets); count > 1 {
+			clusterSync.Status.ResourceConflicts = append(
+				clusterSync.Status.ResourceConflicts,
+				fmt.Sprintf(tpl, resource, count, strings.Join(syncsets, ", ")))
+		}
+	}
 }
 
 func getFailingSyncSets(syncStatuses []hiveintv1alpha1.SyncStatus) []string {

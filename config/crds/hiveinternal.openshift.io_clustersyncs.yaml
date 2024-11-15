@@ -26,6 +26,10 @@ spec:
       name: Message
       priority: 1
       type: string
+    - jsonPath: .status.resourceConflicts
+      name: ResourceConflicts
+      priority: 1
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -103,6 +107,14 @@ spec:
                   all (selector)syncsets to a cluster.
                 format: date-time
                 type: string
+              resourceConflicts:
+                description: |-
+                  ResourceConflicts is a list of human-readable messages warning when a resource is mentioned
+                  more than once across all [Selector]SyncSets affecting this ClusterSync. Note that this only
+                  counts Spec.Resources, not Patches or SecretMappings.
+                items:
+                  type: string
+                type: array
               selectorSyncSets:
                 description: SelectorSyncSets is the sync status of all of the SelectorSyncSets
                   for the cluster.

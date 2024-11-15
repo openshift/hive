@@ -215,6 +215,11 @@ func (in *ClusterSyncStatus) DeepCopyInto(out *ClusterSyncStatus) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.ResourceConflicts != nil {
+		in, out := &in.ResourceConflicts, &out.ResourceConflicts
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

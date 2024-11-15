@@ -16,6 +16,7 @@ import (
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.conditions[0].reason`
 // +kubebuilder:printcolumn:name="ControllerReplica",type=string,JSONPath=`.status.controlledByReplica`
 // +kubebuilder:printcolumn:name="Message",type=string,priority=1,JSONPath=`.status.conditions[?(@.type=="Failed")].message`
+// +kubebuilder:printcolumn:name="ResourceConflicts",type=string,priority=1,JSONPath=`.status.resourceConflicts`
 type ClusterSync struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -50,6 +51,12 @@ type ClusterSyncStatus struct {
 	// recently handled the ClusterSync. If the hive-clustersync statefulset is scaled up or down, the
 	// controlling replica can change, potentially causing logs to be spread across multiple pods.
 	ControlledByReplica *int64 `json:"controlledByReplica,omitempty"`
+
+	// ResourceConflicts is a list of human-readable messages warning when a resource is mentioned
+	// more than once across all [Selector]SyncSets affecting this ClusterSync. Note that this only
+	// counts Spec.Resources, not Patches or SecretMappings.
+	// +optional
+	ResourceConflicts []string `json:"resourceConflicts,omitempty"`
 }
 
 // SyncStatus is the status of applying a specific SyncSet or SelectorSyncSet to the cluster.

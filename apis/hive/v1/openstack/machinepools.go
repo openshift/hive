@@ -16,7 +16,7 @@ type MachinePool struct {
 	RootVolume *RootVolume `json:"rootVolume,omitempty"`
 
 	// AdditionalSecurityGroupIDs contains IDs of additional security groups for machines, where each ID
-	// is presented in the format sg-xxxx.
+	// is presented in the UUID format.
 	//
 	// +optional
 	AdditionalSecurityGroupIDs []string `json:"additionalSecurityGroupIDs,omitempty"`

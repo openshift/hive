@@ -235,3 +235,10 @@ rules:
   - get
   - list
   - watch
+# Required to patch the Network resource to initiate SDN to OVN migration via a SelectorSyncSet
+- apiGroups:
+    - config.openshift.io
+  resources:
+    - networks
+  verbs:
+    - patch

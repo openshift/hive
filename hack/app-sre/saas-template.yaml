@@ -10257,6 +10257,12 @@ objects:
     - get
     - list
     - watch
+  - apiGroups:
+    - config.openshift.io
+    resources:
+    - networks
+    verbs:
+    - patch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:

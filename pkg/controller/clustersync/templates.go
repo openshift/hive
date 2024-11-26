@@ -12,21 +12,35 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
-// processParameters modifies `u`, appling text/template parameters found in string values therein.
-func processParameters(u *unstructured.Unstructured, cd *hivev1.ClusterDeployment) error {
-	resourceParamTemplate := template.New("resourceParams").Funcs(
-		template.FuncMap{
-			"fromCDLabel": fromCDLabel(cd),
-		},
-	)
+// processResourceParameters modifies `u`, appling text/template parameters found in string values therein.
+func processResourceParameters(u *unstructured.Unstructured, cd *hivev1.ClusterDeployment) error {
 	for k, v := range u.Object {
-		newVal, err := applyTemplate(resourceParamTemplate, v)
+		newVal, err := applyTemplate(templateForCD(cd), v)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to apply template to value %#v", v)
 		}
 		u.Object[k] = newVal
 	}
 	return nil
+}
+
+// processPatchParameters returns a modified version of `patch` with text/template parameters applied.
+func processPatchParameters(patch string, cd *hivev1.ClusterDeployment) (string, error) {
+	newPatch, err := applyTemplate(templateForCD(cd), patch)
+	if err != nil {
+		return patch, err
+	}
+	return newPatch.(string), nil
+}
+
+// templateForCD returns a Template that knows how to apply parameters invoking custom functions
+// related to ClusterDeployments.
+func templateForCD(cd *hivev1.ClusterDeployment) *template.Template {
+	return template.New("cdParams").Funcs(
+		template.FuncMap{
+			"fromCDLabel": fromCDLabel(cd),
+		},
+	)
 }
 
 // fromCDLabel produces a text/template-suitable func accepting a single parameter which will be

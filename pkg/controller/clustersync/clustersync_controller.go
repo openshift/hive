@@ -696,12 +696,27 @@ func (r *ReconcileClusterSync) applySyncSet(
 	}
 	resourcesApplied = append(resourcesApplied, referencesToSecrets...)
 
+	var decodeErrors []error
 	// Apply Patches
 	for i, patch := range syncSet.GetSpec().Patches {
+		// Apply templates, if enabled
+		if syncSet.GetSpec().EnablePatchTemplates {
+			newPatch, err := processPatchParameters(patch.Patch, cd)
+			if err != nil {
+				logger.WithField("patchIndex", i).WithError(err).Warn("error parameterizing patch")
+				decodeErrors = append(decodeErrors, errors.Wrapf(err, "failed to parameterize patch %d", i))
+				continue
+			}
+			patch.Patch = newPatch
+		}
 		returnErr, requeue = r.applyPatch(i, patch, resourceHelper, logger)
 		if returnErr != nil {
 			return
 		}
+	}
+	if len(decodeErrors) > 0 {
+		returnErr = utilerrors.NewAggregate(decodeErrors)
+		return
 	}
 
 	logger.Info("syncset applied")
@@ -721,7 +736,7 @@ func decodeResources(syncSet CommonSyncSet, cd *hivev1.ClusterDeployment, logger
 		}
 		// Apply templates, if enabled
 		if syncSet.GetSpec().EnableResourceTemplates {
-			if err := processParameters(u, cd); err != nil {
+			if err := processResourceParameters(u, cd); err != nil {
 				logger.WithField("resourceIndex", i).WithError(err).Warn("error parameterizing object")
 				decodeErrors = append(decodeErrors, errors.Wrapf(err, "failed to parameterize resource %d", i))
 				continue

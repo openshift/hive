@@ -3,7 +3,7 @@
 - [Overview](#overview)
 - [SyncSet Object Definition](#syncset-object-definition)
   - [How to use `applyBehavior`](#how-to-use-applybehavior)
-  - [Resource Parameters](#resource-parameters)
+  - [Patch and Resource Templates](#patch-and-resource-templates)
     - [`fromCDLabel` Custom Function](#fromcdlabel-custom-function)
   - [Example of SyncSet use](#example-of-syncset-use)
 - [SelectorSyncSet Object Definition](#selectorsyncset-object-definition)
@@ -39,6 +39,7 @@ spec:
 
   applyBehavior: CreateOnly
 
+  enablePatchTemplates: false
   enableResourceTemplates: false
 
   resources:
@@ -72,7 +73,8 @@ spec:
 | `clusterDeploymentRefs` | List of `ClusterDeployment` names in the current namespace which the `SyncSet` will apply to. |
 | `resourceApplyMode` | Defaults to `"Upsert"`, which indicates that objects will be created and updated to match the `SyncSet`. Existing `SyncSet` resources that are not listed in the `SyncSet` are not deleted. Specify `"Sync"` to allow deleting existing objects that were previously in the resources list. This includes deleting _all_ resources when the entire SyncSet is deleted. |
 | `applyBehavior` | One of `Apply` (the default), `CreateOnly`, `CreateOrUpdate`. Affects how the controller computes the patch to apply to `resources` and `secretMappings` (but not `patches`). More details [below](#how-to-use-applybehavior). |
-| `enableResourceTemplates  ` | If true, special use of golang's `text/templates` is allowed in `resources`. More details [below](#resource-parameters). |
+| `enablePatchTemplates  ` | If true, special use of golang's `text/templates` is allowed in `patches[].patch`. More details [below](#patch-and-resource-templates). |
+| `enableResourceTemplates  ` | If true, special use of golang's `text/templates` is allowed in `resources`. More details [below](#patch-and-resource-templates). |
 | `resources` | A list of resource object definitions. Resources will be created in the referenced clusters. |
 | `patches` | A list of patches to apply to existing resources in the referenced clusters. You can include any valid cluster object type in the list. |
 | `secretMappings` | A list of secret mappings. The secrets will be copied from the existing sources to the target resources in the referenced clusters |
@@ -107,21 +109,24 @@ It is safe to put these into the same [Selector]SyncSet because:
 - `patches` in a given [Selector]SyncSet are applied after `resources`.
 - `applyBehavior` only applies to `resources` and `secretMappings` -- it does not affect `patches`.
 
-### Resource Parameters
-By setting `spec.enableResourceTemplates: true`, it is possible to use golang
-[text/template](https://pkg.go.dev/text/template)-isms in
-`spec.resources[]` values. Note, however, that there is no
-"dot" (data object) so the out-of-the-box functionality won't convey a
-lot of power.
+### Patch and Resource Templates
+By setting `spec.enablePatchTemplates` and/or `spec.enableResourceTemplates` to `true`, it is
+possible to use golang [text/template](https://pkg.go.dev/text/template)-isms in
+`spec.patches[].patch` and/or `spec.resources[]` values, respectively.
+Note, however, that there is no "dot" (data object) so the out-of-the-box functionality won't
+convey a lot of power.
 This feature exists to expose custom functions, described below.
 
 Note:
-- Templates are only honored on resource _values_. They are ignored for keys.
-- Templates are only honored on values whose schema type is `string`.
+- Templates are only honored on `resources[]` _values_. They are ignored for keys.
+  In contrast, templates can be used anywhere in a `patches[].patch` as long as the entire patch
+  string is valid JSON once rendered.
+- Templates are only honored on `resources[]` values whose schema type is `string`.
   (This is because the embedded resource must be valid JSON _before_ it is parsed; and templates can't be recognized as any other valid JSON type.)
-- Errors parsing or processing the template will cause the SyncSet to fail
-and will be bubbled up in the ClusterSync status as usual.
-- Templates are only supported on `spec.resources[]`, not on `patches` or `secretMappings`.
+  In contrast, templates can be used for any data type in a `patches[].patch` as long as the
+  rendered string contains valid and appropriate JSON data types.
+- Errors parsing or processing the template will cause the SyncSet to fail and will be bubbled up
+  in the ClusterSync status as usual.
 
 #### `fromCDLabel` Custom Function
 With `enableResourceTemplates` on, including a string like

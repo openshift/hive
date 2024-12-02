@@ -284,6 +284,10 @@ spec:
                         - sku
                         - version
                         type: object
+                      outboundType:
+                        description: OutboundType is a strategy for how egress from
+                          cluster is achieved. When not specified default is "Loadbalancer".
+                        type: string
                       type:
                         description: |-
                           InstanceType defines the azure instance type.

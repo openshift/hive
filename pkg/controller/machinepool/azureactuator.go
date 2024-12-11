@@ -76,6 +76,8 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 				NetworkResourceGroupName: pool.Spec.Platform.Azure.NetworkResourceGroupName,
 				VirtualNetwork:           pool.Spec.Platform.Azure.VirtualNetwork,
 				ComputeSubnet:            pool.Spec.Platform.Azure.ComputeSubnet,
+				// This will be defaulted by the installer if empty
+				OutboundType: installertypesazure.OutboundType(pool.Spec.Platform.Azure.OutboundType),
 			},
 		},
 	}
@@ -117,7 +119,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	} else {
 		// An image was not provided so check if the installer created a "gen2" image
 		// to determine if we should allow resultant machinesets to consume a "gen2" image.
-		gen2ImageExists, err := a.gen2ImageExists(cd.Spec.ClusterMetadata.InfraID, ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
+		gen2ImageExists, err := a.gen2ImageExists(ic.Platform.Azure.ClusterResourceGroupName(cd.Spec.ClusterMetadata.InfraID))
 		if err != nil {
 			return nil, false, err
 		}
@@ -205,7 +207,7 @@ func (a *AzureActuator) getImagesByResourceGroup(resourceGroupName string) ([]co
 	return images, err
 }
 
-func (a *AzureActuator) gen2ImageExists(infraID, resourceGroupName string) (bool, error) {
+func (a *AzureActuator) gen2ImageExists(resourceGroupName string) (bool, error) {
 	images, err := a.getImagesByResourceGroup(resourceGroupName)
 	if err != nil {
 		return false, errors.Wrapf(err, "error listing images by resourceGroup: %s", resourceGroupName)

@@ -100,6 +100,7 @@ func TestAzureActuator(t *testing.T) {
 				assert.Equal(t, testInfraID+"-worker-subnet", providerSpec.Subnet, "unexpected ComputeSubnet => Subnet")
 				assert.Equal(t, testInfraID+"-vnet", providerSpec.Vnet, "unexpected VirtualNetwork => Vnet")
 				assert.False(t, providerSpec.AcceleratedNetworking, "expected basic networking")
+				assert.Equal(t, providerSpec.PublicLoadBalancer, testInfraID, "expected default (clusterID) public load balancer")
 			},
 		},
 		{
@@ -111,6 +112,7 @@ func TestAzureActuator(t *testing.T) {
 				pool.Spec.Platform.Azure.ComputeSubnet = "some-subnet"
 				pool.Spec.Platform.Azure.VirtualNetwork = "some-vnet"
 				pool.Spec.Platform.Azure.VMNetworkingType = "Accelerated"
+				pool.Spec.Platform.Azure.OutboundType = "UserDefinedRouting"
 				return pool
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -128,6 +130,7 @@ func TestAzureActuator(t *testing.T) {
 				assert.Equal(t, "some-subnet", providerSpec.Subnet, "unexpected ComputeSubnet => Subnet")
 				assert.Equal(t, "some-vnet", providerSpec.Vnet, "unexpected VirtualNetwork => Vnet")
 				assert.True(t, providerSpec.AcceleratedNetworking, "expected accelerated networking")
+				assert.Equal(t, providerSpec.PublicLoadBalancer, "", "expected empty public load balancer with UserDefinedRouting")
 			},
 		},
 		{

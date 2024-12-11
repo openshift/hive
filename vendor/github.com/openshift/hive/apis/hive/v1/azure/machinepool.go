@@ -41,6 +41,10 @@ type MachinePool struct {
 	// +kubebuilder:validation:Enum="Accelerated"; "Basic"
 	// +optional
 	VMNetworkingType string `json:"vmNetworkingType,omitempty"`
+
+	// OutboundType is a strategy for how egress from cluster is achieved. When not specified default is "Loadbalancer".
+	// +optional
+	OutboundType string `json:"outboundType"`
 }
 
 // OSImage is the image to use for the OS of a machine.

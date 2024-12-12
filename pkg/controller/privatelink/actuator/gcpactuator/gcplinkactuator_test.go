@@ -886,21 +886,47 @@ func Test_ShouldSync(t *testing.T) {
 		cd   *hivev1.ClusterDeployment
 
 		expect bool
-	}{{ // Sync is required when status.platform is nil
-		name:   "status.platform is nil",
-		cd:     cdBuilder.Build(),
+	}{{ // Sync is not required when spec.platform.gcp is nil
+		name: "spec.platform.gcp is nil",
+		cd:   cdBuilder.Build(),
+	}, { // Sync is not required when spec.platform.gcp.privateServiceConnect is nil
+		name: "spec.platform.gcp.privateServiceConnect",
+		cd:   cdBuilder.Build(testcd.WithGCPPlatform(&hivev1gcp.Platform{})),
+	}, { // Sync is not required when spec.platform.gcp.privateServiceConnect.enabled is false
+		name: "privateServiceConnect is not enabled",
+		cd: cdBuilder.Build(testcd.WithGCPPlatform(&hivev1gcp.Platform{
+			PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: false},
+		})),
+	}, { // Sync is required when status.platform is nil
+		name: "status.platform is nil",
+		cd: cdBuilder.Build(testcd.WithGCPPlatform(&hivev1gcp.Platform{
+			PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+		})),
 		expect: true,
 	}, { // Sync is required when status.platform.gcp is nil
-		name:   "status.platform.gcp is nil",
-		cd:     cdBuilder.Options(testcd.WithEmptyPlatformStatus()).Build(),
+		name: "status.platform.gcp is nil",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
+			testcd.WithEmptyPlatformStatus(),
+		),
 		expect: true,
 	}, { // Sync is required when status.platform.gcp.privateServiceConnect is nil
-		name:   "status.platform.aws.privateServiceConnect is nil",
-		cd:     cdBuilder.Options(testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{})).Build(),
+		name: "status.platform.aws.privateServiceConnect is nil",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{}),
+		),
 		expect: true,
 	}, { // Sync is required when endpoint is empty
 		name: "Endpoint is empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
 				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
 					EndpointAddress:           mockAddress.SelfLink,
@@ -909,11 +935,14 @@ func Test_ShouldSync(t *testing.T) {
 					ServiceAttachmentSubnet:   mockSubnet.SelfLink,
 				},
 			}),
-		).Build(),
+		),
 		expect: true,
 	}, { // Sync is required when EndpointAddress is empty
 		name: "EndpointAddress is empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
 				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
 					Endpoint:                  mockForwardingRule.SelfLink,
@@ -922,11 +951,14 @@ func Test_ShouldSync(t *testing.T) {
 					ServiceAttachmentSubnet:   mockSubnet.SelfLink,
 				},
 			}),
-		).Build(),
+		),
 		expect: true,
 	}, { // Sync is required when ServiceAttachment is empty
 		name: "ServiceAttachment is empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
 				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
 					Endpoint:                  mockForwardingRule.SelfLink,
@@ -935,11 +967,14 @@ func Test_ShouldSync(t *testing.T) {
 					ServiceAttachmentSubnet:   mockSubnet.SelfLink,
 				},
 			}),
-		).Build(),
+		),
 		expect: true,
 	}, { // Sync is required when ServiceAttachmentFirewall is empty
 		name: "ServiceAttachmentFirewall is empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
 				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
 					Endpoint:                mockForwardingRule.SelfLink,
@@ -948,11 +983,14 @@ func Test_ShouldSync(t *testing.T) {
 					ServiceAttachmentSubnet: mockSubnet.SelfLink,
 				},
 			}),
-		).Build(),
+		),
 		expect: true,
 	}, { // Sync is required when ServiceAttachmentSubnet is empty
 		name: "ServiceAttachmentSubnet is empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
 				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
 					Endpoint:                  mockForwardingRule.SelfLink,
@@ -961,11 +999,14 @@ func Test_ShouldSync(t *testing.T) {
 					ServiceAttachmentFirewall: mockFirewall.SelfLink,
 				},
 			}),
-		).Build(),
+		),
 		expect: true,
 	}, { // Sync is not required when hostedZoneID is set
 		name: "no changes required",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{
+				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{Enabled: true},
+			}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
 				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
 					Endpoint:                  mockForwardingRule.SelfLink,
@@ -975,7 +1016,7 @@ func Test_ShouldSync(t *testing.T) {
 					ServiceAttachmentSubnet:   mockSubnet.SelfLink,
 				},
 			}),
-		).Build(),
+		),
 	}}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

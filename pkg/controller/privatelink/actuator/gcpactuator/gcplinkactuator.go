@@ -263,8 +263,13 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 
 // ShouldSync is the actuator interface to determine if there are changes that need to be made.
 func (a *GCPLinkActuator) ShouldSync(cd *hivev1.ClusterDeployment) bool {
-	shouldCreateSubnet := getServiceAttachmentSubnetExistingName(cd) == ""
+	if cd.Spec.Platform.GCP == nil ||
+		cd.Spec.Platform.GCP.PrivateServiceConnect == nil ||
+		!cd.Spec.Platform.GCP.PrivateServiceConnect.Enabled {
+		return false
+	}
 
+	shouldCreateSubnet := getServiceAttachmentSubnetExistingName(cd) == ""
 	return cd.Status.Platform == nil ||
 		cd.Status.Platform.GCP == nil ||
 		cd.Status.Platform.GCP.PrivateServiceConnect == nil ||

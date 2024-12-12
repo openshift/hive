@@ -184,6 +184,11 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 
 // ShouldSync is the actuator interface to determine if there are changes that need to be made.
 func (a *AWSHubActuator) ShouldSync(cd *hivev1.ClusterDeployment) bool {
+	if cd.Spec.Platform.AWS == nil ||
+		cd.Spec.Platform.AWS.PrivateLink == nil ||
+		!cd.Spec.Platform.AWS.PrivateLink.Enabled {
+		return false
+	}
 	return cd.Status.Platform == nil ||
 		cd.Status.Platform.AWS == nil ||
 		cd.Status.Platform.AWS.PrivateLink == nil ||

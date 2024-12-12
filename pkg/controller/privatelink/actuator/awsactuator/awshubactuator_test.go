@@ -420,35 +420,64 @@ func Test_ShouldSync(t *testing.T) {
 		cd   *hivev1.ClusterDeployment
 
 		expect bool
-	}{{ // Sync is required when status.platform is nil
-		name:   "status.platform is nil",
-		cd:     cdBuilder.Build(),
+	}{{ // Sync is not required when spec.platform.aws is nil
+		name: "spec.plaform is nil",
+		cd:   cdBuilder.Build(),
+	}, { // Sync is not required when spec.platform.aws.privatelink is nil
+		name: "spec.plaform.aws.privatelink is nil",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+	}, { // Sync is not required when spec.platform.aws.privatelink.enabled is false
+		name: "privatelink is not enabled",
+		cd: cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{
+			PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: false},
+		})),
+	}, { // Sync is required when status.platform is nil
+		name: "status.platform is nil",
+		cd: cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{
+			PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+		})),
 		expect: true,
 	}, { // Sync is required when status.platform.aws is nil
-		name:   "status.platform.aws is nil",
-		cd:     cdBuilder.Options(testcd.WithEmptyPlatformStatus()).Build(),
+		name: "status.platform.aws is nil",
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
+			testcd.WithEmptyPlatformStatus(),
+		),
 		expect: true,
 	}, { // Sync is required when status.platform.aws.privatelink is nil
-		name:   "status.platform.aws.privatelink is nil",
-		cd:     cdBuilder.Options(testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{})).Build(),
+		name: "status.platform.aws.privatelink is nil",
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
+			testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{}),
+		),
 		expect: true,
 	}, { // Sync is required when hostedZoneID is empty
 		name: "hostedZoneID is empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
 			testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{
 				PrivateLink: &hivev1aws.PrivateLinkAccessStatus{},
 			}),
-		).Build(),
+		),
 		expect: true,
 	}, { // Sync is not required when hostedZoneID is set
 		name: "hostedZoneID is not empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
 			testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{
 				PrivateLink: &hivev1aws.PrivateLinkAccessStatus{
 					HostedZoneID: testHostedZone,
 				},
 			}),
-		).Build(),
+		),
 	}}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

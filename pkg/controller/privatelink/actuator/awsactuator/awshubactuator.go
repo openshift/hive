@@ -140,6 +140,7 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	logger.Debug("reconciling Hosted Zone Records")
@@ -158,6 +159,7 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	logger.Debug("reconciling Hosted Zone Associations")
@@ -177,6 +179,7 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	return reconcile.Result{}, nil
@@ -374,11 +377,117 @@ func (a *AWSHubActuator) cleanupHostedZone(cd *hivev1.ClusterDeployment, metadat
 }
 
 func (a *AWSHubActuator) ReconcileHostedZoneRecords(cd *hivev1.ClusterDeployment, hostedZoneID string, dnsRecord *actuator.DnsRecord, apiDomain string, logger log.FieldLogger) (bool, error) {
+	hzLog := logger.WithField("hostedZoneID", hostedZoneID)
+	modified := false
+
 	rSet, err := a.recordSet(cd, apiDomain, dnsRecord)
 	if err != nil {
 		return false, errors.Wrap(err, "error generating DNS records")
 	}
 
+	recordsResp, err := a.awsClientHub.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+		HostedZoneId: aws.String(hostedZoneID),
+	})
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to list the hosted zone %s", hostedZoneID)
+	}
+
+	recordName := aws.StringValue(rSet.Name) + "."
+	for _, record := range recordsResp.ResourceRecordSets {
+		if aws.StringValue(record.Type) != aws.StringValue(rSet.Type) {
+			continue
+		}
+		if aws.StringValue(record.Name) != recordName {
+			continue
+		}
+		if rSet.ResourceRecords != nil {
+			if aws.StringValue(record.Type) != aws.StringValue(rSet.Type) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+					"type":   aws.StringValue(rSet.Type),
+				}).Debug("updating record type")
+			}
+			if aws.Int64Value(record.TTL) != aws.Int64Value(rSet.TTL) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+					"ttl":    aws.Int64Value(rSet.TTL),
+				}).Debug("updating record ttl")
+			}
+
+			oldRecords := sets.NewString()
+			for _, record := range record.ResourceRecords {
+				oldRecords.Insert(aws.StringValue(record.Value))
+			}
+
+			desiredRecords := sets.NewString()
+			for _, record := range rSet.ResourceRecords {
+				desiredRecords.Insert(aws.StringValue(record.Value))
+			}
+
+			added := desiredRecords.Difference(oldRecords).List()
+			removed := oldRecords.Difference(desiredRecords).List()
+
+			if len(added) > 0 || len(removed) > 0 {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"added":   added,
+					"removed": removed,
+				}).Debug("updating the addresses assigned to the dns record")
+			}
+
+			if !modified {
+				return false, nil
+			}
+		} else if rSet.AliasTarget != nil {
+			logger.Debugf("AliasTarget")
+			if record.AliasTarget == nil {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+				}).Debug("updating the record to use alias target")
+				break
+			}
+
+			if aws.StringValue(record.Type) != aws.StringValue(rSet.Type) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+					"type":   aws.StringValue(rSet.Type),
+				}).Debug("updating record type")
+			}
+
+			if aws.StringValue(record.AliasTarget.DNSName) != aws.StringValue(rSet.AliasTarget.DNSName) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record":  aws.StringValue(rSet.Name),
+					"dnsName": aws.StringValue(rSet.AliasTarget.DNSName),
+				}).Debug("updating the aliasTarget dnsName")
+			}
+
+			if aws.StringValue(record.AliasTarget.HostedZoneId) != aws.StringValue(rSet.AliasTarget.HostedZoneId) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record":       aws.StringValue(rSet.Name),
+					"hostedZoneId": aws.StringValue(rSet.AliasTarget.HostedZoneId),
+				}).Debug("updating the aliasTarget hostedZoneId")
+			}
+
+			if aws.BoolValue(record.AliasTarget.EvaluateTargetHealth) != aws.BoolValue(rSet.AliasTarget.EvaluateTargetHealth) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record":               aws.StringValue(rSet.Name),
+					"evaluateTargetHealth": aws.BoolValue(rSet.AliasTarget.EvaluateTargetHealth),
+				}).Debug("updating the aliasTarget evaluateTargetHealth")
+			}
+
+			if !modified {
+				return false, nil
+			}
+		}
+		break
+	}
 	_, err = a.awsClientHub.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(hostedZoneID),
 		ChangeBatch: &route53.ChangeBatch{

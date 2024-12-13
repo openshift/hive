@@ -447,9 +447,9 @@ func Test_Reconcile(t *testing.T) {
 	}, { // Should return requeue later when forwarding rule is not found
 		name: "forwarding rule not found",
 		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
-			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -471,9 +471,9 @@ func Test_Reconcile(t *testing.T) {
 	}, { // There should be an error on GetForwardingRule failure
 		name: "GetForwardingRule failure",
 		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
-			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -495,6 +495,7 @@ func Test_Reconcile(t *testing.T) {
 	}, { // There should be an error on GetSubnet failure when existing subnet is specified
 		name: "Existing Subnet, GetSubnet failure",
 		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 			testcd.WithGCPPlatform(&hivev1gcp.Platform{
 				PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{
 					ServiceAttachment: &hivev1gcp.ServiceAttachment{
@@ -508,7 +509,6 @@ func Test_Reconcile(t *testing.T) {
 				Region: testRegion,
 			}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
-			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -543,7 +543,11 @@ func Test_Reconcile(t *testing.T) {
 				},
 				Region: testRegion,
 			}),
-			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachment: mockServiceAttachment.SelfLink,
+				EndpointAddress:   mockAddress.SelfLink,
+				Endpoint:          mockForwardingRule.SelfLink,
+			}}),
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
@@ -566,12 +570,6 @@ func Test_Reconcile(t *testing.T) {
 			m.EXPECT().GetAddress(gomock.Any(), gomock.Any()).Return(mockAddress, nil)
 			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
 		},
-		expectConditions: []hivev1.ClusterDeploymentCondition{{
-			Status:  corev1.ConditionFalse,
-			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
-			Reason:  "ReconciledEndpoint",
-			Message: "reconciled the Endpoint",
-		}},
 		expectStatus: &hivev1gcp.PrivateServiceConnectStatus{
 			ServiceAttachment: mockServiceAttachment.SelfLink,
 			EndpointAddress:   mockAddress.SelfLink,
@@ -581,9 +579,9 @@ func Test_Reconcile(t *testing.T) {
 	}, { // There should be an error on GetNetwork failure
 		name: "GetNetwork failure",
 		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
-			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -606,9 +604,9 @@ func Test_Reconcile(t *testing.T) {
 	}, { // There should be an error on ensureServiceAttachmentSubnet failure
 		name: "ensureServiceAttachmentSubnet failure",
 		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
-			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -635,12 +633,50 @@ func Test_Reconcile(t *testing.T) {
 			Message: "googleapi: Error 401: not authorized to GetSubnet, AccessDenied",
 		}},
 		expectError: "failed to reconcile the Service Attachment Subnet: googleapi: Error 401: not authorized to GetSubnet, AccessDenied",
+	}, { // Ready condition should be updated when subnetModified
+		name: "subnetModified",
+		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
+		),
+		config: &hivev1.GCPPrivateServiceConnectConfig{
+			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
+				Network: mockNetwork.Name,
+				Subnets: []hivev1.GCPPrivateServiceConnectSubnet{{
+					Subnet: mockSubnet.SelfLink,
+					Region: testRegion,
+				}},
+			}},
+		},
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().ListAddresses(gomock.Any(), gomock.Any()).Return(&compute.AddressList{
+				Items: []*compute.Address{mockAddress},
+			}, nil)
+			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
+			m.EXPECT().GetNetwork(gomock.Any()).Return(mockNetwork, nil)
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "Subnet not found"))
+			m.EXPECT().CreateSubnet(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+		},
+		expect: reconcile.Result{Requeue: true},
+		expectConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "ReconciledServiceAttachmentSubnet",
+			Message: "reconciled the Service Attachment Subnet",
+		}},
+		expectStatus: &hivev1gcp.PrivateServiceConnectStatus{
+			ServiceAttachmentSubnet: mockSubnet.SelfLink,
+		},
 	}, { // There should be an error on ensureServiceAttachmentFirewall failure
 		name: "ensureServiceAttachmentFirewall failure",
 		cd: cdBuilder.Build(
-			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
-			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet: mockSubnet.SelfLink,
+			}}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -668,15 +704,55 @@ func Test_Reconcile(t *testing.T) {
 			Message: "googleapi: Error 401: not authorized to GetFirewall, AccessDenied",
 		}},
 		expectError: "failed to reconcile the Service Attachment Firwall: googleapi: Error 401: not authorized to GetFirewall, AccessDenied",
+	}, { // Ready condition should be updated when firewallModified
+		name: "firewallModified",
+		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet: mockSubnet.SelfLink,
+			}}),
+		),
+		config: &hivev1.GCPPrivateServiceConnectConfig{
+			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
+				Network: mockNetwork.Name,
+				Subnets: []hivev1.GCPPrivateServiceConnectSubnet{{
+					Subnet: mockSubnet.SelfLink,
+					Region: testRegion,
+				}},
+			}},
+		},
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().ListAddresses(gomock.Any(), gomock.Any()).Return(&compute.AddressList{
+				Items: []*compute.Address{mockAddress},
+			}, nil)
+			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
+			m.EXPECT().GetNetwork(gomock.Any()).Return(mockNetwork, nil)
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().GetFirewall(gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "Firewall not found"))
+			m.EXPECT().CreateFirewall(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockFirewall, nil)
+		},
+		expect: reconcile.Result{Requeue: true},
+		expectConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "ReconciledServiceAttachmentFirewall",
+			Message: "reconciled the Service Attachment Firewall",
+		}},
 		expectStatus: &hivev1gcp.PrivateServiceConnectStatus{
-			ServiceAttachmentSubnet: mockSubnet.SelfLink,
+			ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+			ServiceAttachmentFirewall: mockFirewall.SelfLink,
 		},
 	}, { // There should be an error on ensureServiceAttachment failure
 		name: "ensureServiceAttachment failure",
 		cd: cdBuilder.Build(
-			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
-			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+				ServiceAttachmentFirewall: mockFirewall.SelfLink,
+			}}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -705,16 +781,60 @@ func Test_Reconcile(t *testing.T) {
 			Message: "googleapi: Error 401: not authorized to GetServiceAttachment, AccessDenied",
 		}},
 		expectError: "failed to reconcile the Service Attachment: googleapi: Error 401: not authorized to GetServiceAttachment, AccessDenied",
+	}, { // Ready condition should be updated when serviceAttachmentModified
+		name: "serviceAttachmentModified",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+				ServiceAttachmentFirewall: mockFirewall.SelfLink,
+			}}),
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+		),
+		config: &hivev1.GCPPrivateServiceConnectConfig{
+			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
+				Network: mockNetwork.Name,
+				Subnets: []hivev1.GCPPrivateServiceConnectSubnet{{
+					Subnet: mockSubnet.SelfLink,
+					Region: testRegion,
+				}},
+			}},
+		},
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().ListAddresses(gomock.Any(), gomock.Any()).Return(&compute.AddressList{
+				Items: []*compute.Address{mockAddress},
+			}, nil)
+			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
+			m.EXPECT().GetNetwork(gomock.Any()).Return(mockNetwork, nil)
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().GetFirewall(gomock.Any()).Return(mockFirewall, nil)
+			m.EXPECT().GetProjectName().Return(testProjectName)
+			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ServiceAttachment not found"))
+			m.EXPECT().CreateServiceAttachment(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockServiceAttachment, nil)
+		},
+		expect: reconcile.Result{Requeue: true},
+		expectConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "ReconciledServiceAttachment",
+			Message: "reconciled the Service Attachment",
+		}},
 		expectStatus: &hivev1gcp.PrivateServiceConnectStatus{
 			ServiceAttachmentSubnet:   mockSubnet.SelfLink,
 			ServiceAttachmentFirewall: mockFirewall.SelfLink,
+			ServiceAttachment:         mockServiceAttachment.SelfLink,
 		},
 	}, { // There should be an error on ensureEndpointAddress failure
 		name: "ensureEndpointAddress failure",
 		cd: cdBuilder.Build(
-			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
-			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+				ServiceAttachmentFirewall: mockFirewall.SelfLink,
+				ServiceAttachment:         mockServiceAttachment.SelfLink,
+			}}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -744,17 +864,63 @@ func Test_Reconcile(t *testing.T) {
 			Message: "googleapi: Error 401: not authorized to GetAddress, AccessDenied",
 		}},
 		expectError: "failed to reconcile the Endpoint Address: googleapi: Error 401: not authorized to GetAddress, AccessDenied",
+	}, { // Ready condition should be updated when addressModified
+		name: "addressModified",
+		cd: cdBuilder.Build(
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+				ServiceAttachmentFirewall: mockFirewall.SelfLink,
+				ServiceAttachment:         mockServiceAttachment.SelfLink,
+			}}),
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+		),
+		config: &hivev1.GCPPrivateServiceConnectConfig{
+			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
+				Network: mockNetwork.Name,
+				Subnets: []hivev1.GCPPrivateServiceConnectSubnet{{
+					Subnet: mockSubnet.SelfLink,
+					Region: testRegion,
+				}},
+			}},
+		},
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().ListAddresses(gomock.Any(), gomock.Any()).Return(&compute.AddressList{
+				Items: []*compute.Address{mockAddress},
+			}, nil)
+			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
+			m.EXPECT().GetNetwork(gomock.Any()).Return(mockNetwork, nil)
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().GetFirewall(gomock.Any()).Return(mockFirewall, nil)
+			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(mockServiceAttachment, nil)
+			m.EXPECT().GetAddress(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "Address not found"))
+			m.EXPECT().CreateAddress(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockAddress, nil)
+		},
+		expect: reconcile.Result{Requeue: true},
+		expectConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "ReconciledEndpointAddress",
+			Message: "reconciled the Endpoint Address",
+		}},
 		expectStatus: &hivev1gcp.PrivateServiceConnectStatus{
 			ServiceAttachmentSubnet:   mockSubnet.SelfLink,
 			ServiceAttachmentFirewall: mockFirewall.SelfLink,
 			ServiceAttachment:         mockServiceAttachment.SelfLink,
+			EndpointAddress:           mockAddress.SelfLink,
 		},
 	}, { // There should be an error on ensureEndpoint failure
 		name: "ensureEndpoint failure",
 		cd: cdBuilder.Build(
-			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
-			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+				ServiceAttachmentFirewall: mockFirewall.SelfLink,
+				ServiceAttachment:         mockServiceAttachment.SelfLink,
+				EndpointAddress:           mockAddress.SelfLink,
+			}}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
 			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
@@ -785,17 +951,16 @@ func Test_Reconcile(t *testing.T) {
 			Message: "googleapi: Error 401: not authorized to GetForwardingRule, AccessDenied",
 		}},
 		expectError: "failed to reconcile the Endpoint: googleapi: Error 401: not authorized to GetForwardingRule, AccessDenied",
-		expectStatus: &hivev1gcp.PrivateServiceConnectStatus{
-			ServiceAttachmentSubnet:   mockSubnet.SelfLink,
-			ServiceAttachmentFirewall: mockFirewall.SelfLink,
-			ServiceAttachment:         mockServiceAttachment.SelfLink,
-			EndpointAddress:           mockAddress.SelfLink,
-		},
-	}, { // An endpoint IP address should be returned on success
-		name: "success",
+	}, { // Ready condition should be updated when endpointModified
+		name: "endpointModified",
 		cd: cdBuilder.Build(
 			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
-			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{}}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+				ServiceAttachmentFirewall: mockFirewall.SelfLink,
+				ServiceAttachment:         mockServiceAttachment.SelfLink,
+				EndpointAddress:           mockAddress.SelfLink,
+			}}),
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
 		),
 		config: &hivev1.GCPPrivateServiceConnectConfig{
@@ -818,8 +983,10 @@ func Test_Reconcile(t *testing.T) {
 			m.EXPECT().GetFirewall(gomock.Any()).Return(mockFirewall, nil)
 			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(mockServiceAttachment, nil)
 			m.EXPECT().GetAddress(gomock.Any(), gomock.Any()).Return(mockAddress, nil)
-			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
+			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "ForwardingRule not found"))
+			m.EXPECT().CreateForwardingRule(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
 		},
+		expect: reconcile.Result{Requeue: true},
 		expectConditions: []hivev1.ClusterDeploymentCondition{{
 			Status:  corev1.ConditionFalse,
 			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
@@ -832,6 +999,41 @@ func Test_Reconcile(t *testing.T) {
 			ServiceAttachment:         mockServiceAttachment.SelfLink,
 			EndpointAddress:           mockAddress.SelfLink,
 			Endpoint:                  mockForwardingRule.SelfLink,
+		},
+	}, { // An endpoint IP address should be returned on success
+		name: "success",
+		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: testInfraID}),
+			testcd.WithGCPPlatform(&hivev1gcp.Platform{Region: testRegion}),
+			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{PrivateServiceConnect: &hivev1gcp.PrivateServiceConnectStatus{
+				ServiceAttachmentSubnet:   mockSubnet.SelfLink,
+				ServiceAttachmentFirewall: mockFirewall.SelfLink,
+				ServiceAttachment:         mockServiceAttachment.SelfLink,
+				EndpointAddress:           mockAddress.SelfLink,
+				Endpoint:                  mockForwardingRule.SelfLink,
+			}}),
+		),
+		config: &hivev1.GCPPrivateServiceConnectConfig{
+			EndpointVPCInventory: []hivev1.GCPPrivateServiceConnectInventory{{
+				Network: mockNetwork.Name,
+				Subnets: []hivev1.GCPPrivateServiceConnectSubnet{{
+					Subnet: mockSubnet.SelfLink,
+					Region: testRegion,
+				}},
+			}},
+		},
+		gcpClientConfig: func(m *mockclient.MockClient) {
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().ListAddresses(gomock.Any(), gomock.Any()).Return(&compute.AddressList{
+				Items: []*compute.Address{mockAddress},
+			}, nil)
+			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
+			m.EXPECT().GetNetwork(gomock.Any()).Return(mockNetwork, nil)
+			m.EXPECT().GetSubnet(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockSubnet, nil)
+			m.EXPECT().GetFirewall(gomock.Any()).Return(mockFirewall, nil)
+			m.EXPECT().GetServiceAttachment(gomock.Any(), gomock.Any()).Return(mockServiceAttachment, nil)
+			m.EXPECT().GetAddress(gomock.Any(), gomock.Any()).Return(mockAddress, nil)
+			m.EXPECT().GetForwardingRule(gomock.Any(), gomock.Any()).Return(mockForwardingRule, nil)
 		},
 		expectRecord: &actuator.DnsRecord{IpAddress: []string{mockAddress.Address}},
 	}}
@@ -863,10 +1065,9 @@ func Test_Reconcile(t *testing.T) {
 			}
 			assert.Equal(t, test.expectRecord, dnsRecord)
 
-			if test.expectStatus == nil {
-				test.expectStatus = &hivev1gcp.PrivateServiceConnectStatus{}
+			if test.expectStatus != nil {
+				assert.Equal(t, test.expectStatus, test.cd.Status.Platform.GCP.PrivateServiceConnect)
 			}
-			assert.Equal(t, test.expectStatus, test.cd.Status.Platform.GCP.PrivateServiceConnect)
 
 			curr := &hivev1.ClusterDeployment{}
 			fakeClient := *gcpLinkActuator.client

@@ -179,6 +179,7 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 			if err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 			}
+			return reconcile.Result{Requeue: true}, nil
 		}
 		subnet = newSubnet
 
@@ -198,6 +199,7 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 			if err != nil {
 				return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 			}
+			return reconcile.Result{Requeue: true}, nil
 		}
 	}
 
@@ -217,6 +219,7 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	logger.Debug("reconciling Endpoint Address")
@@ -235,6 +238,7 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	logger.Debug("reconciling Endpoint")
@@ -253,6 +257,7 @@ func (a *GCPLinkActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hive
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	// Set the DNS IP Addresses for the hub actuator.

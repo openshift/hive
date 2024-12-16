@@ -217,7 +217,7 @@ func (a *AWSHubActuator) ensureHostedZone(cd *hivev1.ClusterDeployment, metadata
 			return false, "", err
 		}
 
-		newHzID, err := a.createHostedZone(&selectedVPC, apiDomain)
+		newHzID, err := a.createHostedZone(selectedVPC, apiDomain)
 		if err != nil {
 			return false, "", err
 		}
@@ -713,9 +713,7 @@ func (a *AWSHubActuator) getEndpointVPC(cd *hivev1.ClusterDeployment, metadata *
 	return endpointVPC, nil
 }
 
-func (a *AWSHubActuator) selectHostedZoneVPC(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger log.FieldLogger) (hivev1.AWSAssociatedVPC, error) {
-	selectedVPC := hivev1.AWSAssociatedVPC{}
-
+func (a *AWSHubActuator) selectHostedZoneVPC(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger log.FieldLogger) (*hivev1.AWSAssociatedVPC, error) {
 	// For clusterdeployments that are on AWS, use the VPCEndpoint VPC
 	if cd.Status.Platform != nil &&
 		cd.Status.Platform.AWS != nil &&
@@ -724,29 +722,29 @@ func (a *AWSHubActuator) selectHostedZoneVPC(cd *hivev1.ClusterDeployment, metad
 
 		endpointVPC, err := a.getEndpointVPC(cd, metadata)
 		if err != nil {
-			return selectedVPC, errors.Wrap(err, "error getting Endpoint VPC")
+			return nil, errors.Wrap(err, "error getting Endpoint VPC")
 		}
 
 		if endpointVPC.VPCID == "" {
-			return selectedVPC, errors.New("unable to select Endpoint VPC: Endpoint not found")
+			return nil, errors.New("unable to select Endpoint VPC: Endpoint not found")
 		}
 
-		return endpointVPC, nil
+		return &endpointVPC, nil
 	}
 
 	associatedVPCS, err := a.getAssociatedVPCs(cd, metadata, logger)
 	if err != nil {
-		return selectedVPC, errors.Wrap(err, "error getting associated VPCs")
+		return nil, errors.Wrap(err, "error getting associated VPCs")
 	}
 
 	// Select the first associatedVPC that uses the primary AWS PrivateLink credential.
 	// This is necessary because a Hosted Zone can only be created using a VPC owned by the same account.
 	for _, associatedVPC := range associatedVPCS {
 		if associatedVPC.CredentialsSecretRef == nil || *associatedVPC.CredentialsSecretRef == a.config.CredentialsSecretRef {
-			return associatedVPC, nil
+			return &associatedVPC, nil
 		}
 	}
 
 	// No VPCs found that match the criteria, return an error.
-	return selectedVPC, errors.New("unable to find an associatedVPC that uses the primary AWS PrivateLink credentials")
+	return nil, errors.New("unable to find an associatedVPC that uses the primary AWS PrivateLink credentials")
 }

@@ -1792,7 +1792,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 
 		AWSClientConfig func(*mock.MockClient)
 
-		expect      hivev1.AWSAssociatedVPC
+		expect      *hivev1.AWSAssociatedVPC
 		expectError string
 	}{{ // There should be an error if VPCEndpointID is set and getEndpointVPC fails
 		name: "VPCEndpointID, getEndpointVPC failure",
@@ -1808,7 +1808,6 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 		AWSClientConfig: func(m *mock.MockClient) {
 			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
 		},
-		expect:      hivev1.AWSAssociatedVPC{},
 		expectError: "error getting Endpoint VPC: error getting the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, { // There should be an error if VPCEndPointID is set and getEndpointVPC returns an empty VPCID
 		name: "VPCEndpointID, getEndpointVPC return empty vpcid",
@@ -1826,7 +1825,6 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				VpcEndpoints: []*ec2.VpcEndpoint{{VpcId: aws.String("")}},
 			}, nil)
 		},
-		expect:      hivev1.AWSAssociatedVPC{},
 		expectError: "unable to select Endpoint VPC: Endpoint not found",
 	}, { // The AWS VPCEndpointID VPC should be used when set
 		name: "VPCEndpointID, success",
@@ -1844,7 +1842,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				VpcEndpoints: []*ec2.VpcEndpoint{mockEndpoint},
 			}, nil)
 		},
-		expect: hivev1.AWSAssociatedVPC{
+		expect: &hivev1.AWSAssociatedVPC{
 			AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 				VPCID:  *mockEndpoint.VpcId,
 				Region: testRegion,
@@ -1863,7 +1861,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{VPCID: "vpc-2", Region: testRegion},
 			}},
 		},
-		expect: hivev1.AWSAssociatedVPC{
+		expect: &hivev1.AWSAssociatedVPC{
 			AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 				VPCID:  "vpc-2",
 				Region: testRegion,
@@ -1881,7 +1879,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				CredentialsSecretRef: &corev1.LocalObjectReference{Name: "credential-1"},
 			}},
 		},
-		expect: hivev1.AWSAssociatedVPC{
+		expect: &hivev1.AWSAssociatedVPC{
 			AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 				VPCID:  "vpc-2",
 				Region: testRegion,

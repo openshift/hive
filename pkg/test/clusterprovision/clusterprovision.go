@@ -110,6 +110,12 @@ func Failed() Option {
 	return WithStage(hivev1.ClusterProvisionStageFailed)
 }
 
+func WithPreviousInfraID(previous *string) Option {
+	return func(clusterProvision *hivev1.ClusterProvision) {
+		clusterProvision.Spec.PrevInfraID = previous
+	}
+}
+
 func Attempt(attempt int) Option {
 	return func(clusterProvision *hivev1.ClusterProvision) {
 		// Rename the ClusterProvision according to the attempt number

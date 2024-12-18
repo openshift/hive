@@ -8,6 +8,8 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
+//go:generate mockgen -source=./actuator.go -destination=./mock/actuator_generated.go -package=mock
+
 type Actuator interface {
 
 	// Cleanup cleans up the cloud resources.

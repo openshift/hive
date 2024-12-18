@@ -2107,7 +2107,7 @@ func TestReconcileClusterSync_UpsertToSyncResourceApplyMode(t *testing.T) {
 	}
 }
 
-func TestReconcileClusterSync_WithParameters(t *testing.T) {
+func TestReconcileClusterSync_WithTemplates(t *testing.T) {
 	resourceToApply := `
 apiVersion: v1
 kind: Pod
@@ -2145,19 +2145,32 @@ spec:
   enableServiceLinks: >-
     {{ fromCDLabel "hive.openshift.io/hiveutil-created" }}
 `
+	patches := []hivev1.SyncObjectPatch{
+		{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+			Name:       "mycm",
+			Namespace:  "default",
+			Patch:      `{"metadata": {"annotations": {"test": "{{ fromCDLabel "hive.openshift.io/cluster-platform" }}" }}}`,
+		},
+	}
 	cases := []struct {
 		name                    string
 		cdLabels                map[string]string
-		enableParams            bool
+		enablePatchTemplates    bool
+		enableResourceTemplates bool
+		expectedPatchApplied    string
 		expectedResourceApplied string
 	}{
 		{
-			name:                    "params not enabled; resource unchanged",
+			name:                    "templates not enabled; resource and patch unchanged",
+			expectedPatchApplied:    patches[0].Patch,
 			expectedResourceApplied: resourceToApply,
 		},
 		{
-			name:         "params enabled",
-			enableParams: true,
+			name:                    "templates enabled",
+			enablePatchTemplates:    true,
+			enableResourceTemplates: true,
 			cdLabels: map[string]string{
 				"hive.openshift.io/cluster-region":   "us-east-1",
 				"hive.openshift.io/cluster-platform": "aws",
@@ -2167,6 +2180,7 @@ spec:
 				"hive.openshift.io/version-fix":      "8",
 				"hive.openshift.io/hiveutil-created": "true",
 			},
+			expectedPatchApplied: `{"metadata": {"annotations": {"test": "aws" }}}`,
 			// NOTE: Per Pod schema, livenessProbe.failureThreshold should be int, and
 			// enableServiceLinks should be bool. They're strings in this test to highlight
 			// a limitation of this feature: Since `resources` are embedded as JSON byte
@@ -2215,17 +2229,33 @@ spec:
 				testsyncset.ForClusterDeployments(testCDName),
 				testsyncset.WithApplyMode(hivev1.UpsertResourceApplyMode),
 				testsyncset.WithGeneration(1),
+				testsyncset.WithPatches(patches...),
 				testsyncset.WithYAMLResources(resourceToApply),
-				testsyncset.WithEnableResourceTemplates(tc.enableParams),
+				testsyncset.WithEnablePatchTemplates(tc.enablePatchTemplates),
+				testsyncset.WithEnableResourceTemplates(tc.enableResourceTemplates),
 			)
 			cd := cdBuilder(scheme).Build()
 			// cdLabels may be `nil`
 			cd.SetLabels(tc.cdLabels)
 			rt := func() *reconcileTest {
-				var existing []runtime.Object = []runtime.Object{cd, clusterSyncBuilder(scheme).Build(), teststatefulset.FullBuilder("hive", stsName, scheme).Build(teststatefulset.WithCurrentReplicas(3), teststatefulset.WithReplicas(3)), syncSet}
+				var existing []runtime.Object = []runtime.Object{
+					cd,
+					clusterSyncBuilder(scheme).Build(),
+					teststatefulset.FullBuilder("hive", stsName, scheme).Build(
+						teststatefulset.WithCurrentReplicas(3),
+						teststatefulset.WithReplicas(3)),
+					syncSet}
 				return newReconcileTest(mockCtrl, existing...)
 			}()
-			rt.mockResourceHelper.EXPECT().Apply(newYamlApplyMatcher(t, tc.expectedResourceApplied)).Return(resource.CreatedApplyResult, nil)
+			rt.mockResourceHelper.EXPECT().Apply(
+				newYamlApplyMatcher(t, tc.expectedResourceApplied)).Return(resource.CreatedApplyResult, nil)
+			rt.mockResourceHelper.EXPECT().Patch(
+				types.NamespacedName{Namespace: "default", Name: "mycm"},
+				"ConfigMap",
+				"v1",
+				newByteMatcher(tc.expectedPatchApplied),
+				"").
+				Return(nil)
 			expectedSyncStatusBuilder := newSyncStatusBuilder("test-syncset")
 			rt.expectedSyncSetStatuses = []hiveintv1alpha1.SyncStatus{expectedSyncStatusBuilder.Build()}
 			rt.run(t)
@@ -2413,6 +2443,28 @@ func (m *yamlApplyMatcher) Got(got interface{}) string {
 	default:
 		return fmt.Sprintf("%v", t)
 	}
+}
+
+// byteMatcher is a convenience gomock.Matcher that just makes mismatch failures print useful
+// strings instead of inscrutable lists of decimal byte values.
+type byteMatcher struct {
+	want string
+}
+
+func newByteMatcher(s string) gomock.Matcher {
+	return &byteMatcher{want: s}
+}
+
+func (m *byteMatcher) Matches(x interface{}) bool {
+	return string(x.([]byte)) == m.want
+}
+
+func (m *byteMatcher) String() string {
+	return m.want
+}
+
+func (m *byteMatcher) Got(got interface{}) string {
+	return string(got.([]byte))
 }
 
 func permute(x []interface{}, foo func([]interface{})) {

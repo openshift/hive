@@ -144,6 +144,12 @@ func WithPatches(patches ...hivev1.SyncObjectPatch) Option {
 	}
 }
 
+func WithEnablePatchTemplates(on bool) Option {
+	return func(syncSet *hivev1.SyncSet) {
+		syncSet.Spec.EnablePatchTemplates = on
+	}
+}
+
 func WithEnableResourceTemplates(on bool) Option {
 	return func(syncSet *hivev1.SyncSet) {
 		syncSet.Spec.EnableResourceTemplates = on

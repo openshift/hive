@@ -51,7 +51,7 @@ type Client interface {
 
 	ListComputeInstances(ListComputeInstancesOptions, func(*compute.InstanceAggregatedList) error) error
 
-	StopInstance(*compute.Instance) error
+	StopInstance(*compute.Instance, ...InstancesStopCallOption) error
 
 	StartInstance(*compute.Instance) error
 
@@ -91,6 +91,8 @@ type Client interface {
 
 	GetProjectName() string
 }
+
+type InstancesStopCallOption func(stopCall *compute.InstancesStopCall) *compute.InstancesStopCall
 
 // ListManagedZonesOptions are the options for listing managed zones.
 type ListManagedZonesOptions struct {
@@ -287,9 +289,13 @@ func (c *gcpClient) ListComputeInstances(opts ListComputeInstancesOptions, pages
 	return nil
 }
 
-func (c *gcpClient) StopInstance(instance *compute.Instance) error {
+func (c *gcpClient) StopInstance(instance *compute.Instance, opts ...InstancesStopCallOption) error {
 	zone := instanceZone(instance)
-	_, err := c.computeClient.Instances.Stop(c.projectName, zone, instance.Name).Do()
+	stopCall := c.computeClient.Instances.Stop(c.projectName, zone, instance.Name)
+	for _, o := range opts {
+		stopCall = o(stopCall)
+	}
+	_, err := stopCall.Do()
 	if err != nil && !isNotModified(err) {
 		return errors.Wrapf(err, "failed to stop instance %s in zone %s", instance.Name, zone)
 	}

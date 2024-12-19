@@ -57,10 +57,16 @@ func (a *gcpActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient clie
 	if err != nil {
 		return err
 	}
+	opts := []gcpclient.InstancesStopCallOption{}
+	if cd.Spec.Platform.GCP != nil && cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate != nil {
+		opts = append(opts, func(stopCall *compute.InstancesStopCall) *compute.InstancesStopCall {
+			return stopCall.DiscardLocalSsd(*cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate)
+		})
+	}
 	var errs []error
 	for _, instance := range instances {
 		logger.WithField("instance", instance.Name).Info("Stopping instance")
-		err = gcpClient.StopInstance(instance)
+		err = gcpClient.StopInstance(instance, opts...)
 		if err != nil {
 			errs = append(errs, err)
 		}

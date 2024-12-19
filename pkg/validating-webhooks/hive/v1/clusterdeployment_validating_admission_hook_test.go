@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1agent "github.com/openshift/hive/apis/hive/v1/agent"
@@ -659,7 +659,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						AWS: &hivev1aws.Metadata{
-							HostedZoneRole: pointer.String("my-hzr"),
+							HostedZoneRole: ptr.To("my-hzr"),
 						},
 					},
 				}
@@ -683,7 +683,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						AWS: &hivev1aws.Metadata{
-							HostedZoneRole: pointer.String("my-hzr"),
+							HostedZoneRole: ptr.To("my-hzr"),
 						},
 					},
 				}
@@ -708,7 +708,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						AWS: &hivev1aws.Metadata{
-							HostedZoneRole: pointer.String("my-hzr"),
+							HostedZoneRole: ptr.To("my-hzr"),
 						},
 					},
 				}
@@ -726,7 +726,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						AWS: &hivev1aws.Metadata{
-							HostedZoneRole: pointer.String(""),
+							HostedZoneRole: ptr.To(""),
 						},
 					},
 				}
@@ -739,7 +739,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						AWS: &hivev1aws.Metadata{
-							HostedZoneRole: pointer.String("my-hzr"),
+							HostedZoneRole: ptr.To("my-hzr"),
 						},
 					},
 				}
@@ -757,7 +757,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						AWS: &hivev1aws.Metadata{
-							HostedZoneRole: pointer.String("my-hzr"),
+							HostedZoneRole: ptr.To("my-hzr"),
 						},
 					},
 				}
@@ -842,7 +842,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &hivev1azure.Metadata{
-							ResourceGroupName: pointer.String("my-rg"),
+							ResourceGroupName: ptr.To("my-rg"),
 						},
 					},
 				}
@@ -866,7 +866,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &hivev1azure.Metadata{
-							ResourceGroupName: pointer.String("my-rg"),
+							ResourceGroupName: ptr.To("my-rg"),
 						},
 					},
 				}
@@ -891,7 +891,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &hivev1azure.Metadata{
-							ResourceGroupName: pointer.String("my-rg"),
+							ResourceGroupName: ptr.To("my-rg"),
 						},
 					},
 				}
@@ -909,7 +909,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &hivev1azure.Metadata{
-							ResourceGroupName: pointer.String("old-rg"),
+							ResourceGroupName: ptr.To("old-rg"),
 						},
 					},
 				}
@@ -922,7 +922,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &hivev1azure.Metadata{
-							ResourceGroupName: pointer.String("my-rg"),
+							ResourceGroupName: ptr.To("my-rg"),
 						},
 					},
 				}
@@ -940,7 +940,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &hivev1azure.Metadata{
-							ResourceGroupName: pointer.String("my-rg"),
+							ResourceGroupName: ptr.To("my-rg"),
 						},
 					},
 				}
@@ -1185,6 +1185,43 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name:      "GCP set DiscardLocalSsdOnHibernate allowed",
+			oldObject: validGCPClusterDeployment(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate = ptr.To(true)
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "GCP unset DiscardLocalSsdOnHibernate allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate = ptr.To(true)
+				return cd
+			}(),
+			newObject:       validGCPClusterDeployment(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "GCP edit DiscardLocalSsdOnHibernate allowed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate = ptr.To(true)
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Platform.GCP.DiscardLocalSsdOnHibernate = ptr.To(false)
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
 			name: "GCP set network project ID: installed",
 			oldObject: func() *hivev1.ClusterDeployment {
 				cd := validGCPClusterDeployment()
@@ -1201,7 +1238,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						GCP: &hivev1gcp.Metadata{
-							NetworkProjectID: pointer.String("my@np.id"),
+							NetworkProjectID: ptr.To("my@np.id"),
 						},
 					},
 				}
@@ -1225,7 +1262,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						GCP: &hivev1gcp.Metadata{
-							NetworkProjectID: pointer.String("my@np.id"),
+							NetworkProjectID: ptr.To("my@np.id"),
 						},
 					},
 				}
@@ -1250,7 +1287,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						GCP: &hivev1gcp.Metadata{
-							NetworkProjectID: pointer.String("my@np.id"),
+							NetworkProjectID: ptr.To("my@np.id"),
 						},
 					},
 				}
@@ -1268,7 +1305,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						GCP: &hivev1gcp.Metadata{
-							NetworkProjectID: pointer.String(""),
+							NetworkProjectID: ptr.To(""),
 						},
 					},
 				}
@@ -1281,7 +1318,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						GCP: &hivev1gcp.Metadata{
-							NetworkProjectID: pointer.String("my@np.id"),
+							NetworkProjectID: ptr.To("my@np.id"),
 						},
 					},
 				}
@@ -1299,7 +1336,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 					InfraID: "an-infra-id",
 					Platform: &hivev1.ClusterPlatformMetadata{
 						GCP: &hivev1gcp.Metadata{
-							NetworkProjectID: pointer.String("my@np.id"),
+							NetworkProjectID: ptr.To("my@np.id"),
 						},
 					},
 				}

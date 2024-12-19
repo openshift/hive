@@ -1227,6 +1227,8 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 			logger.WithError(err).Info("could not build GCP cloud builder")
 			return nil, err
 		}
+		// may be nil
+		cloudBuilder.DiscardLocalSsdOnHibernate = platform.GCP.DiscardLocalSsdOnHibernate
 		cloudBuilder.Region = platform.GCP.Region
 		return cloudBuilder, nil
 	case platform.Azure != nil:

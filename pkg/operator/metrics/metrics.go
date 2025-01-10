@@ -106,6 +106,10 @@ func (mc *Calculator) Start(ctx context.Context) error {
 			return
 		}
 
+		// Clear the metricHiveConfigConditions for Ready condition before setting it, to ensure we are not reporting stale values during migration
+		metricHiveConfigConditions.DeletePartialMatch(map[string]string{
+			"condition": string(hivev1.HiveReadyCondition),
+		})
 		mc.setHiveConfigMetrics(hiveConfig)
 
 	}, mc.Interval)

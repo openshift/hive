@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/version"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/version"
 
 	"github.com/openshift/generic-admission-server/pkg/registry/admissionreview"
 )
@@ -199,8 +199,8 @@ func (c completedConfig) New() (*AdmissionServer, error) {
 			continue
 		}
 		s.GenericAPIServer.AddPostStartHookOrDie(postStartName,
-			func(context genericapiserver.PostStartHookContext) error {
-				return admissionHook.Initialize(restConfig, context.StopCh)
+			func(hookContext genericapiserver.PostStartHookContext) error {
+				return admissionHook.Initialize(restConfig, hookContext.Done())
 			},
 		)
 	}

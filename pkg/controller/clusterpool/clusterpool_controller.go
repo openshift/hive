@@ -1311,6 +1311,9 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.Cloud = platform.OpenStack.Cloud
 		return cloudBuilder, nil
 	case platform.VSphere != nil:
+		if platform.VSphere.VSphere == nil {
+			return nil, errors.New("VSphere CD with deprecated fields has not been updated by CD controller yet, requeueing...")
+		}
 		credsSecret, err := r.getCredentialsSecret(pool, platform.VSphere.CredentialsSecretRef.Name, logger)
 		if err != nil {
 			return nil, err
@@ -1326,12 +1329,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		}
 
 		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret)
-		cloudBuilder.Datacenter = platform.VSphere.Datacenter
-		cloudBuilder.DefaultDatastore = platform.VSphere.DefaultDatastore
-		cloudBuilder.VCenter = platform.VSphere.VCenter
-		cloudBuilder.Cluster = platform.VSphere.Cluster
-		cloudBuilder.Folder = platform.VSphere.Folder
-		cloudBuilder.Network = platform.VSphere.Network
+		cloudBuilder.VSphere = platform.VSphere.VSphere
 
 		return cloudBuilder, nil
 	case platform.Ovirt != nil:

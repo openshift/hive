@@ -96,20 +96,27 @@ NOTE: For deprovisioning a cluster, `hiveutil` will use creds from `~/.gcp/osSer
 
 Set credentials/connection information in the following environment variables. `GOVC_USERNAME` should hold the vSphere username, `GOVC_PASSWORD` should be set to the vSphere user's password. If the vCenter instance is using self-signed certificates or is otherwise untrusted by the system being used to connect to vCenter, `GOVC_TLS_CA_CERTS` should be set to the path of a file containing the CA certificate for the vCenter instance. 
 
+The `VSPHERE_INSTALLER_PLATFORM_SPEC_JSON` environment variable should be hold a json (NOT yaml) blob containing a [vSphere platform spec](https://pkg.go.dev/github.com/openshift/installer/pkg/types/vsphere#Platform) ([documented here](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/installing_on_vmware_vsphere/installer-provisioned-infrastructure#installation-installer-provisioned-vsphere-config-yaml_installing-vsphere-installer-provisioned-customizations)).  If you used an older version of `hiveutil` to create vSphere clusters, the many old parameters (network, datastore, etc) should now be specified inside this json object.  If you have this json blob stored as a file on disk, you can load it into an environment variable like so: 
+
+```bash
+$ export VSPHERE_INSTALLER_PLATFORM_SPEC_JSON=$(</path/to/file)
+$ echo $VSPHERE_INSTALLER_PLATFORM_SPEC_JSON
+```
+
 The following parameters are required and must be provided via environment variable or command line parameter:
 
-| Environment Variable | Command line parameter                    |
-| -------------------- | ----------------------------------------- |
-| `GOVC_USERNAME `     | Must be provided as environment variable. |
-| `GOVC_PASSWORD`      | Must be provided as environment variable. |
-| `GOVC_TLS_CA_CERTS`  | `--vsphere-ca-certs`                      |
-| `GOVC_DATACENTER`    | `--vsphere-datacenter`                    |
-| `GOVC_DATASTORE`     | `--vsphere-default-datastore`             |
-| `GOVC_HOST`          | `--vsphere-vcenter`                       |
+| Environment Variable                   | Command line parameter                    |
+|----------------------------------------|-------------------------------------------|
+| `GOVC_USERNAME `                       | Must be provided as environment variable. |
+| `GOVC_PASSWORD`                        | Must be provided as environment variable. |
+| `GOVC_TLS_CA_CERTS`                    | `--vsphere-ca-certs`                      |
+| `VSPHERE_INSTALLER_PLATFORM_SPEC_JSON` | `--vsphere-platform-spec-json`            |
+| N/A                                    | `--vsphere-api-vip`                       |
+| N/A                                    | `--vsphere-ingress-vip`                   |
 
 
 ```bash
-bin/hiveutil create-cluster --cloud=vsphere --vsphere-vcenter=vcenter.example.com --vsphere-datacenter=dc1 --vsphere-default-datastore=ds1 --vsphere-api-vip=192.168.10.10 --vsphere-ingress-vip=192.168.10.11 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-folder=/dc1/vm/mycluster --vsphere-ca-certs="/tmp/cert1.crt:/tmp/cert2.crt" --base-domain vmware.hive.example.com mycluster
+bin/hiveutil create-cluster --cloud=vsphere --vsphere-api-vip=192.168.10.10 --vsphere-ingress-vip=192.168.10.11 --vsphere-ca-certs="/tmp/cert1.crt:/tmp/cert2.crt" --base-domain vmware.hive.example.com mycluster
 ```
 
 #### Create Cluster on OpenStack

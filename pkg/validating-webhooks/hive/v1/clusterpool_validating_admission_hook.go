@@ -234,6 +234,18 @@ func (a *ClusterPoolValidatingAdmissionHook) validateUpdate(admissionSpec *admis
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
 
+	// HIVE-2391
+	if oldObject.Spec.Platform.VSphere != nil && newObject.Spec.Platform.VSphere != nil {
+		// Moving from a non-zonal to a zonal shape is permitted.
+		// This check is faster than checking all the fields individually
+		if oldObject.Spec.Platform.VSphere.Infrastructure == nil && newObject.Spec.Platform.VSphere.Infrastructure != nil {
+			contextLogger.Debug("Passed validation: HIVE-2391")
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: true,
+			}
+		}
+	}
+
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")
 

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/openshift/hive/pkg/controller/utils/vsphereutils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -442,6 +443,19 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil
+	}
+
+	// HIVE-2391: remove this once we fully deprecate the old vSphere method (4.12 sunset)
+	if getClusterPlatform(cd) == constants.PlatformVSphere {
+		if cd.Spec.Platform.VSphere.Infrastructure == nil {
+			r.logger.WithField("gvk", cd.GroupVersionKind().String()).WithField("name", cd.Name).WithField("namespace", cd.Namespace).Info("Updating deprecated vSphere fields on ClusterDeployment object")
+			cd = cd.DeepCopy()
+			if err := vsphereutils.ConvertDeprecatedFields(cd.Spec.Platform.VSphere); err != nil {
+				cdLog.WithError(err).Log(controllerutils.LogLevel(err), "failed to update deprecated vSphere fields")
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, r.Update(ctx, cd)
+		}
 	}
 
 	return r.reconcile(request, cd, cdLog)
@@ -1210,8 +1224,18 @@ func (r *ReconcileClusterDeployment) retrofitMetadataJSON(cd *hivev1.ClusterDepl
 			Identifier: map[string]string{"openshiftClusterID": cdMetadata.InfraID},
 		}
 	case cd.Spec.Platform.VSphere != nil:
+		var vcenters []vsphere.VCenters
+		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+			vcenters = append(vcenters, vsphere.VCenters{
+				VCenter:  vcenter.Server,
+				Username: "SET_BY_DEPROVISION",
+				Password: "SET_BY_DEPROVISION",
+			})
+		}
+
 		iMetadata.VSphere = &vsphere.Metadata{
-			VCenter: cd.Spec.Platform.VSphere.VCenter,
+			VCenter:  cd.Spec.Platform.VSphere.DeprecatedVCenter,
+			VCenters: vcenters,
 			// NOTE: Credentials (Username, Password) must be set before use.
 			// DO NOT set them here.
 			// ...but signal to the deprovisioner _where_ they need to be set (since we must
@@ -2315,10 +2339,14 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CertificatesSecretRef: cd.Spec.Platform.OpenStack.CertificatesSecretRef,
 		}
 	case cd.Spec.Platform.VSphere != nil:
+		vcenters := make([]string, 0, len(cd.Spec.Platform.VSphere.Infrastructure.VCenters))
+		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+			vcenters = append(vcenters, vcenter.Server)
+		}
 		req.Spec.Platform.VSphere = &hivev1.VSphereClusterDeprovision{
 			CredentialsSecretRef:  cd.Spec.Platform.VSphere.CredentialsSecretRef,
 			CertificatesSecretRef: cd.Spec.Platform.VSphere.CertificatesSecretRef,
-			VCenter:               cd.Spec.Platform.VSphere.VCenter,
+			VCenters:              vcenters,
 		}
 	case cd.Spec.Platform.IBMCloud != nil:
 		req.Spec.Platform.IBMCloud = &hivev1.IBMClusterDeprovision{

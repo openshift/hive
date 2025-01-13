@@ -2339,8 +2339,12 @@ objects:
                           type: object
                           x-kubernetes-map-type: atomic
                         cluster:
-                          description: Cluster is the name of the cluster virtual
+                          description: 'Cluster is the name of the cluster virtual
                             machines will be cloned into.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         credentialsSecretRef:
                           description: 'CredentialsSecretRef refers to a secret that
@@ -2365,33 +2369,787 @@ objects:
                           type: object
                           x-kubernetes-map-type: atomic
                         datacenter:
-                          description: Datacenter is the name of the datacenter to
+                          description: 'Datacenter is the name of the datacenter to
                             use in the vCenter.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         defaultDatastore:
-                          description: DefaultDatastore is the default datastore to
-                            use for provisioning volumes.
+                          description: 'DefaultDatastore is the default datastore
+                            to use for provisioning volumes.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         folder:
                           description: 'Folder is the name of the folder that will
                             be used and/or created for
 
-                            virtual machines.'
+                            virtual machines.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
+                        infrastructure:
+                          description: Infrastructure is the desired state of the
+                            vSphere infrastructure provider.
+                          properties:
+                            apiVIP:
+                              description: 'DeprecatedAPIVIP is the virtual IP address
+                                for the api endpoint
+
+                                Deprecated: Use APIVIPs'
+                              type: string
+                            apiVIPs:
+                              description: 'APIVIPs contains the VIP(s) for the api
+                                endpoint. In dual stack clusters
+
+                                it contains an IPv4 and IPv6 address, otherwise only
+                                one VIP'
+                              format: ip
+                              items:
+                                type: string
+                              maxItems: 2
+                              type: array
+                            cluster:
+                              description: 'Cluster is the name of the cluster virtual
+                                machines will be cloned into.
+
+                                Deprecated: Use FailureDomains.Topology.Cluster'
+                              type: string
+                            clusterOSImage:
+                              description: ClusterOSImage overrides the url provided
+                                in rhcos.json to download the RHCOS OVA
+                              type: string
+                            datacenter:
+                              description: 'Datacenter is the name of the datacenter
+                                to use in the vCenter.
+
+                                Deprecated: Use FailureDomains.Topology.Datacenter'
+                              type: string
+                            defaultDatastore:
+                              description: 'DefaultDatastore is the default datastore
+                                to use for provisioning volumes.
+
+                                Deprecated: Use FailureDomains.Topology.Datastore'
+                              type: string
+                            defaultMachinePlatform:
+                              description: 'DefaultMachinePlatform is the default
+                                configuration used when
+
+                                installing on VSphere for machine pools which do not
+                                define their own
+
+                                platform configuration.'
+                              properties:
+                                coresPerSocket:
+                                  description: 'NumCoresPerSocket is the number of
+                                    cores per socket in a vm. The number
+
+                                    of vCPUs on the vm will be NumCPUs/NumCoresPerSocket.'
+                                  format: int32
+                                  type: integer
+                                cpus:
+                                  description: NumCPUs is the total number of virtual
+                                    processor cores to assign a vm.
+                                  format: int32
+                                  type: integer
+                                dataDisks:
+                                  description: DataDisks are additional disks to add
+                                    to the VM that are not part of the VM's OVA template.
+                                  items:
+                                    description: DataDisk defines a data disk to add
+                                      to the VM that is not part of the VM OVA template.
+                                    properties:
+                                      name:
+                                        description: 'name is used to identify the
+                                          disk definition. name is required needs
+                                          to be unique so that it can be used to
+
+                                          clearly identify purpose of the disk.'
+                                        example: images_1
+                                        maxLength: 80
+                                        pattern: ^[a-zA-Z0-9]([-_a-zA-Z0-9]*[a-zA-Z0-9])?$
+                                        type: string
+                                      provisioningMode:
+                                        description: 'provisioningMode is an optional
+                                          field that specifies the provisioning type
+                                          to be used by this vSphere data disk.
+
+                                          Allowed values are "Thin", "Thick", "EagerlyZeroed",
+                                          and omitted.
+
+                                          When set to Thin, the disk will be made
+                                          using thin provisioning allocating the bare
+                                          minimum space.
+
+                                          When set to Thick, the full disk size will
+                                          be allocated when disk is created.
+
+                                          When set to EagerlyZeroed, the disk will
+                                          be created using eager zero provisioning.
+                                          An eager zeroed thick disk has all space
+                                          allocated and wiped clean of any previous
+                                          contents on the physical media at creation
+                                          time. Such disks may take longer time during
+                                          creation compared to other disk formats.
+
+                                          When omitted, no setting will be applied
+                                          to the data disk and the provisioning mode
+                                          for the disk will be determined by the default
+                                          storage policy configured for the datastore
+                                          in vSphere.'
+                                        enum:
+                                        - Thin
+                                        - Thick
+                                        - EagerlyZeroed
+                                        type: string
+                                      sizeGiB:
+                                        description: 'sizeGiB is the size of the disk
+                                          in GiB.
+
+                                          The maximum supported size is 16384 GiB.'
+                                        format: int32
+                                        maximum: 16384
+                                        minimum: 1
+                                        type: integer
+                                    required:
+                                    - name
+                                    - sizeGiB
+                                    type: object
+                                  maxItems: 29
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - name
+                                  x-kubernetes-list-type: map
+                                memoryMB:
+                                  description: Memory is the size of a VM's memory
+                                    in MB.
+                                  format: int64
+                                  type: integer
+                                osDisk:
+                                  description: OSDisk defines the storage for instance.
+                                  properties:
+                                    diskSizeGB:
+                                      description: DiskSizeGB defines the size of
+                                        disk in GB.
+                                      format: int32
+                                      type: integer
+                                  type: object
+                                zones:
+                                  description: 'Zones defines available zones
+
+                                    Zones is available in TechPreview.'
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            diskType:
+                              description: 'DiskType is the name of the disk provisioning
+                                type,
+
+                                valid values are thin, thick, and eagerZeroedThick.
+                                When not
+
+                                specified, it will be set according to the default
+                                storage policy
+
+                                of vsphere.'
+                              enum:
+                              - ''
+                              - thin
+                              - thick
+                              - eagerZeroedThick
+                              type: string
+                            dnsRecordsType:
+                              description: 'dnsRecordsType determines whether records
+                                for api, api-int, and ingress
+
+                                are provided by the internal DNS service or externally.
+
+                                Allowed values are `Internal`, `External`, and omitted.
+
+                                When set to `Internal`, records are provided by the
+                                internal infrastructure and
+
+                                no additional user configuration is required for the
+                                cluster to function.
+
+                                When set to `External`, records are not provided by
+                                the internal infrastructure
+
+                                and must be configured by the user on a DNS server
+                                outside the cluster.
+
+                                Cluster nodes must use this external server for their
+                                upstream DNS requests.
+
+                                This value may only be set when loadBalancer.type
+                                is set to UserManaged.
+
+                                When omitted, this means the user has no opinion and
+                                the platform is left
+
+                                to choose reasonable defaults. These defaults are
+                                subject to change over time.
+
+                                The current default is `Internal`.'
+                              enum:
+                              - Internal
+                              - External
+                              type: string
+                            failureDomains:
+                              description: 'FailureDomains holds the VSpherePlatformFailureDomainSpec
+                                which contains
+
+                                the definition of region, zone and the vCenter topology.
+
+                                If this is omitted failure domains (regions and zones)
+                                will not be used.'
+                              items:
+                                description: 'FailureDomain holds the region and zone
+                                  failure domain and
+
+                                  the vCenter topology of that failure domain.'
+                                properties:
+                                  name:
+                                    description: 'name defines the name of the FailureDomain
+
+                                      This name is arbitrary but will be used
+
+                                      in VSpherePlatformDeploymentZone for association.'
+                                    maxLength: 256
+                                    minLength: 1
+                                    type: string
+                                  region:
+                                    description: 'The region is the name of the tag
+                                      in vCenter that is associated with the
+
+                                      tag category `openshift-region`. The region
+                                      name must match the tag name
+
+                                      and must exist prior to installation. When the
+                                      regionType is Datacenter
+
+                                      the tag must be attached to the toplogy.datacenter
+                                      object in vCenter.
+
+                                      When the regionType is ComputeCluster the tag
+                                      must be attached to the topology.computeCluster
+
+                                      object in vCenter.'
+                                    type: string
+                                  regionType:
+                                    allOf:
+                                    - enum:
+                                      - HostGroup
+                                      - Datacenter
+                                      - ComputeCluster
+                                    - enum:
+                                      - Datacenter
+                                      - ComputeCluster
+                                    description: 'regionType is the type of failure
+                                      domain region, the current values are "Datacenter"
+                                      and "ComputeCluster"
+
+                                      When regionType is Datacenter the zoneType must
+                                      be ComputeCluster.
+
+                                      When regionType is ComputeCluster the zoneType
+                                      must be HostGroup'
+                                    type: string
+                                  server:
+                                    description: server is the fully-qualified domain
+                                      name or the IP address of the vCenter server.
+                                    maxLength: 255
+                                    minLength: 1
+                                    type: string
+                                  topology:
+                                    description: Topology describes a given failure
+                                      domain using vSphere constructs
+                                    properties:
+                                      computeCluster:
+                                        description: 'computeCluster as the failure
+                                          domain
+
+                                          This is required to be a path'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        type: string
+                                      datacenter:
+                                        description: 'datacenter is the vCenter datacenter
+                                          in which virtual machines will be located
+
+                                          and defined as the failure domain.'
+                                        maxLength: 80
+                                        minLength: 1
+                                        type: string
+                                      datastore:
+                                        description: 'datastore is the name or inventory
+                                          path of the datastore in which the
+
+                                          virtual machine is created/located.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        type: string
+                                      folder:
+                                        description: 'folder is the inventory path
+                                          of the folder in which the
+
+                                          virtual machine is created/located.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        pattern: ^/.*?/vm/.*?
+                                        type: string
+                                      hostGroup:
+                                        description: 'hostGroup is the name of the
+                                          vm-host group of type host within vCenter
+                                          for this failure domain.
+
+                                          hostGroup is limited to 80 characters.
+
+                                          This field is required when the ZoneType
+                                          is HostGroup'
+                                        maxLength: 80
+                                        type: string
+                                      networks:
+                                        description: networks is the list of networks
+                                          within this failure domain
+                                        items:
+                                          type: string
+                                        maxItems: 10
+                                        minItems: 1
+                                        type: array
+                                      resourcePool:
+                                        description: 'resourcePool is the absolute
+                                          path of the resource pool where virtual
+                                          machines will be
+
+                                          created. The absolute path is of the form
+                                          /<datacenter>/host/<cluster>/Resources/<resourcepool>.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        pattern: ^/.*?/host/.*?/Resources.*
+                                        type: string
+                                      tagIDs:
+                                        description: 'tagIDs is an optional set of
+                                          tags to add to an instance. Specified tagIDs
+
+                                          must use URN-notation instead of display
+                                          names. A maximum of 10 tag IDs may be specified.'
+                                        example: urn:vmomi:InventoryServiceTag:5736bf56-49f5-4667-b38c-b97e09dc9578:GLOBAL
+                                        items:
+                                          type: string
+                                        type: array
+                                      template:
+                                        description: 'template is the inventory path
+                                          of the virtual machine or template
+
+                                          that will be used for cloning.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        pattern: ^/.*?/vm/.*?
+                                        type: string
+                                    required:
+                                    - computeCluster
+                                    - datacenter
+                                    - datastore
+                                    - networks
+                                    type: object
+                                  zone:
+                                    description: 'The zone is the name of the tag
+                                      in vCenter that is associated with
+
+                                      the tag category `openshift-zone`. The zone
+                                      name must match the tag name
+
+                                      and must exist prior to installation. When zoneType
+                                      is HostGroup the
+
+                                      ESXi hosts defined in the provided in the topology.hostGroup
+                                      field must be tagged.
+
+                                      When the zoneType is ComputeCluster the tag
+                                      must be attached to the topology.computeCluster
+
+                                      object in vCenter.'
+                                    type: string
+                                  zoneType:
+                                    allOf:
+                                    - enum:
+                                      - HostGroup
+                                      - Datacenter
+                                      - ComputeCluster
+                                    - enum:
+                                      - ComputeCluster
+                                      - HostGroup
+                                    description: 'When zoneType is ComputeCluster
+                                      the regionType must be Datacenter
+
+                                      When zoneType is HostGroup the regionType must
+                                      be ComputeCluster
+
+                                      If the zoneType is HostGroup topology.hostGroup
+                                      must be defined and exist in vCenter
+
+                                      prior to installation.'
+                                    type: string
+                                required:
+                                - name
+                                - region
+                                - server
+                                - topology
+                                - zone
+                                type: object
+                              type: array
+                            folder:
+                              description: 'Folder is the absolute path of the folder
+                                that will be used and/or created for
+
+                                virtual machines. The absolute path is of the form
+                                /<datacenter>/vm/<folder>/<subfolder>.
+
+                                Deprecated: Use FailureDomains.Topology.Folder'
+                              pattern: ^/.*?/vm/.*?
+                              type: string
+                            hosts:
+                              description: Hosts defines network configurations to
+                                be applied by the installer. Hosts is available in
+                                TechPreview.
+                              items:
+                                description: Host defines host VMs to generate as
+                                  part of the installation.
+                                properties:
+                                  failureDomain:
+                                    description: FailureDomain refers to the name
+                                      of a FailureDomain as described in https://github.com/openshift/enhancements/blob/master/enhancements/installer/vsphere-ipi-zonal.md
+                                    type: string
+                                  networkDevice:
+                                    description: NetworkDeviceSpec to be applied to
+                                      the host
+                                    properties:
+                                      gateway:
+                                        description: 'gateway is an IPv4 or IPv6 address
+                                          which represents the subnet gateway,
+
+                                          for example, 192.168.1.1.'
+                                        format: ipv6
+                                        type: string
+                                      ipAddrs:
+                                        description: 'ipAddrs is a list of one or
+                                          more IPv4 and/or IPv6 addresses and CIDR
+                                          to assign to
+
+                                          this device, for example, 192.168.1.100/24.
+                                          IP addresses provided via ipAddrs are
+
+                                          intended to allow explicit assignment of
+                                          a machine''s IP address.'
+                                        example: 2001:DB8:0000:0000:244:17FF:FEB6:D37D/64
+                                        format: ipv6
+                                        items:
+                                          type: string
+                                        type: array
+                                      nameservers:
+                                        description: 'nameservers is a list of IPv4
+                                          and/or IPv6 addresses used as DNS nameservers,
+                                          for example,
+
+                                          8.8.8.8. a nameserver is not provided by
+                                          a fulfilled IPAddressClaim. If DHCP is not
+                                          the
+
+                                          source of IP addresses for this network
+                                          device, nameservers should include a valid
+                                          nameserver.'
+                                        example: 8.8.8.8
+                                        format: ipv6
+                                        items:
+                                          type: string
+                                        type: array
+                                    required:
+                                    - ipAddrs
+                                    type: object
+                                  role:
+                                    description: Role defines the role of the node
+                                    enum:
+                                    - ''
+                                    - bootstrap
+                                    - control-plane
+                                    - compute
+                                    type: string
+                                required:
+                                - networkDevice
+                                - role
+                                type: object
+                              type: array
+                            ingressVIP:
+                              description: 'DeprecatedIngressVIP is the virtual IP
+                                address for ingress
+
+                                Deprecated: Use IngressVIPs'
+                              type: string
+                            ingressVIPs:
+                              description: 'IngressVIPs contains the VIP(s) for ingress.
+                                In dual stack clusters it
+
+                                contains an IPv4 and IPv6 address, otherwise only
+                                one VIP'
+                              format: ip
+                              items:
+                                type: string
+                              maxItems: 2
+                              type: array
+                            loadBalancer:
+                              description: 'LoadBalancer defines how the load balancer
+                                used by the cluster is configured.
+
+                                LoadBalancer is available in TechPreview.'
+                              properties:
+                                type:
+                                  default: OpenShiftManagedDefault
+                                  description: 'type defines the type of load balancer
+                                    used by the cluster on VSphere platform
+
+                                    which can be a user-managed or openshift-managed
+                                    load balancer
+
+                                    that is to be used for the OpenShift API and Ingress
+                                    endpoints.
+
+                                    When set to OpenShiftManagedDefault the static
+                                    pods in charge of API and Ingress traffic load-balancing
+
+                                    defined in the machine config operator will be
+                                    deployed.
+
+                                    When set to UserManaged these static pods will
+                                    not be deployed and it is expected that
+
+                                    the load balancer is configured out of band by
+                                    the deployer.
+
+                                    When omitted, this means no opinion and the platform
+                                    is left to choose a reasonable default.
+
+                                    The default value is OpenShiftManagedDefault.'
+                                  enum:
+                                  - OpenShiftManagedDefault
+                                  - UserManaged
+                                  type: string
+                                  x-kubernetes-validations:
+                                  - message: type is immutable once set
+                                    rule: oldSelf == '' || self == oldSelf
+                              type: object
+                            network:
+                              description: 'Network specifies the name of the network
+                                to be used by the cluster.
+
+                                Deprecated: Use FailureDomains.Topology.Network'
+                              type: string
+                            nodeNetworking:
+                              description: 'nodeNetworking contains the definition
+                                of internal and external network constraints for
+
+                                assigning the node''s networking.
+
+                                If this field is omitted, networking defaults to the
+                                legacy
+
+                                address selection behavior which is to only support
+                                a single address and
+
+                                return the first one found.'
+                              properties:
+                                external:
+                                  description: external represents the network configuration
+                                    of the node that is externally routable.
+                                  properties:
+                                    excludeNetworkSubnetCidr:
+                                      description: 'excludeNetworkSubnetCidr IP addresses
+                                        in subnet ranges will be excluded when selecting
+
+                                        the IP address from the VirtualMachine''s
+                                        VM for use in the status.addresses fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                    network:
+                                      description: 'network VirtualMachine''s VM Network
+                                        names that will be used to when searching
+
+                                        for status.addresses fields. Note that if
+                                        internal.networkSubnetCIDR and
+
+                                        external.networkSubnetCIDR are not set, then
+                                        the vNIC associated to this network must
+
+                                        only have a single IP address assigned to
+                                        it.
+
+                                        The available networks (port groups) can be
+                                        listed using
+
+                                        `govc ls ''network/*''`'
+                                      type: string
+                                    networkSubnetCidr:
+                                      description: 'networkSubnetCidr IP address on
+                                        VirtualMachine''s network interfaces included
+                                        in the fields'' CIDRs
+
+                                        that will be used in respective status.addresses
+                                        fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                                internal:
+                                  description: internal represents the network configuration
+                                    of the node that is routable only within the cluster.
+                                  properties:
+                                    excludeNetworkSubnetCidr:
+                                      description: 'excludeNetworkSubnetCidr IP addresses
+                                        in subnet ranges will be excluded when selecting
+
+                                        the IP address from the VirtualMachine''s
+                                        VM for use in the status.addresses fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                    network:
+                                      description: 'network VirtualMachine''s VM Network
+                                        names that will be used to when searching
+
+                                        for status.addresses fields. Note that if
+                                        internal.networkSubnetCIDR and
+
+                                        external.networkSubnetCIDR are not set, then
+                                        the vNIC associated to this network must
+
+                                        only have a single IP address assigned to
+                                        it.
+
+                                        The available networks (port groups) can be
+                                        listed using
+
+                                        `govc ls ''network/*''`'
+                                      type: string
+                                    networkSubnetCidr:
+                                      description: 'networkSubnetCidr IP address on
+                                        VirtualMachine''s network interfaces included
+                                        in the fields'' CIDRs
+
+                                        that will be used in respective status.addresses
+                                        fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                              type: object
+                            password:
+                              description: 'Password is the password for the user
+                                to use to connect to the vCenter.
+
+                                Deprecated: Use VCenters.Password'
+                              type: string
+                            resourcePool:
+                              description: 'ResourcePool is the absolute path of the
+                                resource pool where virtual machines will be
+
+                                created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>.
+
+                                Deprecated: Use FailureDomains.Topology.ResourcePool'
+                              type: string
+                            username:
+                              description: 'Username is the name of the user to use
+                                to connect to the vCenter.
+
+                                Deprecated: Use VCenters.Username'
+                              type: string
+                            vCenter:
+                              description: 'VCenter is the domain name or IP address
+                                of the vCenter.
+
+                                Deprecated: Use VCenters.Server'
+                              type: string
+                            vcenters:
+                              description: VCenters holds the connection details for
+                                services to communicate with vCenter.
+                              items:
+                                description: 'VCenter stores the vCenter connection
+                                  fields
+
+                                  https://github.com/kubernetes/cloud-provider-vsphere/blob/master/pkg/common/config/types_yaml.go'
+                                properties:
+                                  datacenters:
+                                    description: Datacenter in which VMs are located.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
+                                  password:
+                                    description: Password is the password for the
+                                      user to use to connect to the vCenter.
+                                    type: string
+                                  port:
+                                    default: 443
+                                    description: 'port is the TCP port that will be
+                                      used to communicate to
+
+                                      the vCenter endpoint. This is typically unchanged
+                                      from
+
+                                      the default of HTTPS TCP/443.'
+                                    format: int32
+                                    maximum: 32767
+                                    minimum: 1
+                                    type: integer
+                                  server:
+                                    description: server is the fully-qualified domain
+                                      name or the IP address of the vCenter server.
+                                    maxLength: 255
+                                    type: string
+                                  user:
+                                    description: Username is the username that will
+                                      be used to connect to vCenter
+                                    type: string
+                                required:
+                                - datacenters
+                                - password
+                                - server
+                                - user
+                                type: object
+                              maxItems: 3
+                              minItems: 1
+                              type: array
+                          type: object
                         network:
-                          description: Network specifies the name of the network to
-                            be used by the cluster.
+                          description: 'Network specifies the name of the network
+                            to be used by the cluster.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         vCenter:
-                          description: VCenter is the domain name or IP address of
+                          description: 'VCenter is the domain name or IP address of
                             the vCenter.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                       required:
                       - certificatesSecretRef
                       - credentialsSecretRef
-                      - datacenter
-                      - defaultDatastore
-                      - vCenter
                       type: object
                   type: object
                 powerState:
@@ -4198,12 +4956,21 @@ objects:
                           type: object
                           x-kubernetes-map-type: atomic
                         vCenter:
-                          description: VCenter is the vSphere vCenter hostname.
+                          description: 'DeprecatedVCenter is the vSphere vCenter hostname.
+
+                            Deprecated: use VCenters instead'
                           type: string
+                        vCenters:
+                          description: VCenters are potentially multiple vCenter hostnames.
+                            Prefer this field over VCenter.
+                          items:
+                            type: string
+                          type: array
                       required:
                       - certificatesSecretRef
                       - credentialsSecretRef
                       - vCenter
+                      - vCenters
                       type: object
                   type: object
               required:
@@ -5550,8 +6317,12 @@ objects:
                           type: object
                           x-kubernetes-map-type: atomic
                         cluster:
-                          description: Cluster is the name of the cluster virtual
+                          description: 'Cluster is the name of the cluster virtual
                             machines will be cloned into.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         credentialsSecretRef:
                           description: 'CredentialsSecretRef refers to a secret that
@@ -5576,33 +6347,787 @@ objects:
                           type: object
                           x-kubernetes-map-type: atomic
                         datacenter:
-                          description: Datacenter is the name of the datacenter to
+                          description: 'Datacenter is the name of the datacenter to
                             use in the vCenter.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         defaultDatastore:
-                          description: DefaultDatastore is the default datastore to
-                            use for provisioning volumes.
+                          description: 'DefaultDatastore is the default datastore
+                            to use for provisioning volumes.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         folder:
                           description: 'Folder is the name of the folder that will
                             be used and/or created for
 
-                            virtual machines.'
+                            virtual machines.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
+                        infrastructure:
+                          description: Infrastructure is the desired state of the
+                            vSphere infrastructure provider.
+                          properties:
+                            apiVIP:
+                              description: 'DeprecatedAPIVIP is the virtual IP address
+                                for the api endpoint
+
+                                Deprecated: Use APIVIPs'
+                              type: string
+                            apiVIPs:
+                              description: 'APIVIPs contains the VIP(s) for the api
+                                endpoint. In dual stack clusters
+
+                                it contains an IPv4 and IPv6 address, otherwise only
+                                one VIP'
+                              format: ip
+                              items:
+                                type: string
+                              maxItems: 2
+                              type: array
+                            cluster:
+                              description: 'Cluster is the name of the cluster virtual
+                                machines will be cloned into.
+
+                                Deprecated: Use FailureDomains.Topology.Cluster'
+                              type: string
+                            clusterOSImage:
+                              description: ClusterOSImage overrides the url provided
+                                in rhcos.json to download the RHCOS OVA
+                              type: string
+                            datacenter:
+                              description: 'Datacenter is the name of the datacenter
+                                to use in the vCenter.
+
+                                Deprecated: Use FailureDomains.Topology.Datacenter'
+                              type: string
+                            defaultDatastore:
+                              description: 'DefaultDatastore is the default datastore
+                                to use for provisioning volumes.
+
+                                Deprecated: Use FailureDomains.Topology.Datastore'
+                              type: string
+                            defaultMachinePlatform:
+                              description: 'DefaultMachinePlatform is the default
+                                configuration used when
+
+                                installing on VSphere for machine pools which do not
+                                define their own
+
+                                platform configuration.'
+                              properties:
+                                coresPerSocket:
+                                  description: 'NumCoresPerSocket is the number of
+                                    cores per socket in a vm. The number
+
+                                    of vCPUs on the vm will be NumCPUs/NumCoresPerSocket.'
+                                  format: int32
+                                  type: integer
+                                cpus:
+                                  description: NumCPUs is the total number of virtual
+                                    processor cores to assign a vm.
+                                  format: int32
+                                  type: integer
+                                dataDisks:
+                                  description: DataDisks are additional disks to add
+                                    to the VM that are not part of the VM's OVA template.
+                                  items:
+                                    description: DataDisk defines a data disk to add
+                                      to the VM that is not part of the VM OVA template.
+                                    properties:
+                                      name:
+                                        description: 'name is used to identify the
+                                          disk definition. name is required needs
+                                          to be unique so that it can be used to
+
+                                          clearly identify purpose of the disk.'
+                                        example: images_1
+                                        maxLength: 80
+                                        pattern: ^[a-zA-Z0-9]([-_a-zA-Z0-9]*[a-zA-Z0-9])?$
+                                        type: string
+                                      provisioningMode:
+                                        description: 'provisioningMode is an optional
+                                          field that specifies the provisioning type
+                                          to be used by this vSphere data disk.
+
+                                          Allowed values are "Thin", "Thick", "EagerlyZeroed",
+                                          and omitted.
+
+                                          When set to Thin, the disk will be made
+                                          using thin provisioning allocating the bare
+                                          minimum space.
+
+                                          When set to Thick, the full disk size will
+                                          be allocated when disk is created.
+
+                                          When set to EagerlyZeroed, the disk will
+                                          be created using eager zero provisioning.
+                                          An eager zeroed thick disk has all space
+                                          allocated and wiped clean of any previous
+                                          contents on the physical media at creation
+                                          time. Such disks may take longer time during
+                                          creation compared to other disk formats.
+
+                                          When omitted, no setting will be applied
+                                          to the data disk and the provisioning mode
+                                          for the disk will be determined by the default
+                                          storage policy configured for the datastore
+                                          in vSphere.'
+                                        enum:
+                                        - Thin
+                                        - Thick
+                                        - EagerlyZeroed
+                                        type: string
+                                      sizeGiB:
+                                        description: 'sizeGiB is the size of the disk
+                                          in GiB.
+
+                                          The maximum supported size is 16384 GiB.'
+                                        format: int32
+                                        maximum: 16384
+                                        minimum: 1
+                                        type: integer
+                                    required:
+                                    - name
+                                    - sizeGiB
+                                    type: object
+                                  maxItems: 29
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - name
+                                  x-kubernetes-list-type: map
+                                memoryMB:
+                                  description: Memory is the size of a VM's memory
+                                    in MB.
+                                  format: int64
+                                  type: integer
+                                osDisk:
+                                  description: OSDisk defines the storage for instance.
+                                  properties:
+                                    diskSizeGB:
+                                      description: DiskSizeGB defines the size of
+                                        disk in GB.
+                                      format: int32
+                                      type: integer
+                                  type: object
+                                zones:
+                                  description: 'Zones defines available zones
+
+                                    Zones is available in TechPreview.'
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            diskType:
+                              description: 'DiskType is the name of the disk provisioning
+                                type,
+
+                                valid values are thin, thick, and eagerZeroedThick.
+                                When not
+
+                                specified, it will be set according to the default
+                                storage policy
+
+                                of vsphere.'
+                              enum:
+                              - ''
+                              - thin
+                              - thick
+                              - eagerZeroedThick
+                              type: string
+                            dnsRecordsType:
+                              description: 'dnsRecordsType determines whether records
+                                for api, api-int, and ingress
+
+                                are provided by the internal DNS service or externally.
+
+                                Allowed values are `Internal`, `External`, and omitted.
+
+                                When set to `Internal`, records are provided by the
+                                internal infrastructure and
+
+                                no additional user configuration is required for the
+                                cluster to function.
+
+                                When set to `External`, records are not provided by
+                                the internal infrastructure
+
+                                and must be configured by the user on a DNS server
+                                outside the cluster.
+
+                                Cluster nodes must use this external server for their
+                                upstream DNS requests.
+
+                                This value may only be set when loadBalancer.type
+                                is set to UserManaged.
+
+                                When omitted, this means the user has no opinion and
+                                the platform is left
+
+                                to choose reasonable defaults. These defaults are
+                                subject to change over time.
+
+                                The current default is `Internal`.'
+                              enum:
+                              - Internal
+                              - External
+                              type: string
+                            failureDomains:
+                              description: 'FailureDomains holds the VSpherePlatformFailureDomainSpec
+                                which contains
+
+                                the definition of region, zone and the vCenter topology.
+
+                                If this is omitted failure domains (regions and zones)
+                                will not be used.'
+                              items:
+                                description: 'FailureDomain holds the region and zone
+                                  failure domain and
+
+                                  the vCenter topology of that failure domain.'
+                                properties:
+                                  name:
+                                    description: 'name defines the name of the FailureDomain
+
+                                      This name is arbitrary but will be used
+
+                                      in VSpherePlatformDeploymentZone for association.'
+                                    maxLength: 256
+                                    minLength: 1
+                                    type: string
+                                  region:
+                                    description: 'The region is the name of the tag
+                                      in vCenter that is associated with the
+
+                                      tag category `openshift-region`. The region
+                                      name must match the tag name
+
+                                      and must exist prior to installation. When the
+                                      regionType is Datacenter
+
+                                      the tag must be attached to the toplogy.datacenter
+                                      object in vCenter.
+
+                                      When the regionType is ComputeCluster the tag
+                                      must be attached to the topology.computeCluster
+
+                                      object in vCenter.'
+                                    type: string
+                                  regionType:
+                                    allOf:
+                                    - enum:
+                                      - HostGroup
+                                      - Datacenter
+                                      - ComputeCluster
+                                    - enum:
+                                      - Datacenter
+                                      - ComputeCluster
+                                    description: 'regionType is the type of failure
+                                      domain region, the current values are "Datacenter"
+                                      and "ComputeCluster"
+
+                                      When regionType is Datacenter the zoneType must
+                                      be ComputeCluster.
+
+                                      When regionType is ComputeCluster the zoneType
+                                      must be HostGroup'
+                                    type: string
+                                  server:
+                                    description: server is the fully-qualified domain
+                                      name or the IP address of the vCenter server.
+                                    maxLength: 255
+                                    minLength: 1
+                                    type: string
+                                  topology:
+                                    description: Topology describes a given failure
+                                      domain using vSphere constructs
+                                    properties:
+                                      computeCluster:
+                                        description: 'computeCluster as the failure
+                                          domain
+
+                                          This is required to be a path'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        type: string
+                                      datacenter:
+                                        description: 'datacenter is the vCenter datacenter
+                                          in which virtual machines will be located
+
+                                          and defined as the failure domain.'
+                                        maxLength: 80
+                                        minLength: 1
+                                        type: string
+                                      datastore:
+                                        description: 'datastore is the name or inventory
+                                          path of the datastore in which the
+
+                                          virtual machine is created/located.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        type: string
+                                      folder:
+                                        description: 'folder is the inventory path
+                                          of the folder in which the
+
+                                          virtual machine is created/located.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        pattern: ^/.*?/vm/.*?
+                                        type: string
+                                      hostGroup:
+                                        description: 'hostGroup is the name of the
+                                          vm-host group of type host within vCenter
+                                          for this failure domain.
+
+                                          hostGroup is limited to 80 characters.
+
+                                          This field is required when the ZoneType
+                                          is HostGroup'
+                                        maxLength: 80
+                                        type: string
+                                      networks:
+                                        description: networks is the list of networks
+                                          within this failure domain
+                                        items:
+                                          type: string
+                                        maxItems: 10
+                                        minItems: 1
+                                        type: array
+                                      resourcePool:
+                                        description: 'resourcePool is the absolute
+                                          path of the resource pool where virtual
+                                          machines will be
+
+                                          created. The absolute path is of the form
+                                          /<datacenter>/host/<cluster>/Resources/<resourcepool>.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        pattern: ^/.*?/host/.*?/Resources.*
+                                        type: string
+                                      tagIDs:
+                                        description: 'tagIDs is an optional set of
+                                          tags to add to an instance. Specified tagIDs
+
+                                          must use URN-notation instead of display
+                                          names. A maximum of 10 tag IDs may be specified.'
+                                        example: urn:vmomi:InventoryServiceTag:5736bf56-49f5-4667-b38c-b97e09dc9578:GLOBAL
+                                        items:
+                                          type: string
+                                        type: array
+                                      template:
+                                        description: 'template is the inventory path
+                                          of the virtual machine or template
+
+                                          that will be used for cloning.'
+                                        maxLength: 2048
+                                        minLength: 1
+                                        pattern: ^/.*?/vm/.*?
+                                        type: string
+                                    required:
+                                    - computeCluster
+                                    - datacenter
+                                    - datastore
+                                    - networks
+                                    type: object
+                                  zone:
+                                    description: 'The zone is the name of the tag
+                                      in vCenter that is associated with
+
+                                      the tag category `openshift-zone`. The zone
+                                      name must match the tag name
+
+                                      and must exist prior to installation. When zoneType
+                                      is HostGroup the
+
+                                      ESXi hosts defined in the provided in the topology.hostGroup
+                                      field must be tagged.
+
+                                      When the zoneType is ComputeCluster the tag
+                                      must be attached to the topology.computeCluster
+
+                                      object in vCenter.'
+                                    type: string
+                                  zoneType:
+                                    allOf:
+                                    - enum:
+                                      - HostGroup
+                                      - Datacenter
+                                      - ComputeCluster
+                                    - enum:
+                                      - ComputeCluster
+                                      - HostGroup
+                                    description: 'When zoneType is ComputeCluster
+                                      the regionType must be Datacenter
+
+                                      When zoneType is HostGroup the regionType must
+                                      be ComputeCluster
+
+                                      If the zoneType is HostGroup topology.hostGroup
+                                      must be defined and exist in vCenter
+
+                                      prior to installation.'
+                                    type: string
+                                required:
+                                - name
+                                - region
+                                - server
+                                - topology
+                                - zone
+                                type: object
+                              type: array
+                            folder:
+                              description: 'Folder is the absolute path of the folder
+                                that will be used and/or created for
+
+                                virtual machines. The absolute path is of the form
+                                /<datacenter>/vm/<folder>/<subfolder>.
+
+                                Deprecated: Use FailureDomains.Topology.Folder'
+                              pattern: ^/.*?/vm/.*?
+                              type: string
+                            hosts:
+                              description: Hosts defines network configurations to
+                                be applied by the installer. Hosts is available in
+                                TechPreview.
+                              items:
+                                description: Host defines host VMs to generate as
+                                  part of the installation.
+                                properties:
+                                  failureDomain:
+                                    description: FailureDomain refers to the name
+                                      of a FailureDomain as described in https://github.com/openshift/enhancements/blob/master/enhancements/installer/vsphere-ipi-zonal.md
+                                    type: string
+                                  networkDevice:
+                                    description: NetworkDeviceSpec to be applied to
+                                      the host
+                                    properties:
+                                      gateway:
+                                        description: 'gateway is an IPv4 or IPv6 address
+                                          which represents the subnet gateway,
+
+                                          for example, 192.168.1.1.'
+                                        format: ipv6
+                                        type: string
+                                      ipAddrs:
+                                        description: 'ipAddrs is a list of one or
+                                          more IPv4 and/or IPv6 addresses and CIDR
+                                          to assign to
+
+                                          this device, for example, 192.168.1.100/24.
+                                          IP addresses provided via ipAddrs are
+
+                                          intended to allow explicit assignment of
+                                          a machine''s IP address.'
+                                        example: 2001:DB8:0000:0000:244:17FF:FEB6:D37D/64
+                                        format: ipv6
+                                        items:
+                                          type: string
+                                        type: array
+                                      nameservers:
+                                        description: 'nameservers is a list of IPv4
+                                          and/or IPv6 addresses used as DNS nameservers,
+                                          for example,
+
+                                          8.8.8.8. a nameserver is not provided by
+                                          a fulfilled IPAddressClaim. If DHCP is not
+                                          the
+
+                                          source of IP addresses for this network
+                                          device, nameservers should include a valid
+                                          nameserver.'
+                                        example: 8.8.8.8
+                                        format: ipv6
+                                        items:
+                                          type: string
+                                        type: array
+                                    required:
+                                    - ipAddrs
+                                    type: object
+                                  role:
+                                    description: Role defines the role of the node
+                                    enum:
+                                    - ''
+                                    - bootstrap
+                                    - control-plane
+                                    - compute
+                                    type: string
+                                required:
+                                - networkDevice
+                                - role
+                                type: object
+                              type: array
+                            ingressVIP:
+                              description: 'DeprecatedIngressVIP is the virtual IP
+                                address for ingress
+
+                                Deprecated: Use IngressVIPs'
+                              type: string
+                            ingressVIPs:
+                              description: 'IngressVIPs contains the VIP(s) for ingress.
+                                In dual stack clusters it
+
+                                contains an IPv4 and IPv6 address, otherwise only
+                                one VIP'
+                              format: ip
+                              items:
+                                type: string
+                              maxItems: 2
+                              type: array
+                            loadBalancer:
+                              description: 'LoadBalancer defines how the load balancer
+                                used by the cluster is configured.
+
+                                LoadBalancer is available in TechPreview.'
+                              properties:
+                                type:
+                                  default: OpenShiftManagedDefault
+                                  description: 'type defines the type of load balancer
+                                    used by the cluster on VSphere platform
+
+                                    which can be a user-managed or openshift-managed
+                                    load balancer
+
+                                    that is to be used for the OpenShift API and Ingress
+                                    endpoints.
+
+                                    When set to OpenShiftManagedDefault the static
+                                    pods in charge of API and Ingress traffic load-balancing
+
+                                    defined in the machine config operator will be
+                                    deployed.
+
+                                    When set to UserManaged these static pods will
+                                    not be deployed and it is expected that
+
+                                    the load balancer is configured out of band by
+                                    the deployer.
+
+                                    When omitted, this means no opinion and the platform
+                                    is left to choose a reasonable default.
+
+                                    The default value is OpenShiftManagedDefault.'
+                                  enum:
+                                  - OpenShiftManagedDefault
+                                  - UserManaged
+                                  type: string
+                                  x-kubernetes-validations:
+                                  - message: type is immutable once set
+                                    rule: oldSelf == '' || self == oldSelf
+                              type: object
+                            network:
+                              description: 'Network specifies the name of the network
+                                to be used by the cluster.
+
+                                Deprecated: Use FailureDomains.Topology.Network'
+                              type: string
+                            nodeNetworking:
+                              description: 'nodeNetworking contains the definition
+                                of internal and external network constraints for
+
+                                assigning the node''s networking.
+
+                                If this field is omitted, networking defaults to the
+                                legacy
+
+                                address selection behavior which is to only support
+                                a single address and
+
+                                return the first one found.'
+                              properties:
+                                external:
+                                  description: external represents the network configuration
+                                    of the node that is externally routable.
+                                  properties:
+                                    excludeNetworkSubnetCidr:
+                                      description: 'excludeNetworkSubnetCidr IP addresses
+                                        in subnet ranges will be excluded when selecting
+
+                                        the IP address from the VirtualMachine''s
+                                        VM for use in the status.addresses fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                    network:
+                                      description: 'network VirtualMachine''s VM Network
+                                        names that will be used to when searching
+
+                                        for status.addresses fields. Note that if
+                                        internal.networkSubnetCIDR and
+
+                                        external.networkSubnetCIDR are not set, then
+                                        the vNIC associated to this network must
+
+                                        only have a single IP address assigned to
+                                        it.
+
+                                        The available networks (port groups) can be
+                                        listed using
+
+                                        `govc ls ''network/*''`'
+                                      type: string
+                                    networkSubnetCidr:
+                                      description: 'networkSubnetCidr IP address on
+                                        VirtualMachine''s network interfaces included
+                                        in the fields'' CIDRs
+
+                                        that will be used in respective status.addresses
+                                        fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                                internal:
+                                  description: internal represents the network configuration
+                                    of the node that is routable only within the cluster.
+                                  properties:
+                                    excludeNetworkSubnetCidr:
+                                      description: 'excludeNetworkSubnetCidr IP addresses
+                                        in subnet ranges will be excluded when selecting
+
+                                        the IP address from the VirtualMachine''s
+                                        VM for use in the status.addresses fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                    network:
+                                      description: 'network VirtualMachine''s VM Network
+                                        names that will be used to when searching
+
+                                        for status.addresses fields. Note that if
+                                        internal.networkSubnetCIDR and
+
+                                        external.networkSubnetCIDR are not set, then
+                                        the vNIC associated to this network must
+
+                                        only have a single IP address assigned to
+                                        it.
+
+                                        The available networks (port groups) can be
+                                        listed using
+
+                                        `govc ls ''network/*''`'
+                                      type: string
+                                    networkSubnetCidr:
+                                      description: 'networkSubnetCidr IP address on
+                                        VirtualMachine''s network interfaces included
+                                        in the fields'' CIDRs
+
+                                        that will be used in respective status.addresses
+                                        fields.'
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                              type: object
+                            password:
+                              description: 'Password is the password for the user
+                                to use to connect to the vCenter.
+
+                                Deprecated: Use VCenters.Password'
+                              type: string
+                            resourcePool:
+                              description: 'ResourcePool is the absolute path of the
+                                resource pool where virtual machines will be
+
+                                created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>.
+
+                                Deprecated: Use FailureDomains.Topology.ResourcePool'
+                              type: string
+                            username:
+                              description: 'Username is the name of the user to use
+                                to connect to the vCenter.
+
+                                Deprecated: Use VCenters.Username'
+                              type: string
+                            vCenter:
+                              description: 'VCenter is the domain name or IP address
+                                of the vCenter.
+
+                                Deprecated: Use VCenters.Server'
+                              type: string
+                            vcenters:
+                              description: VCenters holds the connection details for
+                                services to communicate with vCenter.
+                              items:
+                                description: 'VCenter stores the vCenter connection
+                                  fields
+
+                                  https://github.com/kubernetes/cloud-provider-vsphere/blob/master/pkg/common/config/types_yaml.go'
+                                properties:
+                                  datacenters:
+                                    description: Datacenter in which VMs are located.
+                                    items:
+                                      type: string
+                                    minItems: 1
+                                    type: array
+                                  password:
+                                    description: Password is the password for the
+                                      user to use to connect to the vCenter.
+                                    type: string
+                                  port:
+                                    default: 443
+                                    description: 'port is the TCP port that will be
+                                      used to communicate to
+
+                                      the vCenter endpoint. This is typically unchanged
+                                      from
+
+                                      the default of HTTPS TCP/443.'
+                                    format: int32
+                                    maximum: 32767
+                                    minimum: 1
+                                    type: integer
+                                  server:
+                                    description: server is the fully-qualified domain
+                                      name or the IP address of the vCenter server.
+                                    maxLength: 255
+                                    type: string
+                                  user:
+                                    description: Username is the username that will
+                                      be used to connect to vCenter
+                                    type: string
+                                required:
+                                - datacenters
+                                - password
+                                - server
+                                - user
+                                type: object
+                              maxItems: 3
+                              minItems: 1
+                              type: array
+                          type: object
                         network:
-                          description: Network specifies the name of the network to
-                            be used by the cluster.
+                          description: 'Network specifies the name of the network
+                            to be used by the cluster.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                         vCenter:
-                          description: VCenter is the domain name or IP address of
+                          description: 'VCenter is the domain name or IP address of
                             the vCenter.
+
+                            Deprecated: Please use Platform.Infrastructure instead
+
+                            See also: Platform.ConvertDeprecatedFields'
                           type: string
                       required:
                       - certificatesSecretRef
                       - credentialsSecretRef
-                      - datacenter
-                      - defaultDatastore
-                      - vCenter
                       type: object
                   type: object
                 pullSecretRef:
@@ -9711,6 +11236,70 @@ objects:
                             cores to assign a vm.
                           format: int32
                           type: integer
+                        dataDisks:
+                          description: DataDisks are additional disks to add to the
+                            VM that are not part of the VM's OVA template.
+                          items:
+                            description: DataDisk defines a data disk to add to the
+                              VM that is not part of the VM OVA template.
+                            properties:
+                              name:
+                                description: 'name is used to identify the disk definition.
+                                  name is required needs to be unique so that it can
+                                  be used to
+
+                                  clearly identify purpose of the disk.'
+                                example: images_1
+                                maxLength: 80
+                                pattern: ^[a-zA-Z0-9]([-_a-zA-Z0-9]*[a-zA-Z0-9])?$
+                                type: string
+                              provisioningMode:
+                                description: 'provisioningMode is an optional field
+                                  that specifies the provisioning type to be used
+                                  by this vSphere data disk.
+
+                                  Allowed values are "Thin", "Thick", "EagerlyZeroed",
+                                  and omitted.
+
+                                  When set to Thin, the disk will be made using thin
+                                  provisioning allocating the bare minimum space.
+
+                                  When set to Thick, the full disk size will be allocated
+                                  when disk is created.
+
+                                  When set to EagerlyZeroed, the disk will be created
+                                  using eager zero provisioning. An eager zeroed thick
+                                  disk has all space allocated and wiped clean of
+                                  any previous contents on the physical media at creation
+                                  time. Such disks may take longer time during creation
+                                  compared to other disk formats.
+
+                                  When omitted, no setting will be applied to the
+                                  data disk and the provisioning mode for the disk
+                                  will be determined by the default storage policy
+                                  configured for the datastore in vSphere.'
+                                enum:
+                                - Thin
+                                - Thick
+                                - EagerlyZeroed
+                                type: string
+                              sizeGiB:
+                                description: 'sizeGiB is the size of the disk in GiB.
+
+                                  The maximum supported size is 16384 GiB.'
+                                format: int32
+                                maximum: 16384
+                                minimum: 1
+                                type: integer
+                            required:
+                            - name
+                            - sizeGiB
+                            type: object
+                          maxItems: 29
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         memoryMB:
                           description: Memory is the size of a VM's memory in MB.
                           format: int64
@@ -9723,27 +11312,120 @@ objects:
                                 GB.
                               format: int32
                               type: integer
-                          required:
-                          - diskSizeGB
                           type: object
                         resourcePool:
                           description: 'ResourcePool is the name of the resource pool
                             that will be used for virtual machines.
 
-                            If it is not present, a default value will be used.'
+                            If it is not present, a default value will be used.
+
+                            Deprecated: use Topology instead'
                           type: string
                         tagIDs:
-                          description: TagIDs is a list of up to 10 tags to add to
+                          description: 'TagIDs is a list of up to 10 tags to add to
                             the VMs that this machine set provisions in vSphere.
+
+                            Deprecated: use Topology instead'
                           items:
                             type: string
                           maxItems: 10
                           type: array
-                      required:
-                      - coresPerSocket
-                      - cpus
-                      - memoryMB
-                      - osDisk
+                        topology:
+                          description: 'Topology is the vSphere topology that will
+                            be used for virtual machines.
+
+                            If it is not present, a default value will be used.'
+                          properties:
+                            computeCluster:
+                              description: 'computeCluster as the failure domain
+
+                                This is required to be a path'
+                              maxLength: 2048
+                              minLength: 1
+                              type: string
+                            datacenter:
+                              description: 'datacenter is the vCenter datacenter in
+                                which virtual machines will be located
+
+                                and defined as the failure domain.'
+                              maxLength: 80
+                              minLength: 1
+                              type: string
+                            datastore:
+                              description: 'datastore is the name or inventory path
+                                of the datastore in which the
+
+                                virtual machine is created/located.'
+                              maxLength: 2048
+                              minLength: 1
+                              type: string
+                            folder:
+                              description: 'folder is the inventory path of the folder
+                                in which the
+
+                                virtual machine is created/located.'
+                              maxLength: 2048
+                              minLength: 1
+                              pattern: ^/.*?/vm/.*?
+                              type: string
+                            hostGroup:
+                              description: 'hostGroup is the name of the vm-host group
+                                of type host within vCenter for this failure domain.
+
+                                hostGroup is limited to 80 characters.
+
+                                This field is required when the ZoneType is HostGroup'
+                              maxLength: 80
+                              type: string
+                            networks:
+                              description: networks is the list of networks within
+                                this failure domain
+                              items:
+                                type: string
+                              maxItems: 10
+                              minItems: 1
+                              type: array
+                            resourcePool:
+                              description: 'resourcePool is the absolute path of the
+                                resource pool where virtual machines will be
+
+                                created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>.'
+                              maxLength: 2048
+                              minLength: 1
+                              pattern: ^/.*?/host/.*?/Resources.*
+                              type: string
+                            tagIDs:
+                              description: 'tagIDs is an optional set of tags to add
+                                to an instance. Specified tagIDs
+
+                                must use URN-notation instead of display names. A
+                                maximum of 10 tag IDs may be specified.'
+                              example: urn:vmomi:InventoryServiceTag:5736bf56-49f5-4667-b38c-b97e09dc9578:GLOBAL
+                              items:
+                                type: string
+                              type: array
+                            template:
+                              description: 'template is the inventory path of the
+                                virtual machine or template
+
+                                that will be used for cloning.'
+                              maxLength: 2048
+                              minLength: 1
+                              pattern: ^/.*?/vm/.*?
+                              type: string
+                          required:
+                          - computeCluster
+                          - datacenter
+                          - datastore
+                          - networks
+                          type: object
+                        zones:
+                          description: 'Zones defines available zones
+
+                            Zones is available in TechPreview.'
+                          items:
+                            type: string
+                          type: array
                       type: object
                   type: object
                 replicas:

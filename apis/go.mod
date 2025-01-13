@@ -6,6 +6,7 @@ toolchain go1.24.6
 
 require (
 	github.com/openshift/api v0.0.0-20251120220512-cb382c9eaf42
+	github.com/openshift/installer v1.4.21-pre2.0.20260112230456-1c2444827f23
 	k8s.io/api v0.34.2
 	k8s.io/apimachinery v0.34.2
 )
@@ -18,10 +19,6 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/rogpeppe/go-internal v1.14.1 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/net v0.47.0 // indirect

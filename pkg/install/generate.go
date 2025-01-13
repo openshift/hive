@@ -811,6 +811,14 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 		req.Namespace,
 		"vsphere-creds", constants.VSphereCredentialsDir, req.Spec.Platform.VSphere.CredentialsSecretRef.Name,
 		"vsphere-certificates", constants.VSphereCertificatesDir, req.Spec.Platform.VSphere.CertificatesSecretRef.Name)
+
+	var joinedVCenters string
+	if len(req.Spec.Platform.VSphere.VCenters) == 0 && req.Spec.Platform.VSphere.VCenter != "" {
+		joinedVCenters = req.Spec.Platform.VSphere.VCenter
+	} else {
+		joinedVCenters = strings.Join(req.Spec.Platform.VSphere.VCenters, "::")
+	}
+
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -820,7 +828,7 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 			Command:         []string{"/usr/bin/hiveutil"},
 			Args: []string{
 				"deprovision", "vsphere",
-				"--vsphere-vcenter", req.Spec.Platform.VSphere.VCenter,
+				"--vsphere-vcenter", joinedVCenters,
 				"--loglevel", "debug",
 				"--creds-dir", constants.VSphereCredentialsDir,
 				req.Spec.InfraID,

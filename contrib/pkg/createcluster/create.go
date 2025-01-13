@@ -2,6 +2,7 @@ package createcluster
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/user"
@@ -32,6 +33,7 @@ import (
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/util/scheme"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -198,14 +200,9 @@ type Options struct {
 	OpenStackIngressFloatingIP string
 
 	// VSphere
-	VSphereVCenter          string
-	VSphereDatacenter       string
-	VSphereDefaultDataStore string
-	VSphereFolder           string
-	VSphereCluster          string
 	VSphereAPIVIP           string
 	VSphereIngressVIP       string
-	VSphereNetwork          string
+	VSpherePlatformSpecJSON string
 	VSphereCACerts          string
 
 	// Ovirt
@@ -357,14 +354,9 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.OpenStackIngressFloatingIP, "openstack-ingress-floating-ip", "", "Floating IP address to use for cluster's Ingress service")
 
 	// vSphere flags
-	flags.StringVar(&opt.VSphereVCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
-	flags.StringVar(&opt.VSphereDatacenter, "vsphere-datacenter", "", "Datacenter to use in the vCenter")
-	flags.StringVar(&opt.VSphereDefaultDataStore, "vsphere-default-datastore", "", "Default datastore to use for provisioning volumes")
-	flags.StringVar(&opt.VSphereFolder, "vsphere-folder", "", "Folder that will be used and/or created for virtual machines")
-	flags.StringVar(&opt.VSphereCluster, "vsphere-cluster", "", "Cluster virtual machines will be cloned into")
 	flags.StringVar(&opt.VSphereAPIVIP, "vsphere-api-vip", "", "Virtual IP address for the api endpoint")
 	flags.StringVar(&opt.VSphereIngressVIP, "vsphere-ingress-vip", "", "Virtual IP address for ingress application routing")
-	flags.StringVar(&opt.VSphereNetwork, "vsphere-network", "", "Name of the network to be used by the cluster")
+	flags.StringVar(&opt.VSpherePlatformSpecJSON, "vsphere-platform-spec-json", "", "Path to installer vsphere platform spec, encoded as JSON")
 	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
 
 	// oVirt flags
@@ -749,47 +741,23 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			caCerts = append(caCerts, caCert)
 		}
 
-		vSphereNetwork := os.Getenv(constants.VSphereNetworkEnvVar)
-		if o.VSphereNetwork != "" {
-			vSphereNetwork = o.VSphereNetwork
+		platformBytes, err := os.ReadFile(o.VSpherePlatformSpecJSON)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s: %w", o.VSpherePlatformSpecJSON, err)
+		}
+		platform := installervsphere.Platform{}
+		err = json.Unmarshal(platformBytes, &platform)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding platform %s: %w", o.VSpherePlatformSpecJSON, err)
 		}
 
-		vSphereDatacenter := os.Getenv(constants.VSphereDataCenterEnvVar)
-		if o.VSphereDatacenter != "" {
-			vSphereDatacenter = o.VSphereDatacenter
-		}
-		if vSphereDatacenter == "" {
-			return nil, fmt.Errorf("must provide --vsphere-datacenter or set %s env var", constants.VSphereDataCenterEnvVar)
-		}
-
-		vSphereDatastore := os.Getenv(constants.VSphereDataStoreEnvVar)
-		if o.VSphereDefaultDataStore != "" {
-			vSphereDatastore = o.VSphereDefaultDataStore
-		}
-		if vSphereDatastore == "" {
-			return nil, fmt.Errorf("must provide --vsphere-default-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
-		}
-
-		vSphereVCenter := os.Getenv(constants.VSphereVCenterEnvVar)
-		if o.VSphereVCenter != "" {
-			vSphereVCenter = o.VSphereVCenter
-		}
-		if vSphereVCenter == "" {
-			return nil, fmt.Errorf("must provide --vsphere-vcenter or set %s env var", constants.VSphereVCenterEnvVar)
-		}
+		vSphereSpec := clusterresource.APIPlatformSpecFromInstallerPlatformSpecAndIPs(platform, o.VSphereAPIVIP, o.VSphereIngressVIP)
 
 		vsphereProvider := &clusterresource.VSphereCloudBuilder{
-			VCenter:          vSphereVCenter,
-			Username:         vsphereUsername,
-			Password:         vspherePassword,
-			Datacenter:       vSphereDatacenter,
-			DefaultDatastore: vSphereDatastore,
-			Folder:           o.VSphereFolder,
-			Cluster:          o.VSphereCluster,
-			APIVIP:           o.VSphereAPIVIP,
-			IngressVIP:       o.VSphereIngressVIP,
-			Network:          vSphereNetwork,
-			CACert:           bytes.Join(caCerts, []byte("\n")),
+			Username: vsphereUsername,
+			Password: vspherePassword,
+			CACert:   bytes.Join(caCerts, []byte("\n")),
+			VSphere:  vSphereSpec,
 		}
 		builder.CloudBuilder = vsphereProvider
 	case cloudOVirt:

@@ -2,7 +2,6 @@ package clusterresource
 
 import (
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -10,6 +9,7 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 
+	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	"github.com/openshift/hive/pkg/constants"
@@ -19,39 +19,17 @@ var _ CloudBuilder = (*VSphereCloudBuilder)(nil)
 
 // VSphereCloudBuilder encapsulates cluster artifact generation logic specific to vSphere.
 type VSphereCloudBuilder struct {
-	// VCenter is the domain name or IP address of the vCenter.
-	VCenter string
-
 	// Username is the name of the user to use to connect to the vCenter.
 	Username string
 
 	// Password is the password for the user to use to connect to the vCenter.
 	Password string
 
-	// Datacenter is the name of the datacenter to use in the vCenter.
-	Datacenter string
-
-	// DefaultDatastore is the default datastore to use for provisioning volumes.
-	DefaultDatastore string
-
-	// Folder is the name of the folder that will be used and/or created for
-	// virtual machines.
-	Folder string
-
-	// Cluster is the name of the cluster virtual machines will be cloned into.
-	Cluster string
-
-	// APIVIP is the virtual IP address for the api endpoint
-	APIVIP string
-
-	// IngressVIP is the virtual IP address for ingress
-	IngressVIP string
-
-	// Network specifies the name of the network to be used by the cluster.
-	Network string
-
 	// CACert is the CA certificate(s) used to communicate with the vCenter.
 	CACert []byte
+
+	// VSphere is the full vSphere platform spec
+	VSphere *configv1.VSpherePlatformSpec
 }
 
 func NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret *corev1.Secret) *VSphereCloudBuilder {
@@ -63,6 +41,10 @@ func NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret *corev1.Secret) *
 		Password: string(password),
 		CACert:   cacert,
 	}
+}
+
+func NewDummyVSphereCloudBuilder() *VSphereCloudBuilder {
+	return &VSphereCloudBuilder{}
 }
 
 func (p *VSphereCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -111,12 +93,7 @@ func (p *VSphereCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			CertificatesSecretRef: corev1.LocalObjectReference{
 				Name: p.certificatesSecretName(o),
 			},
-			VCenter:          p.VCenter,
-			Datacenter:       p.Datacenter,
-			DefaultDatastore: p.DefaultDatastore,
-			Folder:           p.Folder,
-			Cluster:          p.Cluster,
-			Network:          p.Network,
+			VSphere: p.VSphere,
 		},
 	}
 }
@@ -132,23 +109,59 @@ func (p *VSphereCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.Mach
 	}
 }
 
-func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
+func (p *VSphereCloudBuilder) AttachToInstallConfig(ic *installertypes.InstallConfig) {
+	var vCenters []installervsphere.VCenter
+	var failureDomains []installervsphere.FailureDomain
+	var apiVIPs []string
+	var ingressVIPs []string
 
-	// TODO: Watch for removal of deprecated fields https://issues.redhat.com/browse/SPLAT-1093
+	for _, vCenter := range p.VSphere.VCenters {
+		vCenters = append(vCenters, installervsphere.VCenter{
+			Server:      vCenter.Server,
+			Username:    p.Username,
+			Password:    p.Password,
+			Datacenters: vCenter.Datacenters,
+		})
+	}
+
+	for _, failureDomain := range p.VSphere.FailureDomains {
+		failureDomains = append(failureDomains, installervsphere.FailureDomain{
+			Server: failureDomain.Server,
+			Name:   failureDomain.Name,
+			Zone:   failureDomain.Zone,
+			Region: failureDomain.Region,
+			Topology: installervsphere.Topology{
+				Datacenter:     failureDomain.Topology.Datacenter,
+				ComputeCluster: failureDomain.Topology.ComputeCluster,
+				Networks:       failureDomain.Topology.Networks,
+				Datastore:      failureDomain.Topology.Datastore,
+				ResourcePool:   failureDomain.Topology.ResourcePool,
+				Folder:         failureDomain.Topology.Folder,
+				Template:       failureDomain.Topology.Template,
+			},
+		})
+	}
+
+	for _, apiVIP := range p.VSphere.APIServerInternalIPs {
+		apiVIPs = append(apiVIPs, string(apiVIP))
+	}
+
+	for _, ingressVIP := range p.VSphere.IngressIPs {
+		ingressVIPs = append(ingressVIPs, string(ingressVIP))
+	}
+
 	ic.Platform = installertypes.Platform{
 		VSphere: &installervsphere.Platform{
-			DeprecatedVCenter:          p.VCenter,
-			DeprecatedUsername:         p.Username,
-			DeprecatedPassword:         p.Password,
-			DeprecatedDatacenter:       p.Datacenter,
-			DeprecatedDefaultDatastore: p.DefaultDatastore,
-			DeprecatedFolder:           p.Folder,
-			DeprecatedCluster:          p.Cluster,
-			APIVIPs:                    []string{p.APIVIP},
-			IngressVIPs:                []string{p.IngressVIP},
-			DeprecatedNetwork:          p.Network,
+			VCenters:       vCenters,
+			FailureDomains: failureDomains,
+			APIVIPs:        apiVIPs,
+			IngressVIPs:    ingressVIPs,
 		},
 	}
+}
+
+func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
+	p.AttachToInstallConfig(ic)
 }
 
 func (p *VSphereCloudBuilder) CredsSecretName(o *Builder) string {
@@ -157,4 +170,41 @@ func (p *VSphereCloudBuilder) CredsSecretName(o *Builder) string {
 
 func (p *VSphereCloudBuilder) certificatesSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-vsphere-certs", o.Name)
+}
+
+// APIPlatformSpecFromInstallerPlatformSpecAndIPs builds an openshift api VSpherePlatformSpec from the given installer platform spec
+// and the two IP addresses (API and ingress).
+func APIPlatformSpecFromInstallerPlatformSpecAndIPs(platform installervsphere.Platform, apisVIP, ingressVIP string) *configv1.VSpherePlatformSpec {
+	vcenters := make([]configv1.VSpherePlatformVCenterSpec, 0, len(platform.VCenters))
+	for _, vcenter := range platform.VCenters {
+		vcenters = append(vcenters, configv1.VSpherePlatformVCenterSpec{
+			Server:      vcenter.Server,
+			Port:        vcenter.Port,
+			Datacenters: vcenter.Datacenters,
+		})
+	}
+
+	failureDomains := make([]configv1.VSpherePlatformFailureDomainSpec, 0, len(platform.FailureDomains))
+	for _, failureDomain := range platform.FailureDomains {
+		failureDomains = append(failureDomains, configv1.VSpherePlatformFailureDomainSpec{
+			Server: failureDomain.Server,
+			Name:   failureDomain.Name,
+			Zone:   failureDomain.Zone,
+			Region: failureDomain.Region,
+			Topology: configv1.VSpherePlatformTopology{
+				ResourcePool:   failureDomain.Topology.ResourcePool,
+				ComputeCluster: failureDomain.Topology.ComputeCluster,
+				Datacenter:     failureDomain.Topology.Datacenter,
+				Datastore:      failureDomain.Topology.Datastore,
+				Networks:       failureDomain.Topology.Networks,
+			},
+		})
+	}
+
+	return &configv1.VSpherePlatformSpec{
+		VCenters:             vcenters,
+		FailureDomains:       failureDomains,
+		APIServerInternalIPs: []configv1.IP{configv1.IP(apisVIP)},
+		IngressIPs:           []configv1.IP{configv1.IP(ingressVIP)},
+	}
 }

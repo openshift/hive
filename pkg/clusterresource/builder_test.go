@@ -2,6 +2,7 @@ package clusterresource
 
 import (
 	"fmt"
+	configv1 "github.com/openshift/api/config/v1"
 	"strings"
 	"testing"
 
@@ -141,16 +142,37 @@ func createOpenStackClusterBuilder() *Builder {
 func createVSphereClusterBuilder() *Builder {
 	b := createTestBuilder()
 	b.CloudBuilder = &VSphereCloudBuilder{
-		VCenter:          "test",
-		Username:         "test",
-		Password:         "test",
-		Datacenter:       "test",
-		DefaultDatastore: "test",
-		Folder:           "test",
-		Cluster:          "test",
-		APIVIP:           "192.168.0.2",
-		IngressVIP:       "192.168.0.3",
-		CACert:           []byte{},
+		Username: "test",
+		Password: "test",
+		CACert:   []byte{},
+		VSphere: &configv1.VSpherePlatformSpec{
+			VCenters: []configv1.VSpherePlatformVCenterSpec{
+				{
+					Server:      "test",
+					Port:        123,
+					Datacenters: []string{"test"},
+				},
+			},
+			FailureDomains: []configv1.VSpherePlatformFailureDomainSpec{
+				{
+					Name:   "test",
+					Region: "test",
+					Zone:   "test",
+					Server: "test",
+					Topology: configv1.VSpherePlatformTopology{
+						Datacenter:     "test",
+						ComputeCluster: "test",
+						Networks:       []string{"test"},
+						Datastore:      "test",
+						ResourcePool:   "test",
+						Folder:         "test",
+						Template:       "test",
+					},
+				},
+			},
+			APIServerInternalIPs: []configv1.IP{"192.168.0.2"},
+			IngressIPs:           []configv1.IP{"192.168.0.3"},
+		},
 	}
 	return b
 }

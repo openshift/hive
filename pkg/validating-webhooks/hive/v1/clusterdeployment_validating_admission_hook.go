@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	"github.com/bombsimon/logrusr/v4"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -306,7 +307,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), cd.Spec.Platform)...)
+	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), cd.Spec.Platform, contextLogger)...)
 	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
 	if cd.Spec.Platform.AWS != nil {
@@ -458,7 +459,7 @@ func validatefeatureGates(decoder admission.Decoder, admissionSpec *admissionv1b
 	return nil
 }
 
-func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.ErrorList {
+func validateClusterPlatform(path *field.Path, platform hivev1.Platform, entry *log.Entry) field.ErrorList {
 	allErrs := field.ErrorList{}
 	numberOfPlatforms := 0
 	if aws := platform.AWS; aws != nil {
@@ -511,6 +512,8 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		}
 	}
 	if vsphere := platform.VSphere; vsphere != nil {
+		vsphere = vsphere.DeepCopy()
+		vsphere.ConvertDeprecatedFields(logrusr.New(entry))
 		numberOfPlatforms++
 		vspherePath := path.Child("vsphere")
 		if vsphere.CredentialsSecretRef.Name == "" {
@@ -519,14 +522,8 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		if vsphere.CertificatesSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
 		}
-		if vsphere.VCenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
-		}
-		if vsphere.Datacenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
-		}
-		if vsphere.DefaultDatastore == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
+		if len(vsphere.VSphere.VCenters) == 0 {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("vSphere").Child("vcenters").Index(0), "must specify at least one vSphere vCenter"))
 		}
 	}
 	if ovirt := platform.Ovirt; ovirt != nil {

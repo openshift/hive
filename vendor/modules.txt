@@ -643,6 +643,9 @@ github.com/blang/semver/v4
 # github.com/blizzy78/varnamelen v0.8.0
 ## explicit; go 1.16
 github.com/blizzy78/varnamelen
+# github.com/bombsimon/logrusr/v4 v4.1.0
+## explicit; go 1.17
+github.com/bombsimon/logrusr/v4
 # github.com/bombsimon/wsl/v4 v4.5.0
 ## explicit; go 1.22
 github.com/bombsimon/wsl/v4

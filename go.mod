@@ -90,6 +90,7 @@ require (
 	github.com/alexkohler/nakedret/v2 v2.0.5 // indirect
 	github.com/alingse/asasalint v0.0.11 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
+	github.com/bombsimon/logrusr/v4 v4.1.0
 	github.com/breml/errchkjson v0.4.0 // indirect
 	github.com/butuzov/mirror v1.3.0 // indirect
 	github.com/ccojocar/zxcvbn-go v1.0.2 // indirect

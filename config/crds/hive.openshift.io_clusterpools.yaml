@@ -808,8 +808,10 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       cluster:
-                        description: Cluster is the name of the cluster virtual machines
-                          will be cloned into.
+                        description: |-
+                          Cluster is the name of the cluster virtual machines will be cloned into.
+                          Deprecated: Please use Platform.VSphere instead
+                          See also: Platform.ConvertDeprecatedFields
                         type: string
                       credentialsSecretRef:
                         description: |-
@@ -828,26 +830,455 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       datacenter:
-                        description: Datacenter is the name of the datacenter to use
-                          in the vCenter.
+                        description: |-
+                          Datacenter is the name of the datacenter to use in the vCenter.
+                          Deprecated: Please use Platform.VSphere instead
+                          See also: Platform.ConvertDeprecatedFields
                         type: string
                       defaultDatastore:
-                        description: DefaultDatastore is the default datastore to
-                          use for provisioning volumes.
+                        description: |-
+                          DefaultDatastore is the default datastore to use for provisioning volumes.
+                          Deprecated: Please use Platform.VSphere instead
+                          See also: Platform.ConvertDeprecatedFields
                         type: string
                       folder:
                         description: |-
                           Folder is the name of the folder that will be used and/or created for
                           virtual machines.
+                          Deprecated: Please use Platform.VSphere instead
+                          See also: Platform.ConvertDeprecatedFields
                         type: string
                       network:
-                        description: Network specifies the name of the network to
-                          be used by the cluster.
+                        description: |-
+                          Network specifies the name of the network to be used by the cluster.
+                          Deprecated: Please use Platform.VSphere instead
+                          See also: Platform.ConvertDeprecatedFields
                         type: string
                       vCenter:
-                        description: VCenter is the domain name or IP address of the
-                          vCenter.
+                        description: |-
+                          VCenter is the domain name or IP address of the vCenter.
+                          Deprecated: Please use Platform.VSphere instead
+                          See also: Platform.ConvertDeprecatedFields
                         type: string
+                      vSphere:
+                        description: VSphere is the full spec of the vSphere platform.
+                        properties:
+                          apiServerInternalIPs:
+                            description: |-
+                              apiServerInternalIPs are the IP addresses to contact the Kubernetes API
+                              server that can be used by components inside the cluster, like kubelets
+                              using the infrastructure rather than Kubernetes networking. These are the
+                              IPs for a self-hosted load balancer in front of the API servers.
+                              In dual stack clusters this list contains two IP addresses, one from IPv4
+                              family and one from IPv6.
+                              In single stack clusters a single IP address is expected.
+                              When omitted, values from the status.apiServerInternalIPs will be used.
+                              Once set, the list cannot be completely removed (but its second entry can).
+                            items:
+                              description: IP is an IP address (for example, "10.0.0.0"
+                                or "fd00::").
+                              maxLength: 39
+                              minLength: 1
+                              type: string
+                              x-kubernetes-validations:
+                              - message: value must be a valid IP address
+                                rule: isIP(self)
+                            maxItems: 2
+                            type: array
+                            x-kubernetes-list-type: atomic
+                            x-kubernetes-validations:
+                            - message: apiServerInternalIPs must contain at most one
+                                IPv4 address and at most one IPv6 address
+                              rule: 'size(self) == 2 && isIP(self[0]) && isIP(self[1])
+                                ? ip(self[0]).family() != ip(self[1]).family() : true'
+                          failureDomains:
+                            description: |-
+                              failureDomains contains the definition of region, zone and the vCenter topology.
+                              If this is omitted failure domains (regions and zones) will not be used.
+                            items:
+                              description: VSpherePlatformFailureDomainSpec holds
+                                the region and zone failure domain and the vCenter
+                                topology of that failure domain.
+                              properties:
+                                name:
+                                  description: |-
+                                    name defines the arbitrary but unique name
+                                    of a failure domain.
+                                  maxLength: 256
+                                  minLength: 1
+                                  type: string
+                                region:
+                                  description: |-
+                                    region defines the name of a region tag that will
+                                    be attached to a vCenter datacenter. The tag
+                                    category in vCenter must be named openshift-region.
+                                  maxLength: 80
+                                  minLength: 1
+                                  type: string
+                                regionAffinity:
+                                  description: |-
+                                    regionAffinity holds the type of region, Datacenter or ComputeCluster.
+                                    When set to Datacenter, this means the region is a vCenter Datacenter as defined in topology.
+                                    When set to ComputeCluster, this means the region is a vCenter Cluster as defined in topology.
+                                  properties:
+                                    type:
+                                      description: |-
+                                        type determines the vSphere object type for a region within this failure domain.
+                                        Available types are Datacenter and ComputeCluster.
+                                        When set to Datacenter, this means the vCenter Datacenter defined is the region.
+                                        When set to ComputeCluster, this means the vCenter cluster defined is the region.
+                                      enum:
+                                      - ComputeCluster
+                                      - Datacenter
+                                      type: string
+                                  required:
+                                  - type
+                                  type: object
+                                server:
+                                  description: server is the fully-qualified domain
+                                    name or the IP address of the vCenter server.
+                                  maxLength: 255
+                                  minLength: 1
+                                  type: string
+                                topology:
+                                  description: topology describes a given failure
+                                    domain using vSphere constructs
+                                  properties:
+                                    computeCluster:
+                                      description: |-
+                                        computeCluster the absolute path of the vCenter cluster
+                                        in which virtual machine will be located.
+                                        The absolute path is of the form /<datacenter>/host/<cluster>.
+                                        The maximum length of the path is 2048 characters.
+                                      maxLength: 2048
+                                      pattern: ^/.*?/host/.*?
+                                      type: string
+                                    datacenter:
+                                      description: |-
+                                        datacenter is the name of vCenter datacenter in which virtual machines will be located.
+                                        The maximum length of the datacenter name is 80 characters.
+                                      maxLength: 80
+                                      type: string
+                                    datastore:
+                                      description: |-
+                                        datastore is the absolute path of the datastore in which the
+                                        virtual machine is located.
+                                        The absolute path is of the form /<datacenter>/datastore/<datastore>
+                                        The maximum length of the path is 2048 characters.
+                                      maxLength: 2048
+                                      pattern: ^/.*?/datastore/.*?
+                                      type: string
+                                    folder:
+                                      description: |-
+                                        folder is the absolute path of the folder where
+                                        virtual machines are located. The absolute path
+                                        is of the form /<datacenter>/vm/<folder>.
+                                        The maximum length of the path is 2048 characters.
+                                      maxLength: 2048
+                                      pattern: ^/.*?/vm/.*?
+                                      type: string
+                                    networks:
+                                      description: |-
+                                        networks is the list of port group network names within this failure domain.
+                                        If feature gate VSphereMultiNetworks is enabled, up to 10 network adapters may be defined.
+                                        10 is the maximum number of virtual network devices which may be attached to a VM as defined by:
+                                        https://configmax.esp.vmware.com/guest?vmwareproduct=vSphere&release=vSphere%208.0&categories=1-0
+                                        The available networks (port groups) can be listed using
+                                        `govc ls 'network/*'`
+                                        Networks should be in the form of an absolute path:
+                                        /<datacenter>/network/<portgroup>.
+                                      items:
+                                        type: string
+                                      minItems: 1
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                    resourcePool:
+                                      description: |-
+                                        resourcePool is the absolute path of the resource pool where virtual machines will be
+                                        created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>.
+                                        The maximum length of the path is 2048 characters.
+                                      maxLength: 2048
+                                      pattern: ^/.*?/host/.*?/Resources.*
+                                      type: string
+                                    template:
+                                      description: |-
+                                        template is the full inventory path of the virtual machine or template
+                                        that will be cloned when creating new machines in this failure domain.
+                                        The maximum length of the path is 2048 characters.
+
+                                        When omitted, the template will be calculated by the control plane
+                                        machineset operator based on the region and zone defined in
+                                        VSpherePlatformFailureDomainSpec.
+                                        For example, for zone=zonea, region=region1, and infrastructure name=test,
+                                        the template path would be calculated as /<datacenter>/vm/test-rhcos-region1-zonea.
+                                      maxLength: 2048
+                                      minLength: 1
+                                      pattern: ^/.*?/vm/.*?
+                                      type: string
+                                  required:
+                                  - computeCluster
+                                  - datacenter
+                                  - datastore
+                                  - networks
+                                  type: object
+                                zone:
+                                  description: |-
+                                    zone defines the name of a zone tag that will
+                                    be attached to a vCenter cluster. The tag
+                                    category in vCenter must be named openshift-zone.
+                                  maxLength: 80
+                                  minLength: 1
+                                  type: string
+                                zoneAffinity:
+                                  description: |-
+                                    zoneAffinity holds the type of the zone and the hostGroup which
+                                    vmGroup and the hostGroup names in vCenter corresponds to
+                                    a vm-host group of type Virtual Machine and Host respectively. Is also
+                                    contains the vmHostRule which is an affinity vm-host rule in vCenter.
+                                  properties:
+                                    hostGroup:
+                                      description: |-
+                                        hostGroup holds the vmGroup and the hostGroup names in vCenter
+                                        corresponds to a vm-host group of type Virtual Machine and Host respectively. Is also
+                                        contains the vmHostRule which is an affinity vm-host rule in vCenter.
+                                      properties:
+                                        hostGroup:
+                                          description: |-
+                                            hostGroup is the name of the vm-host group of type host within vCenter for this failure domain.
+                                            hostGroup is limited to 80 characters.
+                                            This field is required when the VSphereFailureDomain ZoneType is HostGroup
+                                          maxLength: 80
+                                          minLength: 1
+                                          type: string
+                                        vmGroup:
+                                          description: |-
+                                            vmGroup is the name of the vm-host group of type virtual machine within vCenter for this failure domain.
+                                            vmGroup is limited to 80 characters.
+                                            This field is required when the VSphereFailureDomain ZoneType is HostGroup
+                                          maxLength: 80
+                                          minLength: 1
+                                          type: string
+                                        vmHostRule:
+                                          description: |-
+                                            vmHostRule is the name of the affinity vm-host rule within vCenter for this failure domain.
+                                            vmHostRule is limited to 80 characters.
+                                            This field is required when the VSphereFailureDomain ZoneType is HostGroup
+                                          maxLength: 80
+                                          minLength: 1
+                                          type: string
+                                      required:
+                                      - hostGroup
+                                      - vmGroup
+                                      - vmHostRule
+                                      type: object
+                                    type:
+                                      description: |-
+                                        type determines the vSphere object type for a zone within this failure domain.
+                                        Available types are ComputeCluster and HostGroup.
+                                        When set to ComputeCluster, this means the vCenter cluster defined is the zone.
+                                        When set to HostGroup, hostGroup must be configured with hostGroup, vmGroup and vmHostRule and
+                                        this means the zone is defined by the grouping of those fields.
+                                      enum:
+                                      - HostGroup
+                                      - ComputeCluster
+                                      type: string
+                                  required:
+                                  - type
+                                  type: object
+                                  x-kubernetes-validations:
+                                  - message: hostGroup is required when type is HostGroup,
+                                      and forbidden otherwise
+                                    rule: 'has(self.type) && self.type == ''HostGroup''
+                                      ?  has(self.hostGroup) : !has(self.hostGroup)'
+                              required:
+                              - name
+                              - region
+                              - server
+                              - topology
+                              - zone
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          ingressIPs:
+                            description: |-
+                              ingressIPs are the external IPs which route to the default ingress
+                              controller. The IPs are suitable targets of a wildcard DNS record used to
+                              resolve default route host names.
+                              In dual stack clusters this list contains two IP addresses, one from IPv4
+                              family and one from IPv6.
+                              In single stack clusters a single IP address is expected.
+                              When omitted, values from the status.ingressIPs will be used.
+                              Once set, the list cannot be completely removed (but its second entry can).
+                            items:
+                              description: IP is an IP address (for example, "10.0.0.0"
+                                or "fd00::").
+                              maxLength: 39
+                              minLength: 1
+                              type: string
+                              x-kubernetes-validations:
+                              - message: value must be a valid IP address
+                                rule: isIP(self)
+                            maxItems: 2
+                            type: array
+                            x-kubernetes-list-type: atomic
+                            x-kubernetes-validations:
+                            - message: ingressIPs must contain at most one IPv4 address
+                                and at most one IPv6 address
+                              rule: 'size(self) == 2 && isIP(self[0]) && isIP(self[1])
+                                ? ip(self[0]).family() != ip(self[1]).family() : true'
+                          machineNetworks:
+                            description: |-
+                              machineNetworks are IP networks used to connect all the OpenShift cluster
+                              nodes. Each network is provided in the CIDR format and should be IPv4 or IPv6,
+                              for example "10.0.0.0/8" or "fd00::/8".
+                            items:
+                              description: CIDR is an IP address range in CIDR notation
+                                (for example, "10.0.0.0/8" or "fd00::/8").
+                              maxLength: 43
+                              minLength: 1
+                              type: string
+                              x-kubernetes-validations:
+                              - message: value must be a valid CIDR network address
+                                rule: isCIDR(self)
+                            maxItems: 32
+                            type: array
+                            x-kubernetes-list-type: atomic
+                            x-kubernetes-validations:
+                            - rule: self.all(x, self.exists_one(y, x == y))
+                          nodeNetworking:
+                            description: |-
+                              nodeNetworking contains the definition of internal and external network constraints for
+                              assigning the node's networking.
+                              If this field is omitted, networking defaults to the legacy
+                              address selection behavior which is to only support a single address and
+                              return the first one found.
+                            properties:
+                              external:
+                                description: external represents the network configuration
+                                  of the node that is externally routable.
+                                properties:
+                                  excludeNetworkSubnetCidr:
+                                    description: |-
+                                      excludeNetworkSubnetCidr IP addresses in subnet ranges will be excluded when selecting
+                                      the IP address from the VirtualMachine's VM for use in the status.addresses fields.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  network:
+                                    description: |-
+                                      network VirtualMachine's VM Network names that will be used to when searching
+                                      for status.addresses fields. Note that if internal.networkSubnetCIDR and
+                                      external.networkSubnetCIDR are not set, then the vNIC associated to this network must
+                                      only have a single IP address assigned to it.
+                                      The available networks (port groups) can be listed using
+                                      `govc ls 'network/*'`
+                                    type: string
+                                  networkSubnetCidr:
+                                    description: |-
+                                      networkSubnetCidr IP address on VirtualMachine's network interfaces included in the fields' CIDRs
+                                      that will be used in respective status.addresses fields.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: set
+                                type: object
+                              internal:
+                                description: internal represents the network configuration
+                                  of the node that is routable only within the cluster.
+                                properties:
+                                  excludeNetworkSubnetCidr:
+                                    description: |-
+                                      excludeNetworkSubnetCidr IP addresses in subnet ranges will be excluded when selecting
+                                      the IP address from the VirtualMachine's VM for use in the status.addresses fields.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  network:
+                                    description: |-
+                                      network VirtualMachine's VM Network names that will be used to when searching
+                                      for status.addresses fields. Note that if internal.networkSubnetCIDR and
+                                      external.networkSubnetCIDR are not set, then the vNIC associated to this network must
+                                      only have a single IP address assigned to it.
+                                      The available networks (port groups) can be listed using
+                                      `govc ls 'network/*'`
+                                    type: string
+                                  networkSubnetCidr:
+                                    description: |-
+                                      networkSubnetCidr IP address on VirtualMachine's network interfaces included in the fields' CIDRs
+                                      that will be used in respective status.addresses fields.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: set
+                                type: object
+                            type: object
+                          vcenters:
+                            description: |-
+                              vcenters holds the connection details for services to communicate with vCenter.
+                              Currently, only a single vCenter is supported, but in tech preview 3 vCenters are supported.
+                              Once the cluster has been installed, you are unable to change the current number of defined
+                              vCenters except in the case where the cluster has been upgraded from a version of OpenShift
+                              where the vsphere platform spec was not present.  You may make modifications to the existing
+                              vCenters that are defined in the vcenters list in order to match with any added or modified
+                              failure domains.
+                            items:
+                              description: |-
+                                VSpherePlatformVCenterSpec stores the vCenter connection fields.
+                                This is used by the vSphere CCM.
+                              properties:
+                                datacenters:
+                                  description: |-
+                                    The vCenter Datacenters in which the RHCOS
+                                    vm guests are located. This field will
+                                    be used by the Cloud Controller Manager.
+                                    Each datacenter listed here should be used within
+                                    a topology.
+                                  items:
+                                    type: string
+                                  minItems: 1
+                                  type: array
+                                  x-kubernetes-list-type: set
+                                port:
+                                  description: |-
+                                    port is the TCP port that will be used to communicate to
+                                    the vCenter endpoint.
+                                    When omitted, this means the user has no opinion and
+                                    it is up to the platform to choose a sensible default,
+                                    which is subject to change over time.
+                                  format: int32
+                                  maximum: 32767
+                                  minimum: 1
+                                  type: integer
+                                server:
+                                  description: server is the fully-qualified domain
+                                    name or the IP address of the vCenter server.
+                                  maxLength: 255
+                                  type: string
+                              required:
+                              - datacenters
+                              - server
+                              type: object
+                            minItems: 0
+                            type: array
+                            x-kubernetes-list-type: atomic
+                            x-kubernetes-validations:
+                            - message: vcenters cannot be added or removed once set
+                              rule: 'size(self) != size(oldSelf) ? size(oldSelf) ==
+                                0 && size(self) < 2 : true'
+                        type: object
+                        x-kubernetes-validations:
+                        - message: apiServerInternalIPs list is required once set
+                          rule: '!has(oldSelf.apiServerInternalIPs) || has(self.apiServerInternalIPs)'
+                        - message: ingressIPs list is required once set
+                          rule: '!has(oldSelf.ingressIPs) || has(self.ingressIPs)'
+                        - message: vcenters can have at most 1 item when configured
+                            post-install
+                          rule: '!has(oldSelf.vcenters) && has(self.vcenters) ? size(self.vcenters)
+                            < 2 : true'
                     required:
                     - certificatesSecretRef
                     - credentialsSecretRef

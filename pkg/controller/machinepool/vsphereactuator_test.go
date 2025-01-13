@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -29,13 +30,20 @@ func TestVSphereActuator(t *testing.T) {
 		expectedErr                bool
 	}{
 		{
+			name:              "deprecated vsphere fields",
+			clusterDeployment: testDeprecatedVSphereClusterDeployment(),
+			pool:              testVSpherePool(),
+			masterMachine:     testVSphereMachine("master0", "master"),
+			expectedErr:       true,
+		},
+		{
 			name:              "generate machineset",
 			clusterDeployment: testVSphereClusterDeployment(),
 			pool:              testVSpherePool(),
+			masterMachine:     testVSphereMachine("master0", "master"),
 			expectedMachineSetReplicas: map[string]int64{
 				fmt.Sprintf("%s-worker-0", testInfraID): 3,
 			},
-			masterMachine: testVSphereMachine("master0", "master"),
 		},
 	}
 
@@ -95,7 +103,7 @@ func testVSpherePool() *hivev1.MachinePool {
 	return p
 }
 
-func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
+func testDeprecatedVSphereClusterDeployment() *hivev1.ClusterDeployment {
 	cd := testClusterDeployment()
 	cd.Spec.Platform = hivev1.Platform{
 		VSphere: &hivev1vsphere.Platform{
@@ -103,6 +111,34 @@ func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
 				Name: "vsphere-credentials",
 			},
 			Folder: "/vsphere-datacenter/vm/vsphere-folder",
+		},
+	}
+	return cd
+}
+
+func testVSphereClusterDeployment() *hivev1.ClusterDeployment {
+	cd := testClusterDeployment()
+	cd.Spec.Platform = hivev1.Platform{
+		VSphere: &hivev1vsphere.Platform{
+			CredentialsSecretRef: corev1.LocalObjectReference{
+				Name: "vsphere-credentials",
+			},
+			VSphere: &configv1.VSpherePlatformSpec{
+				VCenters: []configv1.VSpherePlatformVCenterSpec{
+					{
+						Server: "test-server",
+					},
+				},
+				FailureDomains: []configv1.VSpherePlatformFailureDomainSpec{
+					{
+						Server: "test-server",
+						Topology: configv1.VSpherePlatformTopology{
+							ResourcePool: "/vsphere-datacenter/host/vsphere-cluster/Resources/vsphere-pool",
+							Folder:       "/vsphere-datacenter/vm/vsphere-folder",
+						},
+					},
+				},
+			},
 		},
 	}
 	return cd

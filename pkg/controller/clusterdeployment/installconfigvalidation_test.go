@@ -1,7 +1,6 @@
 package clusterdeployment
 
 import (
-	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,8 +11,11 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	hivev1vpshere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
+
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
@@ -264,9 +266,7 @@ func TestInstallConfigValidation(t *testing.T) {
 			name: "test install config no vSphere platform",
 			cd: cdBuilder.Build(
 				func(cd *hivev1.ClusterDeployment) {
-					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
-						VCenter: "10.0.0.1",
-					}
+					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{}
 				},
 			),
 			ic:            testAWSIC,
@@ -277,7 +277,7 @@ func TestInstallConfigValidation(t *testing.T) {
 			cd: cdBuilder.Build(
 				func(cd *hivev1.ClusterDeployment) {
 					cd.Spec.Platform.VSphere = &hivev1vpshere.Platform{
-						VCenter: "10.0.0.1",
+						Infrastructure: &installervsphere.Platform{},
 					}
 				},
 			),

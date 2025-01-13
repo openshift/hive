@@ -889,9 +889,16 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 	// empty args implies legacy deprovision
 	legacy := len(args) == 0
 	if legacy {
+		var joinedVCenters string
+		if len(req.Spec.Platform.VSphere.VCenters) == 0 && req.Spec.Platform.VSphere.DeprecatedVCenter != "" {
+			joinedVCenters = req.Spec.Platform.VSphere.DeprecatedVCenter
+		} else {
+			joinedVCenters = strings.Join(req.Spec.Platform.VSphere.VCenters, "::")
+		}
+
 		args = []string{
 			"deprovision", "vsphere",
-			"--vsphere-vcenter", req.Spec.Platform.VSphere.VCenter,
+			"--vsphere-vcenter", joinedVCenters,
 		}
 	}
 	args = append(args,
@@ -901,6 +908,7 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 	if legacy {
 		args = append(args, req.Spec.InfraID)
 	}
+
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Name:            "deprovision",

@@ -77,11 +77,17 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 			}
 		}
 
-		return validateVSphereCredentials(cd.Spec.Platform.VSphere.VCenter,
-			strings.TrimSpace(string(secret.Data[constants.UsernameSecretKey])),
-			strings.TrimSpace(string(secret.Data[constants.PasswordSecretKey])),
-			rootCAFiles,
-			logger)
+		for _, vcenter := range cd.Spec.Platform.VSphere.Infrastructure.VCenters {
+			valid, err := validateVSphereCredentials(vcenter.Server,
+				string(secret.Data[constants.UsernameSecretKey]),
+				string(secret.Data[constants.PasswordSecretKey]),
+				rootCAFiles,
+				logger)
+			if err != nil || valid == false {
+				return false, err
+			}
+		}
+		return true, nil
 	default:
 		// If we have no platform-specific credentials verification
 		// assume the creds are valid.

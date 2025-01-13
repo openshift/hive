@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/davegardnerisme/deephash"
+	"github.com/openshift/hive/pkg/controller/utils/vsphereutils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -316,6 +317,19 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil
+	}
+
+	// HIVE-2391: remove this once we fully deprecate the old vSphere method (4.12 sunset)
+	if clp.Spec.Platform.VSphere != nil {
+		if clp.Spec.Platform.VSphere.Infrastructure == nil {
+			r.logger.WithField("gvk", clp.GroupVersionKind().String()).WithField("name", clp.Name).WithField("namespace", clp.Namespace).Info("Updating deprecated vSphere fields on ClusterPool object")
+			clp = clp.DeepCopy()
+			if err := vsphereutils.ConvertDeprecatedFields(clp.Spec.Platform.VSphere); err != nil {
+				logger.WithError(err).Log(controllerutils.LogLevel(err), "failed to update deprecated vSphere fields")
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, r.Update(ctx, clp)
+		}
 	}
 
 	// If the pool is deleted, clear finalizer once all ClusterDeployments have been deleted.
@@ -1311,6 +1325,9 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.Cloud = platform.OpenStack.Cloud
 		return cloudBuilder, nil
 	case platform.VSphere != nil:
+		if platform.VSphere.Infrastructure == nil {
+			return nil, errors.New("VSphere ClusterPool with deprecated fields has not been updated by ClusterPool controller yet, requeueing...")
+		}
 		credsSecret, err := r.getCredentialsSecret(pool, platform.VSphere.CredentialsSecretRef.Name, logger)
 		if err != nil {
 			return nil, err
@@ -1326,12 +1343,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		}
 
 		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret)
-		cloudBuilder.Datacenter = platform.VSphere.Datacenter
-		cloudBuilder.DefaultDatastore = platform.VSphere.DefaultDatastore
-		cloudBuilder.VCenter = platform.VSphere.VCenter
-		cloudBuilder.Cluster = platform.VSphere.Cluster
-		cloudBuilder.Folder = platform.VSphere.Folder
-		cloudBuilder.Network = platform.VSphere.Network
+		cloudBuilder.Infrastructure = platform.VSphere.Infrastructure
 
 		return cloudBuilder, nil
 	default:

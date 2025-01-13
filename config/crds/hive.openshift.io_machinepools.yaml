@@ -778,6 +778,49 @@ spec:
                           description: NumCPUs is the total number of virtual processor cores to assign a vm.
                           format: int32
                           type: integer
+                        dataDisks:
+                          description: DataDisks are additional disks to add to the VM that are not part of the VM's OVA template.
+                          items:
+                            description: DataDisk defines a data disk to add to the VM that is not part of the VM OVA template.
+                            properties:
+                              name:
+                                description: |-
+                                  name is used to identify the disk definition. name is required needs to be unique so that it can be used to
+                                  clearly identify purpose of the disk.
+                                example: images_1
+                                maxLength: 80
+                                pattern: ^[a-zA-Z0-9]([-_a-zA-Z0-9]*[a-zA-Z0-9])?$
+                                type: string
+                              provisioningMode:
+                                description: |-
+                                  provisioningMode is an optional field that specifies the provisioning type to be used by this vSphere data disk.
+                                  Allowed values are "Thin", "Thick", "EagerlyZeroed", and omitted.
+                                  When set to Thin, the disk will be made using thin provisioning allocating the bare minimum space.
+                                  When set to Thick, the full disk size will be allocated when disk is created.
+                                  When set to EagerlyZeroed, the disk will be created using eager zero provisioning. An eager zeroed thick disk has all space allocated and wiped clean of any previous contents on the physical media at creation time. Such disks may take longer time during creation compared to other disk formats.
+                                  When omitted, no setting will be applied to the data disk and the provisioning mode for the disk will be determined by the default storage policy configured for the datastore in vSphere.
+                                enum:
+                                  - Thin
+                                  - Thick
+                                  - EagerlyZeroed
+                                type: string
+                              sizeGiB:
+                                description: |-
+                                  sizeGiB is the size of the disk in GiB.
+                                  The maximum supported size is 16384 GiB.
+                                format: int32
+                                maximum: 16384
+                                minimum: 1
+                                type: integer
+                            required:
+                              - name
+                              - sizeGiB
+                            type: object
+                          maxItems: 29
+                          type: array
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                         memoryMB:
                           description: Memory is the size of a VM's memory in MB.
                           format: int64
@@ -789,25 +832,106 @@ spec:
                               description: DiskSizeGB defines the size of disk in GB.
                               format: int32
                               type: integer
-                          required:
-                            - diskSizeGB
                           type: object
                         resourcePool:
                           description: |-
                             ResourcePool is the name of the resource pool that will be used for virtual machines.
                             If it is not present, a default value will be used.
+                            Deprecated: use Topology instead
                           type: string
                         tagIDs:
-                          description: TagIDs is a list of up to 10 tags to add to the VMs that this machine set provisions in vSphere.
+                          description: |-
+                            TagIDs is a list of up to 10 tags to add to the VMs that this machine set provisions in vSphere.
+                            Deprecated: use Topology instead
                           items:
                             type: string
                           maxItems: 10
                           type: array
-                      required:
-                        - coresPerSocket
-                        - cpus
-                        - memoryMB
-                        - osDisk
+                        topology:
+                          description: |-
+                            Topology is the vSphere topology that will be used for virtual machines.
+                            If it is not present, a default value will be used.
+                          properties:
+                            computeCluster:
+                              description: |-
+                                computeCluster as the failure domain
+                                This is required to be a path
+                              maxLength: 2048
+                              minLength: 1
+                              type: string
+                            datacenter:
+                              description: |-
+                                datacenter is the vCenter datacenter in which virtual machines will be located
+                                and defined as the failure domain.
+                              maxLength: 80
+                              minLength: 1
+                              type: string
+                            datastore:
+                              description: |-
+                                datastore is the name or inventory path of the datastore in which the
+                                virtual machine is created/located.
+                              maxLength: 2048
+                              minLength: 1
+                              type: string
+                            folder:
+                              description: |-
+                                folder is the inventory path of the folder in which the
+                                virtual machine is created/located.
+                              maxLength: 2048
+                              minLength: 1
+                              pattern: ^/.*?/vm/.*?
+                              type: string
+                            hostGroup:
+                              description: |-
+                                hostGroup is the name of the vm-host group of type host within vCenter for this failure domain.
+                                hostGroup is limited to 80 characters.
+                                This field is required when the ZoneType is HostGroup
+                              maxLength: 80
+                              type: string
+                            networks:
+                              description: networks is the list of networks within this failure domain
+                              items:
+                                type: string
+                              maxItems: 10
+                              minItems: 1
+                              type: array
+                            resourcePool:
+                              description: |-
+                                resourcePool is the absolute path of the resource pool where virtual machines will be
+                                created. The absolute path is of the form /<datacenter>/host/<cluster>/Resources/<resourcepool>.
+                              maxLength: 2048
+                              minLength: 1
+                              pattern: ^/.*?/host/.*?/Resources.*
+                              type: string
+                            tagIDs:
+                              description: |-
+                                tagIDs is an optional set of tags to add to an instance. Specified tagIDs
+                                must use URN-notation instead of display names. A maximum of 10 tag IDs may be specified.
+                              example: urn:vmomi:InventoryServiceTag:5736bf56-49f5-4667-b38c-b97e09dc9578:GLOBAL
+                              items:
+                                type: string
+                              type: array
+                            template:
+                              description: |-
+                                template is the inventory path of the virtual machine or template
+                                that will be used for cloning.
+                              maxLength: 2048
+                              minLength: 1
+                              pattern: ^/.*?/vm/.*?
+                              type: string
+                          required:
+                            - computeCluster
+                            - datacenter
+                            - datastore
+                            - networks
+                          type: object
+                        zones:
+                          description: |-
+                            Zones defines available zones
+                            Zones is available in TechPreview.
+                          items:
+                            type: string
+                          type: array
                       type: object
                   type: object
                 replicas:

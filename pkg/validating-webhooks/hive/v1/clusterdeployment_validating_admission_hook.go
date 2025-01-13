@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bombsimon/logrusr/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	log "github.com/sirupsen/logrus"
@@ -318,8 +319,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
-
+	allErrs = append(allErrs, validateClusterPlatform(specPath, cd, contextLogger)...)
 	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
 	if cd.Spec.Platform.AWS != nil {
@@ -473,7 +473,7 @@ func validatefeatureGates(decoder admission.Decoder, admissionSpec *admissionv1b
 
 // validatePlatformConfiguration validates platform-specific fields.
 // Shared by ClusterDeployment and ClusterPool validation.
-func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) field.ErrorList {
+func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform, entry *log.Entry) field.ErrorList {
 	allErrs := field.ErrorList{}
 	numberOfPlatforms := 0
 	if aws := platform.AWS; aws != nil {
@@ -524,6 +524,8 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		}
 	}
 	if vsphere := platform.VSphere; vsphere != nil {
+		vsphere = vsphere.DeepCopy()
+		vsphere.ConvertDeprecatedFields(logrusr.New(entry))
 		numberOfPlatforms++
 		vspherePath := path.Child("vsphere")
 		if vsphere.CredentialsSecretRef.Name == "" {
@@ -532,14 +534,8 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		if vsphere.CertificatesSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
 		}
-		if vsphere.VCenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
-		}
-		if vsphere.Datacenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
-		}
-		if vsphere.DefaultDatastore == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
+		if len(vsphere.Infrastructure.VCenters) == 0 {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("vSphere").Child("vcenters").Index(0), "must specify at least one vSphere vCenter"))
 		}
 	}
 	if ibmCloud := platform.IBMCloud; ibmCloud != nil {
@@ -588,9 +584,9 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 // validateClusterPlatform validates platform configuration for ClusterDeployment.
 // Performs common platform validation and adds ClusterDeployment-specific checks
 // (e.g., Azure baseDomainResourceGroupName when manageDNS is enabled).
-func validateClusterPlatform(specPath *field.Path, cd *hivev1.ClusterDeployment) field.ErrorList {
+func validateClusterPlatform(specPath *field.Path, cd *hivev1.ClusterDeployment, entry *log.Entry) field.ErrorList {
 	platformPath := specPath.Child("platform")
-	allErrs := validatePlatformConfiguration(platformPath, cd.Spec.Platform)
+	allErrs := validatePlatformConfiguration(platformPath, cd.Spec.Platform, entry)
 
 	if cd.Spec.Platform.Azure != nil && cd.Spec.ManageDNS {
 		if cd.Spec.Platform.Azure.BaseDomainResourceGroupName == "" {
@@ -603,9 +599,9 @@ func validateClusterPlatform(specPath *field.Path, cd *hivev1.ClusterDeployment)
 
 // validateClusterPoolPlatform validates platform configuration for ClusterPool.
 // Only performs common platform validation as ClusterPool lacks ClusterDeployment-specific fields.
-func validateClusterPoolPlatform(specPath *field.Path, cp *hivev1.ClusterPool) field.ErrorList {
+func validateClusterPoolPlatform(specPath *field.Path, cp *hivev1.ClusterPool, entry *log.Entry) field.ErrorList {
 	platformPath := specPath.Child("platform")
-	return validatePlatformConfiguration(platformPath, cp.Spec.Platform)
+	return validatePlatformConfiguration(platformPath, cp.Spec.Platform, entry)
 }
 
 func validateCanManageDNSForClusterPlatform(specPath *field.Path, spec hivev1.ClusterDeploymentSpec) field.ErrorList {
@@ -670,6 +666,18 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
+
+	// HIVE-2391
+	if oldObject.Spec.Platform.VSphere != nil && cd.Spec.Platform.VSphere != nil {
+		// Moving from a non-zonal to a zonal shape is permitted.
+		// This check is faster than checking all the fields individually
+		if oldObject.Spec.Platform.VSphere.Infrastructure == nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
+			contextLogger.Debug("Passed validation: HIVE-2391")
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: true,
+			}
+		}
+	}
 
 	hasChangedImmutableField, unsupportedDiff := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
 	if hasChangedImmutableField {

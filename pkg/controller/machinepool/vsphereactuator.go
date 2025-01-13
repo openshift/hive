@@ -1,8 +1,7 @@
 package machinepool
 
 import (
-	"fmt"
-	"strings"
+	"github.com/openshift/hive/pkg/clusterresource"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -50,6 +49,9 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	if cd.Spec.Platform.VSphere == nil {
 		return nil, false, errors.New("ClusterDeployment is not for VSphere")
 	}
+	if cd.Spec.Platform.VSphere.VSphere == nil {
+		return nil, false, errors.New("VSphere CD with deprecated fields has not been updated by CD controller yet, requeueing...")
+	}
 	if pool.Spec.Platform.VSphere == nil {
 		return nil, false, errors.New("MachinePool is not for VSphere")
 	}
@@ -67,37 +69,21 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	// Fake an install config as we do with other actuators. We only populate what we know is needed today.
 	// WARNING: changes to use more of installconfig in the MachineSets function can break here. Hopefully
 	// will be caught by unit tests.
-	ic := &installertypes.InstallConfig{
-		Platform: installertypes.Platform{
-			VSphere: &installertypesvsphere.Platform{
-				VCenters: []installertypesvsphere.VCenter{
-					{
-						Server:      cd.Spec.Platform.VSphere.VCenter,
-						Port:        443,
-						Username:    "",
-						Password:    "",
-						Datacenters: []string{cd.Spec.Platform.VSphere.Datacenter},
-					},
-				},
-				FailureDomains: []installertypesvsphere.FailureDomain{
-					{
-						Name:   "generated-failure-domain",
-						Region: "generated-region",
-						Zone:   "generated-zone",
-						Server: cd.Spec.Platform.VSphere.VCenter,
-						Topology: installertypesvsphere.Topology{
-							Datacenter:     cd.Spec.Platform.VSphere.Datacenter,
-							Datastore:      setDatastorePath(cd.Spec.Platform.VSphere.DefaultDatastore, cd.Spec.Platform.VSphere.Datacenter, logger),
-							Folder:         setFolderPath(cd.Spec.Platform.VSphere.Folder, cd.Spec.Platform.VSphere.Datacenter, logger),
-							ComputeCluster: setComputeClusterPath(cd.Spec.Platform.VSphere.Cluster, cd.Spec.Platform.VSphere.Datacenter, logger),
-							Networks:       []string{cd.Spec.Platform.VSphere.Network},
-							Template:       a.osImage,
-							ResourcePool:   pool.Spec.Platform.VSphere.ResourcePool,
-						},
-					},
-				},
-			},
-		},
+	//
+	// HACK: we cannot expose installer types from within the hive API, so we do a round-trip
+	// through the vsphere cloudbuilder, which knows how to construct an install config
+	// from an openshift api configv1.VSpherePlatformSpec
+	ic := &installertypes.InstallConfig{}
+	cloudBuilder := clusterresource.NewDummyVSphereCloudBuilder()
+	cloudBuilder.VSphere = cd.Spec.Platform.VSphere.VSphere
+	cloudBuilder.AttachToInstallConfig(ic)
+	for _, failureDomain := range ic.VSphere.FailureDomains {
+		if failureDomain.Topology.Template == "" {
+			failureDomain.Topology.Template = a.osImage
+		}
+		if failureDomain.Topology.ResourcePool == "" {
+			failureDomain.Topology.ResourcePool = pool.Spec.Platform.VSphere.ResourcePool
+		}
 	}
 
 	installerMachineSets, err := installvsphere.MachineSets(
@@ -124,30 +110,4 @@ func getVSphereOSImage(masterMachine *machineapi.Machine, scheme *runtime.Scheme
 	osImage := providerSpec.Template
 	logger.WithField("image", osImage).Debug("resolved image to use for new machinesets")
 	return osImage, nil
-}
-
-// Copied from https://github.com/openshift/installer/blob/f7731922a0f17a8339a3e837f72898ac77643611/pkg/types/vsphere/conversion/installconfig.go#L75-L97
-
-func setComputeClusterPath(cluster, datacenter string, logger log.FieldLogger) string {
-	if cluster != "" && !strings.HasPrefix(cluster, "/") {
-		logger.Warn("computeCluster as a non-path is now depreciated please use the form: /%s/host/%s", datacenter, cluster)
-		return fmt.Sprintf("/%s/host/%s", datacenter, cluster)
-	}
-	return cluster
-}
-
-func setDatastorePath(datastore, datacenter string, logger log.FieldLogger) string {
-	if datastore != "" && !strings.HasPrefix(datastore, "/") {
-		logger.Warn("datastore as a non-path is now depreciated please use the form: /%s/datastore/%s", datacenter, datastore)
-		return fmt.Sprintf("/%s/datastore/%s", datacenter, datastore)
-	}
-	return datastore
-}
-
-func setFolderPath(folder, datacenter string, logger log.FieldLogger) string {
-	if folder != "" && !strings.HasPrefix(folder, "/") {
-		logger.Warn("folder as a non-path is now depreciated please use the form: /%s/vm/%s", datacenter, folder)
-		return fmt.Sprintf("/%s/vm/%s", datacenter, folder)
-	}
-	return folder
 }

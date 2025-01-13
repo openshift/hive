@@ -202,14 +202,8 @@ type Options struct {
 	OpenStackIngressFloatingIP string
 
 	// VSphere
-	VSphereVCenter          string
-	VSphereDatacenter       string
-	VSphereDefaultDataStore string
-	VSphereFolder           string
-	VSphereCluster          string
 	VSphereAPIVIP           string
 	VSphereIngressVIP       string
-	VSphereNetwork          string
 	VSpherePlatformSpecJSON string
 	VSphereCACerts          string
 
@@ -375,14 +369,8 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.OpenStackIngressFloatingIP, "openstack-ingress-floating-ip", "", "Floating IP address to use for cluster's Ingress service")
 
 	// vSphere flags
-	flags.StringVar(&opt.VSphereVCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
-	flags.StringVar(&opt.VSphereDatacenter, "vsphere-datacenter", "", "Datacenter to use in the vCenter")
-	flags.StringVar(&opt.VSphereDefaultDataStore, "vsphere-default-datastore", "", "Default datastore to use for provisioning volumes")
-	flags.StringVar(&opt.VSphereFolder, "vsphere-folder", "", "Folder that will be used and/or created for virtual machines")
-	flags.StringVar(&opt.VSphereCluster, "vsphere-cluster", "", "Cluster virtual machines will be cloned into")
 	flags.StringVar(&opt.VSphereAPIVIP, "vsphere-api-vip", "", "Virtual IP address for the api endpoint")
 	flags.StringVar(&opt.VSphereIngressVIP, "vsphere-ingress-vip", "", "Virtual IP address for ingress application routing")
-	flags.StringVar(&opt.VSphereNetwork, "vsphere-network", "", "Name of the network to be used by the cluster")
 	flags.StringVar(&opt.VSpherePlatformSpecJSON, "vsphere-platform-spec-json", "", "Installer vsphere platform spec, encoded as JSON")
 	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
 
@@ -781,77 +769,23 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			caCerts = append(caCerts, caCert)
 		}
 
-		vSphereNetwork := os.Getenv(constants.VSphereNetworkEnvVar)
-		if o.VSphereNetwork != "" {
-			vSphereNetwork = o.VSphereNetwork
-		}
-
-		vSphereDatacenter := os.Getenv(constants.VSphereDataCenterEnvVar)
-		if o.VSphereDatacenter != "" {
-			vSphereDatacenter = o.VSphereDatacenter
-		}
-
-		vSphereDatastore := os.Getenv(constants.VSphereDataStoreEnvVar)
-		if o.VSphereDefaultDataStore != "" {
-			vSphereDatastore = o.VSphereDefaultDataStore
-		}
-
-		vSphereVCenter := os.Getenv(constants.VSphereVCenterEnvVar)
-		if o.VSphereVCenter != "" {
-			vSphereVCenter = o.VSphereVCenter
-		}
-
-		vSphereFolder := o.VSphereFolder
-		vSphereCluster := o.VSphereCluster
-		vSphereAPIVIP := o.VSphereAPIVIP
-		vSphereIngressVIP := o.VSphereIngressVIP
-
 		platformBytes := []byte(os.Getenv(constants.VSpherePlatformSpecJSONEnvVar))
 		if o.VSpherePlatformSpecJSON != "" {
 			platformBytes = []byte(o.VSpherePlatformSpecJSON)
 		}
-
-		if len(platformBytes) > 0 {
-			o.log.Info("using provided installer platform spec instead of other flags for vsphere (size: %v)", len(platformBytes))
-			platform := installervsphere.Platform{}
-			err = json.Unmarshal(platformBytes, &platform)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding platform %s: %w", o.VSpherePlatformSpecJSON, err)
-			}
-
-			vSphereVCenter = platform.VCenters[0].Server
-			vSphereDatacenter = platform.VCenters[0].Datacenters[0]
-			if vSphereDatacenter == "" {
-				vSphereDatacenter = platform.FailureDomains[0].Topology.Datacenter
-			}
-			vSphereDatastore = platform.FailureDomains[0].Topology.Datastore
-			vSphereFolder = platform.FailureDomains[0].Topology.Folder
-			vSphereCluster = platform.FailureDomains[0].Topology.ComputeCluster
-			vSphereNetwork = platform.FailureDomains[0].Topology.Networks[0]
+		platform := installervsphere.Platform{}
+		err = json.Unmarshal(platformBytes, &platform)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding platform %s: %w", o.VSpherePlatformSpecJSON, err)
 		}
 
-		if vSphereDatacenter == "" {
-			return nil, fmt.Errorf("must provide --vsphere-datacenter or set %s env var", constants.VSphereDataCenterEnvVar)
-		}
-		if vSphereDatastore == "" {
-			return nil, fmt.Errorf("must provide --vsphere-default-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
-		}
-		if vSphereVCenter == "" {
-			return nil, fmt.Errorf("must provide --vsphere-vcenter or set %s env var", constants.VSphereVCenterEnvVar)
-		}
+		vSphereSpec := clusterresource.APIPlatformSpecFromInstallerPlatformSpecAndIPs(platform, o.VSphereAPIVIP, o.VSphereIngressVIP)
 
 		vsphereProvider := &clusterresource.VSphereCloudBuilder{
-			VCenter:          vSphereVCenter,
-			Username:         vsphereUsername,
-			Password:         vspherePassword,
-			Datacenter:       vSphereDatacenter,
-			DefaultDatastore: vSphereDatastore,
-			Folder:           vSphereFolder,
-			Cluster:          vSphereCluster,
-			APIVIP:           vSphereAPIVIP,
-			IngressVIP:       vSphereIngressVIP,
-			Network:          vSphereNetwork,
-			CACert:           bytes.Join(caCerts, []byte("\n")),
+			Username: vsphereUsername,
+			Password: vspherePassword,
+			CACert:   bytes.Join(caCerts, []byte("\n")),
+			VSphere:  vSphereSpec,
 		}
 		builder.CloudBuilder = vsphereProvider
 	case cloudOVirt:

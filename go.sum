@@ -216,6 +216,8 @@ github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
 github.com/blizzy78/varnamelen v0.8.0 h1:oqSblyuQvFsW1hbBHh1zfwrKe3kcSj0rnXkKzsQ089M=
 github.com/blizzy78/varnamelen v0.8.0/go.mod h1:V9TzQZ4fLJ1DSrjVDfl89H7aMnTvKkApdHeyESmyR7k=
+github.com/bombsimon/logrusr/v4 v4.1.0 h1:uZNPbwusB0eUXlO8hIUwStE6Lr5bLN6IgYgG+75kuh4=
+github.com/bombsimon/logrusr/v4 v4.1.0/go.mod h1:pjfHC5e59CvjTBIU3V3sGhFWFAnsnhOR03TRc6im0l8=
 github.com/bombsimon/wsl/v4 v4.5.0 h1:iZRsEvDdyhd2La0FVi5k6tYehpOR/R7qIUjmKk7N74A=
 github.com/bombsimon/wsl/v4 v4.5.0/go.mod h1:NOQ3aLF4nD7N5YPXMruR6ZXDOAqLoM0GEpLwTdvmOSc=
 github.com/breml/bidichk v0.3.2 h1:xV4flJ9V5xWTqxL+/PMFF6dtJPvZLPsyixAoPe8BGJs=
@@ -283,6 +285,8 @@ github.com/dimchansky/utfbom v1.1.1 h1:vV6w1AhK4VMnhBno/TPVCoK9U/LP0PkLCS9tbxHdi
 github.com/dimchansky/utfbom v1.1.1/go.mod h1:SxdoEBH5qIqFocHMyGOXVAybYJdr71b1Q/j0mACtrfE=
 github.com/dlclark/regexp2 v1.11.0 h1:G/nrcoOa7ZXlpoa/91N3X7mM3r8eIlMBBJZvsz/mxKI=
 github.com/dlclark/regexp2 v1.11.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
+github.com/dlom/installer v0.0.0-20251023182801-c056b7bdd6ca h1:HNAloxQEJCg0ssd3xBbdslsQR7F9bIUvC2GPdZbnfnI=
+github.com/dlom/installer v0.0.0-20251023182801-c056b7bdd6ca/go.mod h1:O+iZiJnRcMHIr8tzLvl+I8JCL7CbDYr4DcLOzj1+AXw=
 github.com/dougm/pretty v0.0.0-20160325215624-add1dbc86daf h1:A2XbJkAuMMFy/9EftoubSKBUIyiOm6Z8+X5G7QpS6so=
 github.com/dougm/pretty v0.0.0-20160325215624-add1dbc86daf/go.mod h1:7NQ3kWOx2cZOSjtcveTa5nqupVr2s6/83sG+rTlI7uA=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
@@ -787,8 +791,6 @@ github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-202409090
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20240909043600-373ac49835bf/go.mod h1:2fZsjZ3QSPkoMUc8QntXfeBb8AnvW+WIYwwQX8vmgvQ=
 github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6 h1:+2D45NQ1B53nU0Lbsqa6rX9duCcO1df6U1HGCboijEQ=
 github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6/go.mod h1:5gqtfZSOJ7CWfrzPJ5c6B1Ju3r+W4UHIWXuav/+OGJQ=
-github.com/openshift/installer v1.4.19-ec5 h1:xiQ3D4DLf170cqfdp4Bo8uqVCyRkfQdjIC1DhXeOfpw=
-github.com/openshift/installer v1.4.19-ec5/go.mod h1:xTqIPA65EoaSpL5KZKOcxGcoh9HRs+aTdi3OUeedgKk=
 github.com/openshift/library-go v0.0.0-20250114132252-af5b21ebad2f h1:inJ2wNKevyuR+7VfBecMJ+HjEsVwbTtw0x3SoZZ24uI=
 github.com/openshift/library-go v0.0.0-20250114132252-af5b21ebad2f/go.mod h1:Dsex3pPrZ+krgVFZIv21DGzeFvcC0muMvaQe9E/q0uI=
 github.com/openshift/machine-api-operator v0.2.1-0.20240930121047-57b7917e6140 h1:VKn644y4Ra94L8YZ3JT8ZuOZMEspZt8yoIjHeaRM3pA=

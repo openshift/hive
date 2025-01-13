@@ -33,6 +33,7 @@ import (
 
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/awsprivatelink"
+	"github.com/openshift/hive/pkg/controller/utils/vsphereutils"
 	"github.com/openshift/hive/pkg/manageddns"
 	"github.com/openshift/hive/pkg/util/contracts"
 )
@@ -319,7 +320,6 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 	}
 
 	allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
-
 	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
 	if cd.Spec.Platform.AWS != nil {
@@ -524,22 +524,20 @@ func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) f
 		}
 	}
 	if vsphere := platform.VSphere; vsphere != nil {
+		vsphere = vsphere.DeepCopy()
 		numberOfPlatforms++
 		vspherePath := path.Child("vsphere")
+		if err := vsphereutils.ConvertDeprecatedFields(vsphere); err != nil {
+			allErrs = append(allErrs, field.InternalError(vspherePath, fmt.Errorf("error converting deprecated vsphere fields: %e", err)))
+		}
 		if vsphere.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("credentialsSecretRef", "name"), "must specify secrets for vSphere access"))
 		}
 		if vsphere.CertificatesSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(vspherePath.Child("certificatesSecretRef", "name"), "must specify certificates for vSphere access"))
 		}
-		if vsphere.VCenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("vCenter"), "must specify vSphere vCenter"))
-		}
-		if vsphere.Datacenter == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("datacenter"), "must specify vSphere datacenter"))
-		}
-		if vsphere.DefaultDatastore == "" {
-			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
+		if len(vsphere.Infrastructure.VCenters) == 0 {
+			allErrs = append(allErrs, field.Required(vspherePath.Child("vSphere").Child("vcenters").Index(0), "must specify at least one vSphere vCenter"))
 		}
 	}
 	if ibmCloud := platform.IBMCloud; ibmCloud != nil {
@@ -670,6 +668,18 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
+
+	// HIVE-2391
+	if oldObject.Spec.Platform.VSphere != nil && cd.Spec.Platform.VSphere != nil {
+		// Moving from a non-zonal to a zonal shape is permitted.
+		// This check is faster than checking all the fields individually
+		if oldObject.Spec.Platform.VSphere.Infrastructure == nil && cd.Spec.Platform.VSphere.Infrastructure != nil {
+			contextLogger.Debug("Passed validation: HIVE-2391")
+			return &admissionv1beta1.AdmissionResponse{
+				Allowed: true,
+			}
+		}
+	}
 
 	hasChangedImmutableField, unsupportedDiff := hasChangedImmutableField(&oldObject.Spec, &cd.Spec)
 	if hasChangedImmutableField {

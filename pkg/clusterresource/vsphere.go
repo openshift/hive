@@ -19,39 +19,17 @@ var _ CloudBuilder = (*VSphereCloudBuilder)(nil)
 
 // VSphereCloudBuilder encapsulates cluster artifact generation logic specific to vSphere.
 type VSphereCloudBuilder struct {
-	// VCenter is the domain name or IP address of the vCenter.
-	VCenter string
-
 	// Username is the name of the user to use to connect to the vCenter.
 	Username string
 
 	// Password is the password for the user to use to connect to the vCenter.
 	Password string
 
-	// Datacenter is the name of the datacenter to use in the vCenter.
-	Datacenter string
-
-	// DefaultDatastore is the default datastore to use for provisioning volumes.
-	DefaultDatastore string
-
-	// Folder is the name of the folder that will be used and/or created for
-	// virtual machines.
-	Folder string
-
-	// Cluster is the name of the cluster virtual machines will be cloned into.
-	Cluster string
-
-	// APIVIP is the virtual IP address for the api endpoint
-	APIVIP string
-
-	// IngressVIP is the virtual IP address for ingress
-	IngressVIP string
-
-	// Network specifies the name of the network to be used by the cluster.
-	Network string
-
 	// CACert is the CA certificate(s) used to communicate with the vCenter.
 	CACert []byte
+
+	// Infrastructure is the full vSphere platform spec
+	Infrastructure *installervsphere.Platform
 }
 
 func NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret *corev1.Secret) *VSphereCloudBuilder {
@@ -111,43 +89,27 @@ func (p *VSphereCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			CertificatesSecretRef: corev1.LocalObjectReference{
 				Name: p.certificatesSecretName(o),
 			},
-			VCenter:          p.VCenter,
-			Datacenter:       p.Datacenter,
-			DefaultDatastore: p.DefaultDatastore,
-			Folder:           p.Folder,
-			Cluster:          p.Cluster,
-			Network:          p.Network,
+			Infrastructure: p.Infrastructure,
 		},
 	}
 }
 
 func (p *VSphereCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.VSphere = &hivev1vsphere.MachinePool{
-		NumCPUs:           2,
-		NumCoresPerSocket: 1,
-		MemoryMiB:         8192,
-		OSDisk: hivev1vsphere.OSDisk{
-			DiskSizeGB: 120,
+		MachinePool: installervsphere.MachinePool{
+			NumCPUs:           2,
+			NumCoresPerSocket: 1,
+			MemoryMiB:         8192,
+			OSDisk: installervsphere.OSDisk{
+				DiskSizeGB: 120,
+			},
 		},
 	}
 }
 
 func (p *VSphereCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
-
-	// TODO: Watch for removal of deprecated fields https://issues.redhat.com/browse/SPLAT-1093
 	ic.Platform = installertypes.Platform{
-		VSphere: &installervsphere.Platform{
-			DeprecatedVCenter:          p.VCenter,
-			DeprecatedUsername:         p.Username,
-			DeprecatedPassword:         p.Password,
-			DeprecatedDatacenter:       p.Datacenter,
-			DeprecatedDefaultDatastore: p.DefaultDatastore,
-			DeprecatedFolder:           p.Folder,
-			DeprecatedCluster:          p.Cluster,
-			APIVIPs:                    []string{p.APIVIP},
-			IngressVIPs:                []string{p.IngressVIP},
-			DeprecatedNetwork:          p.Network,
-		},
+		VSphere: p.Infrastructure,
 	}
 }
 

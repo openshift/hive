@@ -1069,7 +1069,7 @@ func (in *ClusterDeprovisionPlatform) DeepCopyInto(out *ClusterDeprovisionPlatfo
 	if in.VSphere != nil {
 		in, out := &in.VSphere, &out.VSphere
 		*out = new(VSphereClusterDeprovision)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.IBMCloud != nil {
 		in, out := &in.IBMCloud, &out.IBMCloud
@@ -3408,7 +3408,7 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.VSphere != nil {
 		in, out := &in.VSphere, &out.VSphere
 		*out = new(vsphere.Platform)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.AgentBareMetal != nil {
 		in, out := &in.AgentBareMetal, &out.AgentBareMetal
@@ -4170,6 +4170,11 @@ func (in *VSphereClusterDeprovision) DeepCopyInto(out *VSphereClusterDeprovision
 	*out = *in
 	out.CredentialsSecretRef = in.CredentialsSecretRef
 	out.CertificatesSecretRef = in.CertificatesSecretRef
+	if in.VCenters != nil {
+		in, out := &in.VCenters, &out.VCenters
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

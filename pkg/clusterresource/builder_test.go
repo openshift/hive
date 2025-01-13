@@ -9,6 +9,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/installer/pkg/types/nutanix"
+	"github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -141,16 +142,37 @@ func createOpenStackClusterBuilder() *Builder {
 func createVSphereClusterBuilder() *Builder {
 	b := createTestBuilder()
 	b.CloudBuilder = &VSphereCloudBuilder{
-		VCenter:          "test",
-		Username:         "test",
-		Password:         "test",
-		Datacenter:       "test",
-		DefaultDatastore: "test",
-		Folder:           "test",
-		Cluster:          "test",
-		APIVIP:           "192.168.0.2",
-		IngressVIP:       "192.168.0.3",
-		CACert:           []byte{},
+		Username: "test",
+		Password: "test",
+		CACert:   []byte{},
+		Infrastructure: &vsphere.Platform{
+			VCenters: []vsphere.VCenter{
+				{
+					Server:      "test",
+					Port:        123,
+					Datacenters: []string{"test"},
+				},
+			},
+			FailureDomains: []vsphere.FailureDomain{
+				{
+					Name:   "test",
+					Region: "test",
+					Zone:   "test",
+					Server: "test",
+					Topology: vsphere.Topology{
+						Datacenter:     "test",
+						ComputeCluster: "test",
+						Networks:       []string{"test"},
+						Datastore:      "test",
+						ResourcePool:   "test",
+						Folder:         "test",
+						Template:       "test",
+					},
+				},
+			},
+			APIVIPs:     []string{"192.168.0.2"},
+			IngressVIPs: []string{"192.168.0.3"},
+		},
 	}
 	return b
 }

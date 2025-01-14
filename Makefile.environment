@@ -1,0 +1,65 @@
+IMG = localhost:5000/hive:latest
+
+HIVE_OPERATOR_NS=dev-hive
+HIVE_NS=dev-hive
+KUBECONFIG=~/.kube/dev-hive.kubeconfig
+
+# Install dependency bins, make hive & run containerd
+install_environment_bins:
+	@echo "Installing go and additional dependencies"
+	./hack/install_dev_env.sh
+
+# Start buildkitd, build & push hive image
+build_push_image:
+	@echo "Starting buildkitd"
+	./hack/buildkitd_build_push_image.sh
+
+# Create registry
+create-registry:
+	@echo "Creating local image registry"
+	nerdctl run -d --restart=always -p "5000:5000" --name "kind-nerdctl-registry" --network "kind" registry:2
+
+
+# Build the image
+build-image:
+	@echo "Building the image using buildkitd..."
+	buildctl --addr unix:///run/user/$$UID/buildkit/buildkitd.sock build --frontend dockerfile.v0 --local context=. --local dockerfile=. --secret id=docker,src=/home/$$USER/.docker/config.json --output type=image,name=localhost:5000/hive:latest,push=true
+
+
+# Delete Kind Cluster
+delete-kind-cluster:
+	@echo "Deleting Kind cluster 'dev-hive'..."
+	kind delete cluster --name dev-hive
+
+# Create Kind Cluster
+create-kind-cluster: delete-kind-cluster
+	@echo "Creating a Kind cluster..."
+	IMG=$(IMG) ./hack/create_cluster.sh dev-hive
+
+# Deploy & install certs
+deploy:
+	set -x
+	export KUBECONFIG=~/.kube/dev-hive.kubeconfig 
+	@echo "Deploying the application..."
+	KUBECONFIG=$(KUBECONFIG) IMG=$(IMG) HIVE_IMAGE=$(IMG) ./hack/deploy.sh dev-hive
+	KUBECONFIG=$(KUBECONFIG) HIVE_NS=$(HIVE_NS) ./hack/hiveadmission-dev-cert.sh
+
+# Set up the entire environment
+create_cluster_registry_deploy: create-kind-cluster create-registry build_push_image deploy
+	@echo "Environment setup complete!"
+
+# Scale down operator
+scale-down-operator:
+	HIVE_OPERATOR_NS=$(HIVE_OPERATOR_NS) oc scale -n dev-hive deployment.v1.apps/hive-operator --replicas=0
+
+# Scale down controllers
+scale-down-controllers:
+	HIVE_OPERATOR_NS=$(HIVE_OPERATOR_NS) oc scale -n dev-hive deployment.v1.apps/hive-controllers --replicas=0
+
+# Run operator
+run-operator: scale-down-operator
+	KUBECONFIG=$(KUBECONFIG) HIVE_OPERATOR_NS=$(HIVE_OPERATOR_NS) ./bin/operator --log-level=debug
+
+# Run controller
+run-controller: scale-down-controllers
+	HIVE_SKIP_LEADER_ELECTION=1 METRICS_CONFIG_FILE=metrics.json  KUBECONFIG=dev-hive.kubeconfig HIVE_NS=$(HIVE_NS) HIVE_MACHINEPOOL_POD_NAME="hive-machinepool-0" HIVE_OPERATOR_NS=$(HIVE_OPERATOR_NS) HIVE_CLUSTERSYNC_POD_NAME=$hive-clustersync-0 ./bin/manager --log-level=debug

@@ -19,6 +19,14 @@ type Platform struct {
 	// of using public load balancers.
 	// +optional
 	PrivateServiceConnect *PrivateServiceConnect `json:"privateServiceConnect,omitempty"`
+
+	// DiscardLocalSsdOnHibernate passes the specified value through to the GCP API to indicate
+	// whether the content of any local SSDs should be preserved or discarded. See
+	// https://cloud.google.com/compute/docs/disks/local-ssd#stop_instance
+	// This field is required when attempting to hibernate clusters with instances possessing
+	// SSDs -- e.g. those with GPUs.
+	// +optional
+	DiscardLocalSsdOnHibernate *bool `json:"discardLocalSsdOnHibernate,omitempty"`
 }
 
 // PrivateServiceConnectAccess configures access to the cluster API using GCP Private Service Connect

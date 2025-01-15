@@ -180,6 +180,15 @@ type Options struct {
 	AzureCloudName                   string
 	AzureResourceGroupName           string
 
+	// GCP
+	// This field is used by the cobra flag...
+	DiscardLocalSsdOnHibernate bool
+	// ...but we need a way to differentiate among `true` (discard), `false` (preserve), and `nil`
+	// (user did not specify, so we won't send the option through the GCP API at all). Cobra gives
+	// us a way to ask, after the fact, whether the field was "Changed"; we'll use that in the code
+	// to set this (lowercase) option so we can trigger the correct behavior when talking to GCP.
+	discardLocalSsdOnHibernate *bool
+
 	// OpenStack
 	OpenStackCloud             string
 	OpenStackExternalNetwork   string
@@ -335,6 +344,9 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.AzureBaseDomainResourceGroupName, "azure-base-domain-resource-group-name", "os4-common", "Resource group where the azure DNS zone for the base domain is found")
 	flags.StringVar(&opt.AzureCloudName, "azure-cloud-name", "AzurePublicCloud", "Azure Cloud in which cluster will be created")
 	flags.StringVar(&opt.AzureResourceGroupName, "azure-resource-group-name", "", "Resource group where the cluster will be installed")
+
+	// GCP flags
+	flags.BoolVar(&opt.DiscardLocalSsdOnHibernate, "gcp-discard-local-ssd-on-hibernate", false, "(GCP) Preserve (false) or discard (true) contents of locally-attached SSDs when cluster is hibernated. Required when using hibernation with VM types with SSDs.")
 
 	// OpenStack flags
 	flags.StringVar(&opt.OpenStackCloud, "openstack-cloud", "openstack", "Section of clouds.yaml to use for API/auth")
@@ -492,6 +504,13 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("unable to parse key=value annotation: %s", ls)
 		}
 	}
+
+	// Differentiate among `true` (discard), `false` (preserve), and `nil` (user did not specify,
+	// so we won't send the option through the GCP API at all).
+	if f := cmd.Flags().Lookup("gcp-discard-local-ssd-on-hibernate"); f != nil && f.Changed {
+		o.discardLocalSsdOnHibernate = &o.DiscardLocalSsdOnHibernate
+	}
+
 	return nil
 }
 
@@ -684,6 +703,8 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			ServiceAccount:        creds,
 			Region:                o.Region,
 			PrivateServiceConnect: o.PrivateLink,
+			// NB: not Discard... (capitalized) -- see Validate()
+			DiscardLocalSsdOnHibernate: o.discardLocalSsdOnHibernate,
 		}
 		builder.CloudBuilder = gcpProvider
 	case cloudOpenStack:

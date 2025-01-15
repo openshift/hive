@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	compute "google.golang.org/api/compute/v1"
 
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -34,6 +35,7 @@ func TestGCPStopAndStartMachines(t *testing.T) {
 	tests := []struct {
 		name        string
 		testFunc    string
+		cd          *hivev1.ClusterDeployment
 		instances   map[string]int
 		setupClient func(*testing.T, *mockgcpclient.MockClient)
 	}{
@@ -48,8 +50,29 @@ func TestGCPStopAndStartMachines(t *testing.T) {
 			instances: map[string]int{"TERMINATED": 5, "RUNNING": 2},
 			setupClient: func(t *testing.T, c *mockgcpclient.MockClient) {
 				c.EXPECT().StopInstance(gomock.Any()).Times(2).Do(
-					func(instance *compute.Instance) {
+					func(instance *compute.Instance, opts ...gcpclient.InstancesStopCallOption) {
 						assert.True(t, instance.Status == "RUNNING")
+						assert.Len(t, opts, 0, "expected no InstancesStopCallOptions")
+					},
+				)
+			},
+		},
+		{
+			name:     "stop running instances with SSDs: preserve",
+			testFunc: "StopMachines",
+			cd: testcd.BasicBuilder().Options(
+				testcd.WithClusterMetadata(&hivev1.ClusterMetadata{InfraID: "abcd1234"}),
+				testcd.WithGCPPlatform(&hivev1gcp.Platform{DiscardLocalSsdOnHibernate: ptr.To(false)}),
+			).Build(),
+			instances: map[string]int{"TERMINATED": 5, "RUNNING": 2},
+			setupClient: func(t *testing.T, c *mockgcpclient.MockClient) {
+				// TODO: This currently just validates that we passed an extra argument to StopInstance.
+				// Validate that it's actually calling DiscardLocalSsd, and with the correct bool.
+				// This is Hard because that's not part of an interface, so we can't mock it.
+				c.EXPECT().StopInstance(gomock.Any(), gomock.Any()).Times(2).Do(
+					func(instance *compute.Instance, opts ...gcpclient.InstancesStopCallOption) {
+						assert.True(t, instance.Status == "RUNNING")
+						assert.Len(t, opts, 1, "expected one InstancesStopCallOption")
 					},
 				)
 			},
@@ -60,8 +83,9 @@ func TestGCPStopAndStartMachines(t *testing.T) {
 			instances: map[string]int{"TERMINATED": 5, "STOPPING": 3, "STOPPED": 4, "STAGING": 7, "RUNNING": 3},
 			setupClient: func(t *testing.T, c *mockgcpclient.MockClient) {
 				c.EXPECT().StopInstance(gomock.Any()).Times(10).Do(
-					func(instance *compute.Instance) {
+					func(instance *compute.Instance, opts ...gcpclient.InstancesStopCallOption) {
 						assert.True(t, instance.Status == "STAGING" || instance.Status == "RUNNING")
+						assert.Len(t, opts, 0, "expected no InstancesStopCallOptions")
 					},
 				)
 			},
@@ -106,12 +130,16 @@ func TestGCPStopAndStartMachines(t *testing.T) {
 				test.setupClient(t, gcpClient)
 			}
 			actuator := testGCPActuator(gcpClient)
+			cd := test.cd
+			if cd == nil {
+				cd = testClusterDeployment()
+			}
 			var err error
 			switch test.testFunc {
 			case "StopMachines":
-				err = actuator.StopMachines(testClusterDeployment(), nil, log.New())
+				err = actuator.StopMachines(cd, nil, log.New())
 			case "StartMachines":
-				err = actuator.StartMachines(testClusterDeployment(), nil, log.New())
+				err = actuator.StartMachines(cd, nil, log.New())
 			default:
 				t.Fatal("Invalid function to test")
 			}

@@ -475,17 +475,22 @@ func (mr *MockClientMockRecorder) StartInstance(arg0 interface{}) *gomock.Call {
 }
 
 // StopInstance mocks base method.
-func (m *MockClient) StopInstance(arg0 *compute.Instance) error {
+func (m *MockClient) StopInstance(arg0 *compute.Instance, arg1 ...gcpclient.InstancesStopCallOption) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StopInstance", arg0)
+	varargs := []interface{}{arg0}
+	for _, a := range arg1 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "StopInstance", varargs...)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // StopInstance indicates an expected call of StopInstance.
-func (mr *MockClientMockRecorder) StopInstance(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) StopInstance(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopInstance", reflect.TypeOf((*MockClient)(nil).StopInstance), arg0)
+	varargs := append([]interface{}{arg0}, arg1...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopInstance", reflect.TypeOf((*MockClient)(nil).StopInstance), varargs...)
 }
 
 // UpdateResourceRecordSet mocks base method.

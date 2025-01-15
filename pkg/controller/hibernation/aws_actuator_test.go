@@ -389,11 +389,9 @@ func testAWSActuator(awsClient awsclient.Client) *awsActuator {
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {
-	return testcd.BasicBuilder().Options(func(cd *hivev1.ClusterDeployment) {
-		cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
-			InfraID: "abcd1234",
-		}
-	}).Build()
+	return testcd.BasicBuilder().Options(testcd.WithClusterMetadata(&hivev1.ClusterMetadata{
+		InfraID: "abcd1234",
+	})).Build()
 }
 
 func setupClientInstances(awsClient *mockawsclient.MockClient, states map[string]int) {

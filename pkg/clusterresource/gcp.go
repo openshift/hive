@@ -34,8 +34,13 @@ type GCPCloudBuilder struct {
 	// Region is the GCP region to which to install the cluster.
 	Region string
 
-	// PrivateServiceConncet is true if the cluster should use GCP Private Service Connect
+	// PrivateServiceConnect is true if the cluster should use GCP Private Service Connect
 	PrivateServiceConnect bool
+
+	// DiscardLocalSsdOnHibernate describes the desired behavior of SSDs attached to certain
+	// VM types when instances are shut down on hibernate. See the field of the same name in
+	// the GCP Platform API.
+	DiscardLocalSsdOnHibernate *bool
 }
 
 func NewGCPCloudBuilderFromSecret(credsSecret *corev1.Secret) (*GCPCloudBuilder, error) {
@@ -77,6 +82,8 @@ func (p *GCPCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			PrivateServiceConnect: &hivev1gcp.PrivateServiceConnect{
 				Enabled: p.PrivateServiceConnect,
 			},
+			// May be nil
+			DiscardLocalSsdOnHibernate: p.DiscardLocalSsdOnHibernate,
 		},
 	}
 }

@@ -120,6 +120,11 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 		*out = new(PrivateServiceConnect)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.DiscardLocalSsdOnHibernate != nil {
+		in, out := &in.DiscardLocalSsdOnHibernate, &out.DiscardLocalSsdOnHibernate
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

@@ -47,7 +47,21 @@ const (
 )
 
 var (
-	mutableFields = []string{"CertificateBundles", "ClusterMetadata", "ControlPlaneConfig", "Ingress", "Installed", "PreserveOnDelete", "ClusterPoolRef", "PowerState", "HibernateAfter", "InstallAttemptsLimit", "Platform.AgentBareMetal.AgentSelector", "Platform.AWS.PrivateLink.AdditionalAllowedPrincipals"}
+	mutableFields = []string{
+		"CertificateBundles",
+		"ClusterMetadata",
+		"ControlPlaneConfig",
+		"Ingress",
+		"Installed",
+		"PreserveOnDelete",
+		"ClusterPoolRef",
+		"PowerState",
+		"HibernateAfter",
+		"InstallAttemptsLimit",
+		"Platform.AgentBareMetal.AgentSelector",
+		"Platform.AWS.PrivateLink.AdditionalAllowedPrincipals",
+		"Platform.GCP.DiscardLocalSsdOnHibernate",
+	}
 )
 
 // ClusterDeploymentValidatingAdmissionHook is a struct that is used to reference what code should be run by the generic-admission-server.

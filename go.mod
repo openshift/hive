@@ -467,6 +467,9 @@ replace k8s.io/apimachinery => k8s.io/apimachinery v0.31.1
 // taken from https://github.com/openshift/installer/blob/21cd5218bb58288cd7b03018b9a2513aca3a13a5/terraform/providers/ibm/go.mod
 replace github.com/dgrijalva/jwt-go v3.2.0+incompatible => github.com/golang-jwt/jwt v3.2.1+incompatible
 
+// CVE-2022-1996 (only affects go.sum; zero actual code is vendored in from this lib)
+replace github.com/emicklei/go-restful v2.15.0+incompatible => github.com/emicklei/go-restful v2.16.0+incompatible
+
 // needed for fixing CVE-2018-1099
 exclude (
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738

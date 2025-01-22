@@ -1419,8 +1419,8 @@ func Test_ensureServiceAttachmentFirewall(t *testing.T) {
 			m.EXPECT().CreateFirewall(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, newGoogleApiError(http.StatusUnauthorized, "AccessDenied", "not authorized to CreateFirewall"))
 		},
 		expectError: "error creating the Service Attachment Firewall: googleapi: Error 401: not authorized to CreateFirewall, AccessDenied",
-	}, { // Should return modified on createServiceAttachment success
-		name: "createServiceAttachment success",
+	}, { // Should return modified on createServiceAttachmentFirewall success
+		name: "createServiceAttachmentFirewall success",
 		cd: cdBuilder.Build(
 			testcd.WithGCPPlatform(&hivev1gcp.Platform{}),
 			testcd.WithGCPPlatformStatus(&hivev1gcp.PlatformStatus{
@@ -1430,7 +1430,9 @@ func Test_ensureServiceAttachmentFirewall(t *testing.T) {
 		),
 		gcpClientConfig: func(m *mockclient.MockClient) {
 			m.EXPECT().GetFirewall(gomock.Any()).Return(nil, newGoogleApiError(http.StatusNotFound, "NotFound", "Firewall not found"))
-			m.EXPECT().CreateFirewall(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mockFirewall, nil)
+			m.EXPECT().CreateFirewall(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+				[]string{testInfraID + "-master", testInfraID + "-control-plane"},
+			).Return(mockFirewall, nil)
 		},
 		expect:         mockFirewall,
 		expectModified: true,

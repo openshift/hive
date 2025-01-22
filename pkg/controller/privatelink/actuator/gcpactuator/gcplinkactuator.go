@@ -383,7 +383,10 @@ func (a *GCPLinkActuator) ensureServiceAttachmentFirewall(cd *hivev1.ClusterDepl
 	firewall, err := a.gcpClientSpoke.GetFirewall(firewallName)
 	if isNotFound(err) {
 		cidr := getServiceAttachmentSubnetCIDR(cd)
-		targets := []string{metadata.InfraID + "-master"}
+		targets := []string{
+			metadata.InfraID + "-master",        // 4.15 and older
+			metadata.InfraID + "-control-plane", // 4.16 and newer
+		}
 		newFirewall, err := a.createServiceAttachmentFirewall(firewallName, cidr, network, targets)
 		if err != nil {
 			return false, nil, err

@@ -167,6 +167,7 @@ do the trick.
 export EL8_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.22
 export EL9_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.22
 export BASE_IMAGE=registry.ci.openshift.org/origin/4.16:base
+# NOTE: This produces images which are not FIPS-compliant.
 export GO="CGO_ENABLED=0 go"
 ```
 

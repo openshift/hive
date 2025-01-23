@@ -1,9 +1,10 @@
 ARG CONTAINER_SUB_MANAGER_OFF=0
-ARG EL8_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-ARG EL9_BUILD_IMAGE=registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-ARG BASE_IMAGE=registry.ci.openshift.org/ocp/4.16:base-rhel9
+ARG EL8_BUILD_IMAGE=${EL8_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17}
+ARG EL9_BUILD_IMAGE=${EL9_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17}
+ARG BASE_IMAGE=${BASE_IMAGE:-registry.ci.openshift.org/ocp/4.16:base-rhel9}
 
 FROM ${EL8_BUILD_IMAGE} as builder_rhel8
+ARG GO=${GO:-go}
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
@@ -11,9 +12,11 @@ COPY . .
 
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
+ENV GO=${GO}
 RUN make build-hiveutil
 
 FROM ${EL9_BUILD_IMAGE} as builder_rhel9
+ARG GO=${GO:-go}
 ARG CONTAINER_SUB_MANAGER_OFF
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
@@ -22,6 +25,7 @@ COPY . .
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
+ENV GO=${GO}
 RUN make build-hiveadmission build-manager build-operator && \
   make build-hiveutil
 

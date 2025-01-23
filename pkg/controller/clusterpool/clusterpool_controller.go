@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/bombsimon/logrusr/v4"
 	"math"
 	"reflect"
 	"sort"
@@ -1265,12 +1266,8 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		}
 
 		cloudBuilder := clusterresource.NewVSphereCloudBuilderFromSecret(credsSecret, certsSecret)
-		cloudBuilder.Datacenter = platform.VSphere.Datacenter
-		cloudBuilder.DefaultDatastore = platform.VSphere.DefaultDatastore
-		cloudBuilder.VCenter = platform.VSphere.VCenter
-		cloudBuilder.Cluster = platform.VSphere.Cluster
-		cloudBuilder.Folder = platform.VSphere.Folder
-		cloudBuilder.Network = platform.VSphere.Network
+		platform.VSphere.ConvertDeprecatedFields(logrusr.New(logger))
+		cloudBuilder.VSphere = platform.VSphere.VSphere
 
 		return cloudBuilder, nil
 	case platform.Ovirt != nil:

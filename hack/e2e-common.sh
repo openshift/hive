@@ -222,24 +222,30 @@ case "${CLOUD}" in
 	BASE_DOMAIN="${BASE_DOMAIN:-origin-ci-int-gce.dev.openshift.com}"
 	;;
 "vsphere")
+  if [ -z "$SHARED_DIR" ]; then
+    echo "Variable 'SHARED_DIR' not set."
+    exit 1
+  fi
+  if [ -z "$ADDITIONAL_CLUSTER_API_VIP" ]; then
+    echo "Variable 'ADDITIONAL_CLUSTER_API_VIP' not set."
+    exit 1
+  fi
+  if [ -z "$ADDITIONAL_CLUSTER_INGRESS_VIP" ]; then
+    echo "Variable 'ADDITIONAL_CLUSTER_INGRESS_VIP' not set."
+    exit 1
+  fi
+  if [ -z "$ADDITIONAL_CLUSTER_NAME" ]; then
+    echo "Variable 'ADDITIONAL_CLUSTER_NAME' not set."
+    exit 1
+  fi
+  VSPHERE_LEASES=$(find "$SHARED_DIR" -name "LEASE_*.json" | grep -v "LEASE_single.json" | paste -sd ":" -)
+  BASE_DOMAIN=$(<"${SHARED_DIR}"/basedomain.txt)
   BASE_DOMAIN="${BASE_DOMAIN:-vmc.devcluster.openshift.com}"
-  if [ -z "$NETWORK_NAME" ]; then
-    echo "Variable 'NETWORK_NAME' not set."
-    exit 1
-  fi
-   if [ -z "$VCENTER" ]; then
-    echo "Variable 'VCENTER' not set."
-    exit 1
-  fi
-  API_VIP=$(get_vips 3) # Get 3rd vip from file
-  INGRESS_VIP=$(get_vips 4) # Get 4th vip from file
-  EXTRA_CREATE_CLUSTER_ARGS="--vsphere-datacenter=${GOVC_DATACENTER:-DEVQEdatacenter} \
-      --vsphere-default-datastore=${GOVC_DATASTORE:-vsanDatastore}\
-      --vsphere-cluster=${VSPHERE_CLUSTER:-DEVQEcluster}
-      --vsphere-api-vip=$API_VIP \
-      --vsphere-ingress-vip=$INGRESS_VIP \
-      --vsphere-network=$NETWORK_NAME \
-      --vsphere-vcenter=$VCENTER"
+  CLUSTER_NAME="${ADDITIONAL_CLUSTER_NAME}"
+
+  EXTRA_CREATE_CLUSTER_ARGS="--vsphere-leases=$VSPHERE_LEASES \
+      --vsphere-api-vip=$ADDITIONAL_CLUSTER_API_VIP \
+      --vsphere-ingress-vip=$ADDITIONAL_CLUSTER_INGRESS_VIP"
   ;;
 *)
 	echo "unknown cloud: ${CLOUD}"
@@ -317,22 +323,4 @@ function capture_cluster_logs() {
         ${SRC_ROOT}/hack/logextractor.sh ${CLUSTER_NAME} "${ARTIFACT_DIR}/hive"
         exit 1
     fi
-}
-
-function get_vips() {
-  # Return vip at given index
-  idx=${1:-1} 
-   if [ -z "$SHARED_DIR" ]; then
-    echo "Variable 'SHARED_DIR' not set."
-    exit 1
-  fi
-  
-  vips="${SHARED_DIR}/vips.txt"
-  if [ ! -f "$vips" ]; then
-    echo "Error: File '$vips' not found."
-    exit 1
-  fi
-
-  vip=$(sed -n "${idx}p" "$vips")
-  echo "$vip"
 }

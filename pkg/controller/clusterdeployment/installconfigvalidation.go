@@ -15,9 +15,11 @@ const (
 	noGCPPlatformErr     = "install config did not contain a GCP platform"
 	noAzurePlatformErr   = "install config did not contain an Azure platform"
 	novSpherePlatformErr = "install config did not contain an vSphere platform"
+	noNutanixPlatformErr = "install config did not contain a Nutanix platform"
 	regionMismatchErr    = "install config region does not match cluster deployment region"
 
 	missingvSphereCredentialsErr = "install config does not contain username/password for vSphere platform"
+	missingNutanixCredentialsErr = "install config does not contain username/password for Nutanix platform"
 )
 
 // ValidateInstallConfig ensures that the "install-config.yaml" in the `installConfigSecret`
@@ -65,6 +67,14 @@ func ValidateInstallConfig(cd *hivev1.ClusterDeployment, installConfigSecret *co
 			(len(ic.Platform.VSphere.VCenters) == 0 || ic.Platform.VSphere.VCenters[0].Username == "" ||
 				ic.Platform.VSphere.VCenters[0].Password == "") {
 			return ic, errors.New(missingvSphereCredentialsErr)
+		}
+	case platform.Nutanix != nil:
+		if ic.Platform.Nutanix == nil {
+			return ic, errors.New(noNutanixPlatformErr)
+		}
+		if (ic.Platform.Nutanix.PrismCentral.Password == "" || ic.Platform.Nutanix.PrismCentral.Username == "") &&
+			(ic.Platform.Nutanix.PrismCentral.Endpoint.Address == "" || ic.Platform.Nutanix.PrismCentral.Endpoint.Port == 0) {
+			return ic, errors.New(missingNutanixCredentialsErr)
 		}
 	}
 	return ic, nil

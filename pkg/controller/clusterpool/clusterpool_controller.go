@@ -1294,6 +1294,29 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.NetworkName = platform.Ovirt.NetworkName
 
 		return cloudBuilder, nil
+	case platform.Nutanix != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.Nutanix.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		certsSecret, err := r.getCredentialsSecret(pool, platform.Nutanix.CertificatesSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+
+		if _, ok := certsSecret.Data[".cacert"]; !ok {
+			return nil, err
+		}
+
+		cloudBuilder := clusterresource.NewNutanixCloudBuilder(credsSecret, certsSecret)
+		cloudBuilder.Endpoint = platform.Nutanix.Endpoint
+		cloudBuilder.Port = platform.Nutanix.Port
+		cloudBuilder.Cluster = platform.Nutanix.Cluster
+		cloudBuilder.Cluster = platform.Nutanix.Cluster
+		cloudBuilder.Subnet = platform.Nutanix.Subnet
+
+		return cloudBuilder, nil
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

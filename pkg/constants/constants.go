@@ -340,6 +340,33 @@ const (
 	// VSphereCertificatesDir is the directory containing VSphere certificate files.
 	VSphereCertificatesDir = "/vsphere-certificates"
 
+	// NutanixUsernameEnvVar is the environment variable specifying the Nutanix Prism Central username.
+	NutanixUsernameEnvVar = "NUTANIX_USERNAME"
+
+	// NutanixPasswordEnvVar is the environment variable specifying the Nutanix Prism Central password.
+	NutanixPasswordEnvVar = "NUTANIX_PASSWORD"
+
+	// NutanixEndpointEnvVar is the environment variable specifying the Nutanix Prism Central endpoint.
+	NutanixEndpointEnvVar = "NUTANIX_ENDPOINT"
+
+	// NutanixPortEnvVar is the environment variable specifying the Nutanix Prism Central port.
+	NutanixPortEnvVar = "NUTANIX_PORT"
+
+	// NutanixClusterEnvVar is the environment variable specifying the Nutanix cluster name.
+	NutanixClusterEnvVar = "NUTANIX_CLUSTER"
+
+	// NutanixSubnetEnvVar is the environment variable specifying the Nutanix subnet name.
+	NutanixSubnetEnvVar = "NUTANIX_SUBNET"
+
+	// NutanixCACertEnvVar is the environment variable specifying the path to the Nutanix CA certificate file.
+	NutanixCACertEnvVar = "NUTANIX_CA_CERT"
+
+	// NutanixCredentialsDir is the directory containing Nutanix credentials files.
+	NutanixCredentialsDir = "/nutanix-credentials"
+
+	// NutanixCertificatesDir is the directory containing Nutanix certificate files.
+	NutanixCertificatesDir = "/nutanix-certificates"
+
 	// VersionLabel is a label applied to ClusterDeployments to show the full version of the cluster
 	// per ClusterVersion.status.desired.version. This should differ from VersionMajorMinorPatchLabel
 	// only for pre-release versions.

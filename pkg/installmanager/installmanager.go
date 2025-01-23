@@ -41,28 +41,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	"github.com/openshift/installer/pkg/destroy/aws"
-	"github.com/openshift/installer/pkg/destroy/azure"
-	"github.com/openshift/installer/pkg/destroy/gcp"
-	"github.com/openshift/installer/pkg/destroy/ibmcloud"
-	"github.com/openshift/installer/pkg/destroy/openstack"
-	"github.com/openshift/installer/pkg/destroy/ovirt"
-	"github.com/openshift/installer/pkg/destroy/providers"
-	"github.com/openshift/installer/pkg/destroy/vsphere"
-	installertypes "github.com/openshift/installer/pkg/types"
-	installertypesazure "github.com/openshift/installer/pkg/types/azure"
-	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
-	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
-	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
-	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
-	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
-
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
+	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
 	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	ovirtutils "github.com/openshift/hive/contrib/pkg/utils/ovirt"
 	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
@@ -76,6 +61,23 @@ import (
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 	"github.com/openshift/hive/pkg/util/scheme"
 	yamlutils "github.com/openshift/hive/pkg/util/yaml"
+	"github.com/openshift/installer/pkg/destroy/aws"
+	"github.com/openshift/installer/pkg/destroy/azure"
+	"github.com/openshift/installer/pkg/destroy/gcp"
+	"github.com/openshift/installer/pkg/destroy/ibmcloud"
+	"github.com/openshift/installer/pkg/destroy/nutanix"
+	"github.com/openshift/installer/pkg/destroy/openstack"
+	"github.com/openshift/installer/pkg/destroy/ovirt"
+	"github.com/openshift/installer/pkg/destroy/providers"
+	"github.com/openshift/installer/pkg/destroy/vsphere"
+	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesazure "github.com/openshift/installer/pkg/types/azure"
+	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
+	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
+	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
+	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
+	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
+	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 )
 
 const (
@@ -542,6 +544,8 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 		ovirtutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.IBMCloud != nil:
 		ibmutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixutils.ConfigureCreds(m.DynamicClient)
 	}
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.
@@ -748,6 +752,33 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		}
 		var err error
 		uninstaller, err = vsphere.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				Nutanix: &installertypesnutanix.Metadata{
+					PrismCentral: cd.Spec.Platform.Nutanix.Endpoint,
+					Username:     nutanixUsername,
+					Password:     nutanixPassword,
+					Port:         string(cd.Spec.Platform.Nutanix.Port),
+				},
+			},
+		}
+
+		var err error
+		uninstaller, err = nutanix.New(logger, metadata)
 		if err != nil {
 			return err
 		}

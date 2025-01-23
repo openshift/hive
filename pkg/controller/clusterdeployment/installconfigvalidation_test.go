@@ -1,6 +1,11 @@
 package clusterdeployment
 
 import (
+	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
+	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
+	hivev1vpshere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,10 +13,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
-	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
-	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
-	hivev1vpshere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
@@ -148,6 +149,22 @@ platform:
     vCenter: 10.0.0.1
 pullSecret: ""
 `
+const testNutanixIC = `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-nutanix
+platform:
+  nutanix:
+    prismCentral: 
+      endpoint: 
+        address: 10.0.0.1
+pullSecret: ""
+`
 
 func TestInstallConfigValidation(t *testing.T) {
 	scheme := scheme.GetScheme()
@@ -252,6 +269,30 @@ func TestInstallConfigValidation(t *testing.T) {
 			),
 			ic:            testvSphereIC,
 			expectedError: missingvSphereCredentialsErr,
+		},
+		{
+			name: "test install config no Nutanix platform",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.Nutanix = &hivev1nutanix.Platform{
+						Endpoint: "10.0.0.1",
+					}
+				},
+			),
+			ic:            testAWSIC,
+			expectedError: noNutanixPlatformErr,
+		},
+		{
+			name: "test install config no Nutanix credentials",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.Nutanix = &hivev1nutanix.Platform{
+						Endpoint: "10.0.0.1",
+					}
+				},
+			),
+			ic:            testNutanixIC,
+			expectedError: missingNutanixCredentialsErr,
 		},
 		{
 			name: "un-unmarshallable install-config",

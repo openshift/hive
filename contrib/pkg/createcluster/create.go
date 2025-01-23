@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -96,6 +97,7 @@ const (
 	cloudOpenStack       = "openstack"
 	cloudOVirt           = "ovirt"
 	cloudVSphere         = "vsphere"
+	cloudNutanix         = "nutanix"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -207,6 +209,15 @@ type Options struct {
 	VSphereIngressVIP       string
 	VSphereNetwork          string
 	VSphereCACerts          string
+
+	// Nutanix
+	NutanixPrismCentralEndpoint string
+	NutanixPrismCentralPort     int32
+	NutanixAPIVIP               string
+	NutanixIngressVIP           string
+	NutanixNic                  string
+	NutanixCluster              string
+	NutanixCACerts              string
 
 	// Ovirt
 	OvirtClusterID       string
@@ -829,6 +840,72 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			InstanceType: o.IBMInstanceType,
 		}
 		builder.CloudBuilder = ibmCloudProvider
+
+	case cloudNutanix:
+		// Validate and extract required credentials and configuration
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+
+		nutanixEndpoint := os.Getenv(constants.NutanixEndpointEnvVar)
+		if o.NutanixPrismCentralEndpoint != "" {
+			nutanixEndpoint = o.NutanixPrismCentralEndpoint
+		}
+		if nutanixEndpoint == "" {
+			return nil, fmt.Errorf("must provide --nutanix-endpoint or set %s env var", constants.NutanixEndpointEnvVar)
+		}
+
+		var nutanixPort int32
+		nutanixPortVar := os.Getenv(constants.NutanixPortEnvVar)
+		nutanixPortVal, err := strconv.Atoi(nutanixPortVar)
+		if err != nil {
+			return nil, fmt.Errorf("error converting nutanix port %s env var to int: %w", constants.NutanixPortEnvVar, err)
+		}
+		nutanixPort = int32(nutanixPortVal)
+		if o.NutanixPrismCentralPort != 0 {
+			nutanixPort = o.NutanixPrismCentralPort
+		}
+
+		nutanixCluster := os.Getenv(constants.NutanixClusterEnvVar)
+		if o.NutanixCluster != "" {
+			nutanixCluster = o.NutanixCluster
+		}
+
+		nutanixSubnet := os.Getenv(constants.NutanixSubnetEnvVar)
+		if o.NutanixNic != "" {
+			nutanixSubnet = o.NutanixNic
+		}
+
+		caCert := os.Getenv(constants.NutanixCACertEnvVar)
+		if o.NutanixCACerts != "" {
+			caCert = o.NutanixCACerts
+		}
+		var caCertBytes []byte
+		if caCert != "" {
+			caCertBytes, err = os.ReadFile(caCert)
+			if err != nil {
+				return nil, fmt.Errorf("error reading Nutanix CA certificate %s: %w", caCert, err)
+			}
+		}
+
+		nutanixCloudProvider := &clusterresource.NutanixCloudBuilder{
+			Endpoint:   nutanixEndpoint,
+			Port:       nutanixPort,
+			Username:   nutanixUsername,
+			Password:   nutanixPassword,
+			Cluster:    nutanixCluster,
+			Subnet:     nutanixSubnet,
+			APIVIP:     o.NutanixAPIVIP,
+			IngressVIP: o.NutanixIngressVIP,
+			CACert:     caCertBytes,
+		}
+		builder.CloudBuilder = nutanixCloudProvider
 	}
 
 	if o.Internal {

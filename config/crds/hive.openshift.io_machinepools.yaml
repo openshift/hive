@@ -513,6 +513,78 @@ spec:
                           type: string
                         type: array
                     type: object
+                  nutanix:
+                    description: Nutanix is the configuration used when installing
+                      on Nutanix prism central.
+                    properties:
+                      bootType:
+                        description: BootType Indicates whether the VM should use
+                          Secure boot, UEFI boot or Legacy boot.
+                        type: string
+                      clusterUUID:
+                        description: ClusterUUID is the UUID of the Nutanix cluster
+                          to use for provisioning volumes.
+                        type: string
+                      disks:
+                        description: Disks is the list of disks attached to the VM.
+                        items:
+                          properties:
+                            adapterType:
+                              description: AdapterType
+                              enum:
+                              - SCSI
+                              - IDE
+                              - PCI
+                              - SATA
+                              - SPAPR
+                              type: string
+                            deviceType:
+                              description: DeviceType defines the type of disk.
+                              enum:
+                              - Disk
+                              - CDRom
+                              type: string
+                            diskSizeBytes:
+                              description: DiskSizeBytes defines the size of disk
+                                in bytes.
+                              format: int64
+                              type: integer
+                          required:
+                          - adapterType
+                          - deviceType
+                          - diskSizeBytes
+                          type: object
+                        type: array
+                      memorySizeMiB:
+                        description: MemorySizeMiB is the size of a VM's memory in
+                          MiB.
+                        format: int64
+                        type: integer
+                      sockets:
+                        description: |-
+                          NumSockets is the number of sockets in a vm.
+                          The number of vCPUs on the vm will be NumCPUs/NumSockets.
+                        format: int64
+                        type: integer
+                      subnetsUUIDs:
+                        description: NicList is the list of subnets attached to the
+                          VM.
+                        items:
+                          type: string
+                        type: array
+                      vcpus:
+                        description: NumVcpusPerSocket is the total number of virtual
+                          processor cores (per socket) to assign a vm.
+                        format: int64
+                        type: integer
+                    required:
+                    - clusterUUID
+                    - disks
+                    - memorySizeMiB
+                    - sockets
+                    - subnetsUUIDs
+                    - vcpus
+                    type: object
                   openstack:
                     description: OpenStack is the configuration used when installing
                       on OpenStack.

@@ -650,6 +650,65 @@ spec:
                       None indicates platform-agnostic install.
                       https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html
                     type: object
+                  nutanix:
+                    description: Nutanix is the configuration used when installing
+                      on Nutanix prism central.
+                    properties:
+                      certificatesSecretRef:
+                        description: |-
+                          CertificatesSecretRef refers to a secret that contains the Nutanix Prism CA certificates
+                          necessary for communicating with the Nutanix Prism Central.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      cluster:
+                        description: Cluster is the name of the Nutanix cluster to
+                          use for provisioning volumes.
+                        type: string
+                      credentialsSecretRef:
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the Nutanix account access
+                          credentials.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      endpoint:
+                        description: Endpoint is the URL of the Nutanix Prism Central
+                          instance.
+                        type: string
+                      port:
+                        description: Port is the port of the Nutanix Prism Central
+                          instance.
+                        format: int32
+                        type: integer
+                      subnet:
+                        description: Subnet is the name of the subnet to use for provisioning
+                          volumes.
+                        type: string
+                    required:
+                    - certificatesSecretRef
+                    - credentialsSecretRef
+                    - endpoint
+                    - port
+                    type: object
                   openstack:
                     description: OpenStack is the configuration used when installing
                       on OpenStack

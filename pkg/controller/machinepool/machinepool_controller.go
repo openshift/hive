@@ -1259,6 +1259,10 @@ func (r *ReconcileMachinePool) createActuator(
 	logger log.FieldLogger,
 ) (Actuator, error) {
 	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		// todo
+		return NewNutanixActuator(r.Client, r.scheme, logger)
+
 	case cd.Spec.Platform.AWS != nil:
 		creds := awsclient.CredentialsSource{
 			Secret: &awsclient.SecretCredentialsSource{

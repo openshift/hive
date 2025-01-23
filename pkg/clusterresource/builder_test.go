@@ -155,6 +155,22 @@ func createVSphereClusterBuilder() *Builder {
 	return b
 }
 
+func createNutanixClusterBuilder() *Builder {
+	b := createTestBuilder()
+	b.CloudBuilder = &NutanixCloudBuilder{
+		Endpoint:   "nutanix-endpoint",
+		Port:       9940,
+		Username:   "username",
+		Password:   "password",
+		Cluster:    "testCluster",
+		Subnet:     "e4c575c7-a9f0-464b-b8a9-92648de84286",
+		APIVIP:     "192.168.0.2",
+		IngressVIP: "192.168.0.3",
+		CACert:     []byte{},
+	}
+	return b
+}
+
 func TestBuildClusterResources(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -257,6 +273,23 @@ func TestBuildClusterResources(t *testing.T) {
 				certSecret := findSecret(allObjects, certSecretName)
 				require.NotNil(t, certSecret)
 				assert.Equal(t, certSecret.Name, cd.Spec.Platform.VSphere.CertificatesSecretRef.Name)
+			},
+		},
+		{
+			name:    "Nutanix cluster",
+			builder: createNutanixClusterBuilder(),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+				cd := findClusterDeployment(allObjects, clusterName)
+
+				credsSecretName := fmt.Sprintf("%s-nutanix-creds", clusterName)
+				credsSecret := findSecret(allObjects, credsSecretName)
+				require.NotNil(t, credsSecret)
+				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name)
+
+				certSecretName := fmt.Sprintf("%s-nutanix-certs", clusterName)
+				certSecret := findSecret(allObjects, certSecretName)
+				require.NotNil(t, certSecret)
+				assert.Equal(t, certSecret.Name, cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name)
 			},
 		},
 		{

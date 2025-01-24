@@ -15,6 +15,8 @@
   - [Running Code Locally](#running-code-locally)
     - [hive-operator](#hive-operator)
   - [hive-controllers](#hive-controllers)
+- [Rootless development environment setup](#rootless-development-environment-setup)
+  - [Setting up VScode for hive development](#setting-up-vscode-for-hive-development)
 - [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
 - [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
 - [Using Serving Certificates](#using-serving-certificates)
@@ -207,6 +209,70 @@ HIVE_NS="hive" make run
 ```
 
 Kind users should also specify `HIVE_IMAGE="localhost:5000/hive:latest"` as the default image location cannot be authenticated to from Kind clusters, resulting in inability to launch install pods.
+
+# Rootless development environment setup
+An automated script can set up your development environment - download go, prerequisite binaries, create a cluster, registry, and deploy hive. The script downloads binaries, stores them in the repository's root, and calls them from there. The setup is OS-independent and runs rootless, however, it currently only works on amd64 machines.
+
+To prepare the environment, run 
+
+```bash
+make -f Makefile.environment
+```
+Containerd/nerdctl is used for container management, image is built using buildkitd, cluster management is done with kubectl and oc.
+
+Hive will be deployed into a cluster with a *'dev-hive'* namespace.
+
+After the setup is finished, to manage the cluster and do other actions from your shell, source */hack/dev_env_vars.sh* first in order to get access to the necessary paths and environment variables.
+
+```bash
+source hack/dev_env_vars.sh
+```
+
+To clean up your environment *(remove containers, build cache, /.tmp, /.kube, /hiveadmission-certs, background processes)*, please run
+
+```bash
+make -f Makefile.environment prune-dev-env
+```
+
+### Setting up VScode for hive development
+Prerequisites
+- [VScode](https://code.visualstudio.com/docs/setup/linux)
+- VScode Go extension *(Ctrl+Shift+X and search for Go)*
+- [Delve](https://github.com/go-delve/delve/tree/master/Documentation/installation)
+- *source hack/dev_env_vars.sh*
+
+After opening Hive in VScode, you can seup the IDE for debugging by pressing *ctrl + shift + D* and clicking on *create launch.json*.
+
+The launch.json will govern which aspect to debug, e.g. the controller or the operator. Pressing F5 starts the debug process.
+
+Example of launch.json for debugging the controller:
+
+*Note: Metrics are a necessary part of the controller, however, for development purposes they are not needed and we can go around it creating an empty ({}) metrics.json file. The .json file is created automatically when running make -f Makefile.environment run-controller, exported here as METRICS_CONFIG_FILE*
+
+```bash
+{
+   "version": "0.2.0",
+   "configurations": [
+     {
+       "name": "HiveController",
+       "type": "go",
+       "request": "launch",
+       "mode": "auto",
+       "program": "${workspaceFolder}/cmd/manager/main.go",
+       "env": {
+         "HIVE_NS": "dev-hive",
+         "KUBECONFIG":"${workspaceFolder}/.tmp/_output/dev-hive.kubeconfig",
+         "HIVE_SKIP_LEADER_ELECTION":"1",
+         "METRICS_CONFIG_FILE":"${workspaceFolder}/.tmp/_output/metrics.json",
+         "HIVE_MACHINEPOOL_POD_NAME":"hive-machinepool-0",
+         "HIVE_OPERATOR_NS":"dev-hive",
+         "HIVE_CLUSTERSYNC_POD_NAME":"hive-clustersync-0",
+       },
+       "args": ["--log-level=debug"]
+     },
+  ]
+ }
+```
 
 ## Developing Hiveutil Install Manager
 

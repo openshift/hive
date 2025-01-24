@@ -133,6 +133,7 @@ if ! command_exists runc; then
   chmod +x "$HIVE_ROOT"/.tmp/_output/bin/runc
 fi
 
+# Check whether system requirements for running rootless containerd are satisfied
 echo "Checking system requirements for rootless containerd..."
 CHECK_OUTPUT=$(containerd-rootless-setuptool.sh check)
 
@@ -142,9 +143,8 @@ fi
 
 CONTAINERD_SETUPTOOL_PATH="${HIVE_ROOT}/.tmp/_output/bin/containerd-rootless-setuptool.sh"
 
-# Check if the line is already present (avoid duplicating it)
+# Add buildkitd flag pointing to custom /cni/bin location to containerd setup script
 if ! grep -q "cni" $CONTAINERD_SETUPTOOL_PATH; then
-  # Insert the flag if it's not present
   sed -i '/BUILDKITD_FLAG="--oci-cni-binary-dir=${HIVE_ROOT}\.tmp\/_output\/cni\/bin\/"/!s/\(BUILDKITD_FLAG="--oci-worker=true --oci-worker-rootless=true --containerd-worker=false\)/\1 --oci-cni-binary-dir=\/home\/daturece\/hive\/.tmp\/_output\/cni\/bin\//g' "$CONTAINERD_SETUPTOOL_PATH"
   echo "Flag added to setuptool.sh"
 else
@@ -158,6 +158,7 @@ if [ $? -ne 0 ]; then
  exit 1
 fi
 
+# Run buildkitd
 containerd-rootless-setuptool.sh install-buildkit
 if [ $? -ne 0 ]; then
  echo "Error: Failed to install containerd in rootless mode."

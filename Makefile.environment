@@ -3,9 +3,9 @@ export PATH := $(HIVE_ROOT)/.tmp/_output/bin:$(PATH)
 export KUBECONFIG := $(HIVE_ROOT)/.tmp/_output/dev-hive.kubeconfig
 export HIVE_NS := 'dev-hive'
 
-all: install_environment_bins create_cluster_registry start_buildkitd deploy
+all: install_environment_bins create_cluster_registry build_push_image deploy
 
-# Install dependency bins, make hive & run containerd
+# Install dependency bins, make hive & run containerd, buildkitd
 install_environment_bins:
 	@echo "Installing go and additional dependencies"
 	./hack/install_dev_env.sh
@@ -15,9 +15,9 @@ create_cluster_registry:
 	@echo "Creating a Kind cluster"
 	./hack/create_cluster_registry.sh
 
-# Start buildkitd, build and push image
-start_buildkitd:
-	@echo "Starting buildkitd"
+# Build and push image
+build_push_image:
+	@echo "Building and pushing the image"
 	./hack/buildkitd_build_push_image.sh
 
 # Deploy & install certs

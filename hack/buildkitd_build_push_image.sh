@@ -7,6 +7,7 @@ export PATH=$HIVE_ROOT/.tmp/_output/bin:$PATH
 
 touch "$HIVE_ROOT/.tmp/_output/config.json"
 
+# build and push image to localhost:5000/hive:latest
 buildctl --addr unix:///run/user/$UID/buildkit/buildkitd.sock build \
   --frontend dockerfile.v0 \
   --local context=. \

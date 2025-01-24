@@ -21,11 +21,10 @@ build_push_image:
 
 # Deploy & install certs
 deploy:
-	export HIVE_NS := 'dev-hive'
 	set -x
 	@echo "Deploying the application"
 	./hack/deploy_dev_hive.sh
-	./hack/hiveadmission-dev-cert.sh
+	HIVE_NS=dev_hive ./hack/hiveadmission-dev-cert.sh
 
 # Scale down operator
 scale-down-operator:

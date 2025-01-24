@@ -1,7 +1,6 @@
 HIVE_ROOT := $(shell git rev-parse --show-toplevel)
 export PATH := $(HIVE_ROOT)/.tmp/_output/bin:$(PATH)
 export KUBECONFIG := $(HIVE_ROOT)/.tmp/_output/dev-hive.kubeconfig
-export HIVE_NS := 'dev-hive'
 
 all: install_environment_bins create_cluster_registry build_push_image deploy
 
@@ -22,6 +21,7 @@ build_push_image:
 
 # Deploy & install certs
 deploy:
+	export HIVE_NS := 'dev-hive'
 	set -x
 	@echo "Deploying the application"
 	./hack/deploy_dev_hive.sh

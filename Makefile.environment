@@ -40,7 +40,6 @@ run-operator: scale-down-operator
 
 # Run controller
 run-controller: scale-down-controllers
-	touch $(HIVE_ROOT)/.tmp/_output/metrics.json && echo "{}" >> $(HIVE_ROOT)/.tmp/_output/metrics.json
 	./bin/manager --log-level=debug
 
 # Clean the environment

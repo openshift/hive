@@ -24,7 +24,7 @@ deploy:
 	set -x
 	@echo "Deploying the application"
 	./hack/deploy_dev_hive.sh
-	HIVE_NS=dev_hive ./hack/hiveadmission-dev-cert.sh
+	HIVE_NS=dev-hive ./hack/hiveadmission-dev-cert.sh
 
 # Scale down operator
 scale-down-operator:

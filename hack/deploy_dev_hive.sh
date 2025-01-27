@@ -41,4 +41,4 @@ oc process --local=true -p HIVE_NS="${namespace}" -p LOG_LEVEL=debug -f hiveconf
 echo "Operator deployment completed successfully."
 
 # create an empty metrics.json file to satisfy metrics requirements for running the controller
-touch $(HIVE_ROOT)/.tmp/_output/metrics.json && echo "{}" >> $(HIVE_ROOT)/.tmp/_output/metrics.json
+touch "$HIVE_ROOT"/.tmp/_output/metrics.json && echo "{}" >> "$HIVE_ROOT"/.tmp/_output/metrics.json

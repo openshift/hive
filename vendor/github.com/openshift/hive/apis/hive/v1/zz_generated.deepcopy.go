@@ -7,7 +7,6 @@ package v1
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	agent "github.com/openshift/hive/apis/hive/v1/agent"
 	aws "github.com/openshift/hive/apis/hive/v1/aws"
 	azure "github.com/openshift/hive/apis/hive/v1/azure"
@@ -771,7 +770,7 @@ func (in *ClusterDeploymentCustomizationStatus) DeepCopyInto(out *ClusterDeploym
 	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make([]conditionsv1.Condition, len(*in))
+		*out = make([]metav1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

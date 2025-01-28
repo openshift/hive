@@ -17,6 +17,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	configv1 "github.com/openshift/api/config/v1"
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	installertypes "github.com/openshift/installer/pkg/types"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 	"github.com/openshift/library-go/pkg/manifest"
@@ -1532,9 +1532,9 @@ func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDepl
 		return err
 	}
 
-	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
-		Type:    conditionsv1.ConditionAvailable,
-		Status:  corev1.ConditionTrue,
+	changed := meta.SetStatusCondition(&cdc.Status.Conditions, metav1.Condition{
+		Type:    "Available",
+		Status:  metav1.ConditionTrue,
 		Reason:  "Available",
 		Message: "available",
 	})

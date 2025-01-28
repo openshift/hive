@@ -18,12 +18,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
@@ -2195,7 +2195,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			for _, cdc := range cdcs.Items {
 				cdcMap[cdc.Name] = cdc
 
-				condition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
+				condition := meta.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
 				if test.expectedCDCReason != nil {
 					if reason, ok := test.expectedCDCReason[cdc.Name]; ok {
 						assert.NotNil(t, condition)
@@ -2222,8 +2222,8 @@ func TestReconcileClusterPool(t *testing.T) {
 				lastTime := metav1.NewTime(nowish.Add(24 * -time.Hour))
 				for _, cdcName := range order {
 					cdc := cdcMap[cdcName]
-					condition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-					if condition == nil || condition.Status == corev1.ConditionUnknown || condition.Status == corev1.ConditionTrue {
+					condition := meta.FindStatusCondition(cdc.Status.Conditions, "Available")
+					if condition == nil || condition.Status == metav1.ConditionUnknown || condition.Status == metav1.ConditionTrue {
 						assert.Failf(t, "expected CDC %s to be assigned", cdcName)
 					}
 					assert.True(t, lastTime.Before(&condition.LastTransitionTime) || lastTime.Equal(&condition.LastTransitionTime), "expected %s to be before %s", lastTime, condition.LastTransitionTime)

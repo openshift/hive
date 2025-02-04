@@ -99,7 +99,7 @@ else
 fi
 
 # build the image
-CONTAINER_BUILD_FLAGS="--file ./Dockerfile.ubi" make IMG="$IMG" GO_REQUIRED_MIN_VERSION:= docker-build
+CONTAINER_BUILD_FLAGS="--file ./Dockerfile" make IMG="$IMG" GO_REQUIRED_MIN_VERSION:= docker-build
 
 # push the image
 make IMG="$IMG" docker-push

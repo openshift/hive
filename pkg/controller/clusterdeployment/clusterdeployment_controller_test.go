@@ -688,7 +688,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				if assert.Len(t, provisions, 1, "expected exactly one ClusterProvision") {
 					podSpec := provisions[0].Spec.PodSpec
 					if assert.Len(t, podSpec.InitContainers, 1, "expected exactly one initContainer") {
-						assert.Equal(t, "installer", podSpec.InitContainers[0].Name, "expected the initContainer to be 'installer'")
+						assert.Equal(t, "hive", podSpec.InitContainers[0].Name, "expected the initContainer to be 'hive'")
 					}
 				}
 			},

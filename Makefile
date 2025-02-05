@@ -2,9 +2,9 @@
 all: vendor update test build
 
 # These images need to be synced with the default values in the Dockerfile.
-EL8_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-EL9_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-BASE_IMAGE ?= registry.ci.openshift.org/ocp/4.16:base-rhel9
+EL8_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+EL9_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+BASE_IMAGE ?= registry.ci.openshift.org/ocp/4.19:base-rhel9
 
 # In openshift ci (Prow), we need to set $HOME to a writable directory else tests will fail
 # because they don't have permissions to create /.local or /.cache directories

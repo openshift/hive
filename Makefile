@@ -318,6 +318,14 @@ buildah-dev-build:
 podman-dev-build:
 	podman build --tag ${IMG} $(GOCACHE_VOL_ARG) -f ./Dockerfile .
 
+podman-operatorhub-build:
+	podman build --tag ${IMG} ${GOCACHE_VOL_ARG} \
+		--build-arg=BASE_IMAGE=quay.io/centos/centos:stream9 \
+		--build-arg=BUILD_IMAGE_CUSTOMIZATION=./hack/ubi-build-deps.sh \
+		--build-arg=EL8_BUILD_IMAGE=registry.access.redhat.com/ubi8/ubi:8.10 \
+		--build-arg=EL9_BUILD_IMAGE=registry.access.redhat.com/ubi9:9.5 \
+		-f ./Dockerfile .
+
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push
 buildah-dev-push: buildah-dev-build

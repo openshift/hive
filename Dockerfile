@@ -5,10 +5,12 @@ ARG BASE_IMAGE=${BASE_IMAGE:-registry.ci.openshift.org/ocp/4.19:base-rhel9}
 
 FROM ${EL8_BUILD_IMAGE} as builder_rhel8
 ARG GO=${GO:-go}
+ARG BUILD_IMAGE_CUSTOMIZATION
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
+RUN if [ -f "${BUILD_IMAGE_CUSTOMIZATION}" ]; then "${BUILD_IMAGE_CUSTOMIZATION}"; fi
 
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
@@ -18,9 +20,12 @@ RUN make build-hiveutil
 FROM ${EL9_BUILD_IMAGE} as builder_rhel9
 ARG GO=${GO:-go}
 ARG CONTAINER_SUB_MANAGER_OFF
+ARG BUILD_IMAGE_CUSTOMIZATION
 RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
+
+RUN if [ -f "${BUILD_IMAGE_CUSTOMIZATION}" ]; then "${BUILD_IMAGE_CUSTOMIZATION}"; fi
 
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
@@ -44,7 +49,7 @@ RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clea
 RUN if ! rpm -q libvirt-libs; then dnf install -y libvirt-libs && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
 # tar is needed to package must-gathers on install failure
-RUN if ! which tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! command -v tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/

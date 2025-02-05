@@ -2,19 +2,22 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Optional Metrics](#optional-metrics)
-  - [Duration-based Metrics](#duration-based-metrics)
-  - [Metrics with Optional Cluster Deployment labels](#metrics-with-optional-cluster-deployment-labels)
-- [List of all Hive metrics](#list-of-all-hive-metrics)
-  - [Hive Operator metrics](#hive-operator-metrics)
-  - [Metrics reported by all controllers](#metrics-reported-by-all-controllers)
-  - [ClusterDeployment controller metrics](#clusterdeployment-controller-metrics)
-  - [ClusterProvision controller metrics](#clusterprovision-controller-metrics)
-  - [ClusterDeprovision controller metrics](#clusterdeprovision-controller-metrics)
-  - [ClusterPool controller metrics](#clusterpool-controller-metrics)
-  - [Metrics controller metrics](#metrics-controller-metrics)
-- [Managed DNS Metrics](#managed-dns-metrics)
-- [Example: Configure metricsConfig](#example-configure-metricsconfig)
+- [Hive Metrics](#hive-metrics)
+    - [Optional Metrics](#optional-metrics)
+      - [Duration-based Metrics](#duration-based-metrics)
+      - [Metrics with Optional Cluster Deployment labels](#metrics-with-optional-cluster-deployment-labels)
+    - [List of all Hive metrics](#list-of-all-hive-metrics)
+      - [Hive Operator metrics](#hive-operator-metrics)
+      - [Metrics reported by all controllers](#metrics-reported-by-all-controllers)
+      - [ClusterDeployment controller metrics](#clusterdeployment-controller-metrics)
+      - [ClusterProvision controller metrics](#clusterprovision-controller-metrics)
+      - [ClusterDeprovision controller metrics](#clusterdeprovision-controller-metrics)
+      - [ClusterPool controller metrics](#clusterpool-controller-metrics)
+      - [Metrics controller metrics](#metrics-controller-metrics)
+    - [Managed DNS Metrics](#managed-dns-metrics)
+    - [Example: Configure metricsConfig](#example-configure-metricsconfig)
+    - [Frequently Asked Questions](#frequently-asked-questions)
+      - [How can I leverage hive metrics to point to the offending cluster?](#how-can-i-leverage-hive-metrics-to-point-to-the-offending-cluster)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -181,3 +184,13 @@ spec:
 |                hive_clustersync_failing_seconds                | currentClusterSyncFailing |
 |     hive_cluster_deployments_hibernation_transition_seconds    |    cumulativeHibernated   |
 |       hive_cluster_deployments_running_transition_seconds      |     cumulativeResumed     |
+
+### Frequently Asked Questions
+
+#### How can I leverage hive metrics to point to the offending cluster?
+Metrics are meant for monitoring and observing. While you can leverage Alertmanager to throw alerts, it is really not recommended to rely on prometheus metrics to provide the cluster ID.
+
+For this to work, the hive metric would need to publish a label with the cluster identifying information. Since every metric is stored as a map with dimensions equivalent to the labels per its definition,
+the storage taken up by the metric exponentially increases with the number of labels. Hive can manage hundreds, if not thousands of clusters at a time, so high-cardinality labels like cluster ID/name/namespace
+are capable of bringing down the hive instance in certain situations.
+While we publish the cluster identifying label with certain metrics that are reported infrequently enough to not cause an issue, Hive does not recommend relying on hive metrics for tracing the clusters.

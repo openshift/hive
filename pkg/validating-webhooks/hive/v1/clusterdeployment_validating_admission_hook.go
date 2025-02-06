@@ -529,6 +529,26 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 			allErrs = append(allErrs, field.Required(vspherePath.Child("defaultDatastore"), "must specify vSphere defaultDatastore"))
 		}
 	}
+	if nutanix := platform.Nutanix; nutanix != nil {
+		numberOfPlatforms++
+		nutanixPath := path.Child("nutanix")
+		if nutanix.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(nutanixPath.Child("credentialsSecretRef", "name"), "must specify secrets for Nutanix access"))
+		}
+		if nutanix.PrismCentral.Endpoint.Address == "" {
+			allErrs = append(allErrs, field.Required(nutanixPath.Child("endpointAddress"), "must specify Nutanix Prism Central endpoint address"))
+		}
+		if nutanix.PrismCentral.Endpoint.Port == 0 {
+			allErrs = append(allErrs, field.Required(nutanixPath.Child("endpointAddress"), "must specify Nutanix Prism Central endpoint port"))
+		}
+		// TODO
+		//if nutanix.Cluster == "" {
+		//	allErrs = append(allErrs, field.Required(nutanixPath.Child("cluster"), "must specify Nutanix Prism Central cluster"))
+		//}
+		if len(nutanix.SubnetUUIDs) == 0 {
+			allErrs = append(allErrs, field.Required(nutanixPath.Child("subnetUUIDs"), "must specify at least one Nutanix Prism Central Subnet UUID"))
+		}
+	}
 	if ovirt := platform.Ovirt; ovirt != nil {
 		numberOfPlatforms++
 		ovirtPath := path.Child("ovirt")

@@ -769,10 +769,10 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 			InfraID: infraID,
 			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
 				Nutanix: &installertypesnutanix.Metadata{
-					PrismCentral: cd.Spec.Platform.Nutanix.Endpoint,
+					PrismCentral: cd.Spec.Platform.Nutanix.PrismCentral.Endpoint.Address,
 					Username:     nutanixUsername,
 					Password:     nutanixPassword,
-					Port:         string(cd.Spec.Platform.Nutanix.Port),
+					Port:         string(cd.Spec.Platform.Nutanix.PrismCentral.Endpoint.Port),
 				},
 			},
 		}

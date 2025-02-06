@@ -3379,7 +3379,7 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.Nutanix != nil {
 		in, out := &in.Nutanix, &out.Nutanix
 		*out = new(nutanix.Platform)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.None != nil {
 		in, out := &in.None, &out.None

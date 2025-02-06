@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/openshift/installer/pkg/types/nutanix"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -1300,21 +1301,28 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 			return nil, err
 		}
 
-		certsSecret, err := r.getCredentialsSecret(pool, platform.Nutanix.CertificatesSecretRef.Name, logger)
-		if err != nil {
-			return nil, err
+		cloudBuilder := clusterresource.NewNutanixCloudBuilder(credsSecret)
+		cloudBuilder.PrismCentral = nutanix.PrismCentral{
+			Endpoint: nutanix.PrismEndpoint{
+				Address: cloudBuilder.PrismCentral.Endpoint.Address,
+				Port:    cloudBuilder.PrismCentral.Endpoint.Port,
+			},
+			Username: cloudBuilder.PrismCentral.Username,
+			Password: cloudBuilder.PrismCentral.Password,
 		}
 
-		if _, ok := certsSecret.Data[".cacert"]; !ok {
-			return nil, err
+		for _, pe := range cloudBuilder.PrismElements {
+			cloudBuilder.PrismElements = append(cloudBuilder.PrismElements, nutanix.PrismElement{
+				UUID: pe.UUID,
+				Endpoint: nutanix.PrismEndpoint{
+					Address: pe.Endpoint.Address,
+					Port:    pe.Endpoint.Port,
+				},
+				Name: pe.Name,
+			})
 		}
 
-		cloudBuilder := clusterresource.NewNutanixCloudBuilder(credsSecret, certsSecret)
-		cloudBuilder.Endpoint = platform.Nutanix.Endpoint
-		cloudBuilder.Port = platform.Nutanix.Port
-		cloudBuilder.Cluster = platform.Nutanix.Cluster
-		cloudBuilder.Cluster = platform.Nutanix.Cluster
-		cloudBuilder.Subnet = platform.Nutanix.Subnet
+		cloudBuilder.SubnetUUIDs = platform.Nutanix.SubnetUUIDs
 
 		return cloudBuilder, nil
 	default:

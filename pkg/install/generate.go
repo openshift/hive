@@ -255,9 +255,8 @@ func InstallerPodSpec(
 			emptyDirs["libvirtsshkeys"] = constants.LibvirtSSHPrivateKeyDir
 		}
 	case cd.Spec.Platform.Nutanix != nil:
-		credentialRef, certificateRef = cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name, cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name
+		credentialRef = cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name
 		emptyDirs["nutanix-credentials"] = constants.NutanixCredentialsDir
-		emptyDirs["nutanix-certificates"] = constants.NutanixCertificatesDir
 	}
 
 	if credentialRef != "" {

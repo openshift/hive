@@ -1,16 +1,14 @@
 package machinepool
 
 import (
-	"fmt"
-	machinev1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	installvsphere "github.com/openshift/installer/pkg/asset/machines/vsphere"
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
+	installnutanix "github.com/openshift/installer/pkg/asset/machines/nutanix"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -21,7 +19,7 @@ type NutanixActuator struct {
 	client client.Client
 	logger log.FieldLogger
 	scheme *runtime.Scheme
-	//nutanixClient *nutanixclient.Client
+	//nutanixClient *nutanixclient.Client // TODO need nutanix client?
 }
 
 var _ Actuator = &NutanixActuator{}
@@ -43,6 +41,73 @@ func NewNutanixActuator(client client.Client, scheme *runtime.Scheme, logger log
 	return actuator, nil
 }
 
+func (a *NutanixActuator) getNutanixPlatformInstallConfig(cd *hivev1.ClusterDeployment) *installertypesnutanix.Platform {
+	var platform installertypesnutanix.Platform
+	platform.PrismCentral = installertypesnutanix.PrismCentral{
+		Endpoint: installertypesnutanix.PrismEndpoint{
+			Address: cd.Spec.Platform.Nutanix.PrismCentral.Endpoint.Address,
+			Port:    cd.Spec.Platform.Nutanix.PrismCentral.Endpoint.Port,
+		},
+		Username: "",
+		Password: "",
+	}
+
+	for _, pe := range cd.Spec.Platform.Nutanix.PrismElements {
+		platform.PrismElements = append(platform.PrismElements, installertypesnutanix.PrismElement{
+			UUID: pe.UUID,
+			Endpoint: installertypesnutanix.PrismEndpoint{
+				Address: pe.Endpoint.Address,
+				Port:    pe.Endpoint.Port,
+			},
+			Name: pe.Name,
+		})
+	}
+
+	platform.SubnetUUIDs = cd.Spec.Platform.Nutanix.SubnetUUIDs
+	platform.FailureDomains = getNutanixInstallConfigFailureDomains(cd.Spec.Platform.Nutanix.FailureDomains)
+
+	return &platform
+}
+
+func getNutanixInstallConfigFailureDomains(failureDomains []nutanix.FailureDomain) []installertypesnutanix.FailureDomain {
+	var domains []installertypesnutanix.FailureDomain
+
+	for _, fd := range failureDomains {
+		domain := installertypesnutanix.FailureDomain{
+			Name: fd.Name,
+			PrismElement: installertypesnutanix.PrismElement{
+				UUID: fd.PrismElement.UUID,
+				Endpoint: installertypesnutanix.PrismEndpoint{
+					Address: fd.PrismElement.Endpoint.Address,
+					Port:    fd.PrismElement.Endpoint.Port,
+				},
+				Name: fd.PrismElement.Name,
+			},
+			SubnetUUIDs:       fd.SubnetUUIDs,
+			StorageContainers: nil,
+			DataSourceImages:  nil,
+		}
+
+		for _, storage := range fd.StorageContainers {
+			domain.StorageContainers = append(domain.StorageContainers, installertypesnutanix.StorageResourceReference{
+				ReferenceName: storage.ReferenceName,
+				UUID:          storage.UUID,
+				Name:          storage.Name,
+			})
+		}
+
+		for _, dsImages := range fd.DataSourceImages {
+			domain.DataSourceImages = append(domain.DataSourceImages, installertypesnutanix.StorageResourceReference{
+				ReferenceName: dsImages.ReferenceName,
+				UUID:          dsImages.UUID,
+				Name:          dsImages.Name,
+			})
+		}
+	}
+
+	return domains
+}
+
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
 // to sync to the remote cluster.
 func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
@@ -59,48 +124,50 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 
 	computePool := baseMachinePool(pool)
 
-	var disks []installertypesnutanix.DataDisk
-	for deviceIndex, disk := range pool.Spec.Platform.Nutanix.Disks {
-		disks = append(disks, installertypesnutanix.DataDisk{
-			DiskSize: resource.MustParse(fmt.Sprintf("%db", disk.DiskSizeBytes)),
-			DeviceProperties: &machinev1.NutanixVMDiskDeviceProperties{
-				DeviceType:  disk.DeviceType,
-				AdapterType: disk.AdapterType,
-				DeviceIndex: int32(deviceIndex),
+	var dataDisks []installertypesnutanix.DataDisk
+	for _, dataDisk := range pool.Spec.Platform.Nutanix.DataDisks {
+		disk := &installertypesnutanix.DataDisk{
+			DiskSize:         dataDisk.DiskSize,
+			DeviceProperties: dataDisk.DeviceProperties,
+			StorageConfig: &installertypesnutanix.StorageConfig{
+				DiskMode: dataDisk.StorageConfig.DiskMode,
+				StorageContainer: &installertypesnutanix.StorageResourceReference{
+					ReferenceName: dataDisk.StorageConfig.StorageContainer.ReferenceName,
+					UUID:          dataDisk.StorageConfig.StorageContainer.UUID,
+					Name:          dataDisk.StorageConfig.StorageContainer.Name,
+				},
 			},
-			StorageConfig:   nil,
-			DataSourceImage: nil,
-		})
+			DataSourceImage: &installertypesnutanix.StorageResourceReference{
+				ReferenceName: dataDisk.DataSourceImage.ReferenceName,
+				UUID:          dataDisk.DataSourceImage.UUID,
+				Name:          dataDisk.DataSourceImage.Name,
+			},
+		}
+		dataDisks = append(dataDisks, *disk)
 	}
 
 	computePool.Platform.Nutanix = &installertypesnutanix.MachinePool{
-		NumCPUs:           pool.Spec.Platform.Nutanix.NumSockets,
-		NumCoresPerSocket: pool.Spec.Platform.Nutanix.NumVcpusPerSocket,
-		MemoryMiB:         pool.Spec.Platform.Nutanix.MemorySizeMiB,
-		BootType:          pool.Spec.Platform.Nutanix.BootType,
-		DataDisks:         disks,
+		NumCPUs:           pool.Spec.Platform.Nutanix.NumCPUs,
+		NumCoresPerSocket: pool.Spec.Platform.Nutanix.NumCoresPerSocket,
+		MemoryMiB:         pool.Spec.Platform.Nutanix.MemoryMiB,
+		OSDisk: installertypesnutanix.OSDisk{
+			DiskSizeGiB: pool.Spec.Platform.Nutanix.OSDisk.DiskSizeGiB,
+		},
+		BootType:       pool.Spec.Platform.Nutanix.BootType,
+		Project:        pool.Spec.Platform.Nutanix.Project,
+		Categories:     pool.Spec.Platform.Nutanix.Categories,
+		GPUs:           pool.Spec.Platform.Nutanix.GPUs,
+		DataDisks:      dataDisks,
+		FailureDomains: []string{}, // TODO
 	}
 
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
-			Nutanix: &installertypesnutanix.Platform{
-				PrismCentral: installertypesnutanix.PrismCentral{
-					Endpoint: installertypesnutanix.PrismEndpoint{
-						Address: cd.Spec.Platform.Nutanix.Endpoint,
-						Port:    cd.Spec.Platform.Nutanix.Port,
-					},
-					Username: "",
-					Password: "",
-				},
-				PrismElements:  nil,
-				IngressVIPs:    nil,
-				SubnetUUIDs:    []string{cd.Spec.Platform.Nutanix.Subnet},
-				FailureDomains: nil,
-			},
+			Nutanix: a.getNutanixPlatformInstallConfig(cd),
 		},
 	}
 
-	installerMachineSets, err := installvsphere.MachineSets(
+	installerMachineSets, err := installnutanix.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,

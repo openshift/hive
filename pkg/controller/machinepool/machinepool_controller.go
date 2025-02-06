@@ -1260,7 +1260,7 @@ func (r *ReconcileMachinePool) createActuator(
 ) (Actuator, error) {
 	switch {
 	case cd.Spec.Platform.Nutanix != nil:
-		// todo
+		// TODO ?
 		return NewNutanixActuator(r.Client, r.scheme, logger)
 
 	case cd.Spec.Platform.AWS != nil:

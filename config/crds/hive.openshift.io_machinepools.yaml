@@ -518,72 +518,257 @@ spec:
                       on Nutanix prism central.
                     properties:
                       bootType:
-                        description: BootType Indicates whether the VM should use
-                          Secure boot, UEFI boot or Legacy boot.
+                        description: |-
+                          BootType indicates the boot type (Legacy, UEFI or SecureBoot) the Machine's VM uses to boot.
+                          If this field is empty or omitted, the VM will use the default boot type "Legacy" to boot.
+                          "SecureBoot" depends on "UEFI" boot, i.e., enabling "SecureBoot" means that "UEFI" boot is also enabled.
+                        enum:
+                        - ""
+                        - Legacy
+                        - UEFI
+                        - SecureBoot
                         type: string
-                      clusterUUID:
-                        description: ClusterUUID is the UUID of the Nutanix cluster
-                          to use for provisioning volumes.
-                        type: string
-                      disks:
-                        description: Disks is the list of disks attached to the VM.
+                      categories:
+                        description: |-
+                          Categories optionally adds one or more prism categories (each with key and value) for
+                          the Machine's VM to associate with. All the category key and value pairs specified must
+                          already exist in the prism central.
                         items:
+                          description: NutanixCategory identifies a pair of prism
+                            category key and value
                           properties:
-                            adapterType:
-                              description: AdapterType
-                              enum:
-                              - SCSI
-                              - IDE
-                              - PCI
-                              - SATA
-                              - SPAPR
+                            key:
+                              description: key is the prism category key name
+                              maxLength: 64
+                              minLength: 1
                               type: string
-                            deviceType:
-                              description: DeviceType defines the type of disk.
-                              enum:
-                              - Disk
-                              - CDRom
+                            value:
+                              description: value is the prism category value associated
+                                with the key
+                              maxLength: 64
+                              minLength: 1
                               type: string
-                            diskSizeBytes:
-                              description: DiskSizeBytes defines the size of disk
-                                in bytes.
-                              format: int64
-                              type: integer
                           required:
-                          - adapterType
-                          - deviceType
-                          - diskSizeBytes
+                          - key
+                          - value
                           type: object
                         type: array
-                      memorySizeMiB:
-                        description: MemorySizeMiB is the size of a VM's memory in
-                          MiB.
-                        format: int64
-                        type: integer
-                      sockets:
+                        x-kubernetes-list-map-keys:
+                        - key
+                        x-kubernetes-list-type: map
+                      coresPerSocket:
                         description: |-
-                          NumSockets is the number of sockets in a vm.
-                          The number of vCPUs on the vm will be NumCPUs/NumSockets.
+                          NumCoresPerSocket is the number of cores per socket in a vm. The number
+                          of vCPUs on the vm will be NumCPUs times NumCoresPerSocket.
+                          For example: 4 CPUs and 4 Cores per socket will result in 16 VPUs.
+                          The AHV scheduler treats socket and core allocation exactly the same
+                          so there is no benefit to configuring cores over CPUs.
                         format: int64
                         type: integer
-                      subnetsUUIDs:
-                        description: NicList is the list of subnets attached to the
-                          VM.
+                      cpus:
+                        description: NumCPUs is the total number of virtual processor
+                          cores to assign a vm.
+                        format: int64
+                        type: integer
+                      dataDisks:
+                        description: DataDisks holds information of the data disks
+                          to attach to the Machine's VM
+                        items:
+                          description: DataDisk defines a data disk for a Machine
+                            VM.
+                          properties:
+                            dataSourceImage:
+                              description: dataSource refers to a data source image
+                                for the VM disk.
+                              properties:
+                                name:
+                                  description: Name is the name of the storage container
+                                    resource in the Prism Element.
+                                  type: string
+                                referenceName:
+                                  description: ReferenceName is the identifier of
+                                    the storage resource configured in the FailureDomain.
+                                  type: string
+                                uuid:
+                                  description: UUID is the UUID of the storage container
+                                    resource in the Prism Element.
+                                  type: string
+                              required:
+                              - uuid
+                              type: object
+                            deviceProperties:
+                              description: deviceProperties are the properties of
+                                the disk device.
+                              properties:
+                                adapterType:
+                                  description: |-
+                                    adapterType is the adapter type of the disk address.
+                                    If the deviceType is "Disk", the valid adapterType can be "SCSI", "IDE", "PCI", "SATA" or "SPAPR".
+                                    If the deviceType is "CDRom", the valid adapterType can be "IDE" or "SATA".
+                                  enum:
+                                  - SCSI
+                                  - IDE
+                                  - PCI
+                                  - SATA
+                                  - SPAPR
+                                  type: string
+                                deviceIndex:
+                                  default: 0
+                                  description: |-
+                                    deviceIndex is the index of the disk address. The valid values are non-negative integers, with the default value 0.
+                                    For a Machine VM, the deviceIndex for the disks with the same deviceType.adapterType combination should
+                                    start from 0 and increase consecutively afterwards. Note that for each Machine VM, the Disk.SCSI.0
+                                    and CDRom.IDE.0 are reserved to be used by the VM's system. So for dataDisks of Disk.SCSI and CDRom.IDE,
+                                    the deviceIndex should start from 1.
+                                  format: int32
+                                  minimum: 0
+                                  type: integer
+                                deviceType:
+                                  default: Disk
+                                  description: |-
+                                    deviceType specifies the disk device type.
+                                    The valid values are "Disk" and "CDRom", and the default is "Disk".
+                                  enum:
+                                  - Disk
+                                  - CDRom
+                                  type: string
+                              required:
+                              - adapterType
+                              - deviceIndex
+                              - deviceType
+                              type: object
+                            diskSize:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                diskSize is size (in Quantity format) of the disk to attach to the VM.
+                                See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Format for the Quantity format and example documentation.
+                                The minimum diskSize is 1GB.
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            storageConfig:
+                              description: storageConfig are the storage configuration
+                                parameters of the VM disks.
+                              properties:
+                                diskMode:
+                                  allOf:
+                                  - enum:
+                                    - Standard
+                                    - Flash
+                                  - enum:
+                                    - Standard
+                                    - Flash
+                                  default: Standard
+                                  description: |-
+                                    diskMode specifies the disk mode.
+                                    The valid values are Standard and Flash, and the default is Standard.
+                                  type: string
+                                storageContainer:
+                                  description: storageContainer refers to the storage_container
+                                    used by the VM disk.
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                              required:
+                              - diskMode
+                              type: object
+                          required:
+                          - diskSize
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: set
+                      failureDomains:
+                        description: |-
+                          FailureDomains optionally configures a list of failure domain names
+                          that will be applied to the MachinePool
                         items:
                           type: string
                         type: array
-                      vcpus:
-                        description: NumVcpusPerSocket is the total number of virtual
-                          processor cores (per socket) to assign a vm.
+                        x-kubernetes-list-type: set
+                      gpus:
+                        description: GPUs is a list of GPU devices to attach to the
+                          machine's VM.
+                        items:
+                          description: NutanixGPU holds the identity of a Nutanix
+                            GPU resource in the Prism Central
+                          properties:
+                            deviceID:
+                              description: deviceID is the GPU device ID with the
+                                integer value.
+                              format: int32
+                              type: integer
+                            name:
+                              description: name is the GPU device name
+                              type: string
+                            type:
+                              description: |-
+                                type is the identifier type of the GPU device.
+                                Valid values are Name and DeviceID.
+                              enum:
+                              - Name
+                              - DeviceID
+                              type: string
+                          required:
+                          - type
+                          type: object
+                          x-kubernetes-validations:
+                          - message: deviceID configuration is required when type
+                              is DeviceID, and forbidden otherwise
+                            rule: 'has(self.type) && self.type == ''DeviceID'' ?  has(self.deviceID)
+                              : !has(self.deviceID)'
+                          - message: name configuration is required when type is Name,
+                              and forbidden otherwise
+                            rule: 'has(self.type) && self.type == ''Name'' ?  has(self.name)
+                              : !has(self.name)'
+                        type: array
+                        x-kubernetes-list-type: set
+                      memoryMiB:
+                        description: Memory is the size of a VM's memory in MiB.
                         format: int64
                         type: integer
-                    required:
-                    - clusterUUID
-                    - disks
-                    - memorySizeMiB
-                    - sockets
-                    - subnetsUUIDs
-                    - vcpus
+                      osDisk:
+                        description: OSDisk defines the storage for instance.
+                        properties:
+                          diskSizeGiB:
+                            description: DiskSizeGiB defines the size of disk in GiB.
+                            format: int64
+                            type: integer
+                        type: object
+                      project:
+                        description: Project optionally identifies a Prism project
+                          for the Machine's VM to associate with.
+                        properties:
+                          name:
+                            description: name is the resource name in the PC
+                            type: string
+                          type:
+                            description: Type is the identifier type to use for this
+                              resource.
+                            enum:
+                            - uuid
+                            - name
+                            type: string
+                          uuid:
+                            description: uuid is the UUID of the resource in the PC.
+                            type: string
+                        required:
+                        - type
+                        type: object
                     type: object
                   openstack:
                     description: OpenStack is the configuration used when installing

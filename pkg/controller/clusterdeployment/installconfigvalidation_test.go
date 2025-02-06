@@ -1,20 +1,18 @@
 package clusterdeployment
 
 import (
+	"testing"
+
+	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	hivev1vpshere "github.com/openshift/hive/apis/hive/v1/vsphere"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-
-	corev1 "k8s.io/api/core/v1"
-
-	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	"github.com/openshift/hive/pkg/util/scheme"
+	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const testAWSIC = `apiVersion: v1

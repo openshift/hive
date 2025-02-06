@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -303,6 +304,10 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 		platforms = append(platforms, "vsphere")
 		allErrs = append(allErrs, validateVSphereMachinePoolPlatformInvariants(p, platformPath.Child("vsphere"))...)
 	}
+	if p := spec.Platform.Nutanix; p != nil {
+		platforms = append(platforms, "nutanix")
+		allErrs = append(allErrs, validateNutanixMachinePoolPlatformInvariants(p, platformPath.Child("nutanix"))...)
+	}
 	if p := spec.Platform.Ovirt; p != nil {
 		platforms = append(platforms, "ovirt")
 		allErrs = append(allErrs, validateOvirtMachinePoolPlatformInvariants(p, platformPath.Child("ovirt"))...)
@@ -419,6 +424,41 @@ func validateVSphereMachinePoolPlatformInvariants(platform *hivev1vsphere.Machin
 	if platform.OSDisk.DiskSizeGB <= 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskSizeGB"), "disk size must be positive"))
 	}
+
+	return allErrs
+}
+
+func validateNutanixMachinePoolPlatformInvariants(platform *hivev1nutanix.MachinePool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if platform.NumCPUs <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("numCPUs"), "number of vCPUs must be positive"))
+	}
+
+	if platform.NumCoresPerSocket <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("numCoresPerSocket"), "number of cores per sockets must be positive"))
+	}
+
+	if platform.MemoryMiB <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("memoryMiB"), "memory must be positive"))
+	}
+
+	// TODO
+	//if len(platform.NicList) == 0 {
+	//	allErrs = append(allErrs, field.Required(fldPath.Child("nicList"), "must provide at least one subnet"))
+	//}
+
+	//if len(platform.) == 0 {
+	//	allErrs = append(allErrs, field.Required(fldPath.Child("disks"), "must provide at least one disk"))
+	//}
+
+	// TODO
+	//if len(platform.Disks) > 0 {
+	//	for _, disk := range platform.Disks {
+	//		if disk.DiskSizeBytes <= 0 {
+	//			allErrs = append(allErrs, field.Required(fldPath.Child("diskSizeBytes"), "disk size must be positive"))
+	//		}
+	//	}
+	//}
 
 	return allErrs
 }

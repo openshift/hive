@@ -58,8 +58,13 @@ func SetErrCondition(client client.Client, cd *hivev1.ClusterDeployment, reason 
 	if !readyChanged && !failedChanged {
 		return nil
 	}
+	if failedChanged {
+		logger.Debug("setting PrivateLinkFailedClusterDeploymentCondition to true")
+	}
+	if readyChanged {
+		logger.Debug("setting PrivateLinkReadyClusterDeploymentCondition to false")
+	}
 	curr.Status.Conditions = conditions
-	logger.Debug("setting PrivateLinkFailedClusterDeploymentCondition to true")
 	return client.Status().Update(context.TODO(), curr)
 }
 
@@ -120,8 +125,13 @@ func SetReadyCondition(client client.Client, cd *hivev1.ClusterDeployment, compl
 	if !readyChanged && !failedChanged {
 		return nil
 	}
+	if failedChanged {
+		logger.WithField("reason", reason).Debug("setting PrivateLinkFailedClusterDeploymentCondition to false")
+	}
+	if readyChanged {
+		logger.WithField("reason", reason).Debugf("setting PrivateLinkReadyClusterDeploymentCondition to %s", completed)
+	}
 	curr.Status.Conditions = conditions
-	logger.Debugf("setting PrivateLinkReadyClusterDeploymentCondition to %s", completed)
 	return client.Status().Update(context.TODO(), curr)
 }
 

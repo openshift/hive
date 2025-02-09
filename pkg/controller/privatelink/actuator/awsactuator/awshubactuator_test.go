@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
@@ -248,9 +249,10 @@ func Test_Reconcile(t *testing.T) {
 
 		AWSClientConfig func(*mock.MockClient)
 
+		expect           reconcile.Result
 		expectConditions []hivev1.ClusterDeploymentCondition
 		expectError      string
-		expectLogs       []string
+		expectStatus     *hivev1aws.PrivateLinkAccessStatus
 	}{{ // There should be an error on failure to initialURL
 		name: "failure on initialURL",
 		cd: cdBuilder.Build(
@@ -267,7 +269,7 @@ func Test_Reconcile(t *testing.T) {
 		}},
 		expectError: "could not get API URL from kubeconfig: failed to load the kubeconfig: kubeconfig secret does not contain necessary data",
 	}, { // There should be an error on failure to ensureHostedZone
-		name: "failure on ensureHostedZone SetErrConditionWithRetry",
+		name: "failure on ensureHostedZone",
 		cd: cdBuilder.Build(
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"}}),
 		),
@@ -282,6 +284,30 @@ func Test_Reconcile(t *testing.T) {
 			Message: "at least one associated VPC must be configured",
 		}},
 		expectError: "failed to reconcile the Hosted Zone: at least one associated VPC must be configured",
+	}, { // Ready condition should be updated when hzModified
+		name: "hzModified",
+		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"}}),
+		),
+		existing: []runtime.Object{
+			mockSecret("kubeconfig", mockKubeconfigData),
+		},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListHostedZonesByVPC(gomock.Any()).Return(&route53.ListHostedZonesByVPCOutput{
+				HostedZoneSummaries: []*route53.HostedZoneSummary{{
+					Name:         aws.String(testAPIDomain),
+					HostedZoneId: aws.String(testHostedZone),
+				}},
+			}, nil)
+		},
+		expect: reconcile.Result{Requeue: true},
+		expectConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "ReconciledPrivateHostedZone",
+			Message: "reconciled the Private Hosted Zone for the VPC Endpoint of the cluster",
+		}},
+		expectStatus: &hivev1aws.PrivateLinkAccessStatus{HostedZoneID: testHostedZone},
 	}, { // There should be an error on failure to ReconcileHostedZoneRecords
 		name: "failure on ReconcileHostedZoneRecords",
 		cd: cdBuilder.Build(
@@ -310,6 +336,7 @@ func Test_Reconcile(t *testing.T) {
 			Message: "error generating DNS records: configured to use ip address, but no address found.",
 		}},
 		expectError: "failed to reconcile the Hosted Zone Records: error generating DNS records: configured to use ip address, but no address found.",
+		// }, { // Ready condition should be updated when recordsModified
 	}, { // There should be an error on failure to reconcileHostedZoneAssociations
 		name: "failure on reconcileHostedZoneAssociations",
 		cd: cdBuilder.Build(
@@ -331,7 +358,16 @@ func Test_Reconcile(t *testing.T) {
 					HostedZoneId: aws.String(testHostedZone),
 				}},
 			}, nil)
-			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}},
+					Type: aws.String("A"),
+					TTL:  aws.Int64(10),
+				}},
+			}, nil)
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to GetHostedZone", nil))
 		},
 		expectConditions: []hivev1.ClusterDeploymentCondition{{
@@ -341,7 +377,52 @@ func Test_Reconcile(t *testing.T) {
 			Message: "failed to get the Hosted Zone: AccessDenied: not authorized to GetHostedZone",
 		}},
 		expectError: "failed to reconcile the Hosted Zone Associations: failed to get the Hosted Zone: AccessDenied: not authorized to GetHostedZone",
-	}, { // There should be no errors on success
+	}, { // Ready condition should be updated on associationsModified
+		name: "associationsModified",
+		cd: cdBuilder.Build(
+			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"}}),
+			testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{
+				PrivateLink: &hivev1aws.PrivateLinkAccessStatus{
+					HostedZoneID: testHostedZone,
+				},
+			}),
+		),
+		existing: []runtime.Object{
+			mockSecret("kubeconfig", mockKubeconfigData),
+		},
+		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1"}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListHostedZonesByVPC(gomock.Any()).Return(&route53.ListHostedZonesByVPCOutput{
+				HostedZoneSummaries: []*route53.HostedZoneSummary{{
+					Name:         aws.String(testAPIDomain),
+					HostedZoneId: aws.String(testHostedZone),
+				}},
+			}, nil)
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}},
+					Type: aws.String("A"),
+					TTL:  aws.Int64(10),
+				}},
+			}, nil)
+			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
+				HostedZone: &route53.HostedZone{
+					Id: aws.String(testHostedZone),
+				},
+			}, nil)
+			m.EXPECT().AssociateVPCWithHostedZone(gomock.Any()).Return(&route53.AssociateVPCWithHostedZoneOutput{}, nil)
+		},
+		expect: reconcile.Result{Requeue: true},
+		expectConditions: []hivev1.ClusterDeploymentCondition{{
+			Status:  corev1.ConditionFalse,
+			Type:    hivev1.PrivateLinkReadyClusterDeploymentCondition,
+			Reason:  "ReconciledAssociationsToVPCs",
+			Message: "reconciled the associations of all the required VPCs to the Private Hosted Zone for the VPC Endpoint",
+		}},
+	}, { // There should be no error on success
 		name: "success",
 		cd: cdBuilder.Build(
 			testcd.WithClusterMetadata(&hivev1.ClusterMetadata{AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "kubeconfig"}}),
@@ -362,7 +443,16 @@ func Test_Reconcile(t *testing.T) {
 					HostedZoneId: aws.String(testHostedZone),
 				}},
 			}, nil)
-			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}},
+					Type: aws.String("A"),
+					TTL:  aws.Int64(10),
+				}},
+			}, nil)
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
 				HostedZone: &route53.HostedZone{
 					Id: aws.String(testHostedZone),
@@ -380,7 +470,7 @@ func Test_Reconcile(t *testing.T) {
 			if test.config == nil {
 				test.config = &hivev1.AWSPrivateLinkConfig{AssociatedVPCs: mockAssociatedVPCs}
 			}
-			logger, hook := testlogger.NewLoggerWithHook()
+			logger, _ := testlogger.NewLoggerWithHook()
 			awsHubActuator, err := newTestAWSHubActuator(t,
 				test.config,
 				test.cd,
@@ -398,15 +488,15 @@ func Test_Reconcile(t *testing.T) {
 				assert.EqualError(t, err, test.expectError)
 			}
 
+			if test.expectStatus != nil {
+				assert.Equal(t, test.expectStatus, test.cd.Status.Platform.AWS.PrivateLink)
+			}
+
 			curr := &hivev1.ClusterDeployment{}
 			fakeClient := *awsHubActuator.client
 			errGet := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: test.cd.Namespace, Name: test.cd.Name}, curr)
 			assert.NoError(t, errGet)
 			testassert.AssertConditions(t, curr, test.expectConditions)
-
-			for _, log := range test.expectLogs {
-				testlogger.AssertHookContainsMessage(t, hook, log)
-			}
 		})
 	}
 }
@@ -420,35 +510,64 @@ func Test_ShouldSync(t *testing.T) {
 		cd   *hivev1.ClusterDeployment
 
 		expect bool
-	}{{ // Sync is required when status.platform is nil
-		name:   "status.platform is nil",
-		cd:     cdBuilder.Build(),
+	}{{ // Sync is not required when spec.platform.aws is nil
+		name: "spec.plaform is nil",
+		cd:   cdBuilder.Build(),
+	}, { // Sync is not required when spec.platform.aws.privatelink is nil
+		name: "spec.plaform.aws.privatelink is nil",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+	}, { // Sync is not required when spec.platform.aws.privatelink.enabled is false
+		name: "privatelink is not enabled",
+		cd: cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{
+			PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: false},
+		})),
+	}, { // Sync is required when status.platform is nil
+		name: "status.platform is nil",
+		cd: cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{
+			PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+		})),
 		expect: true,
 	}, { // Sync is required when status.platform.aws is nil
-		name:   "status.platform.aws is nil",
-		cd:     cdBuilder.Options(testcd.WithEmptyPlatformStatus()).Build(),
+		name: "status.platform.aws is nil",
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
+			testcd.WithEmptyPlatformStatus(),
+		),
 		expect: true,
 	}, { // Sync is required when status.platform.aws.privatelink is nil
-		name:   "status.platform.aws.privatelink is nil",
-		cd:     cdBuilder.Options(testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{})).Build(),
+		name: "status.platform.aws.privatelink is nil",
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
+			testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{}),
+		),
 		expect: true,
 	}, { // Sync is required when hostedZoneID is empty
 		name: "hostedZoneID is empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
 			testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{
 				PrivateLink: &hivev1aws.PrivateLinkAccessStatus{},
 			}),
-		).Build(),
+		),
 		expect: true,
 	}, { // Sync is not required when hostedZoneID is set
 		name: "hostedZoneID is not empty",
-		cd: cdBuilder.Options(
+		cd: cdBuilder.Build(
+			testcd.WithAWSPlatform(&hivev1aws.Platform{
+				PrivateLink: &hivev1aws.PrivateLinkAccess{Enabled: true},
+			}),
 			testcd.WithAWSPlatformStatus(&hivev1aws.PlatformStatus{
 				PrivateLink: &hivev1aws.PrivateLinkAccessStatus{
 					HostedZoneID: testHostedZone,
 				},
 			}),
-		).Build(),
+		),
 	}}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -844,7 +963,7 @@ func Test_cleanupHostedZone(t *testing.T) {
 		AWSClientConfig: func(m *mock.MockClient) {
 			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
 				ResourceRecordSets: []*route53.ResourceRecordSet{{
-					Name: aws.String(testAPIDomain),
+					Name: aws.String(testAPIDomain + "."),
 					ResourceRecords: []*route53.ResourceRecord{{
 						Value: aws.String("0.0.0.1"),
 					}},
@@ -871,7 +990,7 @@ func Test_cleanupHostedZone(t *testing.T) {
 					Type: aws.String("NS"),
 				}, {
 					Type: aws.String("SOA"),
-					Name: aws.String(testAPIDomain),
+					Name: aws.String(testAPIDomain + "."),
 				}, {
 					ResourceRecords: []*route53.ResourceRecord{{
 						Value: aws.String("0.0.0.1"),
@@ -949,11 +1068,239 @@ func Test_ReconcileHostedZoneRecords(t *testing.T) {
 		name:        "recordSet failed",
 		cd:          cdBuilder.Build(),
 		expectError: "error generating DNS records: configured to use ip address, but no address found.",
+	}, { // There should be an error on ListResourceRecordSets failure
+		name:   "ListResourceRecordSets failed",
+		cd:     cdBuilder.Build(),
+		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1"}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to ListResourceRecordSets", nil))
+		},
+		expectError: "failed to list the hosted zone testhostedzone: AccessDenied: not authorized to ListResourceRecordSets",
+	}, { // Should update record Type when using ResourceRecords and Type is different
+		name:   "ResourceRecords type is different",
+		cd:     cdBuilder.Build(),
+		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1", "0.0.0.2"}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}, {
+						Value: aws.String("0.0.0.2"),
+					}},
+					Type: aws.String("different"),
+					TTL:  aws.Int64(10),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // Should update record TTL when using ResourceRecords and TTL is different
+		name:   "ResourceRecords ttl is different",
+		cd:     cdBuilder.Build(),
+		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1", "0.0.0.2"}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}, {
+						Value: aws.String("0.0.0.2"),
+					}},
+					Type: aws.String("A"),
+					TTL:  aws.Int64(11),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // Should update records when using ResourceRecords and an address is missing
+		name:   "ResourceRecords missing address",
+		cd:     cdBuilder.Build(),
+		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1", "0.0.0.2"}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}},
+					Type: aws.String("A"),
+					TTL:  aws.Int64(10),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // Should update records when using ResourceRecords and there is an extra address
+		name:   "ResourceRecords missing address",
+		cd:     cdBuilder.Build(),
+		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1", "0.0.0.2"}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}, {
+						Value: aws.String("0.0.0.2"),
+					}, {
+						Value: aws.String("0.0.0.3"),
+					}},
+					Type: aws.String("A"),
+					TTL:  aws.Int64(10),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // No changes when using ResourceRecords and everything matches
+		name:   "ResourceRecords no change",
+		cd:     cdBuilder.Build(),
+		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1", "0.0.0.2"}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					ResourceRecords: []*route53.ResourceRecord{{
+						Value: aws.String("0.0.0.1"),
+					}, {
+						Value: aws.String("0.0.0.2"),
+					}},
+					Type: aws.String("A"),
+					TTL:  aws.Int64(10),
+				}},
+			}, nil)
+		},
+	}, { // Should update record when using AliasTarget and AliasTarget is nil
+		name: "AliasTarget is nil",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+		record: &actuator.DnsRecord{AliasTarget: actuator.AliasTarget{
+			Name:         "testAliasTarget",
+			HostedZoneID: testHostedZone,
+		}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					Type: aws.String("A"),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // Should update record Type when using AliasTarget and Type is different
+		name: "AliasTarget type is different",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+		record: &actuator.DnsRecord{AliasTarget: actuator.AliasTarget{
+			Name:         "testAliasTarget",
+			HostedZoneID: testHostedZone,
+		}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					AliasTarget: &route53.AliasTarget{
+						DNSName:      aws.String("testAliasTarget"),
+						HostedZoneId: aws.String(testHostedZone),
+					},
+					Type: aws.String("different"),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // Should update record DNSName when using AliasTarget and DNSName is different
+		name: "DNSName type is different",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+		record: &actuator.DnsRecord{AliasTarget: actuator.AliasTarget{
+			Name:         "testAliasTarget",
+			HostedZoneID: testHostedZone,
+		}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					AliasTarget: &route53.AliasTarget{
+						DNSName:      aws.String("different"),
+						HostedZoneId: aws.String(testHostedZone),
+					},
+					Type: aws.String("A"),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // Should update record HostedZoneId when using AliasTarget and HostedZoneId is different
+		name: "HostedZoneId type is different",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+		record: &actuator.DnsRecord{AliasTarget: actuator.AliasTarget{
+			Name:         "testAliasTarget",
+			HostedZoneID: testHostedZone,
+		}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					AliasTarget: &route53.AliasTarget{
+						DNSName:      aws.String("testAliasTarget"),
+						HostedZoneId: aws.String("different"),
+					},
+					Type: aws.String("A"),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // Should update record EvaluateTargetHealth when using AliasTarget and EvaluateTargetHealth is different
+		name: "EvaluateTargetHealth type is different",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+		record: &actuator.DnsRecord{AliasTarget: actuator.AliasTarget{
+			Name:         "testAliasTarget",
+			HostedZoneID: testHostedZone,
+		}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					AliasTarget: &route53.AliasTarget{
+						DNSName:              aws.String("testAliasTarget"),
+						HostedZoneId:         aws.String(testHostedZone),
+						EvaluateTargetHealth: aws.Bool(true),
+					},
+					Type: aws.String("A"),
+				}},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, nil)
+		},
+		expect: true,
+	}, { // No changes when using ResourceRecords and everything matches
+		name: "AliasTarget no change",
+		cd:   cdBuilder.Build(testcd.WithAWSPlatform(&hivev1aws.Platform{})),
+		record: &actuator.DnsRecord{AliasTarget: actuator.AliasTarget{
+			Name:         "testAliasTarget",
+			HostedZoneID: testHostedZone,
+		}},
+		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{{
+					Name: aws.String(testAPIDomain + "."),
+					AliasTarget: &route53.AliasTarget{
+						DNSName:      aws.String("testAliasTarget"),
+						HostedZoneId: aws.String(testHostedZone),
+					},
+					Type: aws.String("A"),
+				}},
+			}, nil)
+		},
 	}, { // There should be an error on failure to change the record set in the aws api
 		name:   "ChangeResourceRecordSets failed",
 		cd:     cdBuilder.Build(),
 		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1"}},
 		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{}, nil)
 			m.EXPECT().ChangeResourceRecordSets(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to ChangeResourceRecordSets", nil))
 		},
 		expectError: "error adding record to Hosted Zone testhostedzone for VPC Endpoint: AccessDenied: not authorized to ChangeResourceRecordSets",
@@ -962,6 +1309,7 @@ func Test_ReconcileHostedZoneRecords(t *testing.T) {
 		cd:     cdBuilder.Build(),
 		record: &actuator.DnsRecord{IpAddress: []string{"0.0.0.1"}},
 		AWSClientConfig: func(m *mock.MockClient) {
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{}, nil)
 			m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 				HostedZoneId: aws.String(testHostedZone),
 				ChangeBatch: &route53.ChangeBatch{
@@ -1444,7 +1792,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 
 		AWSClientConfig func(*mock.MockClient)
 
-		expect      hivev1.AWSAssociatedVPC
+		expect      *hivev1.AWSAssociatedVPC
 		expectError string
 	}{{ // There should be an error if VPCEndpointID is set and getEndpointVPC fails
 		name: "VPCEndpointID, getEndpointVPC failure",
@@ -1460,7 +1808,6 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 		AWSClientConfig: func(m *mock.MockClient) {
 			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
 		},
-		expect:      hivev1.AWSAssociatedVPC{},
 		expectError: "error getting Endpoint VPC: error getting the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, { // There should be an error if VPCEndPointID is set and getEndpointVPC returns an empty VPCID
 		name: "VPCEndpointID, getEndpointVPC return empty vpcid",
@@ -1478,7 +1825,6 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				VpcEndpoints: []*ec2.VpcEndpoint{{VpcId: aws.String("")}},
 			}, nil)
 		},
-		expect:      hivev1.AWSAssociatedVPC{},
 		expectError: "unable to select Endpoint VPC: Endpoint not found",
 	}, { // The AWS VPCEndpointID VPC should be used when set
 		name: "VPCEndpointID, success",
@@ -1496,7 +1842,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				VpcEndpoints: []*ec2.VpcEndpoint{mockEndpoint},
 			}, nil)
 		},
-		expect: hivev1.AWSAssociatedVPC{
+		expect: &hivev1.AWSAssociatedVPC{
 			AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 				VPCID:  *mockEndpoint.VpcId,
 				Region: testRegion,
@@ -1515,7 +1861,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{VPCID: "vpc-2", Region: testRegion},
 			}},
 		},
-		expect: hivev1.AWSAssociatedVPC{
+		expect: &hivev1.AWSAssociatedVPC{
 			AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 				VPCID:  "vpc-2",
 				Region: testRegion,
@@ -1533,7 +1879,7 @@ func Test_selectHostedZoneVPC(t *testing.T) {
 				CredentialsSecretRef: &corev1.LocalObjectReference{Name: "credential-1"},
 			}},
 		},
-		expect: hivev1.AWSAssociatedVPC{
+		expect: &hivev1.AWSAssociatedVPC{
 			AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 				VPCID:  "vpc-2",
 				Region: testRegion,

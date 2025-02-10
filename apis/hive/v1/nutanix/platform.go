@@ -36,10 +36,6 @@ type Platform struct {
 	// SubnetUUIDs identifies the network subnets to be used by the cluster.
 	// Currently, we only support one subnet for an OpenShift cluster.
 	SubnetUUIDs []string `json:"subnetUUIDs"`
-
-	// FailureDomains configures failure domains for the Nutanix platform.
-	// +optional
-	FailureDomains []FailureDomain `json:"failureDomains,omitempty"`
 }
 
 // PrismCentral holds the endpoint and credentials data used to connect to the Prism Central

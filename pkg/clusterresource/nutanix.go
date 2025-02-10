@@ -106,7 +106,7 @@ func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			ClusterOSImage:         "",  // TODO
 			DefaultMachinePlatform: nil, // TODO
 			SubnetUUIDs:            p.SubnetUUIDs,
-			FailureDomains:         nil, // TODO
+			//FailureDomains:         nil, // TODO
 		},
 	}
 }

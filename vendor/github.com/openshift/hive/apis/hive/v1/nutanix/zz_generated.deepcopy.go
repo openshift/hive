@@ -155,13 +155,6 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.FailureDomains != nil {
-		in, out := &in.FailureDomains, &out.FailureDomains
-		*out = make([]FailureDomain, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	return
 }
 

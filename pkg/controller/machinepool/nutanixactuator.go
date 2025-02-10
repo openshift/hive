@@ -64,13 +64,31 @@ func (a *NutanixActuator) getNutanixPlatformInstallConfig(cd *hivev1.ClusterDepl
 	}
 
 	platform.SubnetUUIDs = cd.Spec.Platform.Nutanix.SubnetUUIDs
-	platform.FailureDomains = getNutanixInstallConfigFailureDomains(cd.Spec.Platform.Nutanix.FailureDomains)
+	platform.FailureDomains = getNutanixInstallConfigFailureDomains(cd.Spec.Platform.Nutanix)
 
 	return &platform
 }
 
-func getNutanixInstallConfigFailureDomains(failureDomains []nutanix.FailureDomain) []installertypesnutanix.FailureDomain {
+func getNutanixInstallConfigFailureDomains(platform *nutanix.Platform) []installertypesnutanix.FailureDomain {
 	var domains []installertypesnutanix.FailureDomain
+
+	var failureDomains []nutanix.FailureDomain
+	for _, pe := range platform.PrismElements {
+		failureDomains = append(failureDomains, nutanix.FailureDomain{
+			Name: "generated-failure-domain",
+			PrismElement: nutanix.PrismElement{
+				UUID: pe.UUID,
+				Endpoint: nutanix.PrismEndpoint{
+					Address: pe.Endpoint.Address,
+					Port:    pe.Endpoint.Port,
+				},
+				Name: pe.Name,
+			},
+			SubnetUUIDs: platform.SubnetUUIDs,
+			//StorageContainers: platform,
+			//DataSourceImages:  platform.,
+		})
+	}
 
 	for _, fd := range failureDomains {
 		domain := installertypesnutanix.FailureDomain{

@@ -87,20 +87,6 @@ func (in *MachinePool) DeepCopyInto(out *MachinePool) {
 		*out = make([]v1.NutanixCategory, len(*in))
 		copy(*out, *in)
 	}
-	if in.GPUs != nil {
-		in, out := &in.GPUs, &out.GPUs
-		*out = make([]v1.NutanixGPU, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
-	if in.DataDisks != nil {
-		in, out := &in.DataDisks, &out.DataDisks
-		*out = make([]DataDisk, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	if in.FailureDomains != nil {
 		in, out := &in.FailureDomains, &out.FailureDomains
 		*out = make([]string, len(*in))

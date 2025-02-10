@@ -142,27 +142,27 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 
 	computePool := baseMachinePool(pool)
 
-	var dataDisks []installertypesnutanix.DataDisk
-	for _, dataDisk := range pool.Spec.Platform.Nutanix.DataDisks {
-		disk := &installertypesnutanix.DataDisk{
-			DiskSize:         dataDisk.DiskSize,
-			DeviceProperties: dataDisk.DeviceProperties,
-			StorageConfig: &installertypesnutanix.StorageConfig{
-				DiskMode: dataDisk.StorageConfig.DiskMode,
-				StorageContainer: &installertypesnutanix.StorageResourceReference{
-					ReferenceName: dataDisk.StorageConfig.StorageContainer.ReferenceName,
-					UUID:          dataDisk.StorageConfig.StorageContainer.UUID,
-					Name:          dataDisk.StorageConfig.StorageContainer.Name,
-				},
-			},
-			DataSourceImage: &installertypesnutanix.StorageResourceReference{
-				ReferenceName: dataDisk.DataSourceImage.ReferenceName,
-				UUID:          dataDisk.DataSourceImage.UUID,
-				Name:          dataDisk.DataSourceImage.Name,
-			},
-		}
-		dataDisks = append(dataDisks, *disk)
-	}
+	//var dataDisks []installertypesnutanix.DataDisk
+	//for _, dataDisk := range pool.Spec.Platform.Nutanix.DataDisks {
+	//	disk := &installertypesnutanix.DataDisk{
+	//		DiskSize:         dataDisk.DiskSize,
+	//		DeviceProperties: dataDisk.DeviceProperties,
+	//		StorageConfig: &installertypesnutanix.StorageConfig{
+	//			DiskMode: dataDisk.StorageConfig.DiskMode,
+	//			StorageContainer: &installertypesnutanix.StorageResourceReference{
+	//				ReferenceName: dataDisk.StorageConfig.StorageContainer.ReferenceName,
+	//				UUID:          dataDisk.StorageConfig.StorageContainer.UUID,
+	//				Name:          dataDisk.StorageConfig.StorageContainer.Name,
+	//			},
+	//		},
+	//		DataSourceImage: &installertypesnutanix.StorageResourceReference{
+	//			ReferenceName: dataDisk.DataSourceImage.ReferenceName,
+	//			UUID:          dataDisk.DataSourceImage.UUID,
+	//			Name:          dataDisk.DataSourceImage.Name,
+	//		},
+	//	}
+	//	dataDisks = append(dataDisks, *disk)
+	//}
 
 	computePool.Platform.Nutanix = &installertypesnutanix.MachinePool{
 		NumCPUs:           pool.Spec.Platform.Nutanix.NumCPUs,
@@ -171,11 +171,11 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		OSDisk: installertypesnutanix.OSDisk{
 			DiskSizeGiB: pool.Spec.Platform.Nutanix.OSDisk.DiskSizeGiB,
 		},
-		BootType:       pool.Spec.Platform.Nutanix.BootType,
-		Project:        pool.Spec.Platform.Nutanix.Project,
-		Categories:     pool.Spec.Platform.Nutanix.Categories,
-		GPUs:           pool.Spec.Platform.Nutanix.GPUs,
-		DataDisks:      dataDisks,
+		BootType:   pool.Spec.Platform.Nutanix.BootType,
+		Project:    pool.Spec.Platform.Nutanix.Project,
+		Categories: pool.Spec.Platform.Nutanix.Categories,
+		//GPUs:           pool.Spec.Platform.Nutanix.GPUs,
+		//DataDisks:      dataDisks,
 		FailureDomains: []string{}, // TODO
 	}
 

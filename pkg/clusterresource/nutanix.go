@@ -119,11 +119,11 @@ func (p *NutanixCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.Mach
 		OSDisk: hivev1nutanix.OSDisk{
 			DiskSizeGiB: volumeSize,
 		},
-		BootType:       machinev1.NutanixUEFIBoot,
-		Project:        nil, // TODO
-		Categories:     nil, // TODO
-		GPUs:           nil, // TODO
-		DataDisks:      nil, // TODO
+		BootType:   machinev1.NutanixUEFIBoot,
+		Project:    nil, // TODO
+		Categories: nil, // TODO
+		//GPUs:           nil, // TODO
+		//DataDisks:      nil, // TODO
 		FailureDomains: nil, // TODO
 	}
 

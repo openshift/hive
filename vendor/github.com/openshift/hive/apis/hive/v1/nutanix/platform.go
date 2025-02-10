@@ -9,8 +9,7 @@ const CredentialsSecretName = "nutanix-credentials"
 
 // Platform stores any global configuration used for Nutanix platforms.
 type Platform struct {
-	// PrismCentral is the endpoint (address and port) and credentials to
-	// connect to the Prism Central.
+	// PrismCentral is the endpoint (address and port) and credentials to connect to the Prism Central.
 	// This serves as the default Prism-Central.
 	PrismCentral PrismCentral `json:"prismCentral"`
 

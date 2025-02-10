@@ -3,6 +3,7 @@ package v1
 import (
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
+	nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -50,6 +51,8 @@ type ClusterDeprovisionPlatform struct {
 	OpenStack *OpenStackClusterDeprovision `json:"openstack,omitempty"`
 	// VSphere contains VMWare vSphere-specific deprovision settings
 	VSphere *VSphereClusterDeprovision `json:"vsphere,omitempty"`
+	// Nutanix contains Nutanix-specific deprovision settings
+	Nutanix *NutanixClusterDeprovision `json:"nutanix,omitempty"`
 	// Ovirt contains oVirt-specific deprovision settings
 	Ovirt *OvirtClusterDeprovision `json:"ovirt,omitempty"`
 	// IBMCloud contains IBM Cloud specific deprovision settings
@@ -129,6 +132,14 @@ type VSphereClusterDeprovision struct {
 	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
 	// VCenter is the vSphere vCenter hostname.
 	VCenter string `json:"vCenter"`
+}
+
+// NutanixClusterDeprovision contains Nutanix-specific configuration for a ClusterDeprovision
+type NutanixClusterDeprovision struct {
+	// CredentialsSecretRef is the Nutanix Prism Central account credentials to use for deprovisioning the cluster
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+	// VCenter is the vSphere vCenter hostname.
+	PrismCentral nutanix.PrismCentral `json:"prismCentral,omitempty"`
 }
 
 // OvirtClusterDeprovision contains oVirt-specific configuration for a ClusterDeprovision

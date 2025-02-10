@@ -19,6 +19,7 @@ const (
 	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
+	PlatformNutanix        = "nutanix"
 
 	mergedPullSecretSuffix = "merged-pull-secret"
 
@@ -363,9 +364,6 @@ const (
 
 	// NutanixCredentialsDir is the directory containing Nutanix credentials files.
 	NutanixCredentialsDir = "/nutanix-credentials"
-
-	// NutanixCertificatesDir is the directory containing Nutanix certificate files.
-	NutanixCertificatesDir = "/nutanix-certificates"
 
 	// VersionLabel is a label applied to ClusterDeployments to show the full version of the cluster
 	// per ClusterVersion.status.desired.version. This should differ from VersionMajorMinorPatchLabel

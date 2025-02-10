@@ -1050,8 +1050,7 @@ spec:
                         type: array
                       prismCentral:
                         description: |-
-                          PrismCentral is the endpoint (address and port) and credentials to
-                          connect to the Prism Central.
+                          PrismCentral is the endpoint (address and port) and credentials to connect to the Prism Central.
                           This serves as the default Prism-Central.
                         properties:
                           endpoint:

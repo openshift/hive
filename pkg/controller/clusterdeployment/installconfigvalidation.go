@@ -72,8 +72,7 @@ func ValidateInstallConfig(cd *hivev1.ClusterDeployment, installConfigSecret *co
 		if ic.Platform.Nutanix == nil {
 			return ic, errors.New(noNutanixPlatformErr)
 		}
-		if (ic.Platform.Nutanix.PrismCentral.Password == "" || ic.Platform.Nutanix.PrismCentral.Username == "") &&
-			(ic.Platform.Nutanix.PrismCentral.Endpoint.Address == "" || ic.Platform.Nutanix.PrismCentral.Endpoint.Port == 0) {
+		if ic.Platform.Nutanix.PrismCentral.Password == "" || ic.Platform.Nutanix.PrismCentral.Username == "" {
 			return ic, errors.New(missingNutanixCredentialsErr)
 		}
 	}

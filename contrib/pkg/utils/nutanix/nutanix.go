@@ -19,14 +19,7 @@ func ConfigureCreds(c client.Client) {
 		if password := string(credsSecret.Data[constants.PasswordSecretKey]); password != "" {
 			os.Setenv(constants.NutanixPasswordEnvVar, password)
 		}
-		// NOTE: I think this is only used for terminateWhenFilesChange(), which we don't really
-		// care about anymore. Can we get rid of it?
+
 		utils.ProjectToDir(credsSecret, constants.NutanixCredentialsDir, nil)
 	}
-	if certsSecret := utils.LoadSecretOrDie(c, "CERTS_SECRET_NAME"); certsSecret != nil {
-		utils.ProjectToDir(certsSecret, constants.NutanixCertificatesDir, nil)
-		utils.InstallCerts(constants.NutanixCertificatesDir)
-	}
-	// Install cluster proxy trusted CA bundle
-	utils.InstallCerts(constants.TrustedCABundleDir)
 }

@@ -93,13 +93,14 @@ func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 
 	return hivev1.Platform{
 		Nutanix: &hivev1nutanix.Platform{
+			CredentialsSecretRef: corev1.LocalObjectReference{
+				Name: p.CredsSecretName(o),
+			},
 			PrismCentral: hivev1nutanix.PrismCentral{
 				Endpoint: hivev1nutanix.PrismEndpoint{
 					Address: p.PrismCentral.Endpoint.Address,
 					Port:    p.PrismCentral.Endpoint.Port,
 				},
-				Username: p.PrismCentral.Username,
-				Password: p.PrismCentral.Password,
 			},
 			PrismElements:          elements,
 			ClusterOSImage:         "",  // TODO

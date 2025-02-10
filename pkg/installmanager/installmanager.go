@@ -755,7 +755,6 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if err != nil {
 			return err
 		}
-
 	case cd.Spec.Platform.Nutanix != nil:
 		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
 		if nutanixUsername == "" {

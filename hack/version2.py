@@ -10,7 +10,7 @@ import git
 # Match things like 'mce-2.0' or origin/mce-2.0, capturing:
 # 1: 'origin/'
 # 2: '2.0' (used for the bundle semver prefix)
-MCE_BRANCH_RE = re.compile("^([^/]+/)?mce-(\d+\.\d+)$")
+MCE_BRANCH_RE = re.compile("^([^/]+/)?mce-(\\d+\\.\\d+)$")
 
 MASTER_BRANCH_RE = re.compile("^([^/]+/)?master$")
 

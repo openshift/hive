@@ -1910,8 +1910,9 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 		}
 	case cd.Spec.Platform.Nutanix != nil:
 		req.Spec.Platform.Nutanix = &hivev1.NutanixClusterDeprovision{
-			CredentialsSecretRef: cd.Spec.Platform.Nutanix.CredentialsSecretRef,
-			PrismCentral:         cd.Spec.Platform.Nutanix.PrismCentral,
+			CredentialsSecretRef:  cd.Spec.Platform.Nutanix.CredentialsSecretRef,
+			CertificatesSecretRef: cd.Spec.Platform.Nutanix.CertificatesSecretRef,
+			PrismCentral:          cd.Spec.Platform.Nutanix.PrismCentral,
 		}
 	case cd.Spec.Platform.Ovirt != nil:
 		req.Spec.Platform.Ovirt = &hivev1.OvirtClusterDeprovision{

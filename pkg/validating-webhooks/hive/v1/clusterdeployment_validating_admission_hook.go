@@ -535,6 +535,9 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		if nutanix.CredentialsSecretRef.Name == "" {
 			allErrs = append(allErrs, field.Required(nutanixPath.Child("credentialsSecretRef", "name"), "must specify secrets for Nutanix access"))
 		}
+		if nutanix.CertificatesSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(nutanixPath.Child("certificatesSecretRef", "name"), "must specify certificates for Prism Central access"))
+		}
 		if nutanix.PrismCentral.Endpoint.Address == "" {
 			allErrs = append(allErrs, field.Required(nutanixPath.Child("endpointAddress"), "must specify Nutanix Prism Central endpoint address"))
 		}

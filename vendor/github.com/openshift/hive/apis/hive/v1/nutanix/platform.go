@@ -22,6 +22,10 @@ type Platform struct {
 	// credentials.
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
+	// CertificatesSecretRef refers to a secret that contains the Prism Central CA certificates
+	// necessary for communicating with the Prism Central.
+	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
+
 	// ClusterOSImage overrides the url provided in rhcos.json to download the RHCOS Image.
 	//
 	// +optional

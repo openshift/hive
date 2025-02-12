@@ -347,11 +347,14 @@ const (
 	// NutanixPasswordEnvVar is the environment variable specifying the Nutanix Prism Central password.
 	NutanixPasswordEnvVar = "NUTANIX_PASSWORD"
 
-	// NutanixEndpointEnvVar is the environment variable specifying the Nutanix Prism Central endpoint.
-	NutanixEndpointEnvVar = "NUTANIX_ENDPOINT"
+	// NutanixPrismCentralEndpointEnvVar is the environment variable specifying the Nutanix Prism Central endpoint.
+	NutanixPrismCentralEndpointEnvVar = "NUTANIX_PRISM_CENTRAL_ENDPOINT"
 
-	// NutanixPortEnvVar is the environment variable specifying the Nutanix Prism Central port.
-	NutanixPortEnvVar = "NUTANIX_PORT"
+	// NutanixPrismCentralPortEnvVar is the environment variable specifying the Nutanix Prism Central port.
+	NutanixPrismCentralPortEnvVar = "NUTANIX_PRISM_CENTRAL_ENDPOINT"
+
+	// NutanixTLSCACertsEnvVar is the environment variable containing : delimited paths to Prism Central CA certificates.
+	NutanixTLSCACertsEnvVar = "PRISM_TLS_CA_CERTS"
 
 	// NutanixClusterEnvVar is the environment variable specifying the Nutanix cluster name.
 	NutanixClusterEnvVar = "NUTANIX_CLUSTER"
@@ -364,6 +367,9 @@ const (
 
 	// NutanixCredentialsDir is the directory containing Nutanix credentials files.
 	NutanixCredentialsDir = "/nutanix-credentials"
+
+	// NutanixCertificatesDir is the directory containing PrismCentral certificate files.
+	NutanixCertificatesDir = "/nutanix-certificates"
 
 	// VersionLabel is a label applied to ClusterDeployments to show the full version of the cluster
 	// per ClusterVersion.status.desired.version. This should differ from VersionMajorMinorPatchLabel

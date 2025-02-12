@@ -222,6 +222,22 @@ spec:
                   nutanix:
                     description: Nutanix contains Nutanix-specific deprovision settings
                     properties:
+                      certificatesSecretRef:
+                        description: |-
+                          CertificatesSecretRef refers to a secret that contains the vSphere CA certificates
+                          necessary for communicating with the VCenter.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
                       credentialsSecretRef:
                         description: CredentialsSecretRef is the Nutanix Prism Central
                           account credentials to use for deprovisioning the cluster
@@ -262,6 +278,7 @@ spec:
                         - endpoint
                         type: object
                     required:
+                    - certificatesSecretRef
                     - credentialsSecretRef
                     type: object
                   openstack:

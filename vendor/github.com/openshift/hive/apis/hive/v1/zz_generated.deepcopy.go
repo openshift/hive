@@ -3277,6 +3277,7 @@ func (in *ManageDNSGCPConfig) DeepCopy() *ManageDNSGCPConfig {
 func (in *NutanixClusterDeprovision) DeepCopyInto(out *NutanixClusterDeprovision) {
 	*out = *in
 	out.CredentialsSecretRef = in.CredentialsSecretRef
+	out.CertificatesSecretRef = in.CertificatesSecretRef
 	out.PrismCentral = in.PrismCentral
 	return
 }

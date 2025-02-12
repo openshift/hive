@@ -171,14 +171,13 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		OSDisk: installertypesnutanix.OSDisk{
 			DiskSizeGiB: pool.Spec.Platform.Nutanix.OSDisk.DiskSizeGiB,
 		},
-		BootType:   pool.Spec.Platform.Nutanix.BootType,
-		Project:    pool.Spec.Platform.Nutanix.Project,
-		Categories: pool.Spec.Platform.Nutanix.Categories,
-		//GPUs:           pool.Spec.Platform.Nutanix.GPUs,
-		//DataDisks:      dataDisks,
+		BootType:       pool.Spec.Platform.Nutanix.BootType,
+		Project:        pool.Spec.Platform.Nutanix.Project,
+		Categories:     pool.Spec.Platform.Nutanix.Categories,
 		FailureDomains: []string{}, // TODO
 	}
-
+	//GPUs:           pool.Spec.Platform.Nutanix.GPUs,
+	//DataDisks:      dataDisks,
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			Nutanix: a.getNutanixPlatformInstallConfig(cd),

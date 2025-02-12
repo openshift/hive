@@ -255,8 +255,9 @@ func InstallerPodSpec(
 			emptyDirs["libvirtsshkeys"] = constants.LibvirtSSHPrivateKeyDir
 		}
 	case cd.Spec.Platform.Nutanix != nil:
-		credentialRef = cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name
+		credentialRef, certificateRef = cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name, cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name
 		emptyDirs["nutanix-credentials"] = constants.NutanixCredentialsDir
+		emptyDirs["nutanix-certificates"] = constants.NutanixCertificatesDir
 	}
 
 	if credentialRef != "" {
@@ -530,6 +531,8 @@ func GenerateUninstallerJobForDeprovision(
 		completeOvirtDeprovisionJob(req, job)
 	case req.Spec.Platform.IBMCloud != nil:
 		completeIBMCloudDeprovisionJob(req, job)
+	case req.Spec.Platform.Nutanix != nil:
+		completeNutanixCloudDeprovisionJob(req, job)
 	default:
 		return nil, errors.New("deprovision requests currently not supported for platform")
 	}
@@ -883,4 +886,30 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 			},
 		},
 	}
+}
+
+func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+	env, volumes, volumeMounts := envAndVolumes(
+		req.Namespace,
+		"nutanix-creds", constants.NutanixCredentialsDir, req.Spec.Platform.Nutanix.CredentialsSecretRef.Name,
+		"nutanix-certificates", constants.NutanixCertificatesDir, req.Spec.Platform.Nutanix.CertificatesSecretRef.Name)
+	job.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Name:            "deprovision",
+			Image:           images.GetHiveImage(),
+			ImagePullPolicy: images.GetHiveImagePullPolicy(),
+			Env:             env,
+			Command:         []string{"/usr/bin/hiveutil"},
+			Args: []string{
+				"deprovision", "nutanix",
+				"--nutanix-prism-central-endpoint", req.Spec.Platform.Nutanix.PrismCentral.Endpoint.Address,
+				"--nutanix-prism-central-port", string(req.Spec.Platform.Nutanix.PrismCentral.Endpoint.Port),
+				"--loglevel", "debug",
+				"--creds-dir", constants.NutanixCredentialsDir,
+				req.Spec.InfraID,
+			},
+			VolumeMounts: volumeMounts,
+		},
+	}
+	job.Spec.Template.Spec.Volumes = volumes
 }

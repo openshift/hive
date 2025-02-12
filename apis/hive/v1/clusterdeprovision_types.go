@@ -138,6 +138,9 @@ type VSphereClusterDeprovision struct {
 type NutanixClusterDeprovision struct {
 	// CredentialsSecretRef is the Nutanix Prism Central account credentials to use for deprovisioning the cluster
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+	// CertificatesSecretRef refers to a secret that contains the vSphere CA certificates
+	// necessary for communicating with the VCenter.
+	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
 	// VCenter is the vSphere vCenter hostname.
 	PrismCentral nutanix.PrismCentral `json:"prismCentral,omitempty"`
 }

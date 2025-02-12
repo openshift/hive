@@ -131,6 +131,7 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 		copy(*out, *in)
 	}
 	out.CredentialsSecretRef = in.CredentialsSecretRef
+	out.CertificatesSecretRef = in.CertificatesSecretRef
 	if in.DefaultMachinePlatform != nil {
 		in, out := &in.DefaultMachinePlatform, &out.DefaultMachinePlatform
 		*out = new(MachinePool)

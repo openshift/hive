@@ -21,5 +21,11 @@ func ConfigureCreds(c client.Client) {
 		}
 
 		utils.ProjectToDir(credsSecret, constants.NutanixCredentialsDir, nil)
+		if certsSecret := utils.LoadSecretOrDie(c, "CERTS_SECRET_NAME"); certsSecret != nil {
+			utils.ProjectToDir(certsSecret, constants.NutanixCertificatesDir, nil)
+			utils.InstallCerts(constants.NutanixCertificatesDir)
+		}
+		// Install cluster proxy trusted CA bundle
+		utils.InstallCerts(constants.TrustedCABundleDir)
 	}
 }

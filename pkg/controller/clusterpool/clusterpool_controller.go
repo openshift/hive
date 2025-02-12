@@ -1301,7 +1301,15 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 			return nil, err
 		}
 
-		cloudBuilder := clusterresource.NewNutanixCloudBuilder(credsSecret)
+		certsSecret, err := r.getCredentialsSecret(pool, platform.Nutanix.CertificatesSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := certsSecret.Data[".cacert"]; !ok {
+			return nil, err
+		}
+
+		cloudBuilder := clusterresource.NewNutanixCloudBuilder(credsSecret, certsSecret)
 		cloudBuilder.PrismCentral = nutanix.PrismCentral{
 			Endpoint: nutanix.PrismEndpoint{
 				Address: cloudBuilder.PrismCentral.Endpoint.Address,

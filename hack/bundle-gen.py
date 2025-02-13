@@ -24,7 +24,7 @@ HIVE_REPO_DEFAULT = "git@github.com:openshift/hive.git"
 # https://github.com/k8s-operatorhub/community-operators
 HIVE_SUB_DIR = "operators/hive-operator"
 
-OPERATORHUB_HIVE_IMAGE_DEFAULT = "quay.io/app-sre/hive"
+OPERATORHUB_HIVE_IMAGE_DEFAULT = "quay.io/openshift-hive/hive"
 
 COMMUNITY_OPERATORS_UPSTREAM_REPO = "git@github.com:redhat-openshift-ecosystem/community-operators-prod.git"
 
@@ -37,7 +37,25 @@ CHANNEL_DEFAULT = "alpha"
 
 def get_params():
     parser = argparse.ArgumentParser(
-        description="Hive Bundle Generator and Publishing Script"
+        description="Hive Bundle Generator and Publishing Script",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=f"""
+This utility will:
+1. Clone the repo specified by --hive-repo (default: {HIVE_REPO_DEFAULT}).
+2. Check out the commit-ish specified by --commit (default: the tip of
+   {HIVE_BRANCH_DEFAULT}).
+3. Look for a hive image in the repo specified by --image-repo (default
+   {OPERATORHUB_HIVE_IMAGE_DEFAULT}) with the tag specified by --image-tag-override
+   (default: 10-character SHA of the checked-out commit).
+   - If not found, build and push that image.
+   - You can skip this step by providing --skip-image-validation.
+4. Generate an OperatorHub bundle from the checked-out commit, pointing to the image
+   validated and/or built and pushed above.
+5. Open PRs with this bundle in the Red Hat and upstream Kubernetes community operator
+   projects:
+   - github.com/redhat-openshift-ecosystem/community-operators-prod
+   - github.com/k8s-operatorhub/community-operators
+"""
     )
     parser.add_argument(
         "--verbose",
@@ -48,7 +66,8 @@ def get_params():
     parser.add_argument(
         "--dry-run",
         default=False,
-        help="Test run that skips pushing branches and submitting PRs",
+        help="""Test run that skips building/pushing images, pushing branches,
+and submitting PRs""",
         action="store_true",
     )
     # TODO: Validate this early! As written, if this is wrong you won't bounce until open_pr.
@@ -60,38 +79,41 @@ def get_params():
     parser.add_argument(
         "--hold",
         default=False,
-        help='Adds a /hold comment in commit body to prevent the PR from merging (use "/hold cancel" to remove)',
+        help="""Adds a /hold comment in commit body to prevent the PR from
+merging (use "/hold cancel" to remove)""",
         action="store_true",
     )
     parser.add_argument(
         "--hive-repo",
         default=HIVE_REPO_DEFAULT,
-        help="The hive git repository to clone. E.g. save time by using a local directory (but make sure it's up to date!)",
+        help="""The hive git repository to clone. E.g. save time by using a local
+directory (but make sure it's up to date!)""",
     )
     parser.add_argument(
         "--image-repo",
         default=OPERATORHUB_HIVE_IMAGE_DEFAULT,
-        help="""The image repository to which the operator image should be pushed, e.g. `quay.io/myproject/hive`.
-                                (Do not include a tag; it will be generated based on the branch/commit.)""",
+        help="""The image repository housing the operator image, e.g.
+`quay.io/myproject/hive`. (Do not include a tag; it will be
+generated based on the branch/commit.)""",
     )
     parser.add_argument(
         "--image-tag-override",
-        help="""String to use for the image tag. By default we use the first ten digits of the sha corresponding
-                                to the requested COMMIT-ISH.""",
+        help="""String to use for the image tag. By default we use the first ten
+digits of the sha corresponding to the requested COMMIT-ISH.""",
     )
     parser.add_argument(
         "--commit",
         metavar="COMMIT-ISH",
         help="""The commit-ish from which to build and push the image.
-                                This argument may be used on its own or in conjunction with --dummy-bundle.
-                                If used as a standalone option, we generate a bundle version
-                                for `{}` starting on the commit-ish provided. If --commit is not specified,
-                                we assume the tip of the {} branch. If used alongside --dummy-bundle,
-                                we generate bundle files for the `mce-X.Y` branch specified,
-                                at the commit-ish specified. For example, `--dummy-bundle mce-2.1 --commit $sha
-                                will result in a dummy-bundle 2.1.$count-$sha for mce-2.1. For more information,
-                                see the --dummy-bundle description.
-                                """.format(
+This argument may be used on its own or in conjunction with
+--dummy-bundle. If used as a standalone option, we generate a
+bundle version for `{}` starting on the commit-ish provided.
+If --commit is not specified, we assume the tip of the {}
+branch. If used alongside --dummy-bundle, we generate bundle
+files for the `mce-X.Y` branch specified, at the commit-ish
+specified. For example, `--dummy-bundle mce-2.1 --commit $sha
+will result in a dummy-bundle 2.1.$count-$sha for mce-2.1.
+For more information, see the --dummy-bundle description.""".format(
             HIVE_BRANCH_DEFAULT,
             HIVE_BRANCH_DEFAULT,
         ),
@@ -99,16 +121,17 @@ def get_params():
     parser.add_argument(
         "--dummy-bundle",
         metavar="BRANCH-NAME",
-        help="""Only generate bundle files at a specific commit, as provided by the `--commit`
-                                parameter, defaulting to the commit corresponding to BRANCH-NAME,
-                                which must be `{}` or a valid `mce-*` branch. The bundle files will
-                                be placed in a subdirectory of your PWD named hive-operator-bundle-$version,
-                                where $version is computed as 'X.Y.$count-$sha'; X.Y is the MCE version
-                                number, or `{}` for {}; $count is the number of commits leading up to the
-                                requested commit; and $sha is the first seven digits of the SHA of the requested
-                                commit. No package file will be generated. The CSV will not have any graph
-                                directives (`replaces`, `skipRange`, etc.).
-                                """.format(
+        help="""Only generate bundle files at a specific commit, as provided by
+the `--commit` parameter, defaulting to the commit corresponding
+to BRANCH-NAME, which must be `{}` or a valid `mce-*` branch.
+The bundle files will be placed in a subdirectory of your PWD
+named hive-operator-bundle-$version, where $version is computed
+as 'X.Y.$count-$sha'; X.Y is the MCE version number, or `{}` for
+{}; $count is the number of commits leading up to the
+requested commit; and $sha is the first seven digits of the SHA
+of the requested commit. No package file will be generated. The
+CSV will not have any graph directives (`replaces`, `skipRange`,
+etc.).""".format(
             HIVE_BRANCH_DEFAULT,
             version2.MASTER_BRANCH_PREFIX,
             HIVE_BRANCH_DEFAULT,
@@ -117,9 +140,11 @@ def get_params():
     parser.add_argument(
         "--skip-image-validation",
         default=False,
-        help="""By default, we will check to make sure the image described by --image-repo and --image-tag-override (both
-                                of which may be defaulted/computed) exists. Provide this flag to skip that validation.
-                                Also note that we will currently only validate quay.io/* images.""",
+        help="""By default, we will check to make sure the image described by
+--image-repo and --image-tag-override (both of which may be
+defaulted/computed) exists, building and pushing it if it does
+not. Provide this flag to skip that validation. Also note that we
+will currently only validate quay.io/* images.""",
         action="store_true",
     )
     args = parser.parse_args()
@@ -322,14 +347,16 @@ def validate_image(image_repo, image_tag, skip):
     :param image_repo: The `host/org/repo` of the image.
     :param image_tag: The tag of the image.
     :param skip: If True, we'll skip validation.
+    :return bool: True if a) the image exists; or b) we skipped validation.
+        False if we determine the image does not exist.
     """
     if skip:
         print(f"Skipping validation of image {image_repo}:{image_tag}")
-        return
+        return True
     parsed = urllib3.util.parse_url(image_repo)
     if parsed.host != "quay.io":
         print(f"Skipping validation of non-quay image in repo {image_repo}")
-        return
+        return True
     url = f"https://{parsed.host}/api/v1/repository{parsed.path}/tag/?specificTag={image_tag}"
     resp = requests.get(url)
     if not resp.ok:
@@ -340,9 +367,10 @@ def validate_image(image_repo, image_tag, skip):
     j = resp.json()
     if not j.get("tags"):
         print(f"No image at {image_repo}:{image_tag}!")
-        sys.exit(1)
+        return False
 
     print("Image validated successfully")
+    return True
 
 
 def generate_package(package_file, channel, v: version2.Version):
@@ -499,6 +527,24 @@ def open_pr(
     print()
 
 
+def build_image(uri, dry):
+    if dry:
+        print(f"DRY RUN: Skipping building image {uri}")
+        return True
+
+    print(f"Building image {uri}")
+    return subprocess.run(['make', f'IMG={uri}', 'podman-operatorhub-build']).returncode == 0
+
+
+def push_image(uri, dry):
+    if dry:
+        print(f"DRY RUN: Skipping pushing image {uri}")
+        return True
+
+    print(f"Pushing image {uri}")
+    return subprocess.run(['podman', 'push', uri]).returncode == 0
+
+
 if __name__ == "__main__":
     args = get_params()
 
@@ -523,15 +569,20 @@ if __name__ == "__main__":
     ver = version2.Version(
         hive_repo_dir.name, branch_name=args.dummy_bundle, commit_ish=args.commit
     )
-    image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
-    validate_image(args.image_repo, image_tag, args.skip_image_validation)
-
     print("Checking out {}".format(ver.shortsha))
     try:
         ver.repo.git.checkout(ver.commit)
     except:
         print("Failed to checkout {}".format(ver.shortsha))
         raise
+
+    image_tag = args.image_tag_override or ver.commit.hexsha[0:10]
+    if not validate_image(args.image_repo, image_tag, args.skip_image_validation):
+        uri = f'{args.image_repo}:{image_tag}'
+        if not build_image(uri, args.dry_run):
+            sys.exit(1)
+        if not push_image(uri, args.dry_run):
+            sys.exit(1)
 
     if args.dummy_bundle:
         # Omit version graph stuff

@@ -42,7 +42,7 @@
 
 - Git
 - Make
-- A recent Go distribution (>=1.21)
+- A recent Go distribution (>=1.23)
 
 ### External tools
 
@@ -166,8 +166,8 @@ public images during build and test. At the time of writing, the following publi
 do the trick.
 
 ```shell
-export EL8_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.22
-export EL9_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.22
+export EL8_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.23
+export EL9_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.23
 export BASE_IMAGE=quay.io/centos/centos:stream9
 # NOTE: This produces images which are not FIPS-compliant.
 export GO="CGO_ENABLED=0 go"

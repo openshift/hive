@@ -76,8 +76,9 @@ endif
 # we don't tag versions. Override using the same versioning we apply to OperatorHub builds:
 # v{major}.{minor}.{commitcount}-{sha}
 # Note that building against a local commit may result in {major}.{minor} being rendered as
-# `UnknownBranch`. However, the {commitcount} and {sha} should still be accurate.
-SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -m ensurepip >&2; python3 -mpip --no-cache install --user gitpython pyyaml >&2; hack/version2.py)
+# 0.0.x-y if it is an `UnknownBranch`. However, the {commitcount} and {sha}
+# should still be accurate.
+SOURCE_GIT_TAG := $(shell hack/version2.sh)
 
 BINDATA_INPUTS :=./config/sharded_controllers/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)

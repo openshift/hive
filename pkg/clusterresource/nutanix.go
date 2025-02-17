@@ -133,13 +133,13 @@ func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 
 func (p *NutanixCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {
 	mp.Spec.Platform.Nutanix = &hivev1nutanix.MachinePool{
-		NumCPUs:           2,
+		NumCPUs:           4,
 		NumCoresPerSocket: 2,
-		MemoryMiB:         8192,
+		MemoryMiB:         16348,
 		OSDisk: hivev1nutanix.OSDisk{
 			DiskSizeGiB: volumeSize,
 		},
-		BootType:   machinev1.NutanixUEFIBoot,
+		BootType:   machinev1.NutanixLegacyBoot,
 		Project:    nil, // TODO
 		Categories: nil, // TODO
 		//GPUs:           nil, // TODO
@@ -160,10 +160,10 @@ func (p *NutanixCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installer
 				Username: p.PrismCentral.Username,
 				Password: p.PrismCentral.Password,
 			},
-			//PrismElements:          nil,
-			APIVIPs:     []string{p.APIVIP},
-			IngressVIPs: []string{p.IngressVIP},
-			SubnetUUIDs: p.SubnetUUIDs,
+			PrismElements: p.PrismElements,
+			APIVIPs:       []string{p.APIVIP},
+			IngressVIPs:   []string{p.IngressVIP},
+			SubnetUUIDs:   p.SubnetUUIDs,
 		},
 	}
 }

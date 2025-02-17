@@ -2,7 +2,6 @@ package nutanix
 
 import (
 	machinev1 "github.com/openshift/api/machine/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // MachinePool stores the configuration for a machine pool installed
@@ -51,19 +50,16 @@ type MachinePool struct {
 	// +optional
 	Categories []machinev1.NutanixCategory `json:"categories,omitempty"`
 
-	//// GPUs is a list of GPU devices to attach to the machine's VM.
-	//// +listType=set
-	//// +kubebuilder:validation:X-KubernetesListType=set
-	//// +kubebuilder:validation:X-KubernetesMapType=atomic
-	//// +optional
-	//GPUs []machinev1.NutanixGPU `json:"gpus,omitempty"`
-	//
-	//// DataDisks holds information of the data disks to attach to the Machine's VM
-	//// +listType=set
-	//// +kubebuilder:validation:X-KubernetesListType=set
-	//// +kubebuilder:validation:X-KubernetesMapType=atomic
-	//// +optional
-	//DataDisks []DataDisk `json:"dataDisks,omitempty"`
+	// GPUs is a list of GPU devices to attach to the machine's VM.
+	// +kubebuilder:validation:X-KubernetesListType=set
+	// +kubebuilder:validation:X-KubernetesMapType=atomic
+	// +optional
+	GPUs []machinev1.NutanixGPU `json:"gpus,omitempty"`
+
+	// DataDisks holds information of the data disks to attach to the Machine's VM
+	// +kubebuilder:validation:X-KubernetesListType=set
+	// +optional
+	DataDisks []machinev1.NutanixVMDisk `json:"dataDisks,omitempty"`
 
 	// FailureDomains optionally configures a list of failure domain names
 	// that will be applied to the MachinePool
@@ -91,25 +87,4 @@ type StorageConfig struct {
 	// storageContainer refers to the storage_container used by the VM disk.
 	// +optional
 	StorageContainer *StorageResourceReference `json:"storageContainer,omitempty"`
-}
-
-// DataDisk defines a data disk for a Machine VM.
-type DataDisk struct {
-	// diskSize is size (in Quantity format) of the disk to attach to the VM.
-	// See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Format for the Quantity format and example documentation.
-	// The minimum diskSize is 1GB.
-	// +kubebuilder:validation:Required
-	DiskSize resource.Quantity `json:"diskSize"`
-
-	// deviceProperties are the properties of the disk device.
-	// +optional
-	DeviceProperties *machinev1.NutanixVMDiskDeviceProperties `json:"deviceProperties,omitempty"`
-
-	// storageConfig are the storage configuration parameters of the VM disks.
-	// +optional
-	StorageConfig *StorageConfig `json:"storageConfig,omitempty"`
-
-	// dataSource refers to a data source image for the VM disk.
-	// +optional
-	DataSourceImage *StorageResourceReference `json:"dataSourceImage,omitempty"`
 }

@@ -1,6 +1,9 @@
 package nutanix
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	configv1 "github.com/openshift/api/config/v1"
+	corev1 "k8s.io/api/core/v1"
+)
 
 // CredentialsSecretName is the default nutanix credentials secret name.
 //
@@ -40,6 +43,15 @@ type Platform struct {
 	// SubnetUUIDs identifies the network subnets to be used by the cluster.
 	// Currently, we only support one subnet for an OpenShift cluster.
 	SubnetUUIDs []string `json:"subnetUUIDs"`
+
+	// LoadBalancer defines how the load balancer used by the cluster is configured.
+	// LoadBalancer is available in TechPreview.
+	// +optional
+	LoadBalancer *configv1.NutanixPlatformLoadBalancer `json:"loadBalancer,omitempty"`
+
+	// FailureDomains configures failure domains for the Nutanix platform.
+	// +optional
+	FailureDomains []FailureDomain `json:"failureDomains,omitempty"`
 }
 
 // PrismCentral holds the endpoint and credentials data used to connect to the Prism Central

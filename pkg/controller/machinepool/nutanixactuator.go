@@ -1,6 +1,9 @@
 package machinepool
 
 import (
+	"fmt"
+
+	machinev1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/nutanix"
@@ -69,63 +72,6 @@ func (a *NutanixActuator) getNutanixPlatformInstallConfig(cd *hivev1.ClusterDepl
 	return &platform
 }
 
-func getNutanixInstallConfigFailureDomains(platform *nutanix.Platform) []installertypesnutanix.FailureDomain {
-	var domains []installertypesnutanix.FailureDomain
-
-	var failureDomains []nutanix.FailureDomain
-	for _, pe := range platform.PrismElements {
-		failureDomains = append(failureDomains, nutanix.FailureDomain{
-			Name: "generated-failure-domain",
-			PrismElement: nutanix.PrismElement{
-				UUID: pe.UUID,
-				Endpoint: nutanix.PrismEndpoint{
-					Address: pe.Endpoint.Address,
-					Port:    pe.Endpoint.Port,
-				},
-				Name: pe.Name,
-			},
-			SubnetUUIDs: platform.SubnetUUIDs,
-			//StorageContainers: platform,
-			//DataSourceImages:  platform.,
-		})
-	}
-
-	for _, fd := range failureDomains {
-		domain := installertypesnutanix.FailureDomain{
-			Name: fd.Name,
-			PrismElement: installertypesnutanix.PrismElement{
-				UUID: fd.PrismElement.UUID,
-				Endpoint: installertypesnutanix.PrismEndpoint{
-					Address: fd.PrismElement.Endpoint.Address,
-					Port:    fd.PrismElement.Endpoint.Port,
-				},
-				Name: fd.PrismElement.Name,
-			},
-			SubnetUUIDs:       fd.SubnetUUIDs,
-			StorageContainers: nil,
-			DataSourceImages:  nil,
-		}
-
-		for _, storage := range fd.StorageContainers {
-			domain.StorageContainers = append(domain.StorageContainers, installertypesnutanix.StorageResourceReference{
-				ReferenceName: storage.ReferenceName,
-				UUID:          storage.UUID,
-				Name:          storage.Name,
-			})
-		}
-
-		for _, dsImages := range fd.DataSourceImages {
-			domain.DataSourceImages = append(domain.DataSourceImages, installertypesnutanix.StorageResourceReference{
-				ReferenceName: dsImages.ReferenceName,
-				UUID:          dsImages.UUID,
-				Name:          dsImages.Name,
-			})
-		}
-	}
-
-	return domains
-}
-
 // GenerateMachineSets satisfies the Actuator interface and will take a clusterDeployment and return a list of MachineSets
 // to sync to the remote cluster.
 func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *hivev1.MachinePool, logger log.FieldLogger) ([]*machineapi.MachineSet, bool, error) {
@@ -141,28 +87,10 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	}
 
 	computePool := baseMachinePool(pool)
-
-	//var dataDisks []installertypesnutanix.DataDisk
-	//for _, dataDisk := range pool.Spec.Platform.Nutanix.DataDisks {
-	//	disk := &installertypesnutanix.DataDisk{
-	//		DiskSize:         dataDisk.DiskSize,
-	//		DeviceProperties: dataDisk.DeviceProperties,
-	//		StorageConfig: &installertypesnutanix.StorageConfig{
-	//			DiskMode: dataDisk.StorageConfig.DiskMode,
-	//			StorageContainer: &installertypesnutanix.StorageResourceReference{
-	//				ReferenceName: dataDisk.StorageConfig.StorageContainer.ReferenceName,
-	//				UUID:          dataDisk.StorageConfig.StorageContainer.UUID,
-	//				Name:          dataDisk.StorageConfig.StorageContainer.Name,
-	//			},
-	//		},
-	//		DataSourceImage: &installertypesnutanix.StorageResourceReference{
-	//			ReferenceName: dataDisk.DataSourceImage.ReferenceName,
-	//			UUID:          dataDisk.DataSourceImage.UUID,
-	//			Name:          dataDisk.DataSourceImage.Name,
-	//		},
-	//	}
-	//	dataDisks = append(dataDisks, *disk)
-	//}
+	dataDisks, err := a.getNutanixDataDisks(pool)
+	if err != nil {
+		return nil, false, err
+	}
 
 	computePool.Platform.Nutanix = &installertypesnutanix.MachinePool{
 		NumCPUs:           pool.Spec.Platform.Nutanix.NumCPUs,
@@ -174,10 +102,11 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		BootType:       pool.Spec.Platform.Nutanix.BootType,
 		Project:        pool.Spec.Platform.Nutanix.Project,
 		Categories:     pool.Spec.Platform.Nutanix.Categories,
-		FailureDomains: []string{}, // TODO
+		FailureDomains: pool.Spec.Platform.Nutanix.FailureDomains,
+		DataDisks:      dataDisks,
+		GPUs:           pool.Spec.Platform.Nutanix.GPUs,
 	}
-	//GPUs:           pool.Spec.Platform.Nutanix.GPUs,
-	//DataDisks:      dataDisks,
+
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			Nutanix: a.getNutanixPlatformInstallConfig(cd),
@@ -198,5 +127,138 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	}
 
 	return installerMachineSets, true, nil
+}
 
+func getNutanixFailureDomainsStorageResourceReference(failureDomain nutanix.FailureDomain) []installertypesnutanix.StorageResourceReference {
+	var storageResourceReference []installertypesnutanix.StorageResourceReference
+	for _, storageContainer := range failureDomain.StorageContainers {
+		storageResourceReference = append(storageResourceReference, installertypesnutanix.StorageResourceReference{
+			ReferenceName: storageContainer.ReferenceName,
+			UUID:          storageContainer.UUID,
+			Name:          storageContainer.Name,
+		})
+	}
+
+	return storageResourceReference
+}
+
+func getNutanixFailureDomainsDataSourceImages(failureDomain nutanix.FailureDomain) []installertypesnutanix.StorageResourceReference {
+	var dataSourceImages []installertypesnutanix.StorageResourceReference
+	for _, dataSourceImage := range failureDomain.StorageContainers {
+		dataSourceImages = append(dataSourceImages, installertypesnutanix.StorageResourceReference{
+			ReferenceName: dataSourceImage.ReferenceName,
+			UUID:          dataSourceImage.UUID,
+			Name:          dataSourceImage.Name,
+		})
+	}
+
+	return dataSourceImages
+}
+
+func getNutanixInstallConfigFailureDomains(platform *nutanix.Platform) []installertypesnutanix.FailureDomain {
+	var failureDomains []installertypesnutanix.FailureDomain
+	for _, failureDomain := range platform.FailureDomains {
+
+		storageResourceReference := getNutanixFailureDomainsStorageResourceReference(failureDomain)
+		dataSourceImages := getNutanixFailureDomainsDataSourceImages(failureDomain)
+
+		failureDomains = append(failureDomains, installertypesnutanix.FailureDomain{
+			Name: failureDomain.Name,
+			PrismElement: installertypesnutanix.PrismElement{
+				UUID: failureDomain.PrismElement.UUID,
+				Endpoint: installertypesnutanix.PrismEndpoint{
+					Address: failureDomain.PrismElement.Endpoint.Address,
+					Port:    failureDomain.PrismElement.Endpoint.Port,
+				},
+				Name: failureDomain.Name,
+			},
+			SubnetUUIDs:       failureDomain.SubnetUUIDs,
+			StorageContainers: storageResourceReference,
+			DataSourceImages:  dataSourceImages,
+		})
+	}
+
+	return failureDomains
+}
+
+func (a *NutanixActuator) getNutanixDataDisksStorageConfig(dataDisk machinev1.NutanixVMDisk) (*installertypesnutanix.StorageConfig, error) {
+	if dataDisk.StorageConfig == nil {
+		return nil, nil
+	}
+	storageConfig := &installertypesnutanix.StorageConfig{
+		DiskMode: dataDisk.StorageConfig.DiskMode,
+	}
+
+	if dataDisk.StorageConfig.StorageContainer == nil {
+		return storageConfig, nil
+	}
+
+	if dataDisk.StorageConfig.StorageContainer.Type == machinev1.NutanixIdentifierUUID {
+		storageConfig.StorageContainer.UUID = *dataDisk.StorageConfig.StorageContainer.UUID
+	}
+
+	switch dataDisk.StorageConfig.StorageContainer.Type {
+	case machinev1.NutanixIdentifierUUID:
+		if dataDisk.StorageConfig.StorageContainer.UUID == nil {
+			return nil, fmt.Errorf("no UUID found for data source type %s", dataDisk.StorageConfig.StorageContainer.Type)
+		}
+		storageConfig.StorageContainer.UUID = *dataDisk.StorageConfig.StorageContainer.UUID
+
+	default:
+		return nil, fmt.Errorf("unknown storage type %s", dataDisk.StorageConfig.StorageContainer.Type)
+	}
+
+	return storageConfig, nil
+}
+
+func (a *NutanixActuator) getNutanixDataDisksDataSource(dataDisk machinev1.NutanixVMDisk) (*installertypesnutanix.StorageResourceReference, error) {
+	if dataDisk.DataSource == nil {
+		return nil, nil
+	}
+
+	dataSource := &installertypesnutanix.StorageResourceReference{}
+	switch dataDisk.DataSource.Type {
+	case machinev1.NutanixIdentifierUUID:
+		if dataDisk.DataSource.UUID == nil {
+			return nil, fmt.Errorf("no UUID found for data source type %s", dataDisk.DataSource.Type)
+		}
+		dataSource.UUID = *dataDisk.DataSource.UUID
+
+	case machinev1.NutanixIdentifierName:
+		if dataDisk.DataSource.Name == nil {
+			return nil, fmt.Errorf("no name found for data source type %s", dataDisk.DataSource.Type)
+		}
+		dataSource.Name = *dataDisk.DataSource.Name
+
+	default:
+		return nil, fmt.Errorf("unknown data type %s", dataDisk.DataSource.Type)
+	}
+
+	// TODO what to do with dataSource.ReferenceName?
+	return dataSource, nil
+}
+
+func (a *NutanixActuator) getNutanixDataDisks(pool *hivev1.MachinePool) ([]installertypesnutanix.DataDisk, error) {
+	var dataDisks []installertypesnutanix.DataDisk
+	for _, dataDisk := range pool.Spec.Platform.Nutanix.DataDisks {
+		storageConfig, err := a.getNutanixDataDisksStorageConfig(dataDisk)
+		if err != nil {
+			return nil, err
+		}
+		dataSource, err := a.getNutanixDataDisksDataSource(dataDisk)
+		if err != nil {
+			return nil, err
+		}
+
+		disk := &installertypesnutanix.DataDisk{
+			DiskSize:         dataDisk.DiskSize,
+			DeviceProperties: dataDisk.DeviceProperties,
+			StorageConfig:    storageConfig,
+			DataSourceImage:  dataSource,
+		}
+
+		dataDisks = append(dataDisks, *disk)
+	}
+
+	return dataDisks, nil
 }

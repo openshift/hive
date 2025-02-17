@@ -1600,6 +1600,150 @@ objects:
                                 processor cores to assign a vm.
                               format: int64
                               type: integer
+                            dataDisks:
+                              description: DataDisks holds information of the data
+                                disks to attach to the Machine's VM
+                              items:
+                                description: NutanixDataDisk specifies the VM data
+                                  disk configuration parameters.
+                                properties:
+                                  dataSource:
+                                    description: dataSource refers to a data source
+                                      image for the VM disk.
+                                    properties:
+                                      name:
+                                        description: name is the resource name in
+                                          the PC
+                                        type: string
+                                      type:
+                                        description: Type is the identifier type to
+                                          use for this resource.
+                                        enum:
+                                        - uuid
+                                        - name
+                                        type: string
+                                      uuid:
+                                        description: uuid is the UUID of the resource
+                                          in the PC.
+                                        type: string
+                                    required:
+                                    - type
+                                    type: object
+                                  deviceProperties:
+                                    description: deviceProperties are the properties
+                                      of the disk device.
+                                    properties:
+                                      adapterType:
+                                        description: 'adapterType is the adapter type
+                                          of the disk address.
+
+                                          If the deviceType is "Disk", the valid adapterType
+                                          can be "SCSI", "IDE", "PCI", "SATA" or "SPAPR".
+
+                                          If the deviceType is "CDRom", the valid
+                                          adapterType can be "IDE" or "SATA".'
+                                        enum:
+                                        - SCSI
+                                        - IDE
+                                        - PCI
+                                        - SATA
+                                        - SPAPR
+                                        type: string
+                                      deviceIndex:
+                                        default: 0
+                                        description: 'deviceIndex is the index of
+                                          the disk address. The valid values are non-negative
+                                          integers, with the default value 0.
+
+                                          For a Machine VM, the deviceIndex for the
+                                          disks with the same deviceType.adapterType
+                                          combination should
+
+                                          start from 0 and increase consecutively
+                                          afterwards. Note that for each Machine VM,
+                                          the Disk.SCSI.0
+
+                                          and CDRom.IDE.0 are reserved to be used
+                                          by the VM''s system. So for dataDisks of
+                                          Disk.SCSI and CDRom.IDE,
+
+                                          the deviceIndex should start from 1.'
+                                        format: int32
+                                        minimum: 0
+                                        type: integer
+                                      deviceType:
+                                        default: Disk
+                                        description: 'deviceType specifies the disk
+                                          device type.
+
+                                          The valid values are "Disk" and "CDRom",
+                                          and the default is "Disk".'
+                                        enum:
+                                        - Disk
+                                        - CDRom
+                                        type: string
+                                    required:
+                                    - adapterType
+                                    - deviceIndex
+                                    - deviceType
+                                    type: object
+                                  diskSize:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: 'diskSize is size (in Quantity format)
+                                      of the disk attached to the VM.
+
+                                      See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Format
+                                      for the Quantity format and example documentation.
+
+                                      The minimum diskSize is 1GB.'
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                  storageConfig:
+                                    description: storageConfig are the storage configuration
+                                      parameters of the VM disks.
+                                    properties:
+                                      diskMode:
+                                        default: Standard
+                                        description: 'diskMode specifies the disk
+                                          mode.
+
+                                          The valid values are Standard and Flash,
+                                          and the default is Standard.'
+                                        enum:
+                                        - Standard
+                                        - Flash
+                                        type: string
+                                      storageContainer:
+                                        description: storageContainer refers to the
+                                          storage_container used by the VM disk.
+                                        properties:
+                                          type:
+                                            description: 'type is the identifier type
+                                              to use for this resource.
+
+                                              The valid value is "uuid".'
+                                            enum:
+                                            - uuid
+                                            type: string
+                                          uuid:
+                                            description: uuid is the UUID of the storage
+                                              resource in the PC.
+                                            type: string
+                                        required:
+                                        - type
+                                        type: object
+                                        x-kubernetes-validations:
+                                        - message: uuid configuration is required
+                                            when type is uuid, and forbidden otherwise
+                                          rule: 'has(self.type) && self.type == ''uuid''
+                                            ?  has(self.uuid) : !has(self.uuid)'
+                                    type: object
+                                required:
+                                - diskSize
+                                type: object
+                              type: array
                             failureDomains:
                               description: 'FailureDomains optionally configures a
                                 list of failure domain names
@@ -1609,6 +1753,43 @@ objects:
                                 type: string
                               type: array
                               x-kubernetes-list-type: set
+                            gpus:
+                              description: GPUs is a list of GPU devices to attach
+                                to the machine's VM.
+                              items:
+                                description: NutanixGPU holds the identity of a Nutanix
+                                  GPU resource in the Prism Central
+                                properties:
+                                  deviceID:
+                                    description: deviceID is the GPU device ID with
+                                      the integer value.
+                                    format: int32
+                                    type: integer
+                                  name:
+                                    description: name is the GPU device name
+                                    type: string
+                                  type:
+                                    description: 'type is the identifier type of the
+                                      GPU device.
+
+                                      Valid values are Name and DeviceID.'
+                                    enum:
+                                    - Name
+                                    - DeviceID
+                                    type: string
+                                required:
+                                - type
+                                type: object
+                                x-kubernetes-validations:
+                                - message: deviceID configuration is required when
+                                    type is DeviceID, and forbidden otherwise
+                                  rule: 'has(self.type) && self.type == ''DeviceID''
+                                    ?  has(self.deviceID) : !has(self.deviceID)'
+                                - message: name configuration is required when type
+                                    is Name, and forbidden otherwise
+                                  rule: 'has(self.type) && self.type == ''Name'' ?  has(self.name)
+                                    : !has(self.name)'
+                              type: array
                             memoryMiB:
                               description: Memory is the size of a VM's memory in
                                 MiB.
@@ -1644,6 +1825,168 @@ objects:
                               required:
                               - type
                               type: object
+                          type: object
+                        failureDomains:
+                          description: FailureDomains configures failure domains for
+                            the Nutanix platform.
+                          items:
+                            description: FailureDomain configures failure domain information
+                              for the Nutanix platform.
+                            properties:
+                              dataSourceImages:
+                                description: DataSourceImages identifies the datasource
+                                  images in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              name:
+                                description: Name defines the unique name of a failure
+                                  domain.
+                                maxLength: 64
+                                minLength: 1
+                                pattern: ^[0-9A-Za-z_.-@/]+$
+                                type: string
+                              prismElement:
+                                description: 'prismElement holds the identification
+                                  (name, uuid) and the optional endpoint address and
+                                  port of the Nutanix Prism Element.
+
+                                  When a cluster-wide proxy is installed, by default,
+                                  this endpoint will be accessed via the proxy.
+
+                                  Should you wish for communication with this endpoint
+                                  not to be proxied, please add the endpoint to the
+
+                                  proxy spec.noProxy list.'
+                                properties:
+                                  endpoint:
+                                    description: Endpoint holds the address and port
+                                      of the Prism Element
+                                    properties:
+                                      address:
+                                        description: address is the endpoint address
+                                          (DNS name or IP address) of the Nutanix
+                                          Prism Central or Element (cluster)
+                                        type: string
+                                      port:
+                                        description: port is the port number to access
+                                          the Nutanix Prism Central or Element (cluster)
+                                        format: int32
+                                        type: integer
+                                    required:
+                                    - address
+                                    - port
+                                    type: object
+                                  name:
+                                    description: Name is prism endpoint Name
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the Prism Element
+                                      (cluster)
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              storageContainers:
+                                description: StorageContainers identifies the storage
+                                  containers in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              subnetUUIDs:
+                                description: 'SubnetUUIDs identifies the network subnets
+                                  of the Prism Element.
+
+                                  Currently we only support one subnet for a failure
+                                  domain.'
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                                x-kubernetes-list-type: set
+                            required:
+                            - name
+                            - prismElement
+                            - subnetUUIDs
+                            type: object
+                          type: array
+                        loadBalancer:
+                          description: 'LoadBalancer defines how the load balancer
+                            used by the cluster is configured.
+
+                            LoadBalancer is available in TechPreview.'
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: 'type defines the type of load balancer
+                                used by the cluster on Nutanix platform
+
+                                which can be a user-managed or openshift-managed load
+                                balancer
+
+                                that is to be used for the OpenShift API and Ingress
+                                endpoints.
+
+                                When set to OpenShiftManagedDefault the static pods
+                                in charge of API and Ingress traffic load-balancing
+
+                                defined in the machine config operator will be deployed.
+
+                                When set to UserManaged these static pods will not
+                                be deployed and it is expected that
+
+                                the load balancer is configured out of band by the
+                                deployer.
+
+                                When omitted, this means no opinion and the platform
+                                is left to choose a reasonable default.
+
+                                The default value is OpenShiftManagedDefault.'
+                              enum:
+                              - OpenShiftManagedDefault
+                              - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                              - message: type is immutable once set
+                                rule: oldSelf == '' || self == oldSelf
                           type: object
                         prismCentral:
                           description: 'PrismCentral is the endpoint (address and
@@ -4093,6 +4436,150 @@ objects:
                                 processor cores to assign a vm.
                               format: int64
                               type: integer
+                            dataDisks:
+                              description: DataDisks holds information of the data
+                                disks to attach to the Machine's VM
+                              items:
+                                description: NutanixDataDisk specifies the VM data
+                                  disk configuration parameters.
+                                properties:
+                                  dataSource:
+                                    description: dataSource refers to a data source
+                                      image for the VM disk.
+                                    properties:
+                                      name:
+                                        description: name is the resource name in
+                                          the PC
+                                        type: string
+                                      type:
+                                        description: Type is the identifier type to
+                                          use for this resource.
+                                        enum:
+                                        - uuid
+                                        - name
+                                        type: string
+                                      uuid:
+                                        description: uuid is the UUID of the resource
+                                          in the PC.
+                                        type: string
+                                    required:
+                                    - type
+                                    type: object
+                                  deviceProperties:
+                                    description: deviceProperties are the properties
+                                      of the disk device.
+                                    properties:
+                                      adapterType:
+                                        description: 'adapterType is the adapter type
+                                          of the disk address.
+
+                                          If the deviceType is "Disk", the valid adapterType
+                                          can be "SCSI", "IDE", "PCI", "SATA" or "SPAPR".
+
+                                          If the deviceType is "CDRom", the valid
+                                          adapterType can be "IDE" or "SATA".'
+                                        enum:
+                                        - SCSI
+                                        - IDE
+                                        - PCI
+                                        - SATA
+                                        - SPAPR
+                                        type: string
+                                      deviceIndex:
+                                        default: 0
+                                        description: 'deviceIndex is the index of
+                                          the disk address. The valid values are non-negative
+                                          integers, with the default value 0.
+
+                                          For a Machine VM, the deviceIndex for the
+                                          disks with the same deviceType.adapterType
+                                          combination should
+
+                                          start from 0 and increase consecutively
+                                          afterwards. Note that for each Machine VM,
+                                          the Disk.SCSI.0
+
+                                          and CDRom.IDE.0 are reserved to be used
+                                          by the VM''s system. So for dataDisks of
+                                          Disk.SCSI and CDRom.IDE,
+
+                                          the deviceIndex should start from 1.'
+                                        format: int32
+                                        minimum: 0
+                                        type: integer
+                                      deviceType:
+                                        default: Disk
+                                        description: 'deviceType specifies the disk
+                                          device type.
+
+                                          The valid values are "Disk" and "CDRom",
+                                          and the default is "Disk".'
+                                        enum:
+                                        - Disk
+                                        - CDRom
+                                        type: string
+                                    required:
+                                    - adapterType
+                                    - deviceIndex
+                                    - deviceType
+                                    type: object
+                                  diskSize:
+                                    anyOf:
+                                    - type: integer
+                                    - type: string
+                                    description: 'diskSize is size (in Quantity format)
+                                      of the disk attached to the VM.
+
+                                      See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Format
+                                      for the Quantity format and example documentation.
+
+                                      The minimum diskSize is 1GB.'
+                                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                    x-kubernetes-int-or-string: true
+                                  storageConfig:
+                                    description: storageConfig are the storage configuration
+                                      parameters of the VM disks.
+                                    properties:
+                                      diskMode:
+                                        default: Standard
+                                        description: 'diskMode specifies the disk
+                                          mode.
+
+                                          The valid values are Standard and Flash,
+                                          and the default is Standard.'
+                                        enum:
+                                        - Standard
+                                        - Flash
+                                        type: string
+                                      storageContainer:
+                                        description: storageContainer refers to the
+                                          storage_container used by the VM disk.
+                                        properties:
+                                          type:
+                                            description: 'type is the identifier type
+                                              to use for this resource.
+
+                                              The valid value is "uuid".'
+                                            enum:
+                                            - uuid
+                                            type: string
+                                          uuid:
+                                            description: uuid is the UUID of the storage
+                                              resource in the PC.
+                                            type: string
+                                        required:
+                                        - type
+                                        type: object
+                                        x-kubernetes-validations:
+                                        - message: uuid configuration is required
+                                            when type is uuid, and forbidden otherwise
+                                          rule: 'has(self.type) && self.type == ''uuid''
+                                            ?  has(self.uuid) : !has(self.uuid)'
+                                    type: object
+                                required:
+                                - diskSize
+                                type: object
+                              type: array
                             failureDomains:
                               description: 'FailureDomains optionally configures a
                                 list of failure domain names
@@ -4102,6 +4589,43 @@ objects:
                                 type: string
                               type: array
                               x-kubernetes-list-type: set
+                            gpus:
+                              description: GPUs is a list of GPU devices to attach
+                                to the machine's VM.
+                              items:
+                                description: NutanixGPU holds the identity of a Nutanix
+                                  GPU resource in the Prism Central
+                                properties:
+                                  deviceID:
+                                    description: deviceID is the GPU device ID with
+                                      the integer value.
+                                    format: int32
+                                    type: integer
+                                  name:
+                                    description: name is the GPU device name
+                                    type: string
+                                  type:
+                                    description: 'type is the identifier type of the
+                                      GPU device.
+
+                                      Valid values are Name and DeviceID.'
+                                    enum:
+                                    - Name
+                                    - DeviceID
+                                    type: string
+                                required:
+                                - type
+                                type: object
+                                x-kubernetes-validations:
+                                - message: deviceID configuration is required when
+                                    type is DeviceID, and forbidden otherwise
+                                  rule: 'has(self.type) && self.type == ''DeviceID''
+                                    ?  has(self.deviceID) : !has(self.deviceID)'
+                                - message: name configuration is required when type
+                                    is Name, and forbidden otherwise
+                                  rule: 'has(self.type) && self.type == ''Name'' ?  has(self.name)
+                                    : !has(self.name)'
+                              type: array
                             memoryMiB:
                               description: Memory is the size of a VM's memory in
                                 MiB.
@@ -4137,6 +4661,168 @@ objects:
                               required:
                               - type
                               type: object
+                          type: object
+                        failureDomains:
+                          description: FailureDomains configures failure domains for
+                            the Nutanix platform.
+                          items:
+                            description: FailureDomain configures failure domain information
+                              for the Nutanix platform.
+                            properties:
+                              dataSourceImages:
+                                description: DataSourceImages identifies the datasource
+                                  images in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              name:
+                                description: Name defines the unique name of a failure
+                                  domain.
+                                maxLength: 64
+                                minLength: 1
+                                pattern: ^[0-9A-Za-z_.-@/]+$
+                                type: string
+                              prismElement:
+                                description: 'prismElement holds the identification
+                                  (name, uuid) and the optional endpoint address and
+                                  port of the Nutanix Prism Element.
+
+                                  When a cluster-wide proxy is installed, by default,
+                                  this endpoint will be accessed via the proxy.
+
+                                  Should you wish for communication with this endpoint
+                                  not to be proxied, please add the endpoint to the
+
+                                  proxy spec.noProxy list.'
+                                properties:
+                                  endpoint:
+                                    description: Endpoint holds the address and port
+                                      of the Prism Element
+                                    properties:
+                                      address:
+                                        description: address is the endpoint address
+                                          (DNS name or IP address) of the Nutanix
+                                          Prism Central or Element (cluster)
+                                        type: string
+                                      port:
+                                        description: port is the port number to access
+                                          the Nutanix Prism Central or Element (cluster)
+                                        format: int32
+                                        type: integer
+                                    required:
+                                    - address
+                                    - port
+                                    type: object
+                                  name:
+                                    description: Name is prism endpoint Name
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the Prism Element
+                                      (cluster)
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              storageContainers:
+                                description: StorageContainers identifies the storage
+                                  containers in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              subnetUUIDs:
+                                description: 'SubnetUUIDs identifies the network subnets
+                                  of the Prism Element.
+
+                                  Currently we only support one subnet for a failure
+                                  domain.'
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                                x-kubernetes-list-type: set
+                            required:
+                            - name
+                            - prismElement
+                            - subnetUUIDs
+                            type: object
+                          type: array
+                        loadBalancer:
+                          description: 'LoadBalancer defines how the load balancer
+                            used by the cluster is configured.
+
+                            LoadBalancer is available in TechPreview.'
+                          properties:
+                            type:
+                              default: OpenShiftManagedDefault
+                              description: 'type defines the type of load balancer
+                                used by the cluster on Nutanix platform
+
+                                which can be a user-managed or openshift-managed load
+                                balancer
+
+                                that is to be used for the OpenShift API and Ingress
+                                endpoints.
+
+                                When set to OpenShiftManagedDefault the static pods
+                                in charge of API and Ingress traffic load-balancing
+
+                                defined in the machine config operator will be deployed.
+
+                                When set to UserManaged these static pods will not
+                                be deployed and it is expected that
+
+                                the load balancer is configured out of band by the
+                                deployer.
+
+                                When omitted, this means no opinion and the platform
+                                is left to choose a reasonable default.
+
+                                The default value is OpenShiftManagedDefault.'
+                              enum:
+                              - OpenShiftManagedDefault
+                              - UserManaged
+                              type: string
+                              x-kubernetes-validations:
+                              - message: type is immutable once set
+                                rule: oldSelf == '' || self == oldSelf
                           type: object
                         prismCentral:
                           description: 'PrismCentral is the endpoint (address and
@@ -8182,6 +8868,148 @@ objects:
                             cores to assign a vm.
                           format: int64
                           type: integer
+                        dataDisks:
+                          description: DataDisks holds information of the data disks
+                            to attach to the Machine's VM
+                          items:
+                            description: NutanixDataDisk specifies the VM data disk
+                              configuration parameters.
+                            properties:
+                              dataSource:
+                                description: dataSource refers to a data source image
+                                  for the VM disk.
+                                properties:
+                                  name:
+                                    description: name is the resource name in the
+                                      PC
+                                    type: string
+                                  type:
+                                    description: Type is the identifier type to use
+                                      for this resource.
+                                    enum:
+                                    - uuid
+                                    - name
+                                    type: string
+                                  uuid:
+                                    description: uuid is the UUID of the resource
+                                      in the PC.
+                                    type: string
+                                required:
+                                - type
+                                type: object
+                              deviceProperties:
+                                description: deviceProperties are the properties of
+                                  the disk device.
+                                properties:
+                                  adapterType:
+                                    description: 'adapterType is the adapter type
+                                      of the disk address.
+
+                                      If the deviceType is "Disk", the valid adapterType
+                                      can be "SCSI", "IDE", "PCI", "SATA" or "SPAPR".
+
+                                      If the deviceType is "CDRom", the valid adapterType
+                                      can be "IDE" or "SATA".'
+                                    enum:
+                                    - SCSI
+                                    - IDE
+                                    - PCI
+                                    - SATA
+                                    - SPAPR
+                                    type: string
+                                  deviceIndex:
+                                    default: 0
+                                    description: 'deviceIndex is the index of the
+                                      disk address. The valid values are non-negative
+                                      integers, with the default value 0.
+
+                                      For a Machine VM, the deviceIndex for the disks
+                                      with the same deviceType.adapterType combination
+                                      should
+
+                                      start from 0 and increase consecutively afterwards.
+                                      Note that for each Machine VM, the Disk.SCSI.0
+
+                                      and CDRom.IDE.0 are reserved to be used by the
+                                      VM''s system. So for dataDisks of Disk.SCSI
+                                      and CDRom.IDE,
+
+                                      the deviceIndex should start from 1.'
+                                    format: int32
+                                    minimum: 0
+                                    type: integer
+                                  deviceType:
+                                    default: Disk
+                                    description: 'deviceType specifies the disk device
+                                      type.
+
+                                      The valid values are "Disk" and "CDRom", and
+                                      the default is "Disk".'
+                                    enum:
+                                    - Disk
+                                    - CDRom
+                                    type: string
+                                required:
+                                - adapterType
+                                - deviceIndex
+                                - deviceType
+                                type: object
+                              diskSize:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: 'diskSize is size (in Quantity format)
+                                  of the disk attached to the VM.
+
+                                  See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Format
+                                  for the Quantity format and example documentation.
+
+                                  The minimum diskSize is 1GB.'
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              storageConfig:
+                                description: storageConfig are the storage configuration
+                                  parameters of the VM disks.
+                                properties:
+                                  diskMode:
+                                    default: Standard
+                                    description: 'diskMode specifies the disk mode.
+
+                                      The valid values are Standard and Flash, and
+                                      the default is Standard.'
+                                    enum:
+                                    - Standard
+                                    - Flash
+                                    type: string
+                                  storageContainer:
+                                    description: storageContainer refers to the storage_container
+                                      used by the VM disk.
+                                    properties:
+                                      type:
+                                        description: 'type is the identifier type
+                                          to use for this resource.
+
+                                          The valid value is "uuid".'
+                                        enum:
+                                        - uuid
+                                        type: string
+                                      uuid:
+                                        description: uuid is the UUID of the storage
+                                          resource in the PC.
+                                        type: string
+                                    required:
+                                    - type
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: uuid configuration is required when
+                                        type is uuid, and forbidden otherwise
+                                      rule: 'has(self.type) && self.type == ''uuid''
+                                        ?  has(self.uuid) : !has(self.uuid)'
+                                type: object
+                            required:
+                            - diskSize
+                            type: object
+                          type: array
                         failureDomains:
                           description: 'FailureDomains optionally configures a list
                             of failure domain names
@@ -8191,6 +9019,43 @@ objects:
                             type: string
                           type: array
                           x-kubernetes-list-type: set
+                        gpus:
+                          description: GPUs is a list of GPU devices to attach to
+                            the machine's VM.
+                          items:
+                            description: NutanixGPU holds the identity of a Nutanix
+                              GPU resource in the Prism Central
+                            properties:
+                              deviceID:
+                                description: deviceID is the GPU device ID with the
+                                  integer value.
+                                format: int32
+                                type: integer
+                              name:
+                                description: name is the GPU device name
+                                type: string
+                              type:
+                                description: 'type is the identifier type of the GPU
+                                  device.
+
+                                  Valid values are Name and DeviceID.'
+                                enum:
+                                - Name
+                                - DeviceID
+                                type: string
+                            required:
+                            - type
+                            type: object
+                            x-kubernetes-validations:
+                            - message: deviceID configuration is required when type
+                                is DeviceID, and forbidden otherwise
+                              rule: 'has(self.type) && self.type == ''DeviceID'' ?  has(self.deviceID)
+                                : !has(self.deviceID)'
+                            - message: name configuration is required when type is
+                                Name, and forbidden otherwise
+                              rule: 'has(self.type) && self.type == ''Name'' ?  has(self.name)
+                                : !has(self.name)'
+                          type: array
                         memoryMiB:
                           description: Memory is the size of a VM's memory in MiB.
                           format: int64

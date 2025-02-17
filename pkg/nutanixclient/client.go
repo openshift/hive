@@ -1,5 +1,58 @@
 package nutanixclient
 
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	nutanixClient "github.com/nutanix-cloud-native/prism-go-client"
+	nutanixClientV3 "github.com/nutanix-cloud-native/prism-go-client/v3"
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
+)
+
+func NewNutanixClient(nutanixProvider *nutanix.Platform, username, password string) (*nutanixClientV3.Client, error) {
+	credentials := nutanixClient.Credentials{
+		Username: username,
+		Password: password,
+		Endpoint: nutanixProvider.PrismCentral.Endpoint.Address,
+		Port:     string(nutanixProvider.PrismCentral.Endpoint.Port),
+	}
+
+	client, err := nutanixClientV3.NewV3Client(credentials)
+	if err != nil {
+		return nil, err
+	}
+	return client, err
+
+}
+
+func GetPrismCentralClusterName(client *nutanixClientV3.Client) (string, error) {
+	clusterList, err := client.V3.ListAllCluster(context.TODO(), "")
+	if err != nil {
+		return "", err
+	}
+
+	foundPCs := make([]*nutanixClientV3.ClusterIntentResponse, 0)
+	for _, cl := range clusterList.Entities {
+		if cl.Status != nil && cl.Status.Resources != nil && cl.Status.Resources.Config != nil {
+			serviceList := cl.Status.Resources.Config.ServiceList
+			for _, svc := range serviceList {
+				if svc != nil && strings.ToUpper(*svc) == "PRISM_CENTRAL" {
+					foundPCs = append(foundPCs, cl)
+				}
+			}
+		}
+	}
+	numFoundPCs := len(foundPCs)
+	if numFoundPCs == 1 {
+		return *foundPCs[0].Spec.Name, nil
+	}
+	if len(foundPCs) == 0 {
+		return "", fmt.Errorf("failed to retrieve Prism Central cluster")
+	}
+	return "", fmt.Errorf("found more than one Prism Central cluster: %v", numFoundPCs)
+}
+
 //import (
 //	"context"
 //	"fmt"

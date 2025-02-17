@@ -2629,6 +2629,10 @@ func getClusterRegion(cd *hivev1.ClusterDeployment) string {
 		return cd.Spec.Platform.GCP.Region
 	case cd.Spec.Platform.IBMCloud != nil:
 		return cd.Spec.Platform.IBMCloud.Region
+	case cd.Spec.Platform.Nutanix != nil:
+		if len(cd.Spec.Platform.Nutanix.PrismElements) == 1 {
+			return cd.Spec.Platform.Nutanix.PrismElements[0].Name
+		}
 	}
 	return regionUnknown
 }

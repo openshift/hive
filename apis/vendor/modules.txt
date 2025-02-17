@@ -24,6 +24,8 @@ github.com/modern-go/reflect2
 # github.com/openshift/api v0.0.0-20240919193929-2669d1ebc910
 ## explicit; go 1.22.0
 github.com/openshift/api/config/v1
+github.com/openshift/api/machine/v1
+github.com/openshift/api/machine/v1beta1
 # github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87
 ## explicit; go 1.12
 github.com/openshift/custom-resource-status/conditions/v1

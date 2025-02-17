@@ -1908,6 +1908,12 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CertificatesSecretRef: cd.Spec.Platform.VSphere.CertificatesSecretRef,
 			VCenter:               cd.Spec.Platform.VSphere.VCenter,
 		}
+	case cd.Spec.Platform.Nutanix != nil:
+		req.Spec.Platform.Nutanix = &hivev1.NutanixClusterDeprovision{
+			CredentialsSecretRef:  cd.Spec.Platform.Nutanix.CredentialsSecretRef,
+			CertificatesSecretRef: cd.Spec.Platform.Nutanix.CertificatesSecretRef,
+			PrismCentral:          cd.Spec.Platform.Nutanix.PrismCentral,
+		}
 	case cd.Spec.Platform.Ovirt != nil:
 		req.Spec.Platform.Ovirt = &hivev1.OvirtClusterDeprovision{
 			CredentialsSecretRef:  cd.Spec.Platform.Ovirt.CredentialsSecretRef,
@@ -2606,6 +2612,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformNone
 	case cd.Spec.Platform.Ovirt != nil:
 		return constants.PlatformOvirt
+	case cd.Spec.Platform.Nutanix != nil:
+		return constants.PlatformNutanix
 	}
 	return constants.PlatformUnknown
 }
@@ -2621,6 +2629,10 @@ func getClusterRegion(cd *hivev1.ClusterDeployment) string {
 		return cd.Spec.Platform.GCP.Region
 	case cd.Spec.Platform.IBMCloud != nil:
 		return cd.Spec.Platform.IBMCloud.Region
+	case cd.Spec.Platform.Nutanix != nil:
+		if len(cd.Spec.Platform.Nutanix.PrismElements) == 1 {
+			return cd.Spec.Platform.Nutanix.PrismElements[0].Name
+		}
 	}
 	return regionUnknown
 }

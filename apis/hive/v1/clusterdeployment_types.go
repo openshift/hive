@@ -2,6 +2,7 @@ package v1
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -662,6 +663,9 @@ type Platform struct {
 
 	// IBMCloud is the configuration used when installing on IBM Cloud
 	IBMCloud *ibmcloud.Platform `json:"ibmcloud,omitempty"`
+
+	// Nutanix is the configuration used when installing on Nutanix prism central.
+	Nutanix *nutanix.Platform `json:"nutanix,omitempty"`
 
 	// None indicates platform-agnostic install.
 	// https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html

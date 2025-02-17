@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -98,6 +99,8 @@ type MachinePoolPlatform struct {
 	Ovirt *ovirt.MachinePool `json:"ovirt,omitempty"`
 	// IBMCloud is the configuration used when installing on IBM Cloud.
 	IBMCloud *ibmcloud.MachinePool `json:"ibmcloud,omitempty"`
+	// Nutanix is the configuration used when installing on Nutanix prism central.
+	Nutanix *nutanix.MachinePool `json:"nutanix,omitempty"`
 }
 
 // MachinePoolStatus defines the observed state of MachinePool

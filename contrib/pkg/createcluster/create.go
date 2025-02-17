@@ -3,10 +3,12 @@ package createcluster
 import (
 	"bytes"
 	"fmt"
+	installernutanix "github.com/openshift/installer/pkg/types/nutanix"
 	"os"
 	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -96,6 +98,7 @@ const (
 	cloudOpenStack       = "openstack"
 	cloudOVirt           = "ovirt"
 	cloudVSphere         = "vsphere"
+	cloudNutanix         = "nutanix"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -115,6 +118,7 @@ var (
 		cloudOpenStack: true,
 		cloudOVirt:     true,
 		cloudVSphere:   true,
+		cloudNutanix:   true,
 	}
 	manualCCOModeClouds = map[string]bool{
 		cloudIBM: true,
@@ -208,6 +212,16 @@ type Options struct {
 	VSphereNetwork          string
 	VSphereCACerts          string
 
+	// Nutanix
+	NutanixCACerts              string
+	NutanixPrismCentralEndpoint string
+	NutanixPrismCentralPort     int32
+	NutanixPrismElementAddress  string
+	NutanixPrismElementPort     int32
+	NutanixAPIVIP               string
+	NutanixIngressVIP           string
+	NutanixSubnetUUIDs          []string
+
 	// Ovirt
 	OvirtClusterID       string
 	OvirtStorageDomainID string
@@ -251,6 +265,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=nutanix --nutanix-prism-central=prismcentral.nutanix.com --nutanix-api-vip=192.168.1.2 --nutanix-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
@@ -366,6 +381,8 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.VSphereIngressVIP, "vsphere-ingress-vip", "", "Virtual IP address for ingress application routing")
 	flags.StringVar(&opt.VSphereNetwork, "vsphere-network", "", "Name of the network to be used by the cluster")
 	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
+
+	// TODO add nutanix flags
 
 	// oVirt flags
 	flags.StringVar(&opt.OvirtClusterID, "ovirt-cluster-id", "", "The oVirt cluster id (uuid) under which all VMs will run")
@@ -829,6 +846,76 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			InstanceType: o.IBMInstanceType,
 		}
 		builder.CloudBuilder = ibmCloudProvider
+
+	case cloudNutanix:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+
+		nutanixCACerts := os.Getenv(constants.NutanixTLSCACertsEnvVar)
+		if o.VSphereCACerts != "" {
+			nutanixCACerts = o.NutanixCACerts
+		}
+		if nutanixCACerts == "" {
+			return nil, fmt.Errorf("must provide --nutanix-ca-certs or set %s env var set", constants.NutanixTLSCACertsEnvVar)
+		}
+		caCerts := [][]byte{}
+		for _, cert := range filepath.SplitList(nutanixCACerts) {
+			caCert, err := os.ReadFile(cert)
+			if err != nil {
+				return nil, fmt.Errorf("error reading %s: %w", cert, err)
+			}
+			caCerts = append(caCerts, caCert)
+		}
+
+		nutanixPrismCentralEndpoint := os.Getenv(constants.NutanixPrismCentralEndpointEnvVar)
+		if o.NutanixPrismCentralEndpoint != "" {
+			nutanixPrismCentralEndpoint = o.NutanixPrismCentralEndpoint
+		}
+		if nutanixPrismCentralEndpoint == "" {
+			return nil, fmt.Errorf("must provide --nutanix-prism-central-endpoint or set %s env var", constants.NutanixPrismCentralEndpointEnvVar)
+		}
+
+		var nutanixPrismCentralPort int32
+		nutanixPrismCentralPortVar := os.Getenv(constants.NutanixPrismCentralPortEnvVar)
+		nutanixPortVal, err := strconv.Atoi(nutanixPrismCentralPortVar)
+		if err != nil {
+			return nil, fmt.Errorf("error converting nutanix port %s env var to int: %w", constants.NutanixPrismCentralPortEnvVar, err)
+		}
+		nutanixPrismCentralPort = int32(nutanixPortVal)
+		if o.NutanixPrismCentralPort != 0 {
+			nutanixPrismCentralPort = o.NutanixPrismCentralPort
+		}
+
+		nutanixBuilder := &clusterresource.NutanixCloudBuilder{
+			PrismCentral: installernutanix.PrismCentral{
+				Endpoint: installernutanix.PrismEndpoint{
+					Address: nutanixPrismCentralEndpoint,
+					Port:    nutanixPrismCentralPort,
+				},
+				Username: nutanixUsername,
+				Password: nutanixPassword,
+			},
+			PrismElements: []installernutanix.PrismElement{
+				{
+					Endpoint: installernutanix.PrismEndpoint{
+						Address: o.NutanixPrismElementAddress,
+						Port:    o.NutanixPrismElementPort,
+					},
+				},
+			},
+			SubnetUUIDs: o.NutanixSubnetUUIDs,
+			APIVIP:      o.NutanixAPIVIP,
+			IngressVIP:  o.NutanixIngressVIP,
+			CACert:      bytes.Join(caCerts, []byte("\n")),
+		}
+		builder.CloudBuilder = nutanixBuilder
 	}
 
 	if o.Internal {

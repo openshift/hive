@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -8,6 +9,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -208,4 +211,63 @@ func GCPNetworkProjectID(cd *hivev1.ClusterDeployment) *string {
 	}
 	// may still be nil
 	return cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID
+}
+
+// LoadManifestPatches attempts to load the ClusterDeploymentCustomization(s) referenced by the
+// ClusterDeployment and return their (possibly merged) InstallerManifestPatches. (ClusterPool
+// clusters may have two CDC references: one from the Inventory CDC and one from
+// ClusterPool.Spec.CustomizationRef. In this case we apply the latter first.)
+// If there are no such references, or if neither reference contains InstallerManifestPatches, we
+// return a nil object and a nil error (this is not considered an error condition).
+// Any other error -- including if the referenced CDC doesn't exist -- is bubbled up.
+func LoadManifestPatches(c client.Client, cd *hivev1.ClusterDeployment, log log.FieldLogger) ([]hivev1.InstallerManifestPatch, error) {
+	// Leetle helper to avoid chains of conditionals checking for nils along object paths
+	safeGetField := func(accessor func() string) string {
+		defer func() { recover() }()
+		return accessor()
+	}
+	// Helper to DRY retrieving CDC and extracting its InstallerManifestPatches
+	getCDCAndIMPs := func(cdcName string) ([]hivev1.InstallerManifestPatch, error) {
+		cdc := &hivev1.ClusterDeploymentCustomization{}
+		if err := c.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: cdcName}, cdc); err != nil {
+			log.WithField("cdc", cdcName).WithError(err).Error("failed to retrieve ClusterDeploymentCustomization")
+			return nil, err
+		}
+		return cdc.Spec.InstallerManifestPatches, nil
+	}
+
+	imps := []hivev1.InstallerManifestPatch{}
+	found := false
+
+	if cdcName := safeGetField(func() string { return cd.Spec.Provisioning.CustomizationRef.Name }); cdcName != "" {
+		i, err := getCDCAndIMPs(cdcName)
+		if err != nil {
+			return nil, err
+		}
+		if numIMPs := len(i); numIMPs > 0 {
+			log.Infof("Found %d InstallerManifestPatch entries from ClusterDeployment.Spec.CustomizationRef %s", numIMPs, cdcName)
+			imps = append(imps, i...)
+			found = true
+		}
+	}
+
+	// We want to apply ClusterPool inventory patches last, so they "win" in case of any conflicts.
+	if cdcName := safeGetField(func() string { return cd.Spec.ClusterPoolRef.CustomizationRef.Name }); cdcName != "" {
+		i, err := getCDCAndIMPs(cdcName)
+		if err != nil {
+			return nil, err
+		}
+		if numIMPs := len(i); numIMPs > 0 {
+			log.Infof("Found %d InstallerManifestPatch entries from ClusterPool Inventory CDC %s", numIMPs, cdcName)
+			imps = append(imps, i...)
+			found = true
+		}
+	}
+
+	if !found {
+		log.Info("no manifest customizations to apply")
+		return nil, nil
+	}
+
+	return imps, nil
 }

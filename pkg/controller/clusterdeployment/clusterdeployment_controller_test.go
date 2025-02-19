@@ -13,7 +13,6 @@ import (
 	"github.com/golang/mock/gomock"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
@@ -2333,9 +2332,9 @@ platform:
 				),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				testassert.AssertCDCConditions(t, getCDC(c), []conditionsv1.Condition{{
-					Type:    conditionsv1.ConditionAvailable,
-					Status:  corev1.ConditionTrue,
+				testassert.AssertCDCConditions(t, getCDC(c), []metav1.Condition{{
+					Type:    "Available",
+					Status:  metav1.ConditionTrue,
 					Reason:  "Available",
 					Message: "available",
 				}})

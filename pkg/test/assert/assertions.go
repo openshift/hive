@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
@@ -56,7 +55,7 @@ func findClusterDeploymentCondition(conditions []hivev1.ClusterDeploymentConditi
 	return nil
 }
 
-func findCDCCondition(conditions []conditionsv1.Condition, conditionType conditionsv1.ConditionType) *conditionsv1.Condition {
+func findCDCCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]
@@ -92,7 +91,7 @@ func AssertConditions(t *testing.T, cd *hivev1.ClusterDeployment, expectedCondit
 
 // AssertConditions asserts if the expected conditions are present on the cluster deployment.
 // It also asserts if those conditions have the expected status, reason, and (optionally) message.
-func AssertCDCConditions(t *testing.T, cdc *hivev1.ClusterDeploymentCustomization, expectedConditions []conditionsv1.Condition) {
+func AssertCDCConditions(t *testing.T, cdc *hivev1.ClusterDeploymentCustomization, expectedConditions []metav1.Condition) {
 	testifyassert.LessOrEqual(t, len(expectedConditions), len(cdc.Status.Conditions), "some conditions are not present")
 	for _, expectedCond := range expectedConditions {
 		condition := findCDCCondition(cdc.Status.Conditions, expectedCond.Type)

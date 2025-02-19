@@ -3,12 +3,12 @@ package clusterdeploymentcustomization
 import (
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openshift/hive/pkg/test/generic"
 )
@@ -79,9 +79,9 @@ func Generic(opt generic.Option) Option {
 
 func Available() Option {
 	return func(cdc *hivev1.ClusterDeploymentCustomization) {
-		cdc.Status.Conditions = append(cdc.Status.Conditions, conditionsv1.Condition{
-			Type:    conditionsv1.ConditionAvailable,
-			Status:  corev1.ConditionTrue,
+		cdc.Status.Conditions = append(cdc.Status.Conditions, metav1.Condition{
+			Type:    "Available",
+			Status:  metav1.ConditionTrue,
 			Reason:  "Available",
 			Message: "available",
 		})
@@ -90,9 +90,9 @@ func Available() Option {
 
 func Reserved() Option {
 	return func(cdc *hivev1.ClusterDeploymentCustomization) {
-		cdc.Status.Conditions = append(cdc.Status.Conditions, conditionsv1.Condition{
-			Type:    conditionsv1.ConditionAvailable,
-			Status:  corev1.ConditionFalse,
+		cdc.Status.Conditions = append(cdc.Status.Conditions, metav1.Condition{
+			Type:    "Available",
+			Status:  metav1.ConditionFalse,
 			Reason:  "Reserved",
 			Message: "reserved",
 		})
@@ -111,17 +111,17 @@ func WithPatch(path, op, value string) Option {
 
 func WithApplySucceeded(reason string, change time.Time) Option {
 	return func(cdc *hivev1.ClusterDeploymentCustomization) {
-		status := corev1.ConditionTrue
+		status := metav1.ConditionTrue
 		if reason != hivev1.CustomizationApplyReasonSucceeded {
-			status = corev1.ConditionFalse
+			status = metav1.ConditionFalse
 		}
 
 		if cdc.Status.Conditions == nil {
-			cdc.Status.Conditions = []conditionsv1.Condition{}
+			cdc.Status.Conditions = []metav1.Condition{}
 		}
-		existingCondition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
+		existingCondition := meta.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
 		if existingCondition == nil {
-			newCondition := conditionsv1.Condition{
+			newCondition := metav1.Condition{
 				Type:    hivev1.ApplySucceededCondition,
 				Status:  status,
 				Reason:  reason,

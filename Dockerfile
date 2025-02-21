@@ -9,7 +9,7 @@ WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
 
-RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
 RUN make build-hiveutil
 
@@ -20,7 +20,7 @@ WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
-RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 RUN python3 -m ensurepip
 RUN make build-hiveadmission build-manager build-operator && \
   make build-hiveutil
@@ -29,7 +29,7 @@ FROM ${BASE_IMAGE}
 ARG CONTAINER_SUB_MANAGER_OFF
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 
-RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
+RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 
 ##

@@ -28,10 +28,6 @@ func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 				return
 			}
 
-			if credsDir != "" {
-				go terminateWhenFilesChange(credsDir)
-			}
-
 			log.Infof("Running destroyer with ClusterUninstall %#v", *opt)
 			// ClusterQuota stomped in return
 			if _, err := opt.Run(); err != nil {

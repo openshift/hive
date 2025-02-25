@@ -1677,7 +1677,6 @@ github.com/openshift/installer/pkg/version
 github.com/openshift/library-go/pkg/config/clusterstatus
 github.com/openshift/library-go/pkg/config/leaderelection
 github.com/openshift/library-go/pkg/controller
-github.com/openshift/library-go/pkg/controller/fileobserver
 github.com/openshift/library-go/pkg/manifest
 github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/resource/resourceread

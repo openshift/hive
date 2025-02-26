@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -38,10 +37,6 @@ const (
 	defaultGCPDiskSizeGB = 128
 )
 
-var (
-	versionsSupportingFullNames = semver.MustParseRange(">=4.4.7")
-)
-
 // GCPActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
 type GCPActuator struct {
@@ -66,7 +61,6 @@ func NewGCPActuator(
 	client client.Client,
 	gcpCreds *corev1.Secret,
 	pool *hivev1.MachinePool,
-	clusterVersion string,
 	masterMachine *machineapi.Machine,
 	remoteMachineSets []machineapi.MachineSet,
 	scheme *runtime.Scheme,
@@ -109,7 +103,7 @@ func NewGCPActuator(
 		imageID:        imageID,
 		network:        network,
 		subnet:         subnet,
-		leasesRequired: requireLeases(clusterVersion, remoteMachineSets, logger),
+		leasesRequired: requireLeases(remoteMachineSets, logger),
 	}
 	return actuator, nil
 }
@@ -439,14 +433,7 @@ func (a *GCPActuator) findAvailableLeaseChars(cd *hivev1.ClusterDeployment, leas
 	return keys, nil
 }
 
-func requireLeases(clusterVersion string, remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) bool {
-	logger = logger.WithField("clusterVersion", clusterVersion)
-	if v, err := semver.ParseTolerant(clusterVersion); err == nil {
-		if !versionsSupportingFullNames(v) {
-			logger.Debug("leases are required since cluster does not support full machine names")
-			return true
-		}
-	}
+func requireLeases(remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) bool {
 	poolNames := make(map[string]bool)
 	for _, ms := range remoteMachineSets {
 		nameParts := strings.Split(ms.Name, "-")

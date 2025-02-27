@@ -15,6 +15,7 @@ import (
 	ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
 	metricsconfig "github.com/openshift/hive/apis/hive/v1/metricsconfig"
 	none "github.com/openshift/hive/apis/hive/v1/none"
+	nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -3422,6 +3423,11 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.None != nil {
 		in, out := &in.None, &out.None
 		*out = new(none.Platform)
+		**out = **in
+	}
+	if in.Nutanix != nil {
+		in, out := &in.Nutanix, &out.Nutanix
+		*out = new(nutanix.Platform)
 		**out = **in
 	}
 	return

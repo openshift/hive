@@ -1430,9 +1430,14 @@ github.com/nunnatsa/ginkgolinter/internal/rules
 github.com/nunnatsa/ginkgolinter/linter
 github.com/nunnatsa/ginkgolinter/types
 github.com/nunnatsa/ginkgolinter/version
+# github.com/nutanix-cloud-native/cluster-api-provider-nutanix v1.3.3-0.20240416171357-98239ba02cb2
+## explicit; go 1.21
+github.com/nutanix-cloud-native/cluster-api-provider-nutanix/api/v1beta1
 # github.com/nutanix-cloud-native/prism-go-client v0.3.4
 ## explicit; go 1.16
 github.com/nutanix-cloud-native/prism-go-client
+github.com/nutanix-cloud-native/prism-go-client/environment/credentials
+github.com/nutanix-cloud-native/prism-go-client/environment/types
 github.com/nutanix-cloud-native/prism-go-client/internal
 github.com/nutanix-cloud-native/prism-go-client/utils
 github.com/nutanix-cloud-native/prism-go-client/v3
@@ -1649,6 +1654,7 @@ github.com/openshift/installer/pkg/asset/machines/aws
 github.com/openshift/installer/pkg/asset/machines/azure
 github.com/openshift/installer/pkg/asset/machines/gcp
 github.com/openshift/installer/pkg/asset/machines/ibmcloud
+github.com/openshift/installer/pkg/asset/machines/nutanix
 github.com/openshift/installer/pkg/asset/machines/openstack
 github.com/openshift/installer/pkg/asset/machines/ovirt
 github.com/openshift/installer/pkg/asset/machines/vsphere

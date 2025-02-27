@@ -6,8 +6,10 @@ toolchain go1.23.5
 
 require (
 	github.com/openshift/api v0.0.0-20250224185818-544b3ca4e8f5
+	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
 	k8s.io/api v0.32.2
 	k8s.io/apimachinery v0.32.2
+	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
 require (
@@ -27,5 +29,4 @@ require (
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )

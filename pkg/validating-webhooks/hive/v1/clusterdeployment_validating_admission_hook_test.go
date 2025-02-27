@@ -20,6 +20,7 @@ import (
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -139,6 +140,18 @@ func validVSphereClusterDeployment() *hivev1.ClusterDeployment {
 		Folder:                "/dc1/vm/test",
 		Cluster:               "test",
 		Network:               "Network",
+	}
+	return cd
+}
+
+func validNutanixClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.Nutanix = &hivev1nutanix.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		PrismCentral: hivev1nutanix.PrismEndpoint{
+			Address: "some-prism-central.nutanix.com",
+			Port:    9440,
+		},
 	}
 	return cd
 }
@@ -1457,6 +1470,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name:            "Nutanix create valid",
+			newObject:       validNutanixClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
 			name:            "oVirt create valid",
 			newObject:       validOvirtClusterDeployment(),
 			operation:       admissionv1beta1.Create,
@@ -1474,6 +1493,36 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd := validIBMCloudClusterDeployment()
 				cd.Spec.Provisioning.ManifestsConfigMapRef = nil
 				cd.Spec.Provisioning.ManifestsSecretRef = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Nutanix create missing CredentialsSecretRef",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name = "" // Simulating a missing required field
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Nutanix create missing PrismCentral address",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.PrismCentral.Address = "" // Simulating a missing required field
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Nutanix create missing PrismCentral port",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.PrismCentral.Port = 0 // Simulating a missing required field
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,

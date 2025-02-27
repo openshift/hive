@@ -52,9 +52,8 @@ type MachinePool struct {
 // OSDisk defines the disk for machines on GCP.
 type OSDisk struct {
 	// DiskType defines the type of disk.
-	// The valid values are pd-standard and pd-ssd.
+	// The valid values at this time are: pd-standard, pd-ssd, local-ssd, pd-balanced, hyperdisk-balanced.
 	// Defaulted internally to pd-ssd.
-	// +kubebuilder:validation:Enum=pd-ssd;pd-standard
 	// +optional
 	DiskType string `json:"diskType,omitempty"`
 

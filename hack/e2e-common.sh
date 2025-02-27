@@ -223,6 +223,7 @@ case "${CLOUD}" in
 	;;
 "vsphere")
   BASE_DOMAIN="${BASE_DOMAIN:-vmc.devcluster.openshift.com}"
+  USE_MANAGED_DNS=false
   if [ -z "$NETWORK_NAME" ]; then
     echo "Variable 'NETWORK_NAME' not set."
     exit 1
@@ -334,5 +335,5 @@ function get_vips() {
   fi
 
   vip=$(sed -n "${idx}p" "$vips")
-  echo "$vip"
+  printf "%s" "$vip"
 }

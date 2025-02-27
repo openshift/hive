@@ -45,8 +45,8 @@ func NewDeprovisionNutanixCommand() *cobra.Command {
 	}
 	flags := cmd.Flags()
 	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
-	flags.StringVar(&opt.endpoint, "nutanix-pc-address", "", "Domain name or IP address of the Nutanix Prism Central endpoint")
-	flags.StringVar(&opt.port, "nutanix-pc-port", "", "Port of the Nutanix Prism Central endpoint")
+	flags.StringVar(&opt.endpoint, constants.CliNutanixPcAddressCMD, "", "Domain name or IP address of the Nutanix Prism Central endpoint")
+	flags.StringVar(&opt.port, constants.CliNutanixPcPortCMD, "", "Port of the Nutanix Prism Central endpoint")
 	return cmd
 }
 

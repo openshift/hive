@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/util/scheme"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installernutanix "github.com/openshift/installer/pkg/types/nutanix"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -96,6 +98,7 @@ const (
 	cloudOpenStack       = "openstack"
 	cloudOVirt           = "ovirt"
 	cloudVSphere         = "vsphere"
+	cloudNutanix         = "nutanix"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -115,6 +118,7 @@ var (
 		cloudOpenStack: true,
 		cloudOVirt:     true,
 		cloudVSphere:   true,
+		cloudNutanix:   true,
 	}
 	manualCCOModeClouds = map[string]bool{
 		cloudIBM: true,
@@ -220,6 +224,16 @@ type Options struct {
 	IBMCISInstanceCRN string
 	IBMAccountID      string
 	IBMInstanceType   string
+
+	// Nutanix
+	NutanixCACerts              string
+	NutanixPrismCentralEndpoint string
+	NutanixPrismCentralPort     int32
+	NutanixPrismElementAddress  string
+	NutanixPrismElementPort     int32
+	NutanixAPIVIP               string
+	NutanixIngressVIP           string
+	NutanixSubnetUUIDs          []string
 
 	homeDir string
 	log     log.FieldLogger
@@ -366,6 +380,15 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.VSphereIngressVIP, "vsphere-ingress-vip", "", "Virtual IP address for ingress application routing")
 	flags.StringVar(&opt.VSphereNetwork, "vsphere-network", "", "Name of the network to be used by the cluster")
 	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
+
+	// Nutanix
+	flags.StringVar(&opt.NutanixPrismCentralEndpoint, constants.CliNutanixPcAddressCMD, "", "Domain name or IP address of the Nutanix Prism Central endpoint")
+	flags.Int32Var(&opt.NutanixPrismCentralPort, constants.CliNutanixPcPortCMD, 0, "Port of the Nutanix Prism Central endpoint")
+	flags.StringVar(&opt.NutanixPrismElementAddress, constants.CliNutanixPeAddressCMD, "", "Domain name or IP address of the Nutanix Prism Element endpoint")
+	flags.Int32Var(&opt.NutanixPrismElementPort, constants.CliNutanixPePortCMD, 0, "Port of the Nutanix Prism Element endpoint")
+	flags.StringVar(&opt.NutanixAPIVIP, constants.CliNutanixApiVipCMD, "", "Virtual IP address for the api endpoint")
+	flags.StringVar(&opt.NutanixIngressVIP, constants.CliNutanixIngressVipCMD, "", "Virtual IP address for ingress application routing")
+	flags.StringSliceVar(&opt.NutanixSubnetUUIDs, constants.CliNutanixSubnetUUIDCmd, []string{}, "List of network subnets to be used by the cluster")
 
 	// oVirt flags
 	flags.StringVar(&opt.OvirtClusterID, "ovirt-cluster-id", "", "The oVirt cluster id (uuid) under which all VMs will run")
@@ -829,6 +852,92 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			InstanceType: o.IBMInstanceType,
 		}
 		builder.CloudBuilder = ibmCloudProvider
+	case cloudNutanix:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+
+		nutanixPrismCentralEndpoint := os.Getenv(constants.NutanixPrismCentralEndpointEnvVar)
+		if o.NutanixPrismCentralEndpoint != "" {
+			nutanixPrismCentralEndpoint = o.NutanixPrismCentralEndpoint
+		}
+		if nutanixPrismCentralEndpoint == "" {
+			return nil, fmt.Errorf("must provide --%s or set %s env var", constants.CliNutanixPcAddressCMD, constants.NutanixPrismCentralEndpointEnvVar)
+		}
+
+		nutanixPrismCentralPortVal := os.Getenv(constants.NutanixPrismCentralPortEnvVar)
+		nutanixPortVal, err := strconv.Atoi(nutanixPrismCentralPortVal)
+		if err != nil {
+			return nil, fmt.Errorf("error converting %s port variable to int: %w", nutanixPrismCentralPortVal, err)
+		}
+
+		nutanixPrismCentralPort := int32(nutanixPortVal)
+		if o.NutanixPrismCentralPort != 0 {
+			nutanixPrismCentralPort = o.NutanixPrismCentralPort
+		}
+		if nutanixPrismCentralPort == 0 {
+			return nil, fmt.Errorf("must provide --%s or set %s env var", constants.CliNutanixPcPortCMD, constants.NutanixPrismCentralEndpointEnvVar)
+		}
+
+		nutanixPrismElementAddress := os.Getenv(constants.NutanixPrismElementEndpointEnvVar)
+		if o.NutanixPrismElementAddress != "" {
+			nutanixPrismElementAddress = o.NutanixPrismElementAddress
+		}
+		if nutanixPrismElementAddress == "" {
+			return nil, fmt.Errorf("must provide --%s or set %s env var", constants.CliNutanixPeAddressCMD, constants.NutanixPrismElementEndpointEnvVar)
+		}
+
+		nutanixPrismElementPortVar := os.Getenv(constants.NutanixPrismCentralPortEnvVar)
+		nutanixPortVal, err = strconv.Atoi(nutanixPrismElementPortVar)
+		if err != nil {
+			return nil, fmt.Errorf("error converting %s port variable to int: %w", nutanixPrismElementPortVar, err)
+		}
+
+		nutanixPrismElementPort := int32(nutanixPortVal)
+		if o.NutanixPrismElementPort != 0 {
+			nutanixPrismElementPort = o.NutanixPrismElementPort
+		}
+		if nutanixPrismElementPort == 0 {
+			return nil, fmt.Errorf("must provide --%s or set %s env var", constants.CliNutanixPePortCMD, constants.NutanixPrismElementPortEnvVar)
+		}
+
+		nutanixSubnetUUIds := o.NutanixSubnetUUIDs
+		if len(nutanixSubnetUUIds) == 0 {
+			return nil, fmt.Errorf("must provide --%s", constants.CliNutanixSubnetUUIDCmd)
+		}
+
+		nutanixBuilder := &clusterresource.NutanixCloudBuilder{
+			PrismCentral: installernutanix.PrismCentral{
+				Endpoint: installernutanix.PrismEndpoint{
+					Address: nutanixPrismCentralEndpoint,
+					Port:    nutanixPrismCentralPort,
+				},
+				Username: nutanixUsername,
+				Password: nutanixPassword,
+			},
+			FailureDomains: []installernutanix.FailureDomain{
+				{
+					PrismElement: installernutanix.PrismElement{
+						Endpoint: installernutanix.PrismEndpoint{
+							Address: o.NutanixPrismElementAddress,
+							Port:    o.NutanixPrismElementPort,
+						},
+					},
+
+					SubnetUUIDs:       o.NutanixSubnetUUIDs,
+					StorageContainers: nil,
+					DataSourceImages:  nil,
+				},
+			},
+			APIVIP:     o.NutanixAPIVIP,
+			IngressVIP: o.NutanixIngressVIP,
+		}
+		builder.CloudBuilder = nutanixBuilder
 	}
 
 	if o.Internal {

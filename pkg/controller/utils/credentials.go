@@ -131,7 +131,7 @@ func validateVSphereCredentials(vcenter, username, password string, rootCAFiles 
 		return false, err
 	}
 
-	return err == nil, nil
+	return true, nil
 }
 
 // getClusterPlatform returns the platform of a given ClusterDeployment

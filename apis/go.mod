@@ -19,7 +19,7 @@ require (
 	github.com/openshift/api v0.0.0-20240919193929-2669d1ebc910
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.32.1
 	k8s.io/apimachinery v0.32.1

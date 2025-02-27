@@ -19,6 +19,7 @@ const (
 	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
+	PlatformNutanix        = "nutanix"
 
 	mergedPullSecretSuffix = "merged-pull-secret"
 
@@ -339,6 +340,18 @@ const (
 
 	// VSphereCertificatesDir is the directory containing VSphere certificate files.
 	VSphereCertificatesDir = "/vsphere-certificates"
+
+	// NutanixUsernameEnvVar is the environment variable specifying the Nutanix Prism Central username.
+	NutanixUsernameEnvVar = "NUTANIX_USERNAME"
+
+	// NutanixPasswordEnvVar is the environment variable specifying the Nutanix Prism Central password.
+	NutanixPasswordEnvVar = "NUTANIX_PASSWORD"
+
+	// NutanixPrismCentralEndpointEnvVar is the environment variable specifying the Nutanix Prism Central endpoint.
+	NutanixPrismCentralEndpointEnvVar = "NUTANIX_PC_ADDRESS"
+
+	// NutanixPrismCentralPortEnvVar is the environment variable specifying the Nutanix Prism Central port.
+	NutanixPrismCentralPortEnvVar = "NUTANIX_PC_PORT"
 
 	// VersionLabel is a label applied to ClusterDeployments to show the full version of the cluster
 	// per ClusterVersion.status.desired.version. This should differ from VersionMajorMinorPatchLabel

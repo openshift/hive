@@ -1,8 +1,8 @@
 module github.com/openshift/hive
 
-go 1.21
+go 1.23.0
 
-toolchain go1.21.6
+toolchain go1.23.4
 
 require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
@@ -61,7 +61,7 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mod v0.17.0
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/oauth2 v0.18.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/time v0.5.0
 	google.golang.org/api v0.167.0
 	gopkg.in/ini.v1 v1.67.0
@@ -344,7 +344,6 @@ require (
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
-	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240205150955-31a09d347014 // indirect
 	google.golang.org/grpc v1.62.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
@@ -377,8 +376,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.24.0 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/Antonboom/nilnil v0.1.7 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.6.0 // indirect

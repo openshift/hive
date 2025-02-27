@@ -32,13 +32,13 @@ require (
 	github.com/modern-go/reflect2 v1.0.2
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.35.1
-	github.com/openshift/api v0.0.0-20240919193929-2669d1ebc910
+	github.com/openshift/api v0.0.0-20250224185818-544b3ca4e8f5
 	github.com/openshift/build-machinery-go v0.0.0-20240419090851-af9c868bcf52
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519
 	github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551
 	github.com/openshift/generic-admission-server v1.14.1-0.20250203204636-21579bd45f95
 	github.com/openshift/hive/apis v0.0.0
-	github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721
+	github.com/openshift/installer v1.14.16-dcf8320c8c4e
 	github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
 	github.com/openshift/machine-api-operator v0.2.1-0.20240930121047-57b7917e6140
 	github.com/openshift/machine-api-provider-gcp v0.0.1-0.20231014045125-6096cc86f3ba

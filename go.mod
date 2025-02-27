@@ -1,8 +1,8 @@
 module github.com/openshift/hive
 
-go 1.22.0
+go 1.23.0
 
-toolchain go1.22.4
+toolchain go1.23.4
 
 require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
@@ -59,7 +59,7 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mod v0.20.0
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/oauth2 v0.21.0
+	golang.org/x/oauth2 v0.27.0
 	golang.org/x/time v0.5.0
 	google.golang.org/api v0.189.0
 	gopkg.in/ini.v1 v1.67.0

@@ -1824,7 +1824,7 @@
       }
     }
   },
-  "revision": "20240531",
+  "revision": "20250102",
   "rootUrl": "https://dns.googleapis.com/",
   "schemas": {
     "Change": {
@@ -2753,6 +2753,10 @@
           "description": "A mutable string of at most 1024 characters associated with this resource for the user's convenience. Has no effect on the policy's function.",
           "type": "string"
         },
+        "dns64Config": {
+          "$ref": "PolicyDns64Config",
+          "description": "Configurations related to DNS64 for this Policy."
+        },
         "enableInboundForwarding": {
           "description": "Allows networks bound to this policy to receive DNS queries sent by VMs or applications over VPN connections. When enabled, a virtual IP address is allocated from each of the subnetworks that are bound to this policy.",
           "type": "boolean"
@@ -2831,6 +2835,35 @@
       },
       "type": "object"
     },
+    "PolicyDns64Config": {
+      "description": "DNS64 policies",
+      "id": "PolicyDns64Config",
+      "properties": {
+        "kind": {
+          "default": "dns#policyDns64Config",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "PolicyDns64ConfigScope",
+          "description": "The scope to which DNS64 config will be applied to."
+        }
+      },
+      "type": "object"
+    },
+    "PolicyDns64ConfigScope": {
+      "id": "PolicyDns64ConfigScope",
+      "properties": {
+        "allQueries": {
+          "description": "Controls whether DNS64 is enabled globally at the network level.",
+          "type": "boolean"
+        },
+        "kind": {
+          "default": "dns#policyDns64ConfigScope",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "PolicyNetwork": {
       "id": "PolicyNetwork",
       "properties": {
@@ -2890,6 +2923,10 @@
         },
         "gkeClustersPerResponsePolicy": {
           "description": "Maximum allowed number of GKE clusters per response policy.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "internetHealthChecksPerManagedZone": {
           "format": "int32",
           "type": "integer"
         },
@@ -3009,6 +3046,10 @@
         "geo": {
           "$ref": "RRSetRoutingPolicyGeoPolicy"
         },
+        "healthCheck": {
+          "description": "The selfLink attribute of the HealthCheck resource to use for this RRSetRoutingPolicy. https://cloud.google.com/compute/docs/reference/rest/v1/healthChecks",
+          "type": "string"
+        },
         "kind": {
           "default": "dns#rRSetRoutingPolicy",
           "type": "string"
@@ -3080,6 +3121,13 @@
       "description": "HealthCheckTargets describes endpoints to health-check when responding to Routing Policy queries. Only the healthy endpoints will be included in the response.",
       "id": "RRSetRoutingPolicyHealthCheckTargets",
       "properties": {
+        "externalEndpoints": {
+          "description": "The Internet IP addresses to be health checked. The format matches the format of ResourceRecordSet.rrdata as defined in RFC 1035 (section 5) and RFC 1034 (section 3.6.1)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "internalLoadBalancers": {
           "description": "Configuration for internal load balancers to be health checked.",
           "items": {

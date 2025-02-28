@@ -31,6 +31,15 @@ const (
 	// CliNutanixPePortCMD defines the hiveutil variable name used to specify the Nutanix Prism Element port.
 	CliNutanixPePortCMD = "nutanix-pe-port"
 
+	// CliNutanixPeUUIDCMD defines the hiveutil variable name used to specify the Nutanix Prism Element UUID.
+	CliNutanixPeUUIDCMD = "nutanix-pe-uuid"
+
+	// CliNutanixPeNameCMD defines the hiveutil variable name used to specify the Nutanix Prism Element name.
+	CliNutanixPeNameCMD = "nutanix-pe-name"
+
+	// CliNutanixAzNameCMD defines the hiveutil variable name used to specify the Nutanix Availability Zone name.
+	CliNutanixAzNameCMD = "nutanix-az-name"
+
 	// CliNutanixApiVipCMD defines the hiveutil variable name used to specify the Virtual IP address for the api endpoint.
 	CliNutanixApiVipCMD = "nutanix-api-vip"
 

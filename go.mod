@@ -18,7 +18,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/davegardnerisme/deephash v0.0.0-20210406090112-6d072427d830
 	github.com/evanphx/json-patch v5.9.0+incompatible
-	github.com/ghodss/yaml v1.0.1-0.20190212211648-25d852aebe32
+	github.com/ghodss/yaml d8423dcdf344
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.7.0-rc.1

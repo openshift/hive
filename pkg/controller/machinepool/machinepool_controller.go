@@ -1274,19 +1274,6 @@ func (r *ReconcileMachinePool) createActuator(
 			},
 		}
 		return NewAWSActuator(r.Client, creds, cd.Spec.Platform.AWS.Region, pool, masterMachine, r.scheme, logger)
-	case cd.Spec.Platform.GCP != nil:
-		creds := &corev1.Secret{}
-		if err := r.Get(
-			context.TODO(),
-			types.NamespacedName{
-				Name:      cd.Spec.Platform.GCP.CredentialsSecretRef.Name,
-				Namespace: cd.Namespace,
-			},
-			creds,
-		); err != nil {
-			return nil, err
-		}
-		return NewGCPActuator(r.Client, creds, pool, masterMachine, remoteMachineSets, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.Azure != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -1300,12 +1287,19 @@ func (r *ReconcileMachinePool) createActuator(
 			return nil, err
 		}
 		return NewAzureActuator(creds, cd.Spec.Platform.Azure.CloudName.Name(), logger)
-	case cd.Spec.Platform.OpenStack != nil:
-		return NewOpenStackActuator(masterMachine, r.Client, logger)
-	case cd.Spec.Platform.VSphere != nil:
-		return NewVSphereActuator(masterMachine, r.scheme, logger)
-	case cd.Spec.Platform.Ovirt != nil:
-		return NewOvirtActuator(masterMachine, r.scheme, logger)
+	case cd.Spec.Platform.GCP != nil:
+		creds := &corev1.Secret{}
+		if err := r.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      cd.Spec.Platform.GCP.CredentialsSecretRef.Name,
+				Namespace: cd.Namespace,
+			},
+			creds,
+		); err != nil {
+			return nil, err
+		}
+		return NewGCPActuator(r.Client, creds, pool, masterMachine, remoteMachineSets, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.IBMCloud != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -1319,6 +1313,14 @@ func (r *ReconcileMachinePool) createActuator(
 			return nil, err
 		}
 		return NewIBMCloudActuator(creds, r.scheme, logger)
+	case cd.Spec.Platform.Nutanix != nil:
+		return NewNutanixActuator(masterMachine, r.Client, r.scheme, logger)
+	case cd.Spec.Platform.Ovirt != nil:
+		return NewOvirtActuator(masterMachine, r.scheme, logger)
+	case cd.Spec.Platform.OpenStack != nil:
+		return NewOpenStackActuator(masterMachine, r.Client, logger)
+	case cd.Spec.Platform.VSphere != nil:
+		return NewVSphereActuator(masterMachine, r.scheme, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}

@@ -29,6 +29,7 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/util/scheme"
@@ -719,6 +720,78 @@ func Test_pasteInPullSecret(t *testing.T) {
 			actual, err := pasteInPullSecret(icData, filepath.Join("testdata", "pull-secret.json"))
 			assert.NoError(t, err, "unexpected error pasting in pull secret")
 			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig with pasted pull secret")
+		})
+	}
+}
+
+func Test_nutanix_pasteInProviderCredentials(t *testing.T) {
+	testCases := []struct {
+		name         string
+		inputFile    string
+		expectsErr   bool
+		envOverride  bool
+		expectedFile string
+	}{
+		{
+			name:         "Valid input - credentials should be added",
+			inputFile:    "nutanix-install-config.yaml",
+			expectedFile: "nutanix-install-config-with-credentials.yaml",
+		},
+		{
+			name:         "Already has credentials - should not modify",
+			inputFile:    "nutanix-install-config-with-credentials.yaml",
+			expectedFile: "nutanix-install-config-with-credentials.yaml",
+		},
+		{
+			name:        "Missing environment variables - should fail",
+			inputFile:   "nutanix-install-config.yaml",
+			expectsErr:  true,
+			envOverride: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.envOverride {
+				os.Setenv(constants.NutanixPasswordEnvVar, "pc-nutanix-password")
+				os.Setenv(constants.NutanixUsernameEnvVar, "pc-nutanix-user")
+			} else {
+				os.Unsetenv(constants.NutanixPasswordEnvVar)
+				os.Unsetenv(constants.NutanixUsernameEnvVar)
+			}
+
+			icData, err := os.ReadFile(filepath.Join("testdata", tc.inputFile))
+			if !assert.NoError(t, err, "unexpected error reading input install-config.yaml") {
+				return
+			}
+
+			cd := hivev1.ClusterDeployment{
+				Spec: hivev1.ClusterDeploymentSpec{
+					Platform: hivev1.Platform{
+						Nutanix: &nutanix.Platform{
+							PrismCentral: nutanix.PrismEndpoint{
+								Address: "prism-central.nutanix.com",
+								Port:    9440,
+							},
+						},
+					},
+				},
+			}
+
+			actual, err := pasteInProviderCredentials(icData, &cd)
+			if tc.expectsErr {
+				assert.Error(t, err, "expected error but got none")
+				return
+			} else {
+				assert.NoError(t, err, "unexpected error pasting credentials")
+			}
+
+			expected, err := os.ReadFile(filepath.Join("testdata", tc.expectedFile))
+			if !assert.NoError(t, err, "unexpected error reading expected file") {
+				return
+			}
+
+			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig output")
 		})
 	}
 }

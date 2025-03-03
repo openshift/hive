@@ -11,7 +11,7 @@
   - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
 - [Deploying from Source](#deploying-from-source)
   - [Full Container Build](#full-container-build)
-  - [Fedora Development Container Build](#fedora-development-container-build)
+  - [Using public images](#using-public-images)
   - [Running Code Locally](#running-code-locally)
     - [hive-operator](#hive-operator)
   - [hive-controllers](#hive-controllers)
@@ -40,7 +40,7 @@
 
 - Git
 - Make
-- A recent Go distribution (>=1.21)
+- A recent Go distribution (>=1.23)
 
 ### External tools
 
@@ -157,21 +157,25 @@ NOTE: If you are running on Kubernetes or kind >= version 1.24, (not OpenShift),
 ./hack/create-service-account-secrets.sh
 ```
 
-### Fedora Development Container Build
+### Using public images
 
-This approach is much faster than a full container build as it uses a base OS image, and binaries compiled on your host OS and then added to the container. *At present this is best suited for Fedora 33+.*
+If you cannot login to registry.ci.openshift.org, a temporary solution is to use
+public images during build and test. At the time of writing, the following public images
+do the trick.
 
-The base image only needs to be built once locally, though you may wish to periodically update it:
-
-```bash
-make image-hive-fedora-dev-base
+```shell
+export EL8_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.23
+export EL9_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.23
+export BASE_IMAGE=registry.ci.openshift.org/origin/4.16:base
+# NOTE: This produces images which are not FIPS-compliant.
+export GO="CGO_ENABLED=0 go"
 ```
 
 You can now build the development image with the hiveutil binaries from your local system:
 
 ```bash
 export IMG="quay.io/{username}/hive:latest}"
-make build image-hive-fedora-dev docker-push deploy
+make build image-hive docker-push deploy
 oc delete pods -n hive --all
 ```
 

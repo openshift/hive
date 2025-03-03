@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -1374,36 +1373,11 @@ func getClusterVersion(cd *hivev1.ClusterDeployment) (string, error) {
 }
 
 func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool {
-	// Since 4.5, AWS, Azure, and GCP allow zero-sized minReplicas for autoscaling
-	if cd.Spec.Platform.AWS != nil || cd.Spec.Platform.Azure != nil || cd.Spec.Platform.GCP != nil {
+	// Zero-sized minReplicas for autoscaling are allowed since OCP:
+	// - 4.5 for AWS, Azure, and GCP
+	// - 4.7 for OpenStack
+	if cd.Spec.Platform.AWS != nil || cd.Spec.Platform.Azure != nil || cd.Spec.Platform.GCP != nil || cd.Spec.Platform.OpenStack != nil {
 		return true
-	}
-
-	// Since 4.7, OpenStack allows zero-sized minReplicas for autoscaling
-	if cd.Spec.Platform.OpenStack != nil {
-		version, ok := cd.Labels[constants.VersionLabel]
-		if !ok {
-			// can't determine whether to allow zero minReplicas
-			return false
-		}
-
-		currentVersion, err := semver.Make(version)
-		if err != nil {
-			// assume we can't set minReplicas to zero
-			return false
-		}
-
-		minimumOpenStackVersion, err := semver.Make("4.7.0")
-		if err != nil {
-			// something terrible has happened
-			return false
-		}
-
-		if currentVersion.GTE(minimumOpenStackVersion) {
-			return true
-		}
-
-		return false
 	}
 
 	return false

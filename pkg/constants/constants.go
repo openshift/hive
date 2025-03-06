@@ -525,6 +525,8 @@ const (
 	// hook that normally forbids modifying its Spec.Platform. By setting this annotation, you are taking responsibility
 	// for forcing rollout of such changes on the target cluster -- e.g. by deleting the Machines -- as the machine
 	// config operator will not do so.
+	// Not to be used (can result in thrashing) when boot image updates are in play, which may be opt-in or opt-out depending on
+	// the platform and OCP version. Please consult the documentation to verify.
 	OverrideMachinePoolPlatformAnnotation = "hive.openshift.io/override-machinepool-platform"
 
 	// MinimalInstallModeAnnotation, if set to "true" on a ClusterDeployment along with InstallerImageOverride, asks hive

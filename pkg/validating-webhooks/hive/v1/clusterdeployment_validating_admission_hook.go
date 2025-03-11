@@ -727,6 +727,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	case oldPoolRef != nil && newPoolRef != nil:
 		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.Namespace, oldPoolRef.Namespace, specPath.Child("clusterPoolRef", "namespace"))...)
 		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.PoolName, oldPoolRef.PoolName, specPath.Child("clusterPoolRef", "poolName"))...)
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.CustomizationRef, oldPoolRef.CustomizationRef, specPath.Child("clusterPoolRef", "customizationRef"))...)
 		if oldClaim := oldPoolRef.ClaimName; oldClaim != "" {
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.ClaimName, oldClaim, specPath.Child("clusterPoolRef", "claimName"))...)
 		}

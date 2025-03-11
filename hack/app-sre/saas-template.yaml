@@ -296,6 +296,8 @@ objects:
       kind: ClusterDeploymentCustomization
       listKind: ClusterDeploymentCustomizationList
       plural: clusterdeploymentcustomizations
+      shortNames:
+      - cdc
       singular: clusterdeploymentcustomization
     scope: Namespaced
     versions:
@@ -374,6 +376,81 @@ objects:
                     required:
                     - op
                     - path
+                    type: object
+                  type: array
+                installerManifestPatches:
+                  description: InstallerManifestPatches is a list of patches to be
+                    applied to installer-generated manifests.
+                  items:
+                    properties:
+                      manifestSelector:
+                        description: ManifestSelector identifies one or more manifests
+                          to patch
+                        properties:
+                          glob:
+                            description: 'Glob is a file glob (per https://pkg.go.dev/path/filepath#Glob)
+                              identifying one or more
+
+                              manifests. Paths should be relative to the installer''s
+                              working directory. Examples:
+
+                              - openshift/99_role-cloud-creds-secret-reader.yaml
+
+                              - openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+
+                              - */*secret*
+
+                              It is an error if a glob matches zero manifests.'
+                            type: string
+                        required:
+                        - glob
+                        type: object
+                      patches:
+                        description: Patches is a list of RFC6902 patches to apply
+                          to manifests identified by manifestSelector.
+                        items:
+                          description: PatchEntity represents a json patch (RFC 6902)
+                            to be applied
+                          properties:
+                            from:
+                              description: From is the json path to copy or move the
+                                value from
+                              type: string
+                            op:
+                              description: Op is the operation to perform.
+                              enum:
+                              - add
+                              - remove
+                              - replace
+                              - move
+                              - copy
+                              - test
+                              type: string
+                            path:
+                              description: Path is the json path to the value to be
+                                modified
+                              type: string
+                            value:
+                              description: 'Value is the *string* value to be used
+                                in the operation. For more complex values, use
+
+                                ValueJSON.'
+                              type: string
+                            valueJSON:
+                              description: 'ValueJSON is a string representing a JSON
+                                object to be used in the operation. As such,
+
+                                internal quotes must be escaped. If nonempty, Value
+                                is ignored.'
+                              type: string
+                          required:
+                          - op
+                          - path
+                          type: object
+                        type: array
+                    required:
+                    - manifestSelector
+                    - patches
                     type: object
                   type: array
               type: object
@@ -1762,6 +1839,35 @@ objects:
 
                     May be unset in the case of adopted clusters.'
                   properties:
+                    customizationRef:
+                      description: 'CustomizationRef is a reference to a ClusterDeploymentCustomization
+                        containing
+
+                        InstallerManifestPatches to be applied to the manifests generated
+                        by openshift-install prior
+
+                        to starting the installation. (InstallConfigPatches will be
+                        ignored -- those changes should
+
+                        be made directly to the install-config.yaml referenced by
+                        InstallConfigSecretRef.)'
+                      properties:
+                        name:
+                          default: ''
+                          description: 'Name of the referent.
+
+                            This field is effectively required, but due to backwards
+                            compatibility is
+
+                            allowed to be empty. Instances of this type with an empty
+                            value here are
+
+                            almost certainly wrong.
+
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
                     imageSetRef:
                       description: 'ImageSetRef is a reference to a ClusterImageSet.
                         If a value is specified for ReleaseImage,
@@ -2968,6 +3074,34 @@ objects:
                       pattern: "^([0-9]+(\\.[0-9]+)?(ns|us|\xB5s|ms|s|m|h))+$"
                       type: string
                   type: object
+                customizationRef:
+                  description: 'CustomizationRef refers to a ClusterDeploymentCustomization
+                    object whose InstallerManifestPatches should
+
+                    be applied to *all* ClusterDeployments created by this ClusterPool.
+                    This is in addition to any CDC from
+
+                    Inventory. The CDC must exist in the ClusterPool''s namespace.
+                    It will be copied to the namespace of each
+
+                    ClusterDeployment generated by the ClusterPool.'
+                  properties:
+                    name:
+                      default: ''
+                      description: 'Name of the referent.
+
+                        This field is effectively required, but due to backwards compatibility
+                        is
+
+                        allowed to be empty. Instances of this type with an empty
+                        value here are
+
+                        almost certainly wrong.
+
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
                 hibernateAfter:
                   description: 'HibernateAfter will be applied to new ClusterDeployments
                     created for the pool. HibernateAfter will transition

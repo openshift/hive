@@ -640,12 +640,14 @@ type cdcCollection struct {
 	byCDCName map[string]*hivev1.ClusterDeploymentCustomization
 	// Namespace are all the CDC in the namespace mapped by name
 	namespace map[string]*hivev1.ClusterDeploymentCustomization
+	// nonInventory is the (single) CDC referenced by ClusterPool.Spec.CustomizationRef, if any.
+	nonInventory *hivev1.ClusterDeploymentCustomization
 }
 
 // getAllCustomizationsForPool is the constructor for a cdcCollection for all of the
 // ClusterDeploymentCustomizations that are related to specified pool.
 func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logger log.FieldLogger) (*cdcCollection, error) {
-	if pool.Spec.Inventory == nil {
+	if pool.Spec.Inventory == nil && (pool.Spec.CustomizationRef == nil || pool.Spec.CustomizationRef.Name == "") {
 		return &cdcCollection{}, nil
 	}
 	cdcList := &hivev1.ClusterDeploymentCustomizationList{}
@@ -657,17 +659,26 @@ func getAllCustomizationsForPool(c client.Client, pool *hivev1.ClusterPool, logg
 	}
 
 	cdcCol := cdcCollection{
-		unassigned: make([]*hivev1.ClusterDeploymentCustomization, 0),
-		missing:    make([]string, 0),
-		reserved:   make(map[string]*hivev1.ClusterDeploymentCustomization),
-		cloud:      make(map[string]*hivev1.ClusterDeploymentCustomization),
-		syntax:     make(map[string]*hivev1.ClusterDeploymentCustomization),
-		byCDCName:  make(map[string]*hivev1.ClusterDeploymentCustomization),
-		namespace:  make(map[string]*hivev1.ClusterDeploymentCustomization),
+		unassigned:   make([]*hivev1.ClusterDeploymentCustomization, 0),
+		missing:      make([]string, 0),
+		reserved:     make(map[string]*hivev1.ClusterDeploymentCustomization),
+		cloud:        make(map[string]*hivev1.ClusterDeploymentCustomization),
+		syntax:       make(map[string]*hivev1.ClusterDeploymentCustomization),
+		byCDCName:    make(map[string]*hivev1.ClusterDeploymentCustomization),
+		namespace:    make(map[string]*hivev1.ClusterDeploymentCustomization),
+		nonInventory: nil,
 	}
 
 	for i, cdc := range cdcList.Items {
 		cdcCol.namespace[cdc.Name] = &cdcList.Items[i]
+	}
+
+	// Validate the non-inventory CDC, if any.
+	if pool.Spec.CustomizationRef != nil && pool.Spec.CustomizationRef.Name != "" {
+		niName := pool.Spec.CustomizationRef.Name
+		if niCDC, ok := cdcCol.namespace[niName]; ok {
+			cdcCol.nonInventory = niCDC
+		}
 	}
 
 	for _, item := range pool.Spec.Inventory {

@@ -121,7 +121,7 @@ require (
 	github.com/yagipy/maintidx v1.0.0 // indirect
 	github.com/ykadowak/zerologlint v0.1.5 // indirect
 	gitlab.com/bosi/decorder v0.4.2 // indirect
-	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	sigs.k8s.io/cluster-api v1.8.2 // indirect
 	sigs.k8s.io/cluster-api-provider-aws/v2 v2.6.1 // indirect
 	sigs.k8s.io/cluster-api-provider-gcp v1.7.1-0.20240724153512-c3b8b533143c // indirect

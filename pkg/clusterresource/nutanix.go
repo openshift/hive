@@ -7,7 +7,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	"github.com/openshift/hive/pkg/constants"
-	"github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/controller/utils/nutanixutils"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installernutanix "github.com/openshift/installer/pkg/types/nutanix"
 	corev1 "k8s.io/api/core/v1"
@@ -69,7 +69,7 @@ func (p *NutanixCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object 
 }
 
 func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
-	failureDomains, _, _ := utils.ConvertInstallerFailureDomains(p.FailureDomains)
+	failureDomains, _, _ := nutanixutils.ConvertInstallerFailureDomains(p.FailureDomains)
 
 	return hivev1.Platform{
 		Nutanix: &hivev1nutanix.Platform{
@@ -98,7 +98,7 @@ func (p *NutanixCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.Mach
 }
 
 func (p *NutanixCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installertypes.InstallConfig) {
-	prismElements, subnetUUIDs := utils.ExtractInstallerResources(p.FailureDomains)
+	prismElements, subnetUUIDs := nutanixutils.ExtractInstallerResources(p.FailureDomains)
 
 	ic.Platform = installertypes.Platform{
 		Nutanix: &installernutanix.Platform{

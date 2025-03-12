@@ -1,8 +1,8 @@
-package utils
+package nutanixutils
 
 import (
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	nutanixinstaller "github.com/openshift/installer/pkg/types/nutanix"
@@ -36,23 +36,22 @@ func convertFailureDomains[SourceFD any, TargetFD any, TargetPE any, SRR any](
 	sourceFailureDomains []SourceFD,
 	convertPrismElement func(SourceFD) (TargetPE, error),
 	convertStorageResource func(SourceFD) ([]SRR, []SRR),
-	convertSubnetUUIDs func(SourceFD) []string,
+	convertSubnetUUIDs func(any) []string,
 	convertFailureDomain func(SourceFD, TargetPE, []SRR, []SRR) TargetFD,
 ) ([]TargetFD, []TargetPE, []string) {
 
 	prismElements := make([]TargetPE, 0)
-	subnetUUIDs := make([]string, 0)
+	subnetUUIDSet := sets.Set[string]{}
 	failureDomains := make([]TargetFD, 0)
 	prismElementMap := make(map[string]TargetPE)
 
 	for _, failureDomain := range sourceFailureDomains {
 		storageContainers, dataSourceImages := convertStorageResource(failureDomain)
-		currentSubnetUUIDs := convertSubnetUUIDs(failureDomain)
 
-		// Merge and deduplicate subnet UUIDs
-		subnetUUIDsMerged := append(subnetUUIDs, currentSubnetUUIDs...)
-		slices.Sort(subnetUUIDsMerged)
-		subnetUUIDs = slices.Compact(subnetUUIDsMerged)
+		// Merge subnet UUIDs using sets for efficient deduplication
+		for _, uuid := range convertSubnetUUIDs(failureDomain) {
+			subnetUUIDSet.Insert(uuid)
+		}
 
 		// Ensure PrismElements are unique by UUID
 		prismElement, err := convertPrismElement(failureDomain)
@@ -66,6 +65,9 @@ func convertFailureDomains[SourceFD any, TargetFD any, TargetPE any, SRR any](
 		// Append the converted failure domain
 		failureDomains = append(failureDomains, convertFailureDomain(failureDomain, prismElement, storageContainers, dataSourceImages))
 	}
+
+	// Convert the set to a sorted list
+	subnetUUIDs := subnetUUIDSet.UnsortedList() // Alternative: Use `subnetUUIDSet.List()` if sorting is needed
 
 	return failureDomains, prismElements, subnetUUIDs
 }
@@ -89,7 +91,7 @@ func ConvertHiveFailureDomains(hiveFailureDomains []nutanix.FailureDomain) ([]nu
 		hiveFailureDomains,
 		convertHiveToInstallerPrismElement,
 		convertHiveToInstallerStorageResource,
-		getHiveSubnetUUIDs,
+		getSubnetUUIDs,
 		convertHiveToInstallerFailureDomain,
 	)
 }
@@ -113,7 +115,7 @@ func ConvertInstallerFailureDomains(installerFailureDomains []nutanixinstaller.F
 		installerFailureDomains,
 		convertInstallerToHivePrismElement,
 		convertInstallerToHiveStorageResource,
-		getInstallerSubnetUUIDs,
+		getSubnetUUIDs,
 		convertInstallerToHiveFailureDomain,
 	)
 }
@@ -123,7 +125,7 @@ func ConvertInstallerFailureDomains(installerFailureDomains []nutanixinstaller.F
 //   - nutanixinstaller.PrismElement: The converted Installer PrismElement.
 func convertHiveToInstallerPrismElement(failureDomain nutanix.FailureDomain) (nutanixinstaller.PrismElement, error) {
 	if failureDomain.PrismElement.UUID == "" {
-		return nutanixinstaller.PrismElement{}, errors.New("no prism element found for failure domain " + failureDomain.Name)
+		return nutanixinstaller.PrismElement{}, errors.New("no prism element found for hive failure domain " + failureDomain.Name)
 	}
 
 	return nutanixinstaller.PrismElement{
@@ -141,7 +143,7 @@ func convertHiveToInstallerPrismElement(failureDomain nutanix.FailureDomain) (nu
 //   - nutanix.PrismElement: The converted Hive PrismElement.
 func convertInstallerToHivePrismElement(failureDomain nutanixinstaller.FailureDomain) (nutanix.PrismElement, error) {
 	if failureDomain.PrismElement.UUID == "" {
-		return nutanix.PrismElement{}, errors.New("no prism element found for failure domain " + failureDomain.Name)
+		return nutanix.PrismElement{}, errors.New("no prism element found for installer failure domain " + failureDomain.Name)
 	}
 
 	return nutanix.PrismElement{
@@ -208,25 +210,25 @@ func convertInstallerToHiveStorageResource(failureDomain nutanixinstaller.Failur
 	return storageContainers, dataSourceImages
 }
 
-// getHiveSubnetUUIDs extracts Subnet UUIDs from a Hive FailureDomain.
+// getSubnetUUIDs extracts Subnet UUIDs from a FailureDomain.
 // Returns:
-//   - []string: A slice of Subnet UUID strings from the Hive failure domain.
-func getHiveSubnetUUIDs(failureDomain nutanix.FailureDomain) []string {
-	return failureDomain.SubnetUUIDs
+//   - []string: A slice of Subnet UUID strings from the given failure domain.
+func getSubnetUUIDs(failureDomain any) []string {
+	switch v := failureDomain.(type) {
+	case nutanix.FailureDomain:
+		return v.SubnetUUIDs
+	case nutanixinstaller.FailureDomain:
+		return v.SubnetUUIDs
+	default:
+		return nil
+	}
 }
 
-// getInstallerSubnetUUIDs extracts Subnet UUIDs from an Installer FailureDomain.
-// Returns:
-//   - []string: A slice of Subnet UUID strings from the Installer failure domain.
-func getInstallerSubnetUUIDs(failureDomain nutanixinstaller.FailureDomain) []string {
-	return failureDomain.SubnetUUIDs
-}
-
-// getPrismElementUUID is a generic function to extract the PrismElement UUID from a FailureDomain.
+// getPrismElementUUID extracts the PrismElement UUID from a FailureDomain.
 // Returns:
 //   - string: The UUID of the PrismElement, or an empty string if the type is not recognized.
-func getPrismElementUUID[S any](failureDomain S) string {
-	switch v := any(failureDomain).(type) {
+func getPrismElementUUID(failureDomain any) string {
+	switch v := failureDomain.(type) {
 	case nutanix.FailureDomain:
 		return v.PrismElement.UUID
 	case nutanixinstaller.FailureDomain:
@@ -272,102 +274,32 @@ func convertInstallerToHiveFailureDomain(
 	}
 }
 
-// extractResources is a generic function to extract PrismElements and SubnetUUIDs from FailureDomains of the same type.
-//
-// This function takes a slice of failure domains and uses the generic convertFailureDomains
-// function with identity converters to extract and deduplicate PrismElements and SubnetUUIDs.
-// Since we're not actually converting between types, the source and target types are the same.
-//
-// Type parameters:
-//   - FD: The type of the failure domain.
-//   - PE: The type of the PrismElement.
-//   - SR: The type of the StorageResourceReference.
+// ExtractInstallerResources extracts unique PrismElements and Subnet UUIDs from a slice of Installer failure domains.
+// This function iterates through the provided failure domains, collecting unique PrismElements
+// and Subnet UUIDs. It ensures deduplication using a set for Subnet UUIDs.
 //
 // Parameters:
-//   - failureDomains: A slice of failure domains to extract resources from.
-//   - extractPrismElement: A function to extract the PrismElement from a failure domain.
-//   - getSubnetUUIDs: A function to extract subnet UUIDs from a failure domain.
+//   - installerFailureDomains: A slice of Installer failure domains (nutanixinstaller.FailureDomain).
 //
 // Returns:
-//   - []PE: A slice of unique PrismElements from all failure domains.
-//   - []string: A slice of unique subnet UUIDs from all failure domains.
-func extractResources[FD any, PE any, SR any](
-	failureDomains []FD,
-	extractPrismElement func(FD) (PE, error),
-	getSubnetUUIDs func(FD) []string,
-) ([]PE, []string) {
-	// Identity conversion for StorageResources - we don't need them for extraction
-	identityStorageResource := func(fd FD) ([]SR, []SR) {
-		return []SR{}, []SR{}
-	}
-
-	// Identity conversion for FailureDomain - just return the same domain
-	identityFailureDomain := func(fd FD, pe PE, sc []SR, di []SR) FD {
-		return fd
-	}
-
-	// Use convertFailureDomains with identity converters
-	_, prismElements, subnetUUIDs := convertFailureDomains[FD, FD, PE, SR](
-		failureDomains,
-		extractPrismElement,
-		identityStorageResource,
-		getSubnetUUIDs,
-		identityFailureDomain,
-	)
-
-	return prismElements, subnetUUIDs
-}
-
-// ExtractHiveResources extracts unique PrismElements and SubnetUUIDs from Hive failure domains.
-//
-// This function specializes the generic extractResources function for Hive failure domains.
-// It reuses the existing extraction functions for PrismElements and SubnetUUIDs.
-//
-// Parameters:
-//   - hiveFailureDomains: A slice of Hive failure domains (nutanix.FailureDomain) to extract resources from.
-//
-// Returns:
-//   - []nutanix.PrismElement: A slice of unique PrismElements from all Hive failure domains.
-//   - []string: A slice of unique subnet UUIDs from all Hive failure domains.
-func ExtractHiveResources(hiveFailureDomains []nutanix.FailureDomain) ([]nutanix.PrismElement, []string) {
-	// Create an adapter function that converts a Hive failure domain to a Hive PrismElement
-	extractHivePrismElement := func(fd nutanix.FailureDomain) (nutanix.PrismElement, error) {
-		if fd.PrismElement.UUID == "" {
-			return nutanix.PrismElement{}, errors.New("no prism element found for failure domain " + fd.Name)
-		}
-		return fd.PrismElement, nil
-	}
-
-	return extractResources[nutanix.FailureDomain, nutanix.PrismElement, nutanix.StorageResourceReference](
-		hiveFailureDomains,
-		extractHivePrismElement,
-		getHiveSubnetUUIDs,
-	)
-}
-
-// ExtractInstallerResources extracts unique PrismElements and SubnetUUIDs from Installer failure domains.
-//
-// This function specializes the generic extractResources function for Installer failure domains.
-// It reuses the existing extraction functions for PrismElements and SubnetUUIDs.
-//
-// Parameters:
-//   - installerFailureDomains: A slice of Installer failure domains (nutanixinstaller.FailureDomain) to extract resources from.
-//
-// Returns:
-//   - []nutanixinstaller.PrismElement: A slice of unique PrismElements from all Installer failure domains.
-//   - []string: A slice of unique subnet UUIDs from all Installer failure domains.
+//   - []nutanixinstaller.PrismElement: A deduplicated list of PrismElements from all Installer failure domains.
+//   - []string: A deduplicated list of Subnet UUIDs from all Installer failure domains.
 func ExtractInstallerResources(installerFailureDomains []nutanixinstaller.FailureDomain) ([]nutanixinstaller.PrismElement, []string) {
-	// Create an adapter function that extracts an Installer PrismElement from an Installer failure domain
-	extractInstallerPrismElement := func(fd nutanixinstaller.FailureDomain) (nutanixinstaller.PrismElement, error) {
-		if fd.PrismElement.UUID == "" {
-			return nutanixinstaller.PrismElement{}, errors.New("no prism element found for failure domain " + fd.Name)
+	prismElements := []nutanixinstaller.PrismElement{}
+	subnetUUIDSet := sets.Set[string]{}
+
+	for _, fd := range installerFailureDomains {
+		// Extract and deduplicate PrismElements
+		if fd.PrismElement.UUID != "" {
+			prismElements = append(prismElements, fd.PrismElement)
 		}
-		return fd.PrismElement, nil
+
+		// Extract and deduplicate Subnet UUIDs
+		for _, uuid := range fd.SubnetUUIDs {
+			subnetUUIDSet.Insert(uuid)
+		}
 	}
 
-	return extractResources[nutanixinstaller.FailureDomain, nutanixinstaller.PrismElement, nutanixinstaller.StorageResourceReference](
-		installerFailureDomains,
-		extractInstallerPrismElement,
-		getInstallerSubnetUUIDs,
-	)
+	// Convert subnet UUIDs from set to slice
+	return prismElements, subnetUUIDSet.UnsortedList()
 }

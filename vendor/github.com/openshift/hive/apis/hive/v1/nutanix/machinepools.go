@@ -62,7 +62,8 @@ type MachinePool struct {
 	DataDisks []machinev1.NutanixVMDisk `json:"dataDisks,omitempty"`
 
 	// FailureDomains optionally configures a list of failure domain names
-	// that will be applied to the MachinePool
+	// that will be applied to the MachinePool. These names must correspond
+	// to failure domains configured in `CD.Spec.Platform.Nutanix`.
 	// +listType=set
 	// +optional
 	FailureDomains []string `json:"failureDomains,omitempty"`

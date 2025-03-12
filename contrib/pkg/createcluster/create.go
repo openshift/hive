@@ -383,16 +383,16 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
 
 	// Nutanix
-	flags.StringVar(&opt.NutanixPrismCentralEndpoint, constants.CliNutanixPcAddressCMD, "", "Domain name or IP address of the Nutanix Prism Central endpoint")
-	flags.Int32Var(&opt.NutanixPrismCentralPort, constants.CliNutanixPcPortCMD, 9440, "Port of the Nutanix Prism Central endpoint")
-	flags.StringVar(&opt.NutanixPrismElementAddress, constants.CliNutanixPeAddressCMD, "", "Domain name or IP address of the Nutanix Prism Element endpoint")
-	flags.StringVar(&opt.NutanixPrismElementName, constants.CliNutanixPeNameCMD, "", "Name of the Nutanix Prism Element endpoint")
-	flags.Int32Var(&opt.NutanixPrismElementPort, constants.CliNutanixPePortCMD, 9440, "Port of the Nutanix Prism Element endpoint")
-	flags.StringVar(&opt.NutanixPrismElementUUID, constants.CliNutanixPeUUIDCMD, "", "UUID of the Nutanix Prism Element endpoint")
-	flags.StringVar(&opt.NutanixAPIVIP, constants.CliNutanixApiVipCMD, "", "Virtual IP address for the api endpoint")
-	flags.StringVar(&opt.NutanixIngressVIP, constants.CliNutanixIngressVipCMD, "", "Virtual IP address for ingress application routing")
-	flags.StringVar(&opt.NutanixAzName, constants.CliNutanixAzNameCMD, "", "Name of the Prism Element Availability Zone")
-	flags.StringSliceVar(&opt.NutanixSubnetUUIDs, constants.CliNutanixSubnetUUIDCmd, []string{}, "List of network subnets to be used by the cluster")
+	flags.StringVar(&opt.NutanixPrismCentralEndpoint, constants.CliNutanixPcAddressOpt, "", "Domain name or IP address of the Nutanix Prism Central endpoint")
+	flags.Int32Var(&opt.NutanixPrismCentralPort, constants.CliNutanixPcPortOpt, 9440, "Port of the Nutanix Prism Central endpoint")
+	flags.StringVar(&opt.NutanixPrismElementAddress, constants.CliNutanixPeAddressOpt, "", "Domain name or IP address of the Nutanix Prism Element endpoint")
+	flags.StringVar(&opt.NutanixPrismElementName, constants.CliNutanixPeNameOpt, "", "Name of the Nutanix Prism Element endpoint")
+	flags.Int32Var(&opt.NutanixPrismElementPort, constants.CliNutanixPePortOpt, 9440, "Port of the Nutanix Prism Element endpoint")
+	flags.StringVar(&opt.NutanixPrismElementUUID, constants.CliNutanixPeUUIDOpt, "", "UUID of the Nutanix Prism Element endpoint")
+	flags.StringVar(&opt.NutanixAPIVIP, constants.CliNutanixApiVipOpt, "", "Virtual IP address for the api endpoint")
+	flags.StringVar(&opt.NutanixIngressVIP, constants.CliNutanixIngressVipOpt, "", "Virtual IP address for ingress application routing")
+	flags.StringVar(&opt.NutanixAzName, constants.CliNutanixAzNameOpt, "", "Name of the Prism Element Availability Zone")
+	flags.StringSliceVar(&opt.NutanixSubnetUUIDs, constants.CliNutanixSubnetUUIDOpt, []string{}, "List of network subnets to be used by the cluster")
 
 	// oVirt flags
 	flags.StringVar(&opt.OvirtClusterID, "ovirt-cluster-id", "", "The oVirt cluster id (uuid) under which all VMs will run")

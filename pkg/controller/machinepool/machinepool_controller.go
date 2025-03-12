@@ -1313,7 +1313,7 @@ func (r *ReconcileMachinePool) createActuator(
 		}
 		return NewIBMCloudActuator(creds, r.scheme, logger)
 	case cd.Spec.Platform.Nutanix != nil:
-		return NewNutanixActuator(masterMachine, r.Client, r.scheme, logger)
+		return NewNutanixActuator(masterMachine)
 	case cd.Spec.Platform.Ovirt != nil:
 		return NewOvirtActuator(masterMachine, r.scheme, logger)
 	case cd.Spec.Platform.OpenStack != nil:

@@ -6,12 +6,11 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/controller/utils/nutanixutils"
 	installnutanix "github.com/openshift/installer/pkg/asset/machines/nutanix"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
@@ -20,20 +19,14 @@ import (
 // NutanixActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster
 type NutanixActuator struct {
-	client        client.Client
-	logger        log.FieldLogger
-	scheme        *runtime.Scheme
 	masterMachine *machineapi.Machine
 }
 
 var _ Actuator = &NutanixActuator{}
 
 // NewNutanixActuator is the constructor for building a NutanixActuator
-func NewNutanixActuator(masterMachine *machineapi.Machine, client client.Client, scheme *runtime.Scheme, logger log.FieldLogger) (*NutanixActuator, error) {
+func NewNutanixActuator(masterMachine *machineapi.Machine) (*NutanixActuator, error) {
 	actuator := &NutanixActuator{
-		client:        client,
-		scheme:        scheme,
-		logger:        logger,
 		masterMachine: masterMachine,
 	}
 	return actuator, nil
@@ -142,10 +135,8 @@ func (a *NutanixActuator) getNutanixPlatformInstallConfig(cd *hivev1.ClusterDepl
 		Password: "",
 	}
 
-	failureDomains, prismElements, subnetUUIDs := controllerutils.ConvertHiveFailureDomains(cd.Spec.Platform.Nutanix.FailureDomains)
-	platform.SubnetUUIDs = subnetUUIDs
-	platform.PrismElements = prismElements
-	platform.FailureDomains = failureDomains
+	platform.FailureDomains, platform.PrismElements, platform.SubnetUUIDs = nutanixutils.ConvertHiveFailureDomains(
+		cd.Spec.Platform.Nutanix.FailureDomains)
 
 	return &platform
 }
@@ -155,59 +146,29 @@ func (a *NutanixActuator) getNutanixDataDisksStorageConfig(dataDisk machinev1.Nu
 	if dataDisk.StorageConfig == nil {
 		return nil, nil
 	}
+
 	storageConfig := &installertypesnutanix.StorageConfig{
 		DiskMode: dataDisk.StorageConfig.DiskMode,
 	}
 
-	if dataDisk.StorageConfig.StorageContainer == nil {
+	if dataDisk.StorageConfig.StorageContainer == nil || dataDisk.StorageConfig.StorageContainer.UUID == nil {
 		return storageConfig, nil
 	}
 
-	if dataDisk.StorageConfig.StorageContainer.Type == machinev1.NutanixIdentifierUUID {
-		storageConfig.StorageContainer.UUID = *dataDisk.StorageConfig.StorageContainer.UUID
-	}
-
-	switch dataDisk.StorageConfig.StorageContainer.Type {
-	case machinev1.NutanixIdentifierUUID:
-		if dataDisk.StorageConfig.StorageContainer.UUID == nil {
-			return nil, fmt.Errorf("no UUID found for data source type %s", dataDisk.StorageConfig.StorageContainer.Type)
-		}
-		storageConfig.StorageContainer.UUID = *dataDisk.StorageConfig.StorageContainer.UUID
-
-	default:
-		return nil, fmt.Errorf("unknown storage type %s", dataDisk.StorageConfig.StorageContainer.Type)
-	}
-
+	storageConfig.StorageContainer.UUID = *dataDisk.StorageConfig.StorageContainer.UUID
 	return storageConfig, nil
 }
 
 // getNutanixDataDisksDataSource extracts the data source reference for a Nutanix VM data disk.
 func (a *NutanixActuator) getNutanixDataDisksDataSource(dataDisk machinev1.NutanixVMDisk) (*installertypesnutanix.StorageResourceReference, error) {
-	if dataDisk.DataSource == nil {
-		return nil, nil
+	if dataDisk.DataSource == nil || dataDisk.DataSource.UUID == nil {
+		return nil, fmt.Errorf("data source must specify a UUID")
 	}
 
-	dataSource := &installertypesnutanix.StorageResourceReference{}
-	switch dataDisk.DataSource.Type {
-	case machinev1.NutanixIdentifierUUID:
-		if dataDisk.DataSource.UUID == nil {
-			return nil, fmt.Errorf("no UUID found for data source type %s", dataDisk.DataSource.Type)
-		}
-		dataSource.UUID = *dataDisk.DataSource.UUID
-
-	case machinev1.NutanixIdentifierName:
-		if dataDisk.DataSource.Name == nil {
-			return nil, fmt.Errorf("no name found for data source type %s", dataDisk.DataSource.Type)
-		}
-		dataSource.Name = *dataDisk.DataSource.Name
-
-	default:
-		return nil, fmt.Errorf("unknown data type %s", dataDisk.DataSource.Type)
-	}
-
-	// dataSource.ReferenceName = ???
-	// TODO what to do with dataSource.ReferenceName?
-	return dataSource, nil
+	// Pass through UUID blindly, as MachineSets() only cares about UUID.
+	return &installertypesnutanix.StorageResourceReference{
+		UUID: *dataDisk.DataSource.UUID,
+	}, nil
 }
 
 // getNutanixDataDisks retrieves and constructs a list of Nutanix data disks from a MachinePool specification.

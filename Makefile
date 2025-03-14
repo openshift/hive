@@ -1,6 +1,11 @@
 .PHONY: all
 all: vendor update test build
 
+# These images need to be synced with the default values in the Dockerfile.
+EL8_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+EL9_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+BASE_IMAGE ?= registry.ci.openshift.org/ocp/4.19:base-rhel9
+
 # In openshift ci (Prow), we need to set $HOME to a writable directory else tests will fail
 # because they don't have permissions to create /.local or /.cache directories
 # as $HOME is set to "/" by default.
@@ -34,6 +39,7 @@ LOG_LEVEL ?= debug
 # Image URL to use all building/pushing image targets
 IMG ?= hive-controller:latest
 
+GO ?=go
 GO_PACKAGES :=./...
 GO_BUILD_PACKAGES :=./cmd/...
 GO_BUILD_BINDIR :=bin
@@ -71,10 +77,8 @@ SOURCE_GIT_TAG := $(shell export HOME=$(HOME); python3 -m ensurepip >&2; python3
 BINDATA_INPUTS :=./config/clustersync/... ./config/hiveadmission/... ./config/controllers/... ./config/rbac/... ./config/configmaps/...
 $(call add-bindata,operator,$(BINDATA_INPUTS),,assets,pkg/operator/assets/bindata.go)
 
+IMAGE_BUILD_EXTRA_FLAGS := --build-arg BASE_IMAGE=$(BASE_IMAGE) --build-arg EL8_BUILD_IMAGE=$(EL8_BUILD_IMAGE) --build-arg EL9_BUILD_IMAGE=$(EL9_BUILD_IMAGE)
 $(call build-image,hive,$(IMG),./Dockerfile,.)
-$(call build-image,hive-fedora-dev-base,hive-fedora-dev-base,./build/fedora-dev/Dockerfile.devbase,.)
-$(call build-image,hive-fedora-dev,$(IMG),./build/fedora-dev/Dockerfile.dev,.)
-$(call build-image,hive-build,"hive-build:latest",./build/build-image/Dockerfile,.)
 
 clean:
 	rm -rf $(GO_BUILD_BINDIR)
@@ -294,10 +298,6 @@ docker-build:
 docker-push:
 	$(DOCKER_CMD) push ${IMG}
 
-# Build and push the dev image
-.PHONY: docker-dev-push
-docker-dev-push: build image-hive-fedora-dev docker-push
-
 # Build the dev image using builah
 .PHONY: buildah-dev-build
 buildah-dev-build:
@@ -306,6 +306,14 @@ buildah-dev-build:
 .PHONY: podman-dev-build
 podman-dev-build:
 	podman build --tag ${IMG} -f ./Dockerfile .
+
+podman-operatorhub-build:
+	podman build --tag ${IMG} ${GOCACHE_VOL_ARG} \
+		--build-arg=BASE_IMAGE=quay.io/centos/centos:stream9 \
+		--build-arg=BUILD_IMAGE_CUSTOMIZATION=./hack/ubi-build-deps.sh \
+		--build-arg=EL8_BUILD_IMAGE=registry.access.redhat.com/ubi8/ubi:8.10 \
+		--build-arg=EL9_BUILD_IMAGE=registry.access.redhat.com/ubi9:9.5 \
+		-f ./Dockerfile .
 
 # Build and push the dev image with buildah
 .PHONY: buildah-dev-push

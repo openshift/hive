@@ -1,0 +1,51 @@
+package constants
+
+const (
+	// NutanixUsernameEnvVar is the environment variable specifying the Nutanix Prism Central username.
+	NutanixUsernameEnvVar = "NUTANIX_USERNAME"
+
+	// NutanixPasswordEnvVar is the environment variable specifying the Nutanix Prism Central password.
+	NutanixPasswordEnvVar = "NUTANIX_PASSWORD"
+
+	// NutanixPrismCentralEndpointEnvVar is the environment variable specifying the Nutanix Prism Central endpoint.
+	NutanixPrismCentralEndpointEnvVar = "NUTANIX_PC_ADDRESS"
+
+	// NutanixPrismCentralPortEnvVar is the environment variable specifying the Nutanix Prism Central port.
+	NutanixPrismCentralPortEnvVar = "NUTANIX_PC_PORT"
+
+	// NutanixPrismElementEndpointEnvVar is the environment variable specifying the Nutanix Prism Element endpoint.
+	NutanixPrismElementEndpointEnvVar = "NUTANIX_PE_ADDRESS"
+
+	// NutanixPrismElementPortEnvVar is the environment variable specifying the Nutanix Prism Element port.
+	NutanixPrismElementPortEnvVar = "NUTANIX_PE_PORT"
+
+	// CliNutanixPcAddressOpt defines the hiveutil variable name used to specify the Nutanix Prism Central address.
+	CliNutanixPcAddressOpt = "nutanix-pc-address"
+
+	// CliNutanixPcPortOpt defines the hiveutil variable name used to specify the Nutanix Prism Central port.
+	CliNutanixPcPortOpt = "nutanix-pc-port"
+
+	// CliNutanixPeAddressOpt defines the hiveutil variable name used to specify the Nutanix Prism Element address.
+	CliNutanixPeAddressOpt = "nutanix-pe-address"
+
+	// CliNutanixPePortOpt defines the hiveutil variable name used to specify the Nutanix Prism Element port.
+	CliNutanixPePortOpt = "nutanix-pe-port"
+
+	// CliNutanixPeUUIDOpt defines the hiveutil variable name used to specify the Nutanix Prism Element UUID.
+	CliNutanixPeUUIDOpt = "nutanix-pe-uuid"
+
+	// CliNutanixPeNameOpt defines the hiveutil variable name used to specify the Nutanix Prism Element name.
+	CliNutanixPeNameOpt = "nutanix-pe-name"
+
+	// CliNutanixAzNameOpt defines the hiveutil variable name used to specify the Nutanix Availability Zone name.
+	CliNutanixAzNameOpt = "nutanix-az-name"
+
+	// CliNutanixApiVipOpt defines the hiveutil variable name used to specify the Virtual IP address for the api endpoint.
+	CliNutanixApiVipOpt = "nutanix-api-vip"
+
+	// CliNutanixIngressVipOpt defines the hiveutil variable name used to specify the Virtual IP address for ingress application routing.
+	CliNutanixIngressVipOpt = "nutanix-ingress-vip"
+
+	// CliNutanixSubnetUUIDOpt defines the hiveutil variable name used to specify the a list of network subnets uuids to be used by the cluster.
+	CliNutanixSubnetUUIDOpt = "nutanix-subnetUUIDs"
+)

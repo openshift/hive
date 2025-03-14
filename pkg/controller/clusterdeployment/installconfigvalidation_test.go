@@ -1,6 +1,7 @@
 package clusterdeployment
 
 import (
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -149,6 +150,36 @@ platform:
 pullSecret: ""
 `
 
+const testNutanixIC = `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster-nutanix
+platform:
+  nutanix:
+    prismCentral:
+      endpoint:
+        address: "testcluster-nutanix"
+        port: 9440
+pullSecret: ""
+`
+
+const testNoPlatformIC = `
+apiVersion: v1
+baseDomain: example.com
+compute:
+- name: worker
+controlPlane:
+  name: master
+metadata:
+  name: testcluster
+pullSecret: ""
+`
+
 func TestInstallConfigValidation(t *testing.T) {
 	scheme := scheme.GetScheme()
 	cdBuilder := testcd.FullBuilder("testns", "testcluster", scheme)
@@ -252,6 +283,51 @@ func TestInstallConfigValidation(t *testing.T) {
 			),
 			ic:            testvSphereIC,
 			expectedError: missingvSphereCredentialsErr,
+		},
+		{
+			name: "test install-config mismatch nutanix pc address",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.Nutanix = &hivev1nutanix.Platform{
+						PrismCentral: hivev1nutanix.PrismEndpoint{
+							Address: "nutanix2.com",
+							Port:    9440,
+						},
+					}
+				},
+			),
+			ic:            testNutanixIC,
+			expectedError: prismCentralMismatchErr,
+		},
+		{
+			name: "test install-config missing nutanix platform",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.Nutanix = &hivev1nutanix.Platform{
+						PrismCentral: hivev1nutanix.PrismEndpoint{
+							Address: "nutanix2.com",
+							Port:    9440,
+						},
+					}
+				},
+			),
+			ic:            testNoPlatformIC,
+			expectedError: noNutanixPlatformErr,
+		},
+		{
+			name: "test install-config mismatch nutanix pc port",
+			cd: cdBuilder.Build(
+				func(cd *hivev1.ClusterDeployment) {
+					cd.Spec.Platform.Nutanix = &hivev1nutanix.Platform{
+						PrismCentral: hivev1nutanix.PrismEndpoint{
+							Address: "nutanix.com",
+							Port:    1234,
+						},
+					}
+				},
+			),
+			ic:            testNutanixIC,
+			expectedError: prismCentralMismatchErr,
 		},
 		{
 			name: "un-unmarshallable install-config",

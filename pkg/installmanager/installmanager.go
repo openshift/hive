@@ -45,6 +45,7 @@ import (
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
+	"github.com/openshift/installer/pkg/destroy/nutanix"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/providers"
@@ -53,6 +54,7 @@ import (
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
+	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
@@ -63,6 +65,7 @@ import (
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
+	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
 	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	ovirtutils "github.com/openshift/hive/contrib/pkg/utils/ovirt"
 	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
@@ -350,6 +353,11 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error adding pull secret to install-config.yaml")
 		return err
 	}
+	icData, err = pasteInProviderCredentials(icData, cd)
+	if err != nil {
+		m.log.WithError(err).Error("error adding provider credentials to install-config.yaml")
+		return err
+	}
 	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
 	if err := os.WriteFile(destInstallConfigPath, icData, 0644); err != nil {
 		m.log.WithError(err).Error("error writing install-config.yaml")
@@ -542,6 +550,8 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 		ovirtutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.IBMCloud != nil:
 		ibmutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixutils.ConfigureCreds(m.DynamicClient)
 	}
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.
@@ -804,6 +814,33 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if ibmCloudDestroyerErr != nil {
 			return ibmCloudDestroyerErr
 		}
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				Nutanix: &installertypesnutanix.Metadata{
+					PrismCentral: cd.Spec.Platform.Nutanix.PrismCentral.Address,
+					Username:     nutanixUsername,
+					Password:     nutanixPassword,
+					Port:         string(cd.Spec.Platform.Nutanix.PrismCentral.Port),
+				},
+			},
+		}
+		var err error
+		uninstaller, err = nutanix.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+
 	default:
 		logger.Warn("unknown platform for re-try cleanup")
 		return errors.New("unknown platform for re-try cleanup")
@@ -1880,6 +1917,35 @@ func isDirNonEmpty(dir string) bool {
 
 	_, err = f.Readdirnames(1)
 	return err == nil
+}
+
+// pasteInProviderCredentials Add the credentials from a given secret into the ic if nor present
+func pasteInProviderCredentials(icData []byte, cd *hivev1.ClusterDeployment) ([]byte, error) {
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		ic := installertypes.InstallConfig{}
+		if err := yaml.Unmarshal(icData, &ic); err != nil {
+			return nil, errors.Wrap(err, "could not unmarshal InstallConfig")
+		}
+
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixUsername == "" || nutanixPassword == "" {
+			return nil, fmt.Errorf("missing credentials for %s platform provider", constants.PlatformNutanix)
+		}
+		if ic.Platform.Nutanix.PrismCentral.Username != "" && ic.Platform.Nutanix.PrismCentral.Username != nutanixUsername {
+			return nil, fmt.Errorf("prism central username mismatch for %s platform provider", constants.PlatformNutanix)
+		}
+		if ic.Platform.Nutanix.PrismCentral.Password != "" && ic.Platform.Nutanix.PrismCentral.Password != nutanixPassword {
+			return nil, fmt.Errorf("prism central password mismatch for %s platform provider", constants.PlatformNutanix)
+		}
+
+		ic.Platform.Nutanix.PrismCentral.Username = nutanixUsername
+		ic.Platform.Nutanix.PrismCentral.Password = nutanixPassword
+		return yaml.Marshal(ic)
+	}
+
+	return icData, nil
 }
 
 func pasteInPullSecret(icData []byte, pullSecretFile string) ([]byte, error) {

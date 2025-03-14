@@ -351,8 +351,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.23.0 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/Antonboom/nilnil v0.1.3 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.1.0 // indirect
@@ -447,3 +446,7 @@ exclude (
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200819165624-17cef6e3e9d5
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 )
+
+// CVE-2025-22868
+// This is from tag v0.26.openshift.1
+replace golang.org/x/oauth2 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d

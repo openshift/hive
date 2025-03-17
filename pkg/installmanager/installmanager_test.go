@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1228,5 +1229,48 @@ data:
 				assert.True(t, isGroupCorrect, "expected /data/azure_resourcegroup filled correctly in patched credential secret")
 			}
 		})
+	}
+}
+
+func Test_scrubMetadataJSON(t *testing.T) {
+	cases := []struct {
+		initial  string
+		expected string
+	}{
+		{
+			initial:  `{"stringField":"stringValue","intField":64,"floatField":0.123,"boolField":true,"nilField":null}`,
+			expected: `{"stringField":"stringValue","intField":64,"floatField":0.123,"boolField":true,"nilField":null}`,
+		},
+		{
+			initial:  `{}`,
+			expected: `{}`,
+		},
+		{
+			initial:  `[]`,
+			expected: `[]`,
+		},
+		{
+			initial:  `{"nestedArrays":[{"a":"b"},{"a":"c"},{"a":[1,2,3]}]}`,
+			expected: `{"nestedArrays":[{"a":"b"},{"a":"c"},{"a":[1,2,3]}]}`,
+		},
+		{
+			initial:  `{"nestedObjects":{"innerkey1":"cheese","innerkey2":[1,false,[],"cake",{"random":"onions"},3.7]}}`,
+			expected: `{"nestedObjects":{"innerkey1":"cheese","innerkey2":[1,false,[],"cake",{"random":"onions"},3.7]}}`,
+		},
+		{
+			initial:  `{"username":["skip","array"],"password":{"skip":"entireInnerObject","with":["multiple","BAD","values"]}}`,
+			expected: `{"username":"REDACTED","password":"REDACTED"}`,
+		},
+		{
+			initial:  `{"vCenter":"testVCenter","username":"BAD","password":"BAD","terraform_platform":"testplatform","vcenters":[{"vcenter":"testvcenter2","username":"BAD","password":"BAD"},{"vcenter":"anotherTestVCenter","username":"BAD","password":"BAD"}]}`,
+			expected: `{"vCenter":"testVCenter","username":"REDACTED","password":"REDACTED","terraform_platform":"testplatform","vcenters":[{"vcenter":"testvcenter2","username":"REDACTED","password":"REDACTED"},{"vcenter":"anotherTestVCenter","username":"REDACTED","password":"REDACTED"}]}`,
+		},
+	}
+
+	for _, testCase := range cases {
+		out, err := scrubMetadataJSON([]byte(testCase.initial))
+		assert.NoError(t, err)
+		assert.False(t, strings.Contains(string(out), "BAD"))
+		assert.Equal(t, testCase.expected, string(out))
 	}
 }

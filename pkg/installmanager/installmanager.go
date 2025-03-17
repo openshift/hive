@@ -58,6 +58,7 @@ import (
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 
+	jsoniter "github.com/json-iterator/go"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
@@ -433,6 +434,12 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading cluster metadata")
 		return errors.Wrap(err, "error reading cluster metadata")
 	}
+	scrubbedMetadataBytes, err := scrubMetadataJSON(metadataBytes)
+	if err != nil {
+		m.log.WithError(err).Error("error cleaning up metadata")
+		return errors.Wrap(err, "error cleaning up metadata")
+	}
+
 	kubeconfigSecret, err := m.uploadAdminKubeconfig(m)
 	if err != nil {
 		m.log.WithError(err).Error("error uploading admin kubeconfig")
@@ -447,7 +454,7 @@ func (m *InstallManager) Run() error {
 	if err := m.updateClusterProvision(
 		m,
 		func(provision *hivev1.ClusterProvision) {
-			provision.Spec.MetadataJSON = metadataBytes
+			provision.Spec.MetadataJSON = scrubbedMetadataBytes
 			provision.Spec.InfraID = pointer.String(metadata.InfraID)
 			provision.Spec.ClusterID = pointer.String(metadata.ClusterID)
 
@@ -2049,4 +2056,90 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 		return nil, errors.Wrap(err, "error applying patch on 99_cloud-creds-secret.yaml")
 	}
 	return &modifiedBytes, nil
+}
+
+func scrubMetadataJSON(metadataJson []byte) ([]byte, error) {
+	api := jsoniter.ConfigCompatibleWithStandardLibrary
+	iter := jsoniter.ParseBytes(api, metadataJson)
+	var outBytes bytes.Buffer
+	stream := jsoniter.NewStream(api, &outBytes, len(metadataJson))
+
+	if err := scrubInner(iter, stream); err != nil {
+		return nil, err
+	}
+
+	if err := stream.Flush(); err != nil {
+		return nil, err
+	}
+	return outBytes.Bytes(), nil
+}
+
+func scrubInner(iter *jsoniter.Iterator, stream *jsoniter.Stream) error {
+	switch iter.WhatIsNext() {
+	case jsoniter.InvalidValue:
+		return errors.New("invalid value")
+	case jsoniter.StringValue:
+		stream.WriteString(iter.ReadString())
+	case jsoniter.NumberValue:
+		numVal := iter.ReadNumber()
+		if num, err := numVal.Int64(); err == nil {
+			stream.WriteInt64(num)
+		} else if num, err := numVal.Float64(); err == nil {
+			stream.WriteFloat64(num)
+		}
+	case jsoniter.NilValue:
+		iter.ReadNil()
+		stream.WriteNil()
+	case jsoniter.BoolValue:
+		stream.WriteBool(iter.ReadBool())
+	case jsoniter.ArrayValue:
+		start := true
+		stream.WriteArrayStart()
+		for iter.ReadArray() {
+			if !start {
+				stream.WriteMore()
+			} else {
+				start = false
+			}
+			if err := scrubInner(iter, stream); err != nil {
+				return err
+			}
+		}
+		stream.WriteArrayEnd()
+	case jsoniter.ObjectValue:
+		start := true
+		stream.WriteObjectStart()
+		for {
+			fieldName := iter.ReadObject()
+			if len(fieldName) == 0 {
+				break
+			}
+
+			if !start {
+				stream.WriteMore()
+			} else {
+				start = false
+			}
+
+			stream.WriteObjectField(fieldName)
+			switch strings.ToLower(fieldName) {
+			case "username", "password":
+				_ = iter.ReadAny()
+				stream.WriteString("REDACTED")
+			default:
+				if err := scrubInner(iter, stream); err != nil {
+					return err
+				}
+			}
+		}
+		stream.WriteObjectEnd()
+	}
+
+	if iter.Error != nil {
+		return iter.Error
+	}
+	if stream.Error != nil {
+		return stream.Error
+	}
+	return nil
 }

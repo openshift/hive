@@ -10,3 +10,9 @@ ignore:
   'SNYK-GOLANG-GITHUBCOMAZUREAZURESDKFORGOSDKAZIDENTITY-7246767':
   - '* > github.com/Azure/azure-sdk-for-go/sdk/azidentity':
     reason: 'Updated azidentity lib incompatible with vendored installer code; and revendoring is hard here; and this is fixed in mce-2.6 and later, which is acceptable for a Moderate issue.'
+  'SNYK-GOLANG-K8SIOAPIMACHINERYPKGUTILRUNTIME-8367153':
+  - '* > k8s.io/apimachinery/pkg/util/runtime':
+    reason: 'Requires a k8s bump, which has been done in newer releases, but is hard in older ones. Accepting as risk.'
+  'SNYK-GOLANG-GOLANGORGXCRYPTOSSH-8747056':
+  - '* > golang.org/x/crypto/ssh':
+    reason: 'Upstream fix requires golang 1.23, which has been done in newer releases, but is hard in older ones. We have instead `replace`d this dep with the openshift fork, but it is still being flagged by snyk.'

@@ -1193,8 +1193,8 @@ github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-202409090
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20240909043600-373ac49835bf/go.mod h1:2fZsjZ3QSPkoMUc8QntXfeBb8AnvW+WIYwwQX8vmgvQ=
 github.com/openshift/generic-admission-server v1.14.1-0.20250203204636-21579bd45f95 h1:Q8aJJZByWM5OP3nhqufRYxMy6qlBvJkGA2ii0Ksttzs=
 github.com/openshift/generic-admission-server v1.14.1-0.20250203204636-21579bd45f95/go.mod h1:9kXlVwaJd1fWlzDf8pzFQ1/FLLXe1Q1Wxq7s7dBEH/o=
-github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721 h1:R7PJ171uREaK1dXIPSIaFDWMBDKWcTzt4o5VbPAD5Ao=
-github.com/openshift/installer v0.90.101-0.20240912203725-dfd4c085a721/go.mod h1:PSL94uUGGsuOvuqfQ4wv9I4reGGiQk1PajnfU7N71Xo=
+github.com/openshift/installer v1.14.16-dcf8320c8c4e h1:GP9wv2Bv5cbBqGh57xXiI2kmaPSWwSOnUODxw+ljypU=
+github.com/openshift/installer v1.14.16-dcf8320c8c4e/go.mod h1:PSL94uUGGsuOvuqfQ4wv9I4reGGiQk1PajnfU7N71Xo=
 github.com/openshift/library-go v0.0.0-20210811133500-5e31383de2a7/go.mod h1:3GagmGg6gikg+hAqma7E7axBzs2pjx4+GrAbdl4OYdY=
 github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b h1:y2DduJug7UZqTu0QTkRPAu73nskuUbFA66fmgxVf/fI=
 github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b/go.mod h1:f8QcnrooSwGa96xI4UaKbKGJZskhTCGeimXKyc4t/ZU=

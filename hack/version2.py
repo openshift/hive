@@ -120,7 +120,7 @@ class Version:
                 return commit_ish
 
             refname = ref.remote_head if ref.is_remote() else ref.name
-            if refname == "HEAD":
+            if refname == "HEAD" or 'konflux/' in refname:
                 continue
 
             # Okay, now start using self._commit, which is already rev_parse()d.

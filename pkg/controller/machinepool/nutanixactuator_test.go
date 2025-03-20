@@ -8,13 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
-	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 func getMasterMachineWithImage(t assert.TestingT) *machineapi.Machine {
@@ -40,11 +38,7 @@ func getMasterMachineWithImage(t assert.TestingT) *machineapi.Machine {
 }
 
 func TestNewNutanixActuator(t *testing.T) {
-	scheme := scheme.GetScheme()
-	fakeClient := fake.NewClientBuilder().Build()
-	logger := log.WithField("actuator", "nutanixactuator_test")
-
-	actuator, err := NewNutanixActuator(getMasterMachineWithImage(t), fakeClient, scheme, logger)
+	actuator, err := NewNutanixActuator(getMasterMachineWithImage(t))
 	assert.NoError(t, err, "unexpected error creating NutanixActuator")
 	assert.NotNil(t, actuator, "expected a valid NutanixActuator instance")
 }
@@ -180,11 +174,9 @@ func TestGenerateMachineSets(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			scheme := scheme.GetScheme()
-			fakeClient := fake.NewClientBuilder().Build()
 			logger := log.WithField("actuator", "nutanixactuator_test")
 
-			actuator, err := NewNutanixActuator(getMasterMachineWithImage(t), fakeClient, scheme, logger)
+			actuator, err := NewNutanixActuator(getMasterMachineWithImage(t))
 			require.NoError(t, err, "unexpected error creating NutanixActuator")
 
 			_, _, err = actuator.GenerateMachineSets(test.clusterDeployment, test.pool, logger)

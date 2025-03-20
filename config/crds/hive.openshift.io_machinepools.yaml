@@ -690,7 +690,8 @@ spec:
                       failureDomains:
                         description: |-
                           FailureDomains optionally configures a list of failure domain names
-                          that will be applied to the MachinePool
+                          that will be applied to the MachinePool. These names must correspond
+                          to failure domains configured in `CD.Spec.Platform.Nutanix`.
                         items:
                           type: string
                         type: array

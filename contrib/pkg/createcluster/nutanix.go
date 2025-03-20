@@ -57,44 +57,44 @@ func (o *Options) getNutanixCloudBuilder() (*clusterresource.NutanixCloudBuilder
 		return nil, fmt.Errorf("no %s env var set, cannot proceed", c.NutanixPasswordEnvVar)
 	}
 
-	prismCentralEndpoint, err := getNutanixStrVal(c.NutanixPrismCentralEndpointEnvVar, c.CliNutanixPcAddressCMD, o.NutanixPrismCentralEndpoint)
+	prismCentralEndpoint, err := getNutanixStrVal(c.NutanixPrismCentralEndpointEnvVar, c.CliNutanixPcAddressOpt, o.NutanixPrismCentralEndpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	prismElementAddress, err := getNutanixStrVal(c.NutanixPrismElementEndpointEnvVar, c.CliNutanixPeAddressCMD, o.NutanixPrismElementAddress)
+	prismElementAddress, err := getNutanixStrVal(c.NutanixPrismElementEndpointEnvVar, c.CliNutanixPeAddressOpt, o.NutanixPrismElementAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	prismElementName, err := getNutanixStrVal("", c.CliNutanixPeNameCMD, o.NutanixPrismElementName)
+	prismElementName, err := getNutanixStrVal("", c.CliNutanixPeNameOpt, o.NutanixPrismElementName)
 	if err != nil {
 		return nil, err
 	}
 
-	prismElementUUID, err := getNutanixStrVal("", c.CliNutanixPeUUIDCMD, o.NutanixPrismElementUUID)
+	prismElementUUID, err := getNutanixStrVal("", c.CliNutanixPeUUIDOpt, o.NutanixPrismElementUUID)
 	if err != nil {
 		return nil, err
 	}
 
-	prismCentralPort, err := getNutanixPort(c.NutanixPrismCentralPortEnvVar, c.CliNutanixPcPortCMD, o.NutanixPrismCentralPort)
+	prismCentralPort, err := getNutanixPort(c.NutanixPrismCentralPortEnvVar, c.CliNutanixPcPortOpt, o.NutanixPrismCentralPort)
 	if err != nil {
 		return nil, err
 	}
 
-	prismElementPort, err := getNutanixPort(c.NutanixPrismElementPortEnvVar, c.CliNutanixPePortCMD, o.NutanixPrismElementPort)
+	prismElementPort, err := getNutanixPort(c.NutanixPrismElementPortEnvVar, c.CliNutanixPePortOpt, o.NutanixPrismElementPort)
 	if err != nil {
 		return nil, err
 	}
 
-	azName, err := getNutanixStrVal("", c.CliNutanixAzNameCMD, o.NutanixAzName)
+	azName, err := getNutanixStrVal("", c.CliNutanixAzNameOpt, o.NutanixAzName)
 	if err != nil {
 		return nil, err
 	}
 
 	subnetUUIds := o.NutanixSubnetUUIDs
 	if len(subnetUUIds) == 0 {
-		return nil, fmt.Errorf("must provide --%s", c.CliNutanixSubnetUUIDCmd)
+		return nil, fmt.Errorf("must provide --%s", c.CliNutanixSubnetUUIDOpt)
 	}
 
 	nutanixBuilder := &clusterresource.NutanixCloudBuilder{

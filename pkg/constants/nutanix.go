@@ -19,33 +19,33 @@ const (
 	// NutanixPrismElementPortEnvVar is the environment variable specifying the Nutanix Prism Element port.
 	NutanixPrismElementPortEnvVar = "NUTANIX_PE_PORT"
 
-	// CliNutanixPcAddressCMD defines the hiveutil variable name used to specify the Nutanix Prism Central address.
-	CliNutanixPcAddressCMD = "nutanix-pc-address"
+	// CliNutanixPcAddressOpt defines the hiveutil variable name used to specify the Nutanix Prism Central address.
+	CliNutanixPcAddressOpt = "nutanix-pc-address"
 
-	// CliNutanixPcPortCMD defines the hiveutil variable name used to specify the Nutanix Prism Central port.
-	CliNutanixPcPortCMD = "nutanix-pc-port"
+	// CliNutanixPcPortOpt defines the hiveutil variable name used to specify the Nutanix Prism Central port.
+	CliNutanixPcPortOpt = "nutanix-pc-port"
 
-	// CliNutanixPeAddressCMD defines the hiveutil variable name used to specify the Nutanix Prism Element address.
-	CliNutanixPeAddressCMD = "nutanix-pe-address"
+	// CliNutanixPeAddressOpt defines the hiveutil variable name used to specify the Nutanix Prism Element address.
+	CliNutanixPeAddressOpt = "nutanix-pe-address"
 
-	// CliNutanixPePortCMD defines the hiveutil variable name used to specify the Nutanix Prism Element port.
-	CliNutanixPePortCMD = "nutanix-pe-port"
+	// CliNutanixPePortOpt defines the hiveutil variable name used to specify the Nutanix Prism Element port.
+	CliNutanixPePortOpt = "nutanix-pe-port"
 
-	// CliNutanixPeUUIDCMD defines the hiveutil variable name used to specify the Nutanix Prism Element UUID.
-	CliNutanixPeUUIDCMD = "nutanix-pe-uuid"
+	// CliNutanixPeUUIDOpt defines the hiveutil variable name used to specify the Nutanix Prism Element UUID.
+	CliNutanixPeUUIDOpt = "nutanix-pe-uuid"
 
-	// CliNutanixPeNameCMD defines the hiveutil variable name used to specify the Nutanix Prism Element name.
-	CliNutanixPeNameCMD = "nutanix-pe-name"
+	// CliNutanixPeNameOpt defines the hiveutil variable name used to specify the Nutanix Prism Element name.
+	CliNutanixPeNameOpt = "nutanix-pe-name"
 
-	// CliNutanixAzNameCMD defines the hiveutil variable name used to specify the Nutanix Availability Zone name.
-	CliNutanixAzNameCMD = "nutanix-az-name"
+	// CliNutanixAzNameOpt defines the hiveutil variable name used to specify the Nutanix Availability Zone name.
+	CliNutanixAzNameOpt = "nutanix-az-name"
 
-	// CliNutanixApiVipCMD defines the hiveutil variable name used to specify the Virtual IP address for the api endpoint.
-	CliNutanixApiVipCMD = "nutanix-api-vip"
+	// CliNutanixApiVipOpt defines the hiveutil variable name used to specify the Virtual IP address for the api endpoint.
+	CliNutanixApiVipOpt = "nutanix-api-vip"
 
-	// CliNutanixIngressVipCMD defines the hiveutil variable name used to specify the Virtual IP address for ingress application routing.
-	CliNutanixIngressVipCMD = "nutanix-ingress-vip"
+	// CliNutanixIngressVipOpt defines the hiveutil variable name used to specify the Virtual IP address for ingress application routing.
+	CliNutanixIngressVipOpt = "nutanix-ingress-vip"
 
-	// CliNutanixSubnetUUIDCmd defines the hiveutil variable name used to specify the a list of network subnets uuids to be used by the cluster.
-	CliNutanixSubnetUUIDCmd = "nutanix-subnetUUIDs"
+	// CliNutanixSubnetUUIDOpt defines the hiveutil variable name used to specify the a list of network subnets uuids to be used by the cluster.
+	CliNutanixSubnetUUIDOpt = "nutanix-subnetUUIDs"
 )

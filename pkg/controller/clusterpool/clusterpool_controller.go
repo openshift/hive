@@ -36,6 +36,7 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/controller/utils/nutanixutils"
 	yamlpatch "github.com/openshift/hive/pkg/util/yaml"
 	"github.com/openshift/installer/pkg/types/nutanix"
 )
@@ -1361,7 +1362,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		if err != nil {
 			return nil, err
 		}
-		failureDomains, _, _ := controllerutils.ConvertHiveFailureDomains(platform.Nutanix.FailureDomains)
+		failureDomains, _, _ := nutanixutils.ConvertHiveFailureDomains(platform.Nutanix.FailureDomains)
 
 		cloudBuilder := clusterresource.NewNutanixCloudBuilder(credsSecret)
 		cloudBuilder.PrismCentral = nutanix.PrismCentral{

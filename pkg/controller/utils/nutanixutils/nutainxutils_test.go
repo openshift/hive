@@ -1,4 +1,4 @@
-package utils
+package nutanixutils
 
 import (
 	"reflect"

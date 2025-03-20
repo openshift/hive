@@ -140,6 +140,7 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	logger.Debug("reconciling Hosted Zone Records")
@@ -158,6 +159,7 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	logger.Debug("reconciling Hosted Zone Associations")
@@ -177,6 +179,7 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 		if err != nil {
 			return reconcile.Result{}, errors.Wrap(err, "failed to update condition on cluster deployment")
 		}
+		return reconcile.Result{Requeue: true}, nil
 	}
 
 	return reconcile.Result{}, nil
@@ -184,6 +187,11 @@ func (a *AWSHubActuator) Reconcile(cd *hivev1.ClusterDeployment, metadata *hivev
 
 // ShouldSync is the actuator interface to determine if there are changes that need to be made.
 func (a *AWSHubActuator) ShouldSync(cd *hivev1.ClusterDeployment) bool {
+	if cd.Spec.Platform.AWS == nil ||
+		cd.Spec.Platform.AWS.PrivateLink == nil ||
+		!cd.Spec.Platform.AWS.PrivateLink.Enabled {
+		return false
+	}
 	return cd.Status.Platform == nil ||
 		cd.Status.Platform.AWS == nil ||
 		cd.Status.Platform.AWS.PrivateLink == nil ||
@@ -209,7 +217,7 @@ func (a *AWSHubActuator) ensureHostedZone(cd *hivev1.ClusterDeployment, metadata
 			return false, "", err
 		}
 
-		newHzID, err := a.createHostedZone(&selectedVPC, apiDomain)
+		newHzID, err := a.createHostedZone(selectedVPC, apiDomain)
 		if err != nil {
 			return false, "", err
 		}
@@ -369,11 +377,117 @@ func (a *AWSHubActuator) cleanupHostedZone(cd *hivev1.ClusterDeployment, metadat
 }
 
 func (a *AWSHubActuator) ReconcileHostedZoneRecords(cd *hivev1.ClusterDeployment, hostedZoneID string, dnsRecord *actuator.DnsRecord, apiDomain string, logger log.FieldLogger) (bool, error) {
+	hzLog := logger.WithField("hostedZoneID", hostedZoneID)
+	modified := false
+
 	rSet, err := a.recordSet(cd, apiDomain, dnsRecord)
 	if err != nil {
 		return false, errors.Wrap(err, "error generating DNS records")
 	}
 
+	recordsResp, err := a.awsClientHub.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+		HostedZoneId: aws.String(hostedZoneID),
+	})
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to list the hosted zone %s", hostedZoneID)
+	}
+
+	recordName := aws.StringValue(rSet.Name) + "."
+	for _, record := range recordsResp.ResourceRecordSets {
+		if aws.StringValue(record.Type) != aws.StringValue(rSet.Type) {
+			continue
+		}
+		if aws.StringValue(record.Name) != recordName {
+			continue
+		}
+		if rSet.ResourceRecords != nil {
+			if aws.StringValue(record.Type) != aws.StringValue(rSet.Type) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+					"type":   aws.StringValue(rSet.Type),
+				}).Debug("updating record type")
+			}
+			if aws.Int64Value(record.TTL) != aws.Int64Value(rSet.TTL) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+					"ttl":    aws.Int64Value(rSet.TTL),
+				}).Debug("updating record ttl")
+			}
+
+			oldRecords := sets.NewString()
+			for _, record := range record.ResourceRecords {
+				oldRecords.Insert(aws.StringValue(record.Value))
+			}
+
+			desiredRecords := sets.NewString()
+			for _, record := range rSet.ResourceRecords {
+				desiredRecords.Insert(aws.StringValue(record.Value))
+			}
+
+			added := desiredRecords.Difference(oldRecords).List()
+			removed := oldRecords.Difference(desiredRecords).List()
+
+			if len(added) > 0 || len(removed) > 0 {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"added":   added,
+					"removed": removed,
+				}).Debug("updating the addresses assigned to the dns record")
+			}
+
+			if !modified {
+				return false, nil
+			}
+		} else if rSet.AliasTarget != nil {
+			logger.Debugf("AliasTarget")
+			if record.AliasTarget == nil {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+				}).Debug("updating the record to use alias target")
+				break
+			}
+
+			if aws.StringValue(record.Type) != aws.StringValue(rSet.Type) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record": aws.StringValue(rSet.Name),
+					"type":   aws.StringValue(rSet.Type),
+				}).Debug("updating record type")
+			}
+
+			if aws.StringValue(record.AliasTarget.DNSName) != aws.StringValue(rSet.AliasTarget.DNSName) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record":  aws.StringValue(rSet.Name),
+					"dnsName": aws.StringValue(rSet.AliasTarget.DNSName),
+				}).Debug("updating the aliasTarget dnsName")
+			}
+
+			if aws.StringValue(record.AliasTarget.HostedZoneId) != aws.StringValue(rSet.AliasTarget.HostedZoneId) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record":       aws.StringValue(rSet.Name),
+					"hostedZoneId": aws.StringValue(rSet.AliasTarget.HostedZoneId),
+				}).Debug("updating the aliasTarget hostedZoneId")
+			}
+
+			if aws.BoolValue(record.AliasTarget.EvaluateTargetHealth) != aws.BoolValue(rSet.AliasTarget.EvaluateTargetHealth) {
+				modified = true
+				hzLog.WithFields(log.Fields{
+					"record":               aws.StringValue(rSet.Name),
+					"evaluateTargetHealth": aws.BoolValue(rSet.AliasTarget.EvaluateTargetHealth),
+				}).Debug("updating the aliasTarget evaluateTargetHealth")
+			}
+
+			if !modified {
+				return false, nil
+			}
+		}
+		break
+	}
 	_, err = a.awsClientHub.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(hostedZoneID),
 		ChangeBatch: &route53.ChangeBatch{
@@ -599,9 +713,7 @@ func (a *AWSHubActuator) getEndpointVPC(cd *hivev1.ClusterDeployment, metadata *
 	return endpointVPC, nil
 }
 
-func (a *AWSHubActuator) selectHostedZoneVPC(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger log.FieldLogger) (hivev1.AWSAssociatedVPC, error) {
-	selectedVPC := hivev1.AWSAssociatedVPC{}
-
+func (a *AWSHubActuator) selectHostedZoneVPC(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata, logger log.FieldLogger) (*hivev1.AWSAssociatedVPC, error) {
 	// For clusterdeployments that are on AWS, use the VPCEndpoint VPC
 	if cd.Status.Platform != nil &&
 		cd.Status.Platform.AWS != nil &&
@@ -610,29 +722,29 @@ func (a *AWSHubActuator) selectHostedZoneVPC(cd *hivev1.ClusterDeployment, metad
 
 		endpointVPC, err := a.getEndpointVPC(cd, metadata)
 		if err != nil {
-			return selectedVPC, errors.Wrap(err, "error getting Endpoint VPC")
+			return nil, errors.Wrap(err, "error getting Endpoint VPC")
 		}
 
 		if endpointVPC.VPCID == "" {
-			return selectedVPC, errors.New("unable to select Endpoint VPC: Endpoint not found")
+			return nil, errors.New("unable to select Endpoint VPC: Endpoint not found")
 		}
 
-		return endpointVPC, nil
+		return &endpointVPC, nil
 	}
 
 	associatedVPCS, err := a.getAssociatedVPCs(cd, metadata, logger)
 	if err != nil {
-		return selectedVPC, errors.Wrap(err, "error getting associated VPCs")
+		return nil, errors.Wrap(err, "error getting associated VPCs")
 	}
 
 	// Select the first associatedVPC that uses the primary AWS PrivateLink credential.
 	// This is necessary because a Hosted Zone can only be created using a VPC owned by the same account.
 	for _, associatedVPC := range associatedVPCS {
 		if associatedVPC.CredentialsSecretRef == nil || *associatedVPC.CredentialsSecretRef == a.config.CredentialsSecretRef {
-			return associatedVPC, nil
+			return &associatedVPC, nil
 		}
 	}
 
 	// No VPCs found that match the criteria, return an error.
-	return selectedVPC, errors.New("unable to find an associatedVPC that uses the primary AWS PrivateLink credentials")
+	return nil, errors.New("unable to find an associatedVPC that uses the primary AWS PrivateLink credentials")
 }

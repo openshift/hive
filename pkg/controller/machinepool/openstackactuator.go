@@ -98,6 +98,8 @@ func (a *OpenStackActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, po
 				Cloud: cd.Spec.Platform.OpenStack.Cloud,
 			},
 		},
+		// TODO: Add IPv6 support
+		Networking: &installertypes.Networking{},
 	}
 
 	credsSecretKey := types.NamespacedName{

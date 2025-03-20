@@ -53,10 +53,13 @@ func setDefaultAllowedErrors() {
 		{Err: "io.EOF", Fun: "(*io.SectionReader).Read"},
 		{Err: "io.EOF", Fun: "(*io.SectionReader).ReadAt"},
 		{Err: "io.ErrClosedPipe", Fun: "(*io.PipeWriter).Write"},
+		{Err: "io.EOF", Fun: "io.ReadAtLeast"},
 		{Err: "io.ErrShortBuffer", Fun: "io.ReadAtLeast"},
 		{Err: "io.ErrUnexpectedEOF", Fun: "io.ReadAtLeast"},
 		{Err: "io.EOF", Fun: "io.ReadFull"},
 		{Err: "io.ErrUnexpectedEOF", Fun: "io.ReadFull"},
+		// pkg/mime
+		{Err: "mime.ErrInvalidMediaParameter", Fun: "mime.ParseMediaType"},
 		// pkg/net/http
 		{Err: "net/http.ErrServerClosed", Fun: "(*net/http.Server).ListenAndServe"},
 		{Err: "net/http.ErrServerClosed", Fun: "(*net/http.Server).ListenAndServeTLS"},
@@ -82,6 +85,7 @@ func setDefaultAllowedErrors() {
 		{Err: "context.Canceled", Fun: "(context.Context).Err"},
 		// pkg/encoding/json
 		{Err: "io.EOF", Fun: "(*encoding/json.Decoder).Decode"},
+		{Err: "io.EOF", Fun: "(*encoding/json.Decoder).Token"},
 		// pkg/encoding/csv
 		{Err: "io.EOF", Fun: "(*encoding/csv.Reader).Read"},
 		// pkg/mime/multipart
@@ -127,13 +131,13 @@ func isAllowedErrAndFunc(err, fun string) bool {
 	return false
 }
 
-func isAllowedErrorComparison(pass *TypesInfoExt, binExpr *ast.BinaryExpr) bool {
+func isAllowedErrorComparison(pass *TypesInfoExt, a, b ast.Expr) bool {
 	var errName string // `<package>.<name>`, e.g. `io.EOF`
 	var callExprs []*ast.CallExpr
 
 	// Figure out which half of the expression is the returned error and which
 	// half is the presumed error declaration.
-	for _, expr := range []ast.Expr{binExpr.X, binExpr.Y} {
+	for _, expr := range []ast.Expr{a, b} {
 		switch t := expr.(type) {
 		case *ast.SelectorExpr:
 			// A selector which we assume refers to a staticaly declared error

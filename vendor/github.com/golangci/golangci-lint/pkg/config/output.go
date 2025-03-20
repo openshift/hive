@@ -16,9 +16,11 @@ const (
 	OutFormatCheckstyle        = "checkstyle"
 	OutFormatCodeClimate       = "code-climate"
 	OutFormatHTML              = "html"
-	OutFormatJunitXML          = "junit-xml"
-	OutFormatGithubActions     = "github-actions"
+	OutFormatJUnitXML          = "junit-xml"
+	OutFormatJUnitXMLExtended  = "junit-xml-extended"
+	OutFormatGithubActions     = "github-actions" // Deprecated
 	OutFormatTeamCity          = "teamcity"
+	OutFormatSarif             = "sarif"
 )
 
 var AllOutputFormats = []string{
@@ -30,16 +32,17 @@ var AllOutputFormats = []string{
 	OutFormatCheckstyle,
 	OutFormatCodeClimate,
 	OutFormatHTML,
-	OutFormatJunitXML,
+	OutFormatJUnitXML,
+	OutFormatJUnitXMLExtended,
 	OutFormatGithubActions,
 	OutFormatTeamCity,
+	OutFormatSarif,
 }
 
 type Output struct {
 	Formats         OutputFormats `mapstructure:"formats"`
 	PrintIssuedLine bool          `mapstructure:"print-issued-lines"`
 	PrintLinterName bool          `mapstructure:"print-linter-name"`
-	UniqByLine      bool          `mapstructure:"uniq-by-line"`
 	SortResults     bool          `mapstructure:"sort-results"`
 	SortOrder       []string      `mapstructure:"sort-order"`
 	PathPrefix      string        `mapstructure:"path-prefix"`
@@ -47,6 +50,9 @@ type Output struct {
 
 	// Deprecated: use Formats instead.
 	Format string `mapstructure:"format"`
+
+	// Deprecated: use [Issues.UniqByLine] instead.
+	UniqByLine *bool `mapstructure:"uniq-by-line"`
 }
 
 func (o *Output) Validate() error {

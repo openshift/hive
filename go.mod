@@ -57,7 +57,7 @@ require (
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mod v0.23.0
 	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/oauth2 v0.27.0
+	golang.org/x/oauth2 v0.27.0 // testing
 	golang.org/x/time v0.9.0
 	google.golang.org/api v0.220.0
 	gopkg.in/ini.v1 v1.67.0

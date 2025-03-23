@@ -1450,8 +1450,8 @@ github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/openshift/api v0.0.0-20240919193929-2669d1ebc910
-## explicit; go 1.22.0
+# github.com/openshift/api v0.0.0-20250320170726-75d64d71980b
+## explicit; go 1.23.0
 github.com/openshift/api
 github.com/openshift/api/apiserver
 github.com/openshift/api/apiserver/v1

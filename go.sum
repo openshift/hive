@@ -1173,8 +1173,8 @@ github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3I
 github.com/opencontainers/image-spec v1.0.1/go.mod h1:BtxoFyWECRxE4U/7sNtV5W15zMzWCbyJoFRP3s7yZA0=
 github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee/go.mod h1:ntkQrC1Z6AxxkhDlVpDVjkD+pzdwVUalWyfH40rSyyM=
 github.com/openshift/api v0.0.0-20210816181336-8ff39b776da3/go.mod h1:x81TFA31x1OMT9SYWukQqJ/KbmeveRN6fo+XeGRK8g0=
-github.com/openshift/api v0.0.0-20240919193929-2669d1ebc910 h1:8pA9Ugq0hhUbVaVWi5lgF4PGaV1ozpTI1NYn/QWqspg=
-github.com/openshift/api v0.0.0-20240919193929-2669d1ebc910/go.mod h1:OOh6Qopf21pSzqNVCB5gomomBXb8o5sGKZxG2KNpaXM=
+github.com/openshift/api v0.0.0-20250320170726-75d64d71980b h1:GGuFSHESP0BSOu70AqV4u9IVrjYdaeu4Id+HXRIOvkw=
+github.com/openshift/api v0.0.0-20250320170726-75d64d71980b/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
 github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8 h1:f5nZJ4mB9Rf1epInmKoqDJGdoHyqZwHCiaE/OH4Yx84=
 github.com/openshift/baremetal-operator/apis v0.0.0-20231128154154-6736c9b9c6c8/go.mod h1:CvKrrnAcvvtrZIc9y9WaqWmJhK0AJ9sWnh+VP4d7jcM=
 github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231128154154-6736c9b9c6c8 h1:38vY9w7dXqB7tI9g1GCUnpahNDyBbp9Yylq+BQ154YE=

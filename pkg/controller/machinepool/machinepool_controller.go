@@ -50,14 +50,15 @@ import (
 )
 
 const (
-	ControllerName             = hivev1.MachinePoolControllerName
-	machinePoolNameLabel       = "hive.openshift.io/machine-pool"
-	finalizer                  = "hive.openshift.io/remotemachineset"
-	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
-	defaultPollInterval        = 30 * time.Minute
-	stsName                    = hivev1.DeploymentNameMachinepool
-	capiClusterKey             = "machine.openshift.io/cluster-api-cluster"
-	capiMachineSetKey          = "machine.openshift.io/cluster-api-machineset"
+	ControllerName              = hivev1.MachinePoolControllerName
+	machinePoolNameLabel        = "hive.openshift.io/machine-pool"
+	finalizer                   = "hive.openshift.io/remotemachineset"
+	masterMachineLabelSelector  = "machine.openshift.io/cluster-api-machine-type=master"
+	defaultPollInterval         = 30 * time.Minute
+	defaultErrorRequeueInterval = 1 * time.Minute
+	stsName                     = hivev1.DeploymentNameMachinepool
+	capiClusterKey              = "machine.openshift.io/cluster-api-cluster"
+	capiMachineSetKey           = "machine.openshift.io/cluster-api-machineset"
 )
 
 var (
@@ -70,6 +71,8 @@ var (
 		hivev1.NoMachinePoolNameLeasesAvailable,
 		hivev1.InvalidSubnetsMachinePoolCondition,
 		hivev1.UnsupportedConfigurationMachinePoolCondition,
+		hivev1.MachineSetsGeneratedMachinePoolCondition,
+		hivev1.SyncedMachinePoolCondition,
 	}
 )
 
@@ -366,8 +369,29 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 	generatedMachineSets, generatedMachineLabels, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
+		err := r.updateCondition(
+			pool,
+			hivev1.MachineSetsGeneratedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"MachineSetGenerationFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
+	}
+	if err := r.updateCondition(
+		pool,
+		hivev1.MachineSetsGeneratedMachinePoolCondition,
+		corev1.ConditionTrue,
+		"MachineSetGenerationSucceeded",
+		"MachineSets generated successfully",
+		logger,
+	); err != nil {
 		return reconcile.Result{}, err
-	} else if !proceed {
+	}
+	if !proceed {
 		logger.Info("machineSets generator indicated not to proceed, returning")
 		return reconcile.Result{}, nil
 	}
@@ -383,14 +407,76 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, infrastructure, remoteClusterAPIClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineSets")
+		err := r.updateCondition(
+			pool,
+			hivev1.SyncedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"MachineSetSyncFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
+	}
+	if err := r.updateCondition(
+		pool,
+		hivev1.SyncedMachinePoolCondition,
+		corev1.ConditionTrue,
+		"MachineSetSyncSucceeded",
+		"MachineSets synced successfully",
+		logger,
+	); err != nil {
 		return reconcile.Result{}, err
 	}
+
 	if err := r.syncMachineAutoscalers(pool, cd, machineSets, remoteClusterAPIClient, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineAutoscalers")
+		err := r.updateCondition(
+			pool,
+			hivev1.SyncedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"MachineAutoscalerSyncFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
+	}
+	if err := r.updateCondition(
+		pool,
+		hivev1.SyncedMachinePoolCondition,
+		corev1.ConditionTrue,
+		"MachineAutoscalerSyncFailed",
+		"MachineAutoscalers synced successfully",
+		logger,
+	); err != nil {
 		return reconcile.Result{}, err
 	}
+
 	if err := r.syncClusterAutoscaler(pool, remoteClusterAPIClient, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncClusterAutoscaler")
+		err := r.updateCondition(
+			pool,
+			hivev1.SyncedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"ClusterAutoscalerSyncFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
+	}
+	if err := r.updateCondition(
+		pool,
+		hivev1.SyncedMachinePoolCondition,
+		corev1.ConditionTrue,
+		"ClusterAutoscalerSyncFailed",
+		"ClusterAutoscaler synced successfully",
+		logger,
+	); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -534,7 +620,7 @@ func (r *ReconcileMachinePool) generateMachineSets(
 		}
 	}
 
-	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
+	logger.WithField("numMachineSets", len(generatedMachineSets)).Info("generated worker machine sets")
 
 	return generatedMachineSets, generatedMachineLabels, true, nil
 }
@@ -560,40 +646,25 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 		logger.WithField("machinesets", len(generatedMachineSets)).
 			WithField("minReplicas", pool.Spec.Autoscaling.MinReplicas).
 			Warning("when auto-scaling, the MachinePool must have at least one replica for each MachineSet")
-		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
-			pool.Status.Conditions,
+		err := r.updateCondition(
+			pool,
 			hivev1.NotEnoughReplicasMachinePoolCondition,
 			corev1.ConditionTrue,
 			"MinReplicasTooSmall",
 			fmt.Sprintf("When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least %d", len(generatedMachineSets)),
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
+			logger,
 		)
-		if changed {
-			pool.Status.Conditions = conds
-			if err := r.Status().Update(context.Background(), pool); err != nil {
-				logger.WithError(err).Error("failed to update MachinePool conditions")
-				return &reconcile.Result{}, err
-			}
-		}
-		return &reconcile.Result{}, nil
+		return &reconcile.Result{}, err
 	}
-	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
-		pool.Status.Conditions,
+	err := r.updateCondition(
+		pool,
 		hivev1.NotEnoughReplicasMachinePoolCondition,
 		corev1.ConditionFalse,
 		"EnoughReplicas",
 		"The MachinePool has sufficient replicas for each MachineSet",
-		controllerutils.UpdateConditionNever,
+		logger,
 	)
-	if changed {
-		pool.Status.Conditions = conds
-		err := r.Status().Update(context.Background(), pool)
-		if err != nil {
-			logger.WithError(err).Error("failed to update MachinePool conditions")
-		}
-		return &reconcile.Result{}, err
-	}
-	return nil, nil
+	return nil, err
 }
 
 // Compare Failure Domains to confirm that they match
@@ -1422,4 +1493,29 @@ func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 	}
 
 	return false
+}
+
+func (r *ReconcileMachinePool) updateCondition(
+	pool *hivev1.MachinePool,
+	cond hivev1.MachinePoolConditionType,
+	status corev1.ConditionStatus,
+	reason, message string,
+	logger log.FieldLogger,
+) error {
+	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		cond,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), pool); err != nil {
+			logger.WithError(err).Error("failed to update MachinePool conditions")
+			return err
+		}
+	}
+	return nil
 }

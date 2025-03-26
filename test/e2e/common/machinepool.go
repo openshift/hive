@@ -8,12 +8,12 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
 
-func GetMachinePool(cd *hivev1.ClusterDeployment, poolName string) *hivev1.MachinePool {
-	c := MustGetClient()
+func GetMachinePool(c client.Client, cd *hivev1.ClusterDeployment, poolName string) *hivev1.MachinePool {
 	pool := &hivev1.MachinePool{}
 	switch err := c.Get(
 		context.TODO(),

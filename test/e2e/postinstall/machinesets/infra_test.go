@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -51,19 +52,21 @@ func TestScaleMachinePool(t *testing.T) {
 	}
 
 	c := common.MustGetClient()
-
-	// Scale down
-	pool := common.GetMachinePool(cd, workerMachinePoolName)
-	require.NotNilf(t, pool, "worker machine pool does not exist: %s", workerMachinePoolName)
-
 	machinePrefix, err := machineNamePrefix(cd, workerMachinePoolName)
 	require.NoError(t, err, "cannot determine machine name prefix")
-	logger = logger.WithField("pool", pool.Name)
-	logger.Infof("expected Machine name prefix: %s", machinePrefix)
 
-	logger.Info("scaling pool to 1 replicas")
-	pool.Spec.Replicas = pointer.Int64(1)
-	err = c.Update(context.TODO(), pool)
+	// Scale down
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pool := common.GetMachinePool(c, cd, workerMachinePoolName)
+		require.NotNilf(t, pool, "worker machine pool does not exist: %s", workerMachinePoolName)
+
+		logger = logger.WithField("pool", pool.Name)
+		logger.Infof("expected Machine name prefix: %s", machinePrefix)
+
+		logger.Info("scaling pool to 1 replicas")
+		pool.Spec.Replicas = pointer.Int64(1)
+		return c.Update(context.TODO(), pool)
+	})
 	require.NoError(t, err, "cannot update worker machine pool to reduce replicas")
 
 	err = waitForMachines(logger, cfg, cd, machinePrefix, 1)
@@ -73,12 +76,14 @@ func TestScaleMachinePool(t *testing.T) {
 	require.NoError(t, err, "timed out waiting for nodes to be created")
 
 	// Scale up
-	pool = common.GetMachinePool(cd, workerMachinePoolName)
-	require.NotNilf(t, pool, "worker machine pool does not exist: %s", workerMachinePoolName)
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pool := common.GetMachinePool(c, cd, workerMachinePoolName)
+		require.NotNilf(t, pool, "worker machine pool does not exist: %s", workerMachinePoolName)
 
-	logger.Info("scaling pool back to 3 replicas")
-	pool.Spec.Replicas = pointer.Int64(3)
-	err = c.Update(context.TODO(), pool)
+		logger.Info("scaling pool back to 3 replicas")
+		pool.Spec.Replicas = pointer.Int64(3)
+		return c.Update(context.TODO(), pool)
+	})
 	require.NoError(t, err, "cannot update worker machine pool to increase replicas")
 
 	err = waitForMachines(logger, cfg, cd, machinePrefix, 3)
@@ -95,7 +100,7 @@ func TestNewMachinePool(t *testing.T) {
 
 	c := common.MustGetClient()
 
-	pool := common.GetMachinePool(cd, infraMachinePoolName)
+	pool := common.GetMachinePool(c, cd, infraMachinePoolName)
 	require.Nil(t, pool, "infra machine pool already exists")
 
 	infraMachinePool := &hivev1.MachinePool{
@@ -191,7 +196,7 @@ func TestNewMachinePool(t *testing.T) {
 	// Now remove the infra machinepool and make sure that any machinesets associated
 	// with it are removed
 	logger.Info("removing pool")
-	infraMachinePool = common.GetMachinePool(cd, infraMachinePoolName)
+	infraMachinePool = common.GetMachinePool(c, cd, infraMachinePoolName)
 	require.NotNil(t, infraMachinePool, "could not find infra machine pool")
 	err = c.Delete(context.TODO(), infraMachinePool)
 	require.NoError(t, err, "cannot delete infra machine pool")
@@ -254,17 +259,21 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	c := common.MustGetClient()
 	rc := common.MustGetClientFromConfig(cfg)
 
-	// Scale up
-	pool := common.GetMachinePool(cd, workerMachinePoolName)
-	require.NotNil(t, pool, "worker machine pool does not exist")
+	var pool *hivev1.MachinePool
 
-	logger.Info("switching pool from replicas to autoscaling")
-	pool.Spec.Replicas = nil
-	pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
-		MinReplicas: minReplicas,
-		MaxReplicas: maxReplicas,
-	}
-	err := c.Update(context.TODO(), pool)
+	// Scale up
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pool = common.GetMachinePool(c, cd, workerMachinePoolName)
+		require.NotNil(t, pool, "worker machine pool does not exist")
+
+		logger.Info("switching pool from replicas to autoscaling")
+		pool.Spec.Replicas = nil
+		pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+			MinReplicas: minReplicas,
+			MaxReplicas: maxReplicas,
+		}
+		return c.Update(context.TODO(), pool)
+	})
 	require.NoError(t, err, "cannot update worker machine pool to reduce replicas")
 	logger = logger.WithField("pool", pool.Name)
 
@@ -383,12 +392,14 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	require.NoError(t, err, "timed out waiting for nodes to be created")
 
 	logger.Info("disabling autoscaling")
-	pool = common.GetMachinePool(cd, "worker")
-	require.NotNil(t, pool, "worker machine pool does not exist")
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pool = common.GetMachinePool(c, cd, "worker")
+		require.NotNil(t, pool, "worker machine pool does not exist")
 
-	pool.Spec.Replicas = pointer.Int64(3)
-	pool.Spec.Autoscaling = nil
-	err = c.Update(context.TODO(), pool)
+		pool.Spec.Replicas = pointer.Int64(3)
+		pool.Spec.Autoscaling = nil
+		return c.Update(context.TODO(), pool)
+	})
 	require.NoError(t, err, "cannot update worker machine pool to turn off auto-scaling")
 	err = waitForMachines(logger, cfg, cd, machinePrefix, 3)
 	require.NoError(t, err, "timed out waiting for machines to be created")

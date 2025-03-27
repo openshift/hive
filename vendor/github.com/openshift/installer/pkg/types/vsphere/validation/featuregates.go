@@ -6,6 +6,7 @@ import (
 	"github.com/openshift/api/features"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/featuregates"
+	"github.com/openshift/installer/pkg/types/vsphere"
 )
 
 // GatedFeatures determines all of the vSphere install config fields that should
@@ -21,6 +22,9 @@ func GatedFeatures(c *types.InstallConfig) []featuregates.GatedInstallConfigFeat
 			multiNetworksFound = true
 		}
 	}
+
+	cpDef := c.ControlPlane.Platform.VSphere
+	computeDefs := c.Compute
 
 	return []featuregates.GatedInstallConfigFeature{
 		{
@@ -43,5 +47,37 @@ func GatedFeatures(c *types.InstallConfig) []featuregates.GatedInstallConfigFeat
 			Condition:       nodeNetworkingDefined,
 			Field:           field.NewPath("platform", "vsphere", "nodeNetworking"),
 		},
+		{
+			FeatureGateName: features.FeatureGateVSphereHostVMGroupZonal,
+			Condition: func(v *vsphere.Platform) bool {
+				for _, fd := range v.FailureDomains {
+					if fd.ZoneType == vsphere.HostGroupFailureDomain || fd.Topology.HostGroup != "" {
+						return true
+					}
+				}
+				return false
+			}(v),
+		},
+		{
+			FeatureGateName: features.FeatureGateVSphereMultiDisk,
+			Condition:       cpDef != nil && len(cpDef.DataDisks) > 0, // Here we need to check disk count
+			Field:           field.NewPath("controlPlane", "platform", "vsphere", "dataDisks"),
+		},
+		{
+			FeatureGateName: features.FeatureGateVSphereMultiDisk,
+			Condition:       hasDataDisks(computeDefs), // Here we need to check disk count
+			Field:           field.NewPath("compute", "platform", "vsphere", "dataDisks"),
+		},
 	}
+}
+
+func hasDataDisks(pool []types.MachinePool) bool {
+	foundDataDisks := false
+	for _, machine := range pool {
+		if machine.Platform.VSphere != nil && len(machine.Platform.VSphere.DataDisks) > 0 {
+			foundDataDisks = true
+			break
+		}
+	}
+	return foundDataDisks
 }

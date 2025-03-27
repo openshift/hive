@@ -15,6 +15,24 @@ import (
 
 const (
 	createNew = "<create new>"
+
+	// BootstrapSGNameSuffix is the suffix value to append for the bootstrap VPC Security Group name.
+	BootstrapSGNameSuffix = "security-group-bootstrap"
+
+	// KubernetesAPIPort is the Kubernetes API port.
+	KubernetesAPIPort = 6443
+
+	// KubernetesAPIPrivateSuffix is the name suffix for Kubernetes API Private LB resources.
+	KubernetesAPIPrivateSuffix = "kubernetes-api-private"
+
+	// KubernetesAPIPublicSuffix is the name suffix for Kubernetes API Public LB resources.
+	KubernetesAPIPublicSuffix = "kubernetes-api-public"
+
+	// MachineConfigServerPort is the Machine Config Server port.
+	MachineConfigServerPort = 22623
+
+	// MachineConfigSuffix is the name suffix for Machine Config Server LB resources.
+	MachineConfigSuffix = "machine-config"
 )
 
 // Platform collects IBM Cloud-specific configuration.
@@ -75,4 +93,19 @@ func selectRegion() (string, error) {
 		return "", err
 	}
 	return selectedRegion, nil
+}
+
+// COSInstanceName creates a COS Instance name based on provided InfraID.
+func COSInstanceName(infraID string) string {
+	return fmt.Sprintf("%s-cos", infraID)
+}
+
+// VSIImageCOSBucketName creates a COS Bucket name for the VSI Image, based on provided InfraID.
+func VSIImageCOSBucketName(infraID string) string {
+	return fmt.Sprintf("%s-vsi-image", infraID)
+}
+
+// VSIImageName creates a VPC VSI Image name, based on provided InfraID.
+func VSIImageName(infraID string) string {
+	return fmt.Sprintf("%s-rhcos", infraID)
 }

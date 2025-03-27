@@ -158,6 +158,33 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 	topologyFld := fldPath.Child("topology")
 	var associatedVCenter *vsphere.VCenter
 	for index, failureDomain := range p.FailureDomains {
+		if failureDomain.ZoneType == "" && failureDomain.RegionType == "" {
+			logrus.Debug("using the defaults regionType is Datacenter and zoneType is ComputeCluster")
+		}
+
+		if failureDomain.RegionType == "" && failureDomain.ZoneType != "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("regionType"), "must specify regionType if zoneType is defined"))
+		}
+		if failureDomain.RegionType != "" && failureDomain.ZoneType == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("zoneType"), "must specify zoneType if regionType is defined"))
+		}
+
+		if failureDomain.RegionType == vsphere.HostGroupFailureDomain {
+			return append(allErrs, field.Required(fldPath.Child("regionType"), "region type cannot be used for host group failure domains"))
+		}
+
+		if failureDomain.ZoneType == vsphere.HostGroupFailureDomain && failureDomain.Topology.HostGroup == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("hostGroup"), "must not be empty if zoneType is HostGroup"))
+		}
+
+		if failureDomain.RegionType == vsphere.ComputeClusterFailureDomain {
+			if failureDomain.ZoneType != vsphere.HostGroupFailureDomain {
+				allErrs = append(allErrs, field.Required(fldPath.Child("regionType"), "zoneType must be HostGroup"))
+				allErrs = append(allErrs, field.Required(fldPath.Child("zoneType"), "something something..."))
+				return allErrs
+			}
+		}
+
 		if len(failureDomain.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify the name"))
 		} else {
@@ -220,12 +247,15 @@ func validateFailureDomains(p *vsphere.Platform, fldPath *field.Path, isLegacyUp
 			}
 		}
 
-		if len(failureDomain.Topology.Networks) == 0 {
+		switch networkCount := len(failureDomain.Topology.Networks); {
+		case networkCount == 0:
 			if isLegacyUpi {
 				logrus.Warn("network field empty is now deprecated, in later releases this field will be required.")
 			} else {
 				allErrs = append(allErrs, field.Required(topologyFld.Child("networks"), "must specify a network"))
 			}
+		case networkCount > 10:
+			allErrs = append(allErrs, field.TooMany(topologyFld.Child("networks"), networkCount, 10))
 		}
 
 		// Folder in failuredomain is optional

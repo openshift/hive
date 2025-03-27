@@ -3,13 +3,22 @@ package ibmcloud
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/IBM/go-sdk-core/v5/core"
+	"github.com/IBM/vpc-go-sdk/vpcv1"
 	"github.com/pkg/errors"
+	"k8s.io/utils/ptr"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/types"
+	ibmcloudtypes "github.com/openshift/installer/pkg/types/ibmcloud"
+)
+
+const (
+	privateHostPrefix = "api-int."
+	publicHostPrefix  = "api."
 )
 
 // Metadata holds additional metadata for InstallConfig resources that
@@ -73,6 +82,44 @@ func (m *Metadata) AccountID(ctx context.Context) (string, error) {
 		m.accountID = *apiKeyDetails.AccountID
 	}
 	return m.accountID, nil
+}
+
+// CreateDNSRecord creates a CNAME DNS Record in the IBM Cloud Internet Services zone or DNS Services zone for a Load Balancer hostname, based on the PublishStrategy.
+func (m *Metadata) CreateDNSRecord(ctx context.Context, clusterDomain string, loadBalancer *vpcv1.LoadBalancer) error {
+	var recordName string
+	// Based on the name of the Load Balancer (either for kubernetes API public or private traffic), build the record name.
+	if strings.HasSuffix(*loadBalancer.Name, KubernetesAPIPublicSuffix) {
+		recordName = fmt.Sprintf("%s%s", publicHostPrefix, clusterDomain)
+	} else if strings.HasSuffix(*loadBalancer.Name, KubernetesAPIPrivateSuffix) {
+		recordName = fmt.Sprintf("%s%s", privateHostPrefix, clusterDomain)
+	}
+
+	client, err := m.Client()
+	if err != nil {
+		return fmt.Errorf("failed to create ibmcloud client: %w", err)
+	}
+
+	zoneID, err := client.GetDNSZoneIDByName(ctx, m.BaseDomain, m.publishStrategy)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve dns zone by base domain %s for %s cluster: %w", m.BaseDomain, m.publishStrategy, err)
+	}
+
+	switch m.publishStrategy {
+	case types.ExternalPublishingStrategy:
+		cisInstanceCRN, err := m.CISInstanceCRN(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve cis instance crn for dns record: %w", err)
+		}
+		return client.CreateCISDNSRecord(ctx, cisInstanceCRN, zoneID, recordName, *loadBalancer.Hostname)
+	case types.InternalPublishingStrategy:
+		dnsInstance, err := m.DNSInstance(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve dns instance for dns record: %w", err)
+		}
+		return client.CreateDNSServicesDNSRecord(ctx, dnsInstance.ID, zoneID, recordName, *loadBalancer.Hostname)
+	default:
+		return fmt.Errorf("failed to create dns record, invalid publish strategy: %s", m.publishStrategy)
+	}
 }
 
 // CISInstanceCRN returns the Cloud Internet Services instance CRN that is
@@ -221,6 +268,21 @@ func (m *Metadata) ControlPlaneSubnets(ctx context.Context) (map[string]Subnet, 
 	}
 
 	return m.controlPlaneSubnets, nil
+}
+
+// GetIAMToken will retrieve an IAM access token using an IAM Authenticator and API Key.
+func (m *Metadata) GetIAMToken(apiKey string) (*string, error) {
+	// Get the IAM Service endpoint override, if one was supplied for the authenticator.
+	authenticator, err := NewIamAuthenticator(apiKey, ibmcloudtypes.CheckServiceEndpointOverride(configv1.IBMCloudServiceIAM, m.serviceEndpoints))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authenticator to get iam token: %w", err)
+	}
+
+	token, err := authenticator.GetToken()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get iam token: %w", err)
+	}
+	return ptr.To(token), nil
 }
 
 // Client returns a client used for making API calls to IBM Cloud services.

@@ -115,6 +115,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.openshift.api.machine.v1.ControlPlaneMachineSetSpec
   map:
     fields:
+    - name: machineNamePrefix
+      type:
+        scalar: string
     - name: replicas
       type:
         scalar: numeric
@@ -316,7 +319,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -491,6 +493,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authoritativeAPI
       type:
         scalar: string
+      default: MachineAPI
     - name: deletePolicy
       type:
         scalar: string
@@ -553,6 +556,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: authoritativeAPI
       type:
         scalar: string
+      default: MachineAPI
     - name: lifecycleHooks
       type:
         namedType: com.github.openshift.api.machine.v1beta1.LifecycleHooks
@@ -675,7 +679,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: timeout
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
-      default: 0
     - name: type
       type:
         scalar: string
@@ -739,7 +742,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: lastTransitionTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: message
       type:
         scalar: string
@@ -840,7 +842,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: creationTimestamp
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-      default: {}
     - name: deletionGracePeriodSeconds
       type:
         scalar: numeric

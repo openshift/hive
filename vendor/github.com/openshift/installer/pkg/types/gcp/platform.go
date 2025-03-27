@@ -2,17 +2,9 @@ package gcp
 
 import (
 	"fmt"
-)
 
-// UserProvisionedDNS indicates whether the DNS solution is provisioned by the Installer or the user.
-type UserProvisionedDNS string
-
-const (
-	// UserProvisionedDNSEnabled indicates that the DNS solution is provisioned and provided by the user.
-	UserProvisionedDNSEnabled UserProvisionedDNS = "Enabled"
-
-	// UserProvisionedDNSDisabled indicates that the DNS solution is provisioned by the Installer.
-	UserProvisionedDNSDisabled UserProvisionedDNS = "Disabled"
+	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/installer/pkg/types/dns"
 )
 
 // Platform stores all the global configuration that all machinesets
@@ -66,7 +58,13 @@ type Platform struct {
 	// +kubebuilder:default:="Disabled"
 	// +default="Disabled"
 	// +kubebuilder:validation:Enum="Enabled";"Disabled"
-	UserProvisionedDNS UserProvisionedDNS `json:"userProvisionedDNS,omitempty"`
+	UserProvisionedDNS dns.UserProvisionedDNS `json:"userProvisionedDNS,omitempty"`
+
+	// ServiceEndpoints list contains custom endpoints which will override default
+	// service endpoint of GCP Services.
+	// There must be only one ServiceEndpoint for a service.
+	// +optional
+	ServiceEndpoints []configv1.GCPServiceEndpoint `json:"serviceEndpoints,omitempty"`
 }
 
 // UserLabel is a label to apply to GCP resources created for the cluster.

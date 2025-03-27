@@ -7,6 +7,9 @@
 # cel.dev/expr v0.19.0
 ## explicit; go 1.21.1
 cel.dev/expr
+# cloud.google.com/go v0.116.0
+## explicit; go 1.21
+cloud.google.com/go
 # cloud.google.com/go/auth v0.14.1
 ## explicit; go 1.22.7
 cloud.google.com/go/auth
@@ -16,8 +19,10 @@ cloud.google.com/go/auth/credentials/internal/externalaccountuser
 cloud.google.com/go/auth/credentials/internal/gdch
 cloud.google.com/go/auth/credentials/internal/impersonate
 cloud.google.com/go/auth/credentials/internal/stsexchange
+cloud.google.com/go/auth/grpctransport
 cloud.google.com/go/auth/httptransport
 cloud.google.com/go/auth/internal
+cloud.google.com/go/auth/internal/compute
 cloud.google.com/go/auth/internal/credsfile
 cloud.google.com/go/auth/internal/jwt
 cloud.google.com/go/auth/internal/transport
@@ -28,6 +33,20 @@ cloud.google.com/go/auth/oauth2adapt
 # cloud.google.com/go/compute/metadata v0.6.0
 ## explicit; go 1.21
 cloud.google.com/go/compute/metadata
+# cloud.google.com/go/iam v1.2.2
+## explicit; go 1.21
+cloud.google.com/go/iam
+cloud.google.com/go/iam/apiv1/iampb
+# cloud.google.com/go/kms v1.20.2
+## explicit; go 1.21
+cloud.google.com/go/kms/apiv1
+cloud.google.com/go/kms/apiv1/kmspb
+cloud.google.com/go/kms/internal
+# cloud.google.com/go/longrunning v0.6.2
+## explicit; go 1.21
+cloud.google.com/go/longrunning
+cloud.google.com/go/longrunning/autogen
+cloud.google.com/go/longrunning/autogen/longrunningpb
 # github.com/4meepo/tagalign v1.4.1
 ## explicit; go 1.21.0
 github.com/4meepo/tagalign
@@ -195,8 +214,8 @@ github.com/GaijinEntertainment/go-exhaustruct/v3/internal/structure
 # github.com/IBM-Cloud/bluemix-go v0.0.0-20211102075456-ffc4e11dfb16
 ## explicit; go 1.13
 github.com/IBM-Cloud/bluemix-go/crn
-# github.com/IBM-Cloud/power-go-client v1.6.0
-## explicit; go 1.20
+# github.com/IBM-Cloud/power-go-client v1.9.0
+## explicit; go 1.22.0
 github.com/IBM-Cloud/power-go-client/clients/instance
 github.com/IBM-Cloud/power-go-client/errors
 github.com/IBM-Cloud/power-go-client/helpers
@@ -207,11 +226,16 @@ github.com/IBM-Cloud/power-go-client/power/client/bluemix_service_instances
 github.com/IBM-Cloud/power-go-client/power/client/catalog
 github.com/IBM-Cloud/power-go-client/power/client/datacenters
 github.com/IBM-Cloud/power-go-client/power/client/hardware_platforms
+github.com/IBM-Cloud/power-go-client/power/client/host_groups
 github.com/IBM-Cloud/power-go-client/power/client/iaas_service_broker
 github.com/IBM-Cloud/power-go-client/power/client/internal_power_v_s_instances
 github.com/IBM-Cloud/power-go-client/power/client/internal_power_v_s_locations
 github.com/IBM-Cloud/power-go-client/power/client/internal_storage_regions
 github.com/IBM-Cloud/power-go-client/power/client/internal_transit_gateway
+github.com/IBM-Cloud/power-go-client/power/client/network_address_groups
+github.com/IBM-Cloud/power-go-client/power/client/network_peers
+github.com/IBM-Cloud/power-go-client/power/client/network_security_groups
+github.com/IBM-Cloud/power-go-client/power/client/networks
 github.com/IBM-Cloud/power-go-client/power/client/open_stacks
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_cloud_connections
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_disaster_recovery
@@ -236,18 +260,62 @@ github.com/IBM-Cloud/power-go-client/power/client/p_cloud_tenants
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_tenants_ssh_keys
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_v_p_n_connections
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_v_p_n_policies
+github.com/IBM-Cloud/power-go-client/power/client/p_cloud_virtual_serial_number
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_volume_groups
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_volume_onboarding
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_volumes
+github.com/IBM-Cloud/power-go-client/power/client/power_edge_router
 github.com/IBM-Cloud/power-go-client/power/client/service_bindings
 github.com/IBM-Cloud/power-go-client/power/client/service_instances
+github.com/IBM-Cloud/power-go-client/power/client/snapshots
 github.com/IBM-Cloud/power-go-client/power/client/storage_types
 github.com/IBM-Cloud/power-go-client/power/client/swagger_spec
 github.com/IBM-Cloud/power-go-client/power/client/workspaces
 github.com/IBM-Cloud/power-go-client/power/models
-# github.com/IBM/go-sdk-core/v5 v5.17.5
-## explicit; go 1.20
+# github.com/IBM/go-sdk-core/v5 v5.18.5
+## explicit; go 1.21
 github.com/IBM/go-sdk-core/v5/core
+# github.com/IBM/ibm-cos-sdk-go v1.12.1
+## explicit; go 1.21
+github.com/IBM/ibm-cos-sdk-go/aws
+github.com/IBM/ibm-cos-sdk-go/aws/arn
+github.com/IBM/ibm-cos-sdk-go/aws/awserr
+github.com/IBM/ibm-cos-sdk-go/aws/awsutil
+github.com/IBM/ibm-cos-sdk-go/aws/client
+github.com/IBM/ibm-cos-sdk-go/aws/client/metadata
+github.com/IBM/ibm-cos-sdk-go/aws/corehandlers
+github.com/IBM/ibm-cos-sdk-go/aws/credentials
+github.com/IBM/ibm-cos-sdk-go/aws/credentials/endpointcreds
+github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam
+github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam/token
+github.com/IBM/ibm-cos-sdk-go/aws/credentials/ibmiam/tokenmanager
+github.com/IBM/ibm-cos-sdk-go/aws/credentials/processcreds
+github.com/IBM/ibm-cos-sdk-go/aws/defaults
+github.com/IBM/ibm-cos-sdk-go/aws/endpoints
+github.com/IBM/ibm-cos-sdk-go/aws/request
+github.com/IBM/ibm-cos-sdk-go/aws/session
+github.com/IBM/ibm-cos-sdk-go/aws/signer
+github.com/IBM/ibm-cos-sdk-go/aws/signer/ibmiam
+github.com/IBM/ibm-cos-sdk-go/aws/signer/v4
+github.com/IBM/ibm-cos-sdk-go/internal/ini
+github.com/IBM/ibm-cos-sdk-go/internal/s3shared
+github.com/IBM/ibm-cos-sdk-go/internal/s3shared/arn
+github.com/IBM/ibm-cos-sdk-go/internal/s3shared/s3err
+github.com/IBM/ibm-cos-sdk-go/internal/sdkio
+github.com/IBM/ibm-cos-sdk-go/internal/sdkmath
+github.com/IBM/ibm-cos-sdk-go/internal/sdkrand
+github.com/IBM/ibm-cos-sdk-go/internal/shareddefaults
+github.com/IBM/ibm-cos-sdk-go/internal/strings
+github.com/IBM/ibm-cos-sdk-go/internal/sync/singleflight
+github.com/IBM/ibm-cos-sdk-go/private/checksum
+github.com/IBM/ibm-cos-sdk-go/private/protocol
+github.com/IBM/ibm-cos-sdk-go/private/protocol/json/jsonutil
+github.com/IBM/ibm-cos-sdk-go/private/protocol/query
+github.com/IBM/ibm-cos-sdk-go/private/protocol/query/queryutil
+github.com/IBM/ibm-cos-sdk-go/private/protocol/rest
+github.com/IBM/ibm-cos-sdk-go/private/protocol/restxml
+github.com/IBM/ibm-cos-sdk-go/private/protocol/xml/xmlutil
+github.com/IBM/ibm-cos-sdk-go/service/s3
 # github.com/IBM/keyprotect-go-client v0.12.2
 ## explicit; go 1.15
 github.com/IBM/keyprotect-go-client
@@ -261,15 +329,15 @@ github.com/IBM/networking-go-sdk/dnszonesv1
 github.com/IBM/networking-go-sdk/resourcerecordsv1
 github.com/IBM/networking-go-sdk/transitgatewayapisv1
 github.com/IBM/networking-go-sdk/zonesv1
-# github.com/IBM/platform-services-go-sdk v0.69.0
-## explicit; go 1.20
+# github.com/IBM/platform-services-go-sdk v0.75.0
+## explicit; go 1.21
 github.com/IBM/platform-services-go-sdk/common
 github.com/IBM/platform-services-go-sdk/iamidentityv1
 github.com/IBM/platform-services-go-sdk/iampolicymanagementv1
 github.com/IBM/platform-services-go-sdk/resourcecontrollerv2
 github.com/IBM/platform-services-go-sdk/resourcemanagerv2
-# github.com/IBM/vpc-go-sdk v0.57.0
-## explicit; go 1.20
+# github.com/IBM/vpc-go-sdk v0.64.0
+## explicit; go 1.21
 github.com/IBM/vpc-go-sdk/common
 github.com/IBM/vpc-go-sdk/vpcv1
 # github.com/MakeNowJust/heredoc v1.0.0
@@ -478,7 +546,7 @@ github.com/coreos/go-semver/semver
 github.com/coreos/go-systemd/v22/daemon
 github.com/coreos/go-systemd/v22/journal
 github.com/coreos/go-systemd/v22/unit
-# github.com/coreos/ignition/v2 v2.19.0
+# github.com/coreos/ignition/v2 v2.20.0
 ## explicit; go 1.20
 github.com/coreos/ignition/v2/config/shared/errors
 github.com/coreos/ignition/v2/config/shared/parse
@@ -697,7 +765,7 @@ github.com/go-viper/mapstructure/v2/internal/errors
 # github.com/go-xmlfmt/xmlfmt v1.1.3
 ## explicit
 github.com/go-xmlfmt/xmlfmt
-# github.com/gobuffalo/flect v1.0.2
+# github.com/gobuffalo/flect v1.0.3
 ## explicit; go 1.16
 github.com/gobuffalo/flect
 # github.com/gobwas/glob v0.2.3
@@ -713,7 +781,7 @@ github.com/gobwas/glob/util/strings
 # github.com/gofrs/flock v0.12.1
 ## explicit; go 1.21.0
 github.com/gofrs/flock
-# github.com/gofrs/uuid/v5 v5.2.0
+# github.com/gofrs/uuid/v5 v5.3.0
 ## explicit; go 1.19
 github.com/gofrs/uuid/v5
 # github.com/gogo/protobuf v1.3.2
@@ -1002,7 +1070,8 @@ github.com/googleapis/gax-go/v2/callctx
 github.com/googleapis/gax-go/v2/internal
 github.com/googleapis/gax-go/v2/internallog
 github.com/googleapis/gax-go/v2/internallog/internal
-# github.com/gophercloud/gophercloud/v2 v2.0.0
+github.com/googleapis/gax-go/v2/iterator
+# github.com/gophercloud/gophercloud/v2 v2.2.0
 ## explicit; go 1.22
 github.com/gophercloud/gophercloud/v2
 github.com/gophercloud/gophercloud/v2/openstack
@@ -1049,7 +1118,7 @@ github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/shares
 github.com/gophercloud/gophercloud/v2/openstack/sharedfilesystems/v2/snapshots
 github.com/gophercloud/gophercloud/v2/openstack/utils
 github.com/gophercloud/gophercloud/v2/pagination
-# github.com/gophercloud/utils/v2 v2.0.0-20240701101423-2401526caee5
+# github.com/gophercloud/utils/v2 v2.0.0-20240812072210-8ce1fc0f2894
 ## explicit; go 1.22
 github.com/gophercloud/utils/v2/env
 github.com/gophercloud/utils/v2/gnocchi
@@ -1170,6 +1239,15 @@ github.com/kisielk/errcheck/errcheck
 # github.com/kkHAIKE/contextcheck v1.1.5
 ## explicit; go 1.20
 github.com/kkHAIKE/contextcheck
+# github.com/klauspost/compress v1.17.9
+## explicit; go 1.20
+github.com/klauspost/compress
+github.com/klauspost/compress/fse
+github.com/klauspost/compress/huff0
+github.com/klauspost/compress/internal/cpuinfo
+github.com/klauspost/compress/internal/snapref
+github.com/klauspost/compress/zstd
+github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/kulti/thelper v0.6.3
 ## explicit; go 1.18
 github.com/kulti/thelper/pkg/analyzer
@@ -1430,12 +1508,14 @@ github.com/nunnatsa/ginkgolinter/internal/rules
 github.com/nunnatsa/ginkgolinter/linter
 github.com/nunnatsa/ginkgolinter/types
 github.com/nunnatsa/ginkgolinter/version
-# github.com/nutanix-cloud-native/prism-go-client v0.3.4
-## explicit; go 1.16
+# github.com/nutanix-cloud-native/prism-go-client v0.5.0
+## explicit; go 1.21
 github.com/nutanix-cloud-native/prism-go-client
+github.com/nutanix-cloud-native/prism-go-client/environment/types
 github.com/nutanix-cloud-native/prism-go-client/internal
 github.com/nutanix-cloud-native/prism-go-client/utils
 github.com/nutanix-cloud-native/prism-go-client/v3
+github.com/nutanix-cloud-native/prism-go-client/v3/models
 # github.com/nxadm/tail v1.4.8
 ## explicit; go 1.13
 github.com/nxadm/tail
@@ -1558,8 +1638,8 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/build-machinery-go v0.0.0-20240419090851-af9c868bcf52
-## explicit; go 1.13
+# github.com/openshift/build-machinery-go v0.0.0-20240613134303-8359781da660
+## explicit; go 1.22.0
 github.com/openshift/build-machinery-go
 github.com/openshift/build-machinery-go/make
 github.com/openshift/build-machinery-go/make/lib
@@ -1568,7 +1648,7 @@ github.com/openshift/build-machinery-go/make/targets/golang
 github.com/openshift/build-machinery-go/make/targets/openshift
 github.com/openshift/build-machinery-go/make/targets/openshift/operator
 github.com/openshift/build-machinery-go/scripts
-# github.com/openshift/client-go v0.0.0-20240918182115-6a8ead8397fd
+# github.com/openshift/client-go v0.0.0-20241203091221-452dfb8fa071
 ## explicit; go 1.22.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
 github.com/openshift/client-go/config/applyconfigurations/internal
@@ -1627,8 +1707,8 @@ github.com/openshift/hive/apis/hive/v1/vsphere
 github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
 github.com/openshift/hive/apis/scheme
-# github.com/openshift/installer v0.91.0
-## explicit; go 1.22.0
+# github.com/openshift/installer v1.4.19-ec3
+## explicit; go 1.23.0
 github.com/openshift/installer/data
 github.com/openshift/installer/pkg/asset
 github.com/openshift/installer/pkg/asset/installconfig
@@ -1678,6 +1758,7 @@ github.com/openshift/installer/pkg/types/baremetal/defaults
 github.com/openshift/installer/pkg/types/baremetal/validation
 github.com/openshift/installer/pkg/types/conversion
 github.com/openshift/installer/pkg/types/defaults
+github.com/openshift/installer/pkg/types/dns
 github.com/openshift/installer/pkg/types/external
 github.com/openshift/installer/pkg/types/featuregates
 github.com/openshift/installer/pkg/types/gcp
@@ -1709,7 +1790,7 @@ github.com/openshift/installer/pkg/types/vsphere/validation
 github.com/openshift/installer/pkg/utils
 github.com/openshift/installer/pkg/validate
 github.com/openshift/installer/pkg/version
-# github.com/openshift/library-go v0.0.0-20240919205913-c96b82b3762b
+# github.com/openshift/library-go v0.0.0-20250114132252-af5b21ebad2f
 ## explicit; go 1.22.0
 github.com/openshift/library-go/pkg/config/clusterstatus
 github.com/openshift/library-go/pkg/config/leaderelection
@@ -1733,9 +1814,10 @@ github.com/openshift/machine-api-operator/pkg/metrics
 github.com/openshift/machine-api-operator/pkg/util
 github.com/openshift/machine-api-operator/pkg/util/conditions
 github.com/openshift/machine-api-operator/pkg/util/ipam
-# github.com/openshift/machine-api-provider-gcp v0.0.1-0.20231014045125-6096cc86f3ba
-## explicit; go 1.20
+# github.com/openshift/machine-api-provider-gcp v0.0.1-0.20241021180644-0eca0846914a
+## explicit; go 1.22.0
 github.com/openshift/machine-api-provider-gcp/pkg/apis/gcpprovider/v1beta1
+github.com/openshift/machine-api-provider-gcp/pkg/cloud/gcp/actuators/services/tags
 github.com/openshift/machine-api-provider-gcp/pkg/cloud/gcp/actuators/util
 # github.com/openshift/machine-api-provider-ibmcloud v0.0.0-20231207164151-6b0b8ea7b16d
 ## explicit; go 1.19
@@ -1770,12 +1852,17 @@ github.com/pmezard/go-difflib/difflib
 # github.com/polyfloyd/go-errorlint v1.7.1
 ## explicit; go 1.22.0
 github.com/polyfloyd/go-errorlint/errorlint
+# github.com/ppc64le-cloud/powervs-utils v0.0.0-20240610070307-1c0d75a5c247
+## explicit; go 1.21
+github.com/ppc64le-cloud/powervs-utils
 # github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.74.0
 ## explicit; go 1.21
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring
 github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1
-# github.com/prometheus/client_golang v1.19.1
+# github.com/prometheus/client_golang v1.20.5
 ## explicit; go 1.20
+github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil
+github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil/header
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/collectors
 github.com/prometheus/client_golang/prometheus/internal
@@ -1911,7 +1998,7 @@ github.com/sourcegraph/go-diff/diff
 github.com/spf13/afero
 github.com/spf13/afero/internal/common
 github.com/spf13/afero/mem
-# github.com/spf13/cast v1.6.0
+# github.com/spf13/cast v1.7.0
 ## explicit; go 1.19
 github.com/spf13/cast
 # github.com/spf13/cobra v1.8.1
@@ -2009,9 +2096,10 @@ github.com/uudashr/iface/unused
 # github.com/vincent-petithory/dataurl v1.0.0
 ## explicit
 github.com/vincent-petithory/dataurl
-# github.com/vmware/govmomi v0.39.0
-## explicit; go 1.21
+# github.com/vmware/govmomi v0.46.3
+## explicit; go 1.22
 github.com/vmware/govmomi
+github.com/vmware/govmomi/fault
 github.com/vmware/govmomi/find
 github.com/vmware/govmomi/history
 github.com/vmware/govmomi/internal
@@ -2071,7 +2159,7 @@ go-simpler.org/musttag
 # go-simpler.org/sloglint v0.9.0
 ## explicit; go 1.22.0
 go-simpler.org/sloglint
-# go.etcd.io/etcd/api/v3 v3.5.16
+# go.etcd.io/etcd/api/v3 v3.5.17
 ## explicit; go 1.22
 go.etcd.io/etcd/api/v3/authpb
 go.etcd.io/etcd/api/v3/etcdserverpb
@@ -2079,7 +2167,7 @@ go.etcd.io/etcd/api/v3/membershippb
 go.etcd.io/etcd/api/v3/mvccpb
 go.etcd.io/etcd/api/v3/v3rpc/rpctypes
 go.etcd.io/etcd/api/v3/version
-# go.etcd.io/etcd/client/pkg/v3 v3.5.16
+# go.etcd.io/etcd/client/pkg/v3 v3.5.17
 ## explicit; go 1.22
 go.etcd.io/etcd/client/pkg/v3/fileutil
 go.etcd.io/etcd/client/pkg/v3/logutil
@@ -2087,7 +2175,7 @@ go.etcd.io/etcd/client/pkg/v3/systemd
 go.etcd.io/etcd/client/pkg/v3/tlsutil
 go.etcd.io/etcd/client/pkg/v3/transport
 go.etcd.io/etcd/client/pkg/v3/types
-# go.etcd.io/etcd/client/v3 v3.5.16
+# go.etcd.io/etcd/client/v3 v3.5.17
 ## explicit; go 1.22
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/credentials
@@ -2423,11 +2511,17 @@ google.golang.org/api/internal/cert
 google.golang.org/api/internal/gensupport
 google.golang.org/api/internal/impersonate
 google.golang.org/api/internal/third_party/uritemplates
+google.golang.org/api/iterator
 google.golang.org/api/option
 google.golang.org/api/option/internaloption
 google.golang.org/api/serviceusage/v1
 google.golang.org/api/storage/v1
+google.golang.org/api/transport/grpc
 google.golang.org/api/transport/http
+# google.golang.org/genproto v0.0.0-20241118233622-e639e219e697
+## explicit; go 1.21
+google.golang.org/genproto/googleapis/cloud/location
+google.golang.org/genproto/googleapis/type/expr
 # google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576
 ## explicit; go 1.21
 google.golang.org/genproto/googleapis/api
@@ -2446,6 +2540,8 @@ google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
+google.golang.org/grpc/balancer/grpclb
+google.golang.org/grpc/balancer/grpclb/grpc_lb_v1
 google.golang.org/grpc/balancer/grpclb/state
 google.golang.org/grpc/balancer/pickfirst
 google.golang.org/grpc/balancer/pickfirst/internal
@@ -2456,7 +2552,16 @@ google.golang.org/grpc/channelz
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
+google.golang.org/grpc/credentials/alts
+google.golang.org/grpc/credentials/alts/internal
+google.golang.org/grpc/credentials/alts/internal/authinfo
+google.golang.org/grpc/credentials/alts/internal/conn
+google.golang.org/grpc/credentials/alts/internal/handshaker
+google.golang.org/grpc/credentials/alts/internal/handshaker/service
+google.golang.org/grpc/credentials/alts/internal/proto/grpc_gcp
+google.golang.org/grpc/credentials/google
 google.golang.org/grpc/credentials/insecure
+google.golang.org/grpc/credentials/oauth
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/gzip
 google.golang.org/grpc/encoding/proto
@@ -2473,6 +2578,7 @@ google.golang.org/grpc/internal/buffer
 google.golang.org/grpc/internal/channelz
 google.golang.org/grpc/internal/credentials
 google.golang.org/grpc/internal/envconfig
+google.golang.org/grpc/internal/googlecloud
 google.golang.org/grpc/internal/grpclog
 google.golang.org/grpc/internal/grpcsync
 google.golang.org/grpc/internal/grpcutil
@@ -2490,6 +2596,7 @@ google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/internal/transport/networktype
+google.golang.org/grpc/internal/xds
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/mem
 google.golang.org/grpc/metadata
@@ -2816,7 +2923,7 @@ k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
 k8s.io/api/storagemigration/v1alpha1
-# k8s.io/apiextensions-apiserver v0.32.0
+# k8s.io/apiextensions-apiserver v0.32.1
 ## explicit; go 1.23.0
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
@@ -3416,7 +3523,7 @@ k8s.io/cloud-provider-vsphere/pkg/common/config
 # k8s.io/cluster-registry v0.0.6
 ## explicit
 k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1
-# k8s.io/code-generator v0.32.0
+# k8s.io/code-generator v0.32.1
 ## explicit; go 1.23.0
 k8s.io/code-generator
 k8s.io/code-generator/cmd/applyconfiguration-gen
@@ -3602,7 +3709,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/cluster-api v1.8.2
+# sigs.k8s.io/cluster-api v1.9.4
 ## explicit; go 1.22.0
 sigs.k8s.io/cluster-api/api/v1beta1
 sigs.k8s.io/cluster-api/cmd/clusterctl/api/v1alpha3
@@ -3627,16 +3734,20 @@ sigs.k8s.io/cluster-api-provider-azure/util/webhook
 # sigs.k8s.io/cluster-api-provider-gcp v1.7.1-0.20240724153512-c3b8b533143c
 ## explicit; go 1.21
 sigs.k8s.io/cluster-api-provider-gcp/api/v1beta1
-# sigs.k8s.io/cluster-api-provider-openstack v0.10.3
-## explicit; go 1.22
+# sigs.k8s.io/cluster-api-provider-ibmcloud v0.10.0
+## explicit; go 1.22.0
+sigs.k8s.io/cluster-api-provider-ibmcloud/api/v1beta2
+sigs.k8s.io/cluster-api-provider-ibmcloud/pkg/endpoints
+sigs.k8s.io/cluster-api-provider-ibmcloud/util
+# sigs.k8s.io/cluster-api-provider-openstack v0.11.1
+## explicit; go 1.22.0
 sigs.k8s.io/cluster-api-provider-openstack/api/v1beta1
 sigs.k8s.io/cluster-api-provider-openstack/pkg/utils/optional
-# sigs.k8s.io/cluster-api-provider-vsphere v1.10.2
-## explicit; go 1.21
+# sigs.k8s.io/cluster-api-provider-vsphere v1.12.0-rc.0.0.20241223082411-2880c92b15b6
+## explicit; go 1.22.0
 sigs.k8s.io/cluster-api-provider-vsphere/apis/v1beta1
-sigs.k8s.io/cluster-api-provider-vsphere/pkg/constants
 sigs.k8s.io/cluster-api-provider-vsphere/pkg/session
-# sigs.k8s.io/controller-runtime v0.19.0
+# sigs.k8s.io/controller-runtime v0.19.4
 ## explicit; go 1.22.0
 sigs.k8s.io/controller-runtime
 sigs.k8s.io/controller-runtime/pkg/builder
@@ -3682,7 +3793,7 @@ sigs.k8s.io/controller-runtime/pkg/webhook/admission
 sigs.k8s.io/controller-runtime/pkg/webhook/admission/metrics
 sigs.k8s.io/controller-runtime/pkg/webhook/conversion
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
-# sigs.k8s.io/controller-tools v0.16.1
+# sigs.k8s.io/controller-tools v0.16.3
 ## explicit; go 1.22.0
 sigs.k8s.io/controller-tools/cmd/controller-gen
 sigs.k8s.io/controller-tools/pkg/crd

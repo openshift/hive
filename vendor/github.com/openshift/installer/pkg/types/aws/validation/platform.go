@@ -14,7 +14,7 @@ import (
 )
 
 // tagRegex is used to check that the keys and values of a tag contain only valid characters.
-var tagRegex = regexp.MustCompile(`^[0-9A-Za-z_.:/=+-@]*$`)
+var tagRegex = regexp.MustCompile(`^[0-9A-Za-z_.:/=+-@\p{Z}]*$`)
 
 // kubernetesNamespaceRegex is used to check that a tag key is not in the kubernetes.io namespace.
 var kubernetesNamespaceRegex = regexp.MustCompile(`^([^/]*\.)?kubernetes.io/`)
@@ -35,7 +35,7 @@ func ValidatePlatform(p *aws.Platform, cm types.CredentialsMode, fldPath *field.
 	}
 
 	if p.HostedZone != "" {
-		if len(p.Subnets) == 0 {
+		if len(p.VPC.Subnets) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("hostedZone"), p.HostedZone, "may not use an existing hosted zone when not using existing subnets"))
 		}
 	}
@@ -74,17 +74,8 @@ func validateUserTags(tags map[string]string, propagatingTags bool, fldPath *fie
 		allErrs = append(allErrs, field.TooMany(fldPath, len(tags), userTagLimit))
 	}
 	for key, value := range tags {
-		if strings.EqualFold(key, "Name") {
-			allErrs = append(allErrs, field.Invalid(fldPath.Key(key), tags[key], "Name key is not allowed for user defined tags"))
-		}
-		if propagatingTags {
-			if err := validateTag(key, value); err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Key(key), value, err.Error()))
-			}
-		} else {
-			if strings.HasPrefix(key, "kubernetes.io/cluster/") {
-				allErrs = append(allErrs, field.Invalid(fldPath.Key(key), tags[key], "Keys with prefix 'kubernetes.io/cluster/' are not allowed for user defined tags"))
-			}
+		if err := validateTag(key, value); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(key), value, err.Error()))
 		}
 	}
 	return allErrs
@@ -99,6 +90,9 @@ func validateUserTags(tags map[string]string, propagatingTags bool, fldPath *fie
 //   - The key is not in the kubernetes.io namespace.
 //   - The key is not in the openshift.io namespace.
 func validateTag(key, value string) error {
+	if strings.EqualFold(key, "Name") {
+		return fmt.Errorf("\"Name\" key is not allowed for user defined tags")
+	}
 	if !tagRegex.MatchString(key) {
 		return fmt.Errorf("key contains invalid characters")
 	}

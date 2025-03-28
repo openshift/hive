@@ -118,6 +118,14 @@ func WithInitializedStatusConditions() Option {
 				Status: corev1.ConditionUnknown,
 				Type:   hivev1.UnsupportedConfigurationMachinePoolCondition,
 			},
+			{
+				Status: corev1.ConditionUnknown,
+				Type:   hivev1.MachineSetsGeneratedMachinePoolCondition,
+			},
+			{
+				Status: corev1.ConditionUnknown,
+				Type:   hivev1.SyncedMachinePoolCondition,
+			},
 		}
 	}
 }

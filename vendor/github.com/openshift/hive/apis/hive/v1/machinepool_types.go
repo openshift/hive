@@ -228,6 +228,14 @@ const (
 	// UnsupportedConfigurationMachinePoolCondition is true when the configuration of the MachinePool is unsupported
 	// by the cluster.
 	UnsupportedConfigurationMachinePoolCondition MachinePoolConditionType = "UnsupportedConfiguration"
+
+	// MachineSetsGeneratedMachinePoolCondition is true when the most recent pass of the controller successfully
+	// generated MachineSet manifests to sync to the spoke cluster, false if it failed.
+	MachineSetsGeneratedMachinePoolCondition MachinePoolConditionType = "MachineSetsGenerated"
+
+	// SyncedMachinePoolCondition indicates whether the most recent pass of the controller successfully synced
+	// objects (MachineSets, and {Machine|Cluster}Autoscaler(s) if appropriate) to the spoke cluster.
+	SyncedMachinePoolCondition MachinePoolConditionType = "Synced"
 )
 
 // +genclient

@@ -34,6 +34,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
+	ofake "github.com/openshift/hive/pkg/client/fake"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
@@ -106,15 +107,24 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		return nil, err
 	}
 
+	// errStatus describes an expected "False" status condition
+	type errStatus struct {
+		condType     hivev1.ConditionType
+		expReason    string
+		msgSubstring string
+	}
+
 	tests := []struct {
-		name                 string
-		clusterDeployment    *hivev1.ClusterDeployment
-		machinePool          *hivev1.MachinePool
-		remoteExisting       []runtime.Object
-		generatedMachineSets []*machineapi.MachineSet
-		actuatorDoNotProceed bool
-		expectErr            bool
-		expectNoFinalizer    bool
+		name                   string
+		clusterDeployment      *hivev1.ClusterDeployment
+		machinePool            *hivev1.MachinePool
+		remoteExisting         []runtime.Object
+		configureRemoteClient  func(*ofake.FakeClientWithCustomErrors)
+		generatedMachineSets   []*machineapi.MachineSet
+		generateMachineSetsErr error
+		actuatorDoNotProceed   bool
+		expectErrStatus        *errStatus
+		expectNoFinalizer      bool
 		// expectPoolPresent is ignored if expectNoFinalizer is false
 		expectPoolPresent                bool
 		expectedRemoteMachineSets        []*machineapi.MachineSet
@@ -301,6 +311,23 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "Error in GenerateMachineSets",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1b", "worker", true, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
+			},
+			generateMachineSetsErr: fmt.Errorf("foo bar baz"),
+			expectErrStatus: &errStatus{
+				condType:     hivev1.MachineSetsGeneratedMachinePoolCondition,
+				expReason:    "MachineSetGenerationFailed",
+				msgSubstring: "foo bar baz",
+			},
+		},
+		{
 			name:              "Fail to update MachineSet with same name and AZ but no MachinePool label",
 			clusterDeployment: testClusterDeployment(),
 			machinePool:       testMachinePool(),
@@ -311,7 +338,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			generatedMachineSets: []*machineapi.MachineSet{
 				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
 			},
-			expectErr: true,
+			expectErrStatus: &errStatus{
+				condType:     hivev1.SyncedMachinePoolCondition,
+				expReason:    "MachineSetSyncFailed",
+				msgSubstring: "already exists",
+			},
 		},
 		{
 			name:              "Fail to update MachineSet with same name and MachinePool label but different AZ",
@@ -326,7 +357,11 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			generatedMachineSets: []*machineapi.MachineSet{
 				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 2, 0, "not-us-east-1a"),
 			},
-			expectErr: true,
+			expectErrStatus: &errStatus{
+				condType:     hivev1.SyncedMachinePoolCondition,
+				expReason:    "MachineSetSyncFailed",
+				msgSubstring: "already exists",
+			},
 		},
 		{
 			name:              "Merge labels and taints",
@@ -842,6 +877,53 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 		},
 		{
+			name:              "MachineAutoscaler sync failed",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(testmp.WithAutoscaling(1, 2)),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				// Pre-seed enough MachineAutoscalers that we'll try to delete some.
+				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
+				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
+			},
+			configureRemoteClient: func(fakeClient *ofake.FakeClientWithCustomErrors) {
+				// ...and when we try to delete one, boom.
+				fakeClient.DeleteBehavior = []error{fmt.Errorf("foo bar baz")}
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+			},
+			expectErrStatus: &errStatus{
+				condType:     hivev1.SyncedMachinePoolCondition,
+				expReason:    "MachineAutoscalerSyncFailed",
+				msgSubstring: "foo bar baz",
+			},
+		},
+		{
+			name:              "ClusterAutoscaler sync failed",
+			clusterDeployment: testClusterDeployment(),
+			machinePool:       testMachinePool(testmp.WithAutoscaling(1, 2)),
+			remoteExisting: []runtime.Object{
+				testMachine("master1", "master"),
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
+				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
+			},
+			configureRemoteClient: func(fakeClient *ofake.FakeClientWithCustomErrors) {
+				// The first List() is for MachineAutoscalers. Fail the second, for ClusterAutoscalers
+				fakeClient.ListBehavior = []error{nil, fmt.Errorf("foo bar baz")}
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", false, 1, 0, "us-east-1a"),
+			},
+			expectErrStatus: &errStatus{
+				condType:     hivev1.SyncedMachinePoolCondition,
+				expReason:    "ClusterAutoscalerSyncFailed",
+				msgSubstring: "foo bar baz",
+			},
+		},
+		{
 			name:              "No-op with auto-scaling",
 			clusterDeployment: testClusterDeployment(),
 			machinePool:       testMachinePool(testmp.WithAutoscaling(3, 5)),
@@ -1291,15 +1373,20 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 					Name: "cluster",
 				},
 			}
-			remoteFakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(append(test.remoteExisting, infra)...).Build()
+			remoteFakeClient := ofake.FakeClientWithCustomErrors{
+				Client: testfake.NewFakeClientBuilder().WithRuntimeObjects(append(test.remoteExisting, infra)...).Build(),
+			}
+			if test.configureRemoteClient != nil {
+				test.configureRemoteClient(&remoteFakeClient)
+			}
 
 			mockCtrl := gomock.NewController(t)
 
 			mockActuator := mock.NewMockActuator(mockCtrl)
-			if test.generatedMachineSets != nil {
+			if test.generatedMachineSets != nil || test.generateMachineSetsErr != nil {
 				mockActuator.EXPECT().
 					GenerateMachineSets(test.clusterDeployment, test.machinePool, gomock.Any()).
-					Return(test.generatedMachineSets, !test.actuatorDoNotProceed, nil)
+					Return(test.generatedMachineSets, !test.actuatorDoNotProceed, test.generateMachineSetsErr)
 			}
 
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
@@ -1318,26 +1405,29 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				},
 				expectations: controllerExpectations,
 			}
-			_, err := rcd.Reconcile(context.TODO(), reconcile.Request{
+			res, err := rcd.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      fmt.Sprintf("%s-worker", testName),
 					Namespace: testNamespace,
 				},
 			})
 
-			if test.expectErr {
-				if err == nil {
-					t.Errorf("expected error but got none")
-				}
-				// Should not proceed with test validations if we expected an error from the reconcile.
-				return
-			}
-			if err != nil && !test.expectErr {
-				t.Errorf("unexpected error: %v", err)
+			if assert.NoError(t, err, "unexpected error: %v", err) {
 				return
 			}
 
 			pool := getPool(fakeClient, "worker")
+
+			if test.expectErrStatus != nil {
+				cond := controllerutils.FindCondition(pool.Status.Conditions, test.expectErrStatus.condType)
+				assert.Equal(t, corev1.ConditionFalse, cond.Status, "Expected %s condition to be False", test.expectErrStatus.condType)
+				assert.Equal(t, test.expectErrStatus.expReason, cond.Reason, "Expected %s condition Reason to be %s", test.expectErrStatus.condType, test.expectErrStatus.expReason)
+				assert.Contains(t, cond.Message, test.expectErrStatus.msgSubstring, "Did not find expected substring in condition message")
+				assert.Equal(t, defaultErrorRequeueInterval, res.RequeueAfter, "Unexpected requeueAfter")
+				// Should not proceed with test validations if we expected an error from the reconcile.
+				return
+			}
+
 			if test.expectNoFinalizer {
 				if test.expectPoolPresent {
 					assert.NotNil(t, pool, "missing machinepool (with no finalizer)")

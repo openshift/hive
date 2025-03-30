@@ -179,7 +179,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/coreos/ignition/v2 v2.18.0 // indirect
 	github.com/coreos/stream-metadata-go v0.1.8 // indirect
-	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
+	github.com/coreos/vcontext 685dc7299dc5 // indirect
 	github.com/daixiang0/gci v0.13.4 // indirect
 	github.com/digitalocean/go-libvirt v0.0.0-20240220204746-fcabe97a6eed // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect

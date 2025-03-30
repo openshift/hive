@@ -211,7 +211,7 @@ github.com/GaijinEntertainment/go-exhaustruct/v3/analyzer
 github.com/GaijinEntertainment/go-exhaustruct/v3/internal/comment
 github.com/GaijinEntertainment/go-exhaustruct/v3/internal/pattern
 github.com/GaijinEntertainment/go-exhaustruct/v3/internal/structure
-# github.com/IBM-Cloud/bluemix-go v0.0.0-20211102075456-ffc4e11dfb16
+# github.com/IBM-Cloud/bluemix-go v0.0.0-20250324085928-caa6511f0c13
 ## explicit; go 1.13
 github.com/IBM-Cloud/bluemix-go/crn
 # github.com/IBM-Cloud/power-go-client v1.9.0

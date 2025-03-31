@@ -30,6 +30,10 @@ type FakeClientWithCustomErrors struct {
 	GetBehavior []error
 	// Private tracker of calls to Get, used to determine which GetBehavior to use.
 	numGetCalls int
+	// Ditto List
+	ListBehavior []error
+	// Private tracker of calls to List, used to determine which ListBehavior to use.
+	numListCalls int
 	// Ditto Delete
 	DeleteBehavior []error
 	// Private tracker of calls to Delete, used to determine which DeleteBehavior to use.
@@ -57,7 +61,18 @@ func (f FakeClientWithCustomErrors) Get(ctx context.Context, key crclient.Object
 		return err
 	}
 	// Otherwise run the real Get
-	return f.Client.Get(ctx, key, obj)
+	return f.Client.Get(ctx, key, obj, opts...)
+}
+
+// List overrides the fake client's List, conditionally bypassing it and returning an error instead.
+func (f FakeClientWithCustomErrors) List(ctx context.Context, list crclient.ObjectList, opts ...crclient.ListOption) error {
+	// Always increment the call count, but not until we're done.
+	defer func() { f.numListCalls++ }()
+	if err := clientOverride(f.ListBehavior, f.numListCalls); err != nil {
+		return err
+	}
+	// Otherwise run the real List
+	return f.Client.List(ctx, list, opts...)
 }
 
 // Delete overrides the fake client's Delete, conditionally bypassing it and returning an error instead.

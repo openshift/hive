@@ -357,6 +357,10 @@ const (
 	// in the form "[MAJOR].[MINOR].[PATCH]".
 	VersionMajorMinorPatchLabel = "hive.openshift.io/version-major-minor-patch"
 
+	// MinorVersionUpgradeUnavailable is a label applied to ClusterDeployments to show concerns about upgrades to the
+	// next minor version. i.e 4.y -> 4.(y+1)
+	MinorVersionUpgradeUnavailable = "hive.openshift.io/minor-version-upgrade-unavailable"
+
 	// OvirtCredentialsDir is the directory containing Ovirt credentials files.
 	OvirtCredentialsDir = "/.ovirt"
 

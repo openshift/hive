@@ -1,6 +1,7 @@
 package clusterversion
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"math/rand"
@@ -209,6 +210,22 @@ func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterD
 		delete(cd.Labels, constants.VersionMajorMinorLabel)
 		delete(cd.Labels, constants.VersionMajorMinorPatchLabel)
 		changed = changed || origLen != len(cd.Labels)
+	}
+
+	upgradeableCondition := ""
+	for _, condition := range clusterVersion.Status.Conditions {
+		if condition.Type == openshiftapiv1.OperatorUpgradeable {
+			if condition.Status != openshiftapiv1.ConditionTrue {
+				upgradeableCondition = cmp.Or(condition.Message, fmt.Sprintf("%s: %s", condition.Type, condition.Status))
+			}
+			break
+		}
+	}
+	changed = changed || upgradeableCondition != cd.Labels[constants.MinorVersionUpgradeUnavailable]
+	if upgradeableCondition == "" {
+		delete(cd.Labels, constants.MinorVersionUpgradeUnavailable)
+	} else {
+		cd.Labels[constants.MinorVersionUpgradeUnavailable] = upgradeableCondition
 	}
 
 	if !changed {

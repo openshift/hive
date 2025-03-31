@@ -45,11 +45,12 @@ func init() {
 func TestClusterVersionReconcile(t *testing.T) {
 
 	tests := []struct {
-		name         string
-		existing     []runtime.Object
-		noRemoteCall bool
-		expectError  bool
-		validate     func(*testing.T, *hivev1.ClusterDeployment)
+		name                 string
+		existing             []runtime.Object
+		clusterVersionStatus configv1.ClusterVersionStatus
+		noRemoteCall         bool
+		expectError          bool
+		validate             func(*testing.T, *hivev1.ClusterDeployment)
 	}{
 		{
 			// no cluster deployment, no error expected
@@ -69,11 +70,103 @@ func TestClusterVersionReconcile(t *testing.T) {
 				testClusterDeployment(),
 				testKubeconfigSecret(),
 			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
 				assert.Equal(t, "2.3.4+somebuild", cd.Labels[constants.VersionLabel], "unexpected version label")
 				assert.Equal(t, "2", cd.Labels[constants.VersionMajorLabel], "unexpected version major label")
 				assert.Equal(t, "2.3", cd.Labels[constants.VersionMajorMinorLabel], "unexpected version major-minor label")
 				assert.Equal(t, "2.3.4", cd.Labels[constants.VersionMajorMinorPatchLabel], "unexpected version major-minor-patch label")
+			},
+		},
+		{
+			name: "upgradeable condition true",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
+				Type:   configv1.OperatorUpgradeable,
+				Status: configv1.ConditionTrue,
+			}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+			},
+		},
+		{
+			name: "upgradeable condition false",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
+				Type:   configv1.OperatorUpgradeable,
+				Status: configv1.ConditionFalse,
+			}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "Upgradeable: False", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+			},
+		},
+		{
+			name: "upgradeable condition false with message",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
+				Type:    configv1.OperatorUpgradeable,
+				Status:  configv1.ConditionFalse,
+				Message: "Can't do the upgrade",
+			}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "Can't do the upgrade", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+			},
+		},
+		{
+			name: "upgradeable condition unknown",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
+				Type:   configv1.OperatorUpgradeable,
+				Status: configv1.ConditionUnknown,
+			}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "Upgradeable: Unknown", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+			},
+		},
+		{
+			name: "upgradeable condition unknown with message",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
+				Type:    configv1.OperatorUpgradeable,
+				Status:  configv1.ConditionUnknown,
+				Message: "Can't read status",
+			}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "Can't read status", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+			},
+		},
+		{
+			name: "upgradeable condition when multiple conditions",
+			existing: []runtime.Object{
+				testClusterDeployment(),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatus(
+				configv1.ClusterOperatorStatusCondition{
+					Type: configv1.OperatorProgressing,
+				},
+				configv1.ClusterOperatorStatusCondition{
+					Type:    configv1.OperatorUpgradeable,
+					Status:  configv1.ConditionFalse,
+					Message: "It can't upgrade",
+				}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				assert.Equal(t, "It can't upgrade", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
 			},
 		},
 	}
@@ -85,7 +178,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockRemoteClientBuilder := remoteclientmock.NewMockBuilder(mockCtrl)
 			if !test.noRemoteCall {
-				mockRemoteClientBuilder.EXPECT().Build().Return(testRemoteClusterAPIClient(), nil)
+				mockRemoteClientBuilder.EXPECT().Build().Return(testRemoteClusterAPIClient(test.clusterVersionStatus), nil)
 			}
 			rcd := &ReconcileClusterVersion{
 				Client:                        fakeClient,
@@ -183,19 +276,19 @@ func testSecret(name, key, value string) *corev1.Secret {
 	return s
 }
 
-func testRemoteClusterAPIClient() client.Client {
+func testRemoteClusterAPIClient(status configv1.ClusterVersionStatus) client.Client {
 	remoteClusterVersion := &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: remoteClusterVersionObjectName,
 		},
 	}
-	remoteClusterVersion.Status = *testRemoteClusterVersionStatus()
+	remoteClusterVersion.Status = status
 	return testfake.NewFakeClientBuilder().WithRuntimeObjects(remoteClusterVersion).Build()
 }
 
-func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {
+func testRemoteClusterVersionStatus(conditions ...configv1.ClusterOperatorStatusCondition) configv1.ClusterVersionStatus {
 	zeroTime := metav1.NewTime(time.Unix(0, 0))
-	return &configv1.ClusterVersionStatus{
+	return configv1.ClusterVersionStatus{
 		Desired: configv1.Release{
 			Version: "2.3.4+somebuild",
 		},
@@ -209,5 +302,6 @@ func testRemoteClusterVersionStatus() *configv1.ClusterVersionStatus {
 		},
 		ObservedGeneration: 123456789,
 		VersionHash:        "TESTVERSIONHASH",
+		Conditions:         conditions,
 	}
 }

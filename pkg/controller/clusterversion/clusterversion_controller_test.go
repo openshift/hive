@@ -89,7 +89,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				Status: configv1.ConditionTrue,
 			}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+				assert.Equal(t, "", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
 			},
 		},
 		{
@@ -103,7 +103,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				Status: configv1.ConditionFalse,
 			}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Upgradeable: False", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+				assert.Equal(t, "Upgradeable: False", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
 			},
 		},
 		{
@@ -118,7 +118,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				Message: "Can't do the upgrade",
 			}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Can't do the upgrade", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+				assert.Equal(t, "Can't do the upgrade", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
 			},
 		},
 		{
@@ -132,7 +132,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				Status: configv1.ConditionUnknown,
 			}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Upgradeable: Unknown", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+				assert.Equal(t, "Upgradeable: Unknown", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
 			},
 		},
 		{
@@ -147,7 +147,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 				Message: "Can't read status",
 			}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Can't read status", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+				assert.Equal(t, "Can't read status", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
 			},
 		},
 		{
@@ -166,7 +166,7 @@ func TestClusterVersionReconcile(t *testing.T) {
 					Message: "It can't upgrade",
 				}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "It can't upgrade", cd.Labels[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
+				assert.Equal(t, "It can't upgrade", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected version major-minor-patch label")
 			},
 		},
 	}

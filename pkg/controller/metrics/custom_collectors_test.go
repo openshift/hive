@@ -878,7 +878,7 @@ func FailingSince(t time.Time) testcs.Option {
 }
 
 func metricPretty(d *dto.Metric) string {
-	labels := make([]string, len(d.Label))
+	labels := make([]string, 0, len(d.Label))
 	for _, label := range d.Label {
 		labels = append(labels, fmt.Sprintf("%s = %s", *label.Name, *label.Value))
 	}

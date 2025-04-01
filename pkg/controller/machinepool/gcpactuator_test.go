@@ -393,11 +393,11 @@ func TestGCPActuator(t *testing.T) {
 					// UserTags
 					if eTags := platform.UserTags; len(eTags) != 0 {
 						if aTags := gcpProvider.ResourceManagerTags; assert.Equal(t, len(eTags), len(aTags), "unexpected number of userTags") {
-							uta := make([]string, len(eTags))
+							uta := make([]string, 0, len(eTags))
 							for _, ut := range eTags {
 								uta = append(uta, fmt.Sprintf("%s|%s|%s", ut.ParentID, ut.Key, ut.Value))
 							}
-							rmta := make([]string, len(aTags))
+							rmta := make([]string, 0, len(aTags))
 							for _, rmt := range aTags {
 								rmta = append(rmta, fmt.Sprintf("%s|%s|%s", rmt.ParentID, rmt.Key, rmt.Value))
 							}

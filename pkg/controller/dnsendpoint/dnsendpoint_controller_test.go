@@ -413,7 +413,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 			if tc.configureQuery != nil {
 				tc.configureQuery(mockQuery)
 			}
-			rootDomains := make([]string, len(tc.nameServers))
+			rootDomains := make([]string, 0, len(tc.nameServers))
 			for rootDomain := range tc.nameServers {
 				rootDomains = append(rootDomains, rootDomain)
 			}

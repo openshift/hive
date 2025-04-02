@@ -448,7 +448,7 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		pool,
 		hivev1.SyncedMachinePoolCondition,
 		corev1.ConditionTrue,
-		"MachineAutoscalerSyncFailed",
+		"MachineAutoscalerSyncSucceeded",
 		"MachineAutoscalers synced successfully",
 		logger,
 	); err != nil {
@@ -473,7 +473,7 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		pool,
 		hivev1.SyncedMachinePoolCondition,
 		corev1.ConditionTrue,
-		"ClusterAutoscalerSyncFailed",
+		"ClusterAutoscalerSyncSucceeded",
 		"ClusterAutoscaler synced successfully",
 		logger,
 	); err != nil {

@@ -419,16 +419,6 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
 		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
 	}
-	if err := r.updateCondition(
-		pool,
-		hivev1.SyncedMachinePoolCondition,
-		corev1.ConditionTrue,
-		"MachineSetSyncSucceeded",
-		"MachineSets synced successfully",
-		logger,
-	); err != nil {
-		return reconcile.Result{}, err
-	}
 
 	if err := r.syncMachineAutoscalers(pool, cd, machineSets, remoteClusterAPIClient, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineAutoscalers")
@@ -443,16 +433,6 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		)
 		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
 		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
-	}
-	if err := r.updateCondition(
-		pool,
-		hivev1.SyncedMachinePoolCondition,
-		corev1.ConditionTrue,
-		"MachineAutoscalerSyncSucceeded",
-		"MachineAutoscalers synced successfully",
-		logger,
-	); err != nil {
-		return reconcile.Result{}, err
 	}
 
 	if err := r.syncClusterAutoscaler(pool, remoteClusterAPIClient, logger); err != nil {
@@ -473,8 +453,8 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 		pool,
 		hivev1.SyncedMachinePoolCondition,
 		corev1.ConditionTrue,
-		"ClusterAutoscalerSyncSucceeded",
-		"ClusterAutoscaler synced successfully",
+		"SyncSucceeded",
+		"Resources synced successfully",
 		logger,
 	); err != nil {
 		return reconcile.Result{}, err

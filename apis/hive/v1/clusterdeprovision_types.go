@@ -3,6 +3,7 @@ package v1
 import (
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -54,6 +55,8 @@ type ClusterDeprovisionPlatform struct {
 	Ovirt *OvirtClusterDeprovision `json:"ovirt,omitempty"`
 	// IBMCloud contains IBM Cloud specific deprovision settings
 	IBMCloud *IBMClusterDeprovision `json:"ibmcloud,omitempty"`
+	// Nutanix contains Nutanix-specific deprovision settings
+	Nutanix *NutanixClusterDeprovision `json:"nutanix,omitempty"`
 }
 
 // AWSClusterDeprovision contains AWS-specific configuration for a ClusterDeprovision
@@ -152,6 +155,17 @@ type IBMClusterDeprovision struct {
 	// BaseDomain is the DNS base domain.
 	// TODO: Use the non-platform-specific BaseDomain field.
 	BaseDomain string `json:"baseDomain"`
+}
+
+// NutanixClusterDeprovision contains Nutanix-specific configuration for a ClusterDeprovision
+type NutanixClusterDeprovision struct {
+	// PrismCentral is the endpoint (address and port) to connect to the Prism Central.
+	// This serves as the default Prism-Central.
+	PrismCentral nutanix.PrismEndpoint `json:"prismCentral"`
+
+	// CredentialsSecretRef refers to a secret that contains the Nutanix account access
+	// credentials.
+	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 }
 
 // +genclient

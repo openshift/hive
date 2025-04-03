@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/apis/hive/v1/ibmcloud"
 	"github.com/openshift/hive/apis/hive/v1/none"
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	"github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/apis/hive/v1/ovirt"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -673,6 +674,9 @@ type Platform struct {
 	// None indicates platform-agnostic install.
 	// https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html
 	None *none.Platform `json:"none,omitempty"`
+
+	// Nutanix is the configuration used when installing on Nutanix Prism Central.
+	Nutanix *nutanix.Platform `json:"nutanix,omitempty"`
 }
 
 // PlatformStatus contains the observed state for the specific platform upon which to

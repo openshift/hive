@@ -1906,6 +1906,7 @@ github.com/openshift/installer/pkg/destroy/aws
 github.com/openshift/installer/pkg/destroy/azure
 github.com/openshift/installer/pkg/destroy/gcp
 github.com/openshift/installer/pkg/destroy/ibmcloud
+github.com/openshift/installer/pkg/destroy/nutanix
 github.com/openshift/installer/pkg/destroy/openstack
 github.com/openshift/installer/pkg/destroy/ovirt
 github.com/openshift/installer/pkg/destroy/providers

@@ -3076,6 +3076,11 @@ func (in *MachinePoolPlatform) DeepCopyInto(out *MachinePoolPlatform) {
 		*out = new(ibmcloud.MachinePool)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Nutanix != nil {
+		in, out := &in.Nutanix, &out.Nutanix
+		*out = new(nutanix.MachinePool)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 
@@ -3451,7 +3456,7 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	if in.Nutanix != nil {
 		in, out := &in.Nutanix, &out.Nutanix
 		*out = new(nutanix.Platform)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

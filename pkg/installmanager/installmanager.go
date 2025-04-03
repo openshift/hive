@@ -45,6 +45,7 @@ import (
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
+	"github.com/openshift/installer/pkg/destroy/nutanix"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/providers"
@@ -53,6 +54,7 @@ import (
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
+	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
@@ -819,6 +821,33 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if ibmCloudDestroyerErr != nil {
 			return ibmCloudDestroyerErr
 		}
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				Nutanix: &installertypesnutanix.Metadata{
+					PrismCentral: cd.Spec.Platform.Nutanix.PrismCentral.Address,
+					Username:     nutanixUsername,
+					Password:     nutanixPassword,
+					Port:         string(cd.Spec.Platform.Nutanix.PrismCentral.Port),
+				},
+			},
+		}
+		var err error
+		uninstaller, err = nutanix.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+
 	default:
 		logger.Warn("unknown platform for re-try cleanup")
 		return errors.New("unknown platform for re-try cleanup")

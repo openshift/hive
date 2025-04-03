@@ -67,20 +67,6 @@ func (o *nutanixOptions) Complete(cmd *cobra.Command, args []string) error {
 
 // Validate ensures that option values make sense
 func (o *nutanixOptions) Validate(cmd *cobra.Command) error {
-	if o.endpoint == "" {
-		o.endpoint = os.Getenv(constants.NutanixPrismCentralEndpointEnvVar)
-		if o.endpoint == "" {
-			return fmt.Errorf("must provide --nutanix-pc-address or set %s env var", constants.NutanixPrismCentralEndpointEnvVar)
-		}
-	}
-
-	if o.port == "" {
-		o.port = os.Getenv(constants.NutanixPrismCentralPortEnvVar)
-		if o.port == "" {
-			return fmt.Errorf("must provide --nutanix-pc-port or set %s env var", constants.NutanixPrismCentralPortEnvVar)
-		}
-	}
-
 	o.username = os.Getenv(constants.NutanixUsernameEnvVar)
 	if o.username == "" {
 		return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)

@@ -7,18 +7,6 @@ const (
 	// NutanixPasswordEnvVar is the environment variable specifying the Nutanix Prism Central password.
 	NutanixPasswordEnvVar = "NUTANIX_PASSWORD"
 
-	// NutanixPrismCentralEndpointEnvVar is the environment variable specifying the Nutanix Prism Central endpoint.
-	NutanixPrismCentralEndpointEnvVar = "NUTANIX_PC_ADDRESS"
-
-	// NutanixPrismCentralPortEnvVar is the environment variable specifying the Nutanix Prism Central port.
-	NutanixPrismCentralPortEnvVar = "NUTANIX_PC_PORT"
-
-	// NutanixPrismElementEndpointEnvVar is the environment variable specifying the Nutanix Prism Element endpoint.
-	NutanixPrismElementEndpointEnvVar = "NUTANIX_PE_ADDRESS"
-
-	// NutanixPrismElementPortEnvVar is the environment variable specifying the Nutanix Prism Element port.
-	NutanixPrismElementPortEnvVar = "NUTANIX_PE_PORT"
-
 	// CliNutanixPcAddressOpt defines the hiveutil variable name used to specify the Nutanix Prism Central address.
 	CliNutanixPcAddressOpt = "nutanix-pc-address"
 

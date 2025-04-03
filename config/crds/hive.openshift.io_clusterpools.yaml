@@ -729,10 +729,11 @@ spec:
                               type: string
                             prismElement:
                               description: |-
-                                PrismElement holds the identification (name, uuid) and the optional endpoint address and port of the Nutanix Prism Element.
-                                When a cluster-wide proxy is installed, by default, this endpoint will be accessed via the proxy.
-                                Should you wish for communication with this endpoint not to be proxied, please add the endpoint to the
-                                proxy spec.noProxy list.
+                                PrismElement holds the identification (name, UUID) and the optional endpoint address and
+                                port of the Nutanix Prism Element. When a cluster-wide proxy is installed, this endpoint will,
+                                by default, be accessed through the cluster-wide proxy configured for the platform.
+                                If communication with this endpoint should bypass the proxy, add the endpoint to the install-config
+                                `spec.noProxy` list in the proxy configuration.
                               properties:
                                 endpoint:
                                   description: Endpoint holds the address and port

@@ -36,7 +36,9 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/controller/utils/nutanixutils"
 	yamlpatch "github.com/openshift/hive/pkg/util/yaml"
+	"github.com/openshift/installer/pkg/types/nutanix"
 )
 
 const (
@@ -1355,6 +1357,26 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.NetworkName = platform.Ovirt.NetworkName
 
 		return cloudBuilder, nil
+	case platform.Nutanix != nil:
+		credsSecret, err := r.getCredentialsSecret(pool, platform.Nutanix.CredentialsSecretRef.Name, logger)
+		if err != nil {
+			return nil, err
+		}
+		failureDomains, _, _ := nutanixutils.ConvertHiveFailureDomains(platform.Nutanix.FailureDomains)
+
+		cloudBuilder := clusterresource.NewNutanixCloudBuilder(credsSecret)
+		cloudBuilder.PrismCentral = nutanix.PrismCentral{
+			Endpoint: nutanix.PrismEndpoint{
+				Address: pool.Spec.Platform.Nutanix.PrismCentral.Address,
+				Port:    pool.Spec.Platform.Nutanix.PrismCentral.Port,
+			},
+			Username: cloudBuilder.PrismCentral.Username,
+			Password: cloudBuilder.PrismCentral.Password,
+		}
+		cloudBuilder.FailureDomains = failureDomains
+
+		return cloudBuilder, nil
+
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

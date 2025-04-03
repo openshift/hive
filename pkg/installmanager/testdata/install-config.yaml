@@ -1,19 +1,20 @@
 apiVersion: v1
 baseDomain: hive.example.com
 compute:
-- name: worker
-  platform:
-    aws:
-      rootVolume:
-        iops: 100
-        size: 120
-        type: gp3
-      type: m5.xlarge
-  replicas: 3
+  - name: worker
+    platform:
+      aws:
+        rootVolume:
+          iops: 100
+          size: 120
+          type: gp3
+        type: m5.xlarge
+    replicas: 3
 controlPlane:
   name: master
   platform:
     aws:
+      metadataService: {}
       rootVolume:
         iops: 100
         size: 120
@@ -21,15 +22,16 @@ controlPlane:
       type: m5.xlarge
   replicas: 3
 metadata:
+  creationTimestamp: null
   name: hive-cluster
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14
-    hostPrefix: 23
+    - cidr: 10.128.0.0/14
+      hostPrefix: 23
   machineCIDR: 10.0.0.0/16
   networkType: OpenShiftSDN
   serviceNetwork:
-  - 172.30.0.0/16
+    - 172.30.0.0/16
 platform:
   aws:
     region: us-east-1

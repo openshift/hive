@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sigs.k8s.io/yaml"
 	"strings"
 	"testing"
 	"time"
@@ -718,8 +719,18 @@ func Test_pasteInPullSecret(t *testing.T) {
 			if !assert.NoError(t, err, "unexpected error reading install-config-with-pull-secret.yaml") {
 				return
 			}
-			actual, err := pasteInPullSecret(icData, filepath.Join("testdata", "pull-secret.json"))
+
+			ic := installertypes.InstallConfig{}
+			if err = yaml.Unmarshal(icData, &ic); err != nil {
+				assert.NoError(t, err)
+			}
+			err = pasteInPullSecret(&ic, filepath.Join("testdata", "pull-secret.json"))
 			assert.NoError(t, err, "unexpected error pasting in pull secret")
+
+			actual, err := yaml.Marshal(ic)
+			if err != nil {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig with pasted pull secret")
 		})
 	}
@@ -779,7 +790,17 @@ func Test_nutanix_pasteInProviderCredentials(t *testing.T) {
 				},
 			}
 
-			actual, err := pasteInProviderCredentials(icData, &cd)
+			ic := installertypes.InstallConfig{}
+			if err = yaml.Unmarshal(icData, &ic); err != nil {
+				assert.NoError(t, err)
+			}
+
+			err = pasteInProviderCredentials(&ic, &cd)
+			actual, err2 := yaml.Marshal(ic)
+			if err2 != nil {
+				assert.NoError(t, err)
+			}
+
 			if tc.expectsErr {
 				assert.Error(t, err, "expected error but got none")
 				return

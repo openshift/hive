@@ -349,14 +349,9 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading install-config.yaml")
 		return err
 	}
-	icData, err = pasteInPullSecret(icData, m.PullSecretMountPath)
+	icData, err = m.pasteInInstallConfigSecrets(cd, icData)
 	if err != nil {
-		m.log.WithError(err).Error("error adding pull secret to install-config.yaml")
-		return err
-	}
-	icData, err = pasteInProviderCredentials(icData, cd)
-	if err != nil {
-		m.log.WithError(err).Error("error adding provider credentials to install-config.yaml")
+		m.log.WithError(err).Error("error adding secret to install-config.yaml")
 		return err
 	}
 	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
@@ -1927,45 +1922,52 @@ func isDirNonEmpty(dir string) bool {
 }
 
 // pasteInProviderCredentials Add the credentials from a given secret into the ic if nor present
-func pasteInProviderCredentials(icData []byte, cd *hivev1.ClusterDeployment) ([]byte, error) {
+func pasteInProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
 	switch {
 	case cd.Spec.Platform.Nutanix != nil:
-		ic := installertypes.InstallConfig{}
-		if err := yaml.Unmarshal(icData, &ic); err != nil {
-			return nil, errors.Wrap(err, "could not unmarshal InstallConfig")
-		}
-
 		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
 		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
 		if nutanixUsername == "" || nutanixPassword == "" {
-			return nil, fmt.Errorf("missing credentials for %s platform provider", constants.PlatformNutanix)
+			return fmt.Errorf("missing credentials for %s platform provider", constants.PlatformNutanix)
 		}
 		if ic.Platform.Nutanix.PrismCentral.Username != "" && ic.Platform.Nutanix.PrismCentral.Username != nutanixUsername {
-			return nil, fmt.Errorf("prism central username mismatch for %s platform provider", constants.PlatformNutanix)
+			return fmt.Errorf("prism central username mismatch for %s platform provider", constants.PlatformNutanix)
 		}
 		if ic.Platform.Nutanix.PrismCentral.Password != "" && ic.Platform.Nutanix.PrismCentral.Password != nutanixPassword {
-			return nil, fmt.Errorf("prism central password mismatch for %s platform provider", constants.PlatformNutanix)
+			return fmt.Errorf("prism central password mismatch for %s platform provider", constants.PlatformNutanix)
 		}
 
 		ic.Platform.Nutanix.PrismCentral.Username = nutanixUsername
 		ic.Platform.Nutanix.PrismCentral.Password = nutanixPassword
-		return yaml.Marshal(ic)
 	}
 
-	return icData, nil
+	return nil
 }
 
-func pasteInPullSecret(icData []byte, pullSecretFile string) ([]byte, error) {
-	pullSecretData, err := os.ReadFile(pullSecretFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read the pull secret file")
-	}
-	icRaw := map[string]interface{}{}
-	if err := yaml.Unmarshal(icData, &icRaw); err != nil {
+func (m *InstallManager) pasteInInstallConfigSecrets(cd *hivev1.ClusterDeployment, icData []byte) ([]byte, error) {
+	ic := installertypes.InstallConfig{}
+	if err := yaml.Unmarshal(icData, &ic); err != nil {
 		return nil, errors.Wrap(err, "could not unmarshal InstallConfig")
 	}
-	icRaw["pullSecret"] = string(pullSecretData)
-	return yaml.Marshal(icRaw)
+
+	if err := pasteInPullSecret(&ic, m.PullSecretMountPath); err != nil {
+		return nil, err
+	}
+
+	if err := pasteInProviderCredentials(&ic, cd); err != nil {
+		return nil, err
+	}
+	return yaml.Marshal(ic)
+}
+
+func pasteInPullSecret(ic *installertypes.InstallConfig, pullSecretFile string) error {
+	pullSecretData, err := os.ReadFile(pullSecretFile)
+	if err != nil {
+		return errors.Wrap(err, "could not read the pull secret file")
+	}
+
+	ic.PullSecret = string(pullSecretData)
+	return nil
 }
 
 func getHomeDir() string {

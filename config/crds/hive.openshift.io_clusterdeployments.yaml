@@ -830,6 +830,119 @@ spec:
                             type: string
                         type: object
                         x-kubernetes-map-type: atomic
+                      failureDomains:
+                        description: |-
+                          FailureDomains configures failure domains for the Nutanix platform.
+                          Required for using MachinePools
+                        items:
+                          description: FailureDomain configures failure domain information
+                            for the Nutanix platform.
+                          properties:
+                            dataSourceImages:
+                              description: DataSourceImages identifies the datasource
+                                images in the Prism Element.
+                              items:
+                                description: StorageResourceReference holds reference
+                                  information of a storage resource (storage container,
+                                  data source image, etc.)
+                                properties:
+                                  name:
+                                    description: Name is the name of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                  referenceName:
+                                    description: ReferenceName is the identifier of
+                                      the storage resource configured in the FailureDomain.
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              type: array
+                            name:
+                              description: Name defines the unique name of a failure
+                                domain.
+                              maxLength: 64
+                              minLength: 1
+                              pattern: ^[0-9A-Za-z_.-@/]+$
+                              type: string
+                            prismElement:
+                              description: |-
+                                PrismElement holds the identification (name, uuid) and the optional endpoint address and port of the Nutanix Prism Element.
+                                When a cluster-wide proxy is installed, by default, this endpoint will be accessed via the proxy.
+                                Should you wish for communication with this endpoint not to be proxied, please add the endpoint to the
+                                proxy spec.noProxy list.
+                              properties:
+                                endpoint:
+                                  description: Endpoint holds the address and port
+                                    of the Prism Element
+                                  properties:
+                                    address:
+                                      description: address is the endpoint address
+                                        (DNS name or IP address) of the Nutanix Prism
+                                        Central or Element (cluster)
+                                      type: string
+                                    port:
+                                      description: port is the port number to access
+                                        the Nutanix Prism Central or Element (cluster)
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - address
+                                  - port
+                                  type: object
+                                name:
+                                  description: Name is prism endpoint Name
+                                  type: string
+                                uuid:
+                                  description: UUID is the UUID of the Prism Element
+                                    (cluster)
+                                  type: string
+                              required:
+                              - uuid
+                              type: object
+                            storageContainers:
+                              description: StorageContainers identifies the storage
+                                containers in the Prism Element.
+                              items:
+                                description: StorageResourceReference holds reference
+                                  information of a storage resource (storage container,
+                                  data source image, etc.)
+                                properties:
+                                  name:
+                                    description: Name is the name of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                  referenceName:
+                                    description: ReferenceName is the identifier of
+                                      the storage resource configured in the FailureDomain.
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              type: array
+                            subnetUUIDs:
+                              description: |-
+                                SubnetUUIDs identifies the network subnets of the Prism Element.
+                                Currently we only support one subnet for a failure domain.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-list-type: set
+                          required:
+                          - name
+                          - prismElement
+                          - subnetUUIDs
+                          type: object
+                        type: array
                       prismCentral:
                         description: |-
                           PrismCentral is the endpoint (address and port) to connect to the Prism Central.

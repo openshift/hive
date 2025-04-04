@@ -17,6 +17,7 @@
       - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
     - [vSphere](#vsphere)
     - [OpenStack](#openstack)
+    - [Nutanix](#nutanix)
   - [SSH Key Pair](#ssh-key-pair)
   - [InstallConfig](#installconfig)
   - [ClusterDeployment](#clusterdeployment)
@@ -295,6 +296,110 @@ metadata:
 type: Opaque
 ```
 
+#### Nutanix
+
+To provision an OpenShift cluster on Nutanix using Hive, you must provide the necessary cloud credentials. These credentials are used by Hive to interact with the Nutanix environment and perform cluster provisioning operations.
+
+#### Required Credentials
+Hive requires the following credentials for Nutanix:
+
+- **Prism Central Username**: The username with sufficient privileges to create and manage virtual machines.
+- **Prism Central Password**: The password associated with the provided username.
+
+#### Creating a Secret for Credentials
+The Nutanix credentials must be stored as a Kubernetes secret in the namespace where Hive operates. Create a secret with the following format:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nutanix-cloud-credentials
+  namespace: hive
+type: Opaque
+data:
+  username: <base64-encoded-username>
+  password: <base64-encoded-password>
+```
+
+To create the secret using `oc`, first encode the values in Base64:
+
+```sh
+echo -n "<value>" | base64
+```
+
+Then, apply the secret using:
+
+```sh
+oc apply -f nutanix-cloud-credentials.yaml
+```
+
+#### Additional Required Secrets
+In addition to the Hive credentials, OpenShift requires additional secrets in specific namespaces for authentication with Nutanix.
+
+##### Secret for OpenShift Machine API
+This secret is required by the OpenShift Machine API to manage machines on Nutanix:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+   name: nutanix-credentials
+   namespace: openshift-machine-api 
+type: Opaque
+stringData:
+  credentials: |
+    [{"type":"basic_auth","data":{"prismCentral":{"username":"${NUTANIX_USERNAME}","password":"${NUTANIX_PASSWORD}"}}}]
+```
+
+##### Secret for OpenShift Cloud Controller Manager
+This secret is required by the OpenShift Cloud Controller Manager to integrate OpenShift with Nutanix infrastructure:
+
+```yamlz
+apiVersion: v1
+kind: Secret
+metadata:
+   name: nutanix-credentials
+   namespace: openshift-cloud-controller-manager
+type: Opaque
+stringData:
+  credentials: |
+    [{"type":"basic_auth","data":{"prismCentral":{"username":"${NUTANIX_USERNAME}","password":"${NUTANIX_PASSWORD}"}}}]
+```
+
+#### Why These Secrets Are Required
+- **Hive Secret**: Used by Hive for provisioning clusters and managing resources.
+- **Machine API Secret**: Required for the OpenShift Machine API to manage and create worker nodes on Nutanix.
+- **Cloud Controller Manager Secret**: Enables OpenShift to interact with Nutanix for networking, load balancing, and other infrastructure-related tasks.
+
+Each of these secrets plays a critical role in ensuring a seamless integration between OpenShift and Nutanix, allowing for automated cluster deployment and lifecycle management.
+
+#### Using the Secret in Hive
+Once the secret is created, reference it in the `ClusterDeployment` or `ClusterPool` configuration:
+
+```yaml
+spec:
+  platform:
+    nutanix:
+      credentialsSecretRef:
+        name: nutanix-cloud-credentials
+```
+
+This ensures that Hive can retrieve the necessary credentials to interact with Nutanix for cluster provisioning.
+
+#### Additional Considerations
+- Ensure the Nutanix user has appropriate permissions to create virtual machines and network resources.
+- Verify network connectivity between the OpenShift cluster nodes and Nutanix infrastructure.
+- If using self-signed certificates in Nutanix, additional TLS configurations may be required.
+
+By setting up these credentials correctly, Hive will be able to deploy OpenShift clusters on Nutanix efficiently.
+
+#### No Need to Specify Credentials in Install Config
+
+Hive automatically injects the necessary Nutanix credentials during the provisioning process. Therefore, there is no need to manually specify the Prism Central username and password in the install configuration. By referencing the created secrets, Hive ensures secure and seamless authentication with Nutanix.
+
+By setting up these credentials correctly, Hive will be able to deploy OpenShift clusters on Nutanix efficiently.
+
+
 ### SSH Key Pair
 
 (Optional) Hive uses the provided ssh key pair to ssh into the machines in the remote cluster. Hive connects via ssh to gather logs in the event of an installation failure. The ssh key pair is optional, but neither the user nor Hive will be able to ssh into the machines if it is not supplied.
@@ -458,6 +563,39 @@ and replace the contents of `platform` with:
     externalNetwork: openstack_network_name
     lbFloatingIP: 10.0.111.158
 ```
+
+For Nutanix, you need to specify the Nutanix platform configuration in your install-config.yaml. Below is the required platform section:
+```yaml
+platform:
+  nutanix:
+    apiVIPs:
+      - 10.0.2.12
+    ingressVIPs:
+      - 10.0.2.11
+    prismCentral:
+      endpoint:
+        address: "prism-central.example.com"
+        port: 9440
+    prismElements:
+      - endpoint:
+          address: "prism-element-1.example.com"
+          port: 9440
+        uuid: "prism-elements-uuid-1234"
+        name: "Prism-Element-1"
+    subnetUUIDs:
+      - "subnet-uuid-1234"
+    failureDomains:
+      - name: "Local_AZ"
+        subnetUUIDs:
+          - "subnet-uuid-1234"
+        prismElement:
+          endpoint:
+            address: "prism-element-1.example.com"
+            port: 9440
+          uuid: "prism-elements-uuid-1234"
+          name: "Prism-Element-1"
+```
+Note: The failureDomains section is optional and can be omitted if not required.
 
 ### ClusterDeployment
 
@@ -633,6 +771,39 @@ openstack:
     type: ceph
   flavor: m1.large
 ```
+
+For Nutanix, replace the contents of spec.platform with the settings you want for the instances:
+
+```yaml
+nutanix:
+  prismCentral:
+    address: prism-central.example.com
+    port: 9440
+  credentialsSecretRef:
+      name: nutanix-creds
+  failureDomains:
+    - name: "Local_AZ"
+      subnetUUIDs:
+        - "subnet-uuid-1234"
+      prismElement:
+        endpoint:
+          address: "prism-element-1.example.com"
+          port: 9440
+        uuid: "prism-elements-uuid-1234"
+        name: "Prism-Element-1"
+```
+
+#### Required Secrets
+- `nutanix-creds`: A secret containing the credentials for Prism Central.
+- `install-config`: A secret holding the OpenShift install configuration.
+- `ssh-private-key`: A secret containing the SSH private key for cluster access.
+
+#### Additional Considerations
+- Ensure that the provided `prismCentral.endpoint` and `prismElements.endpoint` are reachable from the Hive environment.
+- The `subnetUUID` must correspond to an existing Nutanix subnet where the cluster nodes will be deployed.
+- If using self-signed certificates in Prism Central, additional configuration may be required to trust the connection.
+
+
 
 #### Configuring Availability Zones
 

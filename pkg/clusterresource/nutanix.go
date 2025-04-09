@@ -33,19 +33,6 @@ type NutanixCloudBuilder struct {
 	IngressVIP string
 }
 
-func NewNutanixCloudBuilder(credsSecret *corev1.Secret) *NutanixCloudBuilder {
-	username := credsSecret.Data[constants.UsernameSecretKey]
-	password := credsSecret.Data[constants.PasswordSecretKey]
-
-	return &NutanixCloudBuilder{
-		PrismCentral: installernutanix.PrismCentral{
-			Endpoint: installernutanix.PrismEndpoint{},
-			Username: string(username),
-			Password: string(password),
-		},
-	}
-}
-
 func (p *NutanixCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{

@@ -1653,12 +1653,13 @@ func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDeleteAndLogAnnotati
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
 	logger := cdLog.WithField("zone", dnsZoneNamespacedName.String())
 	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// DNSZone doesn't exist yet
+			return false, nil
+		}
 		logger.WithError(err).Error("failed to fetch DNS zone")
 		return false, err
-	} else if err != nil {
-		// DNSZone doesn't exist yet
-		return false, nil
 	}
 
 	changed := controllerutils.CopyLogAnnotation(cd, dnsZone)

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -693,7 +692,7 @@ func TestIsBootstrapComplete(t *testing.T) {
 			}
 			defer os.RemoveAll(dir)
 			script := fmt.Sprintf("#!/bin/bash\nexit %d", tc.errCode)
-			if err := os.WriteFile(path.Join(dir, "openshift-install"), []byte(script), 0777); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "openshift-install"), []byte(script), 0777); err != nil {
 				t.Fatalf("could not write openshift-install file: %v", err)
 			}
 			im := &InstallManager{WorkDir: dir}

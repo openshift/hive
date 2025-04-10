@@ -327,7 +327,7 @@ func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Ob
 		}
 		if owner != nil {
 			if err := controllerutil.SetOwnerReference(owner, destSecret, scheme); err != nil {
-				return nil
+				return err
 			}
 		}
 

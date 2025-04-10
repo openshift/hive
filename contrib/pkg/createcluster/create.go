@@ -393,6 +393,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.NutanixIngressVIP, constants.CliNutanixIngressVipOpt, "", "Virtual IP address for ingress application routing")
 	flags.StringVar(&opt.NutanixAzName, constants.CliNutanixAzNameOpt, "", "Name of the Prism Element Availability Zone")
 	flags.StringSliceVar(&opt.NutanixSubnetUUIDs, constants.CliNutanixSubnetUUIDOpt, []string{}, "List of network subnets to be used by the cluster")
+	flags.StringVar(&opt.NutanixCACerts, constants.CliNutanixCACertsOpt, "", "Path to a PEM-encoded CA certificate file used to verify the Nutanix endpoint's TLS certificates")
 
 	// oVirt flags
 	flags.StringVar(&opt.OvirtClusterID, "ovirt-cluster-id", "", "The oVirt cluster id (uuid) under which all VMs will run")

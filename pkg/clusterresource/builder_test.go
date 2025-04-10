@@ -185,6 +185,7 @@ func createNutanixClusterBuilder() *Builder {
 		},
 		APIVIP:     "192.168.0.2",
 		IngressVIP: "192.168.0.3",
+		CACert:     []byte{},
 	}
 	return b
 }
@@ -304,6 +305,11 @@ func TestBuildClusterResources(t *testing.T) {
 				credsSecret := findSecret(allObjects, credsSecretName)
 				require.NotNil(t, credsSecret, "Nutanix credentials secret should be generated")
 				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name)
+
+				certSecretName := fmt.Sprintf("%s-nutanix-certs", clusterName)
+				certSecret := findSecret(allObjects, certSecretName)
+				require.NotNil(t, certSecret, "Nutanix certificate secret should be generated")
+				assert.Equal(t, certSecret.Name, cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name)
 
 				// Validate PrismCentral endpoint
 				assert.Equal(t, "prism-central.nutanix-test.com", cd.Spec.Platform.Nutanix.PrismCentral.Address)

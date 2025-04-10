@@ -36,4 +36,10 @@ const (
 
 	// CliNutanixSubnetUUIDOpt defines the hiveutil variable name used to specify the a list of network subnets uuids to be used by the cluster.
 	CliNutanixSubnetUUIDOpt = "nutanix-subnetUUIDs"
+
+	// CliNutanixCACertsOpt defines the hiveutil variable name used to specify the CA certificates for connecting to Nutanix endpoints.
+	CliNutanixCACertsOpt = "nutanix-ca-certs"
+
+	// NutanixCertificatesDir is the directory containing Prism Central certificate files.
+	NutanixCertificatesDir = "/nutanix-certificates"
 )

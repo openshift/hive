@@ -1,8 +1,10 @@
 package createcluster
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/openshift/hive/pkg/clusterresource"
@@ -50,6 +52,24 @@ func getNutanixStrVal(envVar, valueCmd, optionValue string) (string, error) {
 	return value, nil
 }
 
+func (o *Options) getNutanixCACert() ([]byte, error) {
+	nutanixCACerts, err := getNutanixStrVal("", c.CliNutanixCACertsOpt, o.NutanixCACerts)
+	if err != nil {
+		return nil, err
+	}
+
+	var caCerts [][]byte
+	for _, cert := range filepath.SplitList(nutanixCACerts) {
+		caCert, err := os.ReadFile(cert)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s: %w", cert, err)
+		}
+		caCerts = append(caCerts, caCert)
+	}
+
+	return bytes.Join(caCerts, []byte("\n")), nil
+}
+
 func (o *Options) getNutanixCloudBuilder() (*clusterresource.NutanixCloudBuilder, error) {
 	username := os.Getenv(c.NutanixUsernameEnvVar)
 	if username == "" {
@@ -58,6 +78,11 @@ func (o *Options) getNutanixCloudBuilder() (*clusterresource.NutanixCloudBuilder
 	password := os.Getenv(c.NutanixPasswordEnvVar)
 	if password == "" {
 		return nil, fmt.Errorf("no %s env var set, cannot proceed", c.NutanixPasswordEnvVar)
+	}
+
+	pcCACert, err := o.getNutanixCACert()
+	if err != nil {
+		return nil, err
 	}
 
 	prismCentralEndpoint, err := getNutanixStrVal("", c.CliNutanixPcAddressOpt, o.NutanixPrismCentralEndpoint)
@@ -127,6 +152,7 @@ func (o *Options) getNutanixCloudBuilder() (*clusterresource.NutanixCloudBuilder
 		},
 		APIVIP:     o.NutanixAPIVIP,
 		IngressVIP: o.NutanixIngressVIP,
+		CACert:     pcCACert,
 	}
 
 	return nutanixBuilder, nil

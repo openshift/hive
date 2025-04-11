@@ -67,6 +67,12 @@ func TestSyncSetValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name:            "Test empty patch type create",
+			operation:       admissionv1beta1.Create,
+			syncSet:         testPatchSyncSet(""),
+			expectedAllowed: true,
+		},
+		{
 			name:            "Test valid patch type update",
 			operation:       admissionv1beta1.Update,
 			syncSet:         testValidPatchSyncSet(),
@@ -77,6 +83,12 @@ func TestSyncSetValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			syncSet:         testInvalidPatchSyncSet(),
 			expectedAllowed: false,
+		},
+		{
+			name:            "Test empty patch type update",
+			operation:       admissionv1beta1.Update,
+			syncSet:         testPatchSyncSet(""),
+			expectedAllowed: true,
 		},
 		{
 			name:            "Test create with no patches",

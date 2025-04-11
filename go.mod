@@ -128,7 +128,9 @@ require (
 )
 
 require (
+	github.com/bombsimon/logrusr/v4 v4.1.0
 	github.com/gophercloud/utils/v2 v2.0.0-20240812072210-8ce1fc0f2894
+	github.com/openshift-splat-team/vsphere-capacity-manager v0.0.0-20250403174721-4b65158fb40c
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 )
 

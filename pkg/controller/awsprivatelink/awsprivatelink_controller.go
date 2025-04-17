@@ -54,10 +54,19 @@ const (
 
 // clusterDeploymentAWSPrivateLinkConditions are the cluster deployment conditions controlled by
 // AWS private link controller
-var clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentConditionType{
-	hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-	hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-}
+var (
+	clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentConditionType{
+		hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+		hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+	}
+	goodVpceStates = sets.New(
+		// NOTE: Depending where you look, these strings are sometimes lowercase; so we'll just
+		// compare them case-insensitive.
+		strings.ToLower(ec2.StatePendingAcceptance),
+		strings.ToLower(ec2.StatePending),
+		strings.ToLower(ec2.StateAvailable),
+	)
+)
 
 // Add creates a new AWSPrivateLink Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
@@ -508,7 +517,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 	}
 
 	// Create the VPC endpoint with the chosen VPC.
-	endpointModified, vpcEndpoint, err := r.reconcileVPCEndpoint(awsClient, cd, clusterMetadata, vpcEndpointService, logger)
+	endpointReconciled, vpcEndpoint, err := r.reconcileVPCEndpoint(awsClient, cd, clusterMetadata, vpcEndpointService, logger)
 	if err != nil {
 		logger.WithError(err).Error("failed to reconcile the VPC Endpoint")
 		reason := "VPCEndpointReconcileFailed"
@@ -522,7 +531,7 @@ func (r *ReconcileAWSPrivateLink) reconcilePrivateLink(cd *hivev1.ClusterDeploym
 		return reconcile.Result{}, errors.Wrap(err, "failed to reconcile the VPC Endpoint")
 	}
 
-	if endpointModified {
+	if endpointReconciled {
 		if err := r.setReadyCondition(cd, corev1.ConditionFalse,
 			"ReconciledVPCEndpoint",
 			"reconciled the VPC Endpoint for the cluster",
@@ -637,7 +646,7 @@ func waitForState(state string, timeout time.Duration, currentState func() (stri
 			logger.WithError(err).Error("failed to get the current state")
 			return false, nil
 		}
-		if curr != state {
+		if strings.ToLower(curr) != strings.ToLower(state) {
 			logger.Debugf("Desired state %q is not yet achieved, currently %q", state, curr)
 			return false, nil
 		}
@@ -850,7 +859,7 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 	cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata,
 	vpcEndpointService *ec2.ServiceConfiguration,
 	logger log.FieldLogger) (bool, *ec2.VpcEndpoint, error) {
-	modified := false
+	endpointReconciled := false
 	tag := ec2FilterForCluster(metadata)
 	endpointLog := logger.WithField("tag:key", aws.StringValue(tag.Name)).WithField("tag:value", aws.StringValueSlice(tag.Values))
 
@@ -860,15 +869,24 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 		Filters: []*ec2.Filter{tag},
 	}
 
-	var allVpcEndpoints []*ec2.VpcEndpoint
+	// HIVE-2837: Clean up redundant VPCEs (e.g. "Rejected")
+	var vpcEndpointsToDelete []*string
 	for {
 		resp, err := awsClient.hub.DescribeVpcEndpoints(input)
 		if err != nil {
 			endpointLog.WithError(err).Error("error getting VPC Endpoint")
-			return modified, nil, err
+			return endpointReconciled, nil, err
 		}
 
-		allVpcEndpoints = append(allVpcEndpoints, resp.VpcEndpoints...)
+		// HIVE-2838: First page may be empty even when there are results!
+		for _, vpce := range resp.VpcEndpoints {
+			if vpcEndpoint == nil && goodVpceStates.Has(strings.ToLower(*vpce.State)) {
+				vpcEndpoint = vpce
+				endpointReconciled = true
+				continue
+			}
+			vpcEndpointsToDelete = append(vpcEndpointsToDelete, vpce.VpcEndpointId)
+		}
 
 		if resp.NextToken == nil {
 			break
@@ -876,26 +894,33 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 		input.NextToken = resp.NextToken
 	}
 
-	if len(allVpcEndpoints) == 0 {
-		modified = true
+	if numVpcEndpoints := len(vpcEndpointsToDelete); numVpcEndpoints != 0 {
+		endpointLog.WithField("numVpcEndpoints", numVpcEndpoints).Info("Deleting unused VPC Endpoints")
+		resp, err := awsClient.hub.DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{VpcEndpointIds: vpcEndpointsToDelete})
+		if err != nil || len(resp.Unsuccessful) != 0 {
+			endpointLog.WithError(err).WithField("numUnsuccessful", len(resp.Unsuccessful)).Error("error deleting VPC Endpoints")
+			return endpointReconciled, nil, err
+		}
+	}
+
+	if vpcEndpoint == nil {
+		endpointReconciled = true
 		var err error
 		vpcEndpoint, err = r.createVPCEndpoint(awsClient.hub, cd, metadata, vpcEndpointService, logger)
 		if err != nil {
 			logger.WithError(err).Error("error creating VPC Endpoint for service")
-			return modified, nil, err
+			return endpointReconciled, nil, err
 		}
-	} else {
-		vpcEndpoint = allVpcEndpoints[0]
 	}
 
 	initPrivateLinkStatus(cd)
 	cd.Status.Platform.AWS.PrivateLink.VPCEndpointID = *vpcEndpoint.VpcEndpointId
 	if err := r.updatePrivateLinkStatus(cd); err != nil {
 		logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointID")
-		return modified, nil, err
+		return endpointReconciled, nil, err
 	}
 
-	return modified, vpcEndpoint, nil
+	return endpointReconciled, vpcEndpoint, nil
 }
 
 func (r *ReconcileAWSPrivateLink) createVPCEndpoint(awsClient awsclient.Client,
@@ -955,6 +980,11 @@ func (r *ReconcileAWSPrivateLink) reconcileHostedZone(awsClient *awsClient,
 		return modified, "", err
 	}
 
+	if err := r.scrubHostedZones(awsClient.hub, apiDomain, cd.Spec.Platform.AWS.Region, hostedZoneID, logger); err != nil {
+		logger.WithError(err).Error("failed to scrub redundant Hosted Zones")
+		return modified, "", err
+	}
+
 	hzLog := logger.WithField("hostedZoneID", hostedZoneID)
 
 	rSet, err := r.recordSet(awsClient.hub, apiDomain, vpcEndpoint)
@@ -990,8 +1020,7 @@ func (r *ReconcileAWSPrivateLink) recordSet(awsClient awsclient.Client, apiDomai
 		rSet.TTL = aws.Int64(10)
 
 		// get the ips from the elastic networking interfaces attached to the VPC endpoint
-		enis := vpcEndpoint.NetworkInterfaceIds
-		if len(enis) == 0 {
+		if len(vpcEndpoint.NetworkInterfaceIds) == 0 {
 			return nil, errors.New("No network interfaces attached to the vpc endpoint")
 		}
 		res, err := awsClient.DescribeNetworkInterfaces(&ec2.DescribeNetworkInterfacesInput{NetworkInterfaceIds: vpcEndpoint.NetworkInterfaceIds})
@@ -1055,6 +1084,39 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 	}
 
 	return modified, hzID, nil
+}
+
+// scrubHostedZones looks through all VPCs configured in the inventory and deletes any HostedZones
+// that are associated with the given apiDomain EXCEPT the one identified by goodHZID.
+// The idea is to end up with exactly one HostedZone for the given apiDomain.
+func (r *ReconcileAWSPrivateLink) scrubHostedZones(awsClient awsclient.Client, apiDomain, region, goodHZID string, logger log.FieldLogger) error {
+	for _, entry := range r.controllerconfig.EndpointVPCInventory {
+		vpcId := entry.AWSPrivateLinkVPC.VPCID
+		vlog := logger.WithField("vpcId", vpcId)
+
+		// NOTE: If there is >1 HZ for this domain in this VPC (which should not be possible), we will miss all but the first.
+		hzID, err := findHostedZone(awsClient, vpcId, region, apiDomain)
+		if err != nil {
+			if errors.Is(err, errNoHostedZoneFoundForVPC) {
+				continue
+			}
+			vlog.WithError(err).Error("failed to get Hosted Zone")
+			return err
+		}
+
+		// Skip the good one
+		if hzID == goodHZID {
+			continue
+		}
+
+		zlog := vlog.WithField("hzID", hzID)
+		zlog.Info("cleaning up stale hosted zone")
+		if err := r.deleteHostedZone(awsClient, hzID, vlog); err != nil {
+			zlog.WithError(err).Error("failed to delete Hosted Zone")
+			return err
+		}
+	}
+	return nil
 }
 
 var errNoHostedZoneFoundForVPC = errors.New("no hosted zone found")

@@ -855,22 +855,37 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 	endpointLog := logger.WithField("tag:key", aws.StringValue(tag.Name)).WithField("tag:value", aws.StringValueSlice(tag.Values))
 
 	var vpcEndpoint *ec2.VpcEndpoint
-	resp, err := awsClient.hub.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
+
+	input := &ec2.DescribeVpcEndpointsInput{
 		Filters: []*ec2.Filter{tag},
-	})
-	if err != nil {
-		endpointLog.WithError(err).Error("error getting VPC Endpoint")
-		return modified, nil, err
 	}
-	if len(resp.VpcEndpoints) == 0 {
+
+	var allVpcEndpoints []*ec2.VpcEndpoint
+	for {
+		resp, err := awsClient.hub.DescribeVpcEndpoints(input)
+		if err != nil {
+			endpointLog.WithError(err).Error("error getting VPC Endpoint")
+			return modified, nil, err
+		}
+
+		allVpcEndpoints = append(allVpcEndpoints, resp.VpcEndpoints...)
+
+		if resp.NextToken == nil {
+			break
+		}
+		input.NextToken = resp.NextToken
+	}
+
+	if len(allVpcEndpoints) == 0 {
 		modified = true
+		var err error
 		vpcEndpoint, err = r.createVPCEndpoint(awsClient.hub, cd, metadata, vpcEndpointService, logger)
 		if err != nil {
 			logger.WithError(err).Error("error creating VPC Endpoint for service")
 			return modified, nil, err
 		}
 	} else {
-		vpcEndpoint = resp.VpcEndpoints[0]
+		vpcEndpoint = allVpcEndpoints[0]
 	}
 
 	initPrivateLinkStatus(cd)

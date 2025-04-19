@@ -128,7 +128,10 @@ type VSphereClusterDeprovision struct {
 	// necessary for communicating with the VCenter.
 	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
 	// VCenter is the vSphere vCenter hostname.
+	// Deprecated: use VCenters instead
 	VCenter string `json:"vCenter"`
+	// VCenters are potentially multiple vCenter hostnames. Prefer this field over VCenter.
+	VCenters []string `json:"vCenters"`
 }
 
 // OvirtClusterDeprovision contains oVirt-specific configuration for a ClusterDeprovision

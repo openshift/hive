@@ -340,12 +340,21 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       vCenter:
-                        description: VCenter is the vSphere vCenter hostname.
+                        description: |-
+                          VCenter is the vSphere vCenter hostname.
+                          Deprecated: use VCenters instead
                         type: string
+                      vCenters:
+                        description: VCenters are potentially multiple vCenter hostnames.
+                          Prefer this field over VCenter.
+                        items:
+                          type: string
+                        type: array
                     required:
                     - certificatesSecretRef
                     - credentialsSecretRef
                     - vCenter
+                    - vCenters
                     type: object
                 type: object
             required:

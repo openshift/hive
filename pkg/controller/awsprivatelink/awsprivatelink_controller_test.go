@@ -566,59 +566,243 @@ users:
 		return service
 	}
 
+	// HIVE-2837/HIVE-2838: We'll use this in the closure below to cycle through different
+	// green-path ways DescribeVpcEndpoints can respond, depending on a) what VPCEs already exist;
+	// and b) its apparent whims wrt returning empty pages even when there are more results
+	// available.
+	dvpce_scenario := 0
 	mockCreateEndpoint := func(m *mock.MockClient, service *ec2.ServiceConfiguration) *ec2.VpcEndpoint {
-		m.EXPECT().DescribeVpcEndpoints(
-			&ec2.DescribeVpcEndpointsInput{
-				Filters: []*ec2.Filter{{
-					Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
-					Values: aws.StringSlice([]string{"test-cd-1234"}),
-				}}}).
-			Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
-		m.EXPECT().DescribeVpcEndpointsPages(
-			&ec2.DescribeVpcEndpointsInput{
-				Filters: []*ec2.Filter{{
-					Name:   aws.String("vpc-id"),
-					Values: aws.StringSlice([]string{"vpc-1"}),
-				}}}, gomock.Any()).
-			Do(func(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) {
-				describeVpcEndpointsOutput := &ec2.DescribeVpcEndpointsOutput{}
-				fn(describeVpcEndpointsOutput, true)
-			})
-		m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
-			ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
-		}).Return(&ec2.DescribeVpcEndpointServicesOutput{
-			ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
-		}, nil)
-
 		endpoint := &ec2.VpcEndpoint{
 			VpcEndpointId: aws.String("vpce-12345"),
 			VpcId:         aws.String("vpc-1"),
-			State:         aws.String("available"),
+			// Validate case insensitivity
+			State: aws.String("AvAiLaBlE"),
 			DnsEntries: []*ec2.DnsEntry{{
 				DnsName:      aws.String("vpce-12345-us-east-1.vpce-svc-12345.vpc.amazonaws.com"),
 				HostedZoneId: aws.String("HZ23456"),
 			}},
 		}
-		m.EXPECT().CreateVpcEndpoint(gomock.Any()).
-			Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: endpoint}, nil)
-		m.EXPECT().DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-			VpcEndpointIds: aws.StringSlice([]string{*endpoint.VpcEndpointId}),
-		}).Return(&ec2.DescribeVpcEndpointsOutput{
-			VpcEndpoints: []*ec2.VpcEndpoint{endpoint},
-		}, nil)
+		scenario := dvpce_scenario % 4 // total number of scenarios
+		dvpce_scenario++
+		tagFilters := []*ec2.Filter{{
+			Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
+			Values: aws.StringSlice([]string{"test-cd-1234"}),
+		}}
+
+		switch scenario {
+		case 0: // No VPCEs exist ahead of time
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{Filters: tagFilters}).
+				Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
+		case 1: // No VPCEs exist, but we don't find that out until the second page
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{Filters: tagFilters}).
+				Return(
+					&ec2.DescribeVpcEndpointsOutput{
+						NextToken: aws.String("abc123"),
+					},
+					nil,
+				)
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters:   tagFilters,
+					NextToken: aws.String("abc123"),
+				}).
+				Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
+		case 2: // "Bad" VPCEs exist on both pages
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{Filters: tagFilters}).
+				Return(
+					&ec2.DescribeVpcEndpointsOutput{
+						VpcEndpoints: []*ec2.VpcEndpoint{
+							{
+								VpcEndpointId: aws.String("badvpc1"),
+								State:         aws.String("rejected"),
+							},
+							{
+								VpcEndpointId: aws.String("badvpc2"),
+								State:         aws.String("expired"),
+							},
+						},
+						NextToken: aws.String("abc123"),
+					},
+					nil,
+				)
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters:   tagFilters,
+					NextToken: aws.String("abc123"),
+				}).
+				Return(
+					&ec2.DescribeVpcEndpointsOutput{
+						VpcEndpoints: []*ec2.VpcEndpoint{
+							{
+								VpcEndpointId: aws.String("badvpc3"),
+								State:         aws.String("Deleted"),
+							},
+							{
+								VpcEndpointId: aws.String("badvpc4"),
+								State:         aws.String("Failed"),
+							},
+						},
+					},
+					nil,
+				)
+		case 3: // Our VPCE exists, but it's on the second page, along with some others needing cleanup
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{Filters: tagFilters}).
+				Return(
+					&ec2.DescribeVpcEndpointsOutput{
+						NextToken: aws.String("abc123"),
+					},
+					nil,
+				)
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters:   tagFilters,
+					NextToken: aws.String("abc123"),
+				}).
+				Return(
+					&ec2.DescribeVpcEndpointsOutput{
+						VpcEndpoints: []*ec2.VpcEndpoint{
+							{
+								VpcEndpointId: aws.String("badvpc1"),
+								State:         aws.String("rejected"),
+							},
+							{
+								VpcEndpointId: aws.String("badvpc2"),
+								State:         aws.String("expired"),
+							},
+							// The first good one
+							endpoint,
+							{
+								VpcEndpointId: aws.String("badvpc3"),
+								// Prove we'll still scrub subsequent "good" ones
+								State: aws.String("available"),
+							},
+							{
+								VpcEndpointId: aws.String("badvpc4"),
+								// Prove we'll still scrub subsequent "good" ones
+								State: aws.String("pending"),
+							},
+						},
+					},
+					nil,
+				)
+		}
+
+		// If there were VPCEs that needed cleanup...
+		switch scenario {
+		case 2, 3:
+			m.EXPECT().DeleteVpcEndpoints(
+				&ec2.DeleteVpcEndpointsInput{
+					VpcEndpointIds: []*string{
+						aws.String("badvpc1"),
+						aws.String("badvpc2"),
+						aws.String("badvpc3"),
+						aws.String("badvpc4"),
+					},
+				},
+			).Return(&ec2.DeleteVpcEndpointsOutput{}, nil)
+		}
+
+		// Iff an available VPCE did not exist, we'll go down the creation path
+		switch scenario {
+		case 0, 1, 2:
+			m.EXPECT().DescribeVpcEndpointsPages(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters: []*ec2.Filter{{
+						Name:   aws.String("vpc-id"),
+						Values: aws.StringSlice([]string{"vpc-1"}),
+					}}}, gomock.Any()).
+				Do(func(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) {
+					describeVpcEndpointsOutput := &ec2.DescribeVpcEndpointsOutput{}
+					fn(describeVpcEndpointsOutput, true)
+				})
+			m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
+				ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
+			}).Return(&ec2.DescribeVpcEndpointServicesOutput{
+				ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
+			}, nil)
+
+			m.EXPECT().CreateVpcEndpoint(gomock.Any()).
+				Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: endpoint}, nil)
+			m.EXPECT().DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
+				VpcEndpointIds: aws.StringSlice([]string{*endpoint.VpcEndpointId}),
+			}).Return(&ec2.DescribeVpcEndpointsOutput{
+				VpcEndpoints: []*ec2.VpcEndpoint{endpoint},
+			}, nil)
+		}
+
 		return endpoint
 	}
 
-	mockPHZ := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingSummary *route53.HostedZoneSummary) string {
-		byVPCOut := &route53.ListHostedZonesByVPCOutput{}
-		if existingSummary != nil {
-			byVPCOut.HostedZoneSummaries = []*route53.HostedZoneSummary{existingSummary}
+	mockPHZ := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingSummary *route53.HostedZoneSummary, inventoryVPCs ...string) string {
+		if len(inventoryVPCs) == 0 {
+			inventoryVPCs = []string{"vpc-1"}
 		}
+
+		byVPCOut := []*route53.ListHostedZonesByVPCOutput{
+			{},
+			// This one will only get used when inventoryVPCs has >1 entry
+			{},
+		}
+		if existingSummary != nil {
+			byVPCOut[0].HostedZoneSummaries = []*route53.HostedZoneSummary{existingSummary}
+		}
+
+		// Inject HZs to scrub
+		byVPCOut[1].HostedZoneSummaries = []*route53.HostedZoneSummary{{
+			HostedZoneId: aws.String("notTheGoodOne"),
+			Name:         aws.String("api.test-cluster"),
+		}}
+
 		m.EXPECT().ListHostedZonesByVPC(&route53.ListHostedZonesByVPCInput{
 			MaxItems:  aws.String("100"),
 			VPCId:     endpoint.VpcId,
 			VPCRegion: aws.String("us-east-1"),
-		}).Return(byVPCOut, nil)
+		}).Return(byVPCOut[0], nil)
+
+		// These are the calls to discover & scrub stale HZs
+		rr := &route53.ResourceRecordSet{
+			Type: aws.String("A"),
+			Name: aws.String("api.test-cluster"),
+			AliasTarget: &route53.AliasTarget{
+				DNSName: aws.String("vpc.."),
+			},
+		}
+		for i, vpcId := range inventoryVPCs {
+			m.EXPECT().ListHostedZonesByVPC(&route53.ListHostedZonesByVPCInput{
+				MaxItems:  aws.String("100"),
+				VPCId:     &vpcId,
+				VPCRegion: aws.String("us-east-1"),
+			}).Return(byVPCOut[i], nil)
+			// We only have HZs to scrub on the >1st VPC
+			if i == 0 {
+				continue
+			}
+			m.EXPECT().ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
+				HostedZoneId: aws.String("notTheGoodOne"),
+			}).Return(&route53.ListResourceRecordSetsOutput{
+				ResourceRecordSets: []*route53.ResourceRecordSet{
+					{Type: aws.String("NS")},
+					{Type: aws.String("SOA")},
+					rr},
+			}, nil)
+			m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
+				HostedZoneId: aws.String("notTheGoodOne"),
+				ChangeBatch: &route53.ChangeBatch{
+					Changes: []*route53.Change{{
+						Action:            aws.String("DELETE"),
+						ResourceRecordSet: rr,
+					}},
+				},
+			}).Return(nil, nil)
+			m.EXPECT().DeleteHostedZone(&route53.DeleteHostedZoneInput{
+				Id: aws.String("notTheGoodOne"),
+			}).Return(nil, nil)
+		}
+
 		var hzID string
 		if existingSummary == nil {
 			hzID = "HZ12345"
@@ -670,6 +854,14 @@ users:
 			VPCId:     endpoint.VpcId,
 			VPCRegion: aws.String("us-east-1"),
 		}).Return(byVPCOut, nil)
+
+		// This is the call to discover HZs to scrub
+		m.EXPECT().ListHostedZonesByVPC(&route53.ListHostedZonesByVPCInput{
+			MaxItems:  aws.String("100"),
+			VPCId:     aws.String("vpc-1"),
+			VPCRegion: aws.String("us-east-1"),
+		}).Return(byVPCOut, nil)
+
 		var hzID string
 		if existingSummary == nil {
 			hzID = "HZ12345"
@@ -1274,7 +1466,7 @@ users:
 			hzID := mockPHZ(m, createdEndpoint, "api.test-cluster", &route53.HostedZoneSummary{
 				HostedZoneId: aws.String("HZ22"),
 				Name:         aws.String("api.test-cluster"),
-			})
+			}, "vpc-1", "vpc-2")
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
 				HostedZone: &route53.HostedZone{

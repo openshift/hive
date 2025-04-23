@@ -31,6 +31,9 @@ type NutanixCloudBuilder struct {
 
 	// IngressVIP is the virtual IP address for ingress
 	IngressVIP string
+
+	// CACert is the CA certificate(s) used to communicate with the Nutanix Prism Central.
+	CACert []byte
 }
 
 func (p *NutanixCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secret {
@@ -52,7 +55,22 @@ func (p *NutanixCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secr
 }
 
 func (p *NutanixCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
-	return []runtime.Object{}
+	return []runtime.Object{
+		&corev1.Secret{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Secret",
+				APIVersion: corev1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      p.certificatesSecretName(o),
+				Namespace: o.Namespace,
+			},
+			Type: corev1.SecretTypeOpaque,
+			Data: map[string][]byte{
+				".cacert": p.CACert,
+			},
+		},
+	}
 }
 
 func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
@@ -62,6 +80,9 @@ func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 		Nutanix: &hivev1nutanix.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.CredsSecretName(o),
+			},
+			CertificatesSecretRef: corev1.LocalObjectReference{
+				Name: p.certificatesSecretName(o),
 			},
 			PrismCentral: hivev1nutanix.PrismEndpoint{
 				Address: p.PrismCentral.Endpoint.Address,
@@ -108,4 +129,8 @@ func (p *NutanixCloudBuilder) addInstallConfigPlatform(o *Builder, ic *installer
 
 func (p *NutanixCloudBuilder) CredsSecretName(o *Builder) string {
 	return fmt.Sprintf("%s-nutanix-creds", o.Name)
+}
+
+func (p *NutanixCloudBuilder) certificatesSecretName(o *Builder) string {
+	return fmt.Sprintf("%s-nutanix-certs", o.Name)
 }

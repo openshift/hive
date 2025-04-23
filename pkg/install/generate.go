@@ -256,6 +256,10 @@ func InstallerPodSpec(
 		}
 	case cd.Spec.Platform.Nutanix != nil:
 		credentialRef = cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name
+		if cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name != "" {
+			certificateRef = cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name
+			emptyDirs["nutanix-certificates"] = constants.NutanixCertificatesDir
+		}
 	}
 
 	if credentialRef != "" {
@@ -887,10 +891,10 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 }
 
 func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
-	env, _, _ := envAndVolumes(
+	env, volumes, volumeMounts := envAndVolumes(
 		req.Namespace,
 		"nutanix-creds", "", req.Spec.Platform.Nutanix.CredentialsSecretRef.Name,
-		"", "", "")
+		"nutanix-certificates", constants.NutanixCertificatesDir, req.Spec.Platform.Nutanix.CertificatesSecretRef.Name)
 
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
@@ -906,6 +910,8 @@ func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *bat
 				"--nutanix-pc-port", strconv.Itoa(int(req.Spec.Platform.Nutanix.PrismCentral.Port)),
 				"--loglevel", "debug",
 			},
+			VolumeMounts: volumeMounts,
 		},
 	}
+	job.Spec.Template.Spec.Volumes = volumes
 }

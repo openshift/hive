@@ -3327,6 +3327,7 @@ func (in *NutanixClusterDeprovision) DeepCopyInto(out *NutanixClusterDeprovision
 	*out = *in
 	out.PrismCentral = in.PrismCentral
 	out.CredentialsSecretRef = in.CredentialsSecretRef
+	out.CertificatesSecretRef = in.CertificatesSecretRef
 	return
 }
 

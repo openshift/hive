@@ -14,6 +14,11 @@ type Platform struct {
 	// credentials.
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
 
+	// CertificatesSecretRef refers to a secret that contains the Prism Central CA certificates
+	// necessary for communicating with the Prism Central.
+	// +optional
+	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
+
 	// FailureDomains configures failure domains for the Nutanix platform.
 	// Required for using MachinePools
 	FailureDomains []FailureDomain `json:"failureDomains,omitempty"`

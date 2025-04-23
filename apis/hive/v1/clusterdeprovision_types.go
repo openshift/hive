@@ -166,6 +166,11 @@ type NutanixClusterDeprovision struct {
 	// CredentialsSecretRef refers to a secret that contains the Nutanix account access
 	// credentials.
 	CredentialsSecretRef corev1.LocalObjectReference `json:"credentialsSecretRef"`
+
+	// CertificatesSecretRef refers to a secret that contains the Nutanix CA certificates
+	// necessary for communicating with the Prism Central.
+	// +optional
+	CertificatesSecretRef corev1.LocalObjectReference `json:"certificatesSecretRef"`
 }
 
 // +genclient

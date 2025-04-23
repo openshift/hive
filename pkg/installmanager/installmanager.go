@@ -1921,8 +1921,8 @@ func isDirNonEmpty(dir string) bool {
 	return err == nil
 }
 
-// pasteInProviderCredentials Add the credentials from a given secret into the ic if nor present
-func pasteInProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
+// injectProviderCredentials Add the credentials from a given secret into the ic if nor present
+func injectProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
 	switch {
 	case cd.Spec.Platform.Nutanix != nil:
 		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
@@ -1944,6 +1944,44 @@ func pasteInProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.Clu
 	return nil
 }
 
+// injectProviderAdditionalBundle injects a provider-specific trust bundle into the given
+// InstallConfig if none is already defined in its AdditionalTrustBundle field.
+func injectProviderAdditionalBundle(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment, certDir string) error {
+	// Ignore case where there the install-config AdditionalTrustBundle value is set
+	if ic.AdditionalTrustBundle != "" {
+		return nil
+	}
+
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		// If the ClusterDeployment specifies the Nutanix platform and includes a reference to a certificates secret,
+		// the method attempts to load the trust bundle from the mounted certificate directory and sets it into the InstallConfig.
+		if cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name == "" {
+			return nil
+		}
+
+		certData, err := contributils.BuildCertBundleFromDir(certDir)
+		if err != nil {
+			return err
+		}
+		ic.AdditionalTrustBundle = certData
+		if ic.AdditionalTrustBundlePolicy == "" {
+			ic.AdditionalTrustBundlePolicy = installertypes.PolicyAlways
+		}
+	}
+	return nil
+}
+
+func (m *InstallManager) getPlatformCertificateDir(cd *hivev1.ClusterDeployment) string {
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		return constants.NutanixCertificatesDir
+
+	}
+
+	return ""
+}
+
 func (m *InstallManager) pasteInInstallConfigSecrets(cd *hivev1.ClusterDeployment, icData []byte) ([]byte, error) {
 	ic := installertypes.InstallConfig{}
 	if err := yaml.Unmarshal(icData, &ic); err != nil {
@@ -1954,7 +1992,11 @@ func (m *InstallManager) pasteInInstallConfigSecrets(cd *hivev1.ClusterDeploymen
 		return nil, err
 	}
 
-	if err := pasteInProviderCredentials(&ic, cd); err != nil {
+	if err := injectProviderCredentials(&ic, cd); err != nil {
+		return nil, err
+	}
+
+	if err := injectProviderAdditionalBundle(&ic, cd, m.getPlatformCertificateDir(cd)); err != nil {
 		return nil, err
 	}
 	return yaml.Marshal(ic)

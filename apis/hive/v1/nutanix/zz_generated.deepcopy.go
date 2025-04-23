@@ -108,6 +108,7 @@ func (in *Platform) DeepCopyInto(out *Platform) {
 	*out = *in
 	out.PrismCentral = in.PrismCentral
 	out.CredentialsSecretRef = in.CredentialsSecretRef
+	out.CertificatesSecretRef = in.CertificatesSecretRef
 	if in.FailureDomains != nil {
 		in, out := &in.FailureDomains, &out.FailureDomains
 		*out = make([]FailureDomain, len(*in))

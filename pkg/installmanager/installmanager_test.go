@@ -30,6 +30,7 @@ import (
 	installertypes "github.com/openshift/installer/pkg/types"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
@@ -735,7 +736,7 @@ func Test_pasteInPullSecret(t *testing.T) {
 	}
 }
 
-func Test_nutanix_pasteInProviderCredentials(t *testing.T) {
+func Test_nutanix_injectProviderCredentials(t *testing.T) {
 	testCases := []struct {
 		name         string
 		inputFile    string
@@ -794,7 +795,7 @@ func Test_nutanix_pasteInProviderCredentials(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			err = pasteInProviderCredentials(&ic, &cd)
+			err = injectProviderCredentials(&ic, &cd)
 			actual, err2 := yaml.Marshal(ic)
 			if err2 != nil {
 				assert.NoError(t, err)
@@ -813,6 +814,147 @@ func Test_nutanix_pasteInProviderCredentials(t *testing.T) {
 			}
 
 			assert.Equal(t, string(expected), string(actual), "unexpected InstallConfig output")
+		})
+	}
+}
+
+func Test_nutanix_injectProviderAdditionalBundle(t *testing.T) {
+	dummyCertContent := "-----BEGIN CERTIFICATE-----\nMIINZDCCDQmgAwIBAgIRANBmClal7OtcCYWduPzonj0wCgYIKoZIzj0EAwIwOzEL\nMAkGA1UEBhMCVVMxHjAcBgNVBAoTFUdvb2dsZSBUcnVzdCBTZXJ2aWNlczEMMAoG\nA1UEAxMDV0UyMB4XDTI1MDMzMTA4NTQzN1oXDTI1MDYyMzA4NTQzNlowFzEVMBMG\nn/CnAAAEAwBIMEYCIQDWd5qRHuR/nGvbweKA/5BLr377zPwM/LS22u2ggKln9AIh\nAPdTY+ItNgEk3f6dPUU4idWSGi+I1CTgHFLkOHbkrjGUMAoGCCqGSM49BAMCA0kA\nMEYCIQD1vRFUnYWcZCRS238Hb2wbw5fAJJMITIWyb75+Zp51QwIhAIuiXBAI0WX9\nY8ukaMiA4vzXMLEIXueiK1Acw54EZnxp\n-----END CERTIFICATE-----"
+	expectedCertFilename := "ca-bundle.crt"
+
+	testCases := []struct {
+		name                      string
+		clusterDeploymentPlatform hivev1.Platform
+		installConfig             installertypes.InstallConfig
+		setupFS                   func(t *testing.T, certDir string) // Function to set up filesystem for the test
+		expectedBundle            string                             // Now expects the actual content from the file
+		expectedPolicy            installertypes.PolicyType
+		expectedErrMsg            string
+	}{
+		{
+			name:                      "Nutanix: Inject bundle when empty (FS success)",
+			clusterDeploymentPlatform: hivev1.Platform{Nutanix: &nutanix.Platform{CertificatesSecretRef: corev1.LocalObjectReference{Name: "nutanix-certs"}}},
+			installConfig:             installertypes.InstallConfig{AdditionalTrustBundle: ""},
+			setupFS: func(t *testing.T, certDir string) {
+				certFilePath := filepath.Join(certDir, expectedCertFilename)
+				err := os.WriteFile(certFilePath, []byte(dummyCertContent), 0600)
+				require.NoError(t, err, "Failed to write dummy cert file")
+			},
+			expectedBundle: dummyCertContent,
+			expectedPolicy: installertypes.PolicyAlways,
+		},
+		{
+			name:                      "Nutanix: Do not inject bundle when already set",
+			clusterDeploymentPlatform: hivev1.Platform{Nutanix: &nutanix.Platform{CertificatesSecretRef: corev1.LocalObjectReference{Name: "nutanix-certs"}}},
+			installConfig:             installertypes.InstallConfig{AdditionalTrustBundle: "EXISTING_BUNDLE_DATA"},
+			setupFS: func(t *testing.T, certDir string) {
+			},
+			expectedBundle: "EXISTING_BUNDLE_DATA",
+			expectedPolicy: "",
+		},
+		{
+			name:                      "Nutanix: Inject bundle when policy already set (FS success)",
+			clusterDeploymentPlatform: hivev1.Platform{Nutanix: &nutanix.Platform{CertificatesSecretRef: corev1.LocalObjectReference{Name: "nutanix-certs"}}},
+			installConfig:             installertypes.InstallConfig{AdditionalTrustBundle: "", AdditionalTrustBundlePolicy: installertypes.PolicyProxyOnly},
+			setupFS: func(t *testing.T, certDir string) {
+				// Create the expected cert file
+				certFilePath := filepath.Join(certDir, expectedCertFilename)
+				err := os.WriteFile(certFilePath, []byte(dummyCertContent), 0600)
+				require.NoError(t, err, "Failed to write dummy cert file")
+			},
+			expectedBundle: dummyCertContent,
+			expectedPolicy: installertypes.PolicyProxyOnly,
+		},
+		{
+			name:                      "Nutanix: Inject bundle and default policy (FS success)",
+			clusterDeploymentPlatform: hivev1.Platform{Nutanix: &nutanix.Platform{CertificatesSecretRef: corev1.LocalObjectReference{Name: "nutanix-certs"}}},
+			installConfig:             installertypes.InstallConfig{AdditionalTrustBundle: "", AdditionalTrustBundlePolicy: ""},
+			setupFS: func(t *testing.T, certDir string) {
+				certFilePath := filepath.Join(certDir, expectedCertFilename)
+				err := os.WriteFile(certFilePath, []byte(dummyCertContent), 0600)
+				require.NoError(t, err, "Failed to write dummy cert file")
+			},
+			expectedBundle: dummyCertContent, // Expect the actual file content
+			expectedPolicy: installertypes.PolicyAlways,
+		},
+		{
+			name:                      "Nutanix: No cert secret ref, do nothing",
+			clusterDeploymentPlatform: hivev1.Platform{Nutanix: &nutanix.Platform{CertificatesSecretRef: corev1.LocalObjectReference{Name: ""}}},
+			installConfig:             installertypes.InstallConfig{AdditionalTrustBundle: ""},
+			setupFS: func(t *testing.T, certDir string) {
+			},
+			expectedBundle: "",
+			expectedPolicy: "",
+		},
+		{
+			name:                      "Nutanix: Error building cert bundle (FS failure)",
+			clusterDeploymentPlatform: hivev1.Platform{Nutanix: &nutanix.Platform{CertificatesSecretRef: corev1.LocalObjectReference{Name: "nutanix-certs"}}},
+			installConfig:             installertypes.InstallConfig{AdditionalTrustBundle: ""},
+			setupFS: func(t *testing.T, certDir string) {
+			},
+			expectedBundle: "",
+			expectedPolicy: "",
+			expectedErrMsg: "no cert files found",
+		},
+		{
+			name:                      "Non-Nutanix platform, do nothing",
+			clusterDeploymentPlatform: hivev1.Platform{AWS: &aws.Platform{}},
+			installConfig:             installertypes.InstallConfig{AdditionalTrustBundle: ""},
+			setupFS: func(t *testing.T, certDir string) {
+				// FS state doesn't matter here
+			},
+			expectedBundle: "",
+			expectedPolicy: "",
+		},
+		{
+			name: "Nutanix: Invalid PEM certificate",
+			clusterDeploymentPlatform: hivev1.Platform{
+				Nutanix: &nutanix.Platform{
+					CertificatesSecretRef: corev1.LocalObjectReference{Name: "nutanix-certs"},
+				},
+			},
+			installConfig: installertypes.InstallConfig{
+				AdditionalTrustBundle: "",
+			},
+			setupFS: func(t *testing.T, certDir string) {
+				// Write a file that is NOT a valid PEM certificate
+				certFilePath := filepath.Join(certDir, "ca-bundle.crt")
+				err := os.WriteFile(certFilePath, []byte("NOT A CERT"), 0600)
+				require.NoError(t, err, "Failed to write invalid cert file")
+			},
+			expectedBundle: "",
+			expectedPolicy: "",
+			expectedErrMsg: "does not contain a valid PEM certificate",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			if tc.setupFS != nil {
+				tc.setupFS(t, tmpDir)
+			}
+
+			cd := &hivev1.ClusterDeployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-cd", Namespace: "test-ns"},
+				Spec: hivev1.ClusterDeploymentSpec{
+					Platform: tc.clusterDeploymentPlatform,
+				},
+			}
+			ic := tc.installConfig
+			err := injectProviderAdditionalBundle(&ic, cd, tmpDir)
+
+			if tc.expectedErrMsg != "" {
+				require.Error(t, err, "Expected an error but got none")
+				if tc.expectedErrMsg != "" {
+					assert.Contains(t, err.Error(), tc.expectedErrMsg, "Unexpected error message")
+				}
+			} else {
+				require.NoError(t, err, "Expected no error but got one: %v", err)
+			}
+
+			assert.Equal(t, tc.expectedBundle, ic.AdditionalTrustBundle, "AdditionalTrustBundle mismatch")
+			assert.Equal(t, tc.expectedPolicy, ic.AdditionalTrustBundlePolicy, "AdditionalTrustBundlePolicy mismatch")
 		})
 	}
 }

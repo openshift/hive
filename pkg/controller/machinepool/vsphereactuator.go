@@ -104,8 +104,6 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 		cd.Spec.ClusterMetadata.InfraID,
 		ic,
 		computePool,
-		// With FailureDomains[0].Topology.Template set, this param is ignored.
-		"HIVE_BUG!",
 		workerRole,
 		workerUserDataName,
 	)

@@ -980,7 +980,7 @@ func (r *ReconcileAWSPrivateLink) reconcileHostedZone(awsClient *awsClient,
 		return modified, "", err
 	}
 
-	if err := r.scrubHostedZones(awsClient.hub, apiDomain, hostedZoneID, logger); err != nil {
+	if err := r.scrubHostedZones(awsClient.hub, apiDomain, cd.Spec.Platform.AWS.Region, hostedZoneID, logger); err != nil {
 		logger.WithError(err).Error("failed to scrub redundant Hosted Zones")
 		return modified, "", err
 	}
@@ -1089,13 +1089,13 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 // scrubHostedZones looks through all VPCs configured in the inventory and deletes any HostedZones
 // that are associated with the given apiDomain EXCEPT the one identified by goodHZID.
 // The idea is to end up with exactly one HostedZone for the given apiDomain.
-func (r *ReconcileAWSPrivateLink) scrubHostedZones(awsClient awsclient.Client, apiDomain, goodHZID string, logger log.FieldLogger) error {
+func (r *ReconcileAWSPrivateLink) scrubHostedZones(awsClient awsclient.Client, apiDomain, region, goodHZID string, logger log.FieldLogger) error {
 	for _, entry := range r.controllerconfig.EndpointVPCInventory {
-		vpcId := entry.VPCID
+		vpcId := entry.AWSPrivateLinkVPC.VPCID
 		vlog := logger.WithField("vpcId", vpcId)
 
 		// NOTE: If there is >1 HZ for this domain in this VPC (which should not be possible), we will miss all but the first.
-		hzID, err := findHostedZone(awsClient, vpcId, entry.Region, apiDomain)
+		hzID, err := findHostedZone(awsClient, vpcId, region, apiDomain)
 		if err != nil {
 			if errors.Is(err, errNoHostedZoneFoundForVPC) {
 				continue

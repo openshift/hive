@@ -155,10 +155,10 @@ type ServiceEndpoint struct {
 type VPC struct {
 	// Subnets defines the subnets in an existing VPC and can optionally specify their intended roles.
 	// If no roles are specified on any subnet, then the subnet roles are decided automatically.
-	// In this case, the VPC must not contain any subnets without the kubernetes.io/cluster/<cluster-id> tag.
+	// In this case, the VPC must not contain any other non-cluster subnets without the kubernetes.io/cluster/<cluster-id> tag.
 	//
 	// For manually specified subnet role selection, each subnet must have at least one assigned role,
-	// and the ClusterNode, IngressControllerLB, ControlPlaneExternalLB, and ControlPlaneInternalLB roles must be assigned to at least one subnet.
+	// and the ClusterNode, BootstrapNode, IngressControllerLB, ControlPlaneExternalLB, and ControlPlaneInternalLB roles must be assigned to at least one subnet.
 	// However, if the cluster scope is internal, then ControlPlaneExternalLB is not required.
 	//
 	// Subnets must contain unique IDs, and can include no more than 10 subnets with the IngressController role.
@@ -191,7 +191,7 @@ type Subnet struct {
 // SubnetRole specifies the role (aka function) that the subnet will provide in the cluster.
 type SubnetRole struct {
 	// Type specifies the type of role (aka function) that the subnet will provide in the cluster.
-	// Role types include ClusterNode, EdgeNode, Bootstrap, IngressControllerLB, ControlPlaneExternalLB, and ControlPlaneInternalLB.
+	// Role types include ClusterNode, EdgeNode, BootstrapNode, IngressControllerLB, ControlPlaneExternalLB, and ControlPlaneInternalLB.
 	//
 	// +required
 	Type SubnetRoleType `json:"type"`
@@ -204,7 +204,7 @@ type SubnetRole struct {
 type AWSSubnetID string // nolint:revive
 
 // SubnetRoleType defines the type of role (aka function) that the subnet will provide in the cluster.
-// +kubebuilder:validation:Enum:="ClusterNode";"EdgeNode";"Bootstrap";"IngressControllerLB";"ControlPlaneExternalLB";"ControlPlaneInternalLB"
+// +kubebuilder:validation:Enum:="ClusterNode";"EdgeNode";"BootstrapNode";"IngressControllerLB";"ControlPlaneExternalLB";"ControlPlaneInternalLB"
 type SubnetRoleType string
 
 const (
@@ -216,9 +216,9 @@ const (
 	// in Local or Wavelength Zones for edge compute nodes.
 	EdgeNodeSubnetRole SubnetRoleType = "EdgeNode"
 
-	// BootstrapSubnetRole specifies subnets that will be used as subnets for the
+	// BootstrapNodeSubnetRole specifies subnets that will be used as subnets for the
 	// bootstrap node used to create the cluster.
-	BootstrapSubnetRole SubnetRoleType = "Bootstrap"
+	BootstrapNodeSubnetRole SubnetRoleType = "BootstrapNode"
 
 	// IngressControllerLBSubnetRole specifies subnets used by the default IngressController.
 	IngressControllerLBSubnetRole SubnetRoleType = "IngressControllerLB"

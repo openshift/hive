@@ -9,12 +9,14 @@ import (
 	"github.com/blang/semver/v4"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 
+	icazure "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	installazure "github.com/openshift/installer/pkg/asset/machines/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
@@ -68,6 +70,12 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		return nil, false, err
 	}
 
+	// NOTE: This is dummied up specifically to facilitate the no-op path through MachineSets()=>provider=>getBootDiagnosticObject.
+	// That path relies on ic.Platform.DefaultMachinePlatform and computePool.Platform.Azure.BootDiagnostics both being nil.
+	session := &icazure.Session{
+		Environment: azure.Environment{},
+	}
+
 	ic := &installertypes.InstallConfig{
 		Platform: installertypes.Platform{
 			Azure: &installertypesazure.Platform{
@@ -84,7 +92,9 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 
 	computePool := baseMachinePool(pool)
 	computePool.Platform.Azure = &installertypesazure.MachinePool{
-		Zones:        pool.Spec.Platform.Azure.Zones,
+		Zones: pool.Spec.Platform.Azure.Zones,
+		// Currently not supported
+		Identity:     &installertypesazure.VMIdentity{},
 		InstanceType: pool.Spec.Platform.Azure.InstanceType,
 		OSDisk: installertypesazure.OSDisk{
 			DiskSizeGB: pool.Spec.Platform.Azure.OSDisk.DiskSizeGB,
@@ -167,6 +177,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		workerUserDataName,
 		capabilities,
 		useImageGallery,
+		session,
 		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
 	)
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")

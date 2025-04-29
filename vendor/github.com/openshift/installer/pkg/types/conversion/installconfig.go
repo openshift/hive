@@ -96,10 +96,13 @@ func convertNetworking(config *types.InstallConfig) {
 		netconf.NetworkType = netconf.DeprecatedType
 	}
 
-	// Recognize the OpenShiftSDN network plugin name regardless of capitalization, for
+	// Recognize the network plugin name regardless of capitalization, for
 	// backward compatibility
-	if strings.ToLower(netconf.NetworkType) == strings.ToLower(string(operv1.NetworkTypeOpenShiftSDN)) {
+	if strings.EqualFold(netconf.NetworkType, string(operv1.NetworkTypeOpenShiftSDN)) {
 		netconf.NetworkType = string(operv1.NetworkTypeOpenShiftSDN)
+	}
+	if strings.EqualFold(netconf.NetworkType, string(operv1.NetworkTypeOVNKubernetes)) {
+		netconf.NetworkType = string(operv1.NetworkTypeOVNKubernetes)
 	}
 
 	// Convert hostSubnetLength to hostPrefix
@@ -302,9 +305,9 @@ func convertAWS(config *types.InstallConfig) error {
 
 	// Subnets field is deprecated in favor of VPC.Subnets.
 	fldPath := field.NewPath("platform", "aws")
-	if config.AWS.DeprecatedSubnets != nil && config.AWS.VPC.Subnets != nil { // nolint: staticcheck
+	if len(config.AWS.DeprecatedSubnets) > 0 && len(config.AWS.VPC.Subnets) > 0 { // nolint: staticcheck
 		return field.Forbidden(fldPath.Child("subnets"), fmt.Sprintf("cannot specify %s and %s together", fldPath.Child("subnets"), fldPath.Child("vpc", "subnets")))
-	} else if config.AWS.DeprecatedSubnets != nil { // nolint: staticcheck
+	} else if len(config.AWS.DeprecatedSubnets) > 0 { // nolint: staticcheck
 		var subnets []aws.Subnet
 		for _, subnetID := range config.AWS.DeprecatedSubnets { // nolint: staticcheck
 			subnets = append(subnets, aws.Subnet{

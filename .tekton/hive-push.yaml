@@ -29,15 +29,6 @@ spec:
     value: Dockerfile
   - name: path-context
     value: .
-  taskRunSpecs:
-  - pipelineTaskName: build-container
-    computeResources:
-      limits:
-        cpu: "4"
-        memory: 20Gi
-      requests:
-        cpu: "1"
-        memory: 16Gi
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while reducing network traffic.
@@ -624,7 +615,17 @@ spec:
       optional: true
     - name: netrc
       optional: true
-  taskRunTemplate: {}
+  taskRunSpecs:
+  - computeResources:
+      limits:
+        cpu: "4"
+        memory: 20Gi
+      requests:
+        cpu: "1"
+        memory: 16Gi
+    pipelineTaskName: build-container
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-hive
   workspaces:
   - name: workspace
     volumeClaimTemplate:

@@ -136,18 +136,18 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 		hzID = cd.Status.Platform.AWS.PrivateLink.HostedZoneID
 	}
 
-	idLog := logger.WithField("infraID", metadata.InfraID)
 	if hzID == "" { // since we don't have the hz ID, we try to discover it to prevent leaks
 		apiDomain, err := initialURL(r.Client,
 			client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name}) // HIVE-2485 ✓
 		if apierrors.IsNotFound(err) {
-			idLog.Info("no hostedZoneID in status and admin kubeconfig does not exist, skipping hosted zone cleanup")
+			logger.Info("no hostedZoneID in status and admin kubeconfig does not exist, skipping hosted zone cleanup")
 			return nil
 		} else if err != nil {
-			idLog.WithError(err).Error("could not get API URL from kubeconfig")
+			logger.WithError(err).Error("could not get API URL from kubeconfig")
 			return err
 		}
 
+		idLog := logger.WithField("infraID", metadata.InfraID)
 		endpointResp, err := awsClient.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
 			Filters: []*ec2.Filter{ec2FilterForCluster(metadata)},
 		})
@@ -169,10 +169,7 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 			return err
 		}
 	}
-	return r.deleteHostedZone(awsClient, hzID, idLog)
-}
 
-func (r *ReconcileAWSPrivateLink) deleteHostedZone(awsClient awsclient.Client, hzID string, logger log.FieldLogger) error {
 	hzLog := logger.WithField("hostedZoneID", hzID)
 	recordsResp, err := awsClient.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 		HostedZoneId: aws.String(hzID),

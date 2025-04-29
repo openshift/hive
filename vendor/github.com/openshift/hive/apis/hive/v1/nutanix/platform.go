@@ -42,7 +42,7 @@ type PrismElement struct {
 	// +optional
 	Endpoint PrismEndpoint `json:"endpoint,omitempty"`
 
-	// Name is prism endpoint Name
+	// Name is the Prism Element (cluster) name.
 	Name string `json:"name,omitempty"`
 }
 

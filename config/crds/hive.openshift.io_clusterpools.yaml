@@ -770,7 +770,8 @@ spec:
                                   - port
                                   type: object
                                 name:
-                                  description: Name is prism endpoint Name
+                                  description: Name is the Prism Element (cluster)
+                                    name.
                                   type: string
                                 uuid:
                                   description: UUID is the UUID of the Prism Element

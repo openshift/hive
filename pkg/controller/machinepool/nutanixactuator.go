@@ -146,9 +146,9 @@ func (a *NutanixActuator) getNutanixPlatformInstallConfig(cd *hivev1.ClusterDepl
 }
 
 // getNutanixDataDisksStorageConfig retrieves the storage configuration for a given Nutanix VM data disk.
-func (a *NutanixActuator) getNutanixDataDisksStorageConfig(dataDisk machinev1.NutanixVMDisk) (*installertypesnutanix.StorageConfig, error) {
+func (a *NutanixActuator) getNutanixDataDisksStorageConfig(dataDisk machinev1.NutanixVMDisk) *installertypesnutanix.StorageConfig {
 	if dataDisk.StorageConfig == nil {
-		return nil, nil
+		return nil
 	}
 
 	storageConfig := &installertypesnutanix.StorageConfig{
@@ -156,11 +156,11 @@ func (a *NutanixActuator) getNutanixDataDisksStorageConfig(dataDisk machinev1.Nu
 	}
 
 	if dataDisk.StorageConfig.StorageContainer == nil || dataDisk.StorageConfig.StorageContainer.UUID == nil {
-		return storageConfig, nil
+		return storageConfig
 	}
 
 	storageConfig.StorageContainer.UUID = *dataDisk.StorageConfig.StorageContainer.UUID
-	return storageConfig, nil
+	return storageConfig
 }
 
 // getNutanixDataDisksDataSource extracts the data source reference for a Nutanix VM data disk.
@@ -179,10 +179,7 @@ func (a *NutanixActuator) getNutanixDataDisksDataSource(dataDisk machinev1.Nutan
 func (a *NutanixActuator) getNutanixDataDisks(pool *hivev1.MachinePool, logger log.FieldLogger) ([]installertypesnutanix.DataDisk, error) {
 	var dataDisks []installertypesnutanix.DataDisk
 	for _, dataDisk := range pool.Spec.Platform.Nutanix.DataDisks {
-		storageConfig, err := a.getNutanixDataDisksStorageConfig(dataDisk)
-		if err != nil {
-			return nil, err
-		}
+		storageConfig := a.getNutanixDataDisksStorageConfig(dataDisk)
 		dataSource, err := a.getNutanixDataDisksDataSource(dataDisk)
 		if err != nil {
 			return nil, err
@@ -197,6 +194,6 @@ func (a *NutanixActuator) getNutanixDataDisks(pool *hivev1.MachinePool, logger l
 		dataDisks = append(dataDisks, *disk)
 	}
 
-	logger.Infof("found %d Nutanix data disks", len(dataDisks))
+	logger.WithField("numDisks", len(dataDisks)).Info("found Nutanix data disks")
 	return dataDisks, nil
 }

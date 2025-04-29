@@ -1,17 +1,19 @@
 package machinepool
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machinev1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/controller/utils/nutanixutils"
 	installnutanix "github.com/openshift/installer/pkg/asset/machines/nutanix"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -82,7 +84,10 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	computePool := baseMachinePool(pool)
 	dataDisks, err := a.getNutanixDataDisks(pool, logger)
 	if err != nil {
-		return nil, false, err
+		if updateErr := a.setUnsupportedConfigurationCondition(pool, logger, "InvalidDataDisk", "data source must specify a UUID"); updateErr != nil {
+			return nil, false, updateErr
+		}
+		return nil, false, nil
 	}
 
 	computePool.Platform.Nutanix = &installertypesnutanix.MachinePool{
@@ -108,7 +113,10 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 
 	osImage, err := getRHCOSImageNameFromMasterMachine(a.masterMachine, cd, logger)
 	if err != nil {
-		return nil, false, err
+		if updateErr := a.setUnsupportedConfigurationCondition(pool, logger, "MissingRHCOSImage", "no RHCOS image found in master machine provider spec"); updateErr != nil {
+			return nil, false, updateErr
+		}
+		return nil, false, nil
 	}
 
 	installerMachineSets, err := installnutanix.MachineSets(
@@ -196,4 +204,26 @@ func (a *NutanixActuator) getNutanixDataDisks(pool *hivev1.MachinePool, logger l
 
 	logger.WithField("numDisks", len(dataDisks)).Info("found Nutanix data disks")
 	return dataDisks, nil
+}
+
+func (a *NutanixActuator) setUnsupportedConfigurationCondition(pool *hivev1.MachinePool, logger log.FieldLogger, reason, message string) error {
+	logger.WithField("reason", reason).Error(message)
+
+	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		hivev1.UnsupportedConfigurationMachinePoolCondition,
+		corev1.ConditionFalse,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+
+	if changed {
+		pool.Status.Conditions = conds
+		if updateErr := a.client.Status().Update(context.Background(), pool); updateErr != nil {
+			logger.WithError(updateErr).Error("failed to update MachinePool status with UnsupportedConfiguration condition")
+			return updateErr
+		}
+	}
+	return nil
 }

@@ -436,6 +436,8 @@ spec:
       params:
       - name: image-url
         value: $(tasks.build-image-index.results.IMAGE_URL)
+      - name: image-digest
+        value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: IMAGE
         value: $(params.output-image)
       - name: DOCKERFILE
@@ -533,6 +535,8 @@ spec:
       params:
       - name: image-url
         value: $(tasks.build-image-index.results.IMAGE_URL)
+      - name: image-digest
+        value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       runAfter:
       - build-image-index
       taskRef:

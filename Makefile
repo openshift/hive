@@ -373,6 +373,10 @@ modcheck:
 	go run ./hack/modcheck.go
 verify: modcheck
 
+.PHONY: modfix
+modfix:
+	go run ./hack/modcheck.go -f
+
 .PHONY: install-tools
 install-tools:
 	go install $(GO_MOD_FLAGS) github.com/golang/mock/mockgen

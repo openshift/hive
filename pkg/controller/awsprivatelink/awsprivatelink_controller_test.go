@@ -1322,6 +1322,124 @@ users:
 			"secrets \"test-cd-provision-0-kubeconfig\" not found"),
 		err: "secrets \"test-cd-provision-0-kubeconfig\" not found",
 	}, {
+		name: "existing VPCEndpoint",
+
+		existing: []runtime.Object{
+			testProvision("test-cd-provision-0",
+				provisionWithInfraID("test-cd-1234"),
+				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
+			enabledPrivateLinkBuilder.Build(
+				withClusterProvision("test-cd-provision-0"),
+				// Existing VPCEndpoint
+				withPrivateLink(&hivev1aws.PrivateLinkAccessStatus{
+					VPCEndpointID: "vpce-12345",
+				}),
+			),
+		},
+		inventory: validInventory,
+		configureAWSClient: func(m *mock.MockClient) {
+			clusternlb := mockDiscoverLB(m)
+			service := mockCreateService(m, clusternlb)
+			mockServicePerms(m, service)
+
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters: []*ec2.Filter{{
+						Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
+						Values: aws.StringSlice([]string{"test-cd-1234"}),
+					}}}).
+				Return(&ec2.DescribeVpcEndpointsOutput{
+					VpcEndpoints: []*ec2.VpcEndpoint{
+						{
+							// A bad one we should ignore
+							VpcEndpointId: aws.String("badvpce"),
+							State:         aws.String("expired"),
+						},
+						{
+							// A good one we should ignore
+							VpcEndpointId: aws.String("goldenvpce"),
+							State:         aws.String("pendingAcceptance"),
+						},
+						{
+							// The previously configured one
+							VpcEndpointId: aws.String("vpce-12345"),
+							State:         aws.String("available"),
+						},
+					},
+				}, nil)
+		},
+
+		hasFinalizer: true,
+		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
+			VPCEndpointID:      "vpce-12345",
+		},
+		err: "secrets \"test-cd-provision-0-kubeconfig\" not found",
+	}, {
+		name: "existing VPCEndpoint is stale, adopt another; and test paging",
+
+		existing: []runtime.Object{
+			testProvision("test-cd-provision-0",
+				provisionWithInfraID("test-cd-1234"),
+				provisionWithAdminKubeconfig("test-cd-provision-0-kubeconfig")),
+			enabledPrivateLinkBuilder.Build(
+				withClusterProvision("test-cd-provision-0"),
+				// Existing VPCEndpoint
+				withPrivateLink(&hivev1aws.PrivateLinkAccessStatus{
+					VPCEndpointID: "vpce-12345",
+				}),
+			),
+		},
+		inventory: validInventory,
+		configureAWSClient: func(m *mock.MockClient) {
+			clusternlb := mockDiscoverLB(m)
+			service := mockCreateService(m, clusternlb)
+			mockServicePerms(m, service)
+
+			tagFilters := []*ec2.Filter{{
+				Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
+				Values: aws.StringSlice([]string{"test-cd-1234"}),
+			}}
+			// First page empty (HIVE-2838)
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters: tagFilters}).
+				Return(&ec2.DescribeVpcEndpointsOutput{
+					NextToken: aws.String("abc123"),
+				}, nil)
+			// Second page contains our existing stale VPCE, and another non-stale one we can adopt
+			m.EXPECT().DescribeVpcEndpoints(
+				&ec2.DescribeVpcEndpointsInput{
+					Filters:   tagFilters,
+					NextToken: aws.String("abc123")}).
+				Return(&ec2.DescribeVpcEndpointsOutput{
+					VpcEndpoints: []*ec2.VpcEndpoint{
+						{
+							// The previously configured one
+							VpcEndpointId: aws.String("vpce-12345"),
+							State:         aws.String("rejected"),
+						},
+						{
+							// A bad one we should ignore
+							VpcEndpointId: aws.String("badvpce"),
+							State:         aws.String("expired"),
+						},
+						{
+							// A good one we should adopt
+							VpcEndpointId: aws.String("goldenvpce"),
+							State:         aws.String("pendingAcceptance"),
+						},
+					},
+				}, nil)
+		},
+
+		hasFinalizer: true,
+		expectedStatus: &hivev1aws.PrivateLinkAccessStatus{
+			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
+			VPCEndpointID:      "goldenvpce",
+		},
+		err: "secrets \"test-cd-provision-0-kubeconfig\" not found",
+	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no previous PHZ",
 
 		existing: []runtime.Object{

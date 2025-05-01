@@ -1355,6 +1355,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.NetworkName = platform.Ovirt.NetworkName
 
 		return cloudBuilder, nil
+
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

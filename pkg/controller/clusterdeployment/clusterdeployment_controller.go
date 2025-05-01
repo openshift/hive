@@ -556,7 +556,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	// Set region label on the ClusterDeployment
 	if region := getClusterRegion(cd); cd.Spec.Platform.BareMetal == nil && cd.Spec.Platform.AgentBareMetal == nil &&
-		cd.Spec.Platform.None == nil && cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+		cd.Spec.Platform.None == nil && cd.Spec.Platform.Nutanix == nil &&
+		cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+		// TODO: For Nutanix, consider populating the region label with the PC name (Requires querying the PC).
 
 		if cd.Labels == nil {
 			cd.Labels = make(map[string]string)
@@ -604,7 +606,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.DeletionTimestamp != nil {
-
 		return r.syncDeletedClusterDeployment(cd, cdLog)
 	}
 
@@ -1979,6 +1980,12 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			Region:               cd.Spec.Platform.IBMCloud.Region,
 			BaseDomain:           cd.Spec.BaseDomain,
 		}
+	case cd.Spec.Platform.Nutanix != nil:
+		req.Spec.Platform.Nutanix = &hivev1.NutanixClusterDeprovision{
+			CredentialsSecretRef:  cd.Spec.Platform.Nutanix.CredentialsSecretRef,
+			CertificatesSecretRef: cd.Spec.Platform.Nutanix.CertificatesSecretRef,
+			PrismCentral:          cd.Spec.Platform.Nutanix.PrismCentral,
+		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
 	}
@@ -2665,6 +2672,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformNone
 	case cd.Spec.Platform.Ovirt != nil:
 		return constants.PlatformOvirt
+	case cd.Spec.Platform.Nutanix != nil:
+		return constants.PlatformNutanix
 	}
 	return constants.PlatformUnknown
 }

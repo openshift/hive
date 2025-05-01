@@ -1675,9 +1675,13 @@ github.com/nunnatsa/ginkgolinter/internal/rules
 github.com/nunnatsa/ginkgolinter/linter
 github.com/nunnatsa/ginkgolinter/types
 github.com/nunnatsa/ginkgolinter/version
+# github.com/nutanix-cloud-native/cluster-api-provider-nutanix v1.5.4-0.20250116153252-296a5347104c
+## explicit; go 1.22.1
+github.com/nutanix-cloud-native/cluster-api-provider-nutanix/api/v1beta1
 # github.com/nutanix-cloud-native/prism-go-client v0.5.0
 ## explicit; go 1.21
 github.com/nutanix-cloud-native/prism-go-client
+github.com/nutanix-cloud-native/prism-go-client/environment/credentials
 github.com/nutanix-cloud-native/prism-go-client/environment/types
 github.com/nutanix-cloud-native/prism-go-client/internal
 github.com/nutanix-cloud-native/prism-go-client/utils
@@ -1868,6 +1872,7 @@ github.com/openshift/hive/apis/hive/v1/gcp
 github.com/openshift/hive/apis/hive/v1/ibmcloud
 github.com/openshift/hive/apis/hive/v1/metricsconfig
 github.com/openshift/hive/apis/hive/v1/none
+github.com/openshift/hive/apis/hive/v1/nutanix
 github.com/openshift/hive/apis/hive/v1/openstack
 github.com/openshift/hive/apis/hive/v1/ovirt
 github.com/openshift/hive/apis/hive/v1/vsphere
@@ -1895,6 +1900,7 @@ github.com/openshift/installer/pkg/asset/machines/aws
 github.com/openshift/installer/pkg/asset/machines/azure
 github.com/openshift/installer/pkg/asset/machines/gcp
 github.com/openshift/installer/pkg/asset/machines/ibmcloud
+github.com/openshift/installer/pkg/asset/machines/nutanix
 github.com/openshift/installer/pkg/asset/machines/openstack
 github.com/openshift/installer/pkg/asset/machines/ovirt
 github.com/openshift/installer/pkg/asset/machines/vsphere
@@ -1905,6 +1911,7 @@ github.com/openshift/installer/pkg/destroy/aws
 github.com/openshift/installer/pkg/destroy/azure
 github.com/openshift/installer/pkg/destroy/gcp
 github.com/openshift/installer/pkg/destroy/ibmcloud
+github.com/openshift/installer/pkg/destroy/nutanix
 github.com/openshift/installer/pkg/destroy/openstack
 github.com/openshift/installer/pkg/destroy/ovirt
 github.com/openshift/installer/pkg/destroy/providers

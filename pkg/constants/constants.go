@@ -19,6 +19,7 @@ const (
 	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
+	PlatformNutanix        = "nutanix"
 
 	mergedPullSecretSuffix = "merged-pull-secret"
 

@@ -45,6 +45,7 @@ import (
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
+	"github.com/openshift/installer/pkg/destroy/nutanix"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/providers"
@@ -53,6 +54,7 @@ import (
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
+	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
@@ -64,6 +66,7 @@ import (
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
+	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
 	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	ovirtutils "github.com/openshift/hive/contrib/pkg/utils/ovirt"
 	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
@@ -346,9 +349,9 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading install-config.yaml")
 		return err
 	}
-	icData, err = pasteInPullSecret(icData, m.PullSecretMountPath)
+	icData, err = m.pasteInInstallConfigSecrets(cd, icData)
 	if err != nil {
-		m.log.WithError(err).Error("error adding pull secret to install-config.yaml")
+		m.log.WithError(err).Error("error adding secret to install-config.yaml")
 		return err
 	}
 	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
@@ -549,6 +552,8 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 		ovirtutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.IBMCloud != nil:
 		ibmutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixutils.ConfigureCreds(m.DynamicClient)
 	}
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.
@@ -811,6 +816,33 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if ibmCloudDestroyerErr != nil {
 			return ibmCloudDestroyerErr
 		}
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				Nutanix: &installertypesnutanix.Metadata{
+					PrismCentral: cd.Spec.Platform.Nutanix.PrismCentral.Address,
+					Username:     nutanixUsername,
+					Password:     nutanixPassword,
+					Port:         string(cd.Spec.Platform.Nutanix.PrismCentral.Port),
+				},
+			},
+		}
+		var err error
+		uninstaller, err = nutanix.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+
 	default:
 		logger.Warn("unknown platform for re-try cleanup")
 		return errors.New("unknown platform for re-try cleanup")
@@ -1889,17 +1921,95 @@ func isDirNonEmpty(dir string) bool {
 	return err == nil
 }
 
-func pasteInPullSecret(icData []byte, pullSecretFile string) ([]byte, error) {
-	pullSecretData, err := os.ReadFile(pullSecretFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read the pull secret file")
+// injectProviderCredentials Add the credentials from a given secret into the ic if nor present
+func injectProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixUsername == "" || nutanixPassword == "" {
+			return fmt.Errorf("missing credentials for %s platform provider", constants.PlatformNutanix)
+		}
+		if ic.Platform.Nutanix.PrismCentral.Username != "" && ic.Platform.Nutanix.PrismCentral.Username != nutanixUsername {
+			return fmt.Errorf("prism central username mismatch for %s platform provider", constants.PlatformNutanix)
+		}
+		if ic.Platform.Nutanix.PrismCentral.Password != "" && ic.Platform.Nutanix.PrismCentral.Password != nutanixPassword {
+			return fmt.Errorf("prism central password mismatch for %s platform provider", constants.PlatformNutanix)
+		}
+
+		ic.Platform.Nutanix.PrismCentral.Username = nutanixUsername
+		ic.Platform.Nutanix.PrismCentral.Password = nutanixPassword
 	}
-	icRaw := map[string]interface{}{}
-	if err := yaml.Unmarshal(icData, &icRaw); err != nil {
+
+	return nil
+}
+
+// injectProviderAdditionalBundle injects a provider-specific trust bundle into the given
+// InstallConfig if none is already defined in its AdditionalTrustBundle field.
+func injectProviderAdditionalBundle(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment, certDir string) error {
+	// Ignore case where there the install-config AdditionalTrustBundle value is set
+	if ic.AdditionalTrustBundle != "" {
+		return nil
+	}
+
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		// If the ClusterDeployment specifies the Nutanix platform and includes a reference to a certificates secret,
+		// the method attempts to load the trust bundle from the mounted certificate directory and sets it into the InstallConfig.
+		if cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name == "" {
+			return nil
+		}
+
+		certData, err := contributils.BuildCertBundleFromDir(certDir)
+		if err != nil {
+			return err
+		}
+		ic.AdditionalTrustBundle = certData
+		if ic.AdditionalTrustBundlePolicy == "" {
+			ic.AdditionalTrustBundlePolicy = installertypes.PolicyAlways
+		}
+	}
+	return nil
+}
+
+func (m *InstallManager) getPlatformCertificateDir(cd *hivev1.ClusterDeployment) string {
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		return constants.NutanixCertificatesDir
+
+	}
+
+	return ""
+}
+
+func (m *InstallManager) pasteInInstallConfigSecrets(cd *hivev1.ClusterDeployment, icData []byte) ([]byte, error) {
+	ic := installertypes.InstallConfig{}
+	if err := yaml.Unmarshal(icData, &ic); err != nil {
 		return nil, errors.Wrap(err, "could not unmarshal InstallConfig")
 	}
-	icRaw["pullSecret"] = string(pullSecretData)
-	return yaml.Marshal(icRaw)
+
+	if err := pasteInPullSecret(&ic, m.PullSecretMountPath); err != nil {
+		return nil, err
+	}
+
+	if err := injectProviderCredentials(&ic, cd); err != nil {
+		return nil, err
+	}
+
+	if err := injectProviderAdditionalBundle(&ic, cd, m.getPlatformCertificateDir(cd)); err != nil {
+		return nil, err
+	}
+	return yaml.Marshal(ic)
+}
+
+func pasteInPullSecret(ic *installertypes.InstallConfig, pullSecretFile string) error {
+	pullSecretData, err := os.ReadFile(pullSecretFile)
+	if err != nil {
+		return errors.Wrap(err, "could not read the pull secret file")
+	}
+
+	ic.PullSecret = string(pullSecretData)
+	return nil
 }
 
 func getHomeDir() string {

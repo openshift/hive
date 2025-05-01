@@ -810,6 +810,180 @@ spec:
                       None indicates platform-agnostic install.
                       https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html
                     type: object
+                  nutanix:
+                    description: Nutanix is the configuration used when installing
+                      on Nutanix Prism Central.
+                    properties:
+                      certificatesSecretRef:
+                        description: |-
+                          CertificatesSecretRef refers to a secret that contains the Prism Central CA certificates
+                          necessary for communicating with the Prism Central.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      credentialsSecretRef:
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the Nutanix account access
+                          credentials.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      failureDomains:
+                        description: |-
+                          FailureDomains configures failure domains for the Nutanix platform.
+                          Required for using MachinePools
+                        items:
+                          description: FailureDomain configures failure domain information
+                            for the Nutanix platform.
+                          properties:
+                            dataSourceImages:
+                              description: DataSourceImages identifies the datasource
+                                images in the Prism Element.
+                              items:
+                                description: StorageResourceReference holds reference
+                                  information of a storage resource (storage container,
+                                  data source image, etc.)
+                                properties:
+                                  name:
+                                    description: Name is the name of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                  referenceName:
+                                    description: ReferenceName is the identifier of
+                                      the storage resource configured in the FailureDomain.
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              type: array
+                            name:
+                              description: Name defines the unique name of a failure
+                                domain.
+                              maxLength: 64
+                              minLength: 1
+                              pattern: ^[0-9A-Za-z_.-@/]+$
+                              type: string
+                            prismElement:
+                              description: |-
+                                PrismElement holds the identification (name, UUID) and the optional endpoint address and
+                                port of the Nutanix Prism Element. When a cluster-wide proxy is installed, this endpoint will,
+                                by default, be accessed through the cluster-wide proxy configured for the platform.
+                                If communication with this endpoint should bypass the proxy, add the endpoint to the install-config
+                                `spec.noProxy` list in the proxy configuration.
+                              properties:
+                                endpoint:
+                                  description: Endpoint holds the address and port
+                                    of the Prism Element
+                                  properties:
+                                    address:
+                                      description: address is the endpoint address
+                                        (DNS name or IP address) of the Nutanix Prism
+                                        Central or Element (cluster)
+                                      type: string
+                                    port:
+                                      description: port is the port number to access
+                                        the Nutanix Prism Central or Element (cluster)
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - address
+                                  - port
+                                  type: object
+                                name:
+                                  description: Name is the Prism Element (cluster)
+                                    name.
+                                  type: string
+                                uuid:
+                                  description: UUID is the UUID of the Prism Element
+                                    (cluster)
+                                  type: string
+                              required:
+                              - uuid
+                              type: object
+                            storageContainers:
+                              description: StorageContainers identifies the storage
+                                containers in the Prism Element.
+                              items:
+                                description: StorageResourceReference holds reference
+                                  information of a storage resource (storage container,
+                                  data source image, etc.)
+                                properties:
+                                  name:
+                                    description: Name is the name of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                  referenceName:
+                                    description: ReferenceName is the identifier of
+                                      the storage resource configured in the FailureDomain.
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the storage container
+                                      resource in the Prism Element.
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              type: array
+                            subnetUUIDs:
+                              description: |-
+                                SubnetUUIDs identifies the network subnets of the Prism Element.
+                                Currently we only support one subnet for a failure domain.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                              x-kubernetes-list-type: set
+                          required:
+                          - name
+                          - prismElement
+                          - subnetUUIDs
+                          type: object
+                        type: array
+                      prismCentral:
+                        description: |-
+                          PrismCentral is the endpoint (address and port) to connect to the Prism Central.
+                          This serves as the default Prism-Central.
+                        properties:
+                          address:
+                            description: address is the endpoint address (DNS name
+                              or IP address) of the Nutanix Prism Central or Element
+                              (cluster)
+                            type: string
+                          port:
+                            description: port is the port number to access the Nutanix
+                              Prism Central or Element (cluster)
+                            format: int32
+                            type: integer
+                        required:
+                        - address
+                        - port
+                        type: object
+                    required:
+                    - credentialsSecretRef
+                    - prismCentral
+                    type: object
                   openstack:
                     description: OpenStack is the configuration used when installing
                       on OpenStack

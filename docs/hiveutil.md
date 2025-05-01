@@ -110,6 +110,44 @@ The IBM Cloud API key will be read from an `IC_API_KEY` environment variable. An
 bin/hiveutil create-cluster --cloud=ibmcloud --region="us-south" --base-domain=ibm.hive.openshift.com --manifests=/path/to/manifests/ --credentials-mode-manual mycluster
 ```
 
+
+### Create Cluster on Nutanix
+
+The `hiveutil` CLI allows you to create an OpenShift cluster on Nutanix with the following command:
+
+```sh
+bin/hiveutil create-cluster hive-cluster-name \
+  --namespace="hive" \
+  --base-domain="my.base.domain.com" \
+  --cloud="nutanix" \
+  --nutanix-api-vip="10.0.2.11" \
+  --nutanix-ingress-vip="10.0.2.12" \
+  --nutanix-pc-address="prismcentral.nutanix.com" \
+  --nutanix-pc-port=9440 \
+  --nutanix-pe-uuid="prism-element-uuid" \
+  --nutanix-pe-address="prism.lts-cluster.nutanix.com" \
+  --nutanix-pe-port=9440 \
+  --nutanix-subnetUUIDs="subnet-uuid-1234" \
+  --nutanix-pe-name="Prism-Element-1" \
+  --nutanix-az-name="Local_AZ" \
+  --manifests="/path/to/nutanix_secrets"
+```
+
+#### Environment Variables
+To authenticate with Prism Central, set the following environment variables before running the command:
+
+```sh
+export NUTANIX_USERNAME="your-username"
+export NUTANIX_PASSWORD="your-password"
+```
+
+#### Additional Notes
+- The `--nutanix-api-vip` and `--nutanix-ingress-vip` must be pre-allocated and available within the network.
+- Ensure that `prismcentral.nutanix.com` and `prism.lts-cluster.nutanix.com` are accessible from the Hive environment.
+- The `--manifests` parameter should point to a directory containing necessary secrets and configurations required for the installation. See [Additional Required Secrets](./using-hive.md#additional-required-secrets).
+- Depending on your environment, you might need to configure DNS for your API VIP and Ingress VIP to ensure proper resolution.
+
+
 ### Cluster Pools
 
 Create a [ClusterPool](./clusterpools.md):

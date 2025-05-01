@@ -23,6 +23,7 @@ import (
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -311,6 +312,10 @@ func validateMachinePoolSpecInvariants(spec *hivev1.MachinePoolSpec, fldPath *fi
 		platforms = append(platforms, "ibmcloud")
 		allErrs = append(allErrs, validateIBMCloudMachinePoolPlatformInvariants(p, platformPath.Child("ibmcloud"))...)
 	}
+	if p := spec.Platform.Nutanix; p != nil {
+		platforms = append(platforms, "nutanix")
+		allErrs = append(allErrs, validateNutanixMachinePoolPlatformInvariants(p, platformPath.Child("nutanix"))...)
+	}
 
 	switch len(platforms) {
 	case 0:
@@ -430,5 +435,30 @@ func validateOvirtMachinePoolPlatformInvariants(platform *hivev1ovirt.MachinePoo
 
 func validateIBMCloudMachinePoolPlatformInvariants(platform *hivev1ibmcloud.MachinePool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	return allErrs
+}
+
+func validateNutanixMachinePoolPlatformInvariants(platform *hivev1nutanix.MachinePool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if platform.NumCPUs <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("numCPUs"), "number of vCPUs must be positive"))
+	}
+
+	if platform.NumCoresPerSocket <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("numCoresPerSocket"), "number of cores per sockets must be positive"))
+	}
+
+	if platform.MemoryMiB <= 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("memoryMiB"), "memory must be positive"))
+	}
+
+	if len(platform.DataDisks) > 0 {
+		for _, disk := range platform.DataDisks {
+			if disk.DiskSize.IsZero() {
+				allErrs = append(allErrs, field.Required(fldPath.Child("diskSizeBytes"), "disk size must be set"))
+			}
+		}
+	}
+
 	return allErrs
 }

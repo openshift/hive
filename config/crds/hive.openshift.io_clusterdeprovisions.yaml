@@ -219,6 +219,64 @@ spec:
                     - credentialsSecretRef
                     - region
                     type: object
+                  nutanix:
+                    description: Nutanix contains Nutanix-specific deprovision settings
+                    properties:
+                      certificatesSecretRef:
+                        description: |-
+                          CertificatesSecretRef refers to a secret that contains the Nutanix CA certificates
+                          necessary for communicating with the Prism Central.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      credentialsSecretRef:
+                        description: |-
+                          CredentialsSecretRef refers to a secret that contains the Nutanix account access
+                          credentials.
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      prismCentral:
+                        description: |-
+                          PrismCentral is the endpoint (address and port) to connect to the Prism Central.
+                          This serves as the default Prism-Central.
+                        properties:
+                          address:
+                            description: address is the endpoint address (DNS name
+                              or IP address) of the Nutanix Prism Central or Element
+                              (cluster)
+                            type: string
+                          port:
+                            description: port is the port number to access the Nutanix
+                              Prism Central or Element (cluster)
+                            format: int32
+                            type: integer
+                        required:
+                        - address
+                        - port
+                        type: object
+                    required:
+                    - credentialsSecretRef
+                    - prismCentral
+                    type: object
                   openstack:
                     description: OpenStack contains OpenStack-specific deprovision
                       settings

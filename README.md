@@ -13,6 +13,7 @@ The Hive service can be used to provision and perform initial configuration of O
 * Azure
 * Google Cloud Platform
 * IBM Cloud
+* Nutanix
 * OpenStack
 * vSphere
 

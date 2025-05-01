@@ -3,6 +3,9 @@
 shopt -s expand_aliases
 alias echo='/bin/echo -n `date -Ins --universal`"  "; /bin/echo'
 
+# Workaround for upstream vsphere e2e setting SSL_CERT_FILE to a vsphere specific value (bad for us)
+unset SSL_CERT_FILE
+
 ###
 # TEMPORARY workaround for https://issues.redhat.com/browse/DPTP-2871
 # The configured job timeout after isn't signaling the test script like it
@@ -223,23 +226,14 @@ case "${CLOUD}" in
 	;;
 "vsphere")
   BASE_DOMAIN="${BASE_DOMAIN:-vmc.devcluster.openshift.com}"
-  if [ -z "$NETWORK_NAME" ]; then
-    echo "Variable 'NETWORK_NAME' not set."
+  USE_MANAGED_DNS=false
+  if [ -z "$VSPHERE_INSTALLER_PLATFORM_SPEC_JSON" ]; then
+    echo "Variable 'VSPHERE_INSTALLER_PLATFORM_SPEC_JSON' not set."
     exit 1
   fi
-   if [ -z "$VCENTER" ]; then
-    echo "Variable 'VCENTER' not set."
-    exit 1
-  fi
-  API_VIP=$(get_vips 3) # Get 3rd vip from file
-  INGRESS_VIP=$(get_vips 4) # Get 4th vip from file
-  EXTRA_CREATE_CLUSTER_ARGS="--vsphere-datacenter=${GOVC_DATACENTER:-DEVQEdatacenter} \
-      --vsphere-default-datastore=${GOVC_DATASTORE:-vsanDatastore}\
-      --vsphere-cluster=${VSPHERE_CLUSTER:-DEVQEcluster}
-      --vsphere-api-vip=$API_VIP \
-      --vsphere-ingress-vip=$INGRESS_VIP \
-      --vsphere-network=$NETWORK_NAME \
-      --vsphere-vcenter=$VCENTER"
+  EXTRA_CREATE_CLUSTER_ARGS="--machine-network=$VSPHERE_MACHINE_NETWORK \
+      --vsphere-api-vip=$VSPHERE_API_VIP \
+      --vsphere-ingress-vip=$VSPHERE_INGRESS_VIP"
   ;;
 *)
 	echo "unknown cloud: ${CLOUD}"
@@ -317,22 +311,4 @@ function capture_cluster_logs() {
         ${SRC_ROOT}/hack/logextractor.sh ${CLUSTER_NAME} "${ARTIFACT_DIR}/hive"
         exit 1
     fi
-}
-
-function get_vips() {
-  # Return vip at given index
-  idx=${1:-1} 
-   if [ -z "$SHARED_DIR" ]; then
-    echo "Variable 'SHARED_DIR' not set."
-    exit 1
-  fi
-  
-  vips="${SHARED_DIR}/vips.txt"
-  if [ ! -f "$vips" ]; then
-    echo "Error: File '$vips' not found."
-    exit 1
-  fi
-
-  vip=$(sed -n "${idx}p" "$vips")
-  echo "$vip"
 }

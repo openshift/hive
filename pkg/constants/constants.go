@@ -335,6 +335,9 @@ const (
 	// VSphereDataStoreEnvVar is the environment variable specifying the vSphere default datastore.
 	VSphereDataStoreEnvVar = "GOVC_DATASTORE"
 
+	// VSpherePlatformSpecJSONEnvVar is the environment variable containing an installer vSphere platform spec, encoded as JSON
+	VSpherePlatformSpecJSONEnvVar = "VSPHERE_INSTALLER_PLATFORM_SPEC_JSON"
+
 	// VSphereCredentialsDir is the directory containing VSphere credentials files.
 	VSphereCredentialsDir = "/vsphere-credentials"
 

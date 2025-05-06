@@ -52,12 +52,16 @@ const (
 	defaultRequeueLater = 1 * time.Minute
 )
 
-// clusterDeploymentAWSPrivateLinkConditions are the cluster deployment conditions controlled by
-// AWS private link controller
-var clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentConditionType{
-	hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-	hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-}
+var (
+	// clusterDeploymentAWSPrivateLinkConditions are the cluster deployment conditions controlled by
+	// AWS private link controller
+	clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentConditionType{
+		hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+		hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+	}
+
+	goodVPCEStates = sets.New("pendingAcceptance", "pending", "available")
+)
 
 // Add creates a new AWSPrivateLink Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
@@ -854,13 +858,17 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 	tag := ec2FilterForCluster(metadata)
 	endpointLog := logger.WithField("tag:key", aws.StringValue(tag.Name)).WithField("tag:value", aws.StringValueSlice(tag.Values))
 
-	var vpcEndpoint *ec2.VpcEndpoint
+	// The VPCE that will end up being configured and recorded in the CD status. May already exist, or may be created here.
+	var configuredVPCE *ec2.VpcEndpoint
+	// The first existing VPCE we find that's in a good state.
+	var firstGoodVPCE *ec2.VpcEndpoint
+	// The total number of VPCEs for our filter.
+	vpceCount := 0
 
 	input := &ec2.DescribeVpcEndpointsInput{
 		Filters: []*ec2.Filter{tag},
 	}
 
-	var allVpcEndpoints []*ec2.VpcEndpoint
 	for {
 		resp, err := awsClient.hub.DescribeVpcEndpoints(input)
 		if err != nil {
@@ -868,7 +876,18 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 			return modified, nil, err
 		}
 
-		allVpcEndpoints = append(allVpcEndpoints, resp.VpcEndpoints...)
+		vpceCount += len(resp.VpcEndpoints)
+		// Only bother searching if we haven't already found the ones we're looking for
+		if firstGoodVPCE == nil || configuredVPCE == nil {
+			for _, vpce := range resp.VpcEndpoints {
+				if firstGoodVPCE == nil && goodVPCEStates.Has(*vpce.State) {
+					firstGoodVPCE = vpce
+				}
+				if configuredVPCE == nil && *vpce.VpcEndpointId == cd.Status.Platform.AWS.PrivateLink.VPCEndpointID {
+					configuredVPCE = vpce
+				}
+			}
+		}
 
 		if resp.NextToken == nil {
 			break
@@ -876,26 +895,52 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 		input.NextToken = resp.NextToken
 	}
 
-	if len(allVpcEndpoints) == 0 {
+	// Has the previously configured VPCE gone rotten?
+	if configuredVPCE != nil && !goodVPCEStates.Has(*configuredVPCE.State) {
+		// NOTE: If the new VPCE is in a different VPC, this will also result in replacing the HostedZone (and leaking the old one!)
+		endpointLog.WithField("vpcEndpointId", *configuredVPCE.VpcEndpointId).WithField("state", *configuredVPCE.State).Warn("previously configured VPCEndpoint is in a bad state; replacing")
+		configuredVPCE = nil
+	}
+	// If we don't already have a VPCE (either never did, or it went bad), see if we found another good one already
+	if configuredVPCE == nil && firstGoodVPCE != nil {
+		endpointLog.WithField("vpcEndpointId", *firstGoodVPCE.VpcEndpointId).Info("adopting VPCEndpoint in good state")
+		configuredVPCE = firstGoodVPCE
 		modified = true
+	}
+	// If we still don't have a usable VPCE, create one
+	if configuredVPCE == nil {
 		var err error
-		vpcEndpoint, err = r.createVPCEndpoint(awsClient.hub, cd, metadata, vpcEndpointService, logger)
+		endpointLog.Info("creating VPCEndpoint")
+		configuredVPCE, err = r.createVPCEndpoint(awsClient.hub, cd, metadata, vpcEndpointService, logger)
 		if err != nil {
-			logger.WithError(err).Error("error creating VPC Endpoint for service")
+			logger.WithError(err).Error("error creating VPCEndpoint")
 			return modified, nil, err
 		}
-	} else {
-		vpcEndpoint = allVpcEndpoints[0]
+		endpointLog.WithField("vpcEndpointId", *configuredVPCE.VpcEndpointId).Info("created VPCEndpoint")
+		modified = true
+		vpceCount++ // Because we just created one
+	}
+
+	// At this point we can log the VPCE count
+	lvl := log.DebugLevel
+	if vpceCount > 1 {
+		lvl = log.WarnLevel
+	}
+	endpointLog.WithField("numVPCEndpoints", vpceCount).Log(lvl, "counted VPCEndpoints for cluster")
+
+	// If we haven't changed anything, we're done
+	if cd.Status.Platform.AWS.PrivateLink.VPCEndpointID == *configuredVPCE.VpcEndpointId {
+		return false, configuredVPCE, nil
 	}
 
 	initPrivateLinkStatus(cd)
-	cd.Status.Platform.AWS.PrivateLink.VPCEndpointID = *vpcEndpoint.VpcEndpointId
+	cd.Status.Platform.AWS.PrivateLink.VPCEndpointID = *configuredVPCE.VpcEndpointId
 	if err := r.updatePrivateLinkStatus(cd); err != nil {
 		logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointID")
 		return modified, nil, err
 	}
 
-	return modified, vpcEndpoint, nil
+	return modified, configuredVPCE, nil
 }
 
 func (r *ReconcileAWSPrivateLink) createVPCEndpoint(awsClient awsclient.Client,

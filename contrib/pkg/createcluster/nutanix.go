@@ -36,13 +36,13 @@ func getNutanixPort(portEnvVar, portCmd string, optionPort int32) (int32, error)
 	return int32(port), nil
 }
 
-func getNutanixStrVal(envVar, valueCmd, optionValue string) (string, error) {
+func getNutanixStrVal(envVar, valueCmd, optionValue string, optional bool) (string, error) {
 	value := os.Getenv(envVar)
 	if optionValue != "" {
 		value = optionValue
 	}
 
-	if value == "" {
+	if value == "" && !optional {
 		if envVar == "" {
 			return "", fmt.Errorf("must provide --%s", valueCmd)
 		}
@@ -53,7 +53,7 @@ func getNutanixStrVal(envVar, valueCmd, optionValue string) (string, error) {
 }
 
 func (o *Options) getNutanixCACert() ([]byte, error) {
-	nutanixCACerts, err := getNutanixStrVal("", c.CliNutanixCACertsOpt, o.NutanixCACerts)
+	nutanixCACerts, err := getNutanixStrVal("", c.CliNutanixCACertsOpt, o.NutanixCACerts, true)
 	if err != nil {
 		return nil, err
 	}
@@ -85,22 +85,22 @@ func (o *Options) getNutanixCloudBuilder() (*clusterresource.NutanixCloudBuilder
 		return nil, err
 	}
 
-	prismCentralEndpoint, err := getNutanixStrVal("", c.CliNutanixPcAddressOpt, o.NutanixPrismCentralEndpoint)
+	prismCentralEndpoint, err := getNutanixStrVal("", c.CliNutanixPcAddressOpt, o.NutanixPrismCentralEndpoint, false)
 	if err != nil {
 		return nil, err
 	}
 
-	prismElementAddress, err := getNutanixStrVal("", c.CliNutanixPeAddressOpt, o.NutanixPrismElementAddress)
+	prismElementAddress, err := getNutanixStrVal("", c.CliNutanixPeAddressOpt, o.NutanixPrismElementAddress, false)
 	if err != nil {
 		return nil, err
 	}
 
-	prismElementName, err := getNutanixStrVal("", c.CliNutanixPeNameOpt, o.NutanixPrismElementName)
+	prismElementName, err := getNutanixStrVal("", c.CliNutanixPeNameOpt, o.NutanixPrismElementName, false)
 	if err != nil {
 		return nil, err
 	}
 
-	prismElementUUID, err := getNutanixStrVal("", c.CliNutanixPeUUIDOpt, o.NutanixPrismElementUUID)
+	prismElementUUID, err := getNutanixStrVal("", c.CliNutanixPeUUIDOpt, o.NutanixPrismElementUUID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (o *Options) getNutanixCloudBuilder() (*clusterresource.NutanixCloudBuilder
 		return nil, err
 	}
 
-	azName, err := getNutanixStrVal("", c.CliNutanixAzNameOpt, o.NutanixAzName)
+	azName, err := getNutanixStrVal("", c.CliNutanixAzNameOpt, o.NutanixAzName, false)
 	if err != nil {
 		return nil, err
 	}

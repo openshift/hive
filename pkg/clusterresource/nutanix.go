@@ -55,6 +55,10 @@ func (p *NutanixCloudBuilder) GenerateCredentialsSecret(o *Builder) *corev1.Secr
 }
 
 func (p *NutanixCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object {
+	if p.CACert == nil || len(p.CACert) == 0 {
+		return []runtime.Object{}
+	}
+
 	return []runtime.Object{
 		&corev1.Secret{
 			TypeMeta: metav1.TypeMeta{
@@ -76,13 +80,10 @@ func (p *NutanixCloudBuilder) GenerateCloudObjects(o *Builder) []runtime.Object 
 func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 	failureDomains, _, _ := nutanixutils.ConvertInstallerFailureDomains(p.FailureDomains)
 
-	return hivev1.Platform{
+	platform := hivev1.Platform{
 		Nutanix: &hivev1nutanix.Platform{
 			CredentialsSecretRef: corev1.LocalObjectReference{
 				Name: p.CredsSecretName(o),
-			},
-			CertificatesSecretRef: corev1.LocalObjectReference{
-				Name: p.certificatesSecretName(o),
 			},
 			PrismCentral: hivev1nutanix.PrismEndpoint{
 				Address: p.PrismCentral.Endpoint.Address,
@@ -91,6 +92,14 @@ func (p *NutanixCloudBuilder) GetCloudPlatform(o *Builder) hivev1.Platform {
 			FailureDomains: failureDomains,
 		},
 	}
+
+	if p.CACert != nil && len(p.CACert) > 0 {
+		platform.Nutanix.CertificatesSecretRef = corev1.LocalObjectReference{
+			Name: p.certificatesSecretName(o),
+		}
+	}
+
+	return platform
 }
 
 func (p *NutanixCloudBuilder) addMachinePoolPlatform(o *Builder, mp *hivev1.MachinePool) {

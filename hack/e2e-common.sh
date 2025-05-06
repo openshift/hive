@@ -64,6 +64,9 @@ while [ $i -le ${max_tries} ]; do
     sleep ${sleep_between_tries}
   fi
 
+  # Delete test namespace if exist
+  oc delete ns ${CLUSTER_NAMESPACE} || true
+
   echo -n "Creating namespace ${CLUSTER_NAMESPACE}. Try #${i}/${max_tries}... "
   if oc create namespace "${CLUSTER_NAMESPACE}"; then
     echo "Success"
@@ -234,6 +237,22 @@ case "${CLOUD}" in
   EXTRA_CREATE_CLUSTER_ARGS="--machine-network=$VSPHERE_MACHINE_NETWORK \
       --vsphere-api-vip=$VSPHERE_API_VIP \
       --vsphere-ingress-vip=$VSPHERE_INGRESS_VIP"
+  ;;
+"nutanix")
+
+  USE_MANAGED_DNS=false
+  EXTRA_CREATE_CLUSTER_ARGS="--nutanix-pc-address=${NUTANIX_HOST} \
+      --nutanix-pc-port=${NUTANIX_PORT:-9440} \
+      --nutanix-pe-address=${PE_HOST} \
+      --nutanix-pe-port=${PE_PORT:-9440} \
+      --nutanix-ca-certs=${NUTANIX_CERT:-}
+      --nutanix-pe-uuid=${PE_UUID} \
+      --nutanix-pe-name=${PE_NAME} \
+      --nutanix-subnetUUIDs=${SUBNET_UUID} \
+      --nutanix-az-name=${NUTANIX_AZ_NAME-Local_AZ} \
+      --manifests=${MANIFESTS} \
+      --nutanix-api-vip=$API_VIP \
+      --nutanix-ingress-vip=$INGRESS_VIP"
   ;;
 *)
 	echo "unknown cloud: ${CLOUD}"

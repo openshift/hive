@@ -1714,6 +1714,11 @@ data:
       - "InvalidSubnet: Not enough IP space available in"
       installFailingReason: AWSSubnetInsufficientIPSpace
       installFailingMessage: Insufficient IP space available in subnet
+    - name: AWSSubnetTagLimitExceeded
+      searchRegexStrings:
+      - "could not add tags to subnets: TagLimitExceeded"
+      installFailingReason: AWSSubnetTagLimitExceeded
+      installFailingMessage: AWS Subnet exceeds the maximum number of tags allowed (50)
     - name: MissingPublicSubnetForZone
       searchRegexStrings:
       - "No public subnet provided for zone"

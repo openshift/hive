@@ -609,18 +609,17 @@ users:
 		return endpoint
 	}
 
-	mockPHZ := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingSummary *route53.HostedZoneSummary) string {
-		byVPCOut := &route53.ListHostedZonesByVPCOutput{}
-		if existingSummary != nil {
-			byVPCOut.HostedZoneSummaries = []*route53.HostedZoneSummary{existingSummary}
+	mockPHZ := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingHZ *route53.HostedZone) string {
+		lhzbnOut := &route53.ListHostedZonesByNameOutput{}
+		if existingHZ != nil {
+			lhzbnOut.HostedZones = []*route53.HostedZone{existingHZ}
 		}
-		m.EXPECT().ListHostedZonesByVPC(&route53.ListHostedZonesByVPCInput{
-			MaxItems:  aws.String("100"),
-			VPCId:     endpoint.VpcId,
-			VPCRegion: aws.String("us-east-1"),
-		}).Return(byVPCOut, nil)
+		m.EXPECT().ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
+			DNSName:  aws.String(apiDomain + "."),
+			MaxItems: aws.String("1"),
+		}).Return(lhzbnOut, nil)
 		var hzID string
-		if existingSummary == nil {
+		if existingHZ == nil {
 			hzID = "HZ12345"
 			m.EXPECT().CreateHostedZone(newCreateHostedZoneInputMatcher(&route53.CreateHostedZoneInput{
 				HostedZoneConfig: &route53.HostedZoneConfig{
@@ -637,7 +636,7 @@ users:
 				},
 			}, nil)
 		} else {
-			hzID = aws.StringValue(existingSummary.HostedZoneId)
+			hzID = aws.StringValue(existingHZ.Id)
 		}
 
 		m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
@@ -660,18 +659,17 @@ users:
 		return hzID
 	}
 
-	mockPHZARecords := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingSummary *route53.HostedZoneSummary, knownENIs map[string]string) string {
-		byVPCOut := &route53.ListHostedZonesByVPCOutput{}
-		if existingSummary != nil {
-			byVPCOut.HostedZoneSummaries = []*route53.HostedZoneSummary{existingSummary}
+	mockPHZARecords := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingHZ *route53.HostedZone, knownENIs map[string]string) string {
+		byVPCOut := &route53.ListHostedZonesByNameOutput{}
+		if existingHZ != nil {
+			byVPCOut.HostedZones = []*route53.HostedZone{existingHZ}
 		}
-		m.EXPECT().ListHostedZonesByVPC(&route53.ListHostedZonesByVPCInput{
-			MaxItems:  aws.String("100"),
-			VPCId:     endpoint.VpcId,
-			VPCRegion: aws.String("us-east-1"),
+		m.EXPECT().ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
+			MaxItems: aws.String("1"),
+			DNSName:  aws.String(apiDomain + "."),
 		}).Return(byVPCOut, nil)
 		var hzID string
-		if existingSummary == nil {
+		if existingHZ == nil {
 			hzID = "HZ12345"
 			m.EXPECT().CreateHostedZone(newCreateHostedZoneInputMatcher(&route53.CreateHostedZoneInput{
 				HostedZoneConfig: &route53.HostedZoneConfig{
@@ -688,7 +686,7 @@ users:
 				},
 			}, nil)
 		} else {
-			hzID = aws.StringValue(existingSummary.HostedZoneId)
+			hzID = aws.StringValue(existingHZ.Id)
 		}
 
 		eniReq := &ec2.DescribeNetworkInterfacesInput{
@@ -1271,9 +1269,9 @@ users:
 				VpcEndpoints: []*ec2.VpcEndpoint{createdEndpoint},
 			}, nil)
 
-			hzID := mockPHZ(m, createdEndpoint, "api.test-cluster", &route53.HostedZoneSummary{
-				HostedZoneId: aws.String("HZ22"),
-				Name:         aws.String("api.test-cluster"),
+			hzID := mockPHZ(m, createdEndpoint, "api.test-cluster", &route53.HostedZone{
+				Id:   aws.String("HZ22"),
+				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
@@ -1540,9 +1538,9 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZoneSummary{
-				HostedZoneId: aws.String("HZ12345"),
-				Name:         aws.String("api.test-cluster"),
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+				Id:   aws.String("HZ12345"),
+				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
@@ -1589,9 +1587,9 @@ users:
 			}
 			endpoint.NetworkInterfaceIds = aws.StringSlice([]string{"eni-2", "eni-1"})
 
-			hzID := mockPHZARecords(m, endpoint, "api.test-cluster", &route53.HostedZoneSummary{
-				HostedZoneId: aws.String("HZ12345"),
-				Name:         aws.String("api.test-cluster"),
+			hzID := mockPHZARecords(m, endpoint, "api.test-cluster", &route53.HostedZone{
+				Id:   aws.String("HZ12345"),
+				Name: aws.String("api.test-cluster."),
 			}, knownENI)
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
@@ -1636,9 +1634,9 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZoneSummary{
-				HostedZoneId: aws.String("HZ12345"),
-				Name:         aws.String("api.test-cluster"),
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+				Id:   aws.String("HZ12345"),
+				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
@@ -1692,9 +1690,9 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZoneSummary{
-				HostedZoneId: aws.String("HZ12345"),
-				Name:         aws.String("api.test-cluster"),
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+				Id:   aws.String("HZ12345"),
+				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
@@ -1747,9 +1745,9 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZoneSummary{
-				HostedZoneId: aws.String("HZ12345"),
-				Name:         aws.String("api.test-cluster"),
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+				Id:   aws.String("HZ12345"),
+				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
@@ -1815,9 +1813,9 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZoneSummary{
-				HostedZoneId: aws.String("HZ12345"),
-				Name:         aws.String("api.test-cluster"),
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+				Id:   aws.String("HZ12345"),
+				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{

@@ -1079,8 +1079,8 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 		hzID string
 		err  error
 	)
-	hzID, err = findHostedZone(awsClient, *endpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain)
-	if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
+	hzID, err = findHostedZone(awsClient, apiDomain)
+	if err != nil && errors.Is(err, errNoHostedZoneFoundForDomain) {
 		modified = true
 		hzID, err = r.createHostedZone(awsClient, cd, endpoint, apiDomain, logger)
 		if err != nil {
@@ -1102,36 +1102,24 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 	return modified, hzID, nil
 }
 
-var errNoHostedZoneFoundForVPC = errors.New("no hosted zone found")
+var errNoHostedZoneFoundForDomain = errors.New("no hosted zone found")
 
-// findHostedZone finds a Private Hosted Zone for apiDomain that is associated with the given
-// VPC.
-// If no such hosted zone exists, it return an errNoHostedZoneFoundForVPC error.
-func findHostedZone(awsClient awsclient.Client, vpcID, vpcRegion, apiDomain string) (string, error) {
-	input := &route53.ListHostedZonesByVPCInput{
-		VPCId:     aws.String(vpcID),
-		VPCRegion: aws.String(vpcRegion),
-
-		MaxItems: aws.String("100"),
+// findHostedZone finds a Private Hosted Zone for apiDomain.
+// If no such hosted zone exists, it returns an errNoHostedZoneFoundForDomain error.
+func findHostedZone(awsClient awsclient.Client, apiDomain string) (string, error) {
+	resp, err := awsClient.ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
+		DNSName:  aws.String(apiDomain + "."),
+		MaxItems: aws.String("1"),
+	})
+	if err != nil {
+		return "", err
 	}
-	var nextToken *string
-	for {
-		input.NextToken = nextToken
-		resp, err := awsClient.ListHostedZonesByVPC(input)
-		if err != nil {
-			return "", err
+	for _, hz := range resp.HostedZones {
+		if strings.EqualFold(apiDomain, strings.TrimSuffix(aws.StringValue(hz.Name), ".")) {
+			return *hz.Id, nil
 		}
-		for _, summary := range resp.HostedZoneSummaries {
-			if strings.EqualFold(apiDomain, strings.TrimSuffix(aws.StringValue(summary.Name), ".")) {
-				return *summary.HostedZoneId, nil
-			}
-		}
-		if resp.NextToken == nil {
-			break
-		}
-		nextToken = resp.NextToken
 	}
-	return "", errNoHostedZoneFoundForVPC
+	return "", errNoHostedZoneFoundForDomain
 }
 
 func (r *ReconcileAWSPrivateLink) createHostedZone(awsClient awsclient.Client,

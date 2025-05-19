@@ -129,6 +129,24 @@ function wait_for_namespace {
   exit 1
 }
 
+function get_osp_resources() {
+  local resource_path=$1
+
+  # Check if SHARED_DIR is set
+  if [ -z "$SHARED_DIR" ]; then
+    echo "Variable 'SHARED_DIR' not set."
+    exit 1
+  fi
+
+  # Check if the file exists
+  if [ ! -f "$1" ]; then
+    echo "Error: Resource file '$1' not found."
+    exit 1
+  fi
+
+  cat "$1"
+}
+
 function save_hive_logs() {
   tmpf=$(mktemp)
   for x in  "deploy  hive-controllers  ${HIVE_NS}" \
@@ -253,6 +271,23 @@ case "${CLOUD}" in
       --manifests=${MANIFESTS} \
       --nutanix-api-vip=$API_VIP \
       --nutanix-ingress-vip=$INGRESS_VIP"
+  ;;
+"openstack")
+  CREDS_FILE_ARG="--creds-file=${SHARED_DIR}/clouds.yaml"
+  USE_MANAGED_DNS=false
+  BASE_DOMAIN="${BASE_DOMAIN:-shiftstack.devcluster.openshift.com }"
+  API_FLOATING_IP=$(get_osp_resources "${SHARED_DIR}/HIVE_FIP_API")
+  INGRESS_FLOATING_IP=$(get_osp_resources "${SHARED_DIR}/HIVE_FIP_INGRESS")
+  EXTERNAL_NETWORK=$(get_osp_resources "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")
+  COMPUTE_FLAVOR=$(get_osp_resources "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
+  CONTROLPLANE_FLAVOR=$(get_osp_resources "${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")
+  EXTRA_CREATE_CLUSTER_ARGS="--openstack-api-floating-ip=$API_FLOATING_IP \
+      --openstack-ingress-floating-ip=$INGRESS_FLOATING_IP \
+      --machine-network="10.0.0.0/16" \
+      --openstack-cloud="openstack" \
+      --openstack-external-network=$EXTERNAL_NETWORK \
+      --openstack-compute-flavor=$COMPUTE_FLAVOR \
+      --openstack-master-flavor=$CONTROLPLANE_FLAVOR"
   ;;
 *)
 	echo "unknown cloud: ${CLOUD}"

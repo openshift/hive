@@ -1,0 +1,6 @@
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+packages: [openssh-clients, libvirt-libs, tar] # this should be kept in sync with the Dockerfile
+context:
+  bare: true

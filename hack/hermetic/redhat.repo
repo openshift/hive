@@ -1,0 +1,38 @@
+#
+# Certificate-Based Repositories
+# Managed by (rhsm) subscription-manager
+#
+# *** This file is auto-generated.  Changes made here will be over-written. ***
+# *** Use "subscription-manager repo-override --help" if you wish to make changes. ***
+#
+# If this file is empty and this system is subscribed consider
+# a "yum repolist" to refresh available repos
+#
+
+[rhel-9-for-$basearch-baseos-rpms]
+name = Red Hat Enterprise Linux 9 for $basearch - BaseOS (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/baseos/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/660446305195862349-key.pem
+sslclientcert = /etc/pki/entitlement/660446305195862349.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 1
+
+[rhel-9-for-$basearch-appstream-rpms]
+name = Red Hat Enterprise Linux 9 for $basearch - AppStream (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/$releasever/$basearch/appstream/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/660446305195862349-key.pem
+sslclientcert = /etc/pki/entitlement/660446305195862349.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 1

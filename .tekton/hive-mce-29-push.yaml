@@ -619,6 +619,7 @@ spec:
   taskRunTemplate:
     serviceAccountName: build-pipeline-hive-mce-29
   workspaces:
+  - name: git-auth
     secret:
       secretName: '{{ git_auth_secret }}'
 status: {}

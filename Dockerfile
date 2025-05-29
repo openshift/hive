@@ -84,3 +84,6 @@ LABEL io.k8s.description="Hive is an operator which runs as a service on top of 
 LABEL io.k8s.display-name="hive-operator"
 LABEL io.openshift.tags="cluster,management,provision"
 LABEL com.redhat.component="hive-rhel9"
+
+ # temporary: if you see this, remove it
+LABEL foo="bar"

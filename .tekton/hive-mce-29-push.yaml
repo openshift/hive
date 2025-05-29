@@ -27,6 +27,9 @@ spec:
   - name: build-platforms
     value:
     - linux/x86_64
+    - linux/ppc64le
+    - linux/s390x
+    - linux/arm64
   - name: dockerfile
     value: Dockerfile
   - name: path-context
@@ -96,7 +99,7 @@ spec:
       description: Build a source image.
       name: build-source-image
       type: string
-    - default: "false"
+    - default: "true"
       description: Add built image into an OCI image index
       name: build-image-index
       type: string
@@ -201,7 +204,7 @@ spec:
         - name: PLATFORM
           value:
           - $(params.build-platforms)
-      name: build-container
+      name: build-images
       params:
       - name: IMAGE
         value: $(params.output-image)
@@ -258,9 +261,9 @@ spec:
         value: $(params.build-image-index)
       - name: IMAGES
         value:
-          - $(tasks.build-container.results.IMAGE_REF[*])
+          - $(tasks.build-images.results.IMAGE_REF[*])
       runAfter:
-      - build-container
+      - build-images
       taskRef:
         params:
         - name: name
@@ -615,7 +618,7 @@ spec:
       requests:
         cpu: "1"
         memory: 16Gi
-    pipelineTaskName: build-container
+    pipelineTaskName: build-images
   taskRunTemplate:
     serviceAccountName: build-pipeline-hive-mce-29
   workspaces:

@@ -12,7 +12,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
-	"github.com/openshift/hive/pkg/awsclient"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
 	"github.com/openshift/hive/pkg/azureclient"
 	dns "github.com/openshift/hive/pkg/controller/dnszone"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"

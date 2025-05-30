@@ -281,6 +281,7 @@ type AWSAssociatedVPC struct {
 // AWSPrivateLinkVPC defines an AWS VPC in a region.
 type AWSPrivateLinkVPC struct {
 	VPCID  string `json:"vpcID"`
+	// TODO: Should we change this to route53types.VPCRegion?
 	Region string `json:"region"`
 }
 

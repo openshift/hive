@@ -11,13 +11,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
 	azureclient "github.com/openshift/hive/pkg/azureclient"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/golang/mock/gomock"
-	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	mockaws "github.com/openshift/hive/pkg/awsclientv2/mock"
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 	mockgcp "github.com/openshift/hive/pkg/gcpclient/mock"
 	testfake "github.com/openshift/hive/pkg/test/fake"

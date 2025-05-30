@@ -11,7 +11,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/openshift/hive/pkg/awsclient"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
 )
 
 // This test will perform a test using real queries with AWS.

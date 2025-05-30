@@ -16,8 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	"github.com/openshift/hive/pkg/awsclient"
-	awsmock "github.com/openshift/hive/pkg/awsclient/mock"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
+	awsmock "github.com/openshift/hive/pkg/awsclientv2/mock"
 	azuremock "github.com/openshift/hive/pkg/azureclient/mock"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	gcpmock "github.com/openshift/hive/pkg/gcpclient/mock"

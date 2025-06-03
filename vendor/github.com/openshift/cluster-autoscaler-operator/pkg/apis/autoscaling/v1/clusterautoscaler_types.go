@@ -8,6 +8,17 @@ func init() {
 	SchemeBuilder.Register(&ClusterAutoscaler{}, &ClusterAutoscalerList{})
 }
 
+// ExpanderString contains the name of an expander to be used by the cluster autoscaler.
+// +kubebuilder:validation:Enum=LeastWaste;Priority;Random
+type ExpanderString string
+
+// These constants define the valid values for an ExpanderString
+const (
+	LeastWasteExpander ExpanderString = "LeastWaste"
+	PriorityExpander   ExpanderString = "Priority"
+	RandomExpander     ExpanderString = "Random"
+)
+
 // ClusterAutoscalerSpec defines the desired state of ClusterAutoscaler
 type ClusterAutoscalerSpec struct {
 	// Constraints of autoscaling resources
@@ -29,17 +40,51 @@ type ClusterAutoscalerSpec struct {
 	PodPriorityThreshold *int32 `json:"podPriorityThreshold,omitempty"`
 
 	// BalanceSimilarNodeGroups enables/disables the
-	// `--balance-similar-node-groups` cluster-autocaler feature.
+	// `--balance-similar-node-groups` cluster-autoscaler feature.
 	// This feature will automatically identify node groups with
 	// the same instance type and the same set of labels and try
 	// to keep the respective sizes of those node groups balanced.
 	BalanceSimilarNodeGroups *bool `json:"balanceSimilarNodeGroups,omitempty"`
+
+	// BalancingIgnoredLabels sets "--balancing-ignore-label <label name>" flag on cluster-autoscaler for each listed label.
+	// This option specifies labels that cluster autoscaler should ignore when considering node group similarity.
+	// For example, if you have nodes with "topology.ebs.csi.aws.com/zone" label, you can add name of this label here
+	// to prevent cluster autoscaler from spliting nodes into different node groups based on its value.
+	BalancingIgnoredLabels []string `json:"balancingIgnoredLabels,omitempty"`
 
 	// Enables/Disables `--ignore-daemonsets-utilization` CA feature flag. Should CA ignore DaemonSet pods when calculating resource utilization for scaling down. false by default
 	IgnoreDaemonsetsUtilization *bool `json:"ignoreDaemonsetsUtilization,omitempty"`
 
 	// Enables/Disables `--skip-nodes-with-local-storage` CA feature flag. If true cluster autoscaler will never delete nodes with pods with local storage, e.g. EmptyDir or HostPath. true by default at autoscaler
 	SkipNodesWithLocalStorage *bool `json:"skipNodesWithLocalStorage,omitempty"`
+
+	// Sets the autoscaler log level.
+	// Default value is 1, level 4 is recommended for DEBUGGING and level 6 will enable almost everything.
+	//
+	// This option has priority over log level set by the `CLUSTER_AUTOSCALER_VERBOSITY` environment variable.
+	// +kubebuilder:validation:Minimum=0
+	LogVerbosity *int32 `json:"logVerbosity,omitempty"`
+
+	// Sets the type and order of expanders to be used during scale out operations.
+	// This option specifies an ordered list, highest priority first, of expanders that
+	// will be used by the cluster autoscaler to select node groups for expansion
+	// when scaling out.
+	// Expanders instruct the autoscaler on how to choose node groups when scaling out
+	// the cluster. They can be specified in order so that the result from the first expander
+	// is used as the input to the second, and so forth. For example, if set to `[LeastWaste, Random]`
+	// the autoscaler will first evaluate node groups to determine which will have the least
+	// resource waste, if multiple groups are selected the autoscaler will then randomly choose
+	// between those groups to determine the group for scaling.
+	// The following expanders are available:
+	// * LeastWaste - selects the node group that will have the least idle CPU (if tied, unused memory) after scale-up.
+	// * Priority - selects the node group that has the highest priority assigned by the user. For details, please see https://github.com/openshift/kubernetes-autoscaler/blob/master/cluster-autoscaler/expander/priority/readme.md
+	// * Random - selects the node group randomly.
+	// If not specified, the default value is `Random`, available options are: `LeastWaste`, `Priority`, `Random`.
+	//
+	// +listType=set
+	// +kubebuilder:validation:MaxItems=3
+	// +optional
+	Expanders []ExpanderString `json:"expanders"`
 }
 
 // ClusterAutoscalerStatus defines the observed state of ClusterAutoscaler
@@ -84,7 +129,7 @@ type ResourceLimits struct {
 	// Cluster autoscaler will not scale the cluster beyond these numbers.
 	Cores *ResourceRange `json:"cores,omitempty"`
 
-	// Minimum and maximum number of gigabytes of memory in cluster, in the format <min>:<max>.
+	// Minimum and maximum number of GiB of memory in cluster, in the format <min>:<max>.
 	// Cluster autoscaler will not scale the cluster beyond these numbers.
 	Memory *ResourceRange `json:"memory,omitempty"`
 
@@ -94,6 +139,11 @@ type ResourceLimits struct {
 }
 
 type GPULimit struct {
+	// The type of GPU to associate with the minimum and maximum limits.
+	// This value is used by the Cluster Autoscaler to identify Nodes that will have GPU capacity by searching
+	// for it as a label value on the Node objects. For example, Nodes that carry the label key
+	// `cluster-api/accelerator` with the label value being the same as the Type field will be counted towards
+	// the resource limits by the Cluster Autoscaler.
 	// +kubebuilder:validation:MinLength=1
 	Type string `json:"type"`
 
@@ -128,4 +178,8 @@ type ScaleDownConfig struct {
 	// How long a node should be unneeded before it is eligible for scale down
 	// +kubebuilder:validation:Pattern=([0-9]*(\.[0-9]*)?[a-z]+)+
 	UnneededTime *string `json:"unneededTime,omitempty"`
+
+	// Node utilization level, defined as sum of requested resources divided by capacity, below which a node can be considered for scale down
+	// +kubebuilder:validation:Pattern=(0.[0-9]+)
+	UtilizationThreshold *string `json:"utilizationThreshold,omitempty"`
 }

@@ -213,6 +213,7 @@ expectations of required permissions for these credentials.
 
     route53:CreateHostedZone
     route53:GetHostedZone
+    route53:ListHostedZonesByName
     route53:ListHostedZonesByVPC
     route53:AssociateVPCWithHostedZone
     route53:DisassociateVPCFromHostedZone

@@ -35,7 +35,7 @@ require (
 	github.com/openshift/api v0.0.0-20250313134101-8a7efbfb5316
 	github.com/openshift/build-machinery-go v0.0.0-20240613134303-8359781da660
 	github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519
-	github.com/openshift/cluster-autoscaler-operator v0.0.0-20211006175002-fe524080b551
+	github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4
 	github.com/openshift/generic-admission-server v1.14.1-0.20250203204636-21579bd45f95
 	github.com/openshift/hive/apis v0.0.0
 	github.com/openshift/installer v1.4.19-ec5
@@ -66,7 +66,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.32.1
 	k8s.io/apimachinery v0.32.3
 	k8s.io/cli-runtime v0.32.0
-	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/client-go v0.32.2
 	k8s.io/cluster-registry v0.0.6
 	k8s.io/code-generator v0.32.1
 	k8s.io/klog v1.0.0
@@ -489,9 +489,6 @@ replace (
 	github.com/metal3-io/baremetal-operator/pkg/hardwareutils => github.com/openshift/baremetal-operator/pkg/hardwareutils v0.0.0-20231128154154-6736c9b9c6c8
 	k8s.io/cloud-provider-vsphere => github.com/openshift/cloud-provider-vsphere v1.19.1-0.20240626105621-6464d0bb4928
 )
-
-// needed because otherwise v12.0.0 is picked up as a more recent version
-replace k8s.io/client-go => k8s.io/client-go v0.32.0
 
 // needed for fixing CVE-2020-26160
 // taken from https://github.com/openshift/installer/blob/21cd5218bb58288cd7b03018b9a2513aca3a13a5/terraform/providers/ibm/go.mod

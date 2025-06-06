@@ -2,8 +2,7 @@
 dnf install -y \
 	git \
 	golang \
-	make \
-	python3
+	make
 
 # Since go 1.23.x is not available in ubi8, let's go upstream
 go install golang.org/dl/go1.23.6@latest

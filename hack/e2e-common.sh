@@ -275,7 +275,7 @@ case "${CLOUD}" in
 "openstack")
   CREDS_FILE_ARG="--creds-file=${SHARED_DIR}/clouds.yaml"
   USE_MANAGED_DNS=false
-  BASE_DOMAIN="${BASE_DOMAIN:-shiftstack.devcluster.openshift.com }"
+  BASE_DOMAIN="${BASE_DOMAIN:-shiftstack.devcluster.openshift.com}"
   API_FLOATING_IP=$(get_osp_resources "${SHARED_DIR}/HIVE_FIP_API")
   INGRESS_FLOATING_IP=$(get_osp_resources "${SHARED_DIR}/HIVE_FIP_INGRESS")
   EXTERNAL_NETWORK=$(get_osp_resources "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")

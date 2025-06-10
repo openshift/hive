@@ -1,6 +1,7 @@
 package hive
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -21,6 +22,7 @@ import (
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
@@ -28,6 +30,8 @@ import (
 const (
 	clusterVersionCRDName              = "clusterversions.config.openshift.io"
 	hiveAdmissionServingCertSecretName = "hiveadmission-serving-cert"
+	kasCACertConfigMapName             = "kube-root-ca.crt"
+	serviceCACertConfigMapName         = "openshift-service-ca.crt"
 )
 
 const (
@@ -55,7 +59,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		"config/hiveadmission/service.yaml",
 		"config/hiveadmission/service-account.yaml",
 	}
-	// In OpenShift, tokens are automatically generated and attached to the hiveadmission pods.
+	// In OpenShift, we get the service and kube root CA certs from automatically-generated ConfigMaps
 	if !r.isOpenShift {
 		namespacedAssets = append(namespacedAssets,
 			// This secret was automatically generated prior to k8s 1.24. We're including it to cover later versions.
@@ -165,18 +169,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme)
 	apiService.Spec.Service.Namespace = hiveNSName
 
-	// If we're running on vanilla Kube (mostly devs using kind), we
-	// will not have access to the service cert injection we normally use. Lookup
-	// the cluster CA and inject into the webhooks.
-	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
-	// secret, see hack/hiveadmission-dev-cert.sh. (TODO: automate -- see HIVE-1449.)
-	if !r.isOpenShift {
-		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
-		err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
-		if err != nil {
-			hLog.WithError(err).Error("error injecting certs")
-			return err
-		}
+	err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
+	if err != nil {
+		hLog.WithError(err).Error("error injecting certs")
+		return err
 	}
 
 	// Set the serving cert CA secret hash as an annotation on the pod template to force a rollout in the event it changes:
@@ -224,7 +220,36 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	return nil
 }
 
-func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {
+// Modern OpenShift injects two ConfigMaps into every namespace. One contains the service CA cert;
+// the other the kube root CA cert.
+func (r *ReconcileHiveConfig) getCACertsOpenShift(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {
+	kasCACertConfigMap := corev1.ConfigMap{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNSName, Name: kasCACertConfigMapName}, &kasCACertConfigMap); err != nil {
+		hLog.WithError(err).Errorf("error getting %s configmap in hive namespace", kasCACertConfigMapName)
+		return nil, nil, err
+	}
+	kubeCAstr, ok := kasCACertConfigMap.Data["ca.crt"]
+	if !ok {
+		return nil, nil, fmt.Errorf("configmap %s did not contain key ca.crt", kasCACertConfigMapName)
+	}
+
+	svcCACertConfigMap := corev1.ConfigMap{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNSName, Name: serviceCACertConfigMapName}, &svcCACertConfigMap); err != nil {
+		hLog.WithError(err).Errorf("error getting %s configmap in hive namespace", serviceCACertConfigMapName)
+		return nil, nil, err
+	}
+	svcCAstr, ok := svcCACertConfigMap.Data["service-ca.crt"]
+	if !ok {
+		return nil, nil, fmt.Errorf("configmap %s did not contain key service-ca.crt", serviceCACertConfigMapName)
+	}
+
+	return []byte(svcCAstr), []byte(kubeCAstr), nil
+}
+
+// If we're running on vanilla Kube (mostly devs using kind), we will not have access to the
+// ConfigMaps injected by OpenShift. Look up the certs in the Secrets created via
+// hack/hiveadmission-dev-cert.sh. (TODO: automate -- see HIVE-1449.)
+func (r *ReconcileHiveConfig) getCACertsNonOpenShift(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
 	hLog.Debugf("listing secrets in %s namespace", hiveNSName)
@@ -248,7 +273,6 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 	if !ok {
 		return nil, nil, fmt.Errorf("secret %s did not contain key ca.crt", firstSATokenSecret.Name)
 	}
-	hLog.Debugf("found kube CA: %s", string(kubeCA))
 
 	// Load the service CA:
 	serviceCA, ok := firstSATokenSecret.Data["service-ca.crt"]
@@ -257,15 +281,24 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 		serviceCA = kubeCA
 	}
 
-	hLog.Debugf("found service CA: %s", string(serviceCA))
 	return serviceCA, kubeCA, nil
 }
 
 func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIService, validatingWebhooks []*admregv1.ValidatingWebhookConfiguration, mutatingWebhooks []*admregv1.MutatingWebhookConfiguration, hiveNS string, hLog log.FieldLogger) error {
-	serviceCA, kubeCA, err := r.getCACerts(hLog, hiveNS)
+	var serviceCA, kubeCA []byte
+	var err error
+	hLog.Debug("modifying hiveadmission webhooks for CA certs")
+	if r.isOpenShift {
+		hLog.Debug("OpenShift cluster detected")
+		serviceCA, kubeCA, err = r.getCACertsOpenShift(hLog, hiveNS)
+	} else {
+		hLog.Debug("non-OpenShift cluster detected")
+		serviceCA, kubeCA, err = r.getCACertsNonOpenShift(hLog, hiveNS)
+	}
 	if err != nil {
 		return err
 	}
+	hLog.WithField("kubeCA", string(kubeCA)).WithField("serviceCA", string(serviceCA)).Debugf("found CA certs")
 
 	// Add the service CA to the aggregated API service:
 	apiService.Spec.CABundle = serviceCA

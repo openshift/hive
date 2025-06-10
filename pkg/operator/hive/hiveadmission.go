@@ -1,6 +1,7 @@
 package hive
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -21,6 +22,7 @@ import (
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
@@ -28,6 +30,7 @@ import (
 const (
 	clusterVersionCRDName              = "clusterversions.config.openshift.io"
 	hiveAdmissionServingCertSecretName = "hiveadmission-serving-cert"
+	kasCACertConfigMapName             = "kube-root-ca.crt"
 )
 
 const (
@@ -55,16 +58,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		"config/hiveadmission/service.yaml",
 		"config/hiveadmission/service-account.yaml",
 	}
-	// In OpenShift, tokens are automatically generated and attached to the hiveadmission pods.
-	if !r.isOpenShift {
-		namespacedAssets = append(namespacedAssets,
-			// This secret was automatically generated prior to k8s 1.24. We're including it to cover later versions.
-			// Note that overwriting it should have no effect as k8s will still populate it for us.
-			// Also note that this secret will be deleted automatically when the serviceaccount is deleted; our deletion
-			// is redundant, but harmless.
-			"config/hiveadmission/sa-token-secret.yaml",
-		)
-	}
+
 	// Delete the assets from previous target namespaces
 	assetsToClean := append(namespacedAssets, deploymentAsset)
 	for _, ns := range namespacesToClean {
@@ -165,18 +159,9 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme)
 	apiService.Spec.Service.Namespace = hiveNSName
 
-	// If we're running on vanilla Kube (mostly devs using kind), we
-	// will not have access to the service cert injection we normally use. Lookup
-	// the cluster CA and inject into the webhooks.
-	// NOTE: If this is vanilla kube, you will also need to manually create a certificate
-	// secret, see hack/hiveadmission-dev-cert.sh. (TODO: automate -- see HIVE-1449.)
-	if !r.isOpenShift {
-		hLog.Debug("non-OpenShift 4.x cluster detected, modifying hiveadmission webhooks for CA certs")
-		err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
-		if err != nil {
-			hLog.WithError(err).Error("error injecting certs")
-			return err
-		}
+	if err := r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog); err != nil {
+		hLog.WithError(err).Error("error injecting certs")
+		return err
 	}
 
 	// Set the serving cert CA secret hash as an annotation on the pod template to force a rollout in the event it changes:
@@ -224,6 +209,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	return nil
 }
 
+// getCACerts retrieves the kube apiserver's certificates that will allow our admission webhooks to authenticate
+// using the aggregated APIServer mechanism. Older k8s automatically creates kubernetes.io/service-account-token
+// Secrets in every namespace, but newer k8s does not. Newer k8s automatically creates a kube-root-ca.crt
+// ConfigMap in every namespace, but older k8s does not. So we have to look for both.
 func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string) ([]byte, []byte, error) {
 	// Locate the kube CA by looking up secrets in hive namespace, finding one of
 	// type 'kubernetes.io/service-account-token', and reading the CA off it.
@@ -241,23 +230,38 @@ func (r *ReconcileHiveConfig) getCACerts(hLog log.FieldLogger, hiveNSName string
 			break
 		}
 	}
-	if firstSATokenSecret == nil {
-		return nil, nil, fmt.Errorf("no %s secrets found", corev1.SecretTypeServiceAccountToken)
-	}
-	kubeCA, ok := firstSATokenSecret.Data["ca.crt"]
-	if !ok {
-		return nil, nil, fmt.Errorf("secret %s did not contain key ca.crt", firstSATokenSecret.Name)
-	}
-	hLog.Debugf("found kube CA: %s", string(kubeCA))
 
-	// Load the service CA:
-	serviceCA, ok := firstSATokenSecret.Data["service-ca.crt"]
-	if !ok {
-		hLog.Warnf("secret %s did not contain key service-ca.crt, likely not running on OpenShift, using ca.crt instead", firstSATokenSecret.Name)
+	var kubeCA, serviceCA []byte
+	var ok bool
+
+	if firstSATokenSecret != nil {
+		kubeCA, ok = firstSATokenSecret.Data["ca.crt"]
+		if !ok {
+			return nil, nil, fmt.Errorf("secret %s did not contain key ca.crt", firstSATokenSecret.Name)
+		}
+		// Load the service CA:
+		serviceCA, ok = firstSATokenSecret.Data["service-ca.crt"]
+		if !ok {
+			hLog.Warnf("secret %s did not contain key service-ca.crt, likely not running on OpenShift, using ca.crt instead", firstSATokenSecret.Name)
+			serviceCA = kubeCA
+		}
+	} else {
+		hLog.WithError(err).Errorf("no %s secrets found -- looking for %s configmap", corev1.SecretTypeServiceAccountToken, kasCACertConfigMapName)
+		kasCACertConfigMap := corev1.ConfigMap{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: hiveNSName, Name: kasCACertConfigMapName}, &kasCACertConfigMap); err != nil {
+			hLog.WithError(err).Errorf("error getting %s configmap in hive namespace", kasCACertConfigMapName)
+			return nil, nil, err
+		}
+		kubeCAstr, ok := kasCACertConfigMap.Data["ca.crt"]
+		if !ok {
+			return nil, nil, fmt.Errorf("configmap %s did not contain key ca.crt", kasCACertConfigMapName)
+		}
+		kubeCA = []byte(kubeCAstr)
+		// kube-root-ca.crt only has a ca.crt key.
 		serviceCA = kubeCA
 	}
 
-	hLog.Debugf("found service CA: %s", string(serviceCA))
+	hLog.WithField("kubeCA", string(kubeCA)).WithField("serviceCA", string(serviceCA)).Debugf("found CA certs")
 	return serviceCA, kubeCA, nil
 }
 

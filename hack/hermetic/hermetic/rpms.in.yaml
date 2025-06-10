@@ -1,0 +1,11 @@
+contentOrigin:
+  repofiles:
+    - ./redhat.repo
+packages: [openssh-clients, libvirt-libs, tar] # this should be kept in sync with the Dockerfile
+arches:
+  - x86_64
+  - ppc64le
+  - s390x
+  - aarch64
+context:
+  bare: true

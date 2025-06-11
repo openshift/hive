@@ -90,6 +90,8 @@ fi
 
 if [[ "${CLOUD}" == "openstack" ]]; then
   export CLUSTER_NAME=$(get_osp_resources "${SHARED_DIR}/HIVE_CLUSTER_NAME")
+elif [[ "${CLOUD}" == "nutanix" ]]; then
+  export CLUSTER_NAME="${HIVE_CLUSTER_NAME}"
 else
   export CLUSTER_NAME="${CLUSTER_NAME:-hive-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
 fi

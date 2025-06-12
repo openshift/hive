@@ -11,7 +11,6 @@
 // config/hiveadmission/hiveadmission_rbac_role.yaml
 // config/hiveadmission/hiveadmission_rbac_role_binding.yaml
 // config/hiveadmission/machinepool-webhook.yaml
-// config/hiveadmission/sa-token-secret.yaml
 // config/hiveadmission/selectorsyncset-webhook.yaml
 // config/hiveadmission/service-account.yaml
 // config/hiveadmission/service.yaml
@@ -243,8 +242,6 @@ apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
   name: v1.admission.hive.openshift.io
-  annotations:
-    service.alpha.openshift.io/inject-cabundle: "true"
 spec:
   group: admission.hive.openshift.io
   groupPriorityMinimum: 1000
@@ -274,8 +271,6 @@ var _configHiveadmissionClusterdeploymentWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterdeploymentvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterdeploymentvalidators.admission.hive.openshift.io
@@ -321,8 +316,6 @@ var _configHiveadmissionClusterimagesetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterimagesetvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterimagesetvalidators.admission.hive.openshift.io
@@ -367,8 +360,6 @@ var _configHiveadmissionClusterprovisionWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterprovisionvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterprovisionvalidators.admission.hive.openshift.io
@@ -498,8 +489,6 @@ var _configHiveadmissionDnszonesWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: dnszonevalidators.admission.hive.openshift.io
 webhooks:
 - name: dnszonevalidators.admission.hive.openshift.io
@@ -644,8 +633,6 @@ var _configHiveadmissionMachinepoolWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: machinepoolvalidators.admission.hive.openshift.io
 webhooks:
 - name: machinepoolvalidators.admission.hive.openshift.io
@@ -686,37 +673,10 @@ func configHiveadmissionMachinepoolWebhookYaml() (*asset, error) {
 	return a, nil
 }
 
-var _configHiveadmissionSaTokenSecretYaml = []byte(`# Prior to k8s 1.24, this secret was generated automatically
-apiVersion: v1
-kind: Secret
-metadata:
-  name: hiveadmission-sa-token
-  namespace: hive
-  annotations:
-    kubernetes.io/service-account.name: "hiveadmission"
-type: kubernetes.io/service-account-token`)
-
-func configHiveadmissionSaTokenSecretYamlBytes() ([]byte, error) {
-	return _configHiveadmissionSaTokenSecretYaml, nil
-}
-
-func configHiveadmissionSaTokenSecretYaml() (*asset, error) {
-	bytes, err := configHiveadmissionSaTokenSecretYamlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "config/hiveadmission/sa-token-secret.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
-	a := &asset{bytes: bytes, info: info}
-	return a, nil
-}
-
 var _configHiveadmissionSelectorsyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: selectorsyncsetvalidators.admission.hive.openshift.io
 webhooks:
 - name: selectorsyncsetvalidators.admission.hive.openshift.io
@@ -816,8 +776,6 @@ var _configHiveadmissionSyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: syncsetvalidators.admission.hive.openshift.io
 webhooks:
 - name: syncsetvalidators.admission.hive.openshift.io
@@ -2115,7 +2073,6 @@ var _bindata = map[string]func() (*asset, error){
 	"config/hiveadmission/hiveadmission_rbac_role.yaml":         configHiveadmissionHiveadmission_rbac_roleYaml,
 	"config/hiveadmission/hiveadmission_rbac_role_binding.yaml": configHiveadmissionHiveadmission_rbac_role_bindingYaml,
 	"config/hiveadmission/machinepool-webhook.yaml":             configHiveadmissionMachinepoolWebhookYaml,
-	"config/hiveadmission/sa-token-secret.yaml":                 configHiveadmissionSaTokenSecretYaml,
 	"config/hiveadmission/selectorsyncset-webhook.yaml":         configHiveadmissionSelectorsyncsetWebhookYaml,
 	"config/hiveadmission/service-account.yaml":                 configHiveadmissionServiceAccountYaml,
 	"config/hiveadmission/service.yaml":                         configHiveadmissionServiceYaml,
@@ -2200,7 +2157,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"hiveadmission_rbac_role.yaml":         {configHiveadmissionHiveadmission_rbac_roleYaml, map[string]*bintree{}},
 			"hiveadmission_rbac_role_binding.yaml": {configHiveadmissionHiveadmission_rbac_role_bindingYaml, map[string]*bintree{}},
 			"machinepool-webhook.yaml":             {configHiveadmissionMachinepoolWebhookYaml, map[string]*bintree{}},
-			"sa-token-secret.yaml":                 {configHiveadmissionSaTokenSecretYaml, map[string]*bintree{}},
 			"selectorsyncset-webhook.yaml":         {configHiveadmissionSelectorsyncsetWebhookYaml, map[string]*bintree{}},
 			"service-account.yaml":                 {configHiveadmissionServiceAccountYaml, map[string]*bintree{}},
 			"service.yaml":                         {configHiveadmissionServiceYaml, map[string]*bintree{}},

@@ -2,8 +2,6 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: machinepoolvalidators.admission.hive.openshift.io
 webhooks:
 - name: machinepoolvalidators.admission.hive.openshift.io

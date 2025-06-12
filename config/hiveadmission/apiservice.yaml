@@ -12,8 +12,6 @@ apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
   name: v1.admission.hive.openshift.io
-  annotations:
-    service.alpha.openshift.io/inject-cabundle: "true"
 spec:
   group: admission.hive.openshift.io
   groupPriorityMinimum: 1000

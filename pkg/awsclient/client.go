@@ -515,7 +515,7 @@ func newClientAssumeRole(kubeClient client.Client,
 		}
 	}
 
-	sess, err := NewSessionFromSecret(secret, region)
+	sess, err := newSessionFromSecret(secret, region)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create AWS session")
 	}
@@ -566,7 +566,7 @@ func NewClient(kubeClient client.Client, secretName, namespace, region string) (
 //
 // Pass a nil secret to load credentials from the standard AWS environment variables.
 func NewClientFromSecret(secret *corev1.Secret, region string) (Client, error) {
-	s, err := NewSessionFromSecret(secret, region)
+	s, err := newSessionFromSecret(secret, region)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create AWS session")
 	}
@@ -586,9 +586,9 @@ func newClientFromSession(s *session.Session, cfgs ...*aws.Config) (Client, erro
 	}, nil
 }
 
-// NewSessionFromSecret creates a new AWS session using the configuration in the secret. If the secret
+// newSessionFromSecret creates a new AWS session using the configuration in the secret. If the secret
 // was nil, it initializes a new session using configuration of the envionment.
-func NewSessionFromSecret(secret *corev1.Secret, region string) (*session.Session, error) {
+func newSessionFromSecret(secret *corev1.Secret, region string) (*session.Session, error) {
 	options := session.Options{
 		Config: aws.Config{
 			Region:           aws.String(region),

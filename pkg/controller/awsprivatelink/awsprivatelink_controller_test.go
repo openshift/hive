@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
@@ -30,8 +30,8 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
-	"github.com/openshift/hive/pkg/awsclient"
-	"github.com/openshift/hive/pkg/awsclient/mock"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
+	"github.com/openshift/hive/pkg/awsclientv2/mock"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testassert "github.com/openshift/hive/pkg/test/assert"
@@ -832,7 +832,10 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			m.EXPECT().DescribeLoadBalancers(gomock.Any()).
-				Return(nil, awserr.New("AccessDenied", "not authorized to DescribeLoadBalancers", nil))
+				Return(nil, smithy.GenericAPIError{
+					Code:    "AccessDenied",
+					Message: "not authorized to DescribeLoadBalancers",
+				})
 		},
 
 		hasFinalizer: true,

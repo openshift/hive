@@ -10,6 +10,11 @@ RUN mkdir -p /go/src/github.com/openshift/hive
 WORKDIR /go/src/github.com/openshift/hive
 COPY . .
 
+RUN NO_DOCKER=1 make build && \
+    mkdir -p /tmp/build && \
+    cp /go/src/github.com/openshift/hive/bin/hive-tests-ext /tmp/build/hive-tests-ext && \
+    gzip /tmp/build/hive-tests-ext
+
 RUN if [ -f "${BUILD_IMAGE_CUSTOMIZATION}" ]; then "${BUILD_IMAGE_CUSTOMIZATION}"; fi
 
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
@@ -57,6 +62,8 @@ COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/operator /opt/se
 
 COPY --from=builder_rhel8 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin/hiveutil.rhel8
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveutil /usr/bin/hiveutil
+
+COPY --from=builder_rhel9 /tmp/build/hive-tests-ext.gz .
 
 # Hacks to allow writing known_hosts, homedir is / by default in OpenShift.
 # Bare metal installs need to write to $HOME/.cache, and $HOME/.ssh for as long as

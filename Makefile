@@ -1,3 +1,13 @@
+GO_PKG_NAME := github.com/openshift-eng/openshift-tests-extension
+
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
+BUILD_DATE := $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+GIT_TREE_STATE := $(shell if git diff --quiet; then echo clean; else echo dirty; fi)
+
+LDFLAGS := -X '$(GO_PKG_NAME)/pkg/version.CommitFromGit=$(GIT_COMMIT)' \
+           -X '$(GO_PKG_NAME)/pkg/version.BuildDate=$(BUILD_DATE)' \
+           -X '$(GO_PKG_NAME)/pkg/version.GitTreeState=$(GIT_TREE_STATE)'
+
 .PHONY: all
 all: vendor update test build
 
@@ -31,6 +41,7 @@ GOCACHE ?= $(shell C=`go env GOCACHE`; [[ -d $$C ]] && echo $$C)
 ifneq ($(GOCACHE),)
 GOCACHE_VOL_ARG = --volume "${GOCACHE}:/go/.cache:z"
 endif
+
 
 # Namespace hive-operator will run:
 HIVE_OPERATOR_NS ?= hive
@@ -167,6 +178,10 @@ $(addprefix test-unit-submodules-,$(GO_SUB_MODULES)):
 	# hande unit test for submodule
 	(cd $(subst test-unit-submodules-,,$@); $(GO) test $(GO_MOD_FLAGS) $(GO_TEST_FLAGS) ./...)
 
+.PHONY: hive-test-ext
+hive-test-ext:
+    ${DOCKER_CMD} ./hack/hive-test-ext.Dockerfile
+
 .PHONY: test-e2e
 test-e2e:
 	hack/e2e-test.sh
@@ -301,8 +316,17 @@ $(addprefix generate-submodules-,$(GO_SUB_MODULES)): $(addprefix vendor-submodul
 # Build the image using docker
 .PHONY: docker-build
 docker-build:
-	@echo "*** DEPRECATED: Use the image-hive target instead ***"
+ifeq ($(BUILD_OTE),1)
+	@echo ">> Building OTE image"
+	$(DOCKER_CMD) build $(CONTAINER_BUILD_FLAGS) \
+		--label io.k8s.display-name="OpenShift Hive Tests Extension" \
+		--label io.openshift.release.operator=true \
+		--label io.openshift.tags="openshift,tests,e2e,e2e-extension" \
+		-t ${IMG} .
+else
+	@echo ">> Building default image"
 	$(DOCKER_CMD) build $(CONTAINER_BUILD_FLAGS) -t ${IMG} .
+endif
 
 # Push the image using docker
 .PHONY: docker-push

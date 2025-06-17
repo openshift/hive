@@ -222,14 +222,11 @@ func (r *ReconcileClusterVersion) updateClusterVersionMetadata(cd *hivev1.Cluste
 		}
 	}
 	changed = changed || upgradeableCondition != cd.Annotations[constants.MinorVersionUpgradeUnavailable]
-	if upgradeableCondition == "" {
-		delete(cd.Annotations, constants.MinorVersionUpgradeUnavailable)
-	} else {
-		if cd.Annotations == nil {
-			cd.Annotations = map[string]string{}
-		}
-		cd.Annotations[constants.MinorVersionUpgradeUnavailable] = upgradeableCondition
+
+	if cd.Annotations == nil {
+		cd.Annotations = map[string]string{}
 	}
+	cd.Annotations[constants.MinorVersionUpgradeUnavailable] = upgradeableCondition
 
 	if !changed {
 		cdLog.Debug("cluster version metadata has not changed, nothing to update")

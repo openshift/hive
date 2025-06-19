@@ -257,8 +257,9 @@ case "${CLOUD}" in
       --vsphere-ingress-vip=$VSPHERE_INGRESS_VIP"
   ;;
 "nutanix")
-
   USE_MANAGED_DNS=false
+  CREDS_FILE_ARG="--creds-file=${SHARED_DIR}/credentials"
+  BASE_DOMAIN="${BASE_DOMAIN:-nutanix-ci.devcluster.openshift.com}
   EXTRA_CREATE_CLUSTER_ARGS="--nutanix-pc-address=${NUTANIX_HOST} \
       --nutanix-pc-port=${NUTANIX_PORT:-9440} \
       --nutanix-pe-address=${PE_HOST} \
@@ -269,8 +270,9 @@ case "${CLOUD}" in
       --nutanix-subnetUUIDs=${SUBNET_UUID} \
       --nutanix-az-name=${NUTANIX_AZ_NAME-Local_AZ} \
       --manifests=${MANIFESTS} \
-      --nutanix-api-vip=$API_VIP \
-      --nutanix-ingress-vip=$INGRESS_VIP"
+      --credentials-mode-manual \
+      --nutanix-api-vip=$HIVE_API_VIP \
+      --nutanix-ingress-vip=$HIVE_INGRESS_VIP"
   ;;
 "openstack")
   CREDS_FILE_ARG="--creds-file=${SHARED_DIR}/clouds.yaml"

@@ -42,7 +42,7 @@ var (
 	clusterNamespace = os.Getenv("CLUSTER_NAMESPACE")
 )
 
-var _ = Describe("Test Syncset and SelectorSyncSet func", func() {
+var _ = Describe("[sig-hive][owned: dev] Hive SyncSet Tests", func() {
 
 	hiveClient := common.MustGetClient()
 	targetClusterClient := common.MustGetClientFromConfig(common.MustGetClusterDeploymentClientConfig())

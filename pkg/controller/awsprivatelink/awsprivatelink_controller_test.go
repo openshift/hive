@@ -7,12 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
@@ -30,8 +33,8 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
-	"github.com/openshift/hive/pkg/awsclient"
-	"github.com/openshift/hive/pkg/awsclient/mock"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
+	"github.com/openshift/hive/pkg/awsclientv2/mock"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	testassert "github.com/openshift/hive/pkg/test/assert"
@@ -507,150 +510,150 @@ users:
 	}
 
 	mockDiscoverLB := func(m *mock.MockClient) string {
-		clusternlb := &elbv2.LoadBalancer{
+		clusternlb := elbv2types.LoadBalancer{
 			LoadBalancerArn: aws.String("aws:elb:12345:nlb-arn"),
-			State: &elbv2.LoadBalancerState{
-				Code: aws.String(elbv2.LoadBalancerStateEnumActive),
+			State: &elbv2types.LoadBalancerState{
+				Code: elbv2types.LoadBalancerStateEnumActive,
 			},
 		}
 		m.EXPECT().DescribeLoadBalancers(gomock.Any()).
 			Return(&elbv2.DescribeLoadBalancersOutput{
-				LoadBalancers: []*elbv2.LoadBalancer{clusternlb},
+				LoadBalancers: []elbv2types.LoadBalancer{clusternlb},
 			}, nil).AnyTimes()
 		return *clusternlb.LoadBalancerArn
 	}
 
-	mockCreateService := func(m *mock.MockClient, clusternlb string) *ec2.ServiceConfiguration {
-		service := &ec2.ServiceConfiguration{
+	mockCreateService := func(m *mock.MockClient, clusternlb string) *ec2types.ServiceConfiguration {
+		service := ec2types.ServiceConfiguration{
 			AcceptanceRequired:      aws.Bool(false),
 			ServiceId:               aws.String("vpce-svc-12345"),
 			ServiceName:             aws.String("vpce-svc-12345.vpc.amazon.com"),
-			ServiceState:            aws.String(ec2.ServiceStateAvailable),
-			NetworkLoadBalancerArns: aws.StringSlice([]string{clusternlb}),
-			AvailabilityZones:       aws.StringSlice([]string{"us-east-1b", "us-east-1c"}),
+			ServiceState:            ec2types.ServiceStateAvailable,
+			NetworkLoadBalancerArns: []string{clusternlb},
+			AvailabilityZones:       []string{"us-east-1b", "us-east-1c"},
 		}
 		m.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{}, nil)
 		m.EXPECT().CreateVpcEndpointServiceConfiguration(gomock.Any()).
 			Return(&ec2.CreateVpcEndpointServiceConfigurationOutput{
-				ServiceConfiguration: service,
+				ServiceConfiguration: &service,
 			}, nil)
 		m.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-				ServiceConfigurations: []*ec2.ServiceConfiguration{service},
+				ServiceConfigurations: []ec2types.ServiceConfiguration{service},
 			}, nil)
-		return service
+		return &service
 	}
-	mockServicePerms := func(m *mock.MockClient, service *ec2.ServiceConfiguration) {
+	mockServicePerms := func(m *mock.MockClient, service *ec2types.ServiceConfiguration) {
 		m.EXPECT().GetCallerIdentity(gomock.Any()).Return(&sts.GetCallerIdentityOutput{Arn: aws.String("aws:iam:12345:hub-user")}, nil)
 		m.EXPECT().DescribeVpcEndpointServicePermissions(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServicePermissionsOutput{}, nil)
 		m.EXPECT().ModifyVpcEndpointServicePermissions(&ec2.ModifyVpcEndpointServicePermissionsInput{
-			AddAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:hub-user"}),
+			AddAllowedPrincipals: []string{"aws:iam:12345:hub-user"},
 			ServiceId:            service.ServiceId,
 		}).Return(nil, nil)
 	}
-	mockExistingService := func(m *mock.MockClient, clusternlb string, modify func(*ec2.ServiceConfiguration)) *ec2.ServiceConfiguration {
-		service := &ec2.ServiceConfiguration{
+	mockExistingService := func(m *mock.MockClient, clusternlb string, modify func(*ec2types.ServiceConfiguration)) *ec2types.ServiceConfiguration {
+		service := ec2types.ServiceConfiguration{
 			AcceptanceRequired:      aws.Bool(false),
 			ServiceId:               aws.String("vpce-svc-12345"),
 			ServiceName:             aws.String("vpce-svc-12345.vpc.amazon.com"),
-			ServiceState:            aws.String(ec2.ServiceStateAvailable),
-			NetworkLoadBalancerArns: aws.StringSlice([]string{clusternlb}),
+			ServiceState:            ec2types.ServiceStateAvailable,
+			NetworkLoadBalancerArns: []string{clusternlb},
 		}
-		modify(service)
+		modify(&service)
 		m.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-				ServiceConfigurations: []*ec2.ServiceConfiguration{service},
+				ServiceConfigurations: []ec2types.ServiceConfiguration{service},
 			}, nil)
-		return service
+		return &service
 	}
 
-	mockCreateEndpoint := func(m *mock.MockClient, service *ec2.ServiceConfiguration) *ec2.VpcEndpoint {
+	mockCreateEndpoint := func(m *mock.MockClient, service *ec2types.ServiceConfiguration) *ec2types.VpcEndpoint {
 		m.EXPECT().DescribeVpcEndpoints(
 			&ec2.DescribeVpcEndpointsInput{
-				Filters: []*ec2.Filter{{
+				Filters: []ec2types.Filter{{
 					Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
-					Values: aws.StringSlice([]string{"test-cd-1234"}),
+					Values: []string{"test-cd-1234"},
 				}}}).
 			Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
 		m.EXPECT().DescribeVpcEndpointsPages(
 			&ec2.DescribeVpcEndpointsInput{
-				Filters: []*ec2.Filter{{
+				Filters: []ec2types.Filter{{
 					Name:   aws.String("vpc-id"),
-					Values: aws.StringSlice([]string{"vpc-1"}),
+					Values: []string{"vpc-1"},
 				}}}, gomock.Any()).
 			Do(func(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) {
 				describeVpcEndpointsOutput := &ec2.DescribeVpcEndpointsOutput{}
 				fn(describeVpcEndpointsOutput, true)
 			})
 		m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
-			ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
+			ServiceNames: []string{*service.ServiceName},
 		}).Return(&ec2.DescribeVpcEndpointServicesOutput{
-			ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
+			ServiceDetails: []ec2types.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
 		}, nil)
 
-		endpoint := &ec2.VpcEndpoint{
+		endpoint := ec2types.VpcEndpoint{
 			VpcEndpointId: aws.String("vpce-12345"),
 			VpcId:         aws.String("vpc-1"),
-			State:         aws.String("available"),
-			DnsEntries: []*ec2.DnsEntry{{
+			State:         "available",
+			DnsEntries: []ec2types.DnsEntry{{
 				DnsName:      aws.String("vpce-12345-us-east-1.vpce-svc-12345.vpc.amazonaws.com"),
 				HostedZoneId: aws.String("HZ23456"),
 			}},
 		}
 		m.EXPECT().CreateVpcEndpoint(gomock.Any()).
-			Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: endpoint}, nil)
+			Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: &endpoint}, nil)
 		m.EXPECT().DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-			VpcEndpointIds: aws.StringSlice([]string{*endpoint.VpcEndpointId}),
+			VpcEndpointIds: []string{*endpoint.VpcEndpointId},
 		}).Return(&ec2.DescribeVpcEndpointsOutput{
-			VpcEndpoints: []*ec2.VpcEndpoint{endpoint},
+			VpcEndpoints: []ec2types.VpcEndpoint{endpoint},
 		}, nil)
-		return endpoint
+		return &endpoint
 	}
 
-	mockPHZ := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingHZ *route53.HostedZone) string {
+	mockPHZ := func(m *mock.MockClient, endpoint *ec2types.VpcEndpoint, apiDomain string, existingHZ *route53types.HostedZone) string {
 		lhzbnOut := &route53.ListHostedZonesByNameOutput{}
 		if existingHZ != nil {
-			lhzbnOut.HostedZones = []*route53.HostedZone{existingHZ}
+			lhzbnOut.HostedZones = []route53types.HostedZone{*existingHZ}
 		}
 		m.EXPECT().ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
 			DNSName:  aws.String(apiDomain + "."),
-			MaxItems: aws.String("1"),
+			MaxItems: aws.Int32(1),
 		}).Return(lhzbnOut, nil)
 		var hzID string
 		if existingHZ == nil {
 			hzID = "HZ12345"
 			m.EXPECT().CreateHostedZone(newCreateHostedZoneInputMatcher(&route53.CreateHostedZoneInput{
-				HostedZoneConfig: &route53.HostedZoneConfig{
-					PrivateZone: aws.Bool(true),
+				HostedZoneConfig: &route53types.HostedZoneConfig{
+					PrivateZone: true,
 				},
 				Name: aws.String(apiDomain),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: "us-east-1",
 				},
 			})).Return(&route53.CreateHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
 			}, nil)
 		} else {
-			hzID = aws.StringValue(existingHZ.Id)
+			hzID = aws.ToString(existingHZ.Id)
 		}
 
 		m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
-			ChangeBatch: &route53.ChangeBatch{
-				Changes: []*route53.Change{{
-					Action: aws.String("UPSERT"),
-					ResourceRecordSet: &route53.ResourceRecordSet{
-						AliasTarget: &route53.AliasTarget{
+			ChangeBatch: &route53types.ChangeBatch{
+				Changes: []route53types.Change{{
+					Action: route53types.ChangeActionUpsert,
+					ResourceRecordSet: &route53types.ResourceRecordSet{
+						AliasTarget: &route53types.AliasTarget{
 							DNSName:              endpoint.DnsEntries[0].DnsName,
-							EvaluateTargetHealth: aws.Bool(false),
+							EvaluateTargetHealth: false,
 							HostedZoneId:         endpoint.DnsEntries[0].HostedZoneId,
 						},
 						Name: aws.String(apiDomain),
-						Type: aws.String("A"),
+						Type: route53types.RRTypeA,
 					},
 				}},
 			},
@@ -659,46 +662,46 @@ users:
 		return hzID
 	}
 
-	mockPHZARecords := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingHZ *route53.HostedZone, knownENIs map[string]string) string {
+	mockPHZARecords := func(m *mock.MockClient, endpoint *ec2types.VpcEndpoint, apiDomain string, existingHZ *route53types.HostedZone, knownENIs map[string]string) string {
 		byVPCOut := &route53.ListHostedZonesByNameOutput{}
 		if existingHZ != nil {
-			byVPCOut.HostedZones = []*route53.HostedZone{existingHZ}
+			byVPCOut.HostedZones = []route53types.HostedZone{*existingHZ}
 		}
 		m.EXPECT().ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
-			MaxItems: aws.String("1"),
+			MaxItems: aws.Int32(1),
 			DNSName:  aws.String(apiDomain + "."),
 		}).Return(byVPCOut, nil)
 		var hzID string
 		if existingHZ == nil {
 			hzID = "HZ12345"
 			m.EXPECT().CreateHostedZone(newCreateHostedZoneInputMatcher(&route53.CreateHostedZoneInput{
-				HostedZoneConfig: &route53.HostedZoneConfig{
-					PrivateZone: aws.Bool(true),
+				HostedZoneConfig: &route53types.HostedZoneConfig{
+					PrivateZone: true,
 				},
 				Name: aws.String(apiDomain),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: "us-east-1",
 				},
 			})).Return(&route53.CreateHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
 			}, nil)
 		} else {
-			hzID = aws.StringValue(existingHZ.Id)
+			hzID = aws.ToString(existingHZ.Id)
 		}
 
 		eniReq := &ec2.DescribeNetworkInterfacesInput{
 			NetworkInterfaceIds: endpoint.NetworkInterfaceIds,
 		}
 		eniResp := &ec2.DescribeNetworkInterfacesOutput{}
-		var rr []*route53.ResourceRecord
-		for _, eni := range aws.StringValueSlice(eniReq.NetworkInterfaceIds) {
+		var rr []route53types.ResourceRecord
+		for _, eni := range eniReq.NetworkInterfaceIds {
 			ip, ok := knownENIs[eni]
 			if ok {
-				eniResp.NetworkInterfaces = append(eniResp.NetworkInterfaces, &ec2.NetworkInterface{PrivateIpAddress: aws.String(ip)})
-				rr = append(rr, &route53.ResourceRecord{Value: aws.String(ip)})
+				eniResp.NetworkInterfaces = append(eniResp.NetworkInterfaces, ec2types.NetworkInterface{PrivateIpAddress: aws.String(ip)})
+				rr = append(rr, route53types.ResourceRecord{Value: aws.String(ip)})
 			}
 		}
 		m.EXPECT().DescribeNetworkInterfaces(eniReq).Return(eniResp, nil)
@@ -707,12 +710,12 @@ users:
 			return *rr[i].Value < *rr[j].Value
 		})
 		m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
-			ChangeBatch: &route53.ChangeBatch{
-				Changes: []*route53.Change{{
-					Action: aws.String("UPSERT"),
-					ResourceRecordSet: &route53.ResourceRecordSet{
+			ChangeBatch: &route53types.ChangeBatch{
+				Changes: []route53types.Change{{
+					Action: route53types.ChangeActionUpsert,
+					ResourceRecordSet: &route53types.ResourceRecordSet{
 						Name:            aws.String(apiDomain),
-						Type:            aws.String("A"),
+						Type:            route53types.RRTypeA,
 						TTL:             aws.Int64(10),
 						ResourceRecords: rr,
 					},
@@ -832,7 +835,10 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			m.EXPECT().DescribeLoadBalancers(gomock.Any()).
-				Return(nil, awserr.New("AccessDenied", "not authorized to DescribeLoadBalancers", nil))
+				Return(nil, smithy.GenericAPIError{
+					Code:    "AccessDenied",
+					Message: "not authorized to DescribeLoadBalancers",
+				})
 		},
 
 		hasFinalizer: true,
@@ -851,7 +857,7 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			m.EXPECT().DescribeLoadBalancers(gomock.Any()).
-				Return(nil, awserr.New("LoadBalancerNotFound", "Loadbalance could not be found", nil))
+				Return(nil, smithy.GenericAPIError{Code: "LoadBalancerNotFound", Message: "Loadbalance could not be found"})
 		},
 		expectedConditions: []hivev1.ClusterDeploymentCondition{{
 			Status:  corev1.ConditionFalse,

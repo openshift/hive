@@ -3,15 +3,15 @@ package nameserver
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 
-	"github.com/openshift/hive/pkg/awsclient"
-	"github.com/openshift/hive/pkg/awsclient/mock"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
+	"github.com/openshift/hive/pkg/awsclientv2/mock"
 )
 
 func TestAWSGet(t *testing.T) {

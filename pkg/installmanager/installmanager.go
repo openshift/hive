@@ -673,6 +673,8 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, infr
 
 func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
 	var uninstaller providers.Destroyer
+
+	logger.Info("starting a cleanup failed provision for ClusterDeployment with infraID: ", infraID)
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		// run the uninstaller to clean up any cloud resources previously created
@@ -833,7 +835,7 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 					PrismCentral: cd.Spec.Platform.Nutanix.PrismCentral.Address,
 					Username:     nutanixUsername,
 					Password:     nutanixPassword,
-					Port:         string(cd.Spec.Platform.Nutanix.PrismCentral.Port),
+					Port:         strconv.Itoa(int(cd.Spec.Platform.Nutanix.PrismCentral.Port)),
 				},
 			},
 		}

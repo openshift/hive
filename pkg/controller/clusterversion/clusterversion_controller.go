@@ -221,7 +221,8 @@ func (r *ReconcileClusterVersion) updateClusterVersionMetadata(cd *hivev1.Cluste
 			break
 		}
 	}
-	changed = changed || upgradeableCondition != cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+	annotationValue, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+	changed = changed || !ok || upgradeableCondition != annotationValue
 
 	if cd.Annotations == nil {
 		cd.Annotations = map[string]string{}

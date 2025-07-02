@@ -81,82 +81,175 @@ func TestClusterVersionReconcile(t *testing.T) {
 		{
 			name: "upgradeable condition true",
 			existing: []runtime.Object{
-				testClusterDeployment(),
+				testClusterDeploymentWithLabelsAndAnnotations(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				}, map[string]string{constants.MinorVersionUpgradeUnavailable: "Can't upgrade"}),
 				testKubeconfigSecret(),
 			},
-			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
-				Type:   configv1.OperatorUpgradeable,
-				Status: configv1.ConditionTrue,
-			}),
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3",
+				configv1.ClusterOperatorStatusCondition{
+					Type:   configv1.OperatorUpgradeable,
+					Status: configv1.ConditionTrue,
+				}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
 			},
 		},
 		{
 			name: "upgradeable condition false",
 			existing: []runtime.Object{
-				testClusterDeployment(),
+				testClusterDeploymentWithLabelsAndAnnotations(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				}, map[string]string{constants.MinorVersionUpgradeUnavailable: "Can't upgrade"}),
 				testKubeconfigSecret(),
 			},
-			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
-				Type:   configv1.OperatorUpgradeable,
-				Status: configv1.ConditionFalse,
-			}),
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3",
+				configv1.ClusterOperatorStatusCondition{
+					Type:   configv1.OperatorUpgradeable,
+					Status: configv1.ConditionFalse,
+				}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Upgradeable: False", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "Upgradeable: False", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+			},
+		},
+		{
+			name: "upgradeable condition true with annotation not present",
+			existing: []runtime.Object{
+				testClusterDeploymentWithLabels(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				}),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3",
+				configv1.ClusterOperatorStatusCondition{
+					Type:   configv1.OperatorUpgradeable,
+					Status: configv1.ConditionTrue,
+				}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+			},
+		},
+		{
+			name: "upgradeable condition false with annotation not present",
+			existing: []runtime.Object{
+				testClusterDeploymentWithLabels(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				}),
+				testKubeconfigSecret(),
+			},
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3",
+				configv1.ClusterOperatorStatusCondition{
+					Type:    configv1.OperatorUpgradeable,
+					Status:  configv1.ConditionFalse,
+					Message: "Can't do the upgrade",
+				}),
+			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "Can't do the upgrade", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
 			},
 		},
 		{
 			name: "upgradeable condition false with message",
 			existing: []runtime.Object{
-				testClusterDeployment(),
+				testClusterDeploymentWithLabelsAndAnnotations(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				},
+					map[string]string{constants.MinorVersionUpgradeUnavailable: "Can't upgrade"}),
 				testKubeconfigSecret(),
 			},
-			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
-				Type:    configv1.OperatorUpgradeable,
-				Status:  configv1.ConditionFalse,
-				Message: "Can't do the upgrade",
-			}),
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3",
+				configv1.ClusterOperatorStatusCondition{
+					Type:    configv1.OperatorUpgradeable,
+					Status:  configv1.ConditionFalse,
+					Message: "Can't do the upgrade",
+				}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Can't do the upgrade", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "Can't do the upgrade", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
 			},
 		},
 		{
 			name: "upgradeable condition unknown",
 			existing: []runtime.Object{
-				testClusterDeployment(),
+				testClusterDeploymentWithLabelsAndAnnotations(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				},
+					map[string]string{constants.MinorVersionUpgradeUnavailable: "Can't upgrade"}),
 				testKubeconfigSecret(),
 			},
-			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3", configv1.ClusterOperatorStatusCondition{
 				Type:   configv1.OperatorUpgradeable,
 				Status: configv1.ConditionUnknown,
 			}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Upgradeable: Unknown", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "Upgradeable: Unknown", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
 			},
 		},
 		{
 			name: "upgradeable condition unknown with message",
 			existing: []runtime.Object{
-				testClusterDeployment(),
+				testClusterDeploymentWithLabelsAndAnnotations(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				},
+					map[string]string{constants.MinorVersionUpgradeUnavailable: "Can't upgrade"}),
 				testKubeconfigSecret(),
 			},
-			clusterVersionStatus: testRemoteClusterVersionStatus(configv1.ClusterOperatorStatusCondition{
-				Type:    configv1.OperatorUpgradeable,
-				Status:  configv1.ConditionUnknown,
-				Message: "Can't read status",
-			}),
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3",
+				configv1.ClusterOperatorStatusCondition{
+					Type:    configv1.OperatorUpgradeable,
+					Status:  configv1.ConditionUnknown,
+					Message: "Can't read status",
+				}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "Can't read status", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "Can't read status", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
 			},
 		},
 		{
 			name: "upgradeable condition when multiple conditions",
 			existing: []runtime.Object{
-				testClusterDeployment(),
+				testClusterDeploymentWithLabelsAndAnnotations(map[string]string{
+					constants.VersionLabel:                "1.2.3",
+					constants.VersionMajorLabel:           "1",
+					constants.VersionMajorMinorLabel:      "1.2",
+					constants.VersionMajorMinorPatchLabel: "1.2.3",
+				},
+					map[string]string{constants.MinorVersionUpgradeUnavailable: "Can't upgrade"}),
 				testKubeconfigSecret(),
 			},
-			clusterVersionStatus: testRemoteClusterVersionStatus(
+			clusterVersionStatus: testRemoteClusterVersionStatusWithVersion("1.2.3",
 				configv1.ClusterOperatorStatusCondition{
 					Type: configv1.OperatorProgressing,
 				},
@@ -166,7 +259,9 @@ func TestClusterVersionReconcile(t *testing.T) {
 					Message: "It can't upgrade",
 				}),
 			validate: func(t *testing.T, cd *hivev1.ClusterDeployment) {
-				assert.Equal(t, "It can't upgrade", cd.Annotations[constants.MinorVersionUpgradeUnavailable], "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
+				value, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+				assert.True(t, ok, "value for annotation hive.openshift.io/minor-version-upgrade-unavailable is missing")
+				assert.Equal(t, "It can't upgrade", value, "unexpected value for annotation hive.openshift.io/minor-version-upgrade-unavailable")
 			},
 		},
 	}
@@ -211,6 +306,55 @@ func TestClusterVersionReconcile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testClusterDeploymentWithLabels(labels map[string]string) *hivev1.ClusterDeployment {
+	return testClusterDeploymentWithLabelsAndAnnotations(labels, nil)
+}
+
+func testClusterDeploymentWithLabelsAndAnnotations(labels map[string]string, annotations map[string]string) *hivev1.ClusterDeployment {
+	cd := &hivev1.ClusterDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testName,
+			Namespace:  testNamespace,
+			Finalizers: []string{hivev1.FinalizerDeprovision},
+			UID:        types.UID("1234"),
+		},
+		Spec: hivev1.ClusterDeploymentSpec{
+			ClusterName: testClusterName,
+			PullSecretRef: &corev1.LocalObjectReference{
+				Name: pullSecretSecret,
+			},
+			Platform: hivev1.Platform{
+				AWS: &hivev1aws.Platform{
+					CredentialsSecretRef: corev1.LocalObjectReference{
+						Name: "aws-credentials",
+					},
+					Region: "us-east-1",
+				},
+			},
+			ClusterMetadata: &hivev1.ClusterMetadata{
+				ClusterID: testClusterID,
+				AdminKubeconfigSecretRef: corev1.LocalObjectReference{
+					Name: "kubeconfig-secret",
+				},
+			},
+			Installed: true,
+		},
+		Status: hivev1.ClusterDeploymentStatus{
+			Conditions: []hivev1.ClusterDeploymentCondition{{
+				Type:   hivev1.UnreachableCondition,
+				Status: corev1.ConditionFalse,
+			}},
+		},
+	}
+	if labels != nil {
+		cd.Labels = labels
+	}
+	if annotations != nil {
+		cd.Annotations = annotations
+	}
+	return cd
 }
 
 func testClusterDeployment() *hivev1.ClusterDeployment {
@@ -287,10 +431,14 @@ func testRemoteClusterAPIClient(status configv1.ClusterVersionStatus) client.Cli
 }
 
 func testRemoteClusterVersionStatus(conditions ...configv1.ClusterOperatorStatusCondition) configv1.ClusterVersionStatus {
+	return testRemoteClusterVersionStatusWithVersion("2.3.4+somebuild", conditions...)
+}
+
+func testRemoteClusterVersionStatusWithVersion(version string, conditions ...configv1.ClusterOperatorStatusCondition) configv1.ClusterVersionStatus {
 	zeroTime := metav1.NewTime(time.Unix(0, 0))
 	return configv1.ClusterVersionStatus{
 		Desired: configv1.Release{
-			Version: "2.3.4+somebuild",
+			Version: version,
 		},
 		History: []configv1.UpdateHistory{
 			{

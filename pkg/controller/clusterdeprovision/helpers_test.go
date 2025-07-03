@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
+	mockaws "github.com/openshift/hive/pkg/awsclientv2/mock"
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 	ofake "github.com/openshift/hive/pkg/client/fake"
 	mockgcp "github.com/openshift/hive/pkg/gcpclient/mock"

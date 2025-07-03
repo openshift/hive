@@ -2,10 +2,9 @@ package clusterdeprovision
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	awsclient "github.com/openshift/hive/pkg/awsclientv2"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -222,7 +221,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				}),
 			},
 			mockGetCallerIdentity:          true,
-			expectedGetCallerIdentityError: awserr.New("InvalidClientTokenId", "", fmt.Errorf("")),
+			expectedGetCallerIdentityError: &smithy.GenericAPIError{Code: "InvalidClientTokenId"},
 			validate: func(t *testing.T, c client.Client) {
 				validateCondition(t, c, []hivev1.ClusterDeprovisionCondition{
 					{

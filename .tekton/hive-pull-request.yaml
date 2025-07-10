@@ -221,6 +221,8 @@ spec:
       params:
       - name: IMAGE
         value: $(params.output-image)
+      - name: IMAGE_APPEND_PLATFORM
+        value: 'true'
       - name: DOCKERFILE
         value: $(params.dockerfile)
       - name: CONTEXT

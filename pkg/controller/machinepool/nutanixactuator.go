@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -82,6 +83,24 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	}
 
 	computePool := baseMachinePool(pool)
+
+	// Handle autoscaling case: when autoscaling is enabled, pool.Spec.Replicas is nil
+	// but the installer's MachineSets function needs a non-nil value to generate MachineSets
+	// for each failure domain. We set it to the minimum required replicas to ensure
+	// MachineSets are created, and the MachinePool controller will handle setting
+	// the correct replicas later.
+	if pool.Spec.Autoscaling != nil {
+		numFailureDomains := len(pool.Spec.Platform.Nutanix.FailureDomains)
+		if numFailureDomains == 0 {
+			numFailureDomains = 1 // Default to 1 MachineSet if no failure domains
+		}
+		// Set replicas to ensure at least one MachineSet per failure domain is created
+		minReplicas := int64(numFailureDomains)
+		computePool.Replicas = &minReplicas
+		logger.WithField("minReplicas", minReplicas).WithField("failureDomains", numFailureDomains).
+			Info("autoscaling enabled, setting temporary replicas for MachineSet generation")
+	}
+
 	dataDisks, err := a.getNutanixDataDisks(pool, logger)
 	if err != nil {
 		if updateErr := a.setUnsupportedConfigurationCondition(pool, logger, "InvalidDataDisk", "data source must specify a UUID"); updateErr != nil {
@@ -129,6 +148,14 @@ func (a *NutanixActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 	)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to generate machinesets")
+	}
+
+	if pool.Spec.Autoscaling != nil {
+		logger.WithField("numMachineSets", len(installerMachineSets)).
+			Info("generated worker machine sets for autoscaling")
+	} else {
+		logger.WithField("numMachineSets", len(installerMachineSets)).
+			Info("generated worker machine sets")
 	}
 
 	return installerMachineSets, true, nil

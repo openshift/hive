@@ -57,7 +57,7 @@ func TestUploadLogs(t *testing.T) {
 			}
 			if test.setupPutObjectMock {
 				mocks.mockAWSClient.EXPECT().
-					Upload(gomock.Any()).
+					Upload(gomock.Any(), gomock.Any()).
 					Return(nil, test.putObjectError)
 			}
 

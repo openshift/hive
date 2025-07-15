@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/kinesis"
-	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
+	rtypes "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	"github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/golang/mock/gomock"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/awsclient/mock"
@@ -58,11 +58,11 @@ func TestNewAWSActuator(t *testing.T) {
 
 func mockAWSZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
 
-	if zone.Status.AWS == nil || aws.StringValue(zone.Status.AWS.ZoneID) == "" {
+	if zone.Status.AWS == nil || aws.ToString(zone.Status.AWS.ZoneID) == "" {
 		expect.GetResourcesPages(gomock.Any(), gomock.Any()).
 			Do(func(input *resourcegroupstaggingapi.GetResourcesInput, f func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) {
 				f(&resourcegroupstaggingapi.GetResourcesOutput{
-					ResourceTagMappingList: []*resourcegroupstaggingapi.ResourceTagMapping{
+					ResourceTagMappingList: []rtypes.ResourceTagMapping{
 						{
 							ResourceARN: aws.String("arn:aws:route53:::hostedzone/1234"),
 						},
@@ -71,7 +71,7 @@ func mockAWSZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone
 			}).Return(nil).Times(1)
 	}
 	expect.GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-		HostedZone: &route53.HostedZone{
+		HostedZone: &types.HostedZone{
 			Id:   aws.String("1234"),
 			Name: aws.String("blah.example.com."),
 		},
@@ -79,9 +79,9 @@ func mockAWSZoneExists(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone
 }
 
 func mockAWSZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
-	if zone.Status.AWS != nil && aws.StringValue(zone.Status.AWS.ZoneID) != "" {
+	if zone.Status.AWS != nil && aws.ToString(zone.Status.AWS.ZoneID) != "" {
 		expect.GetHostedZone(gomock.Any()).
-			Return(nil, awserr.New(route53.ErrCodeNoSuchHostedZone, "doesnt exist", fmt.Errorf("doesnt exist"))).Times(1)
+			Return(nil, &types.NoSuchHostedZone{Message: aws.String("doesnt exist")}).Times(1)
 		return
 	}
 	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Times(1)
@@ -89,12 +89,16 @@ func mockAWSZoneDoesntExist(expect *mock.MockClientMockRecorder, zone *hivev1.DN
 
 func mockAWSZoneCreationError(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).
-		Return(nil, awserr.New(kinesis.ErrCodeKMSOptInRequired, "error creating hosted zone", fmt.Errorf("error creating hosted zone"))).Times(1)
+		Return(nil, &mockAPIError{
+			code:    "KMSOptInRequired",
+			message: "error creating hosted zone",
+			err:     fmt.Errorf("error creating hosted zone"),
+		}).Times(1)
 }
 
 func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {
 	expect.CreateHostedZone(gomock.Any()).Return(&route53.CreateHostedZoneOutput{
-		HostedZone: &route53.HostedZone{
+		HostedZone: &types.HostedZone{
 			Id:   aws.String("1234"),
 			Name: aws.String("blah.example.com."),
 		},
@@ -102,23 +106,23 @@ func mockCreateAWSZone(expect *mock.MockClientMockRecorder) {
 }
 
 func mockCreateAWSZoneDuplicateFailure(expect *mock.MockClientMockRecorder) {
-	expect.CreateHostedZone(gomock.Any()).Return(nil, awserr.New(route53.ErrCodeHostedZoneAlreadyExists, "already exists", fmt.Errorf("already exists"))).Times(1)
+	expect.CreateHostedZone(gomock.Any()).Return(nil, &types.HostedZoneAlreadyExists{Message: aws.String("already exists")}).Times(1)
 }
 
 func mockNoExistingAWSTags(expect *mock.MockClientMockRecorder) {
 	expect.ListTagsForResource(gomock.Any()).Return(&route53.ListTagsForResourceOutput{
-		ResourceTagSet: &route53.ResourceTagSet{
+		ResourceTagSet: &types.ResourceTagSet{
 			ResourceId: aws.String("1234"),
-			Tags:       []*route53.Tag{},
+			Tags:       []types.Tag{},
 		},
 	}, nil).Times(1)
 }
 
 func mockExistingAWSTags(expect *mock.MockClientMockRecorder) {
 	expect.ListTagsForResource(gomock.Any()).Return(&route53.ListTagsForResourceOutput{
-		ResourceTagSet: &route53.ResourceTagSet{
+		ResourceTagSet: &types.ResourceTagSet{
 			ResourceId: aws.String("1234"),
-			Tags: []*route53.Tag{
+			Tags: []types.Tag{
 				{
 					Key:   aws.String(hiveDNSZoneAWSTag),
 					Value: aws.String("ns/dnszoneobject"),
@@ -138,11 +142,11 @@ func mockSyncAWSTags(expect *mock.MockClientMockRecorder) {
 
 func mockAWSGetNSRecord(expect *mock.MockClientMockRecorder) {
 	expect.ListResourceRecordSets(gomock.Any()).Return(&route53.ListResourceRecordSetsOutput{
-		ResourceRecordSets: []*route53.ResourceRecordSet{
+		ResourceRecordSets: []types.ResourceRecordSet{
 			{
-				Type: aws.String("NS"),
+				Type: types.RRTypeNs,
 				Name: aws.String("blah.example.com."),
-				ResourceRecords: []*route53.ResourceRecord{
+				ResourceRecords: []types.ResourceRecord{
 					{
 						Value: aws.String("ns1.example.com"),
 					},
@@ -157,7 +161,7 @@ func mockAWSGetNSRecord(expect *mock.MockClientMockRecorder) {
 
 func mockListAWSZonesByNameFound(expect *mock.MockClientMockRecorder, zone *hivev1.DNSZone) {
 	expect.ListHostedZonesByName(gomock.Any()).Return(&route53.ListHostedZonesByNameOutput{
-		HostedZones: []*route53.HostedZone{
+		HostedZones: []types.HostedZone{
 			{
 				Id:              aws.String("1234"),
 				Name:            aws.String("blah.example.com."),
@@ -175,7 +179,7 @@ func mockDeleteAWSZone(expect *mock.MockClientMockRecorder) {
 func mockGetResourcePages(expect *mock.MockClientMockRecorder) {
 	expect.GetResourcesPages(gomock.Any(), gomock.Any()).Return(nil).Do(func(i *resourcegroupstaggingapi.GetResourcesInput, f func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) {
 		getResourcesOutput := &resourcegroupstaggingapi.GetResourcesOutput{
-			ResourceTagMappingList: []*resourcegroupstaggingapi.ResourceTagMapping{
+			ResourceTagMappingList: []rtypes.ResourceTagMapping{
 				{
 					ResourceARN: aws.String("arn:aws:route53:::hostedzone/Z055920326CHQAW0WSG5N"),
 				},

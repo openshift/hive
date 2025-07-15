@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -140,7 +141,7 @@ func TestStopPreemptibleMachines(t *testing.T) {
 		setupClient: func(t *testing.T, c *mockawsclient.MockClient) {
 			c.EXPECT().StopInstances(gomock.Any()).Do(
 				func(input *ec2.StopInstancesInput) {
-					input.InstanceIds = aws.StringSlice([]string{"onDemand-0"})
+					input.InstanceIds = []string{"onDemand-0"}
 				}).Return(nil, nil)
 		},
 	}, {
@@ -149,7 +150,7 @@ func TestStopPreemptibleMachines(t *testing.T) {
 		setupClient: func(t *testing.T, c *mockawsclient.MockClient) {
 			c.EXPECT().TerminateInstances(gomock.Any()).Do(
 				func(input *ec2.TerminateInstancesInput) {
-					input.InstanceIds = aws.StringSlice([]string{"spot-0"})
+					input.InstanceIds = []string{"spot-0"}
 				}).Return(nil, nil)
 		},
 	}, {
@@ -159,11 +160,11 @@ func TestStopPreemptibleMachines(t *testing.T) {
 		setupClient: func(t *testing.T, c *mockawsclient.MockClient) {
 			c.EXPECT().StopInstances(gomock.Any()).Do(
 				func(input *ec2.StopInstancesInput) {
-					input.InstanceIds = aws.StringSlice([]string{"onDemand-0"})
+					input.InstanceIds = []string{"onDemand-0"}
 				}).Return(nil, nil)
 			c.EXPECT().TerminateInstances(gomock.Any()).Do(
 				func(input *ec2.TerminateInstancesInput) {
-					input.InstanceIds = aws.StringSlice([]string{"spot-0", "spot-1"})
+					input.InstanceIds = []string{"spot-0", "spot-1"}
 				}).Return(nil, nil)
 		},
 	}}
@@ -366,18 +367,15 @@ func testMachine(name string, interruptible bool, phase string, lastUpdated time
 	return &ms
 }
 
-func matchInstanceIDs(t *testing.T, actual []*string, states map[string]int) {
+func matchInstanceIDs(t *testing.T, actual []string, states map[string]int) {
 	expected := sets.NewString()
 	for state, count := range states {
 		for i := 0; i < count; i++ {
 			expected.Insert(fmt.Sprintf("%s-%d", state, i))
 		}
 	}
-	actualSet := sets.NewString()
-	for _, a := range actual {
-		actualSet.Insert(aws.StringValue(a))
-	}
-	assert.True(t, expected.Equal(actualSet), "Unexpected set of instance IDs: %v", actualSet.List())
+	actualSet := sets.NewString(actual...)
+	assert.Equal(t, expected, actualSet)
 }
 
 func testAWSActuator(awsClient awsclient.Client) *awsActuator {
@@ -395,48 +393,51 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 }
 
 func setupClientInstances(awsClient *mockawsclient.MockClient, states map[string]int) {
-	instances := []*ec2.Instance{}
+	reservations := []ec2types.Reservation{}
 	for state, count := range states {
+		instances := []ec2types.Instance{}
 		for i := 0; i < count; i++ {
-			instances = append(instances, &ec2.Instance{
+			instance := ec2types.Instance{
 				InstanceId: aws.String(fmt.Sprintf("%s-%d", state, i)),
-				State: &ec2.InstanceState{
-					Name: aws.String(state),
+				State: &ec2types.InstanceState{
+					Name: ec2types.InstanceStateName(state),
 				},
-			})
+			}
+			instances = append(instances, instance)
 		}
+		reservation := ec2types.Reservation{
+			Instances: instances,
+		}
+		reservations = append(reservations, reservation)
 	}
-	reservation := &ec2.Reservation{Instances: instances}
-	reservations := []*ec2.Reservation{reservation}
-	awsClient.EXPECT().DescribeInstances(gomock.Any()).Times(1).Return(
-		&ec2.DescribeInstancesOutput{
-			Reservations: reservations,
-		},
-		nil)
+	output := &ec2.DescribeInstancesOutput{
+		Reservations: reservations,
+	}
+	awsClient.EXPECT().DescribeInstances(gomock.Any()).Return(output, nil).AnyTimes()
 }
 
 func setupOnDemandAndSpotInstances(awsClient *mockawsclient.MockClient, onDemand, spot int) {
-	instances := []*ec2.Instance{}
+	instances := []ec2types.Instance{}
 	for i := 0; i < onDemand; i++ {
-		instances = append(instances, &ec2.Instance{
+		instances = append(instances, ec2types.Instance{
 			InstanceId: aws.String(fmt.Sprintf("%s-%d", "onDemand", i)),
-			State: &ec2.InstanceState{
-				Name: aws.String("running"),
+			State: &ec2types.InstanceState{
+				Name: ec2types.InstanceStateName("running"),
 			},
 		})
 	}
 	for i := 0; i < spot; i++ {
-		instances = append(instances, &ec2.Instance{
+		instances = append(instances, ec2types.Instance{
 			InstanceId: aws.String(fmt.Sprintf("%s-%d", "spot", i)),
-			State: &ec2.InstanceState{
-				Name: aws.String("running"),
+			State: &ec2types.InstanceState{
+				Name: ec2types.InstanceStateName("running"),
 			},
-			InstanceLifecycle: aws.String("spot"),
+			InstanceLifecycle: ec2types.InstanceLifecycleTypeSpot,
 		})
 	}
 
-	reservation := &ec2.Reservation{Instances: instances}
-	reservations := []*ec2.Reservation{reservation}
+	reservation := ec2types.Reservation{Instances: instances}
+	reservations := []ec2types.Reservation{reservation}
 	awsClient.EXPECT().DescribeInstances(gomock.Any()).Times(1).Return(
 		&ec2.DescribeInstancesOutput{
 			Reservations: reservations,

@@ -5,15 +5,15 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
-	ec2 "github.com/aws/aws-sdk-go/service/ec2"
-	elbv2 "github.com/aws/aws-sdk-go/service/elbv2"
-	resourcegroupstaggingapi "github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
-	route53 "github.com/aws/aws-sdk-go/service/route53"
-	s3iface "github.com/aws/aws-sdk-go/service/s3/s3iface"
-	s3manager "github.com/aws/aws-sdk-go/service/s3/s3manager"
-	sts "github.com/aws/aws-sdk-go/service/sts"
+	ec2 "github.com/aws/aws-sdk-go-v2/service/ec2"
+	elasticloadbalancingv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	resourcegroupstaggingapi "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
+	route53 "github.com/aws/aws-sdk-go-v2/service/route53"
+	s3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	sts "github.com/aws/aws-sdk-go-v2/service/sts"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -326,10 +326,10 @@ func (mr *MockClientMockRecorder) DescribeInstances(arg0 interface{}) *gomock.Ca
 }
 
 // DescribeLoadBalancers mocks base method.
-func (m *MockClient) DescribeLoadBalancers(arg0 *elbv2.DescribeLoadBalancersInput) (*elbv2.DescribeLoadBalancersOutput, error) {
+func (m *MockClient) DescribeLoadBalancers(arg0 *elasticloadbalancingv2.DescribeLoadBalancersInput) (*elasticloadbalancingv2.DescribeLoadBalancersOutput, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DescribeLoadBalancers", arg0)
-	ret0, _ := ret[0].(*elbv2.DescribeLoadBalancersOutput)
+	ret0, _ := ret[0].(*elasticloadbalancingv2.DescribeLoadBalancersOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -592,10 +592,10 @@ func (mr *MockClientMockRecorder) GetResourcesPages(input, fn interface{}) *gomo
 }
 
 // GetS3API mocks base method.
-func (m *MockClient) GetS3API() s3iface.S3API {
+func (m *MockClient) GetS3API() *s3.Client {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetS3API")
-	ret0, _ := ret[0].(s3iface.S3API)
+	ret0, _ := ret[0].(*s3.Client)
 	return ret0
 }
 
@@ -756,18 +756,18 @@ func (mr *MockClientMockRecorder) TerminateInstances(arg0 interface{}) *gomock.C
 }
 
 // Upload mocks base method.
-func (m *MockClient) Upload(arg0 *s3manager.UploadInput) (*s3manager.UploadOutput, error) {
+func (m *MockClient) Upload(ctx context.Context, input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Upload", arg0)
-	ret0, _ := ret[0].(*s3manager.UploadOutput)
+	ret := m.ctrl.Call(m, "Upload", ctx, input)
+	ret0, _ := ret[0].(*s3.PutObjectOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Upload indicates an expected call of Upload.
-func (mr *MockClientMockRecorder) Upload(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) Upload(ctx, input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockClient)(nil).Upload), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockClient)(nil).Upload), ctx, input)
 }
 
 // WaitUntilVpcPeeringConnectionDeleted mocks base method.

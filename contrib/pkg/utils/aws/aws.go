@@ -9,8 +9,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
@@ -60,14 +61,14 @@ func FindVpcInInventory(vpcId string, inventory []hivev1.AWSPrivateLinkInventory
 // GetDefaultSGOfVpc gets the default SG of a VPC.
 func GetDefaultSGOfVpc(awsClients awsclient.Client, vpcId *string) (string, error) {
 	describeSecurityGroupsOutput, err := awsClients.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []*ec2.Filter{
+		Filters: []types.Filter{
 			{
 				Name:   aws.String("vpc-id"),
-				Values: []*string{vpcId},
+				Values: []string{*vpcId},
 			},
 			{
 				Name:   aws.String("group-name"),
-				Values: []*string{aws.String("default")},
+				Values: []string{"default"},
 			},
 		},
 	})
@@ -78,16 +79,16 @@ func GetDefaultSGOfVpc(awsClients awsclient.Client, vpcId *string) (string, erro
 		return "", fmt.Errorf("default SG not found for VPC %v", vpcId)
 	}
 
-	return *describeSecurityGroupsOutput.SecurityGroups[0].GroupId, nil
+	return aws.ToString(describeSecurityGroupsOutput.SecurityGroups[0].GroupId), nil
 }
 
 // RevokeAllIngressFromCIDR removes an SG inbound rule which allows all ingress originating from a CIDR block.
 func RevokeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr *string) (*ec2.RevokeSecurityGroupIngressOutput, error) {
 	return awsClients.RevokeSecurityGroupIngress(&ec2.RevokeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []types.IpPermission{
 			{
-				IpRanges: []*ec2.IpRange{
+				IpRanges: []types.IpRange{
 					{
 						CidrIp: cidr,
 					},
@@ -102,10 +103,10 @@ func RevokeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr *string) (*e
 func RevokeAllIngressFromSG(awsClients awsclient.Client, SG, sourceSG *string) (*ec2.RevokeSecurityGroupIngressOutput, error) {
 	return awsClients.RevokeSecurityGroupIngress(&ec2.RevokeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []types.IpPermission{
 			{
 				IpProtocol: aws.String("-1"),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+				UserIdGroupPairs: []types.UserIdGroupPair{
 					{
 						GroupId: sourceSG,
 					},
@@ -119,9 +120,9 @@ func RevokeAllIngressFromSG(awsClients awsclient.Client, SG, sourceSG *string) (
 func AuthorizeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr, description *string) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
 	return awsClients.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []types.IpPermission{
 			{
-				IpRanges: []*ec2.IpRange{
+				IpRanges: []types.IpRange{
 					{
 						CidrIp:      cidr,
 						Description: description,
@@ -137,10 +138,10 @@ func AuthorizeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr, descript
 func AuthorizeAllIngressFromSG(awsClients awsclient.Client, SG, sourceSG, description *string) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
 	return awsClients.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []*ec2.IpPermission{
+		IpPermissions: []types.IpPermission{
 			{
 				IpProtocol: aws.String("-1"),
-				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+				UserIdGroupPairs: []types.UserIdGroupPair{
 					{
 						Description: description,
 						GroupId:     sourceSG,
@@ -156,7 +157,7 @@ func GetInfraIdFromVpcId(awsClients awsclient.Client, vpcId *string) (string, er
 	// When we specify the resource IDs explicitly instead of using filtering,
 	// AWS functions will return a non-nil error if nothing is found.
 	describeVpcsOutput, err := awsClients.DescribeVpcs(&ec2.DescribeVpcsInput{
-		VpcIds: []*string{vpcId},
+		VpcIds: []string{*vpcId},
 	})
 	if err != nil {
 		return "", err
@@ -164,8 +165,8 @@ func GetInfraIdFromVpcId(awsClients awsclient.Client, vpcId *string) (string, er
 
 	targetPrefix := "kubernetes.io/cluster/"
 	for _, tag := range describeVpcsOutput.Vpcs[0].Tags {
-		if strings.HasPrefix(*tag.Key, targetPrefix) {
-			return strings.Replace(*tag.Key, targetPrefix, "", 1), nil
+		if strings.HasPrefix(aws.ToString(tag.Key), targetPrefix) {
+			return strings.Replace(aws.ToString(tag.Key), targetPrefix, "", 1), nil
 		}
 	}
 	return "", fmt.Errorf("no tag with prefix %v found on VPC %v", targetPrefix, vpcId)
@@ -179,10 +180,10 @@ func GetWorkerSGFromVpcId(awsClients awsclient.Client, vpcId *string) (string, e
 	}
 
 	describeSecurityGroupsOutput, err := awsClients.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []*ec2.Filter{
+		Filters: []types.Filter{
 			{
 				Name:   aws.String("tag:Name"),
-				Values: []*string{aws.String(infraID + "-worker-sg"), aws.String(infraID + "-node")},
+				Values: []string{infraID + "-worker-sg", infraID + "-node"},
 			},
 		},
 	})
@@ -193,7 +194,7 @@ func GetWorkerSGFromVpcId(awsClients awsclient.Client, vpcId *string) (string, e
 		return "", fmt.Errorf("worker SG not found for VPC %v", vpcId)
 	}
 
-	return *describeSecurityGroupsOutput.SecurityGroups[0].GroupId, err
+	return aws.ToString(describeSecurityGroupsOutput.SecurityGroups[0].GroupId), err
 }
 
 // GetCIDRFromVpcId gets the CIDR block of a VPC using the ID of it.
@@ -201,13 +202,13 @@ func GetCIDRFromVpcId(awsClients awsclient.Client, vpcId *string) (string, error
 	// When we specify the resource IDs explicitly instead of using filtering,
 	// AWS functions will return a non-nil error if nothing is found.
 	describeVpcOutput, err := awsClients.DescribeVpcs(&ec2.DescribeVpcsInput{
-		VpcIds: []*string{vpcId},
+		VpcIds: []string{*vpcId},
 	})
 	if err != nil {
 		return "", err
 	}
 
-	return *describeVpcOutput.Vpcs[0].CidrBlock, nil
+	return aws.ToString(describeVpcOutput.Vpcs[0].CidrBlock), nil
 }
 
 // GetAWSCreds reads AWS credentials either from either the specified credentials file,

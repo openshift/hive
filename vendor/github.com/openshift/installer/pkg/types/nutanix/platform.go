@@ -28,6 +28,12 @@ type Platform struct {
 	// +optional
 	ClusterOSImage string `json:"clusterOSImage,omitempty"`
 
+	// PreloadedOSImageName uses the named preloaded RHCOS image from PC/PE,
+	// instead of create and upload a new image for each cluster.
+	//
+	// +optional
+	PreloadedOSImageName string `json:"preloadedOSImageName,omitempty"`
+
 	// DeprecatedAPIVIP is the virtual IP address for the api endpoint
 	// Deprecated: use APIVIPs
 	//
@@ -78,6 +84,11 @@ type Platform struct {
 	// FailureDomains configures failure domains for the Nutanix platform.
 	// +optional
 	FailureDomains []FailureDomain `json:"failureDomains,omitempty"`
+
+	// PrismAPICallTimeout sets the timeout (in minutes) for the prism-api calls.
+	// If not configured, the default value of 10 minutes will be used as the prism-api call timeout.
+	// +optional
+	PrismAPICallTimeout *int `json:"prismAPICallTimeout,omitempty"`
 }
 
 // PrismCentral holds the endpoint and credentials data used to connect to the Prism Central

@@ -3,6 +3,9 @@
 shopt -s expand_aliases
 alias echo='/bin/echo -n `date -Ins --universal`"  "; /bin/echo'
 
+# Workaround for upstream vsphere e2e setting SSL_CERT_FILE to a vsphere specific value (bad for us)
+unset SSL_CERT_FILE
+
 ###
 # TEMPORARY workaround for https://issues.redhat.com/browse/DPTP-2871
 # The configured job timeout after isn't signaling the test script like it
@@ -60,6 +63,9 @@ while [ $i -le ${max_tries} ]; do
     echo "sleeping ${sleep_between_tries} seconds"
     sleep ${sleep_between_tries}
   fi
+
+  # Delete test namespace if exist
+  oc delete ns ${CLUSTER_NAMESPACE} || true
 
   echo -n "Creating namespace ${CLUSTER_NAMESPACE}. Try #${i}/${max_tries}... "
   if oc create namespace "${CLUSTER_NAMESPACE}"; then
@@ -121,6 +127,24 @@ function wait_for_namespace {
   done
   echo " Timed out!"
   exit 1
+}
+
+function get_osp_resources() {
+  local resource_path=$1
+
+  # Check if SHARED_DIR is set
+  if [ -z "$SHARED_DIR" ]; then
+    echo "Variable 'SHARED_DIR' not set."
+    exit 1
+  fi
+
+  # Check if the file exists
+  if [ ! -f "$1" ]; then
+    echo "Error: Resource file '$1' not found."
+    exit 1
+  fi
+
+  cat "$1"
 }
 
 function save_hive_logs() {
@@ -223,23 +247,47 @@ case "${CLOUD}" in
 	;;
 "vsphere")
   BASE_DOMAIN="${BASE_DOMAIN:-vmc.devcluster.openshift.com}"
-  if [ -z "$NETWORK_NAME" ]; then
-    echo "Variable 'NETWORK_NAME' not set."
+  USE_MANAGED_DNS=false
+  if [ -z "$VSPHERE_INSTALLER_PLATFORM_SPEC_JSON" ]; then
+    echo "Variable 'VSPHERE_INSTALLER_PLATFORM_SPEC_JSON' not set."
     exit 1
   fi
-   if [ -z "$VCENTER" ]; then
-    echo "Variable 'VCENTER' not set."
-    exit 1
-  fi
-  API_VIP=$(get_vips 3) # Get 3rd vip from file
-  INGRESS_VIP=$(get_vips 4) # Get 4th vip from file
-  EXTRA_CREATE_CLUSTER_ARGS="--vsphere-datacenter=${GOVC_DATACENTER:-DEVQEdatacenter} \
-      --vsphere-default-datastore=${GOVC_DATASTORE:-vsanDatastore}\
-      --vsphere-cluster=${VSPHERE_CLUSTER:-DEVQEcluster}
-      --vsphere-api-vip=$API_VIP \
-      --vsphere-ingress-vip=$INGRESS_VIP \
-      --vsphere-network=$NETWORK_NAME \
-      --vsphere-vcenter=$VCENTER"
+  EXTRA_CREATE_CLUSTER_ARGS="--machine-network=$VSPHERE_MACHINE_NETWORK \
+      --vsphere-api-vip=$VSPHERE_API_VIP \
+      --vsphere-ingress-vip=$VSPHERE_INGRESS_VIP"
+  ;;
+"nutanix")
+
+  USE_MANAGED_DNS=false
+  EXTRA_CREATE_CLUSTER_ARGS="--nutanix-pc-address=${NUTANIX_HOST} \
+      --nutanix-pc-port=${NUTANIX_PORT:-9440} \
+      --nutanix-pe-address=${PE_HOST} \
+      --nutanix-pe-port=${PE_PORT:-9440} \
+      --nutanix-ca-certs=${NUTANIX_CERT:-}
+      --nutanix-pe-uuid=${PE_UUID} \
+      --nutanix-pe-name=${PE_NAME} \
+      --nutanix-subnetUUIDs=${SUBNET_UUID} \
+      --nutanix-az-name=${NUTANIX_AZ_NAME-Local_AZ} \
+      --manifests=${MANIFESTS} \
+      --nutanix-api-vip=$API_VIP \
+      --nutanix-ingress-vip=$INGRESS_VIP"
+  ;;
+"openstack")
+  CREDS_FILE_ARG="--creds-file=${SHARED_DIR}/clouds.yaml"
+  USE_MANAGED_DNS=false
+  BASE_DOMAIN="${BASE_DOMAIN:-shiftstack.devcluster.openshift.com}"
+  API_FLOATING_IP=$(get_osp_resources "${SHARED_DIR}/HIVE_FIP_API")
+  INGRESS_FLOATING_IP=$(get_osp_resources "${SHARED_DIR}/HIVE_FIP_INGRESS")
+  EXTERNAL_NETWORK=$(get_osp_resources "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")
+  COMPUTE_FLAVOR=$(get_osp_resources "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
+  CONTROLPLANE_FLAVOR=$(get_osp_resources "${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")
+  EXTRA_CREATE_CLUSTER_ARGS="--openstack-api-floating-ip=$API_FLOATING_IP \
+      --openstack-ingress-floating-ip=$INGRESS_FLOATING_IP \
+      --machine-network="10.0.0.0/16" \
+      --openstack-cloud="openstack" \
+      --openstack-external-network=$EXTERNAL_NETWORK \
+      --openstack-compute-flavor=$COMPUTE_FLAVOR \
+      --openstack-master-flavor=$CONTROLPLANE_FLAVOR"
   ;;
 *)
 	echo "unknown cloud: ${CLOUD}"
@@ -317,22 +365,4 @@ function capture_cluster_logs() {
         ${SRC_ROOT}/hack/logextractor.sh ${CLUSTER_NAME} "${ARTIFACT_DIR}/hive"
         exit 1
     fi
-}
-
-function get_vips() {
-  # Return vip at given index
-  idx=${1:-1} 
-   if [ -z "$SHARED_DIR" ]; then
-    echo "Variable 'SHARED_DIR' not set."
-    exit 1
-  fi
-  
-  vips="${SHARED_DIR}/vips.txt"
-  if [ ! -f "$vips" ]; then
-    echo "Error: File '$vips' not found."
-    exit 1
-  fi
-
-  vip=$(sed -n "${idx}p" "$vips")
-  echo "$vip"
 }

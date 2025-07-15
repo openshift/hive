@@ -8,6 +8,7 @@ import (
 	"github.com/ghodss/yaml"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
+	"github.com/openshift/installer/pkg/types/nutanix"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -155,6 +156,40 @@ func createVSphereClusterBuilder() *Builder {
 	return b
 }
 
+func createNutanixClusterBuilder(cert string) *Builder {
+	b := createTestBuilder()
+	b.CloudBuilder = &NutanixCloudBuilder{
+		PrismCentral: nutanix.PrismCentral{
+			Endpoint: nutanix.PrismEndpoint{
+				Address: "prism-central.nutanix-test.com",
+				Port:    9440,
+			},
+			Username: "nutanix-user",
+			Password: "nutanix-password",
+		},
+		FailureDomains: []nutanix.FailureDomain{
+			{
+				Name: "fd-name",
+				PrismElement: nutanix.PrismElement{
+					UUID: "0005de05-75a3-dacb-ba00-2c5da2ac4c1a",
+					Endpoint: nutanix.PrismEndpoint{
+						Address: "prism-element.nutanix-test.com",
+						Port:    9440,
+					},
+					Name: "PE-NAME",
+				},
+				SubnetUUIDs:       []string{"0005de05-75a3-dacb-ba00-123456789012"},
+				StorageContainers: nil,
+				DataSourceImages:  nil,
+			},
+		},
+		APIVIP:     "192.168.0.2",
+		IngressVIP: "192.168.0.3",
+		CACert:     []byte(cert),
+	}
+	return b
+}
+
 func TestBuildClusterResources(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -257,6 +292,68 @@ func TestBuildClusterResources(t *testing.T) {
 				certSecret := findSecret(allObjects, certSecretName)
 				require.NotNil(t, certSecret)
 				assert.Equal(t, certSecret.Name, cd.Spec.Platform.VSphere.CertificatesSecretRef.Name)
+			},
+		},
+		{
+			name:    "Nutanix cluster with certificate",
+			builder: createNutanixClusterBuilder("dummy certificate"),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+				cd := findClusterDeployment(allObjects, clusterName)
+				workerPool := findMachinePool(allObjects, fmt.Sprintf("%s-%s", clusterName, "worker"))
+
+				credsSecretName := fmt.Sprintf("%s-nutanix-creds", clusterName)
+				credsSecret := findSecret(allObjects, credsSecretName)
+				require.NotNil(t, credsSecret, "Nutanix credentials secret should be generated")
+				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name)
+
+				certSecretName := fmt.Sprintf("%s-nutanix-certs", clusterName)
+				certSecret := findSecret(allObjects, certSecretName)
+				require.NotNil(t, certSecret, "Nutanix certificate secret should be generated")
+				assert.Equal(t, certSecret.Name, cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name)
+
+				// Validate PrismCentral endpoint
+				assert.Equal(t, "prism-central.nutanix-test.com", cd.Spec.Platform.Nutanix.PrismCentral.Address)
+				assert.Equal(t, int32(9440), cd.Spec.Platform.Nutanix.PrismCentral.Port)
+
+				// Validate Prism Elements
+				require.NotNil(t, cd.Spec.Platform.Nutanix)
+				assert.Len(t, cd.Spec.Platform.Nutanix.FailureDomains, 1, "Expected 1 Failure Domain")
+				assert.Equal(t, "0005de05-75a3-dacb-ba00-2c5da2ac4c1a", cd.Spec.Platform.Nutanix.FailureDomains[0].PrismElement.UUID)
+
+				// Validate machine pool
+				assert.NotNil(t, workerPool)
+				assert.Equal(t, int64(workerNodeCount), *workerPool.Spec.Replicas)
+			},
+		},
+		{
+			name:    "Nutanix cluster no certificate",
+			builder: createNutanixClusterBuilder(""),
+			validate: func(t *testing.T, allObjects []runtime.Object) {
+				cd := findClusterDeployment(allObjects, clusterName)
+				workerPool := findMachinePool(allObjects, fmt.Sprintf("%s-%s", clusterName, "worker"))
+
+				credsSecretName := fmt.Sprintf("%s-nutanix-creds", clusterName)
+				credsSecret := findSecret(allObjects, credsSecretName)
+				require.NotNil(t, credsSecret, "Nutanix credentials secret should be generated")
+				assert.Equal(t, credsSecret.Name, cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name)
+
+				certSecretName := fmt.Sprintf("%s-nutanix-certs", clusterName)
+				certSecret := findSecret(allObjects, certSecretName)
+				require.Nil(t, certSecret)
+				assert.Equal(t, cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name, "")
+
+				// Validate PrismCentral endpoint
+				assert.Equal(t, "prism-central.nutanix-test.com", cd.Spec.Platform.Nutanix.PrismCentral.Address)
+				assert.Equal(t, int32(9440), cd.Spec.Platform.Nutanix.PrismCentral.Port)
+
+				// Validate Prism Elements
+				require.NotNil(t, cd.Spec.Platform.Nutanix)
+				assert.Len(t, cd.Spec.Platform.Nutanix.FailureDomains, 1, "Expected 1 Failure Domain")
+				assert.Equal(t, "0005de05-75a3-dacb-ba00-2c5da2ac4c1a", cd.Spec.Platform.Nutanix.FailureDomains[0].PrismElement.UUID)
+
+				// Validate machine pool
+				assert.NotNil(t, workerPool)
+				assert.Equal(t, int64(workerNodeCount), *workerPool.Spec.Replicas)
 			},
 		},
 		{

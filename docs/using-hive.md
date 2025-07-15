@@ -17,6 +17,7 @@
       - [IBM Cloud Credential Manifests](#ibm-cloud-credential-manifests)
     - [vSphere](#vsphere)
     - [OpenStack](#openstack)
+    - [Nutanix](#nutanix)
   - [SSH Key Pair](#ssh-key-pair)
   - [InstallConfig](#installconfig)
   - [ClusterDeployment](#clusterdeployment)
@@ -295,6 +296,138 @@ metadata:
 type: Opaque
 ```
 
+#### Nutanix
+
+To provision an OpenShift cluster on Nutanix using Hive, you must provide the necessary cloud credentials. These credentials are used by Hive to interact with the Nutanix environment and perform cluster provisioning operations.
+
+#### Required Credentials
+Hive requires the following credentials for Nutanix:
+
+- **Prism Central Username**: The username with sufficient privileges to create and manage virtual machines.
+- **Prism Central Password**: The password associated with the provided username.
+
+#### Creating a Secret for Credentials
+The Nutanix credentials must be stored as a Kubernetes secret in the namespace where Hive operates. Create a secret with the following format:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nutanix-cloud-credentials
+  namespace: hive
+type: Opaque
+data:
+  username: <base64-encoded-username>
+  password: <base64-encoded-password>
+```
+
+To create the secret using `oc`, first encode the values in Base64:
+
+```sh
+echo -n "<value>" | base64
+```
+
+Then, apply the secret using:
+
+```sh
+oc apply -f nutanix-cloud-credentials.yaml
+```
+
+#### Additional Required Secrets
+In addition to the Hive credentials, OpenShift requires additional secrets in specific namespaces for authentication with Nutanix.
+These credentials can be created manually or by using the CCO utility (ccoctl) to generate the credential Secret manifests for the OpenShift installer.
+(See the following [link](https://github.com/nutanix-cloud-native/openshift-cloud-credential-operator/blob/master/docs/ccoctl.md#nutanix) for more details)
+
+##### Secret for OpenShift Machine API
+This secret is required by the OpenShift Machine API to manage machines on Nutanix:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nutanix-credentials
+  namespace: openshift-machine-api
+type: Opaque
+stringData:
+  credentials: |
+    [{"type":"basic_auth","data":{"prismCentral":{"username":"${NUTANIX_USERNAME}","password":"${NUTANIX_PASSWORD}"}}}]
+```
+
+##### Secret for OpenShift Cloud Controller Manager
+This secret is required by the OpenShift Cloud Controller Manager to integrate OpenShift with Nutanix infrastructure:
+
+```yamlz
+apiVersion: v1
+kind: Secret
+metadata:
+   name: nutanix-credentials
+   namespace: openshift-cloud-controller-manager
+type: Opaque
+stringData:
+  credentials: |
+    [{"type":"basic_auth","data":{"prismCentral":{"username":"${NUTANIX_USERNAME}","password":"${NUTANIX_PASSWORD}"}}}]
+```
+
+#### Why These Secrets Are Required
+- **Hive Secret**: Used by Hive for provisioning clusters and managing resources.
+- **Machine API Secret**: Required for the OpenShift Machine API to manage and create worker nodes on Nutanix.
+- **Cloud Controller Manager Secret**: Enables OpenShift to interact with Nutanix for networking, load balancing, and other infrastructure-related tasks.
+
+Each of these secrets plays a critical role in ensuring a seamless integration between OpenShift and Nutanix, allowing for automated cluster deployment and lifecycle management.
+
+#### Using the Secret in Hive
+Once the secret is created, reference it in the `ClusterDeployment` or `ClusterPool` configuration:
+
+```yaml
+spec:
+  platform:
+    nutanix:
+      credentialsSecretRef:
+        name: nutanix-cloud-credentials
+```
+
+This ensures that Hive can retrieve the necessary credentials to interact with Nutanix for cluster provisioning.
+
+#### Additional Considerations
+
+- Ensure that the Nutanix user has appropriate permissions to create and manage virtual machines, networks, and other resources required by OpenShift installation and management.
+- Verify that network connectivity exists between the OpenShift cluster nodes and the Nutanix infrastructure endpoints (Prism Central and Prism Elements).
+- If the Nutanix Prism Central uses certificates that are not trusted by default (such as those signed by a private certificate authority), additional TLS configuration may be required.
+- During installation (day 0), Prism Central certificates can be trusted by specifying an `additionalTrustBundle` in the `install-config.yaml`. After installation (day 2), ongoing communication by Hive requires configuring a `certificatesSecretRef` in the `ClusterDeployment` platform configuration.
+- If both `additionalTrustBundle` and `certificatesSecretRef` are provided, they can reference different certificate bundles if needed. Otherwise, the certificates from `certificatesSecretRef` will be used for both installation and day 2 operations.
+
+
+By setting up these credentials correctly, Hive will be able to deploy OpenShift clusters on Nutanix efficiently.
+
+
+#### TLS and Certificate Trust Configuration
+
+When using certificates to establish trust with Nutanix Prism Central, Hive handles certificates in the following ways depending on the configuration:
+
+- **Case 1: additionalTrustBundle set in install-config.yaml, no certificatesSecretRef in Hive**  
+  The installer will use the provided trust bundle. Hive will not inject any additional certificates.  
+  **Important**: If the cluster nodes (or installer pod) environment does not have `SSL_CERT_DIR` configured properly, the installation might fail due to untrusted Prism Central certificates.
+
+- **Case 2: certificatesSecretRef set in Hive, no additionalTrustBundle in install-config.yaml**  
+  Hive will automatically inject the certificates from certificatesSecretRef into the install-config's `additionalTrustBundle` before installation.  
+  It will also set `additionalTrustBundlePolicy: Always` to ensure the certificates are trusted both during installation and runtime.
+
+- **Case 3: both additionalTrustBundle and certificatesSecretRef are set**  
+  Hive will **not modify** the install-config. The installer will use the `additionalTrustBundle` exactly as provided.  
+  No certificate injection will occur, and the install-config's bundle will be used for establishing trust.
+
+By carefully choosing where to specify certificates, you can control whether the trust setup is handled at install time, during day 2 operations, or both.
+
+
+
+
+#### No Need to Specify Credentials in Install Config
+
+Hive automatically injects the necessary Nutanix credentials during the provisioning process. Therefore, there is no need to manually specify the Prism Central username and password in the install configuration. By referencing the created secrets, Hive ensures secure and seamless authentication with Nutanix.
+
+By setting up these credentials correctly, Hive will be able to deploy OpenShift clusters on Nutanix efficiently.
+
+
 ### SSH Key Pair
 
 (Optional) Hive uses the provided ssh key pair to ssh into the machines in the remote cluster. Hive connects via ssh to gather logs in the event of an installation failure. The ssh key pair is optional, but neither the user nor Hive will be able to ssh into the machines if it is not supplied.
@@ -458,6 +591,50 @@ and replace the contents of `platform` with:
     externalNetwork: openstack_network_name
     lbFloatingIP: 10.0.111.158
 ```
+
+For Nutanix, you need to specify the Nutanix platform configuration in your install-config.yaml. Below is the required platform section:
+```yaml
+platform:
+  nutanix:
+    apiVIPs:
+      - 10.0.2.12
+    ingressVIPs:
+      - 10.0.2.11
+    prismCentral:
+      endpoint:
+        address: "prism-central.example.com"
+        port: 9440
+    prismElements:
+      - endpoint:
+          address: "prism-element-1.example.com"
+          port: 9440
+        uuid: "prism-elements-uuid-1234"
+        name: "Prism-Element-1"
+    subnetUUIDs:
+      - "subnet-uuid-1234"
+    failureDomains:
+      - name: "Local_AZ"
+        subnetUUIDs:
+          - "subnet-uuid-1234"
+        prismElement:
+          endpoint:
+            address: "prism-element-1.example.com"
+            port: 9440
+          uuid: "prism-elements-uuid-1234"
+          name: "Prism-Element-1"
+```
+Note: The failureDomains section is optional and can be omitted if not required.
+
+#### Required Secrets
+- `nutanix-creds`: A secret containing the credentials for Prism Central.
+- `install-config`: A secret holding the OpenShift install configuration.
+- `ssh-private-key`: A secret containing the SSH private key for cluster access.
+
+#### Additional Considerations
+
+- Ensure that the `prismCentral.endpoint` and `prismElements.endpoint` addresses specified in the install-config are reachable from the environment where Hive runs.
+- The `subnetUUIDs` must correspond to existing Nutanix subnets where the cluster nodes will be deployed.
+
 
 ### ClusterDeployment
 
@@ -632,6 +809,29 @@ openstack:
     size: 10
     type: ceph
   flavor: m1.large
+```
+
+For Nutanix, replace the contents of spec.platform with the settings you want for the instances:
+
+```yaml
+nutanix:
+  prismCentral:
+    address: prism-central.example.com
+    port: 9440
+  credentialsSecretRef:
+      name: nutanix-creds
+  certificatesSecretRef:
+      name: prism-central-cert
+  failureDomains:
+    - name: "Local_AZ"
+      subnetUUIDs:
+        - "subnet-uuid-1234"
+      prismElement:
+        endpoint:
+          address: "prism-element-1.example.com"
+          port: 9440
+        uuid: "prism-elements-uuid-1234"
+        name: "Prism-Element-1"
 ```
 
 #### Configuring Availability Zones
@@ -1161,4 +1361,4 @@ For more information please see the [SyncIdentityProvider](syncidentityprovider.
 oc delete clusterdeployment ${CLUSTER_NAME} --wait=false
 ```
 
-Deleting a `ClusterDeployment` will create a `ClusterDeprovision` resource, which in turn will launch a pod to attempt to delete all cloud resources created for and by the cluster. This is done by scanning the cloud provider for resources tagged with the cluster's generated `InfraID`. (i.e. `kubernetes.io/cluster/mycluster-fcp4z=owned` or  `sigs.k8s.io/cluster-api-provider-aws/cluster/mycluster-fcp4z=owned`) Once all resources have been deleted the pod will terminate, finalizers will be removed, and the `ClusterDeployment` and dependent objects will be removed. The deprovision process is powered by vendoring the same code from the OpenShift installer used for `openshift-install cluster destroy`.
+Deleting a `ClusterDeployment` will create a `ClusterDeprovision` resource, which in turn will launch a pod to attempt to delete all cloud resources created for and by the cluster. This is done by scanning the cloud provider for resources tagged with the cluster's generated `InfraID`. (i.e. `kubernetes.io/cluster/mycluster-fcp4z=owned` or  `sigs.k8s.io/cluster-api-provider-aws/cluster/mycluster-fcp4z=owned`) Once all resources have been deleted the pod will terminate, finalizers will be removed, and the `ClusterDeployment` and dependent objects will be removed. The deprovision process is powered by vendoring the same code from the OpenShift installer used for `openshift-install destroy cluster`.

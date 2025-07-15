@@ -125,6 +125,11 @@ type InstallConfig struct {
 	// +optional
 	ControlPlane *MachinePool `json:"controlPlane,omitempty"`
 
+	// Arbiter is the configuration for the machines that comprise the
+	// arbiter nodes.
+	// +optional
+	Arbiter *MachinePool `json:"arbiter,omitempty"`
+
 	// Compute is the configuration for the machines that comprise the
 	// compute nodes.
 	// +optional
@@ -245,6 +250,13 @@ func (c *InstallConfig) IsOKD() bool {
 // bootstrapInPlace
 func (c *InstallConfig) IsSingleNodeOpenShift() bool {
 	return c.BootstrapInPlace != nil
+}
+
+// IsArbiterEnabled returns if arbiter is enabled based off of the install-config arbiter machine pool.
+func (c *InstallConfig) IsArbiterEnabled() bool {
+	return c.Arbiter != nil &&
+		c.Arbiter.Replicas != nil &&
+		*c.Arbiter.Replicas > 0
 }
 
 // CPUPartitioningMode defines how the nodes should be setup for partitioning the CPU Sets.
@@ -401,6 +413,10 @@ type Networking struct {
 	// +optional
 	ClusterNetworkMTU uint32 `json:"clusterNetworkMTU,omitempty"`
 
+	// OVNKubernetesConfig provides configuration for ovn-kubernetes as the default
+	// pod network when NetworkType is set to OVNKubernetes.
+	OVNKubernetesConfig *OVNKubernetesConfig `json:"ovnKubernetesConfig,omitempty"`
+
 	// Deprecated types, scheduled to be removed
 
 	// Deprecated way to configure an IP address pool for machines.
@@ -437,6 +453,8 @@ type ClusterNetworkEntry struct {
 	// HostPrefix is the prefix size to allocate to each node from the CIDR.
 	// For example, 24 would allocate 2^8=256 adresses to each node. If this
 	// field is not used by the plugin, it can be left unset.
+	// When multiple CIDRs of the same family (i.e. IPv4/IPv6) are present,
+	// their HostPrefix value must be the same.
 	// +optional
 	HostPrefix int32 `json:"hostPrefix,omitempty"`
 
@@ -444,6 +462,29 @@ type ClusterNetworkEntry struct {
 	// This is the length in bits - so a 9 here will allocate a /23.
 	// +optional
 	DeprecatedHostSubnetLength int32 `json:"hostSubnetLength,omitempty"`
+}
+
+// OVNKubernetesConfig configures the ovn-kubernetes sdn plugin.
+type OVNKubernetesConfig struct {
+	// ipv4 allows users to configure IP settings for IPv4 connections. When omitted,
+	// this means no opinions and the default configuration is used. Check individual
+	// fields within ipv4 for details of default values.
+	// +optional
+	IPv4 *IPv4OVNKubernetesConfig `json:"ipv4,omitempty"`
+}
+
+// IPv4OVNKubernetesConfig is IPv4 configuration for the ovn-kubernetes sdn plugin.
+type IPv4OVNKubernetesConfig struct {
+	// internalJoinSubnet is a v4 subnet used internally by ovn-kubernetes in case the
+	// default one is being already used by something else. It must not overlap with
+	// any other subnet being used by OpenShift or by the node network. The size of the
+	// subnet must be larger than the number of nodes. The value cannot be changed
+	// after installation.
+	// The current default value is 100.64.0.0/16
+	// The subnet must be large enough to accommodate one IP per node in your cluster
+	// The value must be in proper IPV4 CIDR format
+	// +optional
+	InternalJoinSubnet *ipnet.IPNet `json:"internalJoinSubnet,omitempty"`
 }
 
 // Proxy defines the proxy settings for the cluster.
@@ -588,12 +629,10 @@ func ClusterAPIFeatureGateEnabled(platform string, fgs featuregates.FeatureGate)
 
 	// Check if CAPI install is enabled for individual platforms.
 	switch platform {
-	case aws.Name, azure.Name, gcp.Name, nutanix.Name, openstack.Name, powervs.Name, vsphere.Name:
+	case aws.Name, azure.Name, gcp.Name, nutanix.Name, openstack.Name, powervs.Name, vsphere.Name, ibmcloud.Name:
 		return true
 	case azure.StackTerraformName, azure.StackCloud.Name():
 		return false
-	case ibmcloud.Name:
-		return fgs.Enabled(features.FeatureGateClusterAPIInstallIBMCloud)
 	default:
 		return false
 	}

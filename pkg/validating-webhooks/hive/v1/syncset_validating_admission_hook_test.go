@@ -2,16 +2,20 @@ package v1
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
+	machinev1 "github.com/openshift/api/machine/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -67,6 +71,12 @@ func TestSyncSetValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name:            "Test empty patch type create",
+			operation:       admissionv1beta1.Create,
+			syncSet:         testPatchSyncSet(""),
+			expectedAllowed: true,
+		},
+		{
 			name:            "Test valid patch type update",
 			operation:       admissionv1beta1.Update,
 			syncSet:         testValidPatchSyncSet(),
@@ -77,6 +87,12 @@ func TestSyncSetValidate(t *testing.T) {
 			operation:       admissionv1beta1.Update,
 			syncSet:         testInvalidPatchSyncSet(),
 			expectedAllowed: false,
+		},
+		{
+			name:            "Test empty patch type update",
+			operation:       admissionv1beta1.Update,
+			syncSet:         testPatchSyncSet(""),
+			expectedAllowed: true,
 		},
 		{
 			name:            "Test create with no patches",
@@ -470,4 +486,97 @@ func testSyncSetWithResources(resources ...string) *hivev1.SyncSet {
 		ss.Spec.Resources = append(ss.Spec.Resources, runtime.RawExtension{Raw: []byte(resource)})
 	}
 	return ss
+}
+
+func TestValidateNutanixMachinePoolPlatformInvariants(t *testing.T) {
+	tests := []struct {
+		name     string
+		platform *hivev1nutanix.MachinePool
+		wantErrs []string
+	}{
+		{
+			name: "valid values",
+			platform: &hivev1nutanix.MachinePool{
+				NumCPUs:           4,
+				NumCoresPerSocket: 2,
+				MemoryMiB:         8192,
+				DataDisks: []machinev1.NutanixVMDisk{
+					{DiskSize: resource.MustParse("100Gi")},
+				},
+			},
+			wantErrs: nil,
+		},
+		{
+			name: "zero vCPUs",
+			platform: &hivev1nutanix.MachinePool{
+				NumCPUs:           0,
+				NumCoresPerSocket: 2,
+				MemoryMiB:         8192,
+			},
+			wantErrs: []string{"numCPUs"},
+		},
+		{
+			name: "zero cores per socket",
+			platform: &hivev1nutanix.MachinePool{
+				NumCPUs:           4,
+				NumCoresPerSocket: 0,
+				MemoryMiB:         8192,
+			},
+			wantErrs: []string{"numCoresPerSocket"},
+		},
+		{
+			name: "zero memory",
+			platform: &hivev1nutanix.MachinePool{
+				NumCPUs:           4,
+				NumCoresPerSocket: 2,
+				MemoryMiB:         0,
+			},
+			wantErrs: []string{"memoryMiB"},
+		},
+		{
+			name: "zero disk size",
+			platform: &hivev1nutanix.MachinePool{
+				NumCPUs:           4,
+				NumCoresPerSocket: 2,
+				MemoryMiB:         8192,
+				DataDisks: []machinev1.NutanixVMDisk{
+					{DiskSize: resource.MustParse("0Gi")},
+				},
+			},
+			wantErrs: []string{"diskSizeBytes"},
+		},
+		{
+			name: "multiple invalid fields",
+			platform: &hivev1nutanix.MachinePool{
+				NumCPUs:           0,
+				NumCoresPerSocket: 0,
+				MemoryMiB:         0,
+				DataDisks: []machinev1.NutanixVMDisk{
+					{DiskSize: resource.MustParse("0Gi")},
+				},
+			},
+			wantErrs: []string{"numCPUs", "numCoresPerSocket", "memoryMiB", "diskSizeBytes"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateNutanixMachinePoolPlatformInvariants(tt.platform, field.NewPath("platform"))
+			if len(tt.wantErrs) != len(errs) {
+				t.Errorf("expected %d errors, got %d: %+v", len(tt.wantErrs), len(errs), errs)
+			}
+			for _, want := range tt.wantErrs {
+				found := false
+				for _, got := range errs {
+					if strings.Contains(got.Field, want) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error on field %q not found in errs: %+v", want, errs)
+				}
+			}
+		})
+	}
 }

@@ -19,6 +19,7 @@ const (
 	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
+	PlatformNutanix        = "nutanix"
 
 	mergedPullSecretSuffix = "merged-pull-secret"
 
@@ -334,6 +335,9 @@ const (
 	// VSphereDataStoreEnvVar is the environment variable specifying the vSphere default datastore.
 	VSphereDataStoreEnvVar = "GOVC_DATASTORE"
 
+	// VSpherePlatformSpecJSONEnvVar is the environment variable containing an installer vSphere platform spec, encoded as JSON
+	VSpherePlatformSpecJSONEnvVar = "VSPHERE_INSTALLER_PLATFORM_SPEC_JSON"
+
 	// VSphereCredentialsDir is the directory containing VSphere credentials files.
 	VSphereCredentialsDir = "/vsphere-credentials"
 
@@ -356,6 +360,10 @@ const (
 	// VersionMajorMinorPatchLabel is a label applied to ClusterDeployments to show the version of the cluster
 	// in the form "[MAJOR].[MINOR].[PATCH]".
 	VersionMajorMinorPatchLabel = "hive.openshift.io/version-major-minor-patch"
+
+	// MinorVersionUpgradeUnavailable is a label applied to ClusterDeployments to show concerns about upgrades to the
+	// next minor version. i.e 4.y -> 4.(y+1)
+	MinorVersionUpgradeUnavailable = "hive.openshift.io/minor-version-upgrade-unavailable"
 
 	// OvirtCredentialsDir is the directory containing Ovirt credentials files.
 	OvirtCredentialsDir = "/.ovirt"
@@ -525,6 +533,8 @@ const (
 	// hook that normally forbids modifying its Spec.Platform. By setting this annotation, you are taking responsibility
 	// for forcing rollout of such changes on the target cluster -- e.g. by deleting the Machines -- as the machine
 	// config operator will not do so.
+	// Not to be used (can result in thrashing) when boot image updates are in play, which may be opt-in or opt-out depending on
+	// the platform and OCP version. Please consult the documentation to verify.
 	OverrideMachinePoolPlatformAnnotation = "hive.openshift.io/override-machinepool-platform"
 
 	// MinimalInstallModeAnnotation, if set to "true" on a ClusterDeployment along with InstallerImageOverride, asks hive

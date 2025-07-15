@@ -52,12 +52,16 @@ const (
 	defaultRequeueLater = 1 * time.Minute
 )
 
-// clusterDeploymentAWSPrivateLinkConditions are the cluster deployment conditions controlled by
-// AWS private link controller
-var clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentConditionType{
-	hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
-	hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
-}
+var (
+	// clusterDeploymentAWSPrivateLinkConditions are the cluster deployment conditions controlled by
+	// AWS private link controller
+	clusterDeploymentAWSPrivateLinkConditions = []hivev1.ClusterDeploymentConditionType{
+		hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
+		hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
+	}
+
+	goodVPCEStates = sets.New("pendingAcceptance", "pending", "available")
+)
 
 // Add creates a new AWSPrivateLink Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
@@ -854,33 +858,89 @@ func (r *ReconcileAWSPrivateLink) reconcileVPCEndpoint(awsClient *awsClient,
 	tag := ec2FilterForCluster(metadata)
 	endpointLog := logger.WithField("tag:key", aws.StringValue(tag.Name)).WithField("tag:value", aws.StringValueSlice(tag.Values))
 
-	var vpcEndpoint *ec2.VpcEndpoint
-	resp, err := awsClient.hub.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
+	// The VPCE that will end up being configured and recorded in the CD status. May already exist, or may be created here.
+	var configuredVPCE *ec2.VpcEndpoint
+	// The first existing VPCE we find that's in a good state.
+	var firstGoodVPCE *ec2.VpcEndpoint
+	// The total number of VPCEs for our filter.
+	vpceCount := 0
+
+	input := &ec2.DescribeVpcEndpointsInput{
 		Filters: []*ec2.Filter{tag},
-	})
-	if err != nil {
-		endpointLog.WithError(err).Error("error getting VPC Endpoint")
-		return modified, nil, err
 	}
-	if len(resp.VpcEndpoints) == 0 {
-		modified = true
-		vpcEndpoint, err = r.createVPCEndpoint(awsClient.hub, cd, metadata, vpcEndpointService, logger)
+
+	for {
+		resp, err := awsClient.hub.DescribeVpcEndpoints(input)
 		if err != nil {
-			logger.WithError(err).Error("error creating VPC Endpoint for service")
+			endpointLog.WithError(err).Error("error getting VPC Endpoint")
 			return modified, nil, err
 		}
-	} else {
-		vpcEndpoint = resp.VpcEndpoints[0]
+
+		vpceCount += len(resp.VpcEndpoints)
+		// Only bother searching if we haven't already found the ones we're looking for
+		if firstGoodVPCE == nil || configuredVPCE == nil {
+			for _, vpce := range resp.VpcEndpoints {
+				if firstGoodVPCE == nil && goodVPCEStates.Has(*vpce.State) {
+					firstGoodVPCE = vpce
+				}
+				if configuredVPCE == nil && *vpce.VpcEndpointId == cd.Status.Platform.AWS.PrivateLink.VPCEndpointID {
+					configuredVPCE = vpce
+				}
+			}
+		}
+
+		if resp.NextToken == nil {
+			break
+		}
+		input.NextToken = resp.NextToken
+	}
+
+	// Has the previously configured VPCE gone rotten?
+	if configuredVPCE != nil && !goodVPCEStates.Has(*configuredVPCE.State) {
+		// NOTE: If the new VPCE is in a different VPC, this will also result in replacing the HostedZone (and leaking the old one!)
+		endpointLog.WithField("vpcEndpointId", *configuredVPCE.VpcEndpointId).WithField("state", *configuredVPCE.State).Warn("previously configured VPCEndpoint is in a bad state; replacing")
+		configuredVPCE = nil
+	}
+	// If we don't already have a VPCE (either never did, or it went bad), see if we found another good one already
+	if configuredVPCE == nil && firstGoodVPCE != nil {
+		endpointLog.WithField("vpcEndpointId", *firstGoodVPCE.VpcEndpointId).Info("adopting VPCEndpoint in good state")
+		configuredVPCE = firstGoodVPCE
+		modified = true
+	}
+	// If we still don't have a usable VPCE, create one
+	if configuredVPCE == nil {
+		var err error
+		endpointLog.Info("creating VPCEndpoint")
+		configuredVPCE, err = r.createVPCEndpoint(awsClient.hub, cd, metadata, vpcEndpointService, logger)
+		if err != nil {
+			logger.WithError(err).Error("error creating VPCEndpoint")
+			return modified, nil, err
+		}
+		endpointLog.WithField("vpcEndpointId", *configuredVPCE.VpcEndpointId).Info("created VPCEndpoint")
+		modified = true
+		vpceCount++ // Because we just created one
+	}
+
+	// At this point we can log the VPCE count
+	lvl := log.DebugLevel
+	if vpceCount > 1 {
+		lvl = log.WarnLevel
+	}
+	endpointLog.WithField("numVPCEndpoints", vpceCount).Log(lvl, "counted VPCEndpoints for cluster")
+
+	// If we haven't changed anything, we're done
+	if cd.Status.Platform.AWS.PrivateLink.VPCEndpointID == *configuredVPCE.VpcEndpointId {
+		return false, configuredVPCE, nil
 	}
 
 	initPrivateLinkStatus(cd)
-	cd.Status.Platform.AWS.PrivateLink.VPCEndpointID = *vpcEndpoint.VpcEndpointId
+	cd.Status.Platform.AWS.PrivateLink.VPCEndpointID = *configuredVPCE.VpcEndpointId
 	if err := r.updatePrivateLinkStatus(cd); err != nil {
 		logger.WithError(err).Error("error updating clusterdeployment status with vpcEndpointID")
 		return modified, nil, err
 	}
 
-	return modified, vpcEndpoint, nil
+	return modified, configuredVPCE, nil
 }
 
 func (r *ReconcileAWSPrivateLink) createVPCEndpoint(awsClient awsclient.Client,
@@ -1019,8 +1079,8 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 		hzID string
 		err  error
 	)
-	hzID, err = findHostedZone(awsClient, *endpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain)
-	if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
+	hzID, err = findHostedZone(awsClient, apiDomain)
+	if err != nil && errors.Is(err, errNoHostedZoneFoundForDomain) {
 		modified = true
 		hzID, err = r.createHostedZone(awsClient, cd, endpoint, apiDomain, logger)
 		if err != nil {
@@ -1042,36 +1102,24 @@ func (r *ReconcileAWSPrivateLink) ensureHostedZone(awsClient awsclient.Client,
 	return modified, hzID, nil
 }
 
-var errNoHostedZoneFoundForVPC = errors.New("no hosted zone found")
+var errNoHostedZoneFoundForDomain = errors.New("no hosted zone found")
 
-// findHostedZone finds a Private Hosted Zone for apiDomain that is associated with the given
-// VPC.
-// If no such hosted zone exists, it return an errNoHostedZoneFoundForVPC error.
-func findHostedZone(awsClient awsclient.Client, vpcID, vpcRegion, apiDomain string) (string, error) {
-	input := &route53.ListHostedZonesByVPCInput{
-		VPCId:     aws.String(vpcID),
-		VPCRegion: aws.String(vpcRegion),
-
-		MaxItems: aws.String("100"),
+// findHostedZone finds a Private Hosted Zone for apiDomain.
+// If no such hosted zone exists, it returns an errNoHostedZoneFoundForDomain error.
+func findHostedZone(awsClient awsclient.Client, apiDomain string) (string, error) {
+	resp, err := awsClient.ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
+		DNSName:  aws.String(apiDomain + "."),
+		MaxItems: aws.String("1"),
+	})
+	if err != nil {
+		return "", err
 	}
-	var nextToken *string
-	for {
-		input.NextToken = nextToken
-		resp, err := awsClient.ListHostedZonesByVPC(input)
-		if err != nil {
-			return "", err
+	for _, hz := range resp.HostedZones {
+		if strings.EqualFold(apiDomain, strings.TrimSuffix(aws.StringValue(hz.Name), ".")) {
+			return *hz.Id, nil
 		}
-		for _, summary := range resp.HostedZoneSummaries {
-			if strings.EqualFold(apiDomain, strings.TrimSuffix(aws.StringValue(summary.Name), ".")) {
-				return *summary.HostedZoneId, nil
-			}
-		}
-		if resp.NextToken == nil {
-			break
-		}
-		nextToken = resp.NextToken
 	}
-	return "", errNoHostedZoneFoundForVPC
+	return "", errNoHostedZoneFoundForDomain
 }
 
 func (r *ReconcileAWSPrivateLink) createHostedZone(awsClient awsclient.Client,

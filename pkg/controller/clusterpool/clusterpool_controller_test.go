@@ -9,21 +9,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/pkg/constants"
@@ -51,9 +51,11 @@ func TestReconcileClusterPool(t *testing.T) {
 
 	// See calculatePoolVersion. If these change, the easiest way to figure out the new value is
 	// to pull it from the test failure :)
-	initialPoolVersion := "ac2dc91b241dd33d"
-	inventoryPoolVersion := "06983eaafac7f695"
-	openstackPoolVersion := "0a55303c49151e0d"
+	initialPoolVersion := "9127d5c28667b49b"
+	inventoryPoolVersion := "576ffe9da20c8cf3"
+	inventoryAndCustomizationPoolVersion := "2f0b1beae43348b1"
+	customizationPoolVersion := "e2af66b3a60ab6a1"
+	openstackPoolVersion := "a7130cc122b079dc"
 
 	poolBuilder := testcp.FullBuilder(testNamespace, testLeasePoolName, scheme).
 		GenericOptions(
@@ -137,8 +139,13 @@ func TestReconcileClusterPool(t *testing.T) {
 		expectedUnassignedClaims           int
 		expectedAssignedCDs                int
 		expectedAssignedCDCs               map[string]string
-		expectedRunning                    int
-		expectedLabels                     map[string]string // Tested on all clusters, so will not work if your test has pre-existing cds in the pool.
+		// This will be:
+		// 2 if using inventory AND pool.Spec.CustomizationRef
+		// 1 if using one xor the other
+		// 0 if using neither
+		expectedCDCsInCDNamespaces int
+		expectedRunning            int
+		expectedLabels             map[string]string // Tested on all clusters, so will not work if your test has pre-existing cds in the pool.
 		// Map, keyed by claim name, of expected Status.Conditions['Pending'].Reason.
 		// (The clusterpool controller always sets this condition's Status to True.)
 		// Not checked if nil.
@@ -226,7 +233,41 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedInventoryValidStatus: corev1.ConditionTrue,
 			expectedPoolVersion:          inventoryPoolVersion,
 			expectedAssignedCDCs:         map[string]string{"test-cdc-1": testLeasePoolName},
+			expectedCDCsInCDNamespaces:   1,
 			expectedCDCReason:            map[string]string{"test-cdc-1": hivev1.CustomizationApplyReasonInstallationPending},
+		},
+		{
+			name: "cp with inventory and customizationRef",
+			existing: []runtime.Object{
+				inventoryPoolBuilder().Build(
+					testcp.WithSize(1),
+					testcp.WithCustomizationRef("non-inventory-cdc")),
+				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(),
+				testcdc.FullBuilder(testNamespace, "non-inventory-cdc", scheme).Build(),
+			},
+			expectedTotalClusters:        1,
+			expectedObservedSize:         0,
+			expectedObservedReady:        0,
+			expectedInventoryValidStatus: corev1.ConditionTrue,
+			expectedPoolVersion:          inventoryAndCustomizationPoolVersion,
+			expectedAssignedCDCs:         map[string]string{"test-cdc-1": testLeasePoolName},
+			expectedCDCsInCDNamespaces:   2,
+			expectedCDCReason:            map[string]string{"test-cdc-1": hivev1.CustomizationApplyReasonInstallationPending},
+		},
+		{
+			name: "cp with customizationRef",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(
+					testcp.WithSize(1),
+					testcp.WithCustomizationRef("non-inventory-cdc")),
+				testcdc.FullBuilder(testNamespace, "non-inventory-cdc", scheme).Build(),
+			},
+			expectedTotalClusters:        1,
+			expectedObservedSize:         0,
+			expectedObservedReady:        0,
+			expectedInventoryValidStatus: corev1.ConditionUnknown,
+			expectedPoolVersion:          customizationPoolVersion,
+			expectedCDCsInCDNamespaces:   1,
 		},
 		// TODO: Revise once https://issues.redhat.com/browse/HIVE-2284 solved
 		/*{
@@ -310,9 +351,10 @@ func TestReconcileClusterPool(t *testing.T) {
 				"test-cdc-1": {fmt.Sprintf("hive.openshift.io/%s", testLeasePoolName)},
 				"test-cdc-2": {"hive.openshift.io/test-cp-2"},
 			},
-			expectedTotalClusters: 1,
-			expectedPoolVersion:   inventoryPoolVersion,
-			expectError:           false,
+			expectedCDCsInCDNamespaces: 1,
+			expectedTotalClusters:      1,
+			expectedPoolVersion:        inventoryPoolVersion,
+			expectError:                false,
 		},
 		{
 			name: "cp with inventory and cdc doesn't exist is not valid - missing",
@@ -384,6 +426,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedInventoryValidStatus: corev1.ConditionTrue,
 			expectedPoolVersion:          inventoryPoolVersion,
 			expectedCDCurrentStatus:      corev1.ConditionUnknown,
+			expectedCDCsInCDNamespaces:   1,
 			expectError:                  true,
 		},
 		{
@@ -391,7 +434,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			existing: []runtime.Object{
 				inventoryPoolBuilder().Build(testcp.WithSize(1)),
 				testcdc.FullBuilder(testNamespace, "test-cdc-1", scheme).Build(
-					testcdc.WithPatch("/broken/path", "replace", "x"),
+					testcdc.WithInstallConfigPatch("/broken/path", "replace", "x"),
 				),
 			},
 			expectedTotalClusters:        0,
@@ -543,6 +586,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedPoolVersion:              inventoryPoolVersion,
 			expectedInventoryAssignmentOrder: []string{"test-cdc-successful-old"},
 			expectedAssignedCDCs:             map[string]string{"test-cdc-successful-old": ""},
+			expectedCDCsInCDNamespaces:       1,
 		},
 		{
 			name: "cp with inventory - correct prioritization - mix and multiple deployments",
@@ -567,6 +611,7 @@ func TestReconcileClusterPool(t *testing.T) {
 				"test-cdc-successful-old": "",
 				"test-cdc-unused-new":     "",
 			},
+			expectedCDCsInCDNamespaces: 1,
 		},
 
 		{
@@ -588,6 +633,7 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedPoolVersion:              inventoryPoolVersion,
 			expectedInventoryAssignmentOrder: []string{"test-cdc-successful-new"},
 			expectedAssignedCDCs:             map[string]string{"test-cdc-successful-new": ""},
+			expectedCDCsInCDNamespaces:       1,
 		},
 		{
 			name: "cp with inventory - release cdc when cd is missing",
@@ -603,9 +649,10 @@ func TestReconcileClusterPool(t *testing.T) {
 					testcdc.Reserved(),
 				),
 			},
-			expectedTotalClusters: 1,
-			expectedPoolVersion:   inventoryPoolVersion,
-			expectedAssignedCDCs:  map[string]string{"test-cdc-1": ""},
+			expectedTotalClusters:      1,
+			expectedPoolVersion:        inventoryPoolVersion,
+			expectedAssignedCDCs:       map[string]string{"test-cdc-1": ""},
+			expectedCDCsInCDNamespaces: 1,
 		},
 		{
 			name: "cp with inventory - fix cdc when cd reference exists",
@@ -1285,17 +1332,28 @@ func TestReconcileClusterPool(t *testing.T) {
 			expectedMissingDependenciesMessage: `credentials secret: secrets "aws-creds" not found`,
 			expectedCDCurrentStatus:            corev1.ConditionUnknown,
 		},
-
+		{
+			name: "missing pool-wide CDC",
+			existing: []runtime.Object{
+				initializedPoolBuilder.Build(testcp.WithSize(1), testcp.WithCustomizationRef("non-inventory-cdc")),
+			},
+			expectError:                        true,
+			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
+			expectedMissingDependenciesMessage: `pool-wide customizationRef non-inventory-cdc not found`,
+			expectPoolVersionChanged:           true,
+			expectedCDCurrentStatus:            corev1.ConditionUnknown,
+		},
 		{
 			name: "multiple missing dependents",
 			existing: []runtime.Object{
-				initializedPoolBuilder.Build(testcp.WithSize(1)),
+				initializedPoolBuilder.Build(testcp.WithSize(1), testcp.WithCustomizationRef("non-inventory-cdc")),
 			},
 			noClusterImageSet:                  true,
 			noCredsSecret:                      true,
 			expectError:                        true,
 			expectedMissingDependenciesStatus:  corev1.ConditionTrue,
-			expectedMissingDependenciesMessage: `[cluster image set: clusterimagesets.hive.openshift.io "test-image-set" not found, credentials secret: secrets "aws-creds" not found]`,
+			expectedMissingDependenciesMessage: `[cluster image set: clusterimagesets.hive.openshift.io "test-image-set" not found, credentials secret: secrets "aws-creds" not found, pool-wide customizationRef non-inventory-cdc not found]`,
+			expectPoolVersionChanged:           true,
 			expectedCDCurrentStatus:            corev1.ConditionUnknown,
 		},
 		{
@@ -2120,7 +2178,10 @@ func TestReconcileClusterPool(t *testing.T) {
 			}
 
 			var actualAssignedCDs, actualUnassignedCDs, actualRunning, actualHibernating int
+			cdNamespaces := sets.Set[string]{}
 			for _, cd := range cds.Items {
+				cdNamespaces.Insert(cd.Namespace)
+
 				poolRef := cd.Spec.ClusterPoolRef
 				if poolRef == nil || poolRef.PoolName != testLeasePoolName || poolRef.ClaimName == "" {
 					// TODO: Calling these "unassigned" isn't great. Some may not even belong to the pool.
@@ -2168,7 +2229,8 @@ func TestReconcileClusterPool(t *testing.T) {
 			err = fakeClient.List(context.Background(), claims)
 			require.NoError(t, err)
 
-			actualAssignedClaims := 0
+			// Set of namespaces of claimed clusters
+			actualAssignedClaims := sets.Set[string]{}
 			actualUnassignedClaims := 0
 			for _, claim := range claims.Items {
 				if test.expectedClaimPendingReasons != nil {
@@ -2179,27 +2241,39 @@ func TestReconcileClusterPool(t *testing.T) {
 						}
 					}
 				}
-				if claim.Spec.Namespace == "" {
+				if ns := claim.Spec.Namespace; ns == "" {
 					actualUnassignedClaims++
 				} else {
-					actualAssignedClaims++
+					actualAssignedClaims.Insert(ns)
 				}
 			}
-			assert.Equal(t, test.expectedAssignedClaims, actualAssignedClaims, "unexpected number of assigned claims")
+			assert.Equal(t, test.expectedAssignedClaims, len(actualAssignedClaims), "unexpected number of assigned claims")
 			assert.Equal(t, test.expectedUnassignedClaims, actualUnassignedClaims, "unexpected number of unassigned claims")
 
 			cdcs := &hivev1.ClusterDeploymentCustomizationList{}
+			// Get CDCs from all namespaces
 			err = fakeClient.List(context.Background(), cdcs)
 			require.NoError(t, err)
 			cdcMap := make(map[string]hivev1.ClusterDeploymentCustomization, len(cdcs.Items))
+			// Keep track of the number of CDCs in each CD namespace. In the end, these should all
+			// be the same, equal to expectedCDCsInCDNamespaces
+			cdcsInCDNamespaces := map[string]int{}
 			for _, cdc := range cdcs.Items {
+				// Ensure CDCs were copied to pool CD namespaces
+				if cdc.Namespace != pool.Namespace {
+					assert.Contains(t, cdNamespaces, cdc.Namespace, "expected CDC to have been copied to CD namespace")
+					cdcsInCDNamespaces[cdc.Namespace]++
+					continue
+				}
+
 				cdcMap[cdc.Name] = cdc
 
-				condition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
+				condition := meta.FindStatusCondition(cdc.Status.Conditions, hivev1.ApplySucceededCondition)
 				if test.expectedCDCReason != nil {
 					if reason, ok := test.expectedCDCReason[cdc.Name]; ok {
-						assert.NotNil(t, condition)
-						assert.Equal(t, reason, condition.Reason, "expected CDC status to match")
+						if assert.NotNil(t, condition) {
+							assert.Equal(t, reason, condition.Reason, "expected CDC status to match")
+						}
 					}
 				}
 
@@ -2217,13 +2291,16 @@ func TestReconcileClusterPool(t *testing.T) {
 					}
 				}
 			}
+			for ns, actualCDCsInCDNamespace := range cdcsInCDNamespaces {
+				assert.Equal(t, test.expectedCDCsInCDNamespaces, actualCDCsInCDNamespace, "unexpected number of CDCs in namespace %s", ns)
+			}
 
 			if order := test.expectedInventoryAssignmentOrder; len(order) > 0 {
 				lastTime := metav1.NewTime(nowish.Add(24 * -time.Hour))
 				for _, cdcName := range order {
 					cdc := cdcMap[cdcName]
-					condition := conditionsv1.FindStatusCondition(cdc.Status.Conditions, conditionsv1.ConditionAvailable)
-					if condition == nil || condition.Status == corev1.ConditionUnknown || condition.Status == corev1.ConditionTrue {
+					condition := meta.FindStatusCondition(cdc.Status.Conditions, "Available")
+					if condition == nil || condition.Status == metav1.ConditionUnknown || condition.Status == metav1.ConditionTrue {
 						assert.Failf(t, "expected CDC %s to be assigned", cdcName)
 					}
 					assert.True(t, lastTime.Before(&condition.LastTransitionTime) || lastTime.Equal(&condition.LastTransitionTime), "expected %s to be before %s", lastTime, condition.LastTransitionTime)

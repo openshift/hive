@@ -1,5 +1,11 @@
 package azure
 
+import (
+	"fmt"
+
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
+)
+
 // SecurityTypes represents the SecurityType of the virtual machine.
 type SecurityTypes string
 
@@ -50,6 +56,12 @@ type MachinePool struct {
 	// +optional
 	VMNetworkingType string `json:"vmNetworkingType,omitempty"`
 
+	// BootDiagnostics has the value for the storage account URI where the
+	// machine log information of the control plane is sent to.
+	// Defaults to managed for control plane if no value is mentioned.
+	// +optional
+	BootDiagnostics *BootDiagnostics `json:"bootDiagnostics,omitempty"`
+
 	// OSImage defines the image to use for the OS.
 	// +optional
 	OSImage OSImage `json:"osImage,omitempty"`
@@ -58,6 +70,16 @@ type MachinePool struct {
 	// be set for Confidential VMs and Trusted Launch for VMs.
 	// +optional
 	Settings *SecuritySettings `json:"settings,omitempty"`
+
+	// Identity is the type of identity used for the virtual machine.
+	// The type 'SystemAssigned' is an implicitly created identity.
+	// The generated identity will be assigned a Subscription contributor role.
+	// The type 'UserAssigned' is a standalone Azure resource provided by the user
+	// and assigned to the VM
+	// Identity can only be set for control-plane nodes.
+	// +kubebuilder:default=None
+	// +optional
+	Identity *VMIdentity `json:"identity,omitempty"`
 }
 
 // SecuritySettings define the security type and the UEFI settings of the virtual machine.
@@ -131,6 +153,27 @@ const (
 	VMnetworkingTypeAccelerated VMNetworkingCapability = "Accelerated"
 )
 
+// BootDiagnostics defines the option to set the collection of logs from
+// the machines created.
+type BootDiagnostics struct {
+	// Type specifies the boot diagnostics type for the machines created.
+	// Defaults as disabled for compute nodes and as managed for control plane
+	// nodes.
+	// Values allowed are Disabled, Managed and UserManaged.
+	// +kubebuilder:validation:Enum=Disabled;Managed;UserManaged
+	Type capz.BootDiagnosticsStorageAccountType `json:"type"`
+
+	// ResourceGroup specifies the name of the resource group where the
+	// storage account to be used for diagnostics storage is present.
+	// Only used if the type is set to UserManaged.
+	ResourceGroup string `json:"resourceGroup"`
+
+	// StorageAccountName specifies the storage account where the diagnostics
+	// logs need to be stored.
+	// Only used if the type is set to UserManaged.
+	StorageAccountName string `json:"storageAccountName"`
+}
+
 // Set sets the values from `required` to `a`.
 func (a *MachinePool) Set(required *MachinePool) {
 	if required == nil || a == nil {
@@ -178,8 +221,16 @@ func (a *MachinePool) Set(required *MachinePool) {
 		a.OSDisk.SecurityProfile = required.OSDisk.SecurityProfile
 	}
 
+	if required.BootDiagnostics != nil {
+		a.BootDiagnostics = required.BootDiagnostics
+	}
+
 	if required.Settings != nil {
 		a.Settings = required.Settings
+	}
+
+	if required.Identity != nil {
+		a.Identity = required.Identity
 	}
 }
 
@@ -208,4 +259,34 @@ type OSImage struct {
 	SKU string `json:"sku"`
 	// Version is the version of the image.
 	Version string `json:"version"`
+}
+
+// VMIdentity configures the identity attached to the VM.
+type VMIdentity struct {
+	// Type specifies the type of identity to be used.
+	Type capz.VMIdentity `json:"type"`
+
+	// UserAssignedIdentities is a list of identities to be attached to a node.
+	// Only one user-assigned identity may be supplied.
+	// Supplying more than one user-assigned identity is an experimental feature
+	// which may be enabled with the MachineAPIMigration feature gate.
+	UserAssignedIdentities []UserAssignedIdentity `json:"userAssignedIdentities"`
+}
+
+// UserAssignedIdentity contains the fields that comprise a user-assigned identity.
+type UserAssignedIdentity struct {
+	// Name is the name of the user-assigned identity to be assigned to the node.
+	Name string `json:"name"`
+
+	// Subscription is the subscription that contains the user-assigned identity.
+	Subscription string `json:"subscription"`
+
+	// ResourceGroup is the resource group that contains the user-assigned identity.
+	ResourceGroup string `json:"resourceGroup"`
+}
+
+// ProviderID returns the formated provider id of the user-assigned identity.
+// e.g. '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{identityName}'.
+func (i *UserAssignedIdentity) ProviderID() string {
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s", i.Subscription, i.ResourceGroup, i.Name)
 }

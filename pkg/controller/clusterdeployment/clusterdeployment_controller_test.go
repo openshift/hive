@@ -13,7 +13,6 @@ import (
 	"github.com/golang/mock/gomock"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
@@ -27,6 +26,7 @@ import (
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
 	testassert "github.com/openshift/hive/pkg/test/assert"
 	testclusterdeployment "github.com/openshift/hive/pkg/test/clusterdeployment"
+	testcdc "github.com/openshift/hive/pkg/test/clusterdeploymentcustomization"
 	testclusterdeprovision "github.com/openshift/hive/pkg/test/clusterdeprovision"
 	tcp "github.com/openshift/hive/pkg/test/clusterprovision"
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
@@ -2221,6 +2221,166 @@ platform:
 			},
 		},
 		{
+			name: "set RequirementsMet condition to False: CustomizationRefNotAvailable (Provisioning)",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.Provisioning.CustomizationRef = &corev1.LocalObjectReference{Name: "doesntexist"}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionFalse,
+						Reason: custRefNotFoundReason,
+					},
+				})
+			},
+		},
+		{
+			name: "do not set RequirementsMet condition for installed cluster with missing CustomizationRef (Provisioning)",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(
+						testInstalledClusterDeployment(time.Now()))
+					cd.Spec.Provisioning.CustomizationRef = &corev1.LocalObjectReference{Name: "doesntexist"}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
+					},
+				})
+			},
+		},
+		{
+			name: "clear RequirementsMet condition when CustomizationRef vivifies (Provisioning)",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
+					cd.Spec.Provisioning.CustomizationRef = &corev1.LocalObjectReference{Name: "cdc"}
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.RequirementsMetCondition,
+						corev1.ConditionFalse, custRefNotFoundReason, "test-message")
+					return cd
+				}(),
+				testcdc.FullBuilder(testNamespace, "cdc", scheme.GetScheme()).Build(
+					testcdc.WithManifestPatch("openshift/*.yaml", "/metadata/labels/foo", "add", "bar"),
+				),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "AllRequirementsMet",
+					},
+				})
+			},
+		},
+		{
+			name: "set RequirementsMet condition to False: CustomizationRefNotAvailable (ClusterPoolRef)",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
+					cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+						CustomizationRef: &corev1.LocalObjectReference{Name: "doesntexist"},
+					}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionFalse,
+						Reason: custRefNotFoundReason,
+					},
+				})
+			},
+		},
+		{
+			name: "do not set RequirementsMet condition for installed cluster with missing CustomizationRef (ClusterPoolRef)",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(
+						testInstalledClusterDeployment(time.Now()))
+					cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+						CustomizationRef: &corev1.LocalObjectReference{Name: "doesntexist"},
+					}
+					return cd
+				}(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionUnknown,
+						Reason: "Initialized",
+					},
+				})
+			},
+		},
+		{
+			name: "clear RequirementsMet condition when CustomizationRef vivifies (ClusterPoolRef)",
+			existing: []runtime.Object{
+				testInstallConfigSecretAWS(),
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
+					cd.Spec.ClusterPoolRef = &hivev1.ClusterPoolReference{
+						CustomizationRef: &corev1.LocalObjectReference{Name: "cdc"},
+					}
+					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.RequirementsMetCondition,
+						corev1.ConditionFalse, custRefNotFoundReason, "test-message")
+					return cd
+				}(),
+				testcdc.FullBuilder(testNamespace, "cdc", scheme.GetScheme()).Build(
+					testcdc.WithManifestPatch("openshift/*.yaml", "/metadata/labels/foo", "add", "bar"),
+				),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+			},
+			expectPendingCreation: true,
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				testassert.AssertConditions(t, cd, []hivev1.ClusterDeploymentCondition{
+					{
+						Type:   hivev1.RequirementsMetCondition,
+						Status: corev1.ConditionTrue,
+						Reason: "AllRequirementsMet",
+					},
+				})
+			},
+		},
+		{
 			name: "clear legacy conditions",
 			existing: []runtime.Object{
 				testInstallConfigSecretAWS(),
@@ -2333,9 +2493,9 @@ platform:
 				),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				testassert.AssertCDCConditions(t, getCDC(c), []conditionsv1.Condition{{
-					Type:    conditionsv1.ConditionAvailable,
-					Status:  corev1.ConditionTrue,
+				testassert.AssertCDCConditions(t, getCDC(c), []metav1.Condition{{
+					Type:    "Available",
+					Status:  metav1.ConditionTrue,
 					Reason:  "Available",
 					Message: "available",
 				}})

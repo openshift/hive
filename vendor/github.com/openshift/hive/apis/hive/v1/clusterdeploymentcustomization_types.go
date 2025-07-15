@@ -3,7 +3,6 @@ package v1
 import (
 	"fmt"
 
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,7 +29,7 @@ const (
 // ClusterDeploymentCustomization is the Schema for clusterdeploymentcustomizations API.
 // +kubebuilder:subresource:status
 // +k8s:openapi-gen=true
-// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:resource:shortName=cdc,scope=Namespaced
 type ClusterDeploymentCustomization struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -43,6 +42,27 @@ type ClusterDeploymentCustomization struct {
 type ClusterDeploymentCustomizationSpec struct {
 	// InstallConfigPatches is a list of patches to be applied to the install-config.
 	InstallConfigPatches []PatchEntity `json:"installConfigPatches,omitempty"`
+
+	// InstallerManifestPatches is a list of patches to be applied to installer-generated manifests.
+	InstallerManifestPatches []InstallerManifestPatch `json:"installerManifestPatches,omitempty"`
+}
+
+type InstallerManifestPatch struct {
+	// ManifestSelector identifies one or more manifests to patch
+	ManifestSelector ManifestSelector `json:"manifestSelector"`
+
+	// Patches is a list of RFC6902 patches to apply to manifests identified by manifestSelector.
+	Patches []PatchEntity `json:"patches"`
+}
+
+type ManifestSelector struct {
+	// Glob is a file glob (per https://pkg.go.dev/path/filepath#Glob) identifying one or more
+	// manifests. Paths should be relative to the installer's working directory. Examples:
+	// - openshift/99_role-cloud-creds-secret-reader.yaml
+	// - openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+	// - */*secret*
+	// It is an error if a glob matches zero manifests.
+	Glob string `json:"glob"`
 }
 
 // PatchEntity represents a json patch (RFC 6902) to be applied
@@ -122,11 +142,11 @@ type ClusterDeploymentCustomizationStatus struct {
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +optional
-	Conditions []conditionsv1.Condition `json:"conditions,omitempty"  patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"  patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 const (
-	ApplySucceededCondition conditionsv1.ConditionType = "ApplySucceeded"
+	ApplySucceededCondition = "ApplySucceeded"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

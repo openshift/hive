@@ -17,6 +17,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	configv1 "github.com/openshift/api/config/v1"
-	conditionsv1 "github.com/openshift/custom-resource-status/conditions/v1"
 	installertypes "github.com/openshift/installer/pkg/types"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 	"github.com/openshift/library-go/pkg/manifest"
@@ -94,6 +94,8 @@ const (
 
 	clusterImageSetNotFoundReason = "ClusterImageSetNotFound"
 	clusterImageSetFoundReason    = "ClusterImageSetFound"
+
+	custRefNotFoundReason = "CustomizationRefNotAvailable"
 
 	defaultDNSNotReadyTimeout     = 10 * time.Minute
 	dnsNotReadyReason             = "DNSNotReady"
@@ -240,6 +242,43 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 			handler.TypedEnqueueRequestForOwner[*hiveintv1alpha1.ClusterSync](mgr.GetScheme(), mgr.GetRESTMapper(), &hivev1.ClusterDeployment{})),
 	); err != nil {
 		return errors.Wrap(err, "cannot start watch on ClusterSyncs")
+	}
+
+	// Watch for changes to ClusterDeploymentCustomizations. This covers the situation where
+	// CustomizationRef is in play, but the referenced CDC is created "after" the CD. We'll list
+	// all the CDs in the same namespace as the CDC and return Request{}s for those with a
+	// CustomizationRef pointing to this CDC (which may be none).
+	cl := r.(*ReconcileClusterDeployment).Client
+	if err := c.Watch(
+		source.Kind(mgr.GetCache(), &hivev1.ClusterDeploymentCustomization{},
+			handler.TypedEnqueueRequestsFromMapFunc(
+				func(ctx context.Context, cdc *hivev1.ClusterDeploymentCustomization) []reconcile.Request {
+					cds := &hivev1.ClusterDeploymentList{}
+					if err := cl.List(context.Background(), cds, client.InNamespace(cdc.Namespace)); err != nil {
+						logger.
+							WithError(err).
+							WithField("namespace", cdc.Namespace).
+							Log(controllerutils.LogLevel(err), "failed to list ClusterDeployments in namespace")
+						return nil
+					}
+					matchingCDs := []reconcile.Request{}
+					for _, cd := range cds.Items {
+						if (cd.Spec.Provisioning != nil &&
+							cd.Spec.Provisioning.CustomizationRef != nil &&
+							cd.Spec.Provisioning.CustomizationRef.Name == cdc.Name) ||
+							(cd.Spec.ClusterPoolRef != nil &&
+								cd.Spec.ClusterPoolRef.CustomizationRef != nil &&
+								cd.Spec.ClusterPoolRef.CustomizationRef.Name == cdc.Name) {
+							matchingCDs = append(
+								matchingCDs,
+								reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&cd)},
+							)
+						}
+					}
+					return matchingCDs
+				})),
+	); err != nil {
+		return errors.Wrap(err, "cannot start watch on ClusterDeploymentCustomizations")
 	}
 
 	return nil
@@ -517,7 +556,9 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	// Set region label on the ClusterDeployment
 	if region := getClusterRegion(cd); cd.Spec.Platform.BareMetal == nil && cd.Spec.Platform.AgentBareMetal == nil &&
-		cd.Spec.Platform.None == nil && cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+		cd.Spec.Platform.None == nil && cd.Spec.Platform.Nutanix == nil &&
+		cd.Labels[hivev1.HiveClusterRegionLabel] != region {
+		// TODO: For Nutanix, consider populating the region label with the PC name (Requires querying the PC).
 
 		if cd.Labels == nil {
 			cd.Labels = make(map[string]string)
@@ -565,7 +606,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 	}
 
 	if cd.DeletionTimestamp != nil {
-
 		return r.syncDeletedClusterDeployment(cd, cdLog)
 	}
 
@@ -815,6 +855,25 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				return reconcile.Result{}, r.Status().Update(context.TODO(), cd)
 			}
 			return reconcile.Result{}, nil
+		}
+
+		// Preflight check: make sure any referenced customizations exist
+		if _, err := controllerutils.LoadManifestPatches(r, cd, cdLog); err != nil {
+			cdLog.Info("CustomizationRef specified, but failed to load ClusterDeploymentCustomization")
+			conditions, changed := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
+				cd.Status.Conditions,
+				hivev1.RequirementsMetCondition,
+				corev1.ConditionFalse,
+				custRefNotFoundReason,
+				"Customization reference could not be loaded",
+				controllerutils.UpdateConditionIfReasonOrMessageChange)
+			if changed {
+				cd.Status.Conditions = conditions
+				// This will trigger another reconcile whether it succeeds (update) or fails (error).
+				return reconcile.Result{}, r.Status().Update(context.TODO(), cd)
+			}
+			// It is important that we requeue, since we may just be waiting for the CDC to exist
+			return reconcile.Result{}, err
 		}
 
 		// If we made it this far, RequirementsMet condition should be True:
@@ -1532,9 +1591,9 @@ func (r *ReconcileClusterDeployment) releaseCustomization(cd *hivev1.ClusterDepl
 		return err
 	}
 
-	changed := conditionsv1.SetStatusConditionNoHeartbeat(&cdc.Status.Conditions, conditionsv1.Condition{
-		Type:    conditionsv1.ConditionAvailable,
-		Status:  corev1.ConditionTrue,
+	changed := meta.SetStatusCondition(&cdc.Status.Conditions, metav1.Condition{
+		Type:    "Available",
+		Status:  metav1.ConditionTrue,
 		Reason:  "Available",
 		Message: "available",
 	})
@@ -1595,12 +1654,13 @@ func (r *ReconcileClusterDeployment) ensureDNSZonePreserveOnDeleteAndLogAnnotati
 	dnsZoneNamespacedName := types.NamespacedName{Namespace: cd.Namespace, Name: controllerutils.DNSZoneName(cd.Name)}
 	logger := cdLog.WithField("zone", dnsZoneNamespacedName.String())
 	err := r.Get(context.TODO(), dnsZoneNamespacedName, dnsZone)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// DNSZone doesn't exist yet
+			return false, nil
+		}
 		logger.WithError(err).Error("failed to fetch DNS zone")
 		return false, err
-	} else if err != nil {
-		// DNSZone doesn't exist yet
-		return false, nil
 	}
 
 	changed := controllerutils.CopyLogAnnotation(cd, dnsZone)
@@ -1919,6 +1979,12 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CredentialsSecretRef: cd.Spec.Platform.IBMCloud.CredentialsSecretRef,
 			Region:               cd.Spec.Platform.IBMCloud.Region,
 			BaseDomain:           cd.Spec.BaseDomain,
+		}
+	case cd.Spec.Platform.Nutanix != nil:
+		req.Spec.Platform.Nutanix = &hivev1.NutanixClusterDeprovision{
+			CredentialsSecretRef:  cd.Spec.Platform.Nutanix.CredentialsSecretRef,
+			CertificatesSecretRef: cd.Spec.Platform.Nutanix.CertificatesSecretRef,
+			PrismCentral:          cd.Spec.Platform.Nutanix.PrismCentral,
 		}
 	default:
 		return nil, errors.New("unsupported cloud provider for deprovision")
@@ -2606,6 +2672,8 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformNone
 	case cd.Spec.Platform.Ovirt != nil:
 		return constants.PlatformOvirt
+	case cd.Spec.Platform.Nutanix != nil:
+		return constants.PlatformNutanix
 	}
 	return constants.PlatformUnknown
 }

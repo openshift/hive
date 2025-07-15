@@ -243,8 +243,6 @@ apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
   name: v1.admission.hive.openshift.io
-  annotations:
-    service.alpha.openshift.io/inject-cabundle: "true"
 spec:
   group: admission.hive.openshift.io
   groupPriorityMinimum: 1000
@@ -274,8 +272,6 @@ var _configHiveadmissionClusterdeploymentWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterdeploymentvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterdeploymentvalidators.admission.hive.openshift.io
@@ -321,8 +317,6 @@ var _configHiveadmissionClusterimagesetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterimagesetvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterimagesetvalidators.admission.hive.openshift.io
@@ -367,8 +361,6 @@ var _configHiveadmissionClusterprovisionWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: clusterprovisionvalidators.admission.hive.openshift.io
 webhooks:
 - name: clusterprovisionvalidators.admission.hive.openshift.io
@@ -498,8 +490,6 @@ var _configHiveadmissionDnszonesWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: dnszonevalidators.admission.hive.openshift.io
 webhooks:
 - name: dnszonevalidators.admission.hive.openshift.io
@@ -644,8 +634,6 @@ var _configHiveadmissionMachinepoolWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: machinepoolvalidators.admission.hive.openshift.io
 webhooks:
 - name: machinepoolvalidators.admission.hive.openshift.io
@@ -715,8 +703,6 @@ var _configHiveadmissionSelectorsyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: selectorsyncsetvalidators.admission.hive.openshift.io
 webhooks:
 - name: selectorsyncsetvalidators.admission.hive.openshift.io
@@ -816,8 +802,6 @@ var _configHiveadmissionSyncsetWebhookYaml = []byte(`---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
   name: syncsetvalidators.admission.hive.openshift.io
 webhooks:
 - name: syncsetvalidators.admission.hive.openshift.io
@@ -1714,6 +1698,11 @@ data:
       - "InvalidSubnet: Not enough IP space available in"
       installFailingReason: AWSSubnetInsufficientIPSpace
       installFailingMessage: Insufficient IP space available in subnet
+    - name: AWSSubnetTagLimitExceeded
+      searchRegexStrings:
+      - "could not add tags to subnets: TagLimitExceeded"
+      installFailingReason: AWSSubnetTagLimitExceeded
+      installFailingMessage: AWS Subnet exceeds the maximum number of tags allowed (50)
     - name: MissingPublicSubnetForZone
       searchRegexStrings:
       - "No public subnet provided for zone"

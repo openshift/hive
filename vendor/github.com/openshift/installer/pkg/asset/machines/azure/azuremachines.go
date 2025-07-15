@@ -14,9 +14,10 @@ import (
 
 	"github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/installer/pkg/asset"
+	icazure "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	"github.com/openshift/installer/pkg/asset/manifests/capiutils"
 	"github.com/openshift/installer/pkg/types"
-	"github.com/openshift/installer/pkg/types/azure"
+	aztypes "github.com/openshift/installer/pkg/types/azure"
 )
 
 const (
@@ -32,13 +33,13 @@ type MachineInput struct {
 	UseImageGallery bool
 	Private         bool
 	UserTags        map[string]string
-	Platform        *azure.Platform
+	Platform        *aztypes.Platform
 	Pool            *types.MachinePool
 }
 
 // GenerateMachines returns manifests and runtime objects to provision the control plane (including bootstrap, if applicable) nodes using CAPI.
-func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *MachineInput) ([]*asset.RuntimeFile, error) {
-	if poolPlatform := in.Pool.Platform.Name(); poolPlatform != azure.Name {
+func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *icazure.Session, in *MachineInput) ([]*asset.RuntimeFile, error) {
+	if poolPlatform := in.Pool.Platform.Name(); poolPlatform != aztypes.Name {
 		return nil, fmt.Errorf("non-Azure machine-pool: %q", poolPlatform)
 	}
 	mpool := in.Pool.Platform.Azure
@@ -58,8 +59,6 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *Machi
 		return nil, fmt.Errorf("failed to create machineapi.TagSpecifications from UserTags: %w", err)
 	}
 
-	userAssignedIdentityID := fmt.Sprintf("/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s-identity", subscriptionID, resourceGroup, clusterID)
-
 	var image *capz.Image
 	osImage := mpool.OSImage
 	galleryName := strings.ReplaceAll(clusterID, "-", "_")
@@ -74,7 +73,7 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *Machi
 					SKU:       osImage.SKU,
 				},
 				Version:         osImage.Version,
-				ThirdPartyImage: osImage.Plan != azure.ImageNoPurchasePlan,
+				ThirdPartyImage: osImage.Plan != aztypes.ImageNoPurchasePlan,
 			},
 		}
 	case in.UseImageGallery:
@@ -87,12 +86,13 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *Machi
 		image = &capz.Image{ID: &imageID}
 	default:
 		imageID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/galleries/gallery_%s/images/%s", subscriptionID, resourceGroup, galleryName, clusterID)
-		if in.HyperVGen == "V2" && in.Platform.CloudName != azure.StackCloud {
+		if in.HyperVGen == "V2" && in.Platform.CloudName != aztypes.StackCloud {
 			imageID += genV2Suffix
 		}
 		image = &capz.Image{ID: &imageID}
 	}
 
+	// Set up OSDisk
 	osDisk := capz.OSDisk{
 		OSType:     "Linux",
 		DiskSizeGB: &mpool.DiskSizeGB,
@@ -101,14 +101,29 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *Machi
 		},
 		CachingType: "ReadWrite",
 	}
-	ultrassd := mpool.UltraSSDCapability == "Enabled"
-	additionalCapabilities := &capz.AdditionalCapabilities{
-		UltraSSDEnabled: &ultrassd,
-	}
 	if in.Pool.Platform.Azure.DiskEncryptionSet != nil {
 		osDisk.ManagedDisk.DiskEncryptionSet = &capz.DiskEncryptionSetParameters{
 			ID: mpool.OSDisk.DiskEncryptionSet.ToID(),
 		}
+	}
+
+	var diskSecurityProfile capz.VMDiskSecurityProfile
+	if mpool.OSDisk.SecurityProfile != nil && mpool.OSDisk.SecurityProfile.SecurityEncryptionType != "" {
+		diskSecurityProfile = capz.VMDiskSecurityProfile{
+			SecurityEncryptionType: capz.SecurityEncryptionType(mpool.OSDisk.SecurityProfile.SecurityEncryptionType),
+		}
+
+		if mpool.OSDisk.SecurityProfile.DiskEncryptionSet != nil {
+			diskSecurityProfile.DiskEncryptionSet = &capz.DiskEncryptionSetParameters{
+				ID: mpool.OSDisk.SecurityProfile.DiskEncryptionSet.ToID(),
+			}
+		}
+		osDisk.ManagedDisk.SecurityProfile = &diskSecurityProfile
+	}
+
+	ultrassd := mpool.UltraSSDCapability == "Enabled"
+	additionalCapabilities := &capz.AdditionalCapabilities{
+		UltraSSDEnabled: &ultrassd,
 	}
 
 	machineProfile := generateSecurityProfile(mpool)
@@ -126,6 +141,44 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *Machi
 			VTpmEnabled:       ptr.To(machineProfile.Settings.TrustedLaunch.UEFISettings.VirtualizedTrustedPlatformModule == v1beta1.VirtualizedTrustedPlatformModulePolicyEnabled),
 			SecureBootEnabled: ptr.To(machineProfile.Settings.TrustedLaunch.UEFISettings.SecureBoot == v1beta1.SecureBootPolicyEnabled),
 		}
+	}
+
+	userAssignedIdentities := make([]capz.UserAssignedIdentity, len(mpool.Identity.UserAssignedIdentities))
+	for i, id := range mpool.Identity.UserAssignedIdentities {
+		userAssignedIdentities[i] = capz.UserAssignedIdentity{ProviderID: id.ProviderID()}
+	}
+
+	defaultDiag := &capz.Diagnostics{
+		Boot: &capz.BootDiagnostics{
+			StorageAccountType: capz.ManagedDiagnosticsStorage,
+		},
+	}
+
+	if in.Platform.DefaultMachinePlatform != nil && in.Platform.DefaultMachinePlatform.BootDiagnostics != nil {
+		defaultDiag.Boot.StorageAccountType = in.Platform.DefaultMachinePlatform.BootDiagnostics.Type
+		if saURI := bootDiagStorageURIBuilder(in.Platform.DefaultMachinePlatform.BootDiagnostics, session.Environment.StorageEndpointSuffix); saURI != "" {
+			defaultDiag.Boot.UserManaged = &capz.UserManagedBootDiagnostics{
+				StorageAccountURI: saURI,
+			}
+		}
+	}
+
+	var controlPlaneDiag *capz.Diagnostics
+	if mpool.BootDiagnostics != nil {
+		controlPlaneDiag = &capz.Diagnostics{
+			Boot: &capz.BootDiagnostics{
+				StorageAccountType: mpool.BootDiagnostics.Type,
+			},
+		}
+		controlPlaneDiag.Boot.StorageAccountType = mpool.BootDiagnostics.Type
+		if saURI := bootDiagStorageURIBuilder(mpool.BootDiagnostics, session.Environment.StorageEndpointSuffix); saURI != "" {
+			controlPlaneDiag.Boot.UserManaged = &capz.UserManagedBootDiagnostics{
+				StorageAccountURI: saURI,
+			}
+		}
+	}
+	if controlPlaneDiag == nil {
+		controlPlaneDiag = defaultDiag
 	}
 
 	var result []*asset.RuntimeFile
@@ -153,15 +206,12 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *Machi
 				NetworkInterfaces: []capz.NetworkInterface{
 					{
 						SubnetName:            in.Subnet,
-						AcceleratedNetworking: ptr.To(mpool.VMNetworkingType == string(azure.VMnetworkingTypeAccelerated) || mpool.VMNetworkingType == string(azure.AcceleratedNetworkingEnabled)),
+						AcceleratedNetworking: ptr.To(mpool.VMNetworkingType == string(aztypes.VMnetworkingTypeAccelerated) || mpool.VMNetworkingType == string(aztypes.AcceleratedNetworkingEnabled)),
 					},
 				},
-				Identity: capz.VMIdentityUserAssigned,
-				UserAssignedIdentities: []capz.UserAssignedIdentity{
-					{
-						ProviderID: userAssignedIdentityID,
-					},
-				},
+				Identity:               mpool.Identity.Type,
+				UserAssignedIdentities: userAssignedIdentities,
+				Diagnostics:            controlPlaneDiag,
 			},
 		}
 		azureMachine.SetGroupVersionKind(capz.GroupVersion.WithKind("AzureMachine"))
@@ -216,12 +266,9 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, in *Machi
 			AllocatePublicIP:           !in.Private,
 			AdditionalCapabilities:     additionalCapabilities,
 			SecurityProfile:            securityProfile,
-			Identity:                   capz.VMIdentityUserAssigned,
-			UserAssignedIdentities: []capz.UserAssignedIdentity{
-				{
-					ProviderID: userAssignedIdentityID,
-				},
-			},
+			Identity:                   mpool.Identity.Type,
+			Diagnostics:                controlPlaneDiag,
+			UserAssignedIdentities:     userAssignedIdentities,
 		},
 	}
 	bootstrapAzureMachine.SetGroupVersionKind(capz.GroupVersion.WithKind("AzureMachine"))
@@ -281,4 +328,12 @@ func CapzTagsFromUserTags(clusterID string, usertags map[string]string) (capz.Ta
 		tags[k] = usertags[k]
 	}
 	return tags, nil
+}
+
+func bootDiagStorageURIBuilder(diag *aztypes.BootDiagnostics, storageEndpointSuffix string) string {
+	storageAccountURI := "https://%s.blob.%s"
+	if diag.Type == capz.UserManagedDiagnosticsStorage && diag.StorageAccountName != "" {
+		return fmt.Sprintf(storageAccountURI, diag.StorageAccountName, storageEndpointSuffix)
+	}
+	return ""
 }

@@ -9,16 +9,17 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/davegardnerisme/deephash"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
-	"github.com/davegardnerisme/deephash"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
@@ -196,7 +197,19 @@ func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.Ty
 		}
 
 		var requests []reconcile.Request
+		addRequest := func(cpl *hivev1.ClusterPool) {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: cpl.Namespace,
+					Name:      cpl.Name,
+				},
+			})
+		}
 		for _, cpl := range cpList.Items {
+			if cpl.Spec.CustomizationRef != nil && cpl.Spec.CustomizationRef.Name == cdc.Name {
+				addRequest(&cpl)
+				continue
+			}
 			if cpl.Spec.Inventory == nil {
 				continue
 			}
@@ -204,12 +217,7 @@ func requestsForCDCResources(c client.Client, logger log.FieldLogger) handler.Ty
 				if entry.Name != cdc.Name {
 					continue
 				}
-				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Namespace: cpl.Namespace,
-						Name:      cpl.Name,
-					},
-				})
+				addRequest(&cpl)
 				break
 			}
 		}
@@ -535,6 +543,7 @@ func calculatePoolVersion(clp *hivev1.ClusterPool) string {
 	ba = append(ba, deephash.Hash(clp.Spec.BaseDomain)...)
 	ba = append(ba, deephash.Hash(clp.Spec.ImageSetRef)...)
 	ba = append(ba, deephash.Hash(clp.Spec.InstallConfigSecretTemplateRef)...)
+	ba = append(ba, deephash.Hash(clp.Spec.CustomizationRef)...)
 	// Inventory changes the behavior of cluster pool, thus it needs to be in the pool version.
 	// But to avoid redployment of clusters if inventory changes, a fixed string is added to pool version.
 	// https://github.com/openshift/hive/blob/master/docs/enhancements/clusterpool-inventory.md#pool-version
@@ -686,6 +695,13 @@ func (r *ReconcileClusterPool) addClusters(
 		errs = append(errs, fmt.Errorf("%s: %w", credentialsSecretDependent, err))
 	}
 
+	if clp.Spec.CustomizationRef != nil && clp.Spec.CustomizationRef.Name != "" {
+		custCDC := clp.Spec.CustomizationRef.Name
+		if cdcs.nonInventory == nil || cdcs.nonInventory.Name != custCDC {
+			errs = append(errs, fmt.Errorf("pool-wide customizationRef %s not found", custCDC))
+		}
+	}
+
 	dependenciesError := utilerrors.NewAggregate(errs)
 
 	if err := r.setMissingDependenciesCondition(clp, dependenciesError, logger); err != nil {
@@ -772,6 +788,35 @@ func (r *ReconcileClusterPool) createCluster(
 	var cd *hivev1.ClusterDeployment
 	var secret *corev1.Secret
 	var cdPos int
+	cdcCopies := []runtime.Object{}
+	copyCDC := func(cdc *hivev1.ClusterDeploymentCustomization, ref **corev1.LocalObjectReference, category string) {
+		// We could use DeepCopy(), but then we would have to scrub out things like resourceVersion.
+		// Sixes :shrug:
+		newCDC := &hivev1.ClusterDeploymentCustomization{
+			TypeMeta: cdc.TypeMeta,
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cdc.Name,
+				Namespace:   builder.Namespace,
+				Labels:      cdc.Labels,
+				Annotations: cdc.Annotations,
+			},
+			Spec: cdc.Spec,
+		}
+
+		// These will be tacked onto `objs` later
+		cdcCopies = append(cdcCopies, newCDC)
+		logger.WithFields(log.Fields{
+			"cdc":             newCDC.Name,
+			"targetNamespace": newCDC.Namespace,
+		}).Debugf("Copying %s CDC into builder namespace", category)
+
+		// Register the reference in the requested spot
+		*ref = &corev1.LocalObjectReference{Name: cdc.Name}
+		logger.WithFields(log.Fields{
+			"cdc": newCDC.Name,
+		}).Debugf("Registered %s CDC", category)
+	}
+
 	// Add the ClusterPoolRef to the ClusterDeployment, and move it to the end of the slice.
 	for i, obj := range objs {
 		if cdTmp, ok := obj.(*hivev1.ClusterDeployment); ok {
@@ -780,17 +825,27 @@ func (r *ReconcileClusterPool) createCluster(
 			poolRef := poolReference(clp)
 			cd.Spec.ClusterPoolRef = &poolRef
 			if clp.Spec.Inventory != nil {
+				// Copy the CDC to the new cluster's namespace. If it contains manifest patches,
+				// they will be applied by the provisioner.
 				cdc := cdcs.unassigned[0]
+				copyCDC(cdc, &cd.Spec.ClusterPoolRef.CustomizationRef, "inventory")
 				if cdcs.reserved[cdc.Name] != nil || cdc.Status.ClusterDeploymentRef != nil || cdc.Status.ClusterPoolRef != nil {
 					return nil, errors.Errorf("ClusterDeploymentCustomization %s is already reserved", cdc.Name)
 				}
-				cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{Name: cdc.Name}
+			}
+			// If a non-inventory CDC was requested via pool.Spec.CustomizationRef, copy it to the
+			// new cluster's namespace, and reference it from the CD, so it can be applied by the
+			// provisioner.
+			if cdcs.nonInventory != nil {
+				copyCDC(cdcs.nonInventory, &cd.Spec.Provisioning.CustomizationRef, "non-inventory")
 			}
 		} else if secretTmp := isInstallConfigSecret(obj); secretTmp != nil {
 			secret = secretTmp
 		}
 	}
 
+	// Copy in any CDCs
+	objs = append(objs, cdcCopies...)
 	if err := r.patchInstallConfig(clp, cd, secret, cdcs); err != nil {
 		return nil, err
 	}
@@ -800,7 +855,13 @@ func (r *ReconcileClusterPool) createCluster(
 	objs[cdPos], objs[lastIndex] = objs[lastIndex], objs[cdPos]
 	// Create the resources.
 	for _, obj := range objs {
-		if err := r.Client.Create(context.Background(), obj.(client.Object)); err != nil {
+		cobj := obj.(client.Object)
+		logger.WithFields(log.Fields{
+			"kind":      cobj.GetObjectKind(),
+			"namespace": cobj.GetNamespace(),
+			"name":      cobj.GetName(),
+		}).Debug("Creating clusterresource object")
+		if err := r.Client.Create(context.Background(), cobj); err != nil {
 			r.expectations.CreationObserved(poolKey)
 			return nil, err
 		}
@@ -1294,6 +1355,7 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.NetworkName = platform.Ovirt.NetworkName
 
 		return cloudBuilder, nil
+
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

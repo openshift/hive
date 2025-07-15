@@ -6,6 +6,7 @@
 - [Sample Cluster Claim](#sample-cluster-claim)
 - [Managing admins for Cluster Pools](#managing-admins-for-cluster-pools)
 - [Install Config Template](#install-config-template)
+- [Updating Cluster Pools](#updating-cluster-pools)
 - [Time-based scaling of Cluster Pool](#time-based-scaling-of-cluster-pool)
 - [ClusterPool Deletion](#clusterpool-deletion)
 - [Troubleshooting](#troubleshooting)
@@ -160,6 +161,21 @@ spec:
 ```
 
 **Note** When using ClusterPools, Hive will by default create a MachinePool for the worker nodes for any ClusterDeployments that are a child of a ClusterPool. When you use an installConfigSecretTemplate that deviates from the MachinePool defaults you will most likely want to disable MachinePools by setting spec.skipMachinePools on the ClusterPool, so that Hive does not reconcile away from the machine config specified in install-config.yaml
+
+## Updating Cluster Pools
+The ClusterPool CR can be edited like any kubernetes resource. In such cases, hive will
+automatically replace unclaimed pool clusters one at a time, oldest first. This slow refresh is
+intended to maximize availability, allowing existing workflows to continue claiming clusters
+even if they were created with the previous configuration. To effect more aggressive replacement,
+you can scale the pool to `size: 0` and back to the desired size.
+
+**NOTES:**
+- Hive will only detect changes to the ClusterPool manifest itself. Changes to artifacts referenced
+  therefrom, such as the install-config.yaml template or ImageSet, are not detected. Manual pool
+  refresh via down- and up-scaling may be desired in such cases.
+- Upgrading hive may trigger the slow refresh described above. This is a known artifact of the
+  update detection mechanism, caused by changes in the ClusterPool CRD schema, even if no explicit
+  changes are made.
 
 ## Time-based scaling of Cluster Pool
 

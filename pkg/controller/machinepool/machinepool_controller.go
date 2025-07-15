@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -51,14 +50,15 @@ import (
 )
 
 const (
-	ControllerName             = hivev1.MachinePoolControllerName
-	machinePoolNameLabel       = "hive.openshift.io/machine-pool"
-	finalizer                  = "hive.openshift.io/remotemachineset"
-	masterMachineLabelSelector = "machine.openshift.io/cluster-api-machine-type=master"
-	defaultPollInterval        = 30 * time.Minute
-	stsName                    = hivev1.DeploymentNameMachinepool
-	capiClusterKey             = "machine.openshift.io/cluster-api-cluster"
-	capiMachineSetKey          = "machine.openshift.io/cluster-api-machineset"
+	ControllerName              = hivev1.MachinePoolControllerName
+	machinePoolNameLabel        = "hive.openshift.io/machine-pool"
+	finalizer                   = "hive.openshift.io/remotemachineset"
+	masterMachineLabelSelector  = "machine.openshift.io/cluster-api-machine-type=master"
+	defaultPollInterval         = 30 * time.Minute
+	defaultErrorRequeueInterval = 1 * time.Minute
+	stsName                     = hivev1.DeploymentNameMachinepool
+	capiClusterKey              = "machine.openshift.io/cluster-api-cluster"
+	capiMachineSetKey           = "machine.openshift.io/cluster-api-machineset"
 )
 
 var (
@@ -71,6 +71,8 @@ var (
 		hivev1.NoMachinePoolNameLeasesAvailable,
 		hivev1.InvalidSubnetsMachinePoolCondition,
 		hivev1.UnsupportedConfigurationMachinePoolCondition,
+		hivev1.MachineSetsGeneratedMachinePoolCondition,
+		hivev1.SyncedMachinePoolCondition,
 	}
 )
 
@@ -367,8 +369,29 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 	generatedMachineSets, generatedMachineLabels, proceed, err := r.generateMachineSets(pool, cd, masterMachine, remoteMachineSets, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not generateMachineSets")
+		err := r.updateCondition(
+			pool,
+			hivev1.MachineSetsGeneratedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"MachineSetGenerationFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
+	}
+	if err := r.updateCondition(
+		pool,
+		hivev1.MachineSetsGeneratedMachinePoolCondition,
+		corev1.ConditionTrue,
+		"MachineSetGenerationSucceeded",
+		"MachineSets generated successfully",
+		logger,
+	); err != nil {
 		return reconcile.Result{}, err
-	} else if !proceed {
+	}
+	if !proceed {
 		logger.Info("machineSets generator indicated not to proceed, returning")
 		return reconcile.Result{}, nil
 	}
@@ -384,14 +407,56 @@ func (r *ReconcileMachinePool) reconcile(pool *hivev1.MachinePool, cd *hivev1.Cl
 	machineSets, err := r.syncMachineSets(pool, cd, generatedMachineSets, remoteMachineSets, infrastructure, remoteClusterAPIClient, logger)
 	if err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineSets")
-		return reconcile.Result{}, err
+		err := r.updateCondition(
+			pool,
+			hivev1.SyncedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"MachineSetSyncFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
 	}
+
 	if err := r.syncMachineAutoscalers(pool, cd, machineSets, remoteClusterAPIClient, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncMachineAutoscalers")
-		return reconcile.Result{}, err
+		err := r.updateCondition(
+			pool,
+			hivev1.SyncedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"MachineAutoscalerSyncFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
 	}
+
 	if err := r.syncClusterAutoscaler(pool, remoteClusterAPIClient, logger); err != nil {
 		logger.WithError(err).Log(controllerutils.LogLevel(err), "could not syncClusterAutoscaler")
+		err := r.updateCondition(
+			pool,
+			hivev1.SyncedMachinePoolCondition,
+			corev1.ConditionFalse,
+			"ClusterAutoscalerSyncFailed",
+			// WARNING: Danger of thrashing. This is why we are using a static requeueAfter.
+			err.Error(),
+			logger,
+		)
+		// NOTE: err is nil unless condition update failed, in which case immediate requeue is appropriate.
+		return reconcile.Result{RequeueAfter: defaultErrorRequeueInterval}, err
+	}
+	if err := r.updateCondition(
+		pool,
+		hivev1.SyncedMachinePoolCondition,
+		corev1.ConditionTrue,
+		"SyncSucceeded",
+		"Resources synced successfully",
+		logger,
+	); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -535,7 +600,7 @@ func (r *ReconcileMachinePool) generateMachineSets(
 		}
 	}
 
-	logger.Infof("generated %v worker machine sets", len(generatedMachineSets))
+	logger.WithField("numMachineSets", len(generatedMachineSets)).Info("generated worker machine sets")
 
 	return generatedMachineSets, generatedMachineLabels, true, nil
 }
@@ -561,40 +626,25 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 		logger.WithField("machinesets", len(generatedMachineSets)).
 			WithField("minReplicas", pool.Spec.Autoscaling.MinReplicas).
 			Warning("when auto-scaling, the MachinePool must have at least one replica for each MachineSet")
-		conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
-			pool.Status.Conditions,
+		err := r.updateCondition(
+			pool,
 			hivev1.NotEnoughReplicasMachinePoolCondition,
 			corev1.ConditionTrue,
 			"MinReplicasTooSmall",
 			fmt.Sprintf("When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least %d", len(generatedMachineSets)),
-			controllerutils.UpdateConditionIfReasonOrMessageChange,
+			logger,
 		)
-		if changed {
-			pool.Status.Conditions = conds
-			if err := r.Status().Update(context.Background(), pool); err != nil {
-				logger.WithError(err).Error("failed to update MachinePool conditions")
-				return &reconcile.Result{}, err
-			}
-		}
-		return &reconcile.Result{}, nil
+		return &reconcile.Result{}, err
 	}
-	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
-		pool.Status.Conditions,
+	err := r.updateCondition(
+		pool,
 		hivev1.NotEnoughReplicasMachinePoolCondition,
 		corev1.ConditionFalse,
 		"EnoughReplicas",
 		"The MachinePool has sufficient replicas for each MachineSet",
-		controllerutils.UpdateConditionNever,
+		logger,
 	)
-	if changed {
-		pool.Status.Conditions = conds
-		err := r.Status().Update(context.Background(), pool)
-		if err != nil {
-			logger.WithError(err).Error("failed to update MachinePool conditions")
-		}
-		return &reconcile.Result{}, err
-	}
-	return nil, nil
+	return nil, err
 }
 
 // Compare Failure Domains to confirm that they match
@@ -1274,23 +1324,6 @@ func (r *ReconcileMachinePool) createActuator(
 			},
 		}
 		return NewAWSActuator(r.Client, creds, cd.Spec.Platform.AWS.Region, pool, masterMachine, r.scheme, logger)
-	case cd.Spec.Platform.GCP != nil:
-		creds := &corev1.Secret{}
-		if err := r.Get(
-			context.TODO(),
-			types.NamespacedName{
-				Name:      cd.Spec.Platform.GCP.CredentialsSecretRef.Name,
-				Namespace: cd.Namespace,
-			},
-			creds,
-		); err != nil {
-			return nil, err
-		}
-		clusterVersion, err := getClusterVersion(cd)
-		if err != nil {
-			return nil, err
-		}
-		return NewGCPActuator(r.Client, creds, pool, clusterVersion, masterMachine, remoteMachineSets, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.Azure != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -1304,12 +1337,19 @@ func (r *ReconcileMachinePool) createActuator(
 			return nil, err
 		}
 		return NewAzureActuator(creds, cd.Spec.Platform.Azure.CloudName.Name(), logger)
-	case cd.Spec.Platform.OpenStack != nil:
-		return NewOpenStackActuator(masterMachine, r.Client, logger)
-	case cd.Spec.Platform.VSphere != nil:
-		return NewVSphereActuator(masterMachine, r.scheme, logger)
-	case cd.Spec.Platform.Ovirt != nil:
-		return NewOvirtActuator(masterMachine, r.scheme, logger)
+	case cd.Spec.Platform.GCP != nil:
+		creds := &corev1.Secret{}
+		if err := r.Get(
+			context.TODO(),
+			types.NamespacedName{
+				Name:      cd.Spec.Platform.GCP.CredentialsSecretRef.Name,
+				Namespace: cd.Namespace,
+			},
+			creds,
+		); err != nil {
+			return nil, err
+		}
+		return NewGCPActuator(r.Client, creds, pool, masterMachine, remoteMachineSets, r.scheme, r.expectations, logger)
 	case cd.Spec.Platform.IBMCloud != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(
@@ -1323,6 +1363,14 @@ func (r *ReconcileMachinePool) createActuator(
 			return nil, err
 		}
 		return NewIBMCloudActuator(creds, r.scheme, logger)
+	case cd.Spec.Platform.Nutanix != nil:
+		return NewNutanixActuator(r.Client, masterMachine)
+	case cd.Spec.Platform.Ovirt != nil:
+		return NewOvirtActuator(masterMachine, r.scheme, logger)
+	case cd.Spec.Platform.OpenStack != nil:
+		return NewOpenStackActuator(masterMachine, r.Client, logger)
+	case cd.Spec.Platform.VSphere != nil:
+		return NewVSphereActuator(masterMachine, r.scheme, logger)
 	default:
 		return nil, errors.New("unsupported platform")
 	}
@@ -1378,36 +1426,11 @@ func getClusterVersion(cd *hivev1.ClusterDeployment) (string, error) {
 }
 
 func platformAllowsZeroAutoscalingMinReplicas(cd *hivev1.ClusterDeployment) bool {
-	// Since 4.5, AWS, Azure, and GCP allow zero-sized minReplicas for autoscaling
-	if cd.Spec.Platform.AWS != nil || cd.Spec.Platform.Azure != nil || cd.Spec.Platform.GCP != nil {
+	// Zero-sized minReplicas for autoscaling are allowed since OCP:
+	// - 4.5 for AWS, Azure, and GCP
+	// - 4.7 for OpenStack
+	if cd.Spec.Platform.AWS != nil || cd.Spec.Platform.Azure != nil || cd.Spec.Platform.GCP != nil || cd.Spec.Platform.OpenStack != nil {
 		return true
-	}
-
-	// Since 4.7, OpenStack allows zero-sized minReplicas for autoscaling
-	if cd.Spec.Platform.OpenStack != nil {
-		version, ok := cd.Labels[constants.VersionLabel]
-		if !ok {
-			// can't determine whether to allow zero minReplicas
-			return false
-		}
-
-		currentVersion, err := semver.Make(version)
-		if err != nil {
-			// assume we can't set minReplicas to zero
-			return false
-		}
-
-		minimumOpenStackVersion, err := semver.Make("4.7.0")
-		if err != nil {
-			// something terrible has happened
-			return false
-		}
-
-		if currentVersion.GTE(minimumOpenStackVersion) {
-			return true
-		}
-
-		return false
 	}
 
 	return false
@@ -1452,4 +1475,29 @@ func IsErrorUpdateEvent(evt event.UpdateEvent) bool {
 	}
 
 	return false
+}
+
+func (r *ReconcileMachinePool) updateCondition(
+	pool *hivev1.MachinePool,
+	cond hivev1.MachinePoolConditionType,
+	status corev1.ConditionStatus,
+	reason, message string,
+	logger log.FieldLogger,
+) error {
+	conds, changed := controllerutils.SetMachinePoolConditionWithChangeCheck(
+		pool.Status.Conditions,
+		cond,
+		status,
+		reason,
+		message,
+		controllerutils.UpdateConditionIfReasonOrMessageChange,
+	)
+	if changed {
+		pool.Status.Conditions = conds
+		if err := r.Status().Update(context.Background(), pool); err != nil {
+			logger.WithError(err).Error("failed to update MachinePool conditions")
+			return err
+		}
+	}
+	return nil
 }

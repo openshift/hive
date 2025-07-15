@@ -34,6 +34,9 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 		total = *pool.Replicas
 	}
 
+	// Only enable config drive when using single stack IPv6
+	configDrive := isSingleStackIPv6(config.Networking.MachineNetwork)
+
 	var result []*asset.RuntimeFile
 	failureDomains := failureDomainsFromSpec(*mpool)
 	for idx := int64(0); idx < total; idx++ {
@@ -45,6 +48,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 			osImage,
 			role,
 			failureDomain,
+			&configDrive,
 		)
 		if err != nil {
 			return nil, err
@@ -68,7 +72,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 			},
 			Spec: *machineSpec,
 		}
-		openStackMachine.SetGroupVersionKind(capo.GroupVersion.WithKind("OpenStackMachine"))
+		openStackMachine.SetGroupVersionKind(capo.SchemeGroupVersion.WithKind("OpenStackMachine"))
 
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_inframachine_%s.yaml", openStackMachine.Name)},
@@ -92,7 +96,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 					DataSecretName: ptr.To(fmt.Sprintf("%s-%s", clusterID, role)),
 				},
 				InfrastructureRef: v1.ObjectReference{
-					APIVersion: capo.GroupVersion.String(),
+					APIVersion: capo.SchemeGroupVersion.String(),
 					Kind:       "OpenStackMachine",
 					Name:       openStackMachine.Name,
 				},
@@ -109,7 +113,7 @@ func GenerateMachines(clusterID string, config *types.InstallConfig, pool *types
 	return result, nil
 }
 
-func generateMachineSpec(clusterID string, platform *openstack.Platform, mpool *openstack.MachinePool, osImage string, role string, failureDomain machinev1.OpenStackFailureDomain) (*capo.OpenStackMachineSpec, error) {
+func generateMachineSpec(clusterID string, platform *openstack.Platform, mpool *openstack.MachinePool, osImage string, role string, failureDomain machinev1.OpenStackFailureDomain, configDrive *bool) (*capo.OpenStackMachineSpec, error) {
 	port := capo.PortOpts{}
 
 	addressPairs := populateAllowedAddressPairs(platform)
@@ -173,7 +177,7 @@ func generateMachineSpec(clusterID string, platform *openstack.Platform, mpool *
 	}
 
 	spec := capo.OpenStackMachineSpec{
-		Flavor: mpool.FlavorName,
+		Flavor: ptr.To(mpool.FlavorName),
 		IdentityRef: &capo.OpenStackIdentityReference{
 			Name:      clusterID + "-cloud-config",
 			CloudName: CloudName,
@@ -195,6 +199,7 @@ func generateMachineSpec(clusterID string, platform *openstack.Platform, mpool *
 		Tags: []string{
 			fmt.Sprintf("openshiftClusterID=%s", clusterID),
 		},
+		ConfigDrive: configDrive,
 	}
 
 	if role != "bootstrap" {
@@ -229,4 +234,9 @@ func populateAllowedAddressPairs(platform *openstack.Platform) []capo.AddressPai
 		addressPairs = append(addressPairs, capo.AddressPair{IPAddress: ingressVIP})
 	}
 	return addressPairs
+}
+
+// isSingleStackIPv6 returns true if the machineNetwork contains a single IPv6 CIDR.
+func isSingleStackIPv6(machineNetwork []types.MachineNetworkEntry) bool {
+	return len(machineNetwork) == 1 && machineNetwork[0].CIDR.IPNet.IP.To4() == nil
 }

@@ -16,6 +16,7 @@ import (
 	"golang.org/x/tools/go/analysis/passes/internal/analysisutil"
 	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/cfg"
+	"golang.org/x/tools/internal/analysisinternal"
 )
 
 //go:embed doc.go
@@ -48,7 +49,7 @@ var contextPackage = "context"
 // checkLostCancel analyzes a single named or literal function.
 func run(pass *analysis.Pass) (interface{}, error) {
 	// Fast path: bypass check if file doesn't use context.WithCancel.
-	if !analysisutil.Imports(pass.Pkg, contextPackage) {
+	if !analysisinternal.Imports(pass.Pkg, contextPackage) {
 		return nil, nil
 	}
 
@@ -198,7 +199,9 @@ func isContextWithCancel(info *types.Info, n ast.Node) bool {
 		return false
 	}
 	switch sel.Sel.Name {
-	case "WithCancel", "WithTimeout", "WithDeadline":
+	case "WithCancel", "WithCancelCause",
+		"WithTimeout", "WithTimeoutCause",
+		"WithDeadline", "WithDeadlineCause":
 	default:
 		return false
 	}

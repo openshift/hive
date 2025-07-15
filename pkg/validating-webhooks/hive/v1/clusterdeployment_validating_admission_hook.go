@@ -555,6 +555,21 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 			allErrs = append(allErrs, field.Required(ibmCloudPath.Child("region"), "must specify IBM region"))
 		}
 	}
+	if nutanix := platform.Nutanix; nutanix != nil {
+		numberOfPlatforms++
+		nutanixPath := path.Child("nutanix")
+		if nutanix.CredentialsSecretRef.Name == "" {
+			allErrs = append(allErrs, field.Required(nutanixPath.Child("credentialsSecretRef", "name"), "must specify secrets for Prism Central access"))
+		}
+
+		PrismCentralPath := nutanixPath.Child("prismCentral")
+		if nutanix.PrismCentral.Address == "" {
+			allErrs = append(allErrs, field.Required(PrismCentralPath.Child("address"), "must specify Prism Central address"))
+		}
+		if nutanix.PrismCentral.Port == 0 {
+			allErrs = append(allErrs, field.Required(PrismCentralPath.Child("port"), "must specify Prism Central port"))
+		}
+	}
 	if platform.BareMetal != nil {
 		numberOfPlatforms++
 	}
@@ -727,6 +742,7 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	case oldPoolRef != nil && newPoolRef != nil:
 		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.Namespace, oldPoolRef.Namespace, specPath.Child("clusterPoolRef", "namespace"))...)
 		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.PoolName, oldPoolRef.PoolName, specPath.Child("clusterPoolRef", "poolName"))...)
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.CustomizationRef, oldPoolRef.CustomizationRef, specPath.Child("clusterPoolRef", "customizationRef"))...)
 		if oldClaim := oldPoolRef.ClaimName; oldClaim != "" {
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newPoolRef.ClaimName, oldClaim, specPath.Child("clusterPoolRef", "claimName"))...)
 		}

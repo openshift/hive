@@ -1,6 +1,7 @@
 package clusterversion
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"math/rand"
@@ -166,7 +167,7 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
-	if err := r.updateClusterVersionLabels(cd, clusterVersion, cdLog); err != nil {
+	if err := r.updateClusterVersionMetadata(cd, clusterVersion, cdLog); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -181,7 +182,7 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 	return reconcile.Result{RequeueAfter: requeueAfter}, nil
 }
 
-func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
+func (r *ReconcileClusterVersion) updateClusterVersionMetadata(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
 	changed := false
 	cvoVersion := clusterVersion.Status.Desired.Version
 	if cd.Labels == nil {
@@ -211,13 +212,30 @@ func (r *ReconcileClusterVersion) updateClusterVersionLabels(cd *hivev1.ClusterD
 		changed = changed || origLen != len(cd.Labels)
 	}
 
+	upgradeableCondition := ""
+	for _, condition := range clusterVersion.Status.Conditions {
+		if condition.Type == openshiftapiv1.OperatorUpgradeable {
+			if condition.Status != openshiftapiv1.ConditionTrue {
+				upgradeableCondition = cmp.Or(condition.Message, fmt.Sprintf("%s: %s", condition.Type, condition.Status))
+			}
+			break
+		}
+	}
+	annotationValue, ok := cd.Annotations[constants.MinorVersionUpgradeUnavailable]
+	changed = changed || !ok || upgradeableCondition != annotationValue
+
+	if cd.Annotations == nil {
+		cd.Annotations = map[string]string{}
+	}
+	cd.Annotations[constants.MinorVersionUpgradeUnavailable] = upgradeableCondition
+
 	if !changed {
-		cdLog.Debug("labels have not changed, nothing to update")
+		cdLog.Debug("cluster version metadata has not changed, nothing to update")
 		return nil
 	}
 
 	if err := r.Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error update cluster deployment labels")
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating cluster deployment metadata")
 		return err
 	}
 	return nil

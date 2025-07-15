@@ -451,6 +451,8 @@ make: *** [Makefile:325: modcheck] Error 1
 ```
 In this example, address the first error by updating the version of the `require github.com/go-logr/logr` dependency in `apis/go.mod` from `v1.2.0` to `v1.2.2`.
 Repeat for the other errors until the output is clean.
+For convenience, `make modfix` will attempt to make these updates for you.
+
 Don't forget to `make vendor` when you're done to sync the vendor directories with your go.mod changes.
 
 ### Vendoring the OpenShift Installer

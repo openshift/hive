@@ -20,6 +20,7 @@ import (
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -90,7 +91,7 @@ func validAWSClusterDeployment() *hivev1.ClusterDeployment {
 	return cd
 }
 
-func validAWSClusterDeploymentFromPool(poolNS, poolName, claimName string) *hivev1.ClusterDeployment {
+func validAWSClusterDeploymentFromPool(poolNS, poolName, claimName, custName string) *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.AWS = &hivev1aws.Platform{
 		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
@@ -100,6 +101,11 @@ func validAWSClusterDeploymentFromPool(poolNS, poolName, claimName string) *hive
 		Namespace: poolNS,
 		PoolName:  poolName,
 		ClaimName: claimName,
+	}
+	if custName != "" {
+		cd.Spec.ClusterPoolRef.CustomizationRef = &corev1.LocalObjectReference{
+			Name: custName,
+		}
 	}
 	return cd
 }
@@ -134,6 +140,18 @@ func validVSphereClusterDeployment() *hivev1.ClusterDeployment {
 		Folder:                "/dc1/vm/test",
 		Cluster:               "test",
 		Network:               "Network",
+	}
+	return cd
+}
+
+func validNutanixClusterDeployment() *hivev1.ClusterDeployment {
+	cd := clusterDeploymentTemplate()
+	cd.Spec.Platform.Nutanix = &hivev1nutanix.Platform{
+		CredentialsSecretRef: corev1.LocalObjectReference{Name: "fake-creds-secret"},
+		PrismCentral: hivev1nutanix.PrismEndpoint{
+			Address: "some-prism-central.nutanix.com",
+			Port:    9440,
+		},
 	}
 	return cd
 }
@@ -296,20 +314,20 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:            "Test create with ClusterPoolReference",
-			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", ""),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test create with Claimed ClusterPoolReference",
-			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim"),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", ""),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: false,
 		},
 		{
 			name: "Test DR create (restore) with Claimed ClusterPoolReference",
 			newObject: func() *hivev1.ClusterDeployment {
-				cd := validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim")
+				cd := validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", "")
 				cd.Labels = map[string]string{constants.DisableCreationWebHookForDisasterRecovery: "true"}
 				return cd
 			}(),
@@ -318,7 +336,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		},
 		{
 			name:            "Test update with removed ClusterPoolReference",
-			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", ""),
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
 			newObject:       validAWSClusterDeployment(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
@@ -326,35 +344,56 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name:            "Test update with added ClusterPoolReference",
 			oldObject:       validAWSClusterDeployment(),
-			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", ""),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
 		{
-			name:            "Test update with modified ClusterPoolReference",
-			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", ""),
-			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "new-mypool", ""),
+			name:            "Test update with modified ClusterPoolReference Namespace",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
+			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "mypool", "", ""),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test update with modified ClusterPoolReference PoolName",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "new-mypool", "", "foo"),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test update with added ClusterPoolReference CustomizationRef",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
+			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "new-mypool", "", "foo"),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name:            "Test update with modified ClusterPoolReference CustomizationRef",
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
+			newObject:       validAWSClusterDeploymentFromPool("new-pool-ns", "new-mypool", "", "bar"),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with claimed ClusterPoolReference",
-			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", ""),
-			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim"),
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", ""),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", ""),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: true,
 		},
 		{
 			name:            "Test update with unclaimed ClusterPoolReference",
-			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim"),
-			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", ""),
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", "foo"),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "", "foo"),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
 		{
 			name:            "Test update with changed claim",
-			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim"),
-			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "other-claim"),
+			oldObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "test-claim", ""),
+			newObject:       validAWSClusterDeploymentFromPool("pool-ns", "mypool", "other-claim", ""),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
 		},
@@ -1431,6 +1470,12 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: true,
 		},
 		{
+			name:            "Nutanix create valid",
+			newObject:       validNutanixClusterDeployment(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
 			name:            "oVirt create valid",
 			newObject:       validOvirtClusterDeployment(),
 			operation:       admissionv1beta1.Create,
@@ -1448,6 +1493,36 @@ func TestClusterDeploymentValidate(t *testing.T) {
 				cd := validIBMCloudClusterDeployment()
 				cd.Spec.Provisioning.ManifestsConfigMapRef = nil
 				cd.Spec.Provisioning.ManifestsSecretRef = nil
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Nutanix create missing CredentialsSecretRef",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.CredentialsSecretRef.Name = "" // Simulating a missing required field
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Nutanix create missing PrismCentral address",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.PrismCentral.Address = "" // Simulating a missing required field
+				return cd
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: false,
+		},
+		{
+			name: "Nutanix create missing PrismCentral port",
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.PrismCentral.Port = 0 // Simulating a missing required field
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,

@@ -2,6 +2,7 @@ package createcluster
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/user"
@@ -32,6 +33,7 @@ import (
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/util/scheme"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 	"github.com/openshift/installer/pkg/validate"
 )
 
@@ -96,6 +98,7 @@ const (
 	cloudOpenStack       = "openstack"
 	cloudOVirt           = "ovirt"
 	cloudVSphere         = "vsphere"
+	cloudNutanix         = "nutanix"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -115,6 +118,7 @@ var (
 		cloudOpenStack: true,
 		cloudOVirt:     true,
 		cloudVSphere:   true,
+		cloudNutanix:   true,
 	}
 	manualCCOModeClouds = map[string]bool{
 		cloudIBM: true,
@@ -206,6 +210,7 @@ type Options struct {
 	VSphereAPIVIP           string
 	VSphereIngressVIP       string
 	VSphereNetwork          string
+	VSpherePlatformSpecJSON string
 	VSphereCACerts          string
 
 	// Ovirt
@@ -220,6 +225,19 @@ type Options struct {
 	IBMCISInstanceCRN string
 	IBMAccountID      string
 	IBMInstanceType   string
+
+	// Nutanix
+	NutanixCACerts              string
+	NutanixPrismCentralEndpoint string
+	NutanixPrismCentralPort     int32
+	NutanixPrismElementAddress  string
+	NutanixPrismElementName     string
+	NutanixPrismElementPort     int32
+	NutanixPrismElementUUID     string
+	NutanixAPIVIP               string
+	NutanixIngressVIP           string
+	NutanixSubnetUUIDs          []string
+	NutanixAzName               string
 
 	homeDir string
 	log     log.FieldLogger
@@ -365,7 +383,21 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.VSphereAPIVIP, "vsphere-api-vip", "", "Virtual IP address for the api endpoint")
 	flags.StringVar(&opt.VSphereIngressVIP, "vsphere-ingress-vip", "", "Virtual IP address for ingress application routing")
 	flags.StringVar(&opt.VSphereNetwork, "vsphere-network", "", "Name of the network to be used by the cluster")
+	flags.StringVar(&opt.VSpherePlatformSpecJSON, "vsphere-platform-spec-json", "", "Installer vsphere platform spec, encoded as JSON")
 	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
+
+	// Nutanix
+	flags.StringVar(&opt.NutanixPrismCentralEndpoint, constants.CliNutanixPcAddressOpt, "", "Domain name or IP address of the Nutanix Prism Central endpoint")
+	flags.Int32Var(&opt.NutanixPrismCentralPort, constants.CliNutanixPcPortOpt, 0, "Port of the Nutanix Prism Central endpoint")
+	flags.StringVar(&opt.NutanixPrismElementAddress, constants.CliNutanixPeAddressOpt, "", "Domain name or IP address of the Nutanix Prism Element endpoint")
+	flags.StringVar(&opt.NutanixPrismElementName, constants.CliNutanixPeNameOpt, "", "Name of the Nutanix Prism Element endpoint")
+	flags.Int32Var(&opt.NutanixPrismElementPort, constants.CliNutanixPePortOpt, 0, "Port of the Nutanix Prism Element endpoint")
+	flags.StringVar(&opt.NutanixPrismElementUUID, constants.CliNutanixPeUUIDOpt, "", "UUID of the Nutanix Prism Element endpoint")
+	flags.StringVar(&opt.NutanixAPIVIP, constants.CliNutanixApiVipOpt, "", "Virtual IP address for the api endpoint")
+	flags.StringVar(&opt.NutanixIngressVIP, constants.CliNutanixIngressVipOpt, "", "Virtual IP address for ingress application routing")
+	flags.StringVar(&opt.NutanixAzName, constants.CliNutanixAzNameOpt, "", "Name of the Prism Element Availability Zone")
+	flags.StringSliceVar(&opt.NutanixSubnetUUIDs, constants.CliNutanixSubnetUUIDOpt, []string{}, "List of network subnets to be used by the cluster")
+	flags.StringVar(&opt.NutanixCACerts, constants.CliNutanixCACertsOpt, "", "Path to a PEM-encoded CA certificate file used to verify the Nutanix endpoint's TLS certificates")
 
 	// oVirt flags
 	flags.StringVar(&opt.OvirtClusterID, "ovirt-cluster-id", "", "The oVirt cluster id (uuid) under which all VMs will run")
@@ -758,21 +790,51 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		if o.VSphereDatacenter != "" {
 			vSphereDatacenter = o.VSphereDatacenter
 		}
-		if vSphereDatacenter == "" {
-			return nil, fmt.Errorf("must provide --vsphere-datacenter or set %s env var", constants.VSphereDataCenterEnvVar)
-		}
 
 		vSphereDatastore := os.Getenv(constants.VSphereDataStoreEnvVar)
 		if o.VSphereDefaultDataStore != "" {
 			vSphereDatastore = o.VSphereDefaultDataStore
 		}
-		if vSphereDatastore == "" {
-			return nil, fmt.Errorf("must provide --vsphere-default-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
-		}
 
 		vSphereVCenter := os.Getenv(constants.VSphereVCenterEnvVar)
 		if o.VSphereVCenter != "" {
 			vSphereVCenter = o.VSphereVCenter
+		}
+
+		vSphereFolder := o.VSphereFolder
+		vSphereCluster := o.VSphereCluster
+		vSphereAPIVIP := o.VSphereAPIVIP
+		vSphereIngressVIP := o.VSphereIngressVIP
+
+		platformBytes := []byte(os.Getenv(constants.VSpherePlatformSpecJSONEnvVar))
+		if o.VSpherePlatformSpecJSON != "" {
+			platformBytes = []byte(o.VSpherePlatformSpecJSON)
+		}
+
+		if len(platformBytes) > 0 {
+			o.log.Info("using provided installer platform spec instead of other flags for vsphere (size: %v)", len(platformBytes))
+			platform := installervsphere.Platform{}
+			err = json.Unmarshal(platformBytes, &platform)
+			if err != nil {
+				return nil, fmt.Errorf("error decoding platform %s: %w", o.VSpherePlatformSpecJSON, err)
+			}
+
+			vSphereVCenter = platform.VCenters[0].Server
+			vSphereDatacenter = platform.VCenters[0].Datacenters[0]
+			if vSphereDatacenter == "" {
+				vSphereDatacenter = platform.FailureDomains[0].Topology.Datacenter
+			}
+			vSphereDatastore = platform.FailureDomains[0].Topology.Datastore
+			vSphereFolder = platform.FailureDomains[0].Topology.Folder
+			vSphereCluster = platform.FailureDomains[0].Topology.ComputeCluster
+			vSphereNetwork = platform.FailureDomains[0].Topology.Networks[0]
+		}
+
+		if vSphereDatacenter == "" {
+			return nil, fmt.Errorf("must provide --vsphere-datacenter or set %s env var", constants.VSphereDataCenterEnvVar)
+		}
+		if vSphereDatastore == "" {
+			return nil, fmt.Errorf("must provide --vsphere-default-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
 		}
 		if vSphereVCenter == "" {
 			return nil, fmt.Errorf("must provide --vsphere-vcenter or set %s env var", constants.VSphereVCenterEnvVar)
@@ -784,10 +846,10 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			Password:         vspherePassword,
 			Datacenter:       vSphereDatacenter,
 			DefaultDatastore: vSphereDatastore,
-			Folder:           o.VSphereFolder,
-			Cluster:          o.VSphereCluster,
-			APIVIP:           o.VSphereAPIVIP,
-			IngressVIP:       o.VSphereIngressVIP,
+			Folder:           vSphereFolder,
+			Cluster:          vSphereCluster,
+			APIVIP:           vSphereAPIVIP,
+			IngressVIP:       vSphereIngressVIP,
 			Network:          vSphereNetwork,
 			CACert:           bytes.Join(caCerts, []byte("\n")),
 		}
@@ -829,6 +891,11 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			InstanceType: o.IBMInstanceType,
 		}
 		builder.CloudBuilder = ibmCloudProvider
+	case cloudNutanix:
+		builder.CloudBuilder, err = o.getNutanixCloudBuilder()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if o.Internal {

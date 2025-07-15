@@ -137,31 +137,19 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 	}
 
 	if hzID == "" { // since we don't have the hz ID, we try to discover it to prevent leaks
+		idLog := logger.WithField("infraID", metadata.InfraID)
 		apiDomain, err := initialURL(r.Client,
 			client.ObjectKey{Namespace: cd.Namespace, Name: metadata.AdminKubeconfigSecretRef.Name}) // HIVE-2485 ✓
 		if apierrors.IsNotFound(err) {
-			logger.Info("no hostedZoneID in status and admin kubeconfig does not exist, skipping hosted zone cleanup")
+			idLog.Info("no hostedZoneID in status and admin kubeconfig does not exist, skipping hosted zone cleanup")
 			return nil
 		} else if err != nil {
-			logger.WithError(err).Error("could not get API URL from kubeconfig")
+			idLog.WithError(err).Error("could not get API URL from kubeconfig")
 			return err
 		}
 
-		idLog := logger.WithField("infraID", metadata.InfraID)
-		endpointResp, err := awsClient.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-			Filters: []*ec2.Filter{ec2FilterForCluster(metadata)},
-		})
-		if err != nil {
-			idLog.WithError(err).Error("error getting the VPC Endpoint")
-			return err
-		}
-		if len(endpointResp.VpcEndpoints) == 0 {
-			return nil // no work
-		}
-
-		vpcEndpoint := endpointResp.VpcEndpoints[0]
-		hzID, err = findHostedZone(awsClient, *vpcEndpoint.VpcId, cd.Spec.Platform.AWS.Region, apiDomain)
-		if err != nil && errors.Is(err, errNoHostedZoneFoundForVPC) {
+		hzID, err = findHostedZone(awsClient, apiDomain)
+		if err != nil && errors.Is(err, errNoHostedZoneFoundForDomain) {
 			return nil // no work
 		}
 		if err != nil {

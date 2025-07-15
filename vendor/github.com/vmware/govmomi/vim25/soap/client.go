@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2023 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2024 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -86,7 +86,11 @@ type Client struct {
 	Types     types.Func `json:"types"`
 	UserAgent string     `json:"userAgent"`
 
-	cookie          string
+	// Cookie returns a value for the SOAP Header.Cookie.
+	// This SOAP request header is used for authentication by
+	// API endpoints such as pbm, vslm and sms.
+	// When nil, no SOAP Header.Cookie is set.
+	Cookie          func() *HeaderElement
 	insecureCookies bool
 
 	useJSON bool
@@ -135,20 +139,31 @@ func ParseURL(s string) (*url.URL, error) {
 	return u, nil
 }
 
+// Go's ForceAttemptHTTP2 default is true, we disable by default.
+// This undocumented env var can be used to enable.
+var http2 = os.Getenv("GOVMOMI_HTTP2") == "true"
+
 func NewClient(u *url.URL, insecure bool) *Client {
 	var t *http.Transport
 
 	if d, ok := http.DefaultTransport.(*http.Transport); ok {
-		t = d.Clone()
+		// Inherit the same defaults explicitly set in http.DefaultTransport,
+		// unless otherwise noted.
+		t = &http.Transport{
+			Proxy:                 d.Proxy,
+			DialContext:           d.DialContext,
+			ForceAttemptHTTP2:     http2, // false by default in govmomi
+			MaxIdleConns:          d.MaxIdleConns,
+			IdleConnTimeout:       d.IdleConnTimeout,
+			TLSHandshakeTimeout:   d.TLSHandshakeTimeout,
+			ExpectContinueTimeout: d.ExpectContinueTimeout,
+		}
 	} else {
 		t = new(http.Transport)
 	}
 
-	if insecure {
-		if t.TLSClientConfig == nil {
-			t.TLSClientConfig = new(tls.Config)
-		}
-		t.TLSClientConfig.InsecureSkipVerify = insecure
+	t.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: insecure,
 	}
 
 	c := newClientWithTransport(u, insecure, t)
@@ -199,6 +214,16 @@ func (c *Client) NewServiceClient(path string, namespace string) *Client {
 	return c.newServiceClientWithTransport(path, namespace, c.t)
 }
 
+// SessionCookie returns a SessionCookie with value of the vmware_soap_session http.Cookie.
+func (c *Client) SessionCookie() *HeaderElement {
+	for _, cookie := range c.Jar.Cookies(c.URL()) {
+		if cookie.Name == SessionCookieName {
+			return &HeaderElement{Value: cookie.Value}
+		}
+	}
+	return nil
+}
+
 func (c *Client) newServiceClientWithTransport(path string, namespace string, t *http.Transport) *Client {
 	vc := c.URL()
 	u, err := url.Parse(path)
@@ -222,14 +247,6 @@ func (c *Client) newServiceClientWithTransport(path string, namespace string, t 
 
 	// Copy the cookies
 	client.Client.Jar.SetCookies(u, c.Client.Jar.Cookies(u))
-
-	// Set SOAP Header cookie
-	for _, cookie := range client.Jar.Cookies(u) {
-		if cookie.Name == SessionCookieName {
-			client.cookie = cookie.Value
-			break
-		}
-	}
 
 	// Copy any query params (e.g. GOVMOMI_TUNNEL_PROXY_PORT used in testing)
 	client.u.RawQuery = vc.RawQuery
@@ -707,8 +724,10 @@ func (c *Client) soapRoundTrip(ctx context.Context, reqBody, resBody HasFault) e
 		h.ID = id
 	}
 
-	h.Cookie = c.cookie
-	if h.Cookie != "" || h.ID != "" || h.Security != nil {
+	if c.Cookie != nil {
+		h.Cookie = c.Cookie()
+	}
+	if h.Cookie != nil || h.ID != "" || h.Security != nil {
 		reqEnv.Header = &h // XML marshal header only if a field is set
 	}
 

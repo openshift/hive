@@ -3,7 +3,7 @@ package utils
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -251,4 +252,45 @@ func InstallCerts(sourceDir string) {
 		logger.WithError(err).WithField("output", string(b)).Fatal("failed to copy certs")
 	}
 	logger.WithField("output", string(b)).Info("copied certs")
+}
+
+// BuildCertBundleFromDir reads all non-directory files from the specified directory,
+// assuming each file contains PEM-encoded certificate data, and concatenates their contents
+// into a single string, separated by newlines.
+// This is used to construct a trust bundle from a directory containing multiple
+// certificate files
+func BuildCertBundleFromDir(dir string) (string, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to list cert directory %s", dir)
+	}
+
+	if len(files) == 0 {
+		return "", errors.Errorf("no cert files found in directory %s", dir)
+	}
+
+	var bundle strings.Builder
+	for i, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, file.Name())
+		certData, err := os.ReadFile(path)
+		if err != nil {
+			return "", errors.Wrapf(err, "error reading certificate file %s", file.Name())
+		}
+
+		// Validate PEM block
+		block, _ := pem.Decode(certData)
+		if block == nil || block.Type != "CERTIFICATE" {
+			return "", errors.Errorf("file %s does not contain a valid PEM certificate", file.Name())
+		}
+
+		if i > 0 {
+			bundle.WriteString("\n")
+		}
+		bundle.Write(certData)
+	}
+
+	return bundle.String(), nil
 }

@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -35,13 +36,8 @@ var invalidResourceGroupKinds = map[string]map[string]bool{
 	},
 }
 
-var validPatchTypes = map[string]bool{
-	"json":      true,
-	"merge":     true,
-	"strategic": true,
-}
-
-var validPatchTypeSlice = []string{"json", "merge", "strategic"}
+// HIVE-2807: "" is defaulted to "strategic" in code.
+var validPatchTypes = sets.New("", "json", "merge", "strategic")
 
 var (
 	validResourceApplyModes = map[hivev1.SyncSetResourceApplyMode]bool{
@@ -265,8 +261,8 @@ func validatePatches(patches []hivev1.SyncObjectPatch, fldPath *field.Path) fiel
 	allErrs := field.ErrorList{}
 
 	for i, patch := range patches {
-		if !validPatchTypes[patch.PatchType] {
-			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("PatchType"), patch.PatchType, validPatchTypeSlice))
+		if !validPatchTypes.Has(patch.PatchType) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Index(i).Child("PatchType"), patch.PatchType, sets.List(validPatchTypes)))
 		}
 	}
 	return allErrs

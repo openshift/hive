@@ -1,3 +1,55 @@
+## v2.5.0 (2025-02-11)
+
+* [GH-3278](https://github.com/gophercloud/gophercloud/pull/3278) [v2] test: Ensure that randomly created secgroup rules don't conflict
+* [GH-3287](https://github.com/gophercloud/gophercloud/pull/3287) [v2] Fix panic in ExtractIntoStructPtr
+* [GH-3288](https://github.com/gophercloud/gophercloud/pull/3288) [v2] Fix JSON field name hints in APIVersion structs
+* [GH-3292](https://github.com/gophercloud/gophercloud/pull/3292) [v2] Add permissions to the label-issue workflow
+* [GH-3294](https://github.com/gophercloud/gophercloud/pull/3294) [v2] Add support for zone sharing in DNS v2
+* [GH-3296](https://github.com/gophercloud/gophercloud/pull/3296) build(deps): bump golang.org/x/crypto from 0.30.0 to 0.31.0
+* [GH-3297](https://github.com/gophercloud/gophercloud/pull/3297) [v2] build(deps): bump golang.org/x/crypto from 0.31.0 to 0.32.0
+* [GH-3298](https://github.com/gophercloud/gophercloud/pull/3298) [v2] build(deps): bump golang.org/x/crypto from 0.32.0 to 0.33.0
+
+## v2.4.0 (2024-12-18)
+
+* [GH-3270](https://github.com/gophercloud/gophercloud/pull/3270) [v2] SG rules: implement bulk create
+* [GH-3273](https://github.com/gophercloud/gophercloud/pull/3273) [v2] Add missing fields in Objectstorage and compute API
+
+## v2.3.0 (2024-12-06)
+
+* [GH-3213](https://github.com/gophercloud/gophercloud/pull/3213) [v2] Handle nova api version > 2.87 for hypervisor
+* [GH-3236](https://github.com/gophercloud/gophercloud/pull/3236) [v2] Added required fields for Node API Parity
+* [GH-3248](https://github.com/gophercloud/gophercloud/pull/3248) [v2] Add support for disable_power_off
+* [GH-3261](https://github.com/gophercloud/gophercloud/pull/3261) [v2] Misc cleanups
+* [GH-3262](https://github.com/gophercloud/gophercloud/pull/3262) [v2] Address govet 1.24 issue
+
+## v2.2.0 (2024-10-18)
+
+* [GH-3176](https://github.com/gophercloud/gophercloud/pull/3176) [v2] [containerinfra]: add "MasterLBEnabled" in Cluster results
+* [GH-3181](https://github.com/gophercloud/gophercloud/pull/3181) [v2] octavia: add new options to health monitors
+* [GH-3182](https://github.com/gophercloud/gophercloud/pull/3182) [v2] octavia: add new security options to pools and listeners
+* [GH-3195](https://github.com/gophercloud/gophercloud/pull/3195) [v2] [core]: handle empty response body
+* [GH-3196](https://github.com/gophercloud/gophercloud/pull/3196) [v2] [fwaas_v2]: proper ParseResponse handling
+* [GH-3198](https://github.com/gophercloud/gophercloud/pull/3198) [v2] compute: Fix expected and actual test results
+* [GH-3199](https://github.com/gophercloud/gophercloud/pull/3199) [v2] [octavia] add an ability to filter flavors and flavorprofiles
+* [GH-3214](https://github.com/gophercloud/gophercloud/pull/3214) [v2] [manila] add scheduler_hints to the shares CreateOpts
+* [GH-3215](https://github.com/gophercloud/gophercloud/pull/3215) [v2] [manila] add share_group_id to share's CreateOpts
+* [GH-3219](https://github.com/gophercloud/gophercloud/pull/3219) [v2] docs: Remove outdated godoc
+
+## v2.1.1 (2024-09-18)
+
+* [GH-3161](https://github.com/gophercloud/gophercloud/pull/3161) [v2] fix: create security group rule with any protocol
+
+## v2.1.0 (2024-07-24)
+
+* [GH-3078](https://github.com/gophercloud/gophercloud/pull/3078) [networking]: add BGP VPNs support
+* [GH-3086](https://github.com/gophercloud/gophercloud/pull/3086) build(deps): bump golang.org/x/crypto from 0.24.0 to 0.25.0
+* [GH-3090](https://github.com/gophercloud/gophercloud/pull/3090) Adding support for  field dns_publish_fixed_ip in a subnet
+* [GH-3092](https://github.com/gophercloud/gophercloud/pull/3092) [neutron]: introduce Stateful argument for the security groups
+* [GH-3094](https://github.com/gophercloud/gophercloud/pull/3094) [neutron]: introduce Description argument for the portforwarding
+* [GH-3106](https://github.com/gophercloud/gophercloud/pull/3106) clouds: Parse trust_id from clouds.yaml
+* [GH-3131](https://github.com/gophercloud/gophercloud/pull/3131) Align ServiceFail provisioning state value with Ironic
+* [GH-3136](https://github.com/gophercloud/gophercloud/pull/3136) Added node.Retired
+
 ## v2.0.0 (2024-05-27)
 
 MAIN BREAKING CHANGES:

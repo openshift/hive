@@ -393,11 +393,11 @@ func TestGCPActuator(t *testing.T) {
 					// UserTags
 					if eTags := platform.UserTags; len(eTags) != 0 {
 						if aTags := gcpProvider.ResourceManagerTags; assert.Equal(t, len(eTags), len(aTags), "unexpected number of userTags") {
-							uta := make([]string, len(eTags))
+							uta := make([]string, 0, len(eTags))
 							for _, ut := range eTags {
 								uta = append(uta, fmt.Sprintf("%s|%s|%s", ut.ParentID, ut.Key, ut.Value))
 							}
-							rmta := make([]string, len(aTags))
+							rmta := make([]string, 0, len(aTags))
 							for _, rmt := range aTags {
 								rmta = append(rmta, fmt.Sprintf("%s|%s|%s", rmt.ParentID, rmt.Key, rmt.Value))
 							}
@@ -766,55 +766,21 @@ func TestObtainLeaseChar(t *testing.T) {
 func TestRequireLeases(t *testing.T) {
 	cases := []struct {
 		name            string
-		clusterVersion  string
 		machineSetNames []string
 		expectedResult  bool
 	}{
 		{
-			name:           "before 4.4.7",
-			clusterVersion: "4.4.6",
-			expectedResult: true,
-		},
-		{
-			name:           "4.4.7",
-			clusterVersion: "4.4.7",
-			expectedResult: false,
-		},
-		{
-			name:           "after 4.4.7",
-			clusterVersion: "4.4.8",
-			expectedResult: false,
-		},
-		{
-			name:           "4.5",
-			clusterVersion: "4.5.0",
-			expectedResult: false,
-		},
-		{
-			name:           "after 4.5",
-			clusterVersion: "4.6.0",
-			expectedResult: false,
-		},
-		{
-			name:           "invalid version",
-			clusterVersion: "bad-version",
-			expectedResult: false,
-		},
-		{
 			name:            "worker machine pool",
-			clusterVersion:  "4.5.0",
 			machineSetNames: []string{"cluster-id-worker-a", "cluster-id-worker-b"},
 			expectedResult:  false,
 		},
 		{
 			name:            "w machine pool",
-			clusterVersion:  "4.5.0",
 			machineSetNames: []string{"cluster-id-w-a", "cluster-id-w-a"},
 			expectedResult:  true,
 		},
 		{
 			name:            "worker and w machine pools",
-			clusterVersion:  "4.5.0",
 			machineSetNames: []string{"cluster-id-worker-a", "cluster-id-worker-a", "cluster-id-w-a", "cluster-id-w-a"},
 			expectedResult:  false,
 		},
@@ -825,7 +791,7 @@ func TestRequireLeases(t *testing.T) {
 			for i, n := range tc.machineSetNames {
 				machineSets[i].Name = n
 			}
-			actualResult := requireLeases(tc.clusterVersion, machineSets, log.WithFields(nil))
+			actualResult := requireLeases(machineSets, log.WithFields(nil))
 			assert.Equal(t, tc.expectedResult, actualResult)
 		})
 	}

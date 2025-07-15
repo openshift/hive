@@ -7,7 +7,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: checkpoints.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -91,7 +91,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterclaims.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -288,7 +288,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterdeploymentcustomizations.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -296,6 +296,8 @@ objects:
       kind: ClusterDeploymentCustomization
       listKind: ClusterDeploymentCustomizationList
       plural: clusterdeploymentcustomizations
+      shortNames:
+      - cdc
       singular: clusterdeploymentcustomization
     scope: Namespaced
     versions:
@@ -376,6 +378,81 @@ objects:
                     - path
                     type: object
                   type: array
+                installerManifestPatches:
+                  description: InstallerManifestPatches is a list of patches to be
+                    applied to installer-generated manifests.
+                  items:
+                    properties:
+                      manifestSelector:
+                        description: ManifestSelector identifies one or more manifests
+                          to patch
+                        properties:
+                          glob:
+                            description: 'Glob is a file glob (per https://pkg.go.dev/path/filepath#Glob)
+                              identifying one or more
+
+                              manifests. Paths should be relative to the installer''s
+                              working directory. Examples:
+
+                              - openshift/99_role-cloud-creds-secret-reader.yaml
+
+                              - openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+
+                              - */*secret*
+
+                              It is an error if a glob matches zero manifests.'
+                            type: string
+                        required:
+                        - glob
+                        type: object
+                      patches:
+                        description: Patches is a list of RFC6902 patches to apply
+                          to manifests identified by manifestSelector.
+                        items:
+                          description: PatchEntity represents a json patch (RFC 6902)
+                            to be applied
+                          properties:
+                            from:
+                              description: From is the json path to copy or move the
+                                value from
+                              type: string
+                            op:
+                              description: Op is the operation to perform.
+                              enum:
+                              - add
+                              - remove
+                              - replace
+                              - move
+                              - copy
+                              - test
+                              type: string
+                            path:
+                              description: Path is the json path to the value to be
+                                modified
+                              type: string
+                            value:
+                              description: 'Value is the *string* value to be used
+                                in the operation. For more complex values, use
+
+                                ValueJSON.'
+                              type: string
+                            valueJSON:
+                              description: 'ValueJSON is a string representing a JSON
+                                object to be used in the operation. As such,
+
+                                internal quotes must be escaped. If nonempty, Value
+                                is ignored.'
+                              type: string
+                          required:
+                          - op
+                          - path
+                          type: object
+                        type: array
+                    required:
+                    - manifestSelector
+                    - patches
+                    type: object
+                  type: array
               type: object
             status:
               description: ClusterDeploymentCustomizationStatus defines the observed
@@ -425,27 +502,70 @@ objects:
                   description: Conditions describes the state of the operator's reconciliation
                     functionality.
                   items:
-                    description: 'Condition represents the state of the operator''s
-
-                      reconciliation functionality.'
+                    description: Condition contains details for one aspect of the
+                      current state of this API Resource.
                     properties:
-                      lastHeartbeatTime:
-                        format: date-time
-                        type: string
                       lastTransitionTime:
+                        description: 'lastTransitionTime is the last time the condition
+                          transitioned from one status to another.
+
+                          This should be when the underlying condition changed.  If
+                          that is not known, then using the time when the API field
+                          changed is acceptable.'
                         format: date-time
                         type: string
                       message:
+                        description: 'message is a human readable message indicating
+                          details about the transition.
+
+                          This may be an empty string.'
+                        maxLength: 32768
                         type: string
+                      observedGeneration:
+                        description: 'observedGeneration represents the .metadata.generation
+                          that the condition was set based upon.
+
+                          For instance, if .metadata.generation is currently 12, but
+                          the .status.conditions[x].observedGeneration is 9, the condition
+                          is out of date
+
+                          with respect to the current state of the instance.'
+                        format: int64
+                        minimum: 0
+                        type: integer
                       reason:
+                        description: 'reason contains a programmatic identifier indicating
+                          the reason for the condition''s last transition.
+
+                          Producers of specific condition types may define expected
+                          values and meanings for this field,
+
+                          and whether the values are considered a guaranteed API.
+
+                          The value should be a CamelCase string.
+
+                          This field may not be empty.'
+                        maxLength: 1024
+                        minLength: 1
+                        pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                         type: string
                       status:
+                        description: status of the condition, one of True, False,
+                          Unknown.
+                        enum:
+                        - 'True'
+                        - 'False'
+                        - Unknown
                         type: string
                       type:
-                        description: ConditionType is the state of the operator's
-                          reconciliation functionality.
+                        description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        maxLength: 316
+                        pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                         type: string
                     required:
+                    - lastTransitionTime
+                    - message
+                    - reason
                     - status
                     - type
                     type: object
@@ -469,7 +589,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterdeployments.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -1473,6 +1593,205 @@ objects:
 
                         https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html'
                       type: object
+                    nutanix:
+                      description: Nutanix is the configuration used when installing
+                        on Nutanix Prism Central.
+                      properties:
+                        certificatesSecretRef:
+                          description: 'CertificatesSecretRef refers to a secret that
+                            contains the Prism Central CA certificates
+
+                            necessary for communicating with the Prism Central.'
+                          properties:
+                            name:
+                              default: ''
+                              description: 'Name of the referent.
+
+                                This field is effectively required, but due to backwards
+                                compatibility is
+
+                                allowed to be empty. Instances of this type with an
+                                empty value here are
+
+                                almost certainly wrong.
+
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        credentialsSecretRef:
+                          description: 'CredentialsSecretRef refers to a secret that
+                            contains the Nutanix account access
+
+                            credentials.'
+                          properties:
+                            name:
+                              default: ''
+                              description: 'Name of the referent.
+
+                                This field is effectively required, but due to backwards
+                                compatibility is
+
+                                allowed to be empty. Instances of this type with an
+                                empty value here are
+
+                                almost certainly wrong.
+
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        failureDomains:
+                          description: 'FailureDomains configures failure domains
+                            for the Nutanix platform.
+
+                            Required for using MachinePools'
+                          items:
+                            description: FailureDomain configures failure domain information
+                              for the Nutanix platform.
+                            properties:
+                              dataSourceImages:
+                                description: DataSourceImages identifies the datasource
+                                  images in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              name:
+                                description: Name defines the unique name of a failure
+                                  domain.
+                                maxLength: 64
+                                minLength: 1
+                                pattern: ^[0-9A-Za-z_.-@/]+$
+                                type: string
+                              prismElement:
+                                description: 'PrismElement holds the identification
+                                  (name, UUID) and the optional endpoint address and
+
+                                  port of the Nutanix Prism Element. When a cluster-wide
+                                  proxy is installed, this endpoint will,
+
+                                  by default, be accessed through the cluster-wide
+                                  proxy configured for the platform.
+
+                                  If communication with this endpoint should bypass
+                                  the proxy, add the endpoint to the install-config
+
+                                  `spec.noProxy` list in the proxy configuration.'
+                                properties:
+                                  endpoint:
+                                    description: Endpoint holds the address and port
+                                      of the Prism Element
+                                    properties:
+                                      address:
+                                        description: address is the endpoint address
+                                          (DNS name or IP address) of the Nutanix
+                                          Prism Central or Element (cluster)
+                                        type: string
+                                      port:
+                                        description: port is the port number to access
+                                          the Nutanix Prism Central or Element (cluster)
+                                        format: int32
+                                        type: integer
+                                    required:
+                                    - address
+                                    - port
+                                    type: object
+                                  name:
+                                    description: Name is the Prism Element (cluster)
+                                      name.
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the Prism Element
+                                      (cluster)
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              storageContainers:
+                                description: StorageContainers identifies the storage
+                                  containers in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              subnetUUIDs:
+                                description: 'SubnetUUIDs identifies the network subnets
+                                  of the Prism Element.
+
+                                  Currently we only support one subnet for a failure
+                                  domain.'
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                                x-kubernetes-list-type: set
+                            required:
+                            - name
+                            - prismElement
+                            - subnetUUIDs
+                            type: object
+                          type: array
+                        prismCentral:
+                          description: 'PrismCentral is the endpoint (address and
+                            port) to connect to the Prism Central.
+
+                            This serves as the default Prism-Central.'
+                          properties:
+                            address:
+                              description: address is the endpoint address (DNS name
+                                or IP address) of the Nutanix Prism Central or Element
+                                (cluster)
+                              type: string
+                            port:
+                              description: port is the port number to access the Nutanix
+                                Prism Central or Element (cluster)
+                              format: int32
+                              type: integer
+                          required:
+                          - address
+                          - port
+                          type: object
+                      required:
+                      - credentialsSecretRef
+                      - prismCentral
+                      type: object
                     openstack:
                       description: OpenStack is the configuration used when installing
                         on OpenStack
@@ -1719,6 +2038,35 @@ objects:
 
                     May be unset in the case of adopted clusters.'
                   properties:
+                    customizationRef:
+                      description: 'CustomizationRef is a reference to a ClusterDeploymentCustomization
+                        containing
+
+                        InstallerManifestPatches to be applied to the manifests generated
+                        by openshift-install prior
+
+                        to starting the installation. (InstallConfigPatches will be
+                        ignored -- those changes should
+
+                        be made directly to the install-config.yaml referenced by
+                        InstallConfigSecretRef.)'
+                      properties:
+                        name:
+                          default: ''
+                          description: 'Name of the referent.
+
+                            This field is effectively required, but due to backwards
+                            compatibility is
+
+                            allowed to be empty. Instances of this type with an empty
+                            value here are
+
+                            almost certainly wrong.
+
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
                     imageSetRef:
                       description: 'ImageSetRef is a reference to a ClusterImageSet.
                         If a value is specified for ReleaseImage,
@@ -2250,7 +2598,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterdeprovisions.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -2508,6 +2856,77 @@ objects:
                       - credentialsSecretRef
                       - region
                       type: object
+                    nutanix:
+                      description: Nutanix contains Nutanix-specific deprovision settings
+                      properties:
+                        certificatesSecretRef:
+                          description: 'CertificatesSecretRef refers to a secret that
+                            contains the Nutanix CA certificates
+
+                            necessary for communicating with the Prism Central.'
+                          properties:
+                            name:
+                              default: ''
+                              description: 'Name of the referent.
+
+                                This field is effectively required, but due to backwards
+                                compatibility is
+
+                                allowed to be empty. Instances of this type with an
+                                empty value here are
+
+                                almost certainly wrong.
+
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        credentialsSecretRef:
+                          description: 'CredentialsSecretRef refers to a secret that
+                            contains the Nutanix account access
+
+                            credentials.'
+                          properties:
+                            name:
+                              default: ''
+                              description: 'Name of the referent.
+
+                                This field is effectively required, but due to backwards
+                                compatibility is
+
+                                allowed to be empty. Instances of this type with an
+                                empty value here are
+
+                                almost certainly wrong.
+
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        prismCentral:
+                          description: 'PrismCentral is the endpoint (address and
+                            port) to connect to the Prism Central.
+
+                            This serves as the default Prism-Central.'
+                          properties:
+                            address:
+                              description: address is the endpoint address (DNS name
+                                or IP address) of the Nutanix Prism Central or Element
+                                (cluster)
+                              type: string
+                            port:
+                              description: port is the port number to access the Nutanix
+                                Prism Central or Element (cluster)
+                              format: int32
+                              type: integer
+                          required:
+                          - address
+                          - port
+                          type: object
+                      required:
+                      - credentialsSecretRef
+                      - prismCentral
+                      type: object
                     openstack:
                       description: OpenStack contains OpenStack-specific deprovision
                         settings
@@ -2729,7 +3148,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterimagesets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -2801,7 +3220,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterpools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -2925,6 +3344,34 @@ objects:
                       pattern: "^([0-9]+(\\.[0-9]+)?(ns|us|\xB5s|ms|s|m|h))+$"
                       type: string
                   type: object
+                customizationRef:
+                  description: 'CustomizationRef refers to a ClusterDeploymentCustomization
+                    object whose InstallerManifestPatches should
+
+                    be applied to *all* ClusterDeployments created by this ClusterPool.
+                    This is in addition to any CDC from
+
+                    Inventory. The CDC must exist in the ClusterPool''s namespace.
+                    It will be copied to the namespace of each
+
+                    ClusterDeployment generated by the ClusterPool.'
+                  properties:
+                    name:
+                      default: ''
+                      description: 'Name of the referent.
+
+                        This field is effectively required, but due to backwards compatibility
+                        is
+
+                        allowed to be empty. Instances of this type with an empty
+                        value here are
+
+                        almost certainly wrong.
+
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
                 hibernateAfter:
                   description: 'HibernateAfter will be applied to new ClusterDeployments
                     created for the pool. HibernateAfter will transition
@@ -3636,6 +4083,205 @@ objects:
 
                         https://docs.openshift.com/container-platform/4.7/installing/installing_platform_agnostic/installing-platform-agnostic.html'
                       type: object
+                    nutanix:
+                      description: Nutanix is the configuration used when installing
+                        on Nutanix Prism Central.
+                      properties:
+                        certificatesSecretRef:
+                          description: 'CertificatesSecretRef refers to a secret that
+                            contains the Prism Central CA certificates
+
+                            necessary for communicating with the Prism Central.'
+                          properties:
+                            name:
+                              default: ''
+                              description: 'Name of the referent.
+
+                                This field is effectively required, but due to backwards
+                                compatibility is
+
+                                allowed to be empty. Instances of this type with an
+                                empty value here are
+
+                                almost certainly wrong.
+
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        credentialsSecretRef:
+                          description: 'CredentialsSecretRef refers to a secret that
+                            contains the Nutanix account access
+
+                            credentials.'
+                          properties:
+                            name:
+                              default: ''
+                              description: 'Name of the referent.
+
+                                This field is effectively required, but due to backwards
+                                compatibility is
+
+                                allowed to be empty. Instances of this type with an
+                                empty value here are
+
+                                almost certainly wrong.
+
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        failureDomains:
+                          description: 'FailureDomains configures failure domains
+                            for the Nutanix platform.
+
+                            Required for using MachinePools'
+                          items:
+                            description: FailureDomain configures failure domain information
+                              for the Nutanix platform.
+                            properties:
+                              dataSourceImages:
+                                description: DataSourceImages identifies the datasource
+                                  images in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              name:
+                                description: Name defines the unique name of a failure
+                                  domain.
+                                maxLength: 64
+                                minLength: 1
+                                pattern: ^[0-9A-Za-z_.-@/]+$
+                                type: string
+                              prismElement:
+                                description: 'PrismElement holds the identification
+                                  (name, UUID) and the optional endpoint address and
+
+                                  port of the Nutanix Prism Element. When a cluster-wide
+                                  proxy is installed, this endpoint will,
+
+                                  by default, be accessed through the cluster-wide
+                                  proxy configured for the platform.
+
+                                  If communication with this endpoint should bypass
+                                  the proxy, add the endpoint to the install-config
+
+                                  `spec.noProxy` list in the proxy configuration.'
+                                properties:
+                                  endpoint:
+                                    description: Endpoint holds the address and port
+                                      of the Prism Element
+                                    properties:
+                                      address:
+                                        description: address is the endpoint address
+                                          (DNS name or IP address) of the Nutanix
+                                          Prism Central or Element (cluster)
+                                        type: string
+                                      port:
+                                        description: port is the port number to access
+                                          the Nutanix Prism Central or Element (cluster)
+                                        format: int32
+                                        type: integer
+                                    required:
+                                    - address
+                                    - port
+                                    type: object
+                                  name:
+                                    description: Name is the Prism Element (cluster)
+                                      name.
+                                    type: string
+                                  uuid:
+                                    description: UUID is the UUID of the Prism Element
+                                      (cluster)
+                                    type: string
+                                required:
+                                - uuid
+                                type: object
+                              storageContainers:
+                                description: StorageContainers identifies the storage
+                                  containers in the Prism Element.
+                                items:
+                                  description: StorageResourceReference holds reference
+                                    information of a storage resource (storage container,
+                                    data source image, etc.)
+                                  properties:
+                                    name:
+                                      description: Name is the name of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                    referenceName:
+                                      description: ReferenceName is the identifier
+                                        of the storage resource configured in the
+                                        FailureDomain.
+                                      type: string
+                                    uuid:
+                                      description: UUID is the UUID of the storage
+                                        container resource in the Prism Element.
+                                      type: string
+                                  required:
+                                  - uuid
+                                  type: object
+                                type: array
+                              subnetUUIDs:
+                                description: 'SubnetUUIDs identifies the network subnets
+                                  of the Prism Element.
+
+                                  Currently we only support one subnet for a failure
+                                  domain.'
+                                items:
+                                  type: string
+                                minItems: 1
+                                type: array
+                                x-kubernetes-list-type: set
+                            required:
+                            - name
+                            - prismElement
+                            - subnetUUIDs
+                            type: object
+                          type: array
+                        prismCentral:
+                          description: 'PrismCentral is the endpoint (address and
+                            port) to connect to the Prism Central.
+
+                            This serves as the default Prism-Central.'
+                          properties:
+                            address:
+                              description: address is the endpoint address (DNS name
+                                or IP address) of the Nutanix Prism Central or Element
+                                (cluster)
+                              type: string
+                            port:
+                              description: port is the port number to access the Nutanix
+                                Prism Central or Element (cluster)
+                              format: int32
+                              type: integer
+                          required:
+                          - address
+                          - port
+                          type: object
+                      required:
+                      - credentialsSecretRef
+                      - prismCentral
+                      type: object
                     openstack:
                       description: OpenStack is the configuration used when installing
                         on OpenStack
@@ -3976,7 +4622,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     labels:
       contracts.hive.openshift.io/clusterinstall: 'false'
     name: clusterprovisions.hive.openshift.io
@@ -4225,7 +4871,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterrelocates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4365,7 +5011,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clusterstates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4488,7 +5134,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clustersyncleases.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -4551,7 +5197,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: clustersyncs.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -4826,7 +5472,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: dnszones.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5138,7 +5784,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     labels:
       contracts.hive.openshift.io/clusterinstall: 'true'
     name: fakeclusterinstalls.hiveinternal.openshift.io
@@ -5371,7 +6017,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: hiveconfigs.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6804,7 +7450,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: machinepoolnameleases.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6880,7 +7526,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: machinepools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -7316,12 +7962,10 @@ objects:
                             diskType:
                               description: 'DiskType defines the type of disk.
 
-                                The valid values are pd-standard and pd-ssd.
+                                The valid values at this time are: pd-standard, pd-ssd,
+                                local-ssd, pd-balanced, hyperdisk-balanced.
 
                                 Defaulted internally to pd-ssd.'
-                              enum:
-                              - pd-ssd
-                              - pd-standard
                               type: string
                             encryptionKey:
                               description: EncryptionKey defines the KMS key to be
@@ -7524,6 +8168,302 @@ objects:
                           items:
                             type: string
                           type: array
+                      type: object
+                    nutanix:
+                      description: Nutanix is the configuration used when installing
+                        on Nutanix prism central.
+                      properties:
+                        bootType:
+                          description: 'BootType indicates the boot type (Legacy,
+                            UEFI or SecureBoot) the Machine''s VM uses to boot.
+
+                            If this field is empty or omitted, the VM will use the
+                            default boot type "Legacy" to boot.
+
+                            "SecureBoot" depends on "UEFI" boot, i.e., enabling "SecureBoot"
+                            means that "UEFI" boot is also enabled.'
+                          enum:
+                          - ''
+                          - Legacy
+                          - UEFI
+                          - SecureBoot
+                          type: string
+                        categories:
+                          description: 'Categories optionally adds one or more prism
+                            categories (each with key and value) for
+
+                            the Machine''s VM to associate with. All the category
+                            key and value pairs specified must
+
+                            already exist in the prism central.'
+                          items:
+                            description: NutanixCategory identifies a pair of prism
+                              category key and value
+                            properties:
+                              key:
+                                description: key is the prism category key name
+                                maxLength: 64
+                                minLength: 1
+                                type: string
+                              value:
+                                description: value is the prism category value associated
+                                  with the key
+                                maxLength: 64
+                                minLength: 1
+                                type: string
+                            required:
+                            - key
+                            - value
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - key
+                          x-kubernetes-list-type: map
+                        coresPerSocket:
+                          description: 'NumCoresPerSocket is the number of cores per
+                            socket in a vm. The number
+
+                            of vCPUs on the vm will be NumCPUs times NumCoresPerSocket.
+
+                            For example: 4 CPUs and 4 Cores per socket will result
+                            in 16 VPUs.
+
+                            The AHV scheduler treats socket and core allocation exactly
+                            the same
+
+                            so there is no benefit to configuring cores over CPUs.'
+                          format: int64
+                          type: integer
+                        cpus:
+                          description: NumCPUs is the total number of virtual processor
+                            cores to assign a vm.
+                          format: int64
+                          type: integer
+                        dataDisks:
+                          description: DataDisks holds information of the data disks
+                            to attach to the Machine's VM
+                          items:
+                            description: NutanixDataDisk specifies the VM data disk
+                              configuration parameters.
+                            properties:
+                              dataSource:
+                                description: dataSource refers to a data source image
+                                  for the VM disk.
+                                properties:
+                                  name:
+                                    description: name is the resource name in the
+                                      PC
+                                    type: string
+                                  type:
+                                    description: type is the identifier type to use
+                                      for this resource.
+                                    enum:
+                                    - uuid
+                                    - name
+                                    type: string
+                                  uuid:
+                                    description: uuid is the UUID of the resource
+                                      in the PC.
+                                    type: string
+                                required:
+                                - type
+                                type: object
+                              deviceProperties:
+                                description: deviceProperties are the properties of
+                                  the disk device.
+                                properties:
+                                  adapterType:
+                                    description: 'adapterType is the adapter type
+                                      of the disk address.
+
+                                      If the deviceType is "Disk", the valid adapterType
+                                      can be "SCSI", "IDE", "PCI", "SATA" or "SPAPR".
+
+                                      If the deviceType is "CDRom", the valid adapterType
+                                      can be "IDE" or "SATA".'
+                                    enum:
+                                    - SCSI
+                                    - IDE
+                                    - PCI
+                                    - SATA
+                                    - SPAPR
+                                    type: string
+                                  deviceIndex:
+                                    default: 0
+                                    description: 'deviceIndex is the index of the
+                                      disk address. The valid values are non-negative
+                                      integers, with the default value 0.
+
+                                      For a Machine VM, the deviceIndex for the disks
+                                      with the same deviceType.adapterType combination
+                                      should
+
+                                      start from 0 and increase consecutively afterwards.
+                                      Note that for each Machine VM, the Disk.SCSI.0
+
+                                      and CDRom.IDE.0 are reserved to be used by the
+                                      VM''s system. So for dataDisks of Disk.SCSI
+                                      and CDRom.IDE,
+
+                                      the deviceIndex should start from 1.'
+                                    format: int32
+                                    minimum: 0
+                                    type: integer
+                                  deviceType:
+                                    default: Disk
+                                    description: 'deviceType specifies the disk device
+                                      type.
+
+                                      The valid values are "Disk" and "CDRom", and
+                                      the default is "Disk".'
+                                    enum:
+                                    - Disk
+                                    - CDRom
+                                    type: string
+                                required:
+                                - adapterType
+                                - deviceIndex
+                                - deviceType
+                                type: object
+                              diskSize:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: 'diskSize is size (in Quantity format)
+                                  of the disk attached to the VM.
+
+                                  See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#Format
+                                  for the Quantity format and example documentation.
+
+                                  The minimum diskSize is 1GB.'
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              storageConfig:
+                                description: storageConfig are the storage configuration
+                                  parameters of the VM disks.
+                                properties:
+                                  diskMode:
+                                    default: Standard
+                                    description: 'diskMode specifies the disk mode.
+
+                                      The valid values are Standard and Flash, and
+                                      the default is Standard.'
+                                    enum:
+                                    - Standard
+                                    - Flash
+                                    type: string
+                                  storageContainer:
+                                    description: storageContainer refers to the storage_container
+                                      used by the VM disk.
+                                    properties:
+                                      type:
+                                        description: 'type is the identifier type
+                                          to use for this resource.
+
+                                          The valid value is "uuid".'
+                                        enum:
+                                        - uuid
+                                        type: string
+                                      uuid:
+                                        description: uuid is the UUID of the storage
+                                          resource in the PC.
+                                        type: string
+                                    required:
+                                    - type
+                                    type: object
+                                    x-kubernetes-validations:
+                                    - message: uuid configuration is required when
+                                        type is uuid, and forbidden otherwise
+                                      rule: 'has(self.type) && self.type == ''uuid''
+                                        ?  has(self.uuid) : !has(self.uuid)'
+                                type: object
+                            required:
+                            - diskSize
+                            type: object
+                          type: array
+                        failureDomains:
+                          description: 'FailureDomains optionally configures a list
+                            of failure domain names
+
+                            that will be applied to the MachinePool. These names must
+                            correspond
+
+                            to failure domains configured in `CD.Spec.Platform.Nutanix`.'
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: set
+                        gpus:
+                          description: GPUs is a list of GPU devices to attach to
+                            the machine's VM.
+                          items:
+                            description: NutanixGPU holds the identity of a Nutanix
+                              GPU resource in the Prism Central
+                            properties:
+                              deviceID:
+                                description: deviceID is the GPU device ID with the
+                                  integer value.
+                                format: int32
+                                type: integer
+                              name:
+                                description: name is the GPU device name
+                                type: string
+                              type:
+                                description: 'type is the identifier type of the GPU
+                                  device.
+
+                                  Valid values are Name and DeviceID.'
+                                enum:
+                                - Name
+                                - DeviceID
+                                type: string
+                            required:
+                            - type
+                            type: object
+                            x-kubernetes-validations:
+                            - message: deviceID configuration is required when type
+                                is DeviceID, and forbidden otherwise
+                              rule: 'has(self.type) && self.type == ''DeviceID'' ?  has(self.deviceID)
+                                : !has(self.deviceID)'
+                            - message: name configuration is required when type is
+                                Name, and forbidden otherwise
+                              rule: 'has(self.type) && self.type == ''Name'' ?  has(self.name)
+                                : !has(self.name)'
+                          type: array
+                        memoryMiB:
+                          description: Memory is the size of a VM's memory in MiB.
+                          format: int64
+                          type: integer
+                        osDisk:
+                          description: OSDisk defines the storage for instance.
+                          properties:
+                            diskSizeGiB:
+                              description: DiskSizeGiB defines the size of disk in
+                                GiB.
+                              format: int64
+                              type: integer
+                          type: object
+                        project:
+                          description: Project optionally identifies a Prism project
+                            for the Machine's VM to associate with.
+                          properties:
+                            name:
+                              description: name is the resource name in the PC
+                              type: string
+                            type:
+                              description: type is the identifier type to use for
+                                this resource.
+                              enum:
+                              - uuid
+                              - name
+                              type: string
+                            uuid:
+                              description: uuid is the UUID of the resource in the
+                                PC.
+                              type: string
+                          required:
+                          - type
+                          type: object
                       type: object
                     openstack:
                       description: OpenStack is the configuration used when installing
@@ -7900,7 +8840,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: selectorsyncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -8726,7 +9666,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: selectorsyncsets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -9032,7 +9972,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: syncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -9827,7 +10767,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.1
+      controller-gen.kubebuilder.io/version: v0.16.3
     name: syncsets.hive.openshift.io
   spec:
     group: hive.openshift.io

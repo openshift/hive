@@ -2,17 +2,9 @@ package gcp
 
 import (
 	"fmt"
-)
 
-// UserProvisionedDNS indicates whether the DNS solution is provisioned by the Installer or the user.
-type UserProvisionedDNS string
-
-const (
-	// UserProvisionedDNSEnabled indicates that the DNS solution is provisioned and provided by the user.
-	UserProvisionedDNSEnabled UserProvisionedDNS = "Enabled"
-
-	// UserProvisionedDNSDisabled indicates that the DNS solution is provisioned by the Installer.
-	UserProvisionedDNSDisabled UserProvisionedDNS = "Disabled"
+	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/installer/pkg/types/dns"
 )
 
 // Platform stores all the global configuration that all machinesets
@@ -52,15 +44,13 @@ type Platform struct {
 
 	// userLabels has additional keys and values that the installer will add as
 	// labels to all resources that it creates on GCP. Resources created by the
-	// cluster itself may not include these labels. GCPLabelsTags featureGate is
-	// defined for managing this feature and is enabled by default.
+	// cluster itself may not include these labels.
 	UserLabels []UserLabel `json:"userLabels,omitempty"`
 
 	// userTags has additional keys and values that the installer will add as
 	// tags to all resources that it creates on GCP. Resources created by the
 	// cluster itself may not include these tags. Tag key and tag value should
-	// be the shortnames of the tag key and tag value resource. GCPLabelsTags featureGate
-	// is defined for managing this feature and is enabled by default.
+	// be the shortnames of the tag key and tag value resource.
 	UserTags []UserTag `json:"userTags,omitempty"`
 
 	// UserProvisionedDNS indicates if the customer is providing their own DNS solution in place of the default
@@ -68,7 +58,13 @@ type Platform struct {
 	// +kubebuilder:default:="Disabled"
 	// +default="Disabled"
 	// +kubebuilder:validation:Enum="Enabled";"Disabled"
-	UserProvisionedDNS UserProvisionedDNS `json:"userProvisionedDNS,omitempty"`
+	UserProvisionedDNS dns.UserProvisionedDNS `json:"userProvisionedDNS,omitempty"`
+
+	// ServiceEndpoints list contains custom endpoints which will override default
+	// service endpoint of GCP Services.
+	// There must be only one ServiceEndpoint for a service.
+	// +optional
+	ServiceEndpoints []configv1.GCPServiceEndpoint `json:"serviceEndpoints,omitempty"`
 }
 
 // UserLabel is a label to apply to GCP resources created for the cluster.

@@ -48,7 +48,12 @@ func GetFinder(server, username, password string) (*find.Finder, error) {
 			// If bogus authentication is provided in the scenario of AI or assisted
 			// just provide warning message. If this is IPI or UPI validation will
 			// catch and halt on incorrect authentication.
-			localLogger.Warnf("unable to log into vCenter %s, %v", server, err)
+
+			localLogger.Debugf("this can be safely ignored if non-deprecated platform spec fields are used"+
+				"or installing via UPI, Assisted or Agent Installer. "+
+				"Conversion of deprecated platform spec fields cannot continue without vCenter %s access, error: %v",
+				server, err)
+
 			return nil, nil
 		}
 		finder = find.NewFinder(client.Client, true)
@@ -98,6 +103,8 @@ func fixNoVCentersScenario(platform *vsphere.Platform) {
 				}
 			}
 		}
+	} else if platform.DeprecatedVCenter != "" {
+		localLogger.Warn("vcenter field is deprecated please avoid using both vcenter and vcenters fields together")
 	}
 }
 
@@ -173,7 +180,10 @@ func fixLegacyPlatformScenario(platform *vsphere.Platform, finders map[string]*f
 		if err != nil {
 			return err
 		}
+	} else if platform.DeprecatedDatacenter != "" || platform.DeprecatedFolder != "" || platform.DeprecatedCluster != "" || platform.DeprecatedDefaultDatastore != "" || platform.DeprecatedResourcePool != "" || platform.DeprecatedNetwork != "" {
+		localLogger.Warn("vsphere topology fields are now deprecated; please avoid using failureDomains and the vsphere topology fields together")
 	}
+
 	return nil
 }
 

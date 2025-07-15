@@ -8,6 +8,7 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/gcp"
 	"github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	"github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/apis/hive/v1/ovirt"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
@@ -98,6 +99,8 @@ type MachinePoolPlatform struct {
 	Ovirt *ovirt.MachinePool `json:"ovirt,omitempty"`
 	// IBMCloud is the configuration used when installing on IBM Cloud.
 	IBMCloud *ibmcloud.MachinePool `json:"ibmcloud,omitempty"`
+	// Nutanix is the configuration used when installing on Nutanix prism central.
+	Nutanix *nutanix.MachinePool `json:"nutanix,omitempty"`
 }
 
 // MachinePoolStatus defines the observed state of MachinePool
@@ -228,6 +231,14 @@ const (
 	// UnsupportedConfigurationMachinePoolCondition is true when the configuration of the MachinePool is unsupported
 	// by the cluster.
 	UnsupportedConfigurationMachinePoolCondition MachinePoolConditionType = "UnsupportedConfiguration"
+
+	// MachineSetsGeneratedMachinePoolCondition is true when the most recent pass of the controller successfully
+	// generated MachineSet manifests to sync to the spoke cluster, false if it failed.
+	MachineSetsGeneratedMachinePoolCondition MachinePoolConditionType = "MachineSetsGenerated"
+
+	// SyncedMachinePoolCondition indicates whether the most recent pass of the controller successfully synced
+	// objects (MachineSets, and {Machine|Cluster}Autoscaler(s) if appropriate) to the spoke cluster.
+	SyncedMachinePoolCondition MachinePoolConditionType = "Synced"
 )
 
 // +genclient

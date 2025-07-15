@@ -20,6 +20,8 @@ const (
 	MachinePoolEdgeRoleName = "edge"
 	// MachinePoolControlPlaneRoleName name associated with the control plane machinepool.
 	MachinePoolControlPlaneRoleName = "master"
+	// MachinePoolArbiterRoleName name associated with the control plane machinepool for smaller sized limited nodes.
+	MachinePoolArbiterRoleName = "arbiter"
 )
 
 // HyperthreadingMode is the mode of hyperthreading for a machine.
@@ -53,6 +55,7 @@ type MachinePool struct {
 	// Name is the name of the machine pool.
 	// For the control plane machine pool, the name will always be "master".
 	// For the compute machine pools, the only valid name is "worker".
+	// For the arbiter machine pools, the only valid name is "arbiter".
 	Name string `json:"name"`
 
 	// Replicas is the machine count for the machine pool.
@@ -75,6 +78,11 @@ type MachinePool struct {
 	// +kubebuilder:default=amd64
 	// +optional
 	Architecture Architecture `json:"architecture,omitempty"`
+
+	// Fencing stores the information about a baremetal host's management controller.
+	// Fencing may only be set for control plane nodes.
+	// +optional
+	Fencing *Fencing `json:"fencing,omitempty"`
 }
 
 // MachinePoolPlatform is the platform-specific configuration for a machine
@@ -141,4 +149,19 @@ func (p *MachinePoolPlatform) Name() string {
 	default:
 		return ""
 	}
+}
+
+// Fencing stores the information about a baremetal host's management controller.
+type Fencing struct {
+	// Credentials stores the information about a baremetal host's management controller.
+	// +optional
+	Credentials []*Credential `json:"credentials,omitempty"`
+}
+
+// Credential stores the information about a baremetal host's management controller.
+type Credential struct {
+	HostName string `json:"hostName,omitempty" validate:"required,uniqueField"`
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"`
+	Address  string `json:"address" validate:"required,uniqueField"`
 }

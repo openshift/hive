@@ -12,7 +12,11 @@ import (
 	aznetwork "github.com/Azure/azure-sdk-for-go/profiles/2020-09-01/network/mgmt/network"
 	azenc "github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	azmarketplace "github.com/Azure/azure-sdk-for-go/profiles/latest/marketplaceordering/mgmt/marketplaceordering"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	azstorage "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/go-autorest/autorest/to"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 //go:generate mockgen -source=./client.go -destination=mock/azureclient_generated.go -package=mock
@@ -20,6 +24,7 @@ import (
 // API represents the calls made to the API.
 type API interface {
 	GetVirtualNetwork(ctx context.Context, resourceGroupName, virtualNetwork string) (*aznetwork.VirtualNetwork, error)
+	CheckIPAddressAvailability(ctx context.Context, resourceGroupName, virtualNetwork, ipAddr string) (*aznetwork.IPAddressAvailabilityResult, error)
 	GetComputeSubnet(ctx context.Context, resourceGroupName, virtualNetwork, subnet string) (*aznetwork.Subnet, error)
 	GetControlPlaneSubnet(ctx context.Context, resourceGroupName, virtualNetwork, subnet string) (*aznetwork.Subnet, error)
 	ListLocations(ctx context.Context) (*[]azsubs.Location, error)
@@ -37,6 +42,7 @@ type API interface {
 	GetVMCapabilities(ctx context.Context, instanceType, region string) (map[string]string, error)
 	GetAvailabilityZones(ctx context.Context, region string, instanceType string) ([]string, error)
 	GetLocationInfo(ctx context.Context, region string, instanceType string) (*azenc.ResourceSkuLocationInfo, error)
+	CheckIfExistsStorageAccount(ctx context.Context, resourceGroup, storageAccountName, region string) error
 }
 
 // Client makes calls to the Azure API.
@@ -57,7 +63,7 @@ func (c *Client) GetVirtualNetwork(ctx context.Context, resourceGroupName, virtu
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
 	defer cancel()
 
-	vnetClient, err := c.GetVirtualNetworksClient(ctx)
+	vnetClient, err := c.getVirtualNetworksClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +74,24 @@ func (c *Client) GetVirtualNetwork(ctx context.Context, resourceGroupName, virtu
 	}
 
 	return &vnet, nil
+}
+
+// CheckIPAddressAvailability checks availability of an IP address in an Azure virtual network.
+func (c *Client) CheckIPAddressAvailability(ctx context.Context, resourceGroupName, virtualNetwork, ipAddr string) (*aznetwork.IPAddressAvailabilityResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Minute)
+	defer cancel()
+
+	vnetClient, err := c.getVirtualNetworksClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	availability, err := vnetClient.CheckIPAddressAvailability(ctx, resourceGroupName, virtualNetwork, ipAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get azure ip availability: %w", err)
+	}
+
+	return &availability, nil
 }
 
 // getSubnet gets an Azure subnet by name
@@ -99,7 +123,7 @@ func (c *Client) GetControlPlaneSubnet(ctx context.Context, resourceGroupName, v
 }
 
 // getVnetsClient sets up a new client to retrieve vnets
-func (c *Client) GetVirtualNetworksClient(ctx context.Context) (*aznetwork.VirtualNetworksClient, error) {
+func (c *Client) getVirtualNetworksClient(ctx context.Context) (*aznetwork.VirtualNetworksClient, error) {
 	vnetsClient := aznetwork.NewVirtualNetworksClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
 	vnetsClient.Authorizer = c.ssn.Authorizer
 	return &vnetsClient, nil
@@ -419,4 +443,33 @@ func (c *Client) GetLocationInfo(ctx context.Context, region string, instanceTyp
 	}
 
 	return nil, fmt.Errorf("location information not found for %s in %s", instanceType, region)
+}
+
+// CheckIfExistsStorageAccount checks if the storage account provided already exists for diagnostics
+// purposes.
+func (c *Client) CheckIfExistsStorageAccount(ctx context.Context, resourceGroup, storageAccountName, region string) error {
+	accountClientOptions := arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			// NOTE: the api version must support AzureStack
+			APIVersion: "2019-04-01",
+			Cloud:      c.ssn.CloudConfig,
+		},
+	}
+	storageClient, err := azstorage.NewAccountsClient(c.ssn.Credentials.SubscriptionID, c.ssn.TokenCreds, &accountClientOptions)
+	if err != nil {
+		return err
+	}
+	resp, err := storageClient.GetProperties(ctx, resourceGroup, storageAccountName, nil)
+	if err != nil {
+		return err
+	}
+	if resp.Account.Name != nil && region != *resp.Account.Location {
+		return fmt.Errorf("%s is an invalid location for storage account. must be in the same region as the cluster", *resp.Account.Location)
+	}
+	validSKUs := sets.NewString(string(azstorage.SKUNameStandardGRS), string(azstorage.SKUNameStandardRAGRS), string(azstorage.SKUNameStandardLRS))
+	if resp.Account.SKU != nil && resp.Account.SKU.Name != nil && !validSKUs.Has(string(*resp.Account.SKU.Name)) {
+		stringSKUs := validSKUs.List()
+		return fmt.Errorf("%s is not supported, supported values are %s,%s,%s", string(*resp.Account.SKU.Name), stringSKUs[0], stringSKUs[1], stringSKUs[2])
+	}
+	return err
 }

@@ -324,23 +324,24 @@ var _ reconcile.Reconciler = &ReconcileHiveConfig{}
 
 // ReconcileHiveConfig reconciles a Hive object
 type ReconcileHiveConfig struct {
-	scheme                            *runtime.Scheme
-	kubeClient                        kubernetes.Interface
-	discoveryClient                   discovery.DiscoveryInterface
-	dynamicClient                     dynamic.Interface
-	restConfig                        *rest.Config
-	hiveImage                         string
-	hiveOperatorNamespace             string
-	hiveImagePullPolicy               corev1.PullPolicy
-	nodeSelector                      map[string]string
-	tolerations                       []corev1.Toleration
-	syncAggregatorCA                  bool
-	managedConfigCMLister             corev1listers.ConfigMapLister
-	ctrlr                             controller.Controller
-	hiveSecretLister                  corev1listers.SecretLister
-	secretWatchEstablishedInNamespace string
-	mgr                               manager.Manager
-	isOpenShift                       bool
+	scheme                               *runtime.Scheme
+	kubeClient                           kubernetes.Interface
+	discoveryClient                      discovery.DiscoveryInterface
+	dynamicClient                        dynamic.Interface
+	restConfig                           *rest.Config
+	hiveImage                            string
+	hiveOperatorNamespace                string
+	hiveImagePullPolicy                  corev1.PullPolicy
+	nodeSelector                         map[string]string
+	tolerations                          []corev1.Toleration
+	syncAggregatorCA                     bool
+	managedConfigCMLister                corev1listers.ConfigMapLister
+	ctrlr                                controller.Controller
+	hiveSecretLister                     corev1listers.SecretLister
+	configMapWatchEstablishedInNamespace string
+	secretWatchEstablishedInNamespace    string
+	mgr                                  manager.Manager
+	isOpenShift                          bool
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read
@@ -370,6 +371,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
 			hLog.Debug("HiveConfig not found, deleted?")
+			r.configMapWatchEstablishedInNamespace = ""
 			r.secretWatchEstablishedInNamespace = ""
 			return reconcile.Result{}, nil
 		}
@@ -388,6 +390,19 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		hLog.Info("initializing hive controller conditions")
 		err = r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
 		return reconcile.Result{}, err
+	}
+
+	// NOTE: Today we're using the KAS and service cert ConfigMaps to inject CA bundles into the
+	// admission APIService and webhook configurations ONLY when running on OpenShift (see
+	// getCACertsOpenShift()). Otherwise we're relying on service account token Secrets created by
+	// the user. Watch these specific ConfigMaps, specifically in hive's target namespace -- which
+	// can change at runtime, hence the runtime watch setup -- only if we're running on OpenShift.
+	if r.isOpenShift {
+		if err := r.establishConfigMapWatch(hLog, hiveNSName); err != nil {
+			instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorEstablishingConfigMapWatch", err.Error())
+			r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
+			return reconcile.Result{}, err
+		}
 	}
 
 	if err := r.establishSecretWatch(hLog, hiveNSName); err != nil {
@@ -604,6 +619,64 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileHiveConfig) establishConfigMapWatch(hLog *log.Entry, hiveNSName string) error {
+	if r.configMapWatchEstablishedInNamespace == hiveNSName {
+		hLog.Debug("configMap watch already established")
+		return nil
+	}
+
+	hLog.WithField("namespace", hiveNSName).Infof("establishing watch on %s ConfigMap in hive namespace", kasCACertConfigMapName)
+
+	// Create an informer that only listens to events in the target namespace
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(r.kubeClient, watchResyncInterval,
+		kubeinformers.WithNamespace(hiveNSName))
+	cmInformer := kubeInformerFactory.Core().V1().ConfigMaps().Informer()
+	if err := r.mgr.Add(&informerRunnable{informer: cmInformer}); err != nil {
+		hLog.WithError(err).Error("error adding configmap informer to manager")
+		return err
+	}
+
+	// Watch ConfigMaps in hive namespace, so we can detect changes to the KAS & service CA certs and redeploy.
+	src := &source.Informer{
+		Informer: cmInformer,
+	}
+	src.Handler = handler.Funcs{
+		CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			hLog.Debug("eventHandler CreateFunc")
+			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
+		},
+		UpdateFunc: func(ctx context.Context, e event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			hLog.Debug("eventHandler UpdateFunc")
+			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: constants.HiveConfigName}})
+		},
+	}
+	process := func(oname string) bool {
+		return oname == kasCACertConfigMapName || oname == serviceCACertConfigMapName
+	}
+	src.Predicates = append(src.Predicates, predicate.TypedFuncs[client.Object]{
+		CreateFunc: func(e event.CreateEvent) bool {
+			p := process(e.Object.GetName())
+			hLog.WithField("predicateResponse", p).Debug("configmap CreateEvent")
+			return p
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			p := process(e.ObjectNew.GetName())
+			hLog.WithField("predicateResponse", p).Debug("configmap UpdateEvent")
+			return p
+		},
+	})
+
+	err := r.ctrlr.Watch(src)
+	if err != nil {
+		hLog.WithError(err).Error("error establishing configmap watch")
+		return err
+	}
+
+	r.configMapWatchEstablishedInNamespace = hiveNSName
+
+	return nil
 }
 
 func (r *ReconcileHiveConfig) establishSecretWatch(hLog *log.Entry, hiveNSName string) error {

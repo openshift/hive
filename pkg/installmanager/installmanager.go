@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	clientwatch "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -45,6 +45,7 @@ import (
 	"github.com/openshift/installer/pkg/destroy/azure"
 	"github.com/openshift/installer/pkg/destroy/gcp"
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
+	"github.com/openshift/installer/pkg/destroy/nutanix"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/providers"
@@ -53,16 +54,19 @@ import (
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
+	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
 	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 
+	jsoniter "github.com/json-iterator/go"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
 	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
+	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
 	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	ovirtutils "github.com/openshift/hive/contrib/pkg/utils/ovirt"
 	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
@@ -345,9 +349,9 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading install-config.yaml")
 		return err
 	}
-	icData, err = pasteInPullSecret(icData, m.PullSecretMountPath)
+	icData, err = m.pasteInInstallConfigSecrets(cd, icData)
 	if err != nil {
-		m.log.WithError(err).Error("error adding pull secret to install-config.yaml")
+		m.log.WithError(err).Error("error adding secret to install-config.yaml")
 		return err
 	}
 	destInstallConfigPath := filepath.Join(m.WorkDir, "install-config.yaml")
@@ -413,7 +417,7 @@ func (m *InstallManager) Run() error {
 		if err := m.updateClusterProvision(
 			m,
 			func(provision *hivev1.ClusterProvision) {
-				provision.Spec.InstallLog = pointer.String(installLog)
+				provision.Spec.InstallLog = ptr.To(installLog)
 			},
 		); err != nil {
 			m.log.WithError(err).Error("error updating cluster provision with asset generation log")
@@ -432,6 +436,12 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading cluster metadata")
 		return errors.Wrap(err, "error reading cluster metadata")
 	}
+	scrubbedMetadataBytes, err := scrubMetadataJSON(metadataBytes)
+	if err != nil {
+		m.log.WithError(err).Error("error cleaning up metadata")
+		return errors.Wrap(err, "error cleaning up metadata")
+	}
+
 	kubeconfigSecret, err := m.uploadAdminKubeconfig(m)
 	if err != nil {
 		m.log.WithError(err).Error("error uploading admin kubeconfig")
@@ -446,9 +456,9 @@ func (m *InstallManager) Run() error {
 	if err := m.updateClusterProvision(
 		m,
 		func(provision *hivev1.ClusterProvision) {
-			provision.Spec.MetadataJSON = metadataBytes
-			provision.Spec.InfraID = pointer.String(metadata.InfraID)
-			provision.Spec.ClusterID = pointer.String(metadata.ClusterID)
+			provision.Spec.MetadataJSON = scrubbedMetadataBytes
+			provision.Spec.InfraID = ptr.To(metadata.InfraID)
+			provision.Spec.ClusterID = ptr.To(metadata.ClusterID)
 
 			provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{
 				Name: kubeconfigSecret.Name,
@@ -506,7 +516,7 @@ func (m *InstallManager) Run() error {
 		if err := m.updateClusterProvision(
 			m,
 			func(provision *hivev1.ClusterProvision) {
-				provision.Spec.InstallLog = pointer.String(installLog)
+				provision.Spec.InstallLog = ptr.To(installLog)
 			},
 		); err != nil {
 			m.log.WithError(err).Warning("error updating cluster provision with installer log")
@@ -542,6 +552,8 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 		ovirtutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.IBMCloud != nil:
 		ibmutils.ConfigureCreds(m.DynamicClient)
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixutils.ConfigureCreds(m.DynamicClient)
 	}
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.
@@ -661,6 +673,8 @@ func (m *InstallManager) cleanupFailedInstall(cd *hivev1.ClusterDeployment, infr
 
 func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error {
 	var uninstaller providers.Destroyer
+
+	logger.Info("starting a cleanup failed provision for ClusterDeployment with infraID: ", infraID)
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		// run the uninstaller to clean up any cloud resources previously created
@@ -804,6 +818,33 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		if ibmCloudDestroyerErr != nil {
 			return ibmCloudDestroyerErr
 		}
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		if nutanixUsername == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixUsernameEnvVar)
+		}
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixPassword == "" {
+			return fmt.Errorf("no %s env var set, cannot proceed", constants.NutanixPasswordEnvVar)
+		}
+
+		metadata := &installertypes.ClusterMetadata{
+			InfraID: infraID,
+			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
+				Nutanix: &installertypesnutanix.Metadata{
+					PrismCentral: cd.Spec.Platform.Nutanix.PrismCentral.Address,
+					Username:     nutanixUsername,
+					Password:     nutanixPassword,
+					Port:         strconv.Itoa(int(cd.Spec.Platform.Nutanix.PrismCentral.Port)),
+				},
+			},
+		}
+		var err error
+		uninstaller, err = nutanix.New(logger, metadata)
+		if err != nil {
+			return err
+		}
+
 	default:
 		logger.Warn("unknown platform for re-try cleanup")
 		return errors.New("unknown platform for re-try cleanup")
@@ -942,6 +983,14 @@ func (m *InstallManager) generateAssets(cd *hivev1.ClusterDeployment, mapPoolsBy
 			m.log.WithError(err).Error("error overriding credentials mode on install config")
 			return err
 		}
+	}
+
+	// This needs to be done before `create ignition-configs`, as that thing
+	// consumes and removes manifests.
+	m.log.Info("applying customizations")
+	if err := m.applyCustomizations(cd); err != nil {
+		m.log.WithError(err).Error("error applying customizations")
+		return err
 	}
 
 	m.log.Info("running openshift-install create ignition-configs")
@@ -1596,7 +1645,7 @@ func uploadAdminKubeconfig(m *InstallManager) (*corev1.Secret, error) {
 		Kind:               provisionGVK.Kind,
 		Name:               m.ClusterProvision.Name,
 		UID:                m.ClusterProvision.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}}
 
 	if err := createWithRetries(kubeconfigSecret, m); err != nil {
@@ -1663,7 +1712,7 @@ func uploadAdminPassword(m *InstallManager) (*corev1.Secret, error) {
 		Kind:               provisionGVK.Kind,
 		Name:               m.ClusterProvision.Name,
 		UID:                m.ClusterProvision.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}}
 
 	if err := createWithRetries(s, m); err != nil {
@@ -1874,17 +1923,95 @@ func isDirNonEmpty(dir string) bool {
 	return err == nil
 }
 
-func pasteInPullSecret(icData []byte, pullSecretFile string) ([]byte, error) {
-	pullSecretData, err := os.ReadFile(pullSecretFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not read the pull secret file")
+// injectProviderCredentials Add the credentials from a given secret into the ic if nor present
+func injectProviderCredentials(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment) error {
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		nutanixUsername := os.Getenv(constants.NutanixUsernameEnvVar)
+		nutanixPassword := os.Getenv(constants.NutanixPasswordEnvVar)
+		if nutanixUsername == "" || nutanixPassword == "" {
+			return fmt.Errorf("missing credentials for %s platform provider", constants.PlatformNutanix)
+		}
+		if ic.Platform.Nutanix.PrismCentral.Username != "" && ic.Platform.Nutanix.PrismCentral.Username != nutanixUsername {
+			return fmt.Errorf("prism central username mismatch for %s platform provider", constants.PlatformNutanix)
+		}
+		if ic.Platform.Nutanix.PrismCentral.Password != "" && ic.Platform.Nutanix.PrismCentral.Password != nutanixPassword {
+			return fmt.Errorf("prism central password mismatch for %s platform provider", constants.PlatformNutanix)
+		}
+
+		ic.Platform.Nutanix.PrismCentral.Username = nutanixUsername
+		ic.Platform.Nutanix.PrismCentral.Password = nutanixPassword
 	}
-	icRaw := map[string]interface{}{}
-	if err := yaml.Unmarshal(icData, &icRaw); err != nil {
+
+	return nil
+}
+
+// injectProviderAdditionalBundle injects a provider-specific trust bundle into the given
+// InstallConfig if none is already defined in its AdditionalTrustBundle field.
+func injectProviderAdditionalBundle(ic *installertypes.InstallConfig, cd *hivev1.ClusterDeployment, certDir string) error {
+	// Ignore case where there the install-config AdditionalTrustBundle value is set
+	if ic.AdditionalTrustBundle != "" {
+		return nil
+	}
+
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		// If the ClusterDeployment specifies the Nutanix platform and includes a reference to a certificates secret,
+		// the method attempts to load the trust bundle from the mounted certificate directory and sets it into the InstallConfig.
+		if cd.Spec.Platform.Nutanix.CertificatesSecretRef.Name == "" {
+			return nil
+		}
+
+		certData, err := contributils.BuildCertBundleFromDir(certDir)
+		if err != nil {
+			return err
+		}
+		ic.AdditionalTrustBundle = certData
+		if ic.AdditionalTrustBundlePolicy == "" {
+			ic.AdditionalTrustBundlePolicy = installertypes.PolicyAlways
+		}
+	}
+	return nil
+}
+
+func (m *InstallManager) getPlatformCertificateDir(cd *hivev1.ClusterDeployment) string {
+	switch {
+	case cd.Spec.Platform.Nutanix != nil:
+		return constants.NutanixCertificatesDir
+
+	}
+
+	return ""
+}
+
+func (m *InstallManager) pasteInInstallConfigSecrets(cd *hivev1.ClusterDeployment, icData []byte) ([]byte, error) {
+	ic := installertypes.InstallConfig{}
+	if err := yaml.Unmarshal(icData, &ic); err != nil {
 		return nil, errors.Wrap(err, "could not unmarshal InstallConfig")
 	}
-	icRaw["pullSecret"] = string(pullSecretData)
-	return yaml.Marshal(icRaw)
+
+	if err := pasteInPullSecret(&ic, m.PullSecretMountPath); err != nil {
+		return nil, err
+	}
+
+	if err := injectProviderCredentials(&ic, cd); err != nil {
+		return nil, err
+	}
+
+	if err := injectProviderAdditionalBundle(&ic, cd, m.getPlatformCertificateDir(cd)); err != nil {
+		return nil, err
+	}
+	return yaml.Marshal(ic)
+}
+
+func pasteInPullSecret(ic *installertypes.InstallConfig, pullSecretFile string) error {
+	pullSecretData, err := os.ReadFile(pullSecretFile)
+	if err != nil {
+		return errors.Wrap(err, "could not read the pull secret file")
+	}
+
+	ic.PullSecret = string(pullSecretData)
+	return nil
 }
 
 func getHomeDir() string {
@@ -2044,4 +2171,137 @@ func patchAzureOverrideCreds(overrideCredsBytes, clusterInfraConfigBytes []byte,
 		return nil, errors.Wrap(err, "error applying patch on 99_cloud-creds-secret.yaml")
 	}
 	return &modifiedBytes, nil
+}
+
+func (m *InstallManager) applyCustomizations(cd *hivev1.ClusterDeployment) error {
+	imps, err := utils.LoadManifestPatches(m.DynamicClient, cd, m.log)
+	if err != nil || imps == nil || len(imps) == 0 {
+		// loadCustomization logged
+		// err may be nil if the CD doesn't reference a CDC.
+		return err
+	}
+
+	for i, imp := range imps {
+		glob := imp.ManifestSelector.Glob
+		matches, err := filepath.Glob(filepath.Join(m.WorkDir, glob))
+		if err != nil {
+			return fmt.Errorf("manifest patch glob %d (%s) failed: %w", i, glob, err)
+		}
+		if len(matches) == 0 {
+			return fmt.Errorf("manifest patch glob %d (%s) matched zero manifests", i, glob)
+		}
+		m.log.Infof("manifest patch glob %d (%s) matched %d files", i, glob, len(matches))
+		for _, p := range matches {
+			path, err := filepath.Abs(p)
+			if err != nil {
+				return fmt.Errorf("could not determine absolute path for %s: %w", p, err)
+			}
+			// m.WorkDir is already absolute
+			if !strings.HasPrefix(path, m.WorkDir) {
+				return fmt.Errorf(
+					"manifest patch glob %d (%s) yielded path %s which is not relative to working directory %s -- possible hack attempt",
+					i, glob, path, m.WorkDir)
+			}
+			m.log.Infof("patching manifest %s", path)
+			manifestBytes, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to load manifest %s: %w", path, err)
+			}
+			modifiedBytes, err := yamlutils.ApplyPatches(manifestBytes, imp.Patches)
+			if err != nil {
+				return fmt.Errorf("failed to apply patches to %s: %w", path, err)
+			}
+			// Perm arg is ignored for existing file
+			if err := os.WriteFile(path, modifiedBytes, 0); err != nil {
+				return fmt.Errorf("failed to write patched manifest %s to disk: %w", path, err)
+			}
+		}
+	}
+	return nil
+}
+
+func scrubMetadataJSON(metadataJson []byte) ([]byte, error) {
+	api := jsoniter.ConfigCompatibleWithStandardLibrary
+	iter := jsoniter.ParseBytes(api, metadataJson)
+	var outBytes bytes.Buffer
+	stream := jsoniter.NewStream(api, &outBytes, len(metadataJson))
+
+	if err := scrubInner(iter, stream); err != nil {
+		return nil, err
+	}
+
+	if err := stream.Flush(); err != nil {
+		return nil, err
+	}
+	return outBytes.Bytes(), nil
+}
+
+func scrubInner(iter *jsoniter.Iterator, stream *jsoniter.Stream) error {
+	switch iter.WhatIsNext() {
+	case jsoniter.InvalidValue:
+		return errors.New("invalid value")
+	case jsoniter.StringValue:
+		stream.WriteString(iter.ReadString())
+	case jsoniter.NumberValue:
+		numVal := iter.ReadNumber()
+		if num, err := numVal.Int64(); err == nil {
+			stream.WriteInt64(num)
+		} else if num, err := numVal.Float64(); err == nil {
+			stream.WriteFloat64(num)
+		}
+	case jsoniter.NilValue:
+		iter.ReadNil()
+		stream.WriteNil()
+	case jsoniter.BoolValue:
+		stream.WriteBool(iter.ReadBool())
+	case jsoniter.ArrayValue:
+		start := true
+		stream.WriteArrayStart()
+		for iter.ReadArray() {
+			if !start {
+				stream.WriteMore()
+			} else {
+				start = false
+			}
+			if err := scrubInner(iter, stream); err != nil {
+				return err
+			}
+		}
+		stream.WriteArrayEnd()
+	case jsoniter.ObjectValue:
+		start := true
+		stream.WriteObjectStart()
+		for {
+			fieldName := iter.ReadObject()
+			if len(fieldName) == 0 {
+				break
+			}
+
+			if !start {
+				stream.WriteMore()
+			} else {
+				start = false
+			}
+
+			stream.WriteObjectField(fieldName)
+			switch strings.ToLower(fieldName) {
+			case "username", "password":
+				_ = iter.ReadAny()
+				stream.WriteString("REDACTED")
+			default:
+				if err := scrubInner(iter, stream); err != nil {
+					return err
+				}
+			}
+		}
+		stream.WriteObjectEnd()
+	}
+
+	if iter.Error != nil {
+		return iter.Error
+	}
+	if stream.Error != nil {
+		return stream.Error
+	}
+	return nil
 }

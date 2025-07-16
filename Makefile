@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 .PHONY: all
 all: vendor update test build
 

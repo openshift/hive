@@ -7,8 +7,9 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/openshift/hive/pkg/awsclient"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -32,7 +33,7 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 
 	// Figure out the AZs supported by the service.
 	servicesResp, err := awsClient.DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
-		ServiceNames: aws.StringSlice([]string{vpcEndpointServiceName}),
+		ServiceNames: []string{vpcEndpointServiceName},
 	})
 	if err != nil {
 		serviceLog.WithError(err).Error("error getting VPC Endpoint Service in hub account")
@@ -40,11 +41,11 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 	}
 
 	// Filter candidates that don't have at least one subnet in supported AZs.
-	supportedAZSet := sets.NewString(aws.StringValueSlice(servicesResp.ServiceDetails[0].AvailabilityZones)...)
+	supportedAZSet := sets.New(servicesResp.ServiceDetails[0].AvailabilityZones...)
 	candidates = filterVPCInventory(candidates, toSupportedSubnets(supportedAZSet))
 	if len(candidates) == 0 {
 		logger.WithField("region", cd.Spec.Platform.AWS.Region).
-			WithField("requiredAZs", supportedAZSet.List()).
+			WithField("requiredAZs", sets.List(supportedAZSet)).
 			Error(errNoSupportedAZsInInventory.Error())
 		return nil, errNoSupportedAZsInInventory
 	}
@@ -57,9 +58,9 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 		endpointsPerVPC[cand.VPCID] = 0
 	}
 
-	var endpoints []*ec2.VpcEndpoint
+	var endpoints []types.VpcEndpoint
 	err = awsClient.DescribeVpcEndpointsPages(&ec2.DescribeVpcEndpointsInput{
-		Filters: []*ec2.Filter{{Name: aws.String("vpc-id"), Values: aws.StringSlice(vpcs)}},
+		Filters: []types.Filter{{Name: aws.String("vpc-id"), Values: vpcs}},
 	}, func(page *ec2.DescribeVpcEndpointsOutput, lastPage bool) bool {
 		endpoints = append(endpoints, page.VpcEndpoints...)
 		return !lastPage
@@ -70,7 +71,7 @@ func (r *ReconcileAWSPrivateLink) chooseVPCForVPCEndpoint(awsClient awsclient.Cl
 	}
 
 	for _, vEnd := range endpoints {
-		vpcID := aws.StringValue(vEnd.VpcId)
+		vpcID := aws.ToString(vEnd.VpcId)
 		endpointsPerVPC[vpcID] = endpointsPerVPC[vpcID] + 1
 	}
 
@@ -103,7 +104,7 @@ func toSupportedRegion(region string) filterVPCInventoryFn {
 	}
 }
 
-func toSupportedSubnets(azs sets.String) filterVPCInventoryFn {
+func toSupportedSubnets(azs sets.Set[string]) filterVPCInventoryFn {
 	return func(inv *hivev1.AWSPrivateLinkInventory) bool {
 		n := 0
 		for _, subnet := range inv.Subnets {

@@ -3,12 +3,13 @@ package nameserver
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
 
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/awsclient/mock"
@@ -182,12 +183,12 @@ func TestAWSGet(t *testing.T) {
 			}
 			for i, out := range tc.listHostedZonesOutputs {
 				in := &route53.ListHostedZonesByNameInput{
-					DNSName:  pointer.String("test-domain."),
-					MaxItems: pointer.String("5"),
+					DNSName:  aws.String("test-domain."),
+					MaxItems: aws.Int32(5),
 				}
 				if i > 0 {
-					in.DNSName = pointer.String("next-dns-name")
-					in.HostedZoneId = pointer.String("next-hosted-zone-id")
+					in.DNSName = aws.String("next-dns-name")
+					in.HostedZoneId = aws.String("next-hosted-zone-id")
 				}
 				mockAWSClient.EXPECT().
 					ListHostedZonesByName(gomock.Eq(in)).
@@ -195,12 +196,12 @@ func TestAWSGet(t *testing.T) {
 			}
 			for i, out := range tc.listResourceRecordSetsOutputs {
 				in := &route53.ListResourceRecordSetsInput{
-					HostedZoneId: pointer.String("test-zone-id"),
-					MaxItems:     pointer.String("100"),
+					HostedZoneId: aws.String("test-zone-id"),
+					MaxItems:     aws.Int32(100),
 				}
 				if i > 0 {
-					in.StartRecordName = pointer.String("next-record-name")
-					in.StartRecordType = pointer.String("next-record-type")
+					in.StartRecordName = aws.String("next-record-name")
+					in.StartRecordType = route53types.RRTypeA
 				}
 				mockAWSClient.EXPECT().
 					ListResourceRecordSets(gomock.Eq(in)).
@@ -227,7 +228,7 @@ func testListHostedZonesOutput(opts ...listHostedZonesOutputOption) *route53.Lis
 	return out
 }
 
-func withHostedZones(hostedZones ...*route53.HostedZone) listHostedZonesOutputOption {
+func withHostedZones(hostedZones ...route53types.HostedZone) listHostedZonesOutputOption {
 	return func(out *route53.ListHostedZonesByNameOutput) {
 		out.HostedZones = hostedZones
 	}
@@ -235,20 +236,20 @@ func withHostedZones(hostedZones ...*route53.HostedZone) listHostedZonesOutputOp
 
 func hzTruncated() listHostedZonesOutputOption {
 	return func(out *route53.ListHostedZonesByNameOutput) {
-		out.IsTruncated = pointer.Bool(true)
-		out.NextDNSName = pointer.String("next-dns-name")
-		out.NextHostedZoneId = pointer.String("next-hosted-zone-id")
+		out.IsTruncated = true
+		out.NextDNSName = aws.String("next-dns-name")
+		out.NextHostedZoneId = aws.String("next-hosted-zone-id")
 	}
 }
 
-type hostedZoneOption func(*route53.HostedZone)
+type hostedZoneOption func(route53types.HostedZone)
 
-func testHostedZone(name string, zoneID string, opts ...hostedZoneOption) *route53.HostedZone {
-	zone := &route53.HostedZone{
+func testHostedZone(name string, zoneID string, opts ...hostedZoneOption) route53types.HostedZone {
+	zone := route53types.HostedZone{
 		Name: &name,
 		Id:   &zoneID,
-		Config: &route53.HostedZoneConfig{
-			PrivateZone: pointer.Bool(false),
+		Config: &route53types.HostedZoneConfig{
+			PrivateZone: false,
 		},
 	}
 	for _, o := range opts {
@@ -258,8 +259,8 @@ func testHostedZone(name string, zoneID string, opts ...hostedZoneOption) *route
 }
 
 func private() hostedZoneOption {
-	return func(zone *route53.HostedZone) {
-		zone.Config.PrivateZone = pointer.Bool(true)
+	return func(zone route53types.HostedZone) {
+		zone.Config.PrivateZone = true
 	}
 }
 
@@ -273,7 +274,7 @@ func testListResourceRecordSetsOutput(opts ...listResourceRecordSetsOutputOption
 	return out
 }
 
-func withRecordSets(recordSets ...*route53.ResourceRecordSet) listResourceRecordSetsOutputOption {
+func withRecordSets(recordSets ...route53types.ResourceRecordSet) listResourceRecordSetsOutputOption {
 	return func(out *route53.ListResourceRecordSetsOutput) {
 		out.ResourceRecordSets = recordSets
 	}
@@ -281,21 +282,21 @@ func withRecordSets(recordSets ...*route53.ResourceRecordSet) listResourceRecord
 
 func rrsTruncated() listResourceRecordSetsOutputOption {
 	return func(out *route53.ListResourceRecordSetsOutput) {
-		out.IsTruncated = pointer.BoolPtr(true)
-		out.NextRecordName = pointer.String("next-record-name")
-		out.NextRecordType = pointer.String("next-record-type")
+		out.IsTruncated = true
+		out.NextRecordName = aws.String("next-record-name")
+		out.NextRecordType = route53types.RRTypeA
 	}
 }
 
-func testRecordSet(name string, recordType string, values ...string) *route53.ResourceRecordSet {
-	recordSet := &route53.ResourceRecordSet{
+func testRecordSet(name string, recordType route53types.RRType, values ...string) route53types.ResourceRecordSet {
+	recordSet := route53types.ResourceRecordSet{
 		Name:            &name,
-		Type:            &recordType,
-		ResourceRecords: make([]*route53.ResourceRecord, len(values)),
+		Type:            recordType,
+		ResourceRecords: make([]route53types.ResourceRecord, len(values)),
 	}
 	for i, value := range values {
-		recordSet.ResourceRecords[i] = &route53.ResourceRecord{
-			Value: pointer.String(value),
+		recordSet.ResourceRecords[i] = route53types.ResourceRecord{
+			Value: aws.String(value),
 		}
 	}
 	return recordSet

@@ -619,29 +619,41 @@ func (r *ReconcileMachinePool) ensureEnoughReplicas(
 	cd *hivev1.ClusterDeployment,
 	logger log.FieldLogger,
 ) (*reconcile.Result, error) {
-	if pool.Spec.Autoscaling == nil {
-		return nil, nil
-	}
-	if pool.Spec.Autoscaling.MinReplicas < int32(len(generatedMachineSets)) && !platformAllowsZeroAutoscalingMinReplicas(cd) {
-		logger.WithField("machinesets", len(generatedMachineSets)).
-			WithField("minReplicas", pool.Spec.Autoscaling.MinReplicas).
-			Warning("when auto-scaling, the MachinePool must have at least one replica for each MachineSet")
+	if pool.Spec.Autoscaling != nil {
+		// Handle autoscaling case: check if we have enough replicas
+		if pool.Spec.Autoscaling.MinReplicas < int32(len(generatedMachineSets)) && !platformAllowsZeroAutoscalingMinReplicas(cd) {
+			logger.WithField("machinesets", len(generatedMachineSets)).
+				WithField("minReplicas", pool.Spec.Autoscaling.MinReplicas).
+				Warning("when auto-scaling, the MachinePool must have at least one replica for each MachineSet")
+			err := r.updateCondition(
+				pool,
+				hivev1.NotEnoughReplicasMachinePoolCondition,
+				corev1.ConditionTrue,
+				"MinReplicasTooSmall",
+				fmt.Sprintf("When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least %d", len(generatedMachineSets)),
+				logger,
+			)
+			return &reconcile.Result{}, err
+		}
+		// Autoscaling enabled and we have enough replicas
 		err := r.updateCondition(
 			pool,
 			hivev1.NotEnoughReplicasMachinePoolCondition,
-			corev1.ConditionTrue,
-			"MinReplicasTooSmall",
-			fmt.Sprintf("When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least %d", len(generatedMachineSets)),
+			corev1.ConditionFalse,
+			"EnoughReplicas",
+			"The MachinePool has sufficient replicas for each MachineSet",
 			logger,
 		)
-		return &reconcile.Result{}, err
+		return nil, err
 	}
+
+	// When autoscaling is disabled, reset the NotEnoughReplicas condition to initialized state
 	err := r.updateCondition(
 		pool,
 		hivev1.NotEnoughReplicasMachinePoolCondition,
-		corev1.ConditionFalse,
-		"EnoughReplicas",
-		"The MachinePool has sufficient replicas for each MachineSet",
+		corev1.ConditionUnknown,
+		hivev1.InitializedConditionReason,
+		"Condition Initialized",
 		logger,
 	)
 	return nil, err

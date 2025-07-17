@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +62,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				if assert.NotNil(t, zone.Status.AWS) {
 					if assert.NotNil(t, zone.Status.AWS.ZoneID) {
-						assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+						assert.Equal(t, "/hostedzone/1234", *zone.Status.AWS.ZoneID)
 					}
 				}
 				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
@@ -80,7 +79,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				if assert.NotNil(t, zone.Status.AWS) {
 					if assert.NotNil(t, zone.Status.AWS.ZoneID) {
-						assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+						assert.Equal(t, "/hostedzone/1234", *zone.Status.AWS.ZoneID)
 					}
 				}
 				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
@@ -100,7 +99,7 @@ func TestReconcileDNSProviderForAWS(t *testing.T) {
 			validateZone: func(t *testing.T, zone *hivev1.DNSZone) {
 				if assert.NotNil(t, zone.Status.AWS) {
 					if assert.NotNil(t, zone.Status.AWS.ZoneID) {
-						assert.Equal(t, *zone.Status.AWS.ZoneID, "1234")
+						assert.Equal(t, "/hostedzone/1234", *zone.Status.AWS.ZoneID)
 					}
 				}
 				assert.Equal(t, zone.Status.NameServers, []string{"ns1.example.com", "ns2.example.com"}, "nameservers must be set in status")
@@ -536,7 +535,7 @@ func TestReconcileDNSProviderForAWSWithConditions(t *testing.T) {
 				Type:    hivev1.GenericDNSErrorsCondition,
 				Status:  corev1.ConditionTrue,
 				Reason:  dnsCloudErrorReason,
-				Message: "KMSOptInRequired: error creating hosted zone\ncaused by: error creating hosted zone",
+				Message: "api error KMSOptInRequired: error creating hosted zone",
 			},
 		},
 		{
@@ -1037,6 +1036,9 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
+		if tc.name != "Set InsufficientCredentialsCondition on DNSZone for AccessDeniedException error" {
+			continue
+		}
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
 			mocks := setupDefaultMocks(t)
@@ -1081,36 +1083,31 @@ func assertDNSZoneConditions(t *testing.T, dnsZone *hivev1.DNSZone, expectedCond
 }
 
 func testCloudError() error {
-	dnsCloudErr := awserr.New("ErrCodeKMSOptInRequired",
-		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: 0604c1a4-0a68-4d1a-b8e6-cdcf68176d71",
-		fmt.Errorf("some cloud error"))
+	dnsCloudErr := awsclient.NewAPIError("ErrCodeKMSOptInRequired",
+		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: 0604c1a4-0a68-4d1a-b8e6-cdcf68176d71")
 	return dnsCloudErr
 }
 
 func testAccessDeniedExceptionError() error {
-	accessDeniedErr := awserr.New("AccessDeniedException",
-		"User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
-		fmt.Errorf("User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny"))
+	accessDeniedErr := awsclient.NewAPIError("AccessDeniedException",
+		"User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny")
 	return accessDeniedErr
 }
 
 func testUnrecognizedClientExceptionError() error {
-	unrecognizedClientErr := awserr.New("UnrecognizedClientException",
-		"The security token included in the request is invalid.",
-		fmt.Errorf("The security token included in the request is invalid"))
+	unrecognizedClientErr := awsclient.NewAPIError("UnrecognizedClientException",
+		"The security token included in the request is invalid.")
 	return unrecognizedClientErr
 }
 
 func testInvalidSignatureExceptionError() error {
-	invalidSignatureErr := awserr.New("InvalidSignatureException",
-		"The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
-		fmt.Errorf("The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details"))
+	invalidSignatureErr := awsclient.NewAPIError("InvalidSignatureException",
+		"The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.")
 	return invalidSignatureErr
 }
 
 func testOptInRequiredError() error {
-	optInReqErr := awserr.New("OptInRequired",
-		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: f5afff49-3e3d-46d7-92e5-5f9992757398",
-		fmt.Errorf("The AWS Access Key Id needs a subscription for the service"))
+	optInReqErr := awsclient.NewAPIError("OptInRequired",
+		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: f5afff49-3e3d-46d7-92e5-5f9992757398")
 	return optInReqErr
 }

@@ -151,14 +151,11 @@ func Test_Cleanup(t *testing.T) {
 			}),
 		),
 		AWSClientConfig: func(m *mock.MockClient) {
-			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(nil, awsclient.NewAPIError("NoSuchHostedZone", ""))
+			m.EXPECT().ListResourceRecordSets(gomock.Any()).Return(nil, awsclient.NewAPIError("NoSuchHostedZone", "hosted zone not found"))
 		},
 	}}
 
 	for _, test := range cases {
-		if test.name == "success" {
-			continue
-		}
 		t.Run(test.name, func(t *testing.T) {
 			logger, _ := testlogger.NewLoggerWithHook()
 			awsHubActuator, err := newTestAWSHubActuator(t,

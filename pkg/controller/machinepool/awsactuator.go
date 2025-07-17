@@ -9,7 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -292,7 +292,7 @@ func masterAMIRefByTag(masterMachine *machineapi.Machine) (bool, error) {
 // fetchAvailabilityZones fetches availability zones for the AWS region
 func (a *AWSActuator) fetchAvailabilityZones() ([]string, error) {
 	req := &ec2.DescribeAvailabilityZonesInput{
-		Filters: []types.Filter{{
+		Filters: []ec2types.Filter{{
 			Name:   aws.String("region-name"),
 			Values: []string{a.region},
 		}},
@@ -452,7 +452,7 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ic
 		return nil, err
 	}
 
-	var subnets []types.Subnet
+	var subnets []ec2types.Subnet
 	if numSubnets == numZones {
 		subnets = results.Subnets
 	} else {
@@ -464,7 +464,7 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ic
 	return a.validateSubnets(subnets, pool)
 }
 
-func (a *AWSActuator) filterPublicSubnets(subnets []types.Subnet, pool *hivev1.MachinePool) ([]types.Subnet, error) {
+func (a *AWSActuator) filterPublicSubnets(subnets []ec2types.Subnet, pool *hivev1.MachinePool) ([]ec2types.Subnet, error) {
 
 	vpc := *subnets[0].VpcId
 	if vpc == "" {
@@ -472,7 +472,7 @@ func (a *AWSActuator) filterPublicSubnets(subnets []types.Subnet, pool *hivev1.M
 	}
 
 	routeTables, err := a.awsClient.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
-		Filters: []types.Filter{{
+		Filters: []ec2types.Filter{{
 			Name:   aws.String("vpc-id"),
 			Values: []string{vpc},
 		}},
@@ -481,7 +481,7 @@ func (a *AWSActuator) filterPublicSubnets(subnets []types.Subnet, pool *hivev1.M
 		return nil, errors.Wrap(err, "error describing route tables")
 	}
 
-	var privateSubnets, publicSubnets = []types.Subnet{}, []types.Subnet{}
+	var privateSubnets, publicSubnets = []ec2types.Subnet{}, []ec2types.Subnet{}
 	for _, subnet := range subnets {
 		isPublic, err := isSubnetPublic(routeTables.RouteTables, subnet, a.logger)
 		if err != nil {
@@ -510,9 +510,9 @@ func (a *AWSActuator) filterPublicSubnets(subnets []types.Subnet, pool *hivev1.M
 const tagNameSubnetPublicELB = "kubernetes.io/role/elb"
 
 // https://github.com/kubernetes/kubernetes/blob/9f036cd43d35a9c41d7ac4ca82398a6d0bef957b/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L3376-L3419
-func isSubnetPublic(rt []types.RouteTable, subnet types.Subnet, logger log.FieldLogger) (bool, error) {
+func isSubnetPublic(rt []ec2types.RouteTable, subnet ec2types.Subnet, logger log.FieldLogger) (bool, error) {
 	subnetID := aws.ToString(subnet.SubnetId)
-	var subnetTable *types.RouteTable
+	var subnetTable *ec2types.RouteTable
 	for _, table := range rt {
 		for _, assoc := range table.Associations {
 			if aws.ToString(assoc.SubnetId) == subnetID {
@@ -565,7 +565,7 @@ func isSubnetPublic(rt []types.RouteTable, subnet types.Subnet, logger log.Field
 }
 
 // Finds the value for a given tag.
-func findTag(tags []types.Tag, key string) (string, bool) {
+func findTag(tags []ec2types.Tag, key string) (string, bool) {
 	for _, tag := range tags {
 		if aws.ToString(tag.Key) == key {
 			return aws.ToString(tag.Value), true
@@ -576,7 +576,7 @@ func findTag(tags []types.Tag, key string) (string, bool) {
 
 // validateSubnets ensures there's exactly one subnet per availability zone, and returns
 // the mapping of subnets by availability zone
-func (a *AWSActuator) validateSubnets(subnets []types.Subnet, pool *hivev1.MachinePool) (icaws.Subnets, error) {
+func (a *AWSActuator) validateSubnets(subnets []ec2types.Subnet, pool *hivev1.MachinePool) (icaws.Subnets, error) {
 	conflictingSubnets := sets.NewString()
 	subnetsByAvailabilityZone := make(icaws.Subnets, len(subnets))
 	for _, subnet := range subnets {

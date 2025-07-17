@@ -11,7 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
@@ -61,7 +61,7 @@ func FindVpcInInventory(vpcId string, inventory []hivev1.AWSPrivateLinkInventory
 // GetDefaultSGOfVpc gets the default SG of a VPC.
 func GetDefaultSGOfVpc(awsClients awsclient.Client, vpcId string) (string, error) {
 	describeSecurityGroupsOutput, err := awsClients.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []types.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   aws.String("vpc-id"),
 				Values: []string{vpcId},
@@ -86,9 +86,9 @@ func GetDefaultSGOfVpc(awsClients awsclient.Client, vpcId string) (string, error
 func RevokeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr *string) (*ec2.RevokeSecurityGroupIngressOutput, error) {
 	return awsClients.RevokeSecurityGroupIngress(&ec2.RevokeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []types.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
-				IpRanges: []types.IpRange{
+				IpRanges: []ec2types.IpRange{
 					{
 						CidrIp: cidr,
 					},
@@ -103,10 +103,10 @@ func RevokeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr *string) (*e
 func RevokeAllIngressFromSG(awsClients awsclient.Client, SG, sourceSG *string) (*ec2.RevokeSecurityGroupIngressOutput, error) {
 	return awsClients.RevokeSecurityGroupIngress(&ec2.RevokeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []types.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
 				IpProtocol: aws.String("-1"),
-				UserIdGroupPairs: []types.UserIdGroupPair{
+				UserIdGroupPairs: []ec2types.UserIdGroupPair{
 					{
 						GroupId: sourceSG,
 					},
@@ -120,9 +120,9 @@ func RevokeAllIngressFromSG(awsClients awsclient.Client, SG, sourceSG *string) (
 func AuthorizeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr, description *string) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
 	return awsClients.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []types.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
-				IpRanges: []types.IpRange{
+				IpRanges: []ec2types.IpRange{
 					{
 						CidrIp:      cidr,
 						Description: description,
@@ -138,10 +138,10 @@ func AuthorizeAllIngressFromCIDR(awsClients awsclient.Client, SG, cidr, descript
 func AuthorizeAllIngressFromSG(awsClients awsclient.Client, SG, sourceSG, description *string) (*ec2.AuthorizeSecurityGroupIngressOutput, error) {
 	return awsClients.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
 		GroupId: SG,
-		IpPermissions: []types.IpPermission{
+		IpPermissions: []ec2types.IpPermission{
 			{
 				IpProtocol: aws.String("-1"),
-				UserIdGroupPairs: []types.UserIdGroupPair{
+				UserIdGroupPairs: []ec2types.UserIdGroupPair{
 					{
 						Description: description,
 						GroupId:     sourceSG,
@@ -180,7 +180,7 @@ func GetWorkerSGFromVpcId(awsClients awsclient.Client, vpcId string) (string, er
 	}
 
 	describeSecurityGroupsOutput, err := awsClients.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []types.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   aws.String("tag:Name"),
 				Values: []string{infraID + "-worker-sg", infraID + "-node"},

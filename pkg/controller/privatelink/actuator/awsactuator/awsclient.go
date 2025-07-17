@@ -1,10 +1,6 @@
 package awsactuator
 
 import (
-	"github.com/pkg/errors"
-
-	"github.com/aws/aws-sdk-go/aws/awserr"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -46,18 +42,4 @@ func newAWSClient(client client.Client, clientFn awsClientFn, region string, nam
 	}
 
 	return clientFn(client, options)
-}
-
-// awsErrCodeEquals returns true if the error matches all these conditions:
-//   - err is of type awserr.Error
-//   - Error.Code() equals code
-func awsErrCodeEquals(err error, code string) bool {
-	if err == nil {
-		return false
-	}
-	var awsErr awserr.Error
-	if errors.As(err, &awsErr) {
-		return awsErr.Code() == code
-	}
-	return false
 }

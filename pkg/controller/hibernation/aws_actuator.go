@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -16,15 +17,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 var (
-	runningStates           = sets.NewString("running")
-	stoppedStates           = sets.NewString("stopped")
-	pendingStates           = sets.NewString("pending")
-	stoppingStates          = sets.NewString("stopping", "shutting-down")
+	runningStates           = sets.New(ec2types.InstanceStateNameRunning)
+	stoppedStates           = sets.New(ec2types.InstanceStateNameStopped)
+	pendingStates           = sets.New(ec2types.InstanceStateNamePending)
+	stoppingStates          = sets.New(ec2types.InstanceStateNameStopping, ec2types.InstanceStateNameShuttingDown)
 	runningOrPendingStates  = runningStates.Union(pendingStates)
 	stoppedOrStoppingStates = stoppedStates.Union(stoppingStates)
 	notRunningStates        = stoppedOrStoppingStates.Union(pendingStates)
@@ -79,7 +80,7 @@ func (a *awsActuator) stopOnDemandInstances(awsClient awsclient.Client, instance
 
 	logger.WithField("instanceIDs", instanceIDs).Info("Stopping on-demand cluster instances")
 	_, err := awsClient.StopInstances(&ec2.StopInstancesInput{
-		InstanceIds: aws.StringSlice(instanceIDs),
+		InstanceIds: instanceIDs,
 	})
 	if err != nil {
 		logger.WithError(err).Error("failed to stop on-demand instances")
@@ -94,7 +95,7 @@ func (a *awsActuator) stopSpotInstances(awsClient awsclient.Client, instanceIDs 
 	}
 	logger.WithField("instanceIDs", instanceIDs).Info("Terminating spot cluster instances")
 	_, err := awsClient.TerminateInstances(&ec2.TerminateInstancesInput{
-		InstanceIds: aws.StringSlice(instanceIDs),
+		InstanceIds: instanceIDs,
 	})
 	if err != nil {
 		logger.WithError(err).Error("failed to terminate spot instances")
@@ -123,7 +124,7 @@ func (a *awsActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient cli
 	ids := instanceIDs(instances)
 	logger.WithField("instanceIDs", ids).Info("Starting on-demand cluster instances")
 	_, err = awsClient.StartInstances(&ec2.StartInstancesInput{
-		InstanceIds: aws.StringSlice(ids),
+		InstanceIds: ids,
 	})
 	if err != nil {
 		logger.WithError(err).Error("failed to start on-demand instances")
@@ -272,11 +273,11 @@ func getAWSClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.Fiel
 
 // filterOutSpotInstances removes the spot instances from the list and returns it. It
 // also returned the spot instances that were filtered out in a separate list.
-func filterOutSpotInstances(instances []*ec2.Instance) ([]*ec2.Instance, []*ec2.Instance) {
-	var spotInstances []*ec2.Instance
+func filterOutSpotInstances(instances []*ec2types.Instance) ([]*ec2types.Instance, []*ec2types.Instance) {
+	var spotInstances []*ec2types.Instance
 	n := 0
 	for _, i := range instances {
-		if aws.StringValue(i.InstanceLifecycle) == "spot" {
+		if i.InstanceLifecycle == ec2types.InstanceLifecycleTypeSpot {
 			spotInstances = append(spotInstances, i)
 			continue
 		}
@@ -287,23 +288,23 @@ func filterOutSpotInstances(instances []*ec2.Instance) ([]*ec2.Instance, []*ec2.
 	return instances, spotInstances
 }
 
-func instanceIDs(instances []*ec2.Instance) []string {
+func instanceIDs(instances []*ec2types.Instance) []string {
 	result := make([]string, len(instances))
 	for idx, i := range instances {
-		result[idx] = aws.StringValue(i.InstanceId)
+		result[idx] = aws.ToString(i.InstanceId)
 	}
 	return result
 }
 
-func getClusterInstances(cd *hivev1.ClusterDeployment, c awsclient.Client, states sets.String, logger log.FieldLogger) ([]*ec2.Instance, error) {
+func getClusterInstances(cd *hivev1.ClusterDeployment, c awsclient.Client, states sets.Set[ec2types.InstanceStateName], logger log.FieldLogger) ([]*ec2types.Instance, error) {
 	infraID := cd.Spec.ClusterMetadata.InfraID
 	logger = logger.WithField("infraID", infraID)
 	logger.Debug("listing cluster instances")
 	out, err := c.DescribeInstances(&ec2.DescribeInstancesInput{
-		Filters: []*ec2.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   aws.String(fmt.Sprintf("tag:kubernetes.io/cluster/%s", infraID)),
-				Values: []*string{aws.String("owned")},
+				Values: []string{"owned"},
 			},
 		},
 	})
@@ -311,11 +312,11 @@ func getClusterInstances(cd *hivev1.ClusterDeployment, c awsclient.Client, state
 		logger.WithError(err).Error("failed to list instances")
 		return nil, err
 	}
-	var result []*ec2.Instance
+	var result []*ec2types.Instance
 	for _, r := range out.Reservations {
 		for idx, i := range r.Instances {
-			if states.Has(aws.StringValue(i.State.Name)) {
-				result = append(result, r.Instances[idx])
+			if states.Has(i.State.Name) {
+				result = append(result, &r.Instances[idx])
 			}
 		}
 	}

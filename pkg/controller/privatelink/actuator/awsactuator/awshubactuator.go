@@ -8,9 +8,11 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -235,12 +237,12 @@ func (a *AWSHubActuator) createHostedZone(associatedVPC *hivev1.AWSAssociatedVPC
 	resp, err := a.awsClientHub.CreateHostedZone(&route53.CreateHostedZoneInput{
 		CallerReference: aws.String(time.Now().String()),
 		Name:            aws.String(apiDomain),
-		HostedZoneConfig: &route53.HostedZoneConfig{
-			PrivateZone: aws.Bool(true),
+		HostedZoneConfig: &route53types.HostedZoneConfig{
+			PrivateZone: true,
 		},
-		VPC: &route53.VPC{
+		VPC: &route53types.VPC{
 			VPCId:     aws.String(associatedVPC.VPCID),
-			VPCRegion: aws.String(associatedVPC.Region),
+			VPCRegion: route53types.VPCRegion(associatedVPC.Region),
 		},
 	})
 	if err != nil {
@@ -261,9 +263,9 @@ func (a *AWSHubActuator) findHostedZone(associatedVPCs []hivev1.AWSAssociatedVPC
 
 		input := &route53.ListHostedZonesByVPCInput{
 			VPCId:     aws.String(vpc.VPCID),
-			VPCRegion: aws.String(vpc.Region),
+			VPCRegion: route53types.VPCRegion(vpc.Region),
 
-			MaxItems: aws.String("100"),
+			MaxItems: aws.Int32(100),
 		}
 
 		var nextToken *string
@@ -274,7 +276,7 @@ func (a *AWSHubActuator) findHostedZone(associatedVPCs []hivev1.AWSAssociatedVPC
 				return "", err
 			}
 			for _, summary := range resp.HostedZoneSummaries {
-				if strings.EqualFold(apiDomain, strings.TrimSuffix(aws.StringValue(summary.Name), ".")) {
+				if strings.EqualFold(apiDomain, strings.TrimSuffix(aws.ToString(summary.Name), ".")) {
 					return *summary.HostedZoneId, nil
 				}
 			}
@@ -325,23 +327,23 @@ func (a *AWSHubActuator) cleanupHostedZone(cd *hivev1.ClusterDeployment, metadat
 	recordsResp, err := a.awsClientHub.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 		HostedZoneId: aws.String(hzID),
 	})
-	if awsErrCodeEquals(err, "NoSuchHostedZone") {
+	if awsclient.ErrCodeEquals(err, "NoSuchHostedZone") {
 		return nil // no more work
 	}
 	if err != nil {
 		return errors.Wrapf(err, "failed to list the hosted zone %s", hzID)
 	}
 	for _, record := range recordsResp.ResourceRecordSets {
-		if *record.Type == "SOA" || *record.Type == "NS" {
+		if record.Type == route53types.RRTypeSoa || record.Type == route53types.RRTypeNs {
 			// can't delete SOA and NS types
 			continue
 		}
 		_, err := a.awsClientHub.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 			HostedZoneId: aws.String(hzID),
-			ChangeBatch: &route53.ChangeBatch{
-				Changes: []*route53.Change{{
-					Action:            aws.String("DELETE"),
-					ResourceRecordSet: record,
+			ChangeBatch: &route53types.ChangeBatch{
+				Changes: []route53types.Change{{
+					Action:            route53types.ChangeActionDelete,
+					ResourceRecordSet: &record,
 				}},
 			},
 		})
@@ -353,7 +355,7 @@ func (a *AWSHubActuator) cleanupHostedZone(cd *hivev1.ClusterDeployment, metadat
 	_, err = a.awsClientHub.DeleteHostedZone(&route53.DeleteHostedZoneInput{
 		Id: aws.String(hzID),
 	})
-	if err != nil && !awsErrCodeEquals(err, "NoSuchHostedZone") {
+	if err != nil && !awsclient.ErrCodeEquals(err, "NoSuchHostedZone") {
 		return errors.Wrapf(err, "error deleting the hosted zone %s", hzID)
 	}
 
@@ -376,9 +378,9 @@ func (a *AWSHubActuator) ReconcileHostedZoneRecords(cd *hivev1.ClusterDeployment
 
 	_, err = a.awsClientHub.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(hostedZoneID),
-		ChangeBatch: &route53.ChangeBatch{
-			Changes: []*route53.Change{{
-				Action:            aws.String(route53.ChangeActionUpsert),
+		ChangeBatch: &route53types.ChangeBatch{
+			Changes: []route53types.Change{{
+				Action:            route53types.ChangeActionUpsert,
 				ResourceRecordSet: rSet,
 			}},
 		},
@@ -389,8 +391,8 @@ func (a *AWSHubActuator) ReconcileHostedZoneRecords(cd *hivev1.ClusterDeployment
 	return true, nil
 }
 
-func (a *AWSHubActuator) recordSet(cd *hivev1.ClusterDeployment, apiDomain string, dnsRecord *actuator.DnsRecord) (*route53.ResourceRecordSet, error) {
-	rSet := &route53.ResourceRecordSet{
+func (a *AWSHubActuator) recordSet(cd *hivev1.ClusterDeployment, apiDomain string, dnsRecord *actuator.DnsRecord) (*route53types.ResourceRecordSet, error) {
+	rSet := &route53types.ResourceRecordSet{
 		Name: aws.String(apiDomain),
 	}
 	if a.config == nil {
@@ -411,12 +413,12 @@ func (a *AWSHubActuator) recordSet(cd *hivev1.ClusterDeployment, apiDomain strin
 			return nil, errors.New("configured to use ip address, but no address found.")
 		}
 
-		rSet.Type = aws.String("A")
+		rSet.Type = route53types.RRTypeA
 		rSet.TTL = aws.Int64(10)
 
 		sort.Strings(dnsRecord.IpAddress)
 		for _, ip := range dnsRecord.IpAddress {
-			rSet.ResourceRecords = append(rSet.ResourceRecords, &route53.ResourceRecord{
+			rSet.ResourceRecords = append(rSet.ResourceRecords, route53types.ResourceRecord{
 				Value: aws.String(ip),
 			})
 		}
@@ -424,11 +426,11 @@ func (a *AWSHubActuator) recordSet(cd *hivev1.ClusterDeployment, apiDomain strin
 		if dnsRecord == nil || dnsRecord.AliasTarget.Name == "" || dnsRecord.AliasTarget.HostedZoneID == "" {
 			return nil, errors.New("configured to use alias target, but no alias target found.")
 		}
-		rSet.Type = aws.String("A")
-		rSet.AliasTarget = &route53.AliasTarget{
+		rSet.Type = route53types.RRTypeA
+		rSet.AliasTarget = &route53types.AliasTarget{
 			DNSName:              &dnsRecord.AliasTarget.Name,
 			HostedZoneId:         &dnsRecord.AliasTarget.HostedZoneID,
-			EvaluateTargetHealth: aws.Bool(false),
+			EvaluateTargetHealth: false,
 		}
 	}
 
@@ -456,13 +458,13 @@ func (a *AWSHubActuator) reconcileHostedZoneAssociations(cd *hivev1.ClusterDeplo
 
 	oldVPCs := sets.NewString()
 	for _, vpc := range zoneResp.VPCs {
-		id := aws.StringValue(vpc.VPCId)
+		id := aws.ToString(vpc.VPCId)
 		oldVPCs.Insert(id)
 		if _, ok := vpcIdx[id]; !ok { // make sure we have info for all VPCs for later use
 			vpcInfo = append(vpcInfo, hivev1.AWSAssociatedVPC{
 				AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 					VPCID:  id,
-					Region: aws.StringValue(vpc.VPCRegion),
+					Region: string(vpc.VPCRegion),
 				},
 			})
 			vpcIdx[id] = len(vpcInfo) - 1
@@ -497,9 +499,9 @@ func (a *AWSHubActuator) reconcileHostedZoneAssociations(cd *hivev1.ClusterDeplo
 			// since this VPC is in different account we need to authorize before continuing
 			_, err := a.awsClientHub.CreateVPCAssociationAuthorization(&route53.CreateVPCAssociationAuthorizationInput{
 				HostedZoneId: aws.String(hostedZoneID),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String(vpc),
-					VPCRegion: aws.String(info.Region),
+					VPCRegion: route53types.VPCRegion(info.Region),
 				},
 			})
 			if err != nil {
@@ -514,9 +516,9 @@ func (a *AWSHubActuator) reconcileHostedZoneAssociations(cd *hivev1.ClusterDeplo
 
 		_, err = awsAssociationClient.AssociateVPCWithHostedZone(&route53.AssociateVPCWithHostedZoneInput{
 			HostedZoneId: aws.String(hostedZoneID),
-			VPC: &route53.VPC{
+			VPC: &route53types.VPC{
 				VPCId:     aws.String(vpc),
-				VPCRegion: aws.String(info.Region),
+				VPCRegion: route53types.VPCRegion(info.Region),
 			},
 		})
 		if err != nil {
@@ -528,9 +530,9 @@ func (a *AWSHubActuator) reconcileHostedZoneAssociations(cd *hivev1.ClusterDeplo
 			// as recommended by AWS best practices.
 			_, err := a.awsClientHub.DeleteVPCAssociationAuthorization(&route53.DeleteVPCAssociationAuthorizationInput{
 				HostedZoneId: aws.String(hostedZoneID),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String(vpc),
-					VPCRegion: aws.String(info.Region),
+					VPCRegion: route53types.VPCRegion(info.Region),
 				},
 			})
 			if err != nil {
@@ -542,9 +544,9 @@ func (a *AWSHubActuator) reconcileHostedZoneAssociations(cd *hivev1.ClusterDeplo
 		info := vpcInfo[vpcIdx[vpc]]
 		_, err = a.awsClientHub.DisassociateVPCFromHostedZone(&route53.DisassociateVPCFromHostedZoneInput{
 			HostedZoneId: aws.String(hostedZoneID),
-			VPC: &route53.VPC{
+			VPC: &route53types.VPC{
 				VPCId:     aws.String(vpc),
-				VPCRegion: aws.String(info.Region),
+				VPCRegion: route53types.VPCRegion(info.Region),
 			},
 		})
 		if err != nil {
@@ -585,7 +587,7 @@ func (a *AWSHubActuator) getAssociatedVPCs(
 func (a *AWSHubActuator) getEndpointVPC(cd *hivev1.ClusterDeployment, metadata *hivev1.ClusterMetadata) (hivev1.AWSAssociatedVPC, error) {
 	endpointVPC := hivev1.AWSAssociatedVPC{}
 	endpointResp, err := a.awsClientHub.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-		Filters: []*ec2.Filter{ec2FilterForCluster(metadata)},
+		Filters: []ec2types.Filter{ec2FilterForCluster(metadata)},
 	})
 	if err != nil {
 		return endpointVPC, errors.Wrap(err, "error getting the VPC Endpoint")

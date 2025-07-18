@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,10 +54,10 @@ func initialURL(c client.Client, key client.ObjectKey) (string, error) {
 }
 
 // ec2FilterForCluster is the filter that is used to find the resources tied to the cluster.
-func ec2FilterForCluster(metadata *hivev1.ClusterMetadata) *ec2.Filter {
-	return &ec2.Filter{
+func ec2FilterForCluster(metadata *hivev1.ClusterMetadata) ec2types.Filter {
+	return ec2types.Filter{
 		Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
-		Values: aws.StringSlice([]string{metadata.InfraID}),
+		Values: []string{metadata.InfraID},
 	}
 }
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -1080,37 +1080,68 @@ func assertDNSZoneConditions(t *testing.T, dnsZone *hivev1.DNSZone, expectedCond
 	}
 }
 
+// mockAPIError creates a mock AWS API error for testing
+type mockAPIError struct {
+	code    string
+	message string
+	err     error
+}
+
+func (e *mockAPIError) Error() string {
+	if e.err != nil {
+		return fmt.Sprintf("%s: %s\ncaused by: %s", e.code, e.message, e.err.Error())
+	}
+	return fmt.Sprintf("%s: %s", e.code, e.message)
+}
+
+func (e *mockAPIError) ErrorCode() string {
+	return e.code
+}
+
+func (e *mockAPIError) ErrorMessage() string {
+	return e.message
+}
+
+func (e *mockAPIError) ErrorFault() smithy.ErrorFault {
+	return smithy.FaultClient
+}
+
 func testCloudError() error {
-	dnsCloudErr := awserr.New("ErrCodeKMSOptInRequired",
-		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: 0604c1a4-0a68-4d1a-b8e6-cdcf68176d71",
-		fmt.Errorf("some cloud error"))
-	return dnsCloudErr
+	return &mockAPIError{
+		code:    "ErrCodeKMSOptInRequired",
+		message: "The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: 0604c1a4-0a68-4d1a-b8e6-cdcf68176d71",
+		err:     fmt.Errorf("some cloud error"),
+	}
 }
 
 func testAccessDeniedExceptionError() error {
-	accessDeniedErr := awserr.New("AccessDeniedException",
-		"User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
-		fmt.Errorf("User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny"))
-	return accessDeniedErr
+	return &mockAPIError{
+		code:    "AccessDeniedException",
+		message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+		err:     fmt.Errorf("User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny"),
+	}
 }
 
 func testUnrecognizedClientExceptionError() error {
-	unrecognizedClientErr := awserr.New("UnrecognizedClientException",
-		"The security token included in the request is invalid.",
-		fmt.Errorf("The security token included in the request is invalid"))
-	return unrecognizedClientErr
+	return &mockAPIError{
+		code:    "UnrecognizedClientException",
+		message: "The security token included in the request is invalid.",
+		err:     fmt.Errorf("The security token included in the request is invalid"),
+	}
 }
 
 func testInvalidSignatureExceptionError() error {
-	invalidSignatureErr := awserr.New("InvalidSignatureException",
-		"The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
-		fmt.Errorf("The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details"))
-	return invalidSignatureErr
+	return &mockAPIError{
+		code:    "InvalidSignatureException",
+		message: "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
+		err:     fmt.Errorf("The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details"),
+	}
 }
 
 func testOptInRequiredError() error {
-	optInReqErr := awserr.New("OptInRequired",
-		"The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: f5afff49-3e3d-46d7-92e5-5f9992757398",
-		fmt.Errorf("The AWS Access Key Id needs a subscription for the service"))
-	return optInReqErr
+	return &mockAPIError{
+		code:    "OptInRequired",
+		message: "The AWS Access Key Id needs a subscription for the service\n\tstatus code: 403, request id: f5afff49-3e3d-46d7-92e5-5f9992757398",
+		err:     fmt.Errorf("The AWS Access Key Id needs a subscription for the service"),
+	}
 }

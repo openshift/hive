@@ -7,8 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
@@ -290,12 +291,12 @@ func masterAMIRefByTag(masterMachine *machineapi.Machine) (bool, error) {
 
 // fetchAvailabilityZones fetches availability zones for the AWS region
 func (a *AWSActuator) fetchAvailabilityZones() ([]string, error) {
-	zoneFilter := &ec2.Filter{
+	zoneFilter := types.Filter{
 		Name:   aws.String("region-name"),
-		Values: []*string{aws.String(a.region)},
+		Values: []string{a.region},
 	}
 	req := &ec2.DescribeAvailabilityZonesInput{
-		Filters: []*ec2.Filter{zoneFilter},
+		Filters: []types.Filter{zoneFilter},
 	}
 	resp, err := a.awsClient.DescribeAvailabilityZones(req)
 	if err != nil {
@@ -303,7 +304,7 @@ func (a *AWSActuator) fetchAvailabilityZones() ([]string, error) {
 	}
 	zones := []string{}
 	for _, zone := range resp.AvailabilityZones {
-		zones = append(zones, *zone.ZoneName)
+		zones = append(zones, aws.ToString(zone.ZoneName))
 	}
 	return zones, nil
 }
@@ -424,12 +425,7 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ic
 		return nil, errors.New(msg)
 	}
 
-	idPointers := make([]*string, len(pool.Spec.Platform.AWS.Subnets))
-	for i, id := range pool.Spec.Platform.AWS.Subnets {
-		idPointers[i] = aws.String(id)
-	}
-
-	results, err := a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: idPointers})
+	results, err := a.awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{SubnetIds: pool.Spec.Platform.AWS.Subnets})
 	if err != nil || len(results.Subnets) == 0 {
 		if strings.Contains(err.Error(), "InvalidSubnet") {
 			conditionMessage := err.Error()
@@ -457,7 +453,7 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ic
 		return nil, err
 	}
 
-	var subnets []*ec2.Subnet
+	var subnets []types.Subnet
 	if numSubnets == numZones {
 		subnets = results.Subnets
 	} else {
@@ -469,24 +465,27 @@ func (a *AWSActuator) getSubnetsByAvailabilityZone(pool *hivev1.MachinePool) (ic
 	return a.validateSubnets(subnets, pool)
 }
 
-func (a *AWSActuator) filterPublicSubnets(subnets []*ec2.Subnet, pool *hivev1.MachinePool) ([]*ec2.Subnet, error) {
+func (a *AWSActuator) filterPublicSubnets(subnets []types.Subnet, pool *hivev1.MachinePool) ([]types.Subnet, error) {
+	if len(subnets) == 0 {
+		return nil, errors.New("no subnets provided")
+	}
 
-	vpc := *subnets[0].VpcId
+	vpc := aws.ToString(subnets[0].VpcId)
 	if vpc == "" {
-		return nil, errors.Errorf("%s has no VPC", *subnets[0].SubnetId)
+		return nil, errors.Errorf("%s has no VPC", aws.ToString(subnets[0].SubnetId))
 	}
 
 	routeTables, err := a.awsClient.DescribeRouteTables(&ec2.DescribeRouteTablesInput{
-		Filters: []*ec2.Filter{{
+		Filters: []types.Filter{{
 			Name:   aws.String("vpc-id"),
-			Values: []*string{aws.String(vpc)},
+			Values: []string{vpc},
 		}},
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "error describing route tables")
 	}
 
-	var privateSubnets, publicSubnets = []*ec2.Subnet{}, []*ec2.Subnet{}
+	var privateSubnets, publicSubnets = []types.Subnet{}, []types.Subnet{}
 	for _, subnet := range subnets {
 		isPublic, err := isSubnetPublic(routeTables.RouteTables, subnet, a.logger)
 		if err != nil {
@@ -515,13 +514,13 @@ func (a *AWSActuator) filterPublicSubnets(subnets []*ec2.Subnet, pool *hivev1.Ma
 const tagNameSubnetPublicELB = "kubernetes.io/role/elb"
 
 // https://github.com/kubernetes/kubernetes/blob/9f036cd43d35a9c41d7ac4ca82398a6d0bef957b/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L3376-L3419
-func isSubnetPublic(rt []*ec2.RouteTable, subnet *ec2.Subnet, logger log.FieldLogger) (bool, error) {
-	subnetID := aws.StringValue(subnet.SubnetId)
-	var subnetTable *ec2.RouteTable
+func isSubnetPublic(rt []types.RouteTable, subnet types.Subnet, logger log.FieldLogger) (bool, error) {
+	subnetID := aws.ToString(subnet.SubnetId)
+	var subnetTable *types.RouteTable
 	for _, table := range rt {
 		for _, assoc := range table.Associations {
-			if aws.StringValue(assoc.SubnetId) == subnetID {
-				subnetTable = table
+			if aws.ToString(assoc.SubnetId) == subnetID {
+				subnetTable = &table
 				break
 			}
 		}
@@ -532,10 +531,10 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnet *ec2.Subnet, logger log.FieldLo
 		// associated with the VPC's main routing table.
 		for _, table := range rt {
 			for _, assoc := range table.Associations {
-				if aws.BoolValue(assoc.Main) {
+				if assoc.Main != nil && *assoc.Main {
 					logger.Debugf("Assuming implicit use of main routing table %s for %s",
-						aws.StringValue(table.RouteTableId), subnetID)
-					subnetTable = table
+						aws.ToString(table.RouteTableId), subnetID)
+					subnetTable = &table
 					break
 				}
 			}
@@ -553,7 +552,7 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnet *ec2.Subnet, logger log.FieldLo
 		// from the default in-subnet route which is called "local"
 		// or other virtual gateway (starting with vgv)
 		// or vpc peering connections (starting with pcx).
-		if strings.HasPrefix(aws.StringValue(route.GatewayId), "igw") {
+		if strings.HasPrefix(aws.ToString(route.GatewayId), "igw") {
 			return true, nil
 		}
 	}
@@ -570,10 +569,10 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnet *ec2.Subnet, logger log.FieldLo
 }
 
 // Finds the value for a given tag.
-func findTag(tags []*ec2.Tag, key string) (string, bool) {
+func findTag(tags []types.Tag, key string) (string, bool) {
 	for _, tag := range tags {
-		if aws.StringValue(tag.Key) == key {
-			return aws.StringValue(tag.Value), true
+		if aws.ToString(tag.Key) == key {
+			return aws.ToString(tag.Value), true
 		}
 	}
 	return "", false
@@ -581,21 +580,21 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 
 // validateSubnets ensures there's exactly one subnet per availability zone, and returns
 // the mapping of subnets by availability zone
-func (a *AWSActuator) validateSubnets(subnets []*ec2.Subnet, pool *hivev1.MachinePool) (icaws.Subnets, error) {
+func (a *AWSActuator) validateSubnets(subnets []types.Subnet, pool *hivev1.MachinePool) (icaws.Subnets, error) {
 	conflictingSubnets := sets.NewString()
 	subnetsByAvailabilityZone := make(icaws.Subnets, len(subnets))
 	for _, subnet := range subnets {
-		if oldSubnet, ok := subnetsByAvailabilityZone[*subnet.AvailabilityZone]; ok {
-			conflictingSubnets.Insert(*subnet.SubnetId)
+		az := aws.ToString(subnet.AvailabilityZone)
+		if oldSubnet, ok := subnetsByAvailabilityZone[az]; ok {
+			conflictingSubnets.Insert(aws.ToString(subnet.SubnetId))
 			conflictingSubnets.Insert(oldSubnet.ID)
 			continue
 		}
-		az := aws.StringValue(subnet.AvailabilityZone)
 		subnetsByAvailabilityZone[az] = icaws.Subnet{
-			ID:   aws.StringValue(subnet.SubnetId),
-			ARN:  aws.StringValue(subnet.SubnetArn),
-			Zone: &icaws.Zone{Name: aws.StringValue(subnet.AvailabilityZone)},
-			CIDR: aws.StringValue(subnet.CidrBlock),
+			ID:   aws.ToString(subnet.SubnetId),
+			ARN:  aws.ToString(subnet.SubnetArn),
+			Zone: &icaws.Zone{Name: aws.ToString(subnet.AvailabilityZone)},
+			CIDR: aws.ToString(subnet.CidrBlock),
 			// TODO: populate local zone fields, Public, ZoneType, ZoneGroupName
 		}
 	}
@@ -641,9 +640,7 @@ func GetVPCIDForMachinePool(awsClient awsclient.Client, pool *hivev1.MachinePool
 	}
 	subnetID := pool.Spec.Platform.AWS.Subnets[0]
 	subnetsOutput, err := awsClient.DescribeSubnets(&ec2.DescribeSubnetsInput{
-		SubnetIds: []*string{
-			aws.String(subnetID),
-		},
+		SubnetIds: []string{subnetID},
 	})
 	if err != nil {
 		return "", err
@@ -652,7 +649,7 @@ func GetVPCIDForMachinePool(awsClient awsclient.Client, pool *hivev1.MachinePool
 	if len(subnetsOutput.Subnets) == 0 {
 		return "", errors.Errorf("DescribeSubnets unexpectedly returned no results for subnet ID %s", subnetID)
 	}
-	vpcID := *subnetsOutput.Subnets[0].VpcId
+	vpcID := aws.ToString(subnetsOutput.Subnets[0].VpcId)
 	if vpcID == "" {
 		return "", errors.Errorf("DescribeSubnets unexpectedly returned subnet %s without a VPC ID", subnetID)
 	}

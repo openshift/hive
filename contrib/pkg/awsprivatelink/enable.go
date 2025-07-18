@@ -6,8 +6,9 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -119,10 +120,10 @@ func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 	// Get active cluster's VPC, filtering by infra-id
 	targetTagKey := "kubernetes.io/cluster/" + o.infraId
 	describeVPCsOutput, err := o.awsClients.DescribeVpcs(&ec2.DescribeVpcsInput{
-		Filters: []*ec2.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   aws.String("tag-key"),
-				Values: []*string{aws.String(targetTagKey)},
+				Values: []string{targetTagKey},
 			},
 		},
 	})
@@ -135,7 +136,7 @@ func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 	if len(describeVPCsOutput.Vpcs) > 1 {
 		log.Fatalf("Multiple VPCs found with tag key %s, cannot determine VPC of the active cluster", targetTagKey)
 	}
-	vpcID := *describeVPCsOutput.Vpcs[0].VpcId
+	vpcID := aws.ToString(describeVPCsOutput.Vpcs[0].VpcId)
 	log.Debugf("Found VPC ID = %v for the active cluster", vpcID)
 
 	hiveNS := operatorutils.GetHiveNamespace(hiveConfig)

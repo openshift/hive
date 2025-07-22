@@ -289,14 +289,15 @@ func deleteVpcPeeringConnection(awsClients awsclient.Client, VpcId1, VpcId2 stri
 	}); err != nil {
 		return err
 	}
-	log.Debugf("The deletion of VPC peering connection %v has been initiated", *VpcPeeringConnectionId)
+	pcid := aws.ToString(VpcPeeringConnectionId)
+	log.WithField("VpcPeeringConnectionId", pcid).Debug("The deletion of VPC peering connection has been initiated")
 
 	if err = awsClients.WaitUntilVpcPeeringConnectionDeleted(&ec2.DescribeVpcPeeringConnectionsInput{
-		VpcPeeringConnectionIds: []string{aws.ToString(VpcPeeringConnectionId)},
+		VpcPeeringConnectionIds: []string{pcid},
 	}); err != nil {
 		return err
 	}
-	log.Debugf("VPC peering connection %v deleted", *VpcPeeringConnectionId)
+	log.WithField("VpcPeeringConnectionId", pcid).Debug("VPC peering connection deleted")
 
 	return nil
 }
@@ -323,15 +324,16 @@ func deleteRouteFromRouteTables(
 					RouteTableId:         routeTable.RouteTableId,
 					DestinationCidrBlock: peerCIDR,
 				})
+				logger := log.WithField("RouteTableId", aws.ToString(routeTable.RouteTableId))
 				if err != nil {
 					// Proceed if route not found, fail otherwise
 					if awsclient.ErrCodeEquals(err, "InvalidRoute.NotFound") {
-						log.Warnf("Route not found in route table %v", *routeTable.RouteTableId)
+						logger.Warn("Route not found in route table")
 					} else {
-						log.WithError(err).Fatalf("Failed to delete route from route table %v", *routeTable.RouteTableId)
+						logger.WithError(err).Fatal("Failed to delete route from route table")
 					}
 				} else {
-					log.Debugf("Route deleted from route table %v", *routeTable.RouteTableId)
+					logger.Debug("Route deleted from route table")
 				}
 			}
 

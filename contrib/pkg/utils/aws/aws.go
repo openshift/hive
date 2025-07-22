@@ -165,8 +165,8 @@ func GetInfraIdFromVpcId(awsClients awsclient.Client, vpcId string) (string, err
 
 	targetPrefix := "kubernetes.io/cluster/"
 	for _, tag := range describeVpcsOutput.Vpcs[0].Tags {
-		if strings.HasPrefix(*tag.Key, targetPrefix) {
-			return strings.Replace(*tag.Key, targetPrefix, "", 1), nil
+		if k := aws.ToString(tag.Key); strings.HasPrefix(k, targetPrefix) {
+			return strings.Replace(k, targetPrefix, "", 1), nil
 		}
 	}
 	return "", fmt.Errorf("no tag with prefix %v found on VPC %v", targetPrefix, vpcId)
@@ -194,7 +194,7 @@ func GetWorkerSGFromVpcId(awsClients awsclient.Client, vpcId string) (string, er
 		return "", fmt.Errorf("worker SG not found for VPC %v", vpcId)
 	}
 
-	return *describeSecurityGroupsOutput.SecurityGroups[0].GroupId, err
+	return aws.ToString(describeSecurityGroupsOutput.SecurityGroups[0].GroupId), err
 }
 
 // GetCIDRFromVpcId gets the CIDR block of a VPC using the ID of it.
@@ -208,7 +208,7 @@ func GetCIDRFromVpcId(awsClients awsclient.Client, vpcId string) (string, error)
 		return "", err
 	}
 
-	return *describeVpcOutput.Vpcs[0].CidrBlock, nil
+	return aws.ToString(describeVpcOutput.Vpcs[0].CidrBlock), nil
 }
 
 // GetAWSCreds reads AWS credentials either from either the specified credentials file,

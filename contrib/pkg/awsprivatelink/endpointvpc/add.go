@@ -120,8 +120,8 @@ func (o *endpointVPCAddOptions) Validate(cmd *cobra.Command, args []string) erro
 		},
 		func(page *ec2.DescribeSubnetsOutput, lastPage bool) bool {
 			for _, subnet := range page.Subnets {
-				if *subnet.VpcId != o.endpointVpcId {
-					log.Fatalf("Subnet %v does not belong to the endpoint VPC", *subnet.SubnetId)
+				if aws.ToString(subnet.VpcId) != o.endpointVpcId {
+					log.WithField("subnet", aws.ToString(subnet.SubnetId)).Fatal("Subnet does not belong to the endpoint VPC")
 				}
 			}
 			return !lastPage
@@ -163,7 +163,10 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 		vpcPeeringConnectionId := acceptVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId
 		associatedVpcCIDR := acceptVpcPeeringConnectionOutput.VpcPeeringConnection.RequesterVpcInfo.CidrBlock
 		endpointVpcCIDR := acceptVpcPeeringConnectionOutput.VpcPeeringConnection.AccepterVpcInfo.CidrBlock
-		log.Debugf("Found associated VPC CIDR = %v, endpoint VPC CIDR = %v", *associatedVpcCIDR, *endpointVpcCIDR)
+		log.WithFields(log.Fields{
+			"associated": aws.ToString(associatedVpcCIDR),
+			"endpoint":   aws.ToString(endpointVpcCIDR),
+		}).Debug("Found associated CIDRs")
 
 		// Update route tables
 		log.Info("Adding route to private route tables of the associated VPC")
@@ -281,8 +284,8 @@ func (o *endpointVPCAddOptions) addEndpointVpcToHiveConfig() {
 		func(page *ec2.DescribeSubnetsOutput, lastPage bool) bool {
 			for _, subnet := range page.Subnets {
 				endpointSubnet := hivev1.AWSPrivateLinkSubnet{
-					SubnetID:         *subnet.SubnetId,
-					AvailabilityZone: *subnet.AvailabilityZone,
+					SubnetID:         aws.ToString(subnet.SubnetId),
+					AvailabilityZone: aws.ToString(subnet.AvailabilityZone),
 				}
 				endpointSubnets = append(endpointSubnets, endpointSubnet)
 			}
@@ -352,12 +355,12 @@ func addRouteToRouteTables(
 				if err != nil {
 					// Proceed if route already exists, fail otherwise
 					if awsclient.ErrCodeEquals(err, "RouteAlreadyExists") {
-						log.Warnf("Route already exists in route table %v", *routeTable.RouteTableId)
+						log.WithField("routeTableId", aws.ToString(routeTable.RouteTableId)).Warn("Route already exists in route table")
 					} else {
-						log.WithError(err).Fatalf("Failed to create route for route table %v", *routeTable.RouteTableId)
+						log.WithField("routeTableId", aws.ToString(routeTable.RouteTableId)).WithError(err).Fatal("Failed to create route for route table")
 					}
 				} else {
-					log.Debugf("Route added to route table %v", *routeTable.RouteTableId)
+					log.WithField("routeTableId", aws.ToString(routeTable.RouteTableId)).Debug("Route added to route table")
 				}
 			}
 
@@ -381,16 +384,17 @@ func setupVpcPeeringConnection(
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Nil pointer check?
-	log.Debugf("VPC peering connection %v requested", *createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)
+
+	pcid := aws.ToString(createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)
+	log.WithField("VpcPeeringConnectionId", pcid).Debug("VPC peering connection requested")
 
 	err = endpointVpcClients.WaitUntilVpcPeeringConnectionExists(&ec2.DescribeVpcPeeringConnectionsInput{
-		VpcPeeringConnectionIds: []string{*createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId},
+		VpcPeeringConnectionIds: []string{pcid},
 	})
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("VPC peering connection %v exists", *createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)
+	log.WithField("VpcPeeringConnectionId", pcid).Debug("VPC peering connection exists")
 
 	acceptVpcPeeringConnectionOutput, err := endpointVpcClients.AcceptVpcPeeringConnection(&ec2.AcceptVpcPeeringConnectionInput{
 		VpcPeeringConnectionId: createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId,
@@ -398,7 +402,8 @@ func setupVpcPeeringConnection(
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("VPC peering connection %v accepted", *acceptVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)
+	log.WithField("VpcPeeringConnectionId", aws.ToString(acceptVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)).
+		Debugf("VPC peering connection accepted")
 
 	return acceptVpcPeeringConnectionOutput, nil
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
-	"github.com/aws/aws-sdk-go-v2/service/route53/types"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	"github.com/openshift/hive/pkg/awsclient"
 )
@@ -107,27 +107,27 @@ func (o *HookOptions) modifyDNSRecord(remove bool) error {
 	if err != nil {
 		return errors.Wrap(err, "cannot create AWS client")
 	}
-	action := types.ChangeActionCreate
+	action := route53types.ChangeActionCreate
 	if remove {
-		action = types.ChangeActionDelete
+		action = route53types.ChangeActionDelete
 	}
-	change := types.Change{
+	change := route53types.Change{
 		Action: action,
-		ResourceRecordSet: &types.ResourceRecordSet{
+		ResourceRecordSet: &route53types.ResourceRecordSet{
 			Name: aws.String(fmt.Sprintf("_acme-challenge.%s.", o.Domain)),
-			ResourceRecords: []types.ResourceRecord{
+			ResourceRecords: []route53types.ResourceRecord{
 				{
 					Value: aws.String(fmt.Sprintf("%q", o.Value)),
 				},
 			},
-			Type: types.RRTypeTxt,
+			Type: route53types.RRTypeTxt,
 			TTL:  aws.Int64(30),
 		},
 	}
 	_, err = client.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: aws.String(o.HostedZoneID),
-		ChangeBatch: &types.ChangeBatch{
-			Changes: []types.Change{change},
+		ChangeBatch: &route53types.ChangeBatch{
+			Changes: []route53types.Change{change},
 		},
 	})
 	if err != nil {

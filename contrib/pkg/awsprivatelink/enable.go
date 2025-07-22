@@ -136,7 +136,7 @@ func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 	if len(describeVPCsOutput.Vpcs) > 1 {
 		log.Fatalf("Multiple VPCs found with tag key %s, cannot determine VPC of the active cluster", targetTagKey)
 	}
-	vpcID := *describeVPCsOutput.Vpcs[0].VpcId
+	vpcID := aws.ToString(describeVPCsOutput.Vpcs[0].VpcId)
 	log.Debugf("Found VPC ID = %v for the active cluster", vpcID)
 
 	hiveNS := operatorutils.GetHiveNamespace(hiveConfig)

@@ -140,16 +140,7 @@ func (c *awsClient) DescribeSubnets(input *ec2.DescribeSubnetsInput) (*ec2.Descr
 
 func (c *awsClient) DescribeSubnetsPages(input *ec2.DescribeSubnetsInput, fn func(*ec2.DescribeSubnetsOutput, bool) bool) error {
 	metricAWSAPICalls.WithLabelValues("DescribeSubnetsPages").Inc()
-	paginator := ec2.NewDescribeSubnetsPaginator(c.ec2Client, input)
-	cont := true
-	for hasMore := paginator.HasMorePages(); hasMore && cont; hasMore = paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.TODO())
-		if err != nil {
-			return err
-		}
-		cont = fn(page, hasMore)
-	}
-	return nil
+	return Paginator(ec2.NewDescribeSubnetsPaginator(c.ec2Client, input), fn)
 }
 
 func (c *awsClient) DescribeRouteTables(input *ec2.DescribeRouteTablesInput) (*ec2.DescribeRouteTablesOutput, error) {
@@ -159,16 +150,7 @@ func (c *awsClient) DescribeRouteTables(input *ec2.DescribeRouteTablesInput) (*e
 
 func (c *awsClient) DescribeRouteTablesPages(input *ec2.DescribeRouteTablesInput, fn func(*ec2.DescribeRouteTablesOutput, bool) bool) error {
 	metricAWSAPICalls.WithLabelValues("DescribeRouteTablesPages").Inc()
-	paginator := ec2.NewDescribeRouteTablesPaginator(c.ec2Client, input)
-	cont := true
-	for hasMore := paginator.HasMorePages(); hasMore && cont; hasMore = paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.TODO())
-		if err != nil {
-			return err
-		}
-		cont = fn(page, hasMore)
-	}
-	return nil
+	return Paginator(ec2.NewDescribeRouteTablesPaginator(c.ec2Client, input), fn)
 }
 
 func (c *awsClient) CreateRoute(input *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
@@ -290,16 +272,7 @@ func (c *awsClient) DescribeVpcEndpoints(input *ec2.DescribeVpcEndpointsInput) (
 
 func (c *awsClient) DescribeVpcEndpointsPages(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) error {
 	metricAWSAPICalls.WithLabelValues("DescribeVpcEndpointsPages").Inc()
-	paginator := ec2.NewDescribeVpcEndpointsPaginator(c.ec2Client, input)
-	cont := true
-	for hasMore := paginator.HasMorePages(); hasMore && cont; hasMore = paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.TODO())
-		if err != nil {
-			return err
-		}
-		cont = fn(page, hasMore)
-	}
-	return nil
+	return Paginator(ec2.NewDescribeVpcEndpointsPaginator(c.ec2Client, input), fn)
 }
 
 func (c *awsClient) DescribeNetworkInterfaces(input *ec2.DescribeNetworkInterfacesInput) (*ec2.DescribeNetworkInterfacesOutput, error) {
@@ -368,16 +341,7 @@ func (c *awsClient) DeleteHostedZone(input *route53.DeleteHostedZoneInput) (*rou
 
 func (c *awsClient) GetResourcesPages(input *resourcegroupstaggingapi.GetResourcesInput, fn func(*resourcegroupstaggingapi.GetResourcesOutput, bool) bool) error {
 	metricAWSAPICalls.WithLabelValues("GetResourcesPages").Inc()
-	paginator := resourcegroupstaggingapi.NewGetResourcesPaginator(c.tagClient, input)
-	cont := true
-	for hasMore := paginator.HasMorePages(); hasMore && cont; hasMore = paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.TODO())
-		if err != nil {
-			return err
-		}
-		cont = fn(page, hasMore)
-	}
-	return nil
+	return Paginator(resourcegroupstaggingapi.NewGetResourcesPaginator(c.tagClient, input), fn)
 }
 
 func (c *awsClient) ListResourceRecordSets(input *route53.ListResourceRecordSetsInput) (*route53.ListResourceRecordSetsOutput, error) {
@@ -413,6 +377,23 @@ func (c *awsClient) DisassociateVPCFromHostedZone(input *route53.DisassociateVPC
 func (c *awsClient) GetCallerIdentity(input *sts.GetCallerIdentityInput) (*sts.GetCallerIdentityOutput, error) {
 	metricAWSAPICalls.WithLabelValues("GetCallerIdentity").Inc()
 	return c.stsClient.GetCallerIdentity(context.TODO(), input)
+}
+
+type IPaginator[Out any, OptFn any] interface {
+	HasMorePages() bool
+	NextPage(context.Context, ...OptFn) (*Out, error)
+}
+
+func Paginator[P IPaginator[Out, OptFn], Out any, OptFn any](awsPaginator P, fn func(*Out, bool) bool) error {
+	for hasMore, cont := awsPaginator.HasMorePages(), true; hasMore && cont; {
+		page, err := awsPaginator.NextPage(context.TODO())
+		if err != nil {
+			return err
+		}
+		hasMore = awsPaginator.HasMorePages()
+		cont = fn(page, !hasMore)
+	}
+	return nil
 }
 
 func newClientFromConfig(cfg aws.Config) Client {

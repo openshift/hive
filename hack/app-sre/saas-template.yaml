@@ -11040,6 +11040,8 @@ objects:
       subresources:
         status: {}
 - apiVersion: v1
+  imagePullSecrets:
+  - name: quay.io
   kind: ServiceAccount
   metadata:
     name: hive-operator

@@ -294,7 +294,12 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetByPathWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
+		_, err := util.ApplyResource(h, assetPath, util.ApplyConfig{
+			NamespaceOverride: &hiveNSName,
+			HiveConfig:        instance,
+			Logger:            hLog.WithField("asset", assetPath),
+		})
+		if err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -307,7 +312,11 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/controllers/hive_controllers_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if err := util.ApplyAssetWithGC(h, a, instance, hLog); err != nil {
+		_, err := util.ApplyResource(h, a, util.ApplyConfig{
+			HiveConfig: instance,
+			Logger:     hLog.WithField("asset", a),
+		})
+		if err != nil {
 			hLog.WithField("asset", a).WithError(err).Error("error applying asset")
 			return err
 		}
@@ -319,8 +328,14 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/controllers/hive_controllers_role_binding.yaml",
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
-
-		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, instance); err != nil {
+		rb := resourceread.ReadClusterRoleBindingV1OrDie(assets.MustAsset(crbAsset))
+		_, err := util.ApplyResource(h, rb, util.ApplyConfig{
+			NamespaceOverride:                  &hiveNSName,
+			HiveConfig:                         instance,
+			OverrideClusterRoleBindingSubjects: true,
+			Logger:                             hLog.WithField("asset", crbAsset),
+		})
+		if err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
@@ -341,7 +356,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if r.isOpenShift {
 		hLog.Info("deploying OpenShift specific assets")
 		for _, a := range openshiftSpecificAssets {
-			err = util.ApplyAssetWithGC(h, a, instance, hLog)
+			_, err := util.ApplyResource(h, a, util.ApplyConfig{
+				HiveConfig: instance,
+				Logger:     hLog.WithField("asset", a),
+			})
 			if err != nil {
 				return err
 			}
@@ -355,7 +373,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	hiveDeployment.Spec.Template.Spec.Tolerations = r.tolerations
 
 	hiveDeployment.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObjectWithGC(h, hiveDeployment, instance)
+	result, err := util.ApplyResource(h, hiveDeployment, util.ApplyConfig{
+		HiveConfig: instance,
+		Logger:     hLog,
+	})
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
@@ -414,7 +435,10 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 			"ca.crt": additionalCA.Bytes(),
 		},
 	}
-	result, err := util.ApplyRuntimeObjectWithGC(h, caSecret, instance)
+	result, err := util.ApplyResource(h, caSecret, util.ApplyConfig{
+		HiveConfig: instance,
+		Logger:     hLog,
+	})
 	if err != nil {
 		hLog.WithError(err).Error("error applying additional cert secret")
 		return err

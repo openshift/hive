@@ -1,12 +1,12 @@
 package util
 
 import (
-	"strings"
+	"fmt"
 
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,68 +19,103 @@ import (
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
-// ApplyAsset loads a path from our bindata assets and applies it to the cluster. This function does not apply
-// a HiveConfig owner reference for garbage collection, and should only be used for resources we explicitly want
-// to leave orphaned when Hive is uninstalled. See ApplyAssetWithGC for the more common use case.
-func ApplyAsset(h resource.Helper, assetPath string, hLog log.FieldLogger) error {
-	assetLog := hLog.WithField("asset", assetPath)
-	assetLog.Debug("reading asset")
-	asset := assets.MustAsset(assetPath)
-	assetLog.Debug("applying asset")
-	result, err := h.Apply(asset)
-	if err != nil {
-		assetLog.WithError(err).Error("error applying asset")
-		return err
-	}
-	assetLog.Infof("asset applied successfully: %v", result)
-	return nil
+// ApplyConfig holds configuration options for applying runtime objects
+type ApplyConfig struct {
+	// NamespaceOverride overrides the namespace of the object before applying
+	NamespaceOverride *string
+	// HiveConfig adds an owner reference for garbage collection if provided
+	HiveConfig *hivev1.HiveConfig
+	// Logger for logging apply operations
+	Logger log.FieldLogger
+	// OverrideClusterRoleBindingSubjects overrides the namespace on ClusterRoleBinding subjects
+	OverrideClusterRoleBindingSubjects bool
 }
 
-// ApplyAssetWithGC loads a path from our bindata assets, adds an OwnerReference to the HiveConfig
-// for garbage collection (used when uninstalling Hive), and applies it to the cluster.
-func ApplyAssetWithGC(h resource.Helper, assetPath string, hc *hivev1.HiveConfig, hLog log.FieldLogger) error {
-	assetLog := hLog.WithField("asset", assetPath)
-	assetLog.Info("reading asset")
-	runtimeObj, err := readRuntimeObject(assetPath)
-	if err != nil {
-		return err
+// ApplyResource applies a resource with the specified configuration options.
+// This is the consolidated function that handles all input types and apply variations.
+//
+// Supported input types:
+// - runtime.Object: applied directly
+// - string: treated as asset path, loaded and decoded
+// - []byte: decoded as runtime object
+func ApplyResource(h resource.Helper, input interface{}, config ApplyConfig) (resource.ApplyResult, error) {
+	var runtimeObj runtime.Object
+	var err error
+
+	// Convert input to runtime.Object based on type
+	switch v := input.(type) {
+	case runtime.Object:
+		runtimeObj = v
+	case string:
+		// Treat as asset path
+		runtimeObj, err = readRuntimeObject(v)
+		if err != nil {
+			return resource.UnknownApplyResult, errors.Wrapf(err, "failed to read runtime object from asset path: %s", v)
+		}
+	case []byte:
+		// Treat as asset bytes
+		runtimeObj, err = decodeRuntimeObject(v)
+		if err != nil {
+			return resource.UnknownApplyResult, errors.Wrap(err, "failed to decode runtime object from bytes")
+		}
+	default:
+		return resource.UnknownApplyResult, fmt.Errorf("unsupported input type: %T (supported: runtime.Object, string, []byte)", input)
 	}
-	assetLog.Info("applying asset with GC")
-	result, err := ApplyRuntimeObjectWithGC(h, runtimeObj, hc)
-	if err != nil {
-		assetLog.WithError(err).Error("error applying asset")
-		return err
-	}
-	assetLog.Infof("asset applied successfully: %v", result)
-	return nil
+
+	return applyRuntimeObject(h, runtimeObj, config)
 }
 
-// ApplyAssetByPathWithNSOverrideAndGC loads the given asset, overrides the namespace, adds an owner reference to
-// HiveConfig for uninstall, and applies it to the cluster.
-func ApplyAssetByPathWithNSOverrideAndGC(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
-	requiredObj, err := readRuntimeObject(assetPath)
-	if err != nil {
-		return errors.Wrapf(err, "unable to decode asset: %s", assetPath)
+// applyRuntimeObject applies a runtime object with the specified configuration options.
+// This function is used internally by ApplyResource.
+func applyRuntimeObject(h resource.Helper, runtimeObj runtime.Object, config ApplyConfig) (resource.ApplyResult, error) {
+	// Apply namespace override
+	if config.NamespaceOverride != nil {
+		obj, err := meta.Accessor(runtimeObj)
+		if err != nil {
+			return resource.UnknownApplyResult, err
+		}
+		obj.SetNamespace(*config.NamespaceOverride)
 	}
-	return ApplyRuntimeObjectWithNSOverrideAndGC(h, requiredObj, namespaceOverride, hiveConfig)
-}
 
-func ApplyAssetBytesWithNSOverrideAndGC(h resource.Helper, assetBytes []byte, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
-	rtObj, err := decodeRuntimeObject(assetBytes)
-	if err != nil {
-		return errors.Wrap(err, "unable to decode asset")
+	// Handle special ClusterRoleBinding subject namespace override
+	if config.OverrideClusterRoleBindingSubjects && config.NamespaceOverride != nil {
+		if rb, ok := runtimeObj.(*rbacv1.ClusterRoleBinding); ok {
+			for i := range rb.Subjects {
+				if rb.Subjects[i].Kind == "ServiceAccount" || rb.Subjects[i].Namespace != "" {
+					rb.Subjects[i].Namespace = *config.NamespaceOverride
+				}
+			}
+		}
 	}
-	return ApplyRuntimeObjectWithNSOverrideAndGC(h, rtObj, namespaceOverride, hiveconfig)
-}
 
-func ApplyRuntimeObjectWithNSOverrideAndGC(h resource.Helper, requiredObj runtime.Object, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
-	obj, _ := meta.Accessor(requiredObj)
-	obj.SetNamespace(namespaceOverride)
-
-	if _, err := ApplyRuntimeObjectWithGC(h, requiredObj, hiveConfig); err != nil {
-		return errors.Wrap(err, "unable to apply asset")
+	// Apply owner reference for garbage collection
+	if config.HiveConfig != nil {
+		obj, err := meta.Accessor(runtimeObj)
+		if err != nil {
+			return resource.UnknownApplyResult, err
+		}
+		ownerRef := v1.OwnerReference{
+			APIVersion:         config.HiveConfig.APIVersion,
+			Kind:               config.HiveConfig.Kind,
+			Name:               config.HiveConfig.Name,
+			UID:                config.HiveConfig.UID,
+			BlockOwnerDeletion: ptr.To(true),
+		}
+		// This assumes we have full control of owner references for these resources the operator creates.
+		obj.SetOwnerReferences([]v1.OwnerReference{ownerRef})
 	}
-	return nil
+
+	// Log the operation
+	if config.Logger != nil {
+		action := "applying runtime object"
+		if config.HiveConfig != nil {
+			action += " with GC"
+		}
+		config.Logger.Info(action)
+	}
+
+	// Apply the object
+	return h.ApplyRuntimeObject(runtimeObj, scheme.GetScheme())
 }
 
 func DeleteAssetByPathWithNSOverride(h resource.Helper, assetPath, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
@@ -88,7 +123,7 @@ func DeleteAssetByPathWithNSOverride(h resource.Helper, assetPath, namespaceOver
 	if err != nil {
 		return errors.Wrapf(err, "unable to decode asset: %s", assetPath)
 	}
-	return DeleteRuntimeObjectWithNSOverride(h, requiredObj, namespaceOverride, hiveconfig)
+	return deleteRuntimeObjectWithNSOverride(h, requiredObj, namespaceOverride, hiveconfig)
 }
 
 func DeleteAssetBytesWithNSOverride(h resource.Helper, assetBytes []byte, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
@@ -96,51 +131,16 @@ func DeleteAssetBytesWithNSOverride(h resource.Helper, assetBytes []byte, namesp
 	if err != nil {
 		return errors.Wrap(err, "unable to decode asset")
 	}
-	return DeleteRuntimeObjectWithNSOverride(h, rtObj, namespaceOverride, hiveconfig)
+	return deleteRuntimeObjectWithNSOverride(h, rtObj, namespaceOverride, hiveconfig)
 }
 
-func DeleteRuntimeObjectWithNSOverride(h resource.Helper, requiredObj runtime.Object, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
+func deleteRuntimeObjectWithNSOverride(h resource.Helper, requiredObj runtime.Object, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
 	objA, _ := meta.Accessor(requiredObj)
 	objT, _ := meta.TypeAccessor(requiredObj)
 	if err := h.Delete(objT.GetAPIVersion(), objT.GetKind(), namespaceOverride, objA.GetName()); err != nil {
 		return errors.Wrapf(err, "unable to delete asset")
 	}
 	return nil
-}
-
-// ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC loads the given asset, overrides the namespace on the subject,
-// adds an owner reference to HiveConfig for uninstall, and applies it to the cluster.
-func ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h resource.Helper, roleBindingAssetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
-
-	rb := resourceread.ReadClusterRoleBindingV1OrDie(assets.MustAsset(roleBindingAssetPath))
-	for i := range rb.Subjects {
-		if rb.Subjects[i].Kind == "ServiceAccount" || rb.Subjects[i].Namespace != "" {
-			rb.Subjects[i].Namespace = namespaceOverride
-		}
-	}
-	_, err := ApplyRuntimeObjectWithGC(h, rb, hiveConfig)
-	if err != nil {
-		return errors.Wrapf(err, "unable to apply asset: %s", roleBindingAssetPath)
-	}
-	return nil
-}
-
-// ApplyRuntimeObjectWithGC adds an OwnerReference to the HiveConfig on the runtime object, and applies it to the cluster.
-func ApplyRuntimeObjectWithGC(h resource.Helper, runtimeObj runtime.Object, hc *hivev1.HiveConfig) (resource.ApplyResult, error) {
-	obj, err := meta.Accessor(runtimeObj)
-	if err != nil {
-		return resource.UnknownApplyResult, err
-	}
-	ownerRef := v1.OwnerReference{
-		APIVersion:         hc.APIVersion,
-		Kind:               hc.Kind,
-		Name:               hc.Name,
-		UID:                hc.UID,
-		BlockOwnerDeletion: ptr.To(true),
-	}
-	// This assumes we have full control of owner references for these resources the operator creates.
-	obj.SetOwnerReferences([]v1.OwnerReference{ownerRef})
-	return h.ApplyRuntimeObject(runtimeObj, scheme.GetScheme())
 }
 
 func readRuntimeObject(assetPath string) (runtime.Object, error) {
@@ -150,15 +150,4 @@ func readRuntimeObject(assetPath string) (runtime.Object, error) {
 func decodeRuntimeObject(assetBytes []byte) (runtime.Object, error) {
 	obj, _, err := serializer.NewCodecFactory(scheme.GetScheme()).UniversalDeserializer().Decode(assetBytes, nil, nil)
 	return obj, err
-}
-
-// IsNoSuchCRD inspects an error and determines whether it is similar to this:
-// "could not get mapping: no matches for kind \"ServiceMonitor\" in version \"monitoring.coreos.com/v1\""
-// In certain circumstances -- e.g. deploying hive on non-openshift with monitoring disabled -- these
-// errors may be spurious and ignorable.
-func IsNoSuchCRD(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "no matches for kind")
 }

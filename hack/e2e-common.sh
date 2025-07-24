@@ -94,6 +94,35 @@ CLUSTER_PROFILE_DIR="${CLUSTER_PROFILE_DIR:-/tmp/cluster}"
 CLOUD="${CLOUD:-aws}"
 export ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp}"
 
+if [[ "${CLOUD}" == "nutanix" ]]; then
+  if [[ -z "${SHARED_DIR}" ]]; then
+    echo "Variable 'SHARED_DIR' not set."
+    exit 1
+  fi
+
+  NUTANIX_MANIFESTS_DIR="${SHARED_DIR}/hive-manifests"
+  if ! mkdir -p "${NUTANIX_MANIFESTS_DIR}"; then
+    echo "Failed to create manifests directory '${NUTANIX_MANIFESTS_DIR}'"
+    exit 1
+  fi
+
+  files_found=0
+  while IFS= read -r -d '' item; do
+    ((files_found++))
+    manifest="$(basename "${item}")"
+    if ! cp "${item}" "${NUTANIX_MANIFESTS_DIR}/${manifest##manifest_}"; then
+      echo "Warning: Failed to copy '${item}' to '${NUTANIX_MANIFESTS_DIR}/${manifest##manifest_}'"
+      ((files_found--))
+    fi
+  done < <(find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -size +0c -print0)
+
+  if [[ $files_found -eq 0 ]]; then
+    echo "No non-empty manifest files found in ${SHARED_DIR}"
+    exit 1
+  fi
+  echo "Found and successfully copied ${files_found} non-empty manifest files from ${SHARED_DIR} to ${NUTANIX_MANIFESTS_DIR}"
+fi
+
 SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:-${CLUSTER_PROFILE_DIR}/ssh-publickey}"
 # If not specified or nonexistent, generate a keypair to use
 if ! [[ -s "${SSH_PUBLIC_KEY_FILE}" ]]; then
@@ -257,20 +286,22 @@ case "${CLOUD}" in
       --vsphere-ingress-vip=$VSPHERE_INGRESS_VIP"
   ;;
 "nutanix")
-
   USE_MANAGED_DNS=false
+  CREDS_FILE_ARG="--creds-file=${SHARED_DIR}/credentials"
+  BASE_DOMAIN="${BASE_DOMAIN:-nutanix-ci.devcluster.openshift.com}"
   EXTRA_CREATE_CLUSTER_ARGS="--nutanix-pc-address=${NUTANIX_HOST} \
       --nutanix-pc-port=${NUTANIX_PORT:-9440} \
       --nutanix-pe-address=${PE_HOST} \
       --nutanix-pe-port=${PE_PORT:-9440} \
-      --nutanix-ca-certs=${NUTANIX_CERT:-}
+      --nutanix-ca-certs=${NUTANIX_CERT:-} \
       --nutanix-pe-uuid=${PE_UUID} \
       --nutanix-pe-name=${PE_NAME} \
       --nutanix-subnetUUIDs=${SUBNET_UUID} \
-      --nutanix-az-name=${NUTANIX_AZ_NAME-Local_AZ} \
-      --manifests=${MANIFESTS} \
-      --nutanix-api-vip=$API_VIP \
-      --nutanix-ingress-vip=$INGRESS_VIP"
+      --nutanix-az-name=${NUTANIX_AZ_NAME:-Local_AZ} \
+      --manifests=${NUTANIX_MANIFESTS_DIR} \
+      --credentials-mode-manual \
+      --nutanix-api-vip=$HIVE_API_VIP \
+      --nutanix-ingress-vip=$HIVE_INGRESS_VIP"
   ;;
 "openstack")
   CREDS_FILE_ARG="--creds-file=${SHARED_DIR}/clouds.yaml"

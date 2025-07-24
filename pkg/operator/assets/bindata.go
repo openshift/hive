@@ -749,6 +749,9 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: hiveadmission
+imagePullSecrets:
+# TODO: don't hardcode this in this file.  As far as I can tell, this is harmless if the secret doesn't exist
+- name: quay.io
 `)
 
 func configHiveadmissionServiceAccountYamlBytes() ([]byte, error) {
@@ -1089,7 +1092,9 @@ kind: ServiceAccount
 metadata:
   name: hive-controllers
   namespace: hive
-`)
+imagePullSecrets:
+# TODO: don't hardcode this in this file.  As far as I can tell, this is harmless if the secret doesn't exist
+- name: quay.io`)
 
 func configControllersHive_controllers_serviceaccountYamlBytes() ([]byte, error) {
 	return _configControllersHive_controllers_serviceaccountYaml, nil

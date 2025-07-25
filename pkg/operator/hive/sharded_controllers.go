@@ -157,7 +157,7 @@ func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, a := range namespacedAssets {
-		if err := util.ApplyAssetBytesWithNSOverrideAndGC(h, a.processed, hiveNSName, hiveconfig); err != nil {
+		if _, err := util.ApplyRuntimeObject(h, util.FromBytes(a.processed), hLog, util.WithNamespaceOverride(hiveNSName), util.WithGarbageCollection(hiveconfig)); err != nil {
 			hLog.WithError(err).WithField("asset", a.path).Error("error applying object with namespace override")
 			return err
 		}
@@ -240,7 +240,7 @@ func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h
 	newStatefulSet.Spec.Template.Spec.Tolerations = r.tolerations
 
 	newStatefulSet.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObjectWithGC(h, newStatefulSet, hiveconfig)
+	result, err := util.ApplyRuntimeObject(h, util.Passthrough(newStatefulSet), hLog, util.WithGarbageCollection(hiveconfig))
 	if err != nil {
 		hLog.WithError(err).Error("error applying statefulset")
 		return err

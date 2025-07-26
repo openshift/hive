@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +35,29 @@ const (
 	testNamespace = "default"
 	testFinalizer = "test-finalizer"
 )
+
+// mockAPIError creates a mock AWS API error for testing
+type mockAPIError struct {
+	code    string
+	message string
+	err     error
+}
+
+func (e *mockAPIError) Error() string {
+	return fmt.Sprintf("%s: %s", e.code, e.message)
+}
+
+func (e *mockAPIError) ErrorCode() string {
+	return e.code
+}
+
+func (e *mockAPIError) ErrorMessage() string {
+	return e.message
+}
+
+func (e *mockAPIError) ErrorFault() smithy.ErrorFault {
+	return smithy.FaultClient
+}
 
 func init() {
 	log.SetLevel(log.DebugLevel)
@@ -222,7 +245,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				}),
 			},
 			mockGetCallerIdentity:          true,
-			expectedGetCallerIdentityError: awserr.New("InvalidClientTokenId", "", fmt.Errorf("")),
+			expectedGetCallerIdentityError: &mockAPIError{code: "InvalidClientTokenId", message: "", err: fmt.Errorf("")},
 			validate: func(t *testing.T, c client.Client) {
 				validateCondition(t, c, []hivev1.ClusterDeprovisionCondition{
 					{

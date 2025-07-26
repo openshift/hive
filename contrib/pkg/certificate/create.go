@@ -14,8 +14,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 
 	awsclient "github.com/openshift/hive/pkg/awsclient"
 )
@@ -150,9 +150,9 @@ func (o *Options) getBaseDomainID() (string, error) {
 	}
 	hostedZoneID := ""
 	for _, zone := range result.HostedZones {
-		if strings.TrimSuffix(aws.StringValue(zone.Name), ".") == o.BaseDomain {
-			if zone.Config == nil || !aws.BoolValue(zone.Config.PrivateZone) {
-				hostedZoneID = aws.StringValue(zone.Id)
+		if strings.TrimSuffix(aws.ToString(zone.Name), ".") == o.BaseDomain {
+			if zone.Config == nil || !zone.Config.PrivateZone {
+				hostedZoneID = aws.ToString(zone.Id)
 				break
 			}
 			continue

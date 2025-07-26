@@ -6,9 +6,10 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
@@ -17,6 +18,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"errors"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -108,7 +111,7 @@ func (o *endpointVPCAddOptions) Complete(cmd *cobra.Command, args []string) erro
 func (o *endpointVPCAddOptions) Validate(cmd *cobra.Command, args []string) error {
 	// Check if the endpoint VPC exists
 	if _, err := o.endpointVpcClients.DescribeVpcs(&ec2.DescribeVpcsInput{
-		VpcIds: []*string{aws.String(o.endpointVpcId)},
+		VpcIds: []string{o.endpointVpcId},
 	}); err != nil {
 		log.WithError(err).Fatal("Failed to describe endpoint VPC")
 	}
@@ -116,12 +119,12 @@ func (o *endpointVPCAddOptions) Validate(cmd *cobra.Command, args []string) erro
 	// Check if the endpoint subnets belong to the endpoint VPC
 	err := o.endpointVpcClients.DescribeSubnetsPages(
 		&ec2.DescribeSubnetsInput{
-			SubnetIds: aws.StringSlice(o.endpointSubnetIds),
+			SubnetIds: o.endpointSubnetIds,
 		},
 		func(page *ec2.DescribeSubnetsOutput, lastPage bool) bool {
 			for _, subnet := range page.Subnets {
-				if *subnet.VpcId != o.endpointVpcId {
-					log.Fatalf("Subnet %v does not belong to the endpoint VPC", *subnet.SubnetId)
+				if aws.ToString(subnet.VpcId) != o.endpointVpcId {
+					log.Fatalf("Subnet %v does not belong to the endpoint VPC", aws.ToString(subnet.SubnetId))
 				}
 			}
 			return !lastPage
@@ -163,7 +166,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 		vpcPeeringConnectionId := acceptVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId
 		associatedVpcCIDR := acceptVpcPeeringConnectionOutput.VpcPeeringConnection.RequesterVpcInfo.CidrBlock
 		endpointVpcCIDR := acceptVpcPeeringConnectionOutput.VpcPeeringConnection.AccepterVpcInfo.CidrBlock
-		log.Debugf("Found associated VPC CIDR = %v, endpoint VPC CIDR = %v", *associatedVpcCIDR, *endpointVpcCIDR)
+		log.Debugf("Found associated VPC CIDR = %v, endpoint VPC CIDR = %v", aws.ToString(associatedVpcCIDR), aws.ToString(endpointVpcCIDR))
 
 		// Update route tables
 		log.Info("Adding route to private route tables of the associated VPC")
@@ -172,7 +175,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 			aws.String(associatedVpcId),
 			endpointVpcCIDR,
 			vpcPeeringConnectionId,
-			&ec2.Filter{Name: aws.String("tag:Name"), Values: []*string{aws.String("*private*")}},
+			&ec2types.Filter{Name: aws.String("tag:Name"), Values: []string{"*private*"}},
 		); err != nil {
 			log.WithError(err).Fatal("Failed to add route to private route tables of the associated VPC")
 		}
@@ -183,7 +186,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 			aws.String(o.endpointVpcId),
 			associatedVpcCIDR,
 			vpcPeeringConnectionId,
-			&ec2.Filter{Name: aws.String("association.subnet-id"), Values: aws.StringSlice(o.endpointSubnetIds)},
+			&ec2types.Filter{Name: aws.String("association.subnet-id"), Values: o.endpointSubnetIds},
 		); err != nil {
 			log.WithError(err).Fatal("Failed to add route to route tables of the endpoint subnets")
 		}
@@ -198,10 +201,10 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 		}
 		log.Debugf("Found worker SG %v of the associated Hive cluster", associatedVpcWorkerSG)
 
-		switch {
-
-		// Associated VPC & endpoint VPC in the same region => allow ingress from SG of the peer
-		case associatedVpcRegion == o.endpointVpcRegion:
+		// Different treatment for cross-region vs same-region peering
+		switch associatedVpcRegion {
+		// Associated VPC & endpoint VPC in same region => allow ingress from SG of the peer
+		case o.endpointVpcRegion:
 			log.Info("Authorizing traffic from the associated VPC's worker SG to the endpoint VPC's default SG")
 			if _, err = awsutils.AuthorizeAllIngressFromSG(
 				o.endpointVpcClients,
@@ -210,10 +213,10 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 				aws.String(fmt.Sprintf("Access from worker SG of associated VPC %s", associatedVpcId)),
 			); err != nil {
 				// Proceed if ingress already authorized, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.Duplicate":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.Duplicate" {
 					log.Warnf("Traffic from the associated VPC's worker SG to the endpoint VPC's default SG is already authorized")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to authorize traffic from the associated VPC's worker SG to the endpoint VPC's default SG")
 				}
 			}
@@ -226,10 +229,10 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 				aws.String(fmt.Sprintf("Access from default SG of endpoint VPC %s", o.endpointVpcId)),
 			); err != nil {
 				// Proceed if ingress already authorized, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.Duplicate":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.Duplicate" {
 					log.Warnf("Traffic from the endpoint VPC's default SG to the associated VPC's worker SG is already authorized")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to authorize traffic from the endpoint VPC's default SG to the associated VPC's worker SG")
 				}
 			}
@@ -244,10 +247,10 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 				aws.String(fmt.Sprintf("Access from CIDR block of associated VPC %s", associatedVpcId)),
 			); err != nil {
 				// Proceed if ingress already authorized, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.Duplicate":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.Duplicate" {
 					log.Warnf("Traffic from the associated VPC's CIDR block to the endpoint VPC's default SG is already authorized")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to authorize traffic from the associated VPC's CIDR block to the endpoint VPC's default SG")
 				}
 			}
@@ -260,10 +263,10 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 				aws.String(fmt.Sprintf("Access from CIDR block of endpoint VPC %s", o.endpointVpcId)),
 			); err != nil {
 				// Proceed if ingress already authorized, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.Duplicate":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.Duplicate" {
 					log.Warnf("Traffic from the endpoint VPC's CIDR block to the associated VPC's worker SG is already authorized")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to authorize traffic from the endpoint VPC's CIDR block to the associated VPC's worker SG")
 				}
 			}
@@ -283,13 +286,13 @@ func (o *endpointVPCAddOptions) addEndpointVpcToHiveConfig() {
 	var endpointSubnets []hivev1.AWSPrivateLinkSubnet
 	if err := o.endpointVpcClients.DescribeSubnetsPages(
 		&ec2.DescribeSubnetsInput{
-			SubnetIds: aws.StringSlice(o.endpointSubnetIds),
+			SubnetIds: o.endpointSubnetIds,
 		},
 		func(page *ec2.DescribeSubnetsOutput, lastPage bool) bool {
 			for _, subnet := range page.Subnets {
 				endpointSubnet := hivev1.AWSPrivateLinkSubnet{
-					SubnetID:         *subnet.SubnetId,
-					AvailabilityZone: *subnet.AvailabilityZone,
+					SubnetID:         aws.ToString(subnet.SubnetId),
+					AvailabilityZone: aws.ToString(subnet.AvailabilityZone),
 				}
 				endpointSubnets = append(endpointSubnets, endpointSubnet)
 			}
@@ -336,14 +339,18 @@ func (o *endpointVPCAddOptions) addEndpointVpcToHiveConfig() {
 func addRouteToRouteTables(
 	vpcClients awsclient.Client,
 	vpcId, peerCIDR, VpcPeeringConnectionId *string,
-	additionalFiltersForRouteTables ...*ec2.Filter,
+	additionalFiltersForRouteTables ...*ec2types.Filter,
 ) error {
-	filters := append([]*ec2.Filter{
+	filters := []ec2types.Filter{
 		{
 			Name:   aws.String("vpc-id"),
-			Values: []*string{vpcId},
+			Values: []string{aws.ToString(vpcId)},
 		},
-	}, additionalFiltersForRouteTables...)
+	}
+	
+	for _, filter := range additionalFiltersForRouteTables {
+		filters = append(filters, *filter)
+	}
 
 	return vpcClients.DescribeRouteTablesPages(
 		&ec2.DescribeRouteTablesInput{
@@ -358,14 +365,14 @@ func addRouteToRouteTables(
 				})
 				if err != nil {
 					// Proceed if route already exists, fail otherwise
-					switch aerr, ok := err.(awserr.Error); {
-					case ok && aerr.Code() == "RouteAlreadyExists":
-						log.Warnf("Route already exists in route table %v", *routeTable.RouteTableId)
-					default:
-						log.WithError(err).Fatalf("Failed to create route for route table %v", *routeTable.RouteTableId)
+					var apiErr smithy.APIError
+					if errors.As(err, &apiErr) && apiErr.ErrorCode() == "RouteAlreadyExists" {
+						log.Warnf("Route already exists in route table %v", aws.ToString(routeTable.RouteTableId))
+					} else {
+						log.WithError(err).Fatalf("Failed to create route for route table %v", aws.ToString(routeTable.RouteTableId))
 					}
 				} else {
-					log.Debugf("Route added to route table %v", *routeTable.RouteTableId)
+					log.Debugf("Route added to route table %v", aws.ToString(routeTable.RouteTableId))
 				}
 			}
 
@@ -389,15 +396,15 @@ func setupVpcPeeringConnection(
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("VPC peering connection %v requested", *createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)
+	log.Debugf("VPC peering connection %v requested", aws.ToString(createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId))
 
 	err = endpointVpcClients.WaitUntilVpcPeeringConnectionExists(&ec2.DescribeVpcPeeringConnectionsInput{
-		VpcPeeringConnectionIds: []*string{createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId},
+		VpcPeeringConnectionIds: []string{aws.ToString(createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)},
 	})
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("VPC peering connection %v exists", *createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)
+	log.Debugf("VPC peering connection %v exists", aws.ToString(createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId))
 
 	acceptVpcPeeringConnectionOutput, err := endpointVpcClients.AcceptVpcPeeringConnection(&ec2.AcceptVpcPeeringConnectionInput{
 		VpcPeeringConnectionId: createVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId,
@@ -405,7 +412,7 @@ func setupVpcPeeringConnection(
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("VPC peering connection %v accepted", *acceptVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId)
+	log.Debugf("VPC peering connection %v accepted", aws.ToString(acceptVpcPeeringConnectionOutput.VpcPeeringConnection.VpcPeeringConnectionId))
 
 	return acceptVpcPeeringConnectionOutput, nil
 }

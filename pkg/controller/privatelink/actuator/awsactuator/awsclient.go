@@ -1,9 +1,9 @@
 package awsactuator
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/smithy-go"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,15 +49,15 @@ func newAWSClient(client client.Client, clientFn awsClientFn, region string, nam
 }
 
 // awsErrCodeEquals returns true if the error matches all these conditions:
-//   - err is of type awserr.Error
-//   - Error.Code() equals code
+//   - err is of type smithy.APIError
+//   - Error.ErrorCode() equals code
 func awsErrCodeEquals(err error, code string) bool {
 	if err == nil {
 		return false
 	}
-	var awsErr awserr.Error
-	if errors.As(err, &awsErr) {
-		return awsErr.Code() == code
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.ErrorCode() == code
 	}
 	return false
 }

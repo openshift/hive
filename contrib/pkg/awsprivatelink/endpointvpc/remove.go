@@ -2,10 +2,12 @@ package endpointvpc
 
 import (
 	"context"
+	"errors"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
@@ -150,7 +152,7 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 			associatedVpcClients,
 			aws.String(associatedVpcId),
 			aws.String(endpointVpcCIDR),
-			&ec2.Filter{Name: aws.String("tag:Name"), Values: []*string{aws.String("*private*")}},
+			&ec2types.Filter{Name: aws.String("tag:Name"), Values: []string{"*private*"}},
 		); err != nil {
 			log.WithError(err).Fatal("Failed to delete route from private route tables of the associated VPC")
 		}
@@ -160,7 +162,7 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 			o.endpointVpcClients,
 			aws.String(o.endpointVpcId),
 			aws.String(associatedVpcCIDR),
-			&ec2.Filter{Name: aws.String("association.subnet-id"), Values: aws.StringSlice(o.endpointSubnetIds)},
+			&ec2types.Filter{Name: aws.String("association.subnet-id"), Values: o.endpointSubnetIds},
 		); err != nil {
 			log.WithError(err).Fatal("Failed to delete route from route tables of the endpoint subnets")
 		}
@@ -183,10 +185,10 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 				aws.String(endpointVPCDefaultSG),
 			); err != nil {
 				// Proceed if ingress not found, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.NotFound":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.NotFound" {
 					log.Warnf("Access from the endpoint VPC's default SG to the associated VPC's worker SG is not enabled")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to revoke access from the endpoint VPC's default SG to the associated VPC's worker SG")
 				}
 			}
@@ -198,10 +200,10 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 				aws.String(associatedVpcWorkerSG),
 			); err != nil {
 				// Proceed if ingress not found, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.NotFound":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.NotFound" {
 					log.Warnf("Access from the associated VPC's worker SG to the endpoint VPC's default SG is not enabled")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to revoke access from the associated VPC's worker SG to the endpoint VPC's default SG")
 				}
 			}
@@ -215,10 +217,10 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 				aws.String(endpointVpcCIDR),
 			); err != nil {
 				// Proceed if ingress not found, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.NotFound":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.NotFound" {
 					log.Warnf("Access from the endpoint VPC's CIDR block to the associated VPC's worker SG is not enabled")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to revoke access from the endpoint VPC's CIDR block to the associated VPC's worker SG")
 				}
 			}
@@ -230,10 +232,10 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 				aws.String(associatedVpcCIDR),
 			); err != nil {
 				// Proceed if ingress not found, fail otherwise
-				switch aerr, ok := err.(awserr.Error); {
-				case ok && aerr.Code() == "InvalidPermission.NotFound":
+				var apiErr smithy.APIError
+				if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidPermission.NotFound" {
 					log.Warnf("Access from the associated VPC's CIDR block to the endpoint VPC's default SG is not enabled")
-				default:
+				} else {
 					log.WithError(err).Fatal("Failed to revoke access from the associated VPC's CIDR block to the endpoint VPC's default SG")
 				}
 			}
@@ -263,19 +265,19 @@ func deleteVpcPeeringConnection(awsClients awsclient.Client, VpcId1, VpcId2 *str
 	log.Info("Deleting VPC peering connection between the associated VPC and the endpoint VPC")
 
 	describeVpcPeeringConnectionsOutput, err := awsClients.DescribeVpcPeeringConnections(&ec2.DescribeVpcPeeringConnectionsInput{
-		Filters: []*ec2.Filter{
+		Filters: []ec2types.Filter{
 			{
 				Name:   aws.String("requester-vpc-info.vpc-id"),
-				Values: []*string{VpcId1, VpcId2},
+				Values: []string{aws.ToString(VpcId1), aws.ToString(VpcId2)},
 			},
 			{
 				Name:   aws.String("accepter-vpc-info.vpc-id"),
-				Values: []*string{VpcId1, VpcId2},
+				Values: []string{aws.ToString(VpcId1), aws.ToString(VpcId2)},
 			},
 			// Only one peering connection can be active at any given time between a pair of VPCs
 			{
 				Name:   aws.String("status-code"),
-				Values: []*string{aws.String("active")},
+				Values: []string{"active"},
 			},
 		},
 	})
@@ -293,14 +295,14 @@ func deleteVpcPeeringConnection(awsClients awsclient.Client, VpcId1, VpcId2 *str
 	}); err != nil {
 		return err
 	}
-	log.Debugf("The deletion of VPC peering connection %v has been initiated", *VpcPeeringConnectionId)
+	log.Debugf("The deletion of VPC peering connection %v has been initiated", aws.ToString(VpcPeeringConnectionId))
 
 	if err = awsClients.WaitUntilVpcPeeringConnectionDeleted(&ec2.DescribeVpcPeeringConnectionsInput{
-		VpcPeeringConnectionIds: []*string{VpcPeeringConnectionId},
+		VpcPeeringConnectionIds: []string{aws.ToString(VpcPeeringConnectionId)},
 	}); err != nil {
 		return err
 	}
-	log.Debugf("VPC peering connection %v deleted", *VpcPeeringConnectionId)
+	log.Debugf("VPC peering connection %v deleted", aws.ToString(VpcPeeringConnectionId))
 
 	return nil
 }
@@ -308,14 +310,18 @@ func deleteVpcPeeringConnection(awsClients awsclient.Client, VpcId1, VpcId2 *str
 func deleteRouteFromRouteTables(
 	vpcClients awsclient.Client,
 	vpcId, peerCIDR *string,
-	additionalFiltersForRouteTables ...*ec2.Filter,
+	additionalFiltersForRouteTables ...*ec2types.Filter,
 ) error {
-	filters := append([]*ec2.Filter{
+	filters := []ec2types.Filter{
 		{
 			Name:   aws.String("vpc-id"),
-			Values: []*string{vpcId},
+			Values: []string{aws.ToString(vpcId)},
 		},
-	}, additionalFiltersForRouteTables...)
+	}
+	
+	for _, filter := range additionalFiltersForRouteTables {
+		filters = append(filters, *filter)
+	}
 
 	return vpcClients.DescribeRouteTablesPages(
 		&ec2.DescribeRouteTablesInput{
@@ -329,14 +335,14 @@ func deleteRouteFromRouteTables(
 				})
 				if err != nil {
 					// Proceed if route not found, fail otherwise
-					switch aerr, ok := err.(awserr.Error); {
-					case ok && aerr.Code() == "InvalidRoute.NotFound":
-						log.Warnf("Route not found in route table %v", *routeTable.RouteTableId)
-					default:
-						log.WithError(err).Fatalf("Failed to delete route from route table %v", *routeTable.RouteTableId)
+					var apiErr smithy.APIError
+					if errors.As(err, &apiErr) && apiErr.ErrorCode() == "InvalidRoute.NotFound" {
+						log.Warnf("Route not found in route table %v", aws.ToString(routeTable.RouteTableId))
+					} else {
+						log.WithError(err).Fatalf("Failed to delete route from route table %v", aws.ToString(routeTable.RouteTableId))
 					}
 				} else {
-					log.Debugf("Route deleted from route table %v", *routeTable.RouteTableId)
+					log.Debugf("Route deleted from route table %v", aws.ToString(routeTable.RouteTableId))
 				}
 			}
 

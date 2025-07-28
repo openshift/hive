@@ -1,12 +1,11 @@
 package util
 
 import (
-	"strings"
-
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,68 +18,128 @@ import (
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
-// ApplyAsset loads a path from our bindata assets and applies it to the cluster. This function does not apply
-// a HiveConfig owner reference for garbage collection, and should only be used for resources we explicitly want
-// to leave orphaned when Hive is uninstalled. See ApplyAssetWithGC for the more common use case.
-func ApplyAsset(h resource.Helper, assetPath string, hLog log.FieldLogger) error {
-	assetLog := hLog.WithField("asset", assetPath)
-	assetLog.Debug("reading asset")
-	asset := assets.MustAsset(assetPath)
-	assetLog.Debug("applying asset")
-	result, err := h.Apply(asset)
-	if err != nil {
-		assetLog.WithError(err).Error("error applying asset")
-		return err
+// RTOApplyOpt (runtime.Object apply option) modifies a runtime.Object in preparation for applying it.
+type RTOApplyOpt func(runtime.Object, log.FieldLogger) error
+
+// WithGarbageCollection returns a RTOApplyOpt that adds an owner reference to parent to the
+// runtime object so the latter gets cleaned up when the parent is deleted. Errors only happen
+// if the runtime object can't be interpreted as a metav1.Object or meta.Type.
+func WithGarbageCollection(parent v1.Object) RTOApplyOpt {
+	return func(runtimeObj runtime.Object, hLog log.FieldLogger) error {
+		obj, err := meta.Accessor(runtimeObj)
+		if err != nil {
+			return errors.Wrap(err, "could not interpret runtime object as metav1.Object")
+		}
+		parentT, err := meta.TypeAccessor(parent)
+		if err != nil {
+			return errors.Wrap(err, "could not interpret runtime object as meta.Type")
+		}
+		kind, name := parentT.GetKind(), parent.GetName()
+		hLog.WithFields(log.Fields{
+			"ownerKind": kind,
+			"ownerName": name,
+		}).Info("adding owner reference for garbage collection")
+		ownerRef := v1.OwnerReference{
+			APIVersion:         parentT.GetAPIVersion(),
+			Kind:               kind,
+			Name:               name,
+			UID:                parent.GetUID(),
+			BlockOwnerDeletion: ptr.To(true),
+		}
+		// This assumes we have full control of owner references for these resources the operator creates.
+		obj.SetOwnerReferences([]v1.OwnerReference{ownerRef})
+		return nil
 	}
-	assetLog.Infof("asset applied successfully: %v", result)
-	return nil
 }
 
-// ApplyAssetWithGC loads a path from our bindata assets, adds an OwnerReference to the HiveConfig
-// for garbage collection (used when uninstalling Hive), and applies it to the cluster.
-func ApplyAssetWithGC(h resource.Helper, assetPath string, hc *hivev1.HiveConfig, hLog log.FieldLogger) error {
-	assetLog := hLog.WithField("asset", assetPath)
-	assetLog.Info("reading asset")
-	runtimeObj, err := readRuntimeObject(assetPath)
-	if err != nil {
-		return err
+// WithNamespaceOverride returns a RTOApplyOpt that sets the namespace of the runtime object.
+// There are no error cases.
+func WithNamespaceOverride(namespaceOverride string) RTOApplyOpt {
+	return func(runtimeObj runtime.Object, hLog log.FieldLogger) error {
+		obj, err := meta.Accessor(runtimeObj)
+		if err != nil {
+			return errors.Wrap(err, "could not interpret runtime object as metav1.Object")
+		}
+		hLog.WithField("newNamespace", namespaceOverride).Info("overriding namespace")
+		obj.SetNamespace(namespaceOverride)
+		return nil
 	}
-	assetLog.Info("applying asset with GC")
-	result, err := ApplyRuntimeObjectWithGC(h, runtimeObj, hc)
-	if err != nil {
-		assetLog.WithError(err).Error("error applying asset")
-		return err
-	}
-	assetLog.Infof("asset applied successfully: %v", result)
-	return nil
 }
 
-// ApplyAssetByPathWithNSOverrideAndGC loads the given asset, overrides the namespace, adds an owner reference to
-// HiveConfig for uninstall, and applies it to the cluster.
-func ApplyAssetByPathWithNSOverrideAndGC(h resource.Helper, assetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
-	requiredObj, err := readRuntimeObject(assetPath)
-	if err != nil {
-		return errors.Wrapf(err, "unable to decode asset: %s", assetPath)
+// CRBWithSubjectNSOverride sets the namespace of each Subject to namespaceOverride if it is
+// - a ServiceAccount subject
+// - otherwise unset
+// Errors if the runtime object is not a *ClusterRoleBinding
+func CRBWithSubjectNSOverride(namespaceOverride string) RTOApplyOpt {
+	return func(rto runtime.Object, hLog log.FieldLogger) error {
+		rb, ok := rto.(*rbacv1.ClusterRoleBinding)
+		if !ok {
+			return errors.New("object is not a ClusterRoleBinding")
+		}
+		for i := range rb.Subjects {
+			if rb.Subjects[i].Kind == "ServiceAccount" || rb.Subjects[i].Namespace != "" {
+				rb.Subjects[i].Namespace = namespaceOverride
+			}
+		}
+		return nil
 	}
-	return ApplyRuntimeObjectWithNSOverrideAndGC(h, requiredObj, namespaceOverride, hiveConfig)
 }
 
-func ApplyAssetBytesWithNSOverrideAndGC(h resource.Helper, assetBytes []byte, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
-	rtObj, err := decodeRuntimeObject(assetBytes)
-	if err != nil {
-		return errors.Wrap(err, "unable to decode asset")
+// ToRuntimeObject defines a function that produces a runtime object. It is intended for use
+// in closures to supply such objects from different sources (asset paths, byte arrays) to
+// ApplyRuntimeObject().
+type ToRuntimeObject func(log.FieldLogger) (runtime.Object, error)
+
+// Passthrough's func just returns the input runtime object.
+func Passthrough(rto runtime.Object) ToRuntimeObject {
+	return func(fl log.FieldLogger) (runtime.Object, error) {
+		return rto, nil
 	}
-	return ApplyRuntimeObjectWithNSOverrideAndGC(h, rtObj, namespaceOverride, hiveconfig)
 }
 
-func ApplyRuntimeObjectWithNSOverrideAndGC(h resource.Helper, requiredObj runtime.Object, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
-	obj, _ := meta.Accessor(requiredObj)
-	obj.SetNamespace(namespaceOverride)
-
-	if _, err := ApplyRuntimeObjectWithGC(h, requiredObj, hiveConfig); err != nil {
-		return errors.Wrap(err, "unable to apply asset")
+// FromAssetPath's func loads a runtime object from a known asset path in bindata.
+func FromAssetPath(assetPath string) ToRuntimeObject {
+	return func(hLog log.FieldLogger) (runtime.Object, error) {
+		hLog.WithField("assetPath", assetPath).Info("loading runtime object from asset")
+		return readRuntimeObject(assetPath)
 	}
-	return nil
+}
+
+// CRBFromAssetPath is a special case of FromAssetPath that returns a *ClusterRoleBinding
+// (a specific instance of a runtime object) from a known asset path in bindata. Panics if
+// the asset is not a CRB, or if the asset can't be loaded from the specified path.
+func CRBFromAssetPath(roleBindingAssetPath string) ToRuntimeObject {
+	return func(hLog log.FieldLogger) (runtime.Object, error) {
+		hLog.WithField("assetPath", roleBindingAssetPath).Info("loading ClusterRoleBinding from asset")
+		return resourceread.ReadClusterRoleBindingV1OrDie(assets.MustAsset(roleBindingAssetPath)), nil
+	}
+}
+
+// FromBytes produces a func that decodes a byte array into a runtime object.
+func FromBytes(assetBytes []byte) ToRuntimeObject {
+	return func(hLog log.FieldLogger) (runtime.Object, error) {
+		hLog.Info("decoding runtime object from bytes")
+		return decodeRuntimeObject(assetBytes)
+	}
+}
+
+// ApplyRuntimeObject
+// - Executes rtoFactory to produce a runtime object.
+// - Modifies the runtime object according to opts.
+// - Applies the runtime object to the cluster via h.
+func ApplyRuntimeObject(h resource.Helper, rtoFactory ToRuntimeObject, hLog log.FieldLogger, opts ...RTOApplyOpt) (resource.ApplyResult, error) {
+	requiredObj, err := rtoFactory(hLog)
+	if err != nil {
+		hLog.WithError(err).Error("failed to convert to runtime object")
+		return resource.UnknownApplyResult, err
+	}
+	for _, opt := range opts {
+		if err := opt(requiredObj, hLog); err != nil {
+			hLog.WithError(err).Error("failed to apply option to runtime object")
+			return resource.UnknownApplyResult, err
+		}
+	}
+	return h.ApplyRuntimeObject(requiredObj, scheme.GetScheme())
 }
 
 func DeleteAssetByPathWithNSOverride(h resource.Helper, assetPath, namespaceOverride string, hiveconfig *hivev1.HiveConfig) error {
@@ -108,41 +167,6 @@ func DeleteRuntimeObjectWithNSOverride(h resource.Helper, requiredObj runtime.Ob
 	return nil
 }
 
-// ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC loads the given asset, overrides the namespace on the subject,
-// adds an owner reference to HiveConfig for uninstall, and applies it to the cluster.
-func ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h resource.Helper, roleBindingAssetPath, namespaceOverride string, hiveConfig *hivev1.HiveConfig) error {
-
-	rb := resourceread.ReadClusterRoleBindingV1OrDie(assets.MustAsset(roleBindingAssetPath))
-	for i := range rb.Subjects {
-		if rb.Subjects[i].Kind == "ServiceAccount" || rb.Subjects[i].Namespace != "" {
-			rb.Subjects[i].Namespace = namespaceOverride
-		}
-	}
-	_, err := ApplyRuntimeObjectWithGC(h, rb, hiveConfig)
-	if err != nil {
-		return errors.Wrapf(err, "unable to apply asset: %s", roleBindingAssetPath)
-	}
-	return nil
-}
-
-// ApplyRuntimeObjectWithGC adds an OwnerReference to the HiveConfig on the runtime object, and applies it to the cluster.
-func ApplyRuntimeObjectWithGC(h resource.Helper, runtimeObj runtime.Object, hc *hivev1.HiveConfig) (resource.ApplyResult, error) {
-	obj, err := meta.Accessor(runtimeObj)
-	if err != nil {
-		return resource.UnknownApplyResult, err
-	}
-	ownerRef := v1.OwnerReference{
-		APIVersion:         hc.APIVersion,
-		Kind:               hc.Kind,
-		Name:               hc.Name,
-		UID:                hc.UID,
-		BlockOwnerDeletion: ptr.To(true),
-	}
-	// This assumes we have full control of owner references for these resources the operator creates.
-	obj.SetOwnerReferences([]v1.OwnerReference{ownerRef})
-	return h.ApplyRuntimeObject(runtimeObj, scheme.GetScheme())
-}
-
 func readRuntimeObject(assetPath string) (runtime.Object, error) {
 	return decodeRuntimeObject(assets.MustAsset(assetPath))
 }
@@ -150,15 +174,4 @@ func readRuntimeObject(assetPath string) (runtime.Object, error) {
 func decodeRuntimeObject(assetBytes []byte) (runtime.Object, error) {
 	obj, _, err := serializer.NewCodecFactory(scheme.GetScheme()).UniversalDeserializer().Decode(assetBytes, nil, nil)
 	return obj, err
-}
-
-// IsNoSuchCRD inspects an error and determines whether it is similar to this:
-// "could not get mapping: no matches for kind \"ServiceMonitor\" in version \"monitoring.coreos.com/v1\""
-// In certain circumstances -- e.g. deploying hive on non-openshift with monitoring disabled -- these
-// errors may be spurious and ignorable.
-func IsNoSuchCRD(err error) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), "no matches for kind")
 }

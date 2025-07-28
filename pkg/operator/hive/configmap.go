@@ -307,7 +307,7 @@ func (r *ReconcileHiveConfig) deployConfigMap(hLog log.FieldLogger, h resource.H
 		}
 	}
 
-	result, err := util.ApplyRuntimeObjectWithGC(h, cm, instance)
+	result, err := util.ApplyRuntimeObject(h, util.Passthrough(cm), hLog, util.WithGarbageCollection(instance))
 	if err != nil {
 		cmLog.WithError(err).Error("error applying configmap")
 		return "", err

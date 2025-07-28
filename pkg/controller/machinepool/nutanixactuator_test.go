@@ -176,6 +176,68 @@ func TestGenerateMachineSets(t *testing.T) {
 			}(),
 			expectedErr: false,
 		},
+		{
+			name:              "Autoscaling without failure domains",
+			clusterDeployment: testNutanixClusterDeployment(),
+			pool: func() *hivev1.MachinePool {
+				p := testNutanixPool()
+				p.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 1,
+					MaxReplicas: 3,
+				}
+				return p
+			}(),
+			expectedErr: false,
+		},
+		{
+			name: "Autoscaling with failure domains",
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.FailureDomains = []hivev1nutanix.FailureDomain{
+					{
+						Name: "fd1",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-1",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism1.example.com",
+								Port:    9440,
+							},
+						},
+					},
+					{
+						Name: "fd2",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-2",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism2.example.com",
+								Port:    9440,
+							},
+						},
+					},
+					{
+						Name: "fd3",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-3",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism3.example.com",
+								Port:    9440,
+							},
+						},
+					},
+				}
+				return cd
+			}(),
+			pool: func() *hivev1.MachinePool {
+				p := testNutanixPool()
+				p.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 3,
+					MaxReplicas: 9,
+				}
+				p.Spec.Platform.Nutanix.FailureDomains = []string{"fd1", "fd2", "fd3"}
+				return p
+			}(),
+			expectedErr: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -378,4 +440,149 @@ func TestNutanixActuator_GenerateMachineSets_MissingRHCOSImage_StatusUpdateFails
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "simulated status update failure")
+}
+
+func TestNutanixActuator_AutoscalingGeneratesMachineSets(t *testing.T) {
+	tests := []struct {
+		name                    string
+		pool                    *hivev1.MachinePool
+		clusterDeployment       *hivev1.ClusterDeployment
+		expectedMachineSetCount int
+		expectedTotalReplicas   int32
+	}{
+		{
+			name: "Autoscaling without failure domains creates one MachineSet",
+			pool: func() *hivev1.MachinePool {
+				p := testNutanixPool()
+				p.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 1,
+					MaxReplicas: 5,
+				}
+				return p
+			}(),
+			clusterDeployment:       testNutanixClusterDeployment(),
+			expectedMachineSetCount: 1,
+			expectedTotalReplicas:   1,
+		},
+		{
+			name: "Autoscaling with three failure domains creates three MachineSets",
+			pool: func() *hivev1.MachinePool {
+				p := testNutanixPool()
+				p.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{
+					MinReplicas: 3,
+					MaxReplicas: 9,
+				}
+				p.Spec.Platform.Nutanix.FailureDomains = []string{"fd1", "fd2", "fd3"}
+				return p
+			}(),
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.FailureDomains = []hivev1nutanix.FailureDomain{
+					{
+						Name: "fd1",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-1",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism1.example.com",
+								Port:    9440,
+							},
+						},
+					},
+					{
+						Name: "fd2",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-2",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism2.example.com",
+								Port:    9440,
+							},
+						},
+					},
+					{
+						Name: "fd3",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-3",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism3.example.com",
+								Port:    9440,
+							},
+						},
+					},
+				}
+				return cd
+			}(),
+			expectedMachineSetCount: 3,
+			expectedTotalReplicas:   3,
+		},
+		{
+			name: "Non-autoscaling pool still works",
+			pool: func() *hivev1.MachinePool {
+				p := testNutanixPool()
+				replicas := int64(2)
+				p.Spec.Replicas = &replicas
+				p.Spec.Platform.Nutanix.FailureDomains = []string{"fd1", "fd2"}
+				return p
+			}(),
+			clusterDeployment: func() *hivev1.ClusterDeployment {
+				cd := testNutanixClusterDeployment()
+				cd.Spec.Platform.Nutanix.FailureDomains = []hivev1nutanix.FailureDomain{
+					{
+						Name: "fd1",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-1",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism1.example.com",
+								Port:    9440,
+							},
+						},
+					},
+					{
+						Name: "fd2",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "test-prism-element-uuid-2",
+							Endpoint: hivev1nutanix.PrismEndpoint{
+								Address: "prism2.example.com",
+								Port:    9440,
+							},
+						},
+					},
+				}
+				return cd
+			}(),
+			expectedMachineSetCount: 2,
+			expectedTotalReplicas:   2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger := log.WithField("actuator", "nutanixactuator_test")
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
+
+			actuator, err := NewNutanixActuator(fakeClient, getMasterMachineWithImage(t))
+			require.NoError(t, err, "unexpected error creating NutanixActuator")
+
+			cd := test.clusterDeployment
+			cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{InfraID: "test-infra"}
+
+			machineSets, proceed, err := actuator.GenerateMachineSets(cd, test.pool, logger)
+
+			require.NoError(t, err, "expected no error for test case")
+			assert.True(t, proceed, "expected actuator to proceed")
+			assert.Len(t, machineSets, test.expectedMachineSetCount, "unexpected number of MachineSets")
+
+			// Verify total replicas across all MachineSets
+			var totalReplicas int32
+			for _, ms := range machineSets {
+				assert.NotNil(t, ms.Spec.Replicas, "MachineSet replicas should not be nil")
+				totalReplicas += *ms.Spec.Replicas
+			}
+			assert.Equal(t, test.expectedTotalReplicas, totalReplicas, "unexpected total replicas across MachineSets")
+
+			// For autoscaling tests, verify that MachineSets are created even though original pool had nil replicas
+			if test.pool.Spec.Autoscaling != nil {
+				assert.Greater(t, len(machineSets), 0, "autoscaling should generate at least one MachineSet")
+			}
+		})
+	}
 }

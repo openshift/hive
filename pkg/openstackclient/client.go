@@ -9,7 +9,11 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tags"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/usage"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
@@ -21,38 +25,71 @@ import (
 
 // Client is a wrapper object for actual OpenStack libraries to allow for easier mocking/testing.
 type Client interface {
-	// Servers - only what you actually use
+	// Servers
 	ListServers(ctx context.Context, opts *servers.ListOpts) ([]servers.Server, error)
 	GetServer(ctx context.Context, serverID string) (*servers.Server, error)
 	DeleteServer(ctx context.Context, serverID string) error
 	CreateServerSnapshot(ctx context.Context, serverID, snapshotName string) (string, error)
 	CreateServerFromOpts(ctx context.Context, opts *ServerCreateOpts) (*servers.Server, error)
 
+	// Tags
+	SetServerTags(ctx context.Context, serverID string, serverTags []string) error
+	GetServerTags(ctx context.Context, serverID string) ([]string, error)
+
 	// Images - only snapshot checking
 	GetImage(ctx context.Context, imageID string) (*images.Image, error)
 
-	// Networks - only what you need
+	// Networks
 	GetNetworkByName(ctx context.Context, networkName string) (*Network, error)
 	ListPorts(ctx context.Context) ([]Port, error)
 
-	// Security Groups - only reading
+	// Security Groups
 	GetServerSecurityGroups(ctx context.Context, serverID string) ([]string, error)
+
+	// Project resources
+	GetComputeQuotas(ctx context.Context) (*ComputeQuotas, error)
+	GetComputeUsage(ctx context.Context) (*ComputeUsage, error)
+	GetFlavorDetails(ctx context.Context, flavorID string) (*FlavorDetails, error)
 }
 
-// Network represents an OpenStack network
 type Network struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Status string `json:"status"`
 }
 
-// Port represents an OpenStack port
 type Port struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// ServerCreateOpts contains options for creating a server
+type ComputeQuotas struct {
+	Instances int `json:"instances"`
+	Cores     int `json:"cores"`
+	RAM       int `json:"ram"`
+}
+
+type ComputeUsage struct {
+	InstancesUsed int `json:"totalInstancesUsed"`
+	CoresUsed     int `json:"totalCoresUsed"`
+	RAMUsed       int `json:"totalRAMUsed"`
+}
+
+type FlavorDetails struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	VCPUs int    `json:"vcpus"`
+	RAM   int    `json:"ram"`
+	Disk  int    `json:"disk"`
+}
+
+type ResourceRequirements struct {
+	Instances int
+	VCPUs     int
+	RAM       int
+}
+
+// Options for creating a server
 type ServerCreateOpts struct {
 	Name           string            `json:"name"`
 	ImageRef       string            `json:"imageRef"`
@@ -63,7 +100,7 @@ type ServerCreateOpts struct {
 	Metadata       map[string]string `json:"metadata"`
 }
 
-// OpenStack credentials structure - matches clouds.yaml format
+// OpenStack credentials structure
 type Credentials struct {
 	AuthURL            string `json:"auth_url"`
 	Username           string `json:"username,omitempty"`
@@ -79,7 +116,6 @@ type Credentials struct {
 	Interface          string `json:"interface,omitempty"`
 	IdentityAPIVersion string `json:"identity_api_version,omitempty"`
 
-	// Legacy support
 	TenantID   string `json:"tenant_id,omitempty"`
 	TenantName string `json:"tenant_name,omitempty"`
 	DomainID   string `json:"domain_id,omitempty"`
@@ -139,7 +175,7 @@ func (c *openstackClient) DeleteServer(ctx context.Context, serverID string) err
 	return servers.Delete(c.computeClient, serverID).ExtractErr()
 }
 
-// CreateServerSnapshot creates a snapshot (image) of the specified server
+// Create a snapshot of the specified server
 func (c *openstackClient) CreateServerSnapshot(ctx context.Context, serverID, snapshotName string) (string, error) {
 	// Create image options
 	createImageOpts := servers.CreateImageOpts{
@@ -150,7 +186,6 @@ func (c *openstackClient) CreateServerSnapshot(ctx context.Context, serverID, sn
 		},
 	}
 
-	// Create the snapshot/image
 	result := servers.CreateImage(c.computeClient, serverID, createImageOpts)
 	imageID, err := result.ExtractImageID()
 	if err != nil {
@@ -160,7 +195,7 @@ func (c *openstackClient) CreateServerSnapshot(ctx context.Context, serverID, sn
 	return imageID, nil
 }
 
-// CreateServerFromOpts creates a new server using our custom ServerCreateOpts
+// Creates a new server
 func (c *openstackClient) CreateServerFromOpts(ctx context.Context, opts *ServerCreateOpts) (*servers.Server, error) {
 	// Build networks slice for the NIC
 	networks := []servers.Network{
@@ -170,7 +205,7 @@ func (c *openstackClient) CreateServerFromOpts(ctx context.Context, opts *Server
 		},
 	}
 
-	// Convert our custom options to Gophercloud options
+	// Convert custom options to satisfy GopherCloud
 	createOpts := &servers.CreateOpts{
 		Name:           opts.Name,
 		ImageRef:       opts.ImageRef,
@@ -188,13 +223,13 @@ func (c *openstackClient) CreateServerFromOpts(ctx context.Context, opts *Server
 	return server, nil
 }
 
-// Implementation of image methods
+// Image methods
 func (c *openstackClient) GetImage(ctx context.Context, imageID string) (*images.Image, error) {
 	image, err := images.Get(c.imageClient, imageID).Extract()
 	return image, err
 }
 
-// Port implementations
+// Ports
 func (c *openstackClient) ListPorts(ctx context.Context) ([]Port, error) {
 	allPages, err := ports.List(c.networkClient, nil).AllPages()
 	if err != nil {
@@ -217,6 +252,7 @@ func (c *openstackClient) ListPorts(ctx context.Context) ([]Port, error) {
 	return result, nil
 }
 
+// Network specific
 func (c *openstackClient) GetNetworkByName(ctx context.Context, networkName string) (*Network, error) {
 	listOpts := networks.ListOpts{
 		Name: networkName,
@@ -245,7 +281,7 @@ func (c *openstackClient) GetNetworkByName(ctx context.Context, networkName stri
 	}, nil
 }
 
-// GetServerSecurityGroups gets the security group names for a specific server
+// Get the security group names for a specific server
 func (c *openstackClient) GetServerSecurityGroups(ctx context.Context, serverID string) ([]string, error) {
 	serverSecGroups, err := secgroups.ListByServer(c.computeClient, serverID).AllPages()
 	if err != nil {
@@ -265,26 +301,120 @@ func (c *openstackClient) GetServerSecurityGroups(ctx context.Context, serverID 
 	return secGroupNames, nil
 }
 
-// NewClientFromSecret creates our client wrapper object for interacting with OpenStack.
-// The OpenStack creds are read from the specified secret.
+// Adding tags
+func (c *openstackClient) SetServerTags(ctx context.Context, serverID string, serverTags []string) error {
+	// Delete all existing tags first
+	err := tags.DeleteAll(c.computeClient, serverID).ExtractErr()
+	if err != nil {
+		return fmt.Errorf("failed to clear existing tags for server %s: %w", serverID, err)
+	}
+
+	// Add new tags one by one if any exist
+	for _, tag := range serverTags {
+		err = tags.Add(c.computeClient, serverID, tag).ExtractErr()
+		if err != nil {
+			return fmt.Errorf("failed to set tag '%s' for server %s: %w", tag, serverID, err)
+		}
+	}
+
+	return nil
+}
+
+// Gets all tags for a server
+func (c *openstackClient) GetServerTags(ctx context.Context, serverID string) ([]string, error) {
+	serverTags, err := tags.List(c.computeClient, serverID).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags for server %s: %w", serverID, err)
+	}
+	return serverTags, nil
+}
+
+// Gets the compute quotas for the current project
+func (c *openstackClient) GetComputeQuotas(ctx context.Context) (*ComputeQuotas, error) {
+	projectID := c.credentials.ProjectID
+	if projectID == "" {
+		projectID = c.credentials.TenantID // fallback to legacy field
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("no project ID found in credentials")
+	}
+
+	quotaSet, err := quotasets.Get(c.computeClient, projectID).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get quota set: %w", err)
+	}
+
+	return &ComputeQuotas{
+		Instances: quotaSet.Instances,
+		Cores:     quotaSet.Cores,
+		RAM:       quotaSet.RAM,
+	}, nil
+}
+
+// Gets the current compute usage for the project
+func (c *openstackClient) GetComputeUsage(ctx context.Context) (*ComputeUsage, error) {
+	projectID := c.credentials.ProjectID
+	if projectID == "" {
+		projectID = c.credentials.TenantID // fallback to legacy field
+	}
+	if projectID == "" {
+		return nil, fmt.Errorf("no project ID found in credentials")
+	}
+
+	// Create usage options
+	usageOpts := usage.SingleTenantOpts{}
+
+	// Get usage for current project
+	allPages, err := usage.SingleTenant(c.computeClient, projectID, usageOpts).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get compute usage pages: %w", err)
+	}
+
+	// Extract usage from pages
+	tenantUsage, err := usage.ExtractSingleTenant(allPages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract compute usage: %w", err)
+	}
+
+	// Check if we got valid usage data
+	if tenantUsage == nil {
+		return &ComputeUsage{
+			InstancesUsed: 0,
+			CoresUsed:     0,
+			RAMUsed:       0,
+		}, nil
+	}
+
+	return &ComputeUsage{
+		InstancesUsed: len(tenantUsage.ServerUsages),
+		CoresUsed:     int(tenantUsage.TotalVCPUsUsage),
+		RAMUsed:       int(tenantUsage.TotalMemoryMBUsage),
+	}, nil
+}
+
+// Gets detailed information about a specific flavor
+func (c *openstackClient) GetFlavorDetails(ctx context.Context, flavorID string) (*FlavorDetails, error) {
+	flavor, err := flavors.Get(c.computeClient, flavorID).Extract()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get flavor details: %w", err)
+	}
+
+	return &FlavorDetails{
+		ID:    flavor.ID,
+		Name:  flavor.Name,
+		VCPUs: flavor.VCPUs,
+		RAM:   flavor.RAM,
+		Disk:  flavor.Disk,
+	}, nil
+}
+
+// Create a client wrapper object for interacting with OpenStack.
 func NewClientFromSecret(secret *corev1.Secret) (Client, error) {
-	// Check if it's a clouds.yaml format
-	if cloudsYaml, ok := secret.Data["clouds.yaml"]; ok {
-		return newClientFromCloudsYAML(cloudsYaml)
-	}
-
-	// Handle JSON credentials format directly
-	authJSON, ok := secret.Data["credentials"]
+	cloudsYaml, ok := secret.Data["clouds.yaml"]
 	if !ok {
-		return nil, fmt.Errorf("secret does not contain \"credentials\" or \"clouds.yaml\" data")
+		return nil, fmt.Errorf("secret does not contain \"clouds.yaml\" data")
 	}
-
-	var creds Credentials
-	if err := json.Unmarshal(authJSON, &creds); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal credentials: %w", err)
-	}
-
-	return newClientFromStruct(&creds)
+	return newClientFromCloudsYAML(cloudsYaml)
 }
 
 // newClientFromCloudsYAML creates a client from clouds.yaml data
@@ -319,16 +449,6 @@ func newClientFromCloudsYAML(cloudsYamlData []byte) (Client, error) {
 	return newClientFromStruct(creds)
 }
 
-func authJSONFromSecretSource(secret *corev1.Secret) func() ([]byte, error) {
-	return func() ([]byte, error) {
-		authJSON, ok := secret.Data["credentials"] // adjust key name as needed
-		if !ok {
-			return nil, fmt.Errorf("creds secret does not contain \"credentials\" data")
-		}
-		return authJSON, nil
-	}
-}
-
 // newClientFromStruct creates a client directly from a Credentials struct (no JSON conversion needed)
 func newClientFromStruct(creds *Credentials) (*openstackClient, error) {
 	// Validate required credentials
@@ -347,7 +467,6 @@ func newClientFromStruct(creds *Credentials) (*openstackClient, error) {
 		DomainName:       creds.UserDomainName,
 	}
 
-	// Handle legacy fields for backwards compatibility
 	if creds.TenantID != "" {
 		authOpts.TenantID = creds.TenantID
 	}
@@ -376,17 +495,16 @@ func newClientFromStruct(creds *Credentials) (*openstackClient, error) {
 		return nil, fmt.Errorf("failed to authenticate with OpenStack: %w", err)
 	}
 
-	// Set region - prefer new format over legacy
+	// Set region
 	region := creds.RegionName
 	if region == "" {
 		region = creds.Region
 	}
 	if region == "" {
-		region = "RegionOne" // default region
+		region = "RegionOne" 
 	}
 
-	// Set interface preference (public, internal, admin)
-	interfaceType := gophercloud.AvailabilityPublic // Start with public as default
+	interfaceType := gophercloud.AvailabilityPublic
 	if creds.Interface != "" {
 		switch creds.Interface {
 		case "public":

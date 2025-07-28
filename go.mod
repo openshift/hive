@@ -128,12 +128,8 @@ require (
 )
 
 require (
-<<<<<<< Updated upstream
-	github.com/gophercloud/utils/v2 v2.0.0-20250212084022-725b94822eeb
-=======
 	github.com/gophercloud/gophercloud v1.7.0
-	github.com/gophercloud/utils/v2 v2.0.0-20240701101423-2401526caee5
->>>>>>> Stashed changes
+	github.com/gophercloud/utils/v2 v2.0.0-20250212084022-725b94822eeb
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 )
 

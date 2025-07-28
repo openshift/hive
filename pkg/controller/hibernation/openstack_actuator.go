@@ -27,6 +27,7 @@ type openstackActuator struct {
 	openstackClientFn func(*hivev1.ClusterDeployment, client.Client, log.FieldLogger) (openstackclient.Client, error)
 }
 
+// Create API client
 func getOpenStackClient(cd *hivev1.ClusterDeployment, c client.Client, logger log.FieldLogger) (openstackclient.Client, error) {
 	ctx := context.Background()
 
@@ -49,12 +50,12 @@ func getOpenStackClient(cd *hivev1.ClusterDeployment, c client.Client, logger lo
 	return openstackclient.NewClientFromSecret(secret)
 }
 
-// CanHandle returns true if this actuator can handle the given ClusterDeployment
+// Return true if this actuator can handle the given ClusterDeployment
 func (a *openstackActuator) CanHandle(cd *hivev1.ClusterDeployment) bool {
 	return cd.Spec.Platform.OpenStack != nil
 }
 
-// StopMachines creates snapshots and saves configuration, then stops machines
+// Create snapshots and saves configuration, then stops machines
 func (a *openstackActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "openstack")
 	logger.Info("stopping machines and creating snapshots")
@@ -134,14 +135,39 @@ func (a *openstackActuator) StopMachines(cd *hivev1.ClusterDeployment, hiveClien
 		return err
 	}
 
-	logger.Info("waiting for OpenStack to clean up deleted instances...")
-	time.Sleep(30 * time.Second)
+	err = a.waitForInstanceCleanup(openstackClient, infraID, logger)
+	if err != nil {
+		return err
+	}
 
 	logger.Info("hibernation completed successfully")
 	return nil
 }
 
-// validateInstanceStates checks if instances are in valid states for hibernation
+// Find which instances are missing
+func (a *openstackActuator) findMissingInstances(expectedInstances []OpenStackInstanceConfig, existingServers []ServerInfo, logger log.FieldLogger) []OpenStackInstanceConfig {
+	var missingInstances []OpenStackInstanceConfig
+
+	// Create a map of existing instance names for quick lookup
+	existingNames := make(map[string]bool)
+	for _, server := range existingServers {
+		existingNames[server.Name] = true
+	}
+
+	// Check which expected instances are missing
+	for _, expected := range expectedInstances {
+		if !existingNames[expected.Name] {
+			logger.Infof("instance %s is missing - needs to be created", expected.Name)
+			missingInstances = append(missingInstances, expected)
+		} else {
+			logger.Infof("instance %s already exists", expected.Name)
+		}
+	}
+
+	return missingInstances
+}
+
+// Check if instances are in valid states for hibernation
 func (a *openstackActuator) validateInstanceStates(openstackClient openstackclient.Client, servers []ServerInfo, logger log.FieldLogger) error {
 	ctx := context.Background()
 
@@ -188,7 +214,7 @@ func (a *openstackActuator) createSnapshots(openstackClient openstackclient.Clie
 	return snapshotIDs, nil
 }
 
-// waitForSnapshots waits for all snapshots to complete
+// Wait for all snapshots to complete
 func (a *openstackActuator) waitForSnapshots(openstackClient openstackclient.Client, snapshotIDs []string, servers []ServerInfo, logger log.FieldLogger) error {
 	for i, snapshotID := range snapshotIDs {
 		serverName := servers[i].Name
@@ -202,7 +228,7 @@ func (a *openstackActuator) waitForSnapshots(openstackClient openstackclient.Cli
 	return nil
 }
 
-// deleteInstances deletes all instances
+// Delete all instances
 func (a *openstackActuator) deleteInstances(openstackClient openstackclient.Client, servers []ServerInfo, logger log.FieldLogger) error {
 	ctx := context.Background()
 
@@ -217,7 +243,7 @@ func (a *openstackActuator) deleteInstances(openstackClient openstackclient.Clie
 	return nil
 }
 
-// waitForSnapshotCompletion waits for a snapshot to reach ACTIVE state
+// Wait for snapshot to reach ACTIVE state
 func (a *openstackActuator) waitForSnapshotCompletion(openstackClient openstackclient.Client, snapshotID, serverName string, logger log.FieldLogger) error {
 	ctx := context.Background()
 	maxWaitTime := 30 * time.Minute
@@ -254,7 +280,7 @@ func (a *openstackActuator) waitForSnapshotCompletion(openstackClient openstackc
 	}
 }
 
-// StartMachines recreates instances from snapshots using saved configuration
+// Recreate instances from snapshots using saved configuration
 func (a *openstackActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
 	logger = logger.WithField("cloud", "openstack")
 	logger.Info("starting machines from snapshots")
@@ -270,6 +296,25 @@ func (a *openstackActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClie
 		return fmt.Errorf("failed to create OpenStack client: %v", err)
 	}
 
+	// Load hibernation config first to know how many instances we should have
+	instances, err := a.loadHibernationConfigFromSecret(cd, hiveClient, logger)
+	if err != nil {
+		logger.Warnf("no hibernation config found: %v", err)
+
+		// Check if we have existing instances but no hibernation config
+		infraID := cd.Spec.ClusterMetadata.InfraID
+		existingServers, checkErr := a.findInstancesByPrefix(openstackClient, infraID)
+		if checkErr != nil {
+			logger.Warnf("could not check existing instances: %v", checkErr)
+		} else if len(existingServers) > 0 {
+			logger.Info("instances exist but no hibernation config - clearing any hibernation state")
+			_ = a.deleteHibernationConfigSecret(cd, hiveClient, logger)
+		} else {
+			logger.Warn("cannot recreate instances without hibernation snapshots")
+		}
+		return nil
+	}
+
 	// Check for existing instances
 	infraID := cd.Spec.ClusterMetadata.InfraID
 	existingServers, err := a.findInstancesByPrefix(openstackClient, infraID)
@@ -277,43 +322,177 @@ func (a *openstackActuator) StartMachines(cd *hivev1.ClusterDeployment, hiveClie
 		logger.Warnf("could not check existing instances: %v", err)
 	}
 
-	if len(existingServers) > 0 {
-		logger.Info("instances already exist - clearing hibernation config")
+	// Check if we already have all the instances we need
+	if len(existingServers) >= len(instances) {
+		logger.Info("sufficient instances already exist - clearing hibernation config")
 		_ = a.deleteHibernationConfigSecret(cd, hiveClient, logger) // Best effort cleanup
 		return nil
 	}
 
-	// Load hibernation config and restore
-	instances, err := a.loadHibernationConfigFromSecret(cd, hiveClient, logger)
-	if err != nil {
-		logger.Warnf("no hibernation config found: %v", err)
-		logger.Warn("cannot recreate instances without hibernation snapshots")
-		return nil // Don't fail - let controller handle this gracefully
-	}
+	logger.Infof("restoring %d instances from hibernation snapshots (currently have %d)", len(instances), len(existingServers))
 
-	logger.Infof("restoring %d instances from hibernation snapshots", len(instances))
 	return a.restoreFromHibernationConfig(cd, hiveClient, openstackClient, instances, logger)
 }
 
-// restoreFromHibernationConfig recreates instances from hibernation configuration
-func (a *openstackActuator) restoreFromHibernationConfig(cd *hivev1.ClusterDeployment, hiveClient client.Client, openstackClient openstackclient.Client, instances []OpenStackInstanceConfig, logger log.FieldLogger) error {
+// Validate project resource quotas prior to the restoration
+func (a *openstackActuator) validateRestoreResources(openstackClient openstackclient.Client, instances []OpenStackInstanceConfig, logger log.FieldLogger) error {
 	ctx := context.Background()
+
+	logger.Info("checking OpenStack quotas before restoration...")
+
+	// Get current quotas and usage
+	quotas, err := openstackClient.GetComputeQuotas(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get compute quotas: %v", err)
+	}
+
+	usage, err := openstackClient.GetComputeUsage(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get compute usage: %v", err)
+	}
+
+	// Calculate requirements for restoration
+	requirements, err := a.calculateResourceRequirements(openstackClient, instances, logger)
+	if err != nil {
+		return fmt.Errorf("failed to calculate resource requirements: %v", err)
+	}
+
+	logger.Infof("restoration requires: %d instances, %d vCPUs, %d MB RAM",
+		requirements.Instances, requirements.VCPUs, requirements.RAM)
+
+	// Check available resources
+	availableInstances := quotas.Instances - usage.InstancesUsed
+	availableVCPUs := quotas.Cores - usage.CoresUsed
+	availableRAM := quotas.RAM - usage.RAMUsed
+
+	logger.Infof("available resources: %d instances, %d vCPUs, %d MB RAM",
+		availableInstances, availableVCPUs, availableRAM)
+
+	// Validate sufficient resources
+	var errors []string
+
+	if requirements.Instances > availableInstances {
+		errors = append(errors, fmt.Sprintf("insufficient instances: need %d, have %d available",
+			requirements.Instances, availableInstances))
+	}
+
+	if requirements.VCPUs > availableVCPUs {
+		errors = append(errors, fmt.Sprintf("insufficient vCPUs: need %d, have %d available",
+			requirements.VCPUs, availableVCPUs))
+	}
+
+	if requirements.RAM > availableRAM {
+		errors = append(errors, fmt.Sprintf("insufficient RAM: need %d MB, have %d MB available",
+			requirements.RAM, availableRAM))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("insufficient OpenStack resources for restoration: %s",
+			strings.Join(errors, "; "))
+	}
+
+	logger.Info("sufficient resources available for restoration")
+	return nil
+}
+
+// Calculate required project resources
+func (a *openstackActuator) calculateResourceRequirements(openstackClient openstackclient.Client, instances []OpenStackInstanceConfig, logger log.FieldLogger) (*openstackclient.ResourceRequirements, error) {
+	ctx := context.Background()
+	requirements := &openstackclient.ResourceRequirements{}
+
+	// Track unique flavors to avoid duplicate API calls
+	flavorCache := make(map[string]*openstackclient.FlavorDetails)
+
+	for _, instance := range instances {
+		requirements.Instances++
+
+		// Get flavor details
+		var flavor *openstackclient.FlavorDetails
+		if cached, exists := flavorCache[instance.Flavor]; exists {
+			flavor = cached
+		} else {
+			var err error
+			flavor, err = openstackClient.GetFlavorDetails(ctx, instance.Flavor)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get flavor %s details: %v", instance.Flavor, err)
+			}
+			flavorCache[instance.Flavor] = flavor
+		}
+
+		requirements.VCPUs += flavor.VCPUs
+		requirements.RAM += flavor.RAM
+
+		logger.Infof("instance %s (flavor %s): %d vCPUs, %d MB RAM",
+			instance.Name, flavor.Name, flavor.VCPUs, flavor.RAM)
+	}
+
+	return requirements, nil
+}
+
+// Recreate instances from hibernation configuration
+func (a *openstackActuator) restoreFromHibernationConfig(cd *hivev1.ClusterDeployment, hiveClient client.Client, openstackClient openstackclient.Client, instances []OpenStackInstanceConfig, logger log.FieldLogger) error {
+	infraID := cd.Spec.ClusterMetadata.InfraID
 
 	logger.Infof("restoring %d instances from hibernation", len(instances))
 
-	// Recreate each instance using saved configuration
-	createdServerIDs := make([]string, 0, len(instances))
+	// Validate sufficient resources before starting restoration
+	err := a.validateRestoreResources(openstackClient, instances, logger)
+	if err != nil {
+		return fmt.Errorf("resource validation failed: %v", err)
+	}
 
-	for i, instance := range instances {
-		logger.Infof("creating instance %d/%d: %s", i+1, len(instances), instance.Name)
+	// Check what instances already exist
+	existingServers, err := a.findInstancesByPrefix(openstackClient, infraID)
+	if err != nil {
+		logger.Warnf("could not check existing instances: %v", err)
+		existingServers = []ServerInfo{} // Assume none exist
+	}
 
-		// Validate snapshot exists
+	// Figure out what we need to create
+	instancesToCreate := a.findMissingInstances(instances, existingServers, logger)
+
+	if len(instancesToCreate) == 0 {
+		logger.Info("all instances already exist - restoration complete")
+		return a.deleteHibernationConfigSecret(cd, hiveClient, logger)
+	}
+
+	logger.Infof("need to create %d missing instances", len(instancesToCreate))
+
+	// Create missing instances
+	err = a.createMissingInstances(openstackClient, instancesToCreate, logger)
+	if err != nil {
+		logger.Errorf("some instance creation failed: %v", err)
+	}
+
+	// Wait for instances to be active
+	err = a.waitForAllInstancesToBeActive(openstackClient, infraID, len(instances), logger)
+	if err != nil {
+		return fmt.Errorf("not all instances are active yet: %v", err)
+	}
+
+	// Only clear hibernation config when we have the instances running
+	logger.Info("all instances confirmed active - clearing hibernation configuration")
+	return a.deleteHibernationConfigSecret(cd, hiveClient, logger)
+}
+
+// Create missing instances during restoration
+func (a *openstackActuator) createMissingInstances(openstackClient openstackclient.Client, instancesToCreate []OpenStackInstanceConfig, logger log.FieldLogger) error {
+	ctx := context.Background()
+	var errors []string
+
+	for i, instance := range instancesToCreate {
+		logger.Infof("creating missing instance %d/%d: %s", i+1, len(instancesToCreate), instance.Name)
+
+		// Validate snapshot still exists
 		_, err := openstackClient.GetImage(ctx, instance.SnapshotID)
 		if err != nil {
-			return fmt.Errorf("snapshot %s not found: %v", instance.SnapshotID, err)
+			errorMsg := fmt.Sprintf("snapshot %s not found for %s: %v", instance.SnapshotID, instance.Name, err)
+			errors = append(errors, errorMsg)
+			logger.Error(errorMsg)
+			continue
 		}
 
-		// Build server creation options
+		// Build server creation options with complete metadata
 		createOpts := &openstackclient.ServerCreateOpts{
 			Name:           instance.Name,
 			ImageRef:       instance.SnapshotID,
@@ -321,42 +500,93 @@ func (a *openstackActuator) restoreFromHibernationConfig(cd *hivev1.ClusterDeplo
 			NetworkID:      instance.NetworkID,
 			PortID:         instance.PortID,
 			SecurityGroups: instance.SecurityGroups,
-			Metadata: map[string]string{
-				"openshiftClusterID": instance.OpenshiftClusterID,
-			},
+			Metadata:       instance.Metadata,
 		}
 
 		newServer, err := openstackClient.CreateServerFromOpts(ctx, createOpts)
 		if err != nil {
-			return fmt.Errorf("failed to create instance %s: %v", instance.Name, err)
+			errorMsg := fmt.Sprintf("failed to create instance %s: %v", instance.Name, err)
+			errors = append(errors, errorMsg)
+			logger.Error(errorMsg)
+			continue
 		}
 
-		createdServerIDs = append(createdServerIDs, newServer.ID)
 		logger.Infof("created instance %s (ID: %s)", instance.Name, newServer.ID)
-	}
 
-	// Wait for instances to become ACTIVE
-	logger.Info("waiting for instances to become active")
-	for i, serverID := range createdServerIDs {
-		instanceName := instances[i].Name
-		err := a.waitForServerActive(openstackClient, serverID, instanceName, logger)
-		if err != nil {
-			return fmt.Errorf("failed to wait for instance %s to become active: %v", instanceName, err)
+		// Tags are handled separately after instance creation
+		if len(instance.Tags) > 0 {
+			err = openstackClient.SetServerTags(ctx, newServer.ID, instance.Tags)
+			if err != nil {
+				logger.Warnf("failed to restore tags for %s: %v", instance.Name, err)
+			} else {
+				logger.Infof("restored %d tags for %s: %v", len(instance.Tags), instance.Name, instance.Tags)
+			}
 		}
 	}
 
-	// Clear hibernation config since restoration is complete
-	logger.Info("restoration completed - clearing hibernation configuration")
-	err := a.deleteHibernationConfigSecret(cd, hiveClient, logger)
-	if err != nil {
-		logger.Warnf("could not clear hibernation config: %v", err)
+	if len(errors) > 0 {
+		return fmt.Errorf("some instance creation failed: %s", strings.Join(errors, "; "))
 	}
 
-	logger.Info("restoration completed successfully")
 	return nil
 }
 
-// waitForServerActive waits for a server to reach ACTIVE state
+// Wait for ALL instances to be active
+func (a *openstackActuator) waitForAllInstancesToBeActive(openstackClient openstackclient.Client, infraID string, expectedCount int, logger log.FieldLogger) error {
+	maxWaitTime := 30 * time.Minute
+	checkInterval := 15 * time.Second
+	timeout := time.After(maxWaitTime)
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
+
+	logger.Infof("waiting for all %d instances to become active", expectedCount)
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for all instances to become active after %v", maxWaitTime)
+		case <-ticker.C:
+			// Get current instances
+			currentServers, err := a.findInstancesByPrefix(openstackClient, infraID)
+			if err != nil {
+				logger.Warnf("error checking instance status: %v", err)
+				continue
+			}
+
+			if len(currentServers) != expectedCount {
+				logger.Infof("have %d instances, expecting %d - still waiting", len(currentServers), expectedCount)
+				continue
+			}
+
+			// Check if all instances are ACTIVE
+			activeCount := 0
+			var nonActiveInstances []string
+
+			for _, server := range currentServers {
+				serverDetails, err := openstackClient.GetServer(context.Background(), server.ID)
+				if err != nil {
+					logger.Warnf("could not get server %s details: %v", server.Name, err)
+					continue
+				}
+
+				if serverDetails.Status == "ACTIVE" {
+					activeCount++
+				} else {
+					nonActiveInstances = append(nonActiveInstances, fmt.Sprintf("%s(%s)", server.Name, serverDetails.Status))
+				}
+			}
+
+			if activeCount == expectedCount {
+				logger.Info("all instances are active!")
+				return nil
+			}
+
+			logger.Infof("%d/%d instances active, waiting for: %v", activeCount, expectedCount, nonActiveInstances)
+		}
+	}
+}
+
+// wait for a server to reach ACTIVE state
 func (a *openstackActuator) waitForServerActive(openstackClient openstackclient.Client, serverID, serverName string, logger log.FieldLogger) error {
 	ctx := context.Background()
 	maxWaitTime := 30 * time.Minute
@@ -415,7 +645,7 @@ func (a *openstackActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveCl
 		return false, []string{"no instances found"}, nil
 	}
 
-	// OpenStack-specific: Check actual instance states
+	// Check actual instance states
 	runningCount, deletingInstances := a.categorizeInstanceStates(openstackClient, matchingServers, logger)
 
 	// If instances are being deleted, hibernation is in progress
@@ -427,7 +657,7 @@ func (a *openstackActuator) MachinesRunning(cd *hivev1.ClusterDeployment, hiveCl
 	return runningCount > 0, []string{}, nil
 }
 
-// categorizeInstanceStates checks the actual state of instances in OpenStack
+// Check the actual state of instances in OpenStack
 func (a *openstackActuator) categorizeInstanceStates(openstackClient openstackclient.Client, servers []ServerInfo, logger log.FieldLogger) (int, []string) {
 	ctx := context.Background()
 	runningCount := 0
@@ -454,7 +684,7 @@ func (a *openstackActuator) categorizeInstanceStates(openstackClient openstackcl
 	return runningCount, deletingInstances
 }
 
-// MachinesStopped checks if machines are stopped
+// Check if machines are stopped
 func (a *openstackActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) (bool, []string, error) {
 	logger = logger.WithField("cloud", "openstack")
 	logger.Info("checking if machines are stopped")
@@ -484,24 +714,26 @@ func (a *openstackActuator) MachinesStopped(cd *hivev1.ClusterDeployment, hiveCl
 	return false, notStopped, nil
 }
 
-// ServerInfo holds basic server information
+// basic server information
 type ServerInfo struct {
 	ID   string
 	Name string
 }
 
 type OpenStackInstanceConfig struct {
-	Name               string   `json:"name"`
-	Flavor             string   `json:"flavor"`
-	PortID             string   `json:"portID"`
-	SnapshotID         string   `json:"snapshotID"`
-	SecurityGroups     []string `json:"securityGroups"`
-	ClusterID          string   `json:"clusterID"`
-	NetworkID          string   `json:"networkID"`
-	OpenshiftClusterID string   `json:"openshiftClusterID"`
+	Name               string            `json:"name"`
+	Flavor             string            `json:"flavor"`
+	PortID             string            `json:"portID"`
+	SnapshotID         string            `json:"snapshotID"`
+	SecurityGroups     []string          `json:"securityGroups"`
+	ClusterID          string            `json:"clusterID"`
+	NetworkID          string            `json:"networkID"`
+	OpenshiftClusterID string            `json:"openshiftClusterID"`
+	Metadata           map[string]string `json:"metadata"`
+	Tags               []string          `json:"tags"`
 }
 
-// findInstancesByPrefix returns servers that match the infraID prefix
+// Return servers that match the infraID prefix
 func (a *openstackActuator) findInstancesByPrefix(openstackClient openstackclient.Client, prefix string) ([]ServerInfo, error) {
 	ctx := context.Background()
 
@@ -535,7 +767,7 @@ func (a *openstackActuator) saveInstanceConfigurationToSecret(cd *hivev1.Cluster
 		return fmt.Errorf("mismatch between servers (%d) and snapshot IDs (%d)", len(matchingServers), len(snapshotIDs))
 	}
 
-	// Use infraID directly instead of extracting from instance name
+	// Get InfraID
 	infraID := cd.Spec.ClusterMetadata.InfraID
 
 	// Get shared configuration
@@ -557,7 +789,7 @@ func (a *openstackActuator) saveInstanceConfigurationToSecret(cd *hivev1.Cluster
 		}
 	}
 
-	// Get all ports once for efficiency
+	// Get all ports
 	allPorts, err := openstackClient.ListPorts(ctx)
 	if err != nil {
 		return fmt.Errorf("error listing ports: %v", err)
@@ -569,6 +801,13 @@ func (a *openstackActuator) saveInstanceConfigurationToSecret(cd *hivev1.Cluster
 		serverDetails, err := openstackClient.GetServer(ctx, serverInfo.ID)
 		if err != nil {
 			return fmt.Errorf("error getting server details for %s: %v", serverInfo.Name, err)
+		}
+
+		// Get server tags
+		serverTags, err := openstackClient.GetServerTags(ctx, serverInfo.ID)
+		if err != nil {
+			logger.Warnf("could not get tags for %s: %v", serverInfo.Name, err)
+			serverTags = []string{} // Use empty tags if we can't get them
 		}
 
 		// Get flavor ID
@@ -608,15 +847,22 @@ func (a *openstackActuator) saveInstanceConfigurationToSecret(cd *hivev1.Cluster
 			PortID:             portID,
 			SnapshotID:         snapshotIDs[i],
 			SecurityGroups:     secGroups,
-			ClusterID:          infraID, // Use infraID directly
+			ClusterID:          infraID,
 			NetworkID:          networkID,
 			OpenshiftClusterID: openshiftClusterID,
+			Metadata:           serverDetails.Metadata,
+			Tags:               serverTags,
 		})
+
+		logger.Infof("captured metadata for %s: %d properties, %d tags",
+			serverInfo.Name, len(serverDetails.Metadata), len(serverTags))
 	}
 
 	return a.saveHibernationConfigToSecret(cd, hiveClient, instanceConfigs, logger)
 }
 
+
+// Store hibernation information to secrets
 func (a *openstackActuator) saveHibernationConfigToSecret(cd *hivev1.ClusterDeployment, hiveClient client.Client, instanceConfigs []OpenStackInstanceConfig, logger log.FieldLogger) error {
 	ctx := context.Background()
 
@@ -673,6 +919,43 @@ func (a *openstackActuator) saveHibernationConfigToSecret(cd *hivev1.ClusterDepl
 	return nil
 }
 
+// Waits for OpenStack to fully remove an instance
+func (a *openstackActuator) waitForInstanceCleanup(openstackClient openstackclient.Client, infraID string, logger log.FieldLogger) error {
+	maxWaitTime := 5 * time.Minute   // Maximum time to wait for cleanup
+	checkInterval := 5 * time.Second // Check every 5 seconds
+	timeout := time.After(maxWaitTime)
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
+
+	logger.Info("waiting for OpenStack to clean up deleted instances...")
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for instance cleanup after %v", maxWaitTime)
+		case <-ticker.C:
+			matchingServers, err := a.findInstancesByPrefix(openstackClient, infraID)
+			if err != nil {
+				logger.Warnf("error checking for remaining instances: %v", err)
+				continue // Continue polling despite errors
+			}
+
+			if len(matchingServers) == 0 {
+				logger.Info("all instances have been cleaned up")
+				return nil
+			}
+
+			// Log remaining instances
+			var instanceNames []string
+			for _, server := range matchingServers {
+				instanceNames = append(instanceNames, server.Name)
+			}
+			logger.Infof("still waiting for %d instances to be cleaned up: %v", len(matchingServers), instanceNames)
+		}
+	}
+}
+
+// Get stored hibernation information from secret
 func (a *openstackActuator) loadHibernationConfigFromSecret(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) ([]OpenStackInstanceConfig, error) {
 	ctx := context.Background()
 	secretName := fmt.Sprintf("%s-hibernation-config", cd.Name)
@@ -701,6 +984,7 @@ func (a *openstackActuator) loadHibernationConfigFromSecret(cd *hivev1.ClusterDe
 	return instanceConfigs, nil
 }
 
+// Delete stored hibernation information from secret
 func (a *openstackActuator) deleteHibernationConfigSecret(cd *hivev1.ClusterDeployment, hiveClient client.Client, logger log.FieldLogger) error {
 	ctx := context.Background()
 	secretName := fmt.Sprintf("%s-hibernation-config", cd.Name)
@@ -724,7 +1008,7 @@ func (a *openstackActuator) deleteHibernationConfigSecret(cd *hivev1.ClusterDepl
 	return nil
 }
 
-// getNetworkIDForCluster finds the network ID for a specific cluster using infraID
+// Find the network ID for a specific cluster using infraID
 func (a *openstackActuator) getNetworkIDForCluster(openstackClient openstackclient.Client, infraID string) (string, error) {
 	ctx := context.Background()
 	networkName := fmt.Sprintf("%s-openshift", infraID)

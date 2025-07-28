@@ -512,16 +512,6 @@ func (a *openstackActuator) createMissingInstances(openstackClient openstackclie
 		}
 
 		logger.Infof("created instance %s (ID: %s)", instance.Name, newServer.ID)
-
-		// Tags are handled separately after instance creation
-		if len(instance.Tags) > 0 {
-			err = openstackClient.SetServerTags(ctx, newServer.ID, instance.Tags)
-			if err != nil {
-				logger.Warnf("failed to restore tags for %s: %v", instance.Name, err)
-			} else {
-				logger.Infof("restored %d tags for %s: %v", len(instance.Tags), instance.Name, instance.Tags)
-			}
-		}
 	}
 
 	if len(errors) > 0 {
@@ -730,7 +720,6 @@ type OpenStackInstanceConfig struct {
 	NetworkID          string            `json:"networkID"`
 	OpenshiftClusterID string            `json:"openshiftClusterID"`
 	Metadata           map[string]string `json:"metadata"`
-	Tags               []string          `json:"tags"`
 }
 
 // Return servers that match the infraID prefix
@@ -803,13 +792,6 @@ func (a *openstackActuator) saveInstanceConfigurationToSecret(cd *hivev1.Cluster
 			return fmt.Errorf("error getting server details for %s: %v", serverInfo.Name, err)
 		}
 
-		// Get server tags
-		serverTags, err := openstackClient.GetServerTags(ctx, serverInfo.ID)
-		if err != nil {
-			logger.Warnf("could not get tags for %s: %v", serverInfo.Name, err)
-			serverTags = []string{} // Use empty tags if we can't get them
-		}
-
 		// Get flavor ID
 		var flavorID string
 		if serverDetails.Flavor != nil {
@@ -851,16 +833,14 @@ func (a *openstackActuator) saveInstanceConfigurationToSecret(cd *hivev1.Cluster
 			NetworkID:          networkID,
 			OpenshiftClusterID: openshiftClusterID,
 			Metadata:           serverDetails.Metadata,
-			Tags:               serverTags,
 		})
 
-		logger.Infof("captured metadata for %s: %d properties, %d tags",
-			serverInfo.Name, len(serverDetails.Metadata), len(serverTags))
+		logger.Infof("captured metadata for %s: %d properties",
+			serverInfo.Name, len(serverDetails.Metadata))
 	}
 
 	return a.saveHibernationConfigToSecret(cd, hiveClient, instanceConfigs, logger)
 }
-
 
 // Store hibernation information to secrets
 func (a *openstackActuator) saveHibernationConfigToSecret(cd *hivev1.ClusterDeployment, hiveClient client.Client, instanceConfigs []OpenStackInstanceConfig, logger log.FieldLogger) error {

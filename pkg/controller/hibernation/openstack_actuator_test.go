@@ -46,7 +46,7 @@ func TestOpenStackStopMachines(t *testing.T) {
 	}{
 		{
 			name:      "stop no running instances",
-			instances: map[string]int{}, 
+			instances: map[string]int{},
 		},
 		{
 			name:      "stop running instances",
@@ -65,9 +65,6 @@ func TestOpenStackStopMachines(t *testing.T) {
 
 				// Network operations
 				setupOpenStackNetworkOps(c)
-
-				// Tag operations for hibernation (capture tags)
-				setupOpenStackTagOps(c)
 
 				// OVERRIDE the default ListServers to simulate cleanup progression
 				gomock.InOrder(
@@ -180,9 +177,6 @@ func TestOpenStackStartMachines(t *testing.T) {
 							Status: "BUILD",
 						}, nil
 					})
-
-				// Expect tag restoration after server creation
-				c.EXPECT().SetServerTags(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return(nil)
 
 				// Expect status checks for waiting
 				activeServer := &servers.Server{Status: "ACTIVE"}
@@ -344,17 +338,6 @@ func setupOpenStackNetworkOps(openstackClient *mockopenstackclient.MockClient) {
 	openstackClient.EXPECT().GetServerSecurityGroups(gomock.Any(), gomock.Any()).Return([]string{"default"}, nil).AnyTimes()
 }
 
-// Setup tag operations for tests
-func setupOpenStackTagOps(openstackClient *mockopenstackclient.MockClient) {
-	// Expect tag retrieval during hibernation (capture tags)
-	masterTags := []string{"openshiftClusterID=testinfra"}
-	workerTags := []string{"cluster-api-provider-openstack", "openshift-machine-api-testinfra", "openshiftClusterID=testinfra"}
-
-	// Mock tag calls for different servers
-	openstackClient.EXPECT().GetServerTags(gomock.Any(), "testinfra-ACTIVE-0").Return(masterTags, nil).AnyTimes()
-	openstackClient.EXPECT().GetServerTags(gomock.Any(), "testinfra-ACTIVE-1").Return(workerTags, nil).AnyTimes()
-}
-
 // Setup quota mocks with sufficient resources
 func setupOpenStackQuotaMocks(openstackClient *mockopenstackclient.MockClient) {
 	// Mock quotas - plenty of resources available
@@ -378,7 +361,7 @@ func setupOpenStackQuotaMocks(openstackClient *mockopenstackclient.MockClient) {
 		ID:    "flavor-1",
 		Name:  "m1.small",
 		VCPUs: 2,
-		RAM:   2048, // 2GB in MB
+		RAM:   2048,
 		Disk:  10,
 	}
 	openstackClient.EXPECT().GetFlavorDetails(gomock.Any(), "flavor-1").Return(flavorDetails, nil).AnyTimes()
@@ -388,7 +371,7 @@ func setupOpenStackQuotaMocks(openstackClient *mockopenstackclient.MockClient) {
 		ID:    "flavor-2",
 		Name:  "m1.medium",
 		VCPUs: 4,
-		RAM:   4096, // 4GB in MB
+		RAM:   4096,
 		Disk:  20,
 	}
 	openstackClient.EXPECT().GetFlavorDetails(gomock.Any(), "flavor-2").Return(flavorDetails2, nil).AnyTimes()
@@ -399,16 +382,16 @@ func setupOpenStackQuotaMocksInsufficient(openstackClient *mockopenstackclient.M
 	// Mock quotas - very limited resources
 	quotas := &openstackclient.ComputeQuotas{
 		Instances: 2,
-		Cores:     4,    // Only 4 vCPUs total
-		RAM:       4096, // Only 4GB total
+		Cores:     4,
+		RAM:       4096,
 	}
 	openstackClient.EXPECT().GetComputeQuotas(gomock.Any()).Return(quotas, nil).AnyTimes()
 
 	// Mock usage - most resources already used
 	usage := &openstackclient.ComputeUsage{
 		InstancesUsed: 1,
-		CoresUsed:     3,    // 3 out of 4 vCPUs used
-		RAMUsed:       3072, // 3GB out of 4GB used
+		CoresUsed:     3,
+		RAMUsed:       3072,
 	}
 	openstackClient.EXPECT().GetComputeUsage(gomock.Any()).Return(usage, nil).AnyTimes()
 
@@ -417,7 +400,7 @@ func setupOpenStackQuotaMocksInsufficient(openstackClient *mockopenstackclient.M
 		ID:    "flavor-1",
 		Name:  "m1.small",
 		VCPUs: 2,
-		RAM:   2048, // 2GB in MB
+		RAM:   2048,
 		Disk:  10,
 	}
 	openstackClient.EXPECT().GetFlavorDetails(gomock.Any(), "flavor-1").Return(flavorDetails1, nil).AnyTimes()
@@ -427,7 +410,7 @@ func setupOpenStackQuotaMocksInsufficient(openstackClient *mockopenstackclient.M
 		ID:    "flavor-2",
 		Name:  "m1.medium",
 		VCPUs: 4,
-		RAM:   4096, // 4GB in MB
+		RAM:   4096,
 		Disk:  20,
 	}
 	openstackClient.EXPECT().GetFlavorDetails(gomock.Any(), "flavor-2").Return(flavorDetails2, nil).AnyTimes()
@@ -443,7 +426,7 @@ func testOpenStackClusterDeployment() *hivev1.ClusterDeployment {
 	)
 }
 
-// hibernation secret with complete metadata and tags
+// hibernation secret with complete metadata
 func testHibernationSecretWithMetadata() *corev1.Secret {
 	config := []OpenStackInstanceConfig{
 		{
@@ -459,7 +442,6 @@ func testHibernationSecretWithMetadata() *corev1.Secret {
 				"Name":               "testinfra-master",
 				"openshiftClusterID": "testinfra",
 			},
-			Tags: []string{"openshiftClusterID=testinfra"},
 		},
 		{
 			Name:               "testinfra-worker-0",
@@ -474,7 +456,6 @@ func testHibernationSecretWithMetadata() *corev1.Secret {
 				"Name":               "testinfra-worker",
 				"openshiftClusterID": "testinfra",
 			},
-			Tags: []string{"cluster-api-provider-openstack", "openshift-machine-api-testinfra", "openshiftClusterID=testinfra"},
 		},
 	}
 

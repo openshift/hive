@@ -2,7 +2,6 @@ package openstackclient
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"gopkg.in/yaml.v2"
@@ -11,7 +10,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/tags"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/usage"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -31,10 +29,6 @@ type Client interface {
 	DeleteServer(ctx context.Context, serverID string) error
 	CreateServerSnapshot(ctx context.Context, serverID, snapshotName string) (string, error)
 	CreateServerFromOpts(ctx context.Context, opts *ServerCreateOpts) (*servers.Server, error)
-
-	// Tags
-	SetServerTags(ctx context.Context, serverID string, serverTags []string) error
-	GetServerTags(ctx context.Context, serverID string) ([]string, error)
 
 	// Images - only snapshot checking
 	GetImage(ctx context.Context, imageID string) (*images.Image, error)
@@ -301,34 +295,6 @@ func (c *openstackClient) GetServerSecurityGroups(ctx context.Context, serverID 
 	return secGroupNames, nil
 }
 
-// Adding tags
-func (c *openstackClient) SetServerTags(ctx context.Context, serverID string, serverTags []string) error {
-	// Delete all existing tags first
-	err := tags.DeleteAll(c.computeClient, serverID).ExtractErr()
-	if err != nil {
-		return fmt.Errorf("failed to clear existing tags for server %s: %w", serverID, err)
-	}
-
-	// Add new tags one by one if any exist
-	for _, tag := range serverTags {
-		err = tags.Add(c.computeClient, serverID, tag).ExtractErr()
-		if err != nil {
-			return fmt.Errorf("failed to set tag '%s' for server %s: %w", tag, serverID, err)
-		}
-	}
-
-	return nil
-}
-
-// Gets all tags for a server
-func (c *openstackClient) GetServerTags(ctx context.Context, serverID string) ([]string, error) {
-	serverTags, err := tags.List(c.computeClient, serverID).Extract()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tags for server %s: %w", serverID, err)
-	}
-	return serverTags, nil
-}
-
 // Gets the compute quotas for the current project
 func (c *openstackClient) GetComputeQuotas(ctx context.Context) (*ComputeQuotas, error) {
 	projectID := c.credentials.ProjectID
@@ -501,7 +467,7 @@ func newClientFromStruct(creds *Credentials) (*openstackClient, error) {
 		region = creds.Region
 	}
 	if region == "" {
-		region = "RegionOne" 
+		region = "RegionOne"
 	}
 
 	interfaceType := gophercloud.AvailabilityPublic

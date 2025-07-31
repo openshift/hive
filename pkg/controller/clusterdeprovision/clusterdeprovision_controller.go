@@ -140,11 +140,8 @@ type ReconcileClusterDeprovision struct {
 	scheme               *runtime.Scheme
 	deprovisionsDisabled bool
 
-	// nodeSelector is copied from the hive-controllers pod and must be included in any Jobs we create from here.
-	nodeSelector *map[string]string
-
-	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
-	tolerations *[]corev1.Toleration
+	// sharedPodConfig is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	sharedPodConfig *controllerutils.SharedPodConfig
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeprovision object and makes changes based on the state read
@@ -152,16 +149,15 @@ type ReconcileClusterDeprovision struct {
 func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	rLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeprovision", request.NamespacedName)
 
-	// Discover scheduling settings from the controller. We would like to do this in newReconciler,
+	// Discover settings from the controller. We would like to do this in newReconciler,
 	// but we can't count on the cache having been started at that point.
-	if r.nodeSelector == nil || r.tolerations == nil {
-		thisPod, err := controllerutils.GetThisPod(r)
+	if r.sharedPodConfig == nil {
+		sharedPodConfig, err := controllerutils.ReadSharedConfigFromThisPod(r)
 		if err != nil {
-			rLog.WithError(err).Error("Failed to retrieve the running pod")
+			rLog.WithError(err).Error("error reading shared pod config")
 			return reconcile.Result{}, err
 		}
-		r.nodeSelector = &thisPod.Spec.NodeSelector
-		r.tolerations = &thisPod.Spec.Tolerations
+		r.sharedPodConfig = sharedPodConfig
 	}
 
 	// For logging, we need to see when the reconciliation loop starts and ends.
@@ -307,8 +303,8 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		os.Getenv("HTTPS_PROXY"),
 		os.Getenv("NO_PROXY"),
 		extraEnvVars,
-		*r.nodeSelector,
-		*r.tolerations)
+		*r.sharedPodConfig,
+	)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

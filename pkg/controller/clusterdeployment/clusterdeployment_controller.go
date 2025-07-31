@@ -319,11 +319,8 @@ type ReconcileClusterDeployment struct {
 
 	protectedDelete bool
 
-	// nodeSelector is copied from the hive-controllers pod and must be included in any Jobs we create from here.
-	nodeSelector *map[string]string
-
-	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
-	tolerations *[]corev1.Toleration
+	// sharedPodConfig is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	sharedPodConfig *controllerutils.SharedPodConfig
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -331,16 +328,15 @@ type ReconcileClusterDeployment struct {
 func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 
-	// Discover scheduling settings from the controller. We would like to do this in NewReconciler,
+	// Discover settings from the controller. We would like to do this in NewReconciler,
 	// but we can't count on the cache having been started at that point.
-	if r.nodeSelector == nil || r.tolerations == nil {
-		thisPod, err := controllerutils.GetThisPod(r)
+	if r.sharedPodConfig == nil {
+		sharedPodConfig, err := controllerutils.ReadSharedConfigFromThisPod(r)
 		if err != nil {
-			cdLog.WithError(err).Error("Failed to retrieve the running pod")
+			cdLog.WithError(err).Error("error reading shared pod config")
 			return reconcile.Result{}, err
 		}
-		r.nodeSelector = &thisPod.Spec.NodeSelector
-		r.tolerations = &thisPod.Spec.Tolerations
+		r.sharedPodConfig = sharedPodConfig
 	}
 
 	cdLog.Info("reconciling cluster deployment")
@@ -1104,8 +1100,8 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			os.Getenv("HTTP_PROXY"),
 			os.Getenv("HTTPS_PROXY"),
 			os.Getenv("NO_PROXY"),
-			*r.nodeSelector,
-			*r.tolerations)
+			*r.sharedPodConfig,
+		)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)

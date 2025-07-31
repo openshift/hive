@@ -63,6 +63,14 @@ spec:
               fieldPath: metadata.namespace
         - name: TMPDIR
           value: /tmp
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         securityContext:
           privileged: false
           readOnlyRootFilesystem: true

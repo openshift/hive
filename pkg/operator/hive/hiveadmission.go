@@ -189,9 +189,10 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	}
 	hiveAdmDeployment.Spec.Template.Annotations[servingCertSecretHashAnnotation] = certSecretHash
 
-	// Apply nodeSelector and tolerations passed through from the operator deployment
-	hiveAdmDeployment.Spec.Template.Spec.NodeSelector = r.nodeSelector
-	hiveAdmDeployment.Spec.Template.Spec.Tolerations = r.tolerations
+	// Apply shared pod config passed through from the operator deployment
+	hiveAdmDeployment.Spec.Template.Spec.NodeSelector = r.sharedPodConfig.NodeSelector
+	hiveAdmDeployment.Spec.Template.Spec.Tolerations = r.sharedPodConfig.Tolerations
+	hiveAdmDeployment.Spec.Template.Spec.ImagePullSecrets = r.sharedPodConfig.ImagePullSecrets
 
 	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveAdmDeployment), hLog, util.WithGarbageCollection(instance))
 	if err != nil {

@@ -6,9 +6,9 @@ import (
 	hiveassert "github.com/openshift/hive/pkg/test/assert"
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
 const (
@@ -23,7 +23,7 @@ func TestGenerateImageSetJob(t *testing.T) {
 		testImageSet().Spec.ReleaseImage,
 		"test-service-account",
 		testHttpProxy, testHttpsProxy, testNoProxy,
-		map[string]string{}, []corev1.Toleration{})
+		controllerutils.SharedPodConfig{})
 	assert.Equal(t, GetImageSetJobName(testClusterDeployment().Name), job.Name, "unexpected job name")
 	assert.Equal(t, testClusterDeployment().Namespace, job.Namespace, "unexpected job namespace")
 	assert.Len(t, job.Spec.Template.Spec.InitContainers, 1, "unexpected number of init containers")

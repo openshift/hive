@@ -269,12 +269,11 @@ func TestClusterProvisionReconcile(t *testing.T) {
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			controllerExpectations := controllerutils.NewExpectations(logger)
 			rcp := &ReconcileClusterProvision{
-				Client:       fakeClient,
-				scheme:       scheme,
-				logger:       logger,
-				expectations: controllerExpectations,
-				nodeSelector: &map[string]string{},
-				tolerations:  &[]corev1.Toleration{},
+				Client:          fakeClient,
+				scheme:          scheme,
+				logger:          logger,
+				expectations:    controllerExpectations,
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
 			}
 
 			reconcileRequest := reconcile.Request{
@@ -351,7 +350,7 @@ func testProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
 
 func testJob(opts ...testjob.Option) *batchv1.Job {
 	provision := testProvision()
-	job, err := install.GenerateInstallerJob(provision, map[string]string{}, []corev1.Toleration{})
+	job, err := install.GenerateInstallerJob(provision, controllerutils.SharedPodConfig{})
 	if err != nil {
 		panic("should not error while generating test install job")
 	}
@@ -561,10 +560,9 @@ compute:
 			}
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(icSecret).Build()
 			rcp := &ReconcileClusterProvision{
-				Client:       fakeClient,
-				logger:       logger,
-				nodeSelector: &map[string]string{},
-				tolerations:  &[]corev1.Toleration{},
+				Client:          fakeClient,
+				logger:          logger,
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
 			}
 
 			if got := rcp.getWorkers(*cd); got != test.want {

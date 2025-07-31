@@ -423,8 +423,8 @@ func InstallerPodSpec(
 // given a ClusterDeployment and an installer image.
 func GenerateInstallerJob(
 	provision *hivev1.ClusterProvision,
-	nodeSelector map[string]string,
-	tolerations []corev1.Toleration) (*batchv1.Job, error) {
+	sharedPodConfig controllerutils.SharedPodConfig,
+) (*batchv1.Job, error) {
 
 	pLog := log.WithFields(log.Fields{
 		"clusterProvision": provision.Name,
@@ -440,8 +440,9 @@ func GenerateInstallerJob(
 	labels[constants.InstallJobLabel] = "true"
 
 	podSpec := provision.Spec.PodSpec
-	podSpec.NodeSelector = nodeSelector
-	podSpec.Tolerations = tolerations
+	podSpec.NodeSelector = sharedPodConfig.NodeSelector
+	podSpec.Tolerations = sharedPodConfig.Tolerations
+	podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, sharedPodConfig.ImagePullSecrets...)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -481,8 +482,8 @@ func GenerateUninstallerJobForDeprovision(
 	req *hivev1.ClusterDeprovision,
 	serviceAccountName, httpProxy, httpsProxy, noProxy string,
 	extraEnvVars []corev1.EnvVar,
-	nodeSelector map[string]string,
-	tolerations []corev1.Toleration) (*batchv1.Job, error) {
+	sharedPodConfig controllerutils.SharedPodConfig,
+) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
 
@@ -490,8 +491,9 @@ func GenerateUninstallerJobForDeprovision(
 		DNSPolicy:          corev1.DNSClusterFirst,
 		RestartPolicy:      restartPolicy,
 		ServiceAccountName: serviceAccountName,
-		NodeSelector:       nodeSelector,
-		Tolerations:        tolerations,
+		NodeSelector:       sharedPodConfig.NodeSelector,
+		Tolerations:        sharedPodConfig.Tolerations,
+		ImagePullSecrets:   sharedPodConfig.ImagePullSecrets,
 	}
 
 	completions := int32(1)

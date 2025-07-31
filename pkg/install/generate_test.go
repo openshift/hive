@@ -33,7 +33,7 @@ func TestGenerateDeprovision(t *testing.T) {
 		dr, "someseviceaccount",
 		testHttpProxy, testHttpsProxy, testNoProxy,
 		nil,
-		map[string]string{}, []corev1.Toleration{})
+		map[string]string{}, []corev1.Toleration{}, []corev1.LocalObjectReference{})
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)

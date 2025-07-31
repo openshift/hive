@@ -351,7 +351,7 @@ func testProvision(opts ...tcp.Option) *hivev1.ClusterProvision {
 
 func testJob(opts ...testjob.Option) *batchv1.Job {
 	provision := testProvision()
-	job, err := install.GenerateInstallerJob(provision, map[string]string{}, []corev1.Toleration{})
+	job, err := install.GenerateInstallerJob(provision, map[string]string{}, []corev1.Toleration{}, []corev1.LocalObjectReference{})
 	if err != nil {
 		panic("should not error while generating test install job")
 	}

@@ -85,7 +85,14 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(assetPath), hLog, util.WithNamespaceOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
+		if _, err := util.ApplyRuntimeObject(
+			h,
+			util.FromAssetPath(assetPath),
+			hLog,
+			util.WithNamespaceOverride(hiveNSName),
+			util.WithGarbageCollection(instance),
+			util.WithImagePullSecrets(r.imagePullSecrets),
+		); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}

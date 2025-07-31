@@ -324,6 +324,9 @@ type ReconcileClusterDeployment struct {
 
 	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
 	tolerations *[]corev1.Toleration
+
+	// imagePullSecrets is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	imagePullSecrets *[]corev1.LocalObjectReference
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -333,7 +336,7 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 
 	// Discover scheduling settings from the controller. We would like to do this in NewReconciler,
 	// but we can't count on the cache having been started at that point.
-	if r.nodeSelector == nil || r.tolerations == nil {
+	if r.nodeSelector == nil || r.tolerations == nil || r.imagePullSecrets == nil {
 		thisPod, err := controllerutils.GetThisPod(r)
 		if err != nil {
 			cdLog.WithError(err).Error("Failed to retrieve the running pod")
@@ -341,6 +344,7 @@ func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reco
 		}
 		r.nodeSelector = &thisPod.Spec.NodeSelector
 		r.tolerations = &thisPod.Spec.Tolerations
+		r.imagePullSecrets = &thisPod.Spec.ImagePullSecrets
 	}
 
 	cdLog.Info("reconciling cluster deployment")
@@ -1105,7 +1109,9 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			os.Getenv("HTTPS_PROXY"),
 			os.Getenv("NO_PROXY"),
 			*r.nodeSelector,
-			*r.tolerations)
+			*r.tolerations,
+			*r.imagePullSecrets,
+		)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)

@@ -306,6 +306,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		tolerations := operatorDeployment.Spec.Template.Spec.Tolerations
 		log.Debugf("loaded tolerations from hive-operator deployment: %v", tolerations)
 		r.(*ReconcileHiveConfig).tolerations = tolerations
+		imagePullSecrets := operatorDeployment.Spec.Template.Spec.ImagePullSecrets
+		log.Debugf("loaded imagePullSecrets from hive-operator deployment: %v", imagePullSecrets)
+		r.(*ReconcileHiveConfig).imagePullSecrets = imagePullSecrets
 	} else {
 		log.WithError(err).Fatal("unable to look up hive-operator Deployment")
 	}
@@ -342,6 +345,7 @@ type ReconcileHiveConfig struct {
 	secretWatchEstablishedInNamespace    string
 	mgr                                  manager.Manager
 	isOpenShift                          bool
+	imagePullSecrets                     []corev1.LocalObjectReference
 }
 
 // Reconcile reads that state of the cluster for a Hive object and makes changes based on the state read

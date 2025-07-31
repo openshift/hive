@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,6 +63,21 @@ func WithNamespaceOverride(namespaceOverride string) RTOApplyOpt {
 		}
 		hLog.WithField("newNamespace", namespaceOverride).Info("overriding namespace")
 		obj.SetNamespace(namespaceOverride)
+		return nil
+	}
+}
+
+// WithImagePullSecrets sets the image pull secrets of a service account.
+// It will not choke on non-service account objects, instead it will log a debug message
+// and skip over it.
+func WithImagePullSecrets(imagePullSecrets []corev1.LocalObjectReference) RTOApplyOpt {
+	return func(runtimeObj runtime.Object, hLog log.FieldLogger) error {
+		sa, ok := runtimeObj.(*corev1.ServiceAccount)
+		if !ok {
+			hLog.Debugf("runtime object is not a ServiceAccount, skipping")
+			return nil
+		}
+		sa.ImagePullSecrets = imagePullSecrets
 		return nil
 	}
 }

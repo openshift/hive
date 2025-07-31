@@ -23,7 +23,7 @@ func TestGenerateImageSetJob(t *testing.T) {
 		testImageSet().Spec.ReleaseImage,
 		"test-service-account",
 		testHttpProxy, testHttpsProxy, testNoProxy,
-		map[string]string{}, []corev1.Toleration{})
+		map[string]string{}, []corev1.Toleration{}, []corev1.LocalObjectReference{})
 	assert.Equal(t, GetImageSetJobName(testClusterDeployment().Name), job.Name, "unexpected job name")
 	assert.Equal(t, testClusterDeployment().Namespace, job.Namespace, "unexpected job namespace")
 	assert.Len(t, job.Spec.Template.Spec.InitContainers, 1, "unexpected number of init containers")

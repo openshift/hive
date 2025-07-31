@@ -424,7 +424,9 @@ func InstallerPodSpec(
 func GenerateInstallerJob(
 	provision *hivev1.ClusterProvision,
 	nodeSelector map[string]string,
-	tolerations []corev1.Toleration) (*batchv1.Job, error) {
+	tolerations []corev1.Toleration,
+	imagePullSecrets []corev1.LocalObjectReference,
+) (*batchv1.Job, error) {
 
 	pLog := log.WithFields(log.Fields{
 		"clusterProvision": provision.Name,
@@ -442,6 +444,7 @@ func GenerateInstallerJob(
 	podSpec := provision.Spec.PodSpec
 	podSpec.NodeSelector = nodeSelector
 	podSpec.Tolerations = tolerations
+	podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, imagePullSecrets...)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -482,7 +485,9 @@ func GenerateUninstallerJobForDeprovision(
 	serviceAccountName, httpProxy, httpsProxy, noProxy string,
 	extraEnvVars []corev1.EnvVar,
 	nodeSelector map[string]string,
-	tolerations []corev1.Toleration) (*batchv1.Job, error) {
+	tolerations []corev1.Toleration,
+	imagePullSecrets []corev1.LocalObjectReference,
+) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
 
@@ -492,6 +497,7 @@ func GenerateUninstallerJobForDeprovision(
 		ServiceAccountName: serviceAccountName,
 		NodeSelector:       nodeSelector,
 		Tolerations:        tolerations,
+		ImagePullSecrets:   imagePullSecrets,
 	}
 
 	completions := int32(1)

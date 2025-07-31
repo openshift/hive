@@ -145,6 +145,9 @@ type ReconcileClusterDeprovision struct {
 
 	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
 	tolerations *[]corev1.Toleration
+
+	// imagePullSecrets is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	imagePullSecrets *[]corev1.LocalObjectReference
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeprovision object and makes changes based on the state read
@@ -154,7 +157,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 
 	// Discover scheduling settings from the controller. We would like to do this in newReconciler,
 	// but we can't count on the cache having been started at that point.
-	if r.nodeSelector == nil || r.tolerations == nil {
+	if r.nodeSelector == nil || r.tolerations == nil || r.imagePullSecrets == nil {
 		thisPod, err := controllerutils.GetThisPod(r)
 		if err != nil {
 			rLog.WithError(err).Error("Failed to retrieve the running pod")
@@ -162,6 +165,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		}
 		r.nodeSelector = &thisPod.Spec.NodeSelector
 		r.tolerations = &thisPod.Spec.Tolerations
+		r.imagePullSecrets = &thisPod.Spec.ImagePullSecrets
 	}
 
 	// For logging, we need to see when the reconciliation loop starts and ends.
@@ -308,7 +312,9 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		os.Getenv("NO_PROXY"),
 		extraEnvVars,
 		*r.nodeSelector,
-		*r.tolerations)
+		*r.tolerations,
+		*r.imagePullSecrets,
+	)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)
 		return reconcile.Result{}, err

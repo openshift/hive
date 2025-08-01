@@ -82,6 +82,7 @@ current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 	adminPassword       = "foo"
+	metadataSecret      = "metadata-json-secret"
 	credsSecret         = "foo-aws-creds"
 	sshKeySecret        = "foo-ssh-key"
 
@@ -2110,6 +2111,7 @@ platform:
 						assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID, "unexpected cluster ID")
 						assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, "unexpected admin kubeconfig")
 						assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name, "unexpected admin password")
+						assert.Equal(t, metadataSecret, cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name, "unexpected metadata.json")
 					}
 				}
 			},
@@ -2125,6 +2127,7 @@ platform:
 						ClusterID:                "old-cluster-id",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "old-kubeconfig-secret"},
 						AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "old-password-secret"},
+						MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: "old-metadata-secret"},
 					}
 					return cd
 				}(),
@@ -2140,6 +2143,7 @@ platform:
 						assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID, "unexpected cluster ID")
 						assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, "unexpected admin kubeconfig")
 						assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name, "unexpected admin password")
+						assert.Equal(t, metadataSecret, cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name, "unexpected metadata.json")
 					}
 				}
 			},
@@ -2416,6 +2420,7 @@ platform:
 						InfraID:                  "fakeinfra",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 						AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
+						MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadataSecret},
 					}
 					cd.Status.WebConsoleURL = "https://example.com"
 					cd.Status.APIURL = "https://example.com"
@@ -2423,13 +2428,14 @@ platform:
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+				testSecret(corev1.SecretTypeOpaque, metadataSecret, "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(
 					testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testMetadataConfigMap(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				secretNames := []string{adminKubeconfigSecret, adminPasswordSecret}
+				secretNames := []string{adminKubeconfigSecret, adminPasswordSecret, metadataSecret}
 				for _, secretName := range secretNames {
 					secret := &corev1.Secret{}
 					err := c.Get(context.TODO(), client.ObjectKey{Name: secretName, Namespace: testNamespace},
@@ -3305,6 +3311,9 @@ platform:
 					AdminPasswordSecretRef: &corev1.LocalObjectReference{
 						Name: adminPasswordSecret,
 					},
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{
+						Name: metadataSecret,
+					},
 				}),
 				testClusterImageSet(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -3318,6 +3327,7 @@ platform:
 				assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID)
 				assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name)
 				assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name)
+				assert.Equal(t, metadataSecret, cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name)
 			},
 		},
 		{
@@ -3908,6 +3918,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			InfraID:                  testInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
+			MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadataSecret},
 			Platform: &hivev1.ClusterPlatformMetadata{
 				AWS: &hivev1aws.Metadata{
 					HostedZoneRole: pointer.String("account-b-role"),
@@ -4088,6 +4099,12 @@ func testFakeClusterInstallWithClusterMetadata(name string, metadata hivev1.Clus
 	if metadata.AdminPasswordSecretRef != nil {
 		value["adminPasswordSecretRef"] = map[string]interface{}{
 			"name": metadata.AdminPasswordSecretRef.Name,
+		}
+	}
+
+	if metadata.MetadataJSONSecretRef != nil {
+		value["metadataJSONSecretRef"] = map[string]interface{}{
+			"name": metadata.MetadataJSONSecretRef.Name,
 		}
 	}
 

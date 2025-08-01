@@ -2,6 +2,7 @@ package clusterclaim
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -544,6 +545,11 @@ func (r *ReconcileClusterClaim) createRBAC(claim *hivev1.ClusterClaim, cd *hivev
 }
 
 func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(cd *hivev1.ClusterDeployment, logger log.FieldLogger) error {
+	// HIVE-2302: Avoid a potential timing issue where a pool CD was created before metadata.json passthrough,
+	// and the CD controller has not yet generated it.
+	if cd.Spec.ClusterMetadata.MetadataJSONSecretRef == nil || cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name == "" {
+		return fmt.Errorf("can't apply RBAC for ClusterClaim owner: ClusterDeployment %s/%s has no metadata.json Secret", cd.Namespace, cd.Name)
+	}
 	desiredRole := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: cd.Namespace,
@@ -556,13 +562,14 @@ func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(cd *hivev1.ClusterDeploy
 				Resources: []string{rbacv1.ResourceAll},
 				Verbs:     []string{rbacv1.VerbAll},
 			},
-			// Allow read access to the kubeconfig and admin password secrets
+			// Allow read access to the kubeconfig, admin password, and metadata.json secrets
 			{
 				APIGroups: []string{corev1.GroupName},
 				Resources: []string{"secrets"},
 				ResourceNames: []string{
 					cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, // HIVE-2485: n/a
 					cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name,
+					cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name,
 				},
 				Verbs: []string{"get"},
 			},

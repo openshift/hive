@@ -307,7 +307,13 @@ type ClusterMetadata struct {
 	// +optional
 	AdminPasswordSecretRef *corev1.LocalObjectReference `json:"adminPasswordSecretRef,omitempty"`
 
-	// Platform holds platform-specific cluster metadata
+	// MetaddataJSONSecretRef references the secret containing the metadata.json emitted by the
+	// installer, potentially scrubbed for sensitive data.
+	MetadataJSONSecretRef *corev1.LocalObjectReference `json:"metadataJSONSecretRef,omitempty"`
+
+	// Platform holds platform-specific cluster metadata.
+	// Deprecated. Use the Secret referenced by MetadataJSONSecretRef instead. We may stop
+	// populating this section in the future.
 	// +optional
 	Platform *ClusterPlatformMetadata `json:"platform,omitempty"`
 }

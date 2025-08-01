@@ -1,7 +1,9 @@
 package clusterdeployment
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -37,6 +39,13 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	installertypes "github.com/openshift/installer/pkg/types"
+	installertypesaws "github.com/openshift/installer/pkg/types/aws"
+	installertypesazure "github.com/openshift/installer/pkg/types/azure"
+	installertypesgcp "github.com/openshift/installer/pkg/types/gcp"
+	"github.com/openshift/installer/pkg/types/ibmcloud"
+	"github.com/openshift/installer/pkg/types/nutanix"
+	"github.com/openshift/installer/pkg/types/openstack"
+	"github.com/openshift/installer/pkg/types/vsphere"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
 	"github.com/openshift/library-go/pkg/manifest"
 	"github.com/openshift/library-go/pkg/verify"
@@ -51,6 +60,8 @@ import (
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/gcpclient"
+	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/remoteclient"
 	"github.com/openshift/hive/pkg/util/contracts"
@@ -117,6 +128,8 @@ const (
 
 	regionUnknown     = "unknown"
 	injectCABundleKey = "config.openshift.io/inject-trusted-cabundle"
+
+	metadataJSONSecretNameTemplate = "%s-metadata-json"
 )
 
 // Add creates a new ClusterDeployment controller and adds it to the manager with default RBAC.
@@ -603,6 +616,11 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, err
 	}
 
+	// === START LEGACY METADATA DISCOVERY ===
+	// TODO: We can delete this section (up to "END ...") once we can be assured a hub has
+	// successfully populated metadata.json Secrets for all legacy clusters. Worst case, if we do
+	// it too early, the user would need to manually create that Secret.
+
 	// Discover AWS HostedZoneRole if applicable
 	if r.discoverAWSHostedZoneRole(cd, cdLog) {
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
@@ -628,6 +646,31 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		// since the controller is not watching for secrets. So, requeue manually.
 		return reconcile.Result{Requeue: true}, nil
 	}
+
+	// Generate metadata.json Secret if it doesn't already exist. This code path is here for the
+	// case where we've upgraded hive on a hub that provisioned some clusters prior to the
+	// introduction of this Secret, and we need to build it retroactively from the ClusterProvision
+	// if it's still available; or the individual fields, including those we've populated above.
+	if cd.Spec.ClusterMetadata != nil &&
+		(cd.Spec.ClusterMetadata.MetadataJSONSecretRef == nil || cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name == "") {
+
+		metadataJSONBytes, err := r.retrofitMetadataJSON(cd)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if err := r.ensureMetadataJSONSecret(cd, cd.Spec.ClusterMetadata, metadataJSONBytes, false, cdLog); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "failed to generate metadata.json Secret")
+		}
+		err = r.Update(context.TODO(), cd)
+		if err != nil {
+			cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating clusterdeployment with metadata reference")
+		}
+		return reconcile.Result{}, err
+
+	}
+	// metadata.json Secret already existed; proceed
+
+	// === END LEGACY METADATA DISCOVERY ===
 
 	if cd.DeletionTimestamp != nil {
 		return r.syncDeletedClusterDeployment(cd, cdLog)
@@ -727,13 +770,18 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 				return reconcile.Result{}, err
 			}
 
-			// Add cluster deployment as additional owner reference to admin secrets
+			// Add cluster deployment as additional owner reference to admin & metadata secrets
 			// HIVE-2485: No need to scrub here
 			if err := r.addOwnershipToSecret(cd, cdLog, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name); err != nil {
 				return reconcile.Result{}, err
 			}
 			if cd.Spec.ClusterMetadata.AdminPasswordSecretRef != nil && cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name != "" {
 				if err := r.addOwnershipToSecret(cd, cdLog, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name); err != nil {
+					return reconcile.Result{}, err
+				}
+			}
+			if mdjsr := cd.Spec.ClusterMetadata.MetadataJSONSecretRef; mdjsr != nil && mdjsr.Name != "" {
+				if err := r.addOwnershipToSecret(cd, cdLog, mdjsr.Name); err != nil {
 					return reconcile.Result{}, err
 				}
 			}
@@ -761,8 +809,7 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 
 	// Sanity check the platform/cloud credentials and set hivev1.AuthenticationFailureClusterDeploymentCondition
 	validCreds, authError := r.validatePlatformCreds(cd, cdLog)
-	var err error
-	_, err = r.setAuthenticationFailure(cd, validCreds, authError)
+	_, err := r.setAuthenticationFailure(cd, validCreds, authError)
 	if err != nil {
 		cdLog.WithError(err).Error("unable to update clusterdeployment")
 		return reconcile.Result{}, err
@@ -969,6 +1016,201 @@ func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev
 	}
 
 	return r.reconcileExistingInstallingClusterInstall(cd, ci, logger)
+}
+
+// ensureMetadataJSONSecret makes sure there is a Secret containing metadata.json, and sets/updates
+// clusterMetadata.MetadataJSONSecretRef to point to it. The caller is responsible for folding the
+// (potentially) modified clusterMetadata back into the cd and Update()ing it.
+// If forceUpdate is true, we will ensure the contents of the Secret's metadata.json key are equal
+// to metadataJSON. If forceUpdate is false, we will only update labels iff necessary.
+func (r *ReconcileClusterDeployment) ensureMetadataJSONSecret(
+	cd *hivev1.ClusterDeployment,
+	clusterMetadata *hivev1.ClusterMetadata,
+	metadataJSON []byte,
+	forceUpdate bool,
+	logger log.FieldLogger) error {
+
+	// Figure out the name of the Secret.
+	// The default:
+	secretName := fmt.Sprintf(metadataJSONSecretNameTemplate, cd.Name)
+	// The Secret name may have been set explicitly by the user, e.g. via adoption/hiveutil.
+	// Look for an existing reference in both available ClusterMetadata objects.
+	// Searching both spots is probably overkill, but avoids the tight coupling of knowing how
+	// ensureMetadataJSONSecret is being called.
+	for _, cm := range []*hivev1.ClusterMetadata{clusterMetadata, cd.Spec.ClusterMetadata} {
+		if cm == nil {
+			continue
+		}
+		if cm.MetadataJSONSecretRef == nil {
+			continue
+		}
+		if cm.MetadataJSONSecretRef.Name == "" {
+			continue
+		}
+		secretName = cm.MetadataJSONSecretRef.Name
+		break
+	}
+	clusterMetadata.MetadataJSONSecretRef = &corev1.LocalObjectReference{
+		Name: secretName,
+	}
+
+	cdLog := logger.WithField("secret", secretName)
+	mdjSecret := &corev1.Secret{
+		// Populate these in case we have to Create the Secret. Otherwise harmless.
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: cd.Namespace,
+			Labels:    map[string]string{},
+		},
+		Data: map[string][]byte{},
+	}
+	err := r.Get(context.Background(), types.NamespacedName{Namespace: cd.Namespace, Name: secretName}, mdjSecret)
+	if err != nil && !apierrors.IsNotFound(err) {
+		cdLog.WithError(err).Error("failed to get metadata.json secret")
+		return err
+	}
+	needUpdate := false
+	if oldmdj, ok := mdjSecret.Data[constants.MetadataJSONSecretKey]; !ok || (forceUpdate && !bytes.Equal(oldmdj, metadataJSON)) {
+		mdjSecret.Data[constants.MetadataJSONSecretKey] = metadataJSON
+		needUpdate = true
+	}
+	if stLabel, ok := mdjSecret.Labels[constants.SecretTypeLabel]; !ok || stLabel != constants.SecretTypeMetadataJSON {
+		mdjSecret.Labels[constants.SecretTypeLabel] = constants.SecretTypeMetadataJSON
+		needUpdate = true
+	}
+	// Other labels and OwnerReferences are set via addOwnershipToSecret()
+
+	if mdjSecret.UID == "" {
+		// New Secret -- create it.
+		if err := r.Create(context.Background(), mdjSecret); err != nil {
+			cdLog.WithError(err).Error("failed to create metadata.json secret")
+			return err
+		}
+	} else if needUpdate {
+		if err := r.Update(context.Background(), mdjSecret); err != nil {
+			cdLog.WithError(err).Error("failed to update metadata.json secret")
+			return err
+		}
+	}
+	return nil
+}
+
+// retrofitMetadataJSON attempts to construct an instance of the *installer's* ClusterMetadata type
+// with the piecemeal fields from cd, returning the marshaled JSON.
+func (r *ReconcileClusterDeployment) retrofitMetadataJSON(cd *hivev1.ClusterDeployment) ([]byte, error) {
+	cdMetadata := cd.Spec.ClusterMetadata
+	if cdMetadata == nil {
+		return nil, errors.New("ClusterMetadata should not be nil -- this is a bug!")
+	}
+	iMetadata := installertypes.ClusterMetadata{
+		ClusterName: cd.Spec.ClusterName,
+		ClusterID:   cdMetadata.ClusterID,
+		InfraID:     cdMetadata.InfraID,
+	}
+	switch {
+	case cd.Spec.Platform.AWS != nil:
+		iMetadata.AWS = &installertypesaws.Metadata{
+			Region:        cd.Spec.Platform.AWS.Region,
+			ClusterDomain: cd.Spec.BaseDomain,
+			Identifier: []map[string]string{
+				{fmt.Sprintf("kubernetes.io/cluster/%s", cdMetadata.InfraID): "owned"},
+				{fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s", cdMetadata.InfraID): "owned"},
+			},
+		}
+		if p := cdMetadata.Platform.AWS; p != nil && p.HostedZoneRole != nil {
+			iMetadata.AWS.HostedZoneRole = *p.HostedZoneRole
+		}
+	case cd.Spec.Platform.Azure != nil:
+		iMetadata.Azure = &installertypesazure.Metadata{
+			BaseDomainResourceGroupName: cd.Spec.Platform.Azure.BaseDomainResourceGroupName,
+			CloudName:                   installertypesazure.CloudEnvironment(cd.Spec.Platform.Azure.CloudName),
+		}
+		if p := cdMetadata.Platform.Azure; p != nil && p.ResourceGroupName != nil {
+			iMetadata.Azure = &installertypesazure.Metadata{
+				ResourceGroupName: *p.ResourceGroupName,
+			}
+		}
+	case cd.Spec.Platform.GCP != nil:
+		// The project ID is embedded in the credentials.
+		gcpCreds := &corev1.Secret{}
+		if err := r.Get(
+			context.TODO(),
+			types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.Platform.GCP.CredentialsSecretRef.Name},
+			gcpCreds); err != nil {
+
+			return nil, errors.Wrap(err, "failed to retrieve GCP credentials Secret")
+		}
+		projectID, err := gcpclient.ProjectIDFromSecret(gcpCreds)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get project ID from GCP credentials Secret")
+		}
+		iMetadata.GCP = &installertypesgcp.Metadata{
+			Region:    cd.Spec.Platform.GCP.Region,
+			ProjectID: projectID,
+		}
+		if p := cdMetadata.Platform.GCP; p != nil && p.NetworkProjectID != nil {
+			iMetadata.GCP.NetworkProjectID = *cdMetadata.Platform.GCP.NetworkProjectID
+		}
+	case cd.Spec.Platform.IBMCloud != nil:
+		ibmCreds := &corev1.Secret{}
+		if err := r.Get(
+			context.TODO(),
+			types.NamespacedName{Namespace: cd.Namespace, Name: cd.Spec.Platform.IBMCloud.CredentialsSecretRef.Name},
+			ibmCreds); err != nil {
+
+			return nil, errors.Wrap(err, "failed to retrieve IBMCloud credentials Secret")
+		}
+		ibmClient, err := ibmclient.NewClientFromSecret(ibmCreds)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create IBM client with creds in clusterDeployment's secret")
+		}
+		// Retrieve CISInstanceCRN
+		cisInstanceCRN, err := ibmclient.GetCISInstanceCRN(ibmClient, context.TODO(), cd.Spec.BaseDomain)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to retrieve CISInstanceCRN")
+		}
+		// Retrieve AccountID
+		accountID, err := ibmclient.GetAccountID(ibmClient, context.TODO())
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to retrieve AccountID")
+		}
+		iMetadata.IBMCloud = &ibmcloud.Metadata{
+			AccountID:         accountID,
+			BaseDomain:        cd.Spec.BaseDomain,
+			CISInstanceCRN:    cisInstanceCRN,
+			Region:            cd.Spec.Platform.IBMCloud.Region,
+			ResourceGroupName: cdMetadata.InfraID,
+		}
+	case cd.Spec.Platform.Nutanix != nil:
+		iMetadata.Nutanix = &nutanix.Metadata{
+			PrismCentral: cd.Spec.Platform.Nutanix.PrismCentral.Address,
+			Port:         strconv.Itoa(int(cd.Spec.Platform.Nutanix.PrismCentral.Port)),
+			// NOTE: Credentials (Username, Password) must be set before use.
+			// DO NOT set them here.
+		}
+	case cd.Spec.Platform.OpenStack != nil:
+		iMetadata.OpenStack = &openstack.Metadata{
+			// Not required?
+			Cloud:      cd.Spec.Platform.OpenStack.Cloud,
+			Identifier: map[string]string{"openshiftClusterID": cdMetadata.InfraID},
+		}
+	case cd.Spec.Platform.VSphere != nil:
+		iMetadata.VSphere = &vsphere.Metadata{
+			VCenter: cd.Spec.Platform.VSphere.VCenter,
+			// NOTE: Credentials (Username, Password) must be set before use.
+			// DO NOT set them here.
+			// ...but signal to the deprovisioner _where_ they need to be set (since we must
+			// support pre- and post-zonal).
+			Username: "SET_BY_DEPROVISION",
+			Password: "SET_BY_DEPROVISION",
+		}
+	}
+
+	mBytes, err := json.Marshal(iMetadata)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal retrofitted ClusterMetadata")
+	}
+	return mBytes, nil
 }
 
 func dnsZoneNotReadyMaybeTimedOut(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (string, string, time.Duration) {

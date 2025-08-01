@@ -100,6 +100,10 @@ const (
 	// SecretTypeKubeAdminCreds is used as a value of SecretTypeLabel that says the secret is specifically used for storing kubeadmin credentials.
 	SecretTypeKubeAdminCreds = "kubeadmincreds"
 
+	// SecretTypeMetadataJSON is used as a value of SecretTypeLabel that says the secret is
+	// specifically used for storing the metadata.json emitted by installer.
+	SecretTypeMetadataJSON = "metadata.json"
+
 	// SyncSetTypeLabel is the label that is used to identify what a SyncSet is being used for.
 	SyncSetTypeLabel = "hive.openshift.io/syncset-type"
 
@@ -275,6 +279,9 @@ const (
 
 	// KubeconfigSecretKey is the key used inside of a secret containing a kubeconfig
 	KubeconfigSecretKey = "kubeconfig"
+
+	// MetadataJSONSecretKey is the key used inside of a secret containing a metadata.json file from installer.
+	MetadataJSONSecretKey = "metadata.json"
 
 	// UsernameSecretKey is a key used to store a username inside of a secret containing username / password credentials
 	UsernameSecretKey = "username"

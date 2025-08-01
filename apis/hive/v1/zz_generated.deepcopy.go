@@ -1323,6 +1323,11 @@ func (in *ClusterMetadata) DeepCopyInto(out *ClusterMetadata) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.MetadataJSONSecretRef != nil {
+		in, out := &in.MetadataJSONSecretRef, &out.MetadataJSONSecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	if in.Platform != nil {
 		in, out := &in.Platform, &out.Platform
 		*out = new(ClusterPlatformMetadata)

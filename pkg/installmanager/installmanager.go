@@ -433,6 +433,10 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading cluster metadata")
 		return errors.Wrap(err, "error reading cluster metadata")
 	}
+	// Should be redundant/unreachable, but for future-proofing...
+	if len(metadataBytes) == 0 {
+		return errors.New("invalid (zero length) metadata.json")
+	}
 	scrubbedMetadataBytes, err := scrubMetadataJSON(metadataBytes)
 	if err != nil {
 		m.log.WithError(err).Error("error cleaning up metadata")

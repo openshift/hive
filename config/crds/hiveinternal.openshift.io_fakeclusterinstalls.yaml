@@ -92,8 +92,27 @@ spec:
                     infraID:
                       description: InfraID is an identifier for this cluster generated during installation and used for tagging/naming resources in cloud providers.
                       type: string
+                    metadataJSONSecretRef:
+                      description: |-
+                        MetaddataJSONSecretRef references the secret containing the metadata.json emitted by the
+                        installer, potentially scrubbed for sensitive data.
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
                     platform:
-                      description: Platform holds platform-specific cluster metadata
+                      description: |-
+                        Platform holds platform-specific cluster metadata.
+                        Deprecated. Use the Secret referenced by MetadataJSONSecretRef instead. We may stop
+                        populating this section in the future.
                       properties:
                         aws:
                           description: AWS holds AWS-specific cluster metadata
@@ -102,13 +121,18 @@ spec:
                               description: |-
                                 HostedZoneRole is the role to assume when performing operations
                                 on a hosted zone owned by another account.
+                                Deprecated. Use the Secret referenced by ClusterMetadata.MetadataJSONSecretRef instead. We
+                                may stop populating this section in the future.
                               type: string
                           type: object
                         azure:
                           description: Azure holds azure-specific cluster metadata
                           properties:
                             resourceGroupName:
-                              description: ResourceGroupName is the name of the resource group in which the cluster resources were created.
+                              description: |-
+                                ResourceGroupName is the name of the resource group in which the cluster resources were created.
+                                Deprecated. Use the Secret referenced by ClusterMetadata.MetadataJSONSecretRef instead. We
+                                may stop populating this section in the future.
                               type: string
                           required:
                             - resourceGroupName
@@ -117,7 +141,10 @@ spec:
                           description: GCP holds GCP-specific cluster metadata
                           properties:
                             networkProjectID:
-                              description: NetworkProjectID is used for shared VPC setups
+                              description: |-
+                                NetworkProjectID is used for shared VPC setups
+                                Deprecated. Use the Secret referenced by ClusterMetadata.MetadataJSONSecretRef instead. We
+                                may stop populating this section in the future.
                               type: string
                           type: object
                       type: object

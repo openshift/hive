@@ -158,6 +158,7 @@ type Options struct {
 	AdoptAdminKubeConfig              string
 	AdoptInfraID                      string
 	AdoptClusterID                    string
+	AdoptMetadataJSON                 string
 	AdoptAdminUsername                string
 	AdoptAdminPassword                string
 	MachineNetwork                    string
@@ -337,6 +338,7 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.AdoptAdminKubeConfig, "adopt-admin-kubeconfig", "", "Path to a cluster admin kubeconfig file for a cluster being adopted. (required if using --adopt)")
 	flags.StringVar(&opt.AdoptInfraID, "adopt-infra-id", "", "Infrastructure ID for this cluster's cloud provider. (required if using --adopt)")
 	flags.StringVar(&opt.AdoptClusterID, "adopt-cluster-id", "", "Cluster UUID used for telemetry. (required if using --adopt)")
+	flags.StringVar(&opt.AdoptMetadataJSON, "adopt-metadata-json", "", "Path to a metadata.json file for a cluster being adopted. (optional)")
 	flags.StringVar(&opt.AdoptAdminUsername, "adopt-admin-username", "", "Username for cluster web console administrator. (optional)")
 	flags.StringVar(&opt.AdoptAdminPassword, "adopt-admin-password", "", "Password for cluster web console administrator. (optional)")
 
@@ -486,13 +488,19 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 			return fmt.Errorf("--adopt-admin-kubeconfig does not exist: %s", o.AdoptAdminKubeConfig)
 		}
 
+		if o.AdoptMetadataJSON != "" {
+			if _, err := os.Stat(o.AdoptMetadataJSON); os.IsNotExist(err) {
+				return fmt.Errorf("--adopt-metadata-json does not exist: %s", o.AdoptMetadataJSON)
+			}
+		}
+
 		// Admin username and password must both be specified if either are.
 		if (o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "") && !(o.AdoptAdminUsername != "" && o.AdoptAdminPassword != "") {
 			return fmt.Errorf("--adopt-admin-username and --adopt-admin-password must be used together")
 		}
 	} else {
-		if o.AdoptAdminKubeConfig != "" || o.AdoptInfraID != "" || o.AdoptClusterID != "" || o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "" {
-			return fmt.Errorf("cannot use adoption options without --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id, --adopt-admin-username, --adopt-admin-password")
+		if o.AdoptAdminKubeConfig != "" || o.AdoptInfraID != "" || o.AdoptClusterID != "" || o.AdoptMetadataJSON != "" || o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "" {
+			return fmt.Errorf("cannot use adoption options without --adopt: --adopt-admin-kube-config, --adopt-infra-id, --adopt-cluster-id, --adopt-metadata-json, --adopt-admin-username, --adopt-admin-password")
 		}
 	}
 
@@ -637,6 +645,13 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 		kubeconfigBytes, err := os.ReadFile(o.AdoptAdminKubeConfig)
 		if err != nil {
 			return nil, err
+		}
+		if o.AdoptMetadataJSON != "" {
+			metadataJSONBytes, err := os.ReadFile(o.AdoptMetadataJSON)
+			if err != nil {
+				return nil, err
+			}
+			builder.AdoptMetadataJSON = metadataJSONBytes
 		}
 		builder.Adopt = o.Adopt
 		builder.AdoptInfraID = o.AdoptInfraID

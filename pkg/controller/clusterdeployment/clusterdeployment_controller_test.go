@@ -10,9 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	configv1 "github.com/openshift/api/config/v1"
-	routev1 "github.com/openshift/api/route/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
@@ -32,6 +29,10 @@ import (
 	testdnszone "github.com/openshift/hive/pkg/test/dnszone"
 	testfake "github.com/openshift/hive/pkg/test/fake"
 	"github.com/openshift/hive/pkg/util/scheme"
+
+	"github.com/golang/mock/gomock"
+	configv1 "github.com/openshift/api/config/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	"github.com/openshift/library-go/pkg/verify"
 	"github.com/openshift/library-go/pkg/verify/store"
 	"github.com/pkg/errors"
@@ -47,7 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -82,6 +83,7 @@ current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 	adminPassword       = "foo"
+	metadataSecret      = "foo-lqmsh-metadata-json"
 	credsSecret         = "foo-aws-creds"
 	sshKeySecret        = "foo-ssh-key"
 
@@ -295,12 +297,22 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 						InfraID:                  "fakeinfra",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+						Platform: &hivev1.ClusterPlatformMetadata{
+							AWS: &hivev1aws.Metadata{
+								HostedZoneRole: ptr.To("hzr"),
+							},
+						},
+						MetadataJSONSecretRef: &corev1.LocalObjectReference{
+							Name: "mdjsecret",
+						},
 					}
 					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.UnreachableCondition,
 						corev1.ConditionFalse, "test-reason", "test-message")
 					return cd
 				}(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, "mdjsecret", "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testMetadataConfigMap(),
@@ -321,12 +333,22 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 						InfraID:                  "fakeinfra",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
+						Platform: &hivev1.ClusterPlatformMetadata{
+							AWS: &hivev1aws.Metadata{
+								HostedZoneRole: ptr.To("hzr"),
+							},
+						},
+						MetadataJSONSecretRef: &corev1.LocalObjectReference{
+							Name: "mdjsecret",
+						},
 					}
 					cd.Status.WebConsoleURL = "https://example.com"
 					cd.Status.APIURL = "https://example.com"
 					return cd
 				}(),
+				testInstallConfigSecretAWS(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, "mdjsecret", "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testMetadataConfigMap(),
@@ -816,8 +838,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
-					cd.Status.InstallerImage = pointer.String("test-installer-image")
-					cd.Status.CLIImage = pointer.String("test-cli-image")
+					cd.Status.InstallerImage = ptr.To("test-installer-image")
+					cd.Status.CLIImage = ptr.To("test-cli-image")
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					cd.Status.Conditions = addOrUpdateClusterDeploymentCondition(*cd, hivev1.InstallImagesNotResolvedCondition,
 						corev1.ConditionTrue, "test-reason", "test-message")
@@ -840,8 +862,8 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
-					cd.Status.InstallerImage = pointer.String("test-installer-image")
-					cd.Status.CLIImage = pointer.String("test-cli-image")
+					cd.Status.InstallerImage = ptr.To("test-installer-image")
+					cd.Status.CLIImage = ptr.To("test-cli-image")
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
@@ -893,7 +915,7 @@ func TestClusterDeploymentReconcile(t *testing.T) {
 				testInstallConfigSecretAWS(),
 				func() *hivev1.ClusterDeployment {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
-					cd.Status.InstallerImage = pointer.String("test-installer-image:latest")
+					cd.Status.InstallerImage = ptr.To("test-installer-image:latest")
 					cd.Spec.Provisioning.ImageSetRef = &hivev1.ClusterImageSetReference{Name: testClusterImageSetName}
 					return cd
 				}(),
@@ -1084,12 +1106,16 @@ platform:
 					baseCD.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 						Platform: &hivev1.ClusterPlatformMetadata{
 							Azure: &azure.Metadata{
-								ResourceGroupName: pointer.String("infra-id-rg"),
+								ResourceGroupName: ptr.To("infra-id-rg"),
 							},
+						},
+						MetadataJSONSecretRef: &corev1.LocalObjectReference{
+							Name: "mdjsecret",
 						},
 					}
 					return testClusterDeploymentWithInitializedConditions(baseCD)
 				}(),
+				testSecret(corev1.SecretTypeOpaque, "mdjsecret", "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -1120,12 +1146,16 @@ platform:
 					baseCD.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 						Platform: &hivev1.ClusterPlatformMetadata{
 							Azure: &azure.Metadata{
-								ResourceGroupName: pointer.String("infra-id-rg"),
+								ResourceGroupName: ptr.To("infra-id-rg"),
 							},
+						},
+						MetadataJSONSecretRef: &corev1.LocalObjectReference{
+							Name: "mdjsecret",
 						},
 					}
 					return testClusterDeploymentWithInitializedConditions(baseCD)
 				}(),
+				testSecret(corev1.SecretTypeOpaque, "mdjsecret", "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 			},
@@ -1893,7 +1923,7 @@ platform:
 					}
 					cd.Spec.ClusterMetadata.Platform.AWS = nil
 					cd.Spec.ClusterMetadata.Platform.GCP = &gcp.Metadata{
-						NetworkProjectID: pointer.String("some@np.id"),
+						NetworkProjectID: ptr.To("some@np.id"),
 					}
 					cd.Labels[hivev1.HiveClusterPlatformLabel] = "gcp"
 					cd.Labels[hivev1.HiveClusterRegionLabel] = "us-central1"
@@ -1940,7 +1970,7 @@ platform:
 					}
 					cd.Spec.ClusterMetadata.Platform.AWS = nil
 					cd.Spec.ClusterMetadata.Platform.Azure = &azure.Metadata{
-						ResourceGroupName: pointer.String("some-rg"),
+						ResourceGroupName: ptr.To("some-rg"),
 					}
 					cd.Labels[hivev1.HiveClusterPlatformLabel] = "azure"
 					cd.Labels[hivev1.HiveClusterRegionLabel] = "westus"
@@ -1979,6 +2009,7 @@ platform:
 				testClusterDeploymentWithInitializedConditions(testInstalledClusterDeployment(time.Now())),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+				testSecret(corev1.SecretTypeOpaque, metadataSecret, "metadata.json", "{}"),
 				&hiveintv1alpha1.ClusterSync{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testNamespace,
@@ -2016,6 +2047,7 @@ platform:
 						"test message")
 					return cd
 				}(),
+				testSecret(corev1.SecretTypeOpaque, metadataSecret, "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
 				&hiveintv1alpha1.ClusterSync{
@@ -2052,6 +2084,7 @@ platform:
 					cd.Annotations[constants.SyncsetPauseAnnotation] = "true"
 					return cd
 				}(),
+				testSecret(corev1.SecretTypeOpaque, metadataSecret, "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
 			},
@@ -2110,12 +2143,13 @@ platform:
 						assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID, "unexpected cluster ID")
 						assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, "unexpected admin kubeconfig")
 						assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name, "unexpected admin password")
+						assert.Equal(t, metadataSecret, cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name, "unexpected metadata.json")
 					}
 				}
 			},
 		},
 		{
-			name: "Ensure cluster metadata overwrites from provision",
+			name: "Ensure cluster metadata does not overwrite from provision",
 			existing: []runtime.Object{
 				testInstallConfigSecretAWS(),
 				func() runtime.Object {
@@ -2125,6 +2159,7 @@ platform:
 						ClusterID:                "old-cluster-id",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: "old-kubeconfig-secret"},
 						AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "old-password-secret"},
+						MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: "old-metadata-secret"},
 					}
 					return cd
 				}(),
@@ -2140,6 +2175,7 @@ platform:
 						assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID, "unexpected cluster ID")
 						assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, "unexpected admin kubeconfig")
 						assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name, "unexpected admin password")
+						assert.Equal(t, "old-metadata-secret", cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name, "unexpected metadata.json")
 					}
 				}
 			},
@@ -2416,6 +2452,7 @@ platform:
 						InfraID:                  "fakeinfra",
 						AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 						AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
+						MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadataSecret},
 					}
 					cd.Status.WebConsoleURL = "https://example.com"
 					cd.Status.APIURL = "https://example.com"
@@ -2423,13 +2460,14 @@ platform:
 				}(),
 				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
 				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+				testSecret(corev1.SecretTypeOpaque, metadataSecret, "metadata.json", "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
 				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(
 					testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
 				testMetadataConfigMap(),
 			},
 			validate: func(c client.Client, t *testing.T) {
-				secretNames := []string{adminKubeconfigSecret, adminPasswordSecret}
+				secretNames := []string{adminKubeconfigSecret, adminPasswordSecret, metadataSecret}
 				for _, secretName := range secretNames {
 					secret := &corev1.Secret{}
 					err := c.Get(context.TODO(), client.ObjectKey{Name: secretName, Namespace: testNamespace},
@@ -2740,7 +2778,7 @@ platform:
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 1
-					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
+					cd.Spec.InstallAttemptsLimit = ptr.To(int32(2))
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -2837,7 +2875,7 @@ platform:
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 2
-					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
+					cd.Spec.InstallAttemptsLimit = ptr.To(int32(2))
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -2868,7 +2906,7 @@ platform:
 				func() runtime.Object {
 					cd := testClusterDeploymentWithInitializedConditions(testClusterDeployment())
 					cd.Status.InstallRestarts = 3
-					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
+					cd.Spec.InstallAttemptsLimit = ptr.To(int32(2))
 					return cd
 				}(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -3305,6 +3343,9 @@ platform:
 					AdminPasswordSecretRef: &corev1.LocalObjectReference{
 						Name: adminPasswordSecret,
 					},
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{
+						Name: metadataSecret,
+					},
 				}),
 				testClusterImageSet(),
 				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
@@ -3318,6 +3359,7 @@ platform:
 				assert.Equal(t, testClusterID, cd.Spec.ClusterMetadata.ClusterID)
 				assert.Equal(t, adminKubeconfigSecret, cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name)
 				assert.Equal(t, adminPasswordSecret, cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name)
+				assert.Equal(t, metadataSecret, cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name)
 			},
 		},
 		{
@@ -3410,7 +3452,7 @@ platform:
 				func() runtime.Object {
 					cd := testClusterDeploymentWithDefaultConditions(testClusterDeploymentWithInitializedConditions(testClusterDeployment()))
 					cd.Status.InstallRestarts = 2
-					cd.Spec.InstallAttemptsLimit = pointer.Int32(2)
+					cd.Spec.InstallAttemptsLimit = ptr.To(int32(2))
 					return cd
 				}(),
 				testProvision(tcp.WithFailureReason("aReason")),
@@ -3904,9 +3946,10 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			InfraID:                  testInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
+			MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadataSecret},
 			Platform: &hivev1.ClusterPlatformMetadata{
 				AWS: &hivev1aws.Metadata{
-					HostedZoneRole: pointer.String("account-b-role"),
+					HostedZoneRole: ptr.To("account-b-role"),
 				},
 			},
 		},
@@ -3919,8 +3962,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 	cd.Labels[hivev1.HiveClusterRegionLabel] = "us-east-1"
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
-		InstallerImage: pointer.String("installer-image:latest"),
-		CLIImage:       pointer.String("cli:latest"),
+		InstallerImage: ptr.To("installer-image:latest"),
+		CLIImage:       ptr.To("cli:latest"),
 	}
 
 	return cd
@@ -4084,6 +4127,12 @@ func testFakeClusterInstallWithClusterMetadata(name string, metadata hivev1.Clus
 	if metadata.AdminPasswordSecretRef != nil {
 		value["adminPasswordSecretRef"] = map[string]interface{}{
 			"name": metadata.AdminPasswordSecretRef.Name,
+		}
+	}
+
+	if metadata.MetadataJSONSecretRef != nil {
+		value["metadataJSONSecretRef"] = map[string]interface{}{
+			"name": metadata.MetadataJSONSecretRef.Name,
 		}
 	}
 
@@ -4408,7 +4457,7 @@ func getCDWithoutPullSecret() *hivev1.ClusterDeployment {
 		},
 	}
 	cd.Status = hivev1.ClusterDeploymentStatus{
-		InstallerImage: pointer.String("installer-image:latest"),
+		InstallerImage: ptr.To("installer-image:latest"),
 	}
 	return cd
 }
@@ -4879,24 +4928,24 @@ func Test_discoverAWSHostedZoneRole(t *testing.T) {
 			cd: awsCD(true, &hivev1.ClusterMetadata{
 				Platform: &hivev1.ClusterPlatformMetadata{
 					AWS: &hivev1aws.Metadata{
-						HostedZoneRole: pointer.String("my-hzr"),
+						HostedZoneRole: ptr.To("my-hzr"),
 					},
 				},
 			},
 			),
-			wantHostedZoneRole: pointer.String("my-hzr"),
+			wantHostedZoneRole: ptr.To("my-hzr"),
 		},
 		{
 			name: "no-op: already set, empty string acceptable",
 			cd: awsCD(true, &hivev1.ClusterMetadata{
 				Platform: &hivev1.ClusterPlatformMetadata{
 					AWS: &hivev1aws.Metadata{
-						HostedZoneRole: pointer.String(""),
+						HostedZoneRole: ptr.To(""),
 					},
 				},
 			},
 			),
-			wantHostedZoneRole: pointer.String(""),
+			wantHostedZoneRole: ptr.To(""),
 		},
 		{
 			name: "set from install-config: field absent",
@@ -4907,7 +4956,7 @@ platform:
     region: us-east-1
 `),
 			wantReturn:         true,
-			wantHostedZoneRole: pointer.String(""),
+			wantHostedZoneRole: ptr.To(""),
 		},
 		{
 			name: "set from install-config: field empty",
@@ -4919,7 +4968,7 @@ platform:
     hostedZoneRole: ""
 `),
 			wantReturn:         true,
-			wantHostedZoneRole: pointer.String(""),
+			wantHostedZoneRole: ptr.To(""),
 		},
 		{
 			name: "set from install-config: field populated",
@@ -4931,7 +4980,7 @@ platform:
     hostedZoneRole: some-hzr
 `),
 			wantReturn:         true,
-			wantHostedZoneRole: pointer.String("some-hzr"),
+			wantHostedZoneRole: ptr.To("some-hzr"),
 		},
 		{
 			name: "no cd provisioning",
@@ -5068,7 +5117,7 @@ func Test_discoverAzureResourceGroup(t *testing.T) {
 				&hivev1.ClusterMetadata{
 					Platform: &hivev1.ClusterPlatformMetadata{
 						Azure: &azure.Metadata{
-							ResourceGroupName: pointer.String("some-rg"),
+							ResourceGroupName: ptr.To("some-rg"),
 						},
 					},
 				},
@@ -5322,24 +5371,24 @@ func Test_discoverGCPNetworkProjectID(t *testing.T) {
 			cd: gcpCD(true, &hivev1.ClusterMetadata{
 				Platform: &hivev1.ClusterPlatformMetadata{
 					GCP: &gcp.Metadata{
-						NetworkProjectID: pointer.String("my@np.id"),
+						NetworkProjectID: ptr.To("my@np.id"),
 					},
 				},
 			},
 			),
-			wantNetworkProjectID: pointer.String("my@np.id"),
+			wantNetworkProjectID: ptr.To("my@np.id"),
 		},
 		{
 			name: "no-op: already set, empty string acceptable",
 			cd: gcpCD(true, &hivev1.ClusterMetadata{
 				Platform: &hivev1.ClusterPlatformMetadata{
 					GCP: &gcp.Metadata{
-						NetworkProjectID: pointer.String(""),
+						NetworkProjectID: ptr.To(""),
 					},
 				},
 			},
 			),
-			wantNetworkProjectID: pointer.String(""),
+			wantNetworkProjectID: ptr.To(""),
 		},
 		{
 			name: "set from install-config: field absent",
@@ -5350,7 +5399,7 @@ platform:
     region: us-central1
 `),
 			wantReturn:           true,
-			wantNetworkProjectID: pointer.String(""),
+			wantNetworkProjectID: ptr.To(""),
 		},
 		{
 			name: "set from install-config: field empty",
@@ -5362,7 +5411,7 @@ platform:
     networkProjectID: ""
 `),
 			wantReturn:           true,
-			wantNetworkProjectID: pointer.String(""),
+			wantNetworkProjectID: ptr.To(""),
 		},
 		{
 			name: "set from install-config: field populated",
@@ -5374,7 +5423,7 @@ platform:
     networkProjectID: some@np.id
 `),
 			wantReturn:           true,
-			wantNetworkProjectID: pointer.String("some@np.id"),
+			wantNetworkProjectID: ptr.To("some@np.id"),
 		},
 		{
 			name: "no cd provisioning",

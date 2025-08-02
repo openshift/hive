@@ -617,7 +617,7 @@ func discoverNLBForCluster(client awsclient.Client, infraID string, logger log.F
 	nlbARN := aws.StringValue(nlbs.LoadBalancers[0].LoadBalancerArn)
 	nlbLog := logger.WithField("nlbARN", nlbARN)
 
-	if err := waitForState(elbv2.LoadBalancerStateEnumActive, 1*time.Minute, func() (string, error) {
+	if err := waitForState(elbv2.LoadBalancerStateEnumActive, 3*time.Minute, func() (string, error) {
 		resp, err := client.DescribeLoadBalancers(&elbv2.DescribeLoadBalancersInput{
 			LoadBalancerArns: aws.StringSlice([]string{nlbARN}),
 		})
@@ -826,7 +826,7 @@ func createVPCEndpointService(awsClient awsclient.Client, metadata *hivev1.Clust
 
 	serviceLog := logger.WithField("serviceID", *resp.ServiceConfiguration.ServiceId)
 
-	if err := waitForState(ec2.ServiceStateAvailable, 1*time.Minute, func() (string, error) {
+	if err := waitForState(ec2.ServiceStateAvailable, 3*time.Minute, func() (string, error) {
 		resp, err := awsClient.DescribeVpcEndpointServiceConfigurations(&ec2.DescribeVpcEndpointServiceConfigurationsInput{
 			ServiceIds: aws.StringSlice([]string{*resp.ServiceConfiguration.ServiceId}),
 		})
@@ -971,7 +971,7 @@ func (r *ReconcileAWSPrivateLink) createVPCEndpoint(awsClient awsclient.Client,
 	}
 	endpointLog := logger.WithField("endpointID", *resp.VpcEndpoint.VpcEndpointId)
 
-	if err := waitForState("available", 1*time.Minute, func() (string, error) {
+	if err := waitForState("available", 3*time.Minute, func() (string, error) {
 		resp, err := awsClient.DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
 			VpcEndpointIds: aws.StringSlice([]string{*resp.VpcEndpoint.VpcEndpointId}),
 		})

@@ -216,14 +216,20 @@ func (r *ReconcileAWSPrivateLink) cleanupVPCEndpoint(awsClient awsclient.Client,
 		return nil // no work
 	}
 
-	vpcEndpoint := resp.VpcEndpoints[0]
-	endpointLog := logger.WithField("vpcEndpointID", *vpcEndpoint.VpcEndpointId)
+	// Delete all VPC Endpoints found
+	var endpointIds []string
+	for _, vpcEndpoint := range resp.VpcEndpoints {
+		endpointIds = append(endpointIds, *vpcEndpoint.VpcEndpointId)
+	}
+
+	endpointLog := logger.WithField("vpcEndpointIDs", endpointIds)
+	endpointLog.Infof("found %d VPC Endpoints to delete", len(endpointIds))
 
 	_, err = awsClient.DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{
-		VpcEndpointIds: aws.StringSlice([]string{*vpcEndpoint.VpcEndpointId}),
+		VpcEndpointIds: aws.StringSlice(endpointIds),
 	})
 	if err != nil && !awsErrCodeEquals(err, "InvalidVpcEndpointId.NotFound") {
-		endpointLog.WithError(err).Error("error deleting the VPC Endpoint")
+		endpointLog.WithError(err).Error("error deleting the VPC Endpoints")
 		return err
 	}
 
@@ -245,14 +251,20 @@ func (r *ReconcileAWSPrivateLink) cleanupVPCEndpointService(awsClient awsclient.
 		return nil // no work
 	}
 
-	service := resp.ServiceConfigurations[0]
-	serviceLog := logger.WithField("vpcEndpointServiceID", *service.ServiceId)
+	// Delete all VPC Endpoint Services found
+	var serviceIds []string
+	for _, service := range resp.ServiceConfigurations {
+		serviceIds = append(serviceIds, *service.ServiceId)
+	}
+
+	serviceLog := logger.WithField("vpcEndpointServiceIDs", serviceIds)
+	serviceLog.Infof("found %d VPC Endpoint Services to delete", len(serviceIds))
 
 	_, err = awsClient.DeleteVpcEndpointServiceConfigurations(&ec2.DeleteVpcEndpointServiceConfigurationsInput{
-		ServiceIds: aws.StringSlice([]string{*service.ServiceId}),
+		ServiceIds: aws.StringSlice(serviceIds),
 	})
 	if err != nil && !awsErrCodeEquals(err, "InvalidVpcEndpointService.NotFound") {
-		serviceLog.WithError(err).Error("error deleting the VPC Endpoint Service")
+		serviceLog.WithError(err).Error("error deleting the VPC Endpoint Services")
 		return err
 	}
 

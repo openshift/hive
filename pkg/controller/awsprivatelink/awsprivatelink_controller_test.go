@@ -595,7 +595,8 @@ users:
 		endpoint := ec2types.VpcEndpoint{
 			VpcEndpointId: aws.String("vpce-12345"),
 			VpcId:         aws.String("vpc-1"),
-			State:         ec2types.StateAvailable,
+			// Prove case insensitivity :eyeroll:
+			State: "available",
 			DnsEntries: []ec2types.DnsEntry{{
 				DnsName:      aws.String("vpce-12345-us-east-1.vpce-svc-12345.vpc.amazonaws.com"),
 				HostedZoneId: aws.String("HZ23456"),
@@ -1369,7 +1370,8 @@ users:
 						{
 							// The previously configured one
 							VpcEndpointId: aws.String("vpce-12345"),
-							State:         ec2types.StateAvailable,
+							// Prove case insensitivity :eyeroll:
+							State: "available",
 						},
 					},
 				}, nil)

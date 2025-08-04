@@ -62,8 +62,23 @@ var (
 		hivev1.AWSPrivateLinkReadyClusterDeploymentCondition,
 	}
 
-	goodVPCEStates = sets.New(ec2types.StatePendingAcceptance, ec2types.StatePending, ec2types.StateAvailable)
+	goodVPCEStates = newCaseInsensitiveSet(ec2types.StatePendingAcceptance, ec2types.StatePending, ec2types.StateAvailable)
 )
+
+// The API (sometimes??) returns lowercase strings despite the enums being Title case.
+type caseInsensitiveSet sets.Set[string]
+
+func newCaseInsensitiveSet(items ...ec2types.State) caseInsensitiveSet {
+	ss := sets.New[string]()
+	for _, item := range items {
+		ss.Insert(strings.ToLower(string(item)))
+	}
+	return caseInsensitiveSet(ss)
+}
+
+func (s caseInsensitiveSet) Has(item ec2types.State) bool {
+	return (sets.Set[string])(s).Has(strings.ToLower(string(item)))
+}
 
 // Add creates a new AWSPrivateLink Controller and adds it to the Manager with default RBAC.
 // The Manager will set fields on the Controller and Start it when the Manager is Started.
@@ -643,7 +658,8 @@ func waitForState(state string, timeout time.Duration, currentState func() (stri
 			logger.WithError(err).Error("failed to get the current state")
 			return false, nil
 		}
-		if curr != state {
+		// The API (sometimes??) returns lowercase strings despite the enums being Title case.
+		if !strings.EqualFold(curr, state) {
 			logger.Debugf("Desired state %q is not yet achieved, currently %q", state, curr)
 			return false, nil
 		}

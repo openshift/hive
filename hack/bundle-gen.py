@@ -260,6 +260,22 @@ def generate_csv_base(
         yaml_string = yaml.dump(yaml_annotations)
         file.write(yaml_string)
 
+    # Create release-config.yaml file. This file is only utilized by the Red Hat Ecosystem,
+    # for the automatic catalog update for all RH catalogs. Kubernetes Ecosystem will ignore the file.
+    file_path = os.path.join(version_dir, "release-config.yaml")
+    data = {
+        "catalog_templates": [
+            {
+                "channels": [CHANNEL_DEFAULT],
+                "replaces": "hive-operator.v"+prev_version,
+                "template_name": "basic.yaml"
+            }
+        ]
+    }
+    with open(file_path, 'w') as file:
+        yaml_string = yaml.dump(data)
+        file.write(yaml_string)
+
     owned_crds = []
 
     # Copy all CSV files over to the manifests dir:

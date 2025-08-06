@@ -556,13 +556,14 @@ func (r *ReconcileClusterClaim) applyHiveClaimOwnerRole(cd *hivev1.ClusterDeploy
 				Resources: []string{rbacv1.ResourceAll},
 				Verbs:     []string{rbacv1.VerbAll},
 			},
-			// Allow read access to the kubeconfig and admin password secrets
+			// Allow read access to the kubeconfig, admin password, and metadata.json secrets
 			{
 				APIGroups: []string{corev1.GroupName},
 				Resources: []string{"secrets"},
 				ResourceNames: []string{
 					cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name, // HIVE-2485: n/a
 					cd.Spec.ClusterMetadata.AdminPasswordSecretRef.Name,
+					cd.Spec.ClusterMetadata.AdminKubeconfigSecretRef.Name,
 				},
 				Verbs: []string{"get"},
 			},

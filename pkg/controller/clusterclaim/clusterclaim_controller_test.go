@@ -28,13 +28,14 @@ import (
 )
 
 const (
-	claimNamespace       = "claim-namespace"
-	claimName            = "test-claim"
-	clusterName          = "test-cluster"
-	kubeconfigSecretName = "kubeconfig-secret"
-	passwordSecretName   = "password-secret"
-	testLeasePoolName    = "test-cluster-pool"
-	testFinalizer        = "test-finalizer"
+	claimNamespace         = "claim-namespace"
+	claimName              = "test-claim"
+	clusterName            = "test-cluster"
+	kubeconfigSecretName   = "kubeconfig-secret"
+	passwordSecretName     = "password-secret"
+	metadatajsonSecretName = "metadata-json-secret"
+	testLeasePoolName      = "test-cluster-pool"
+	testFinalizer          = "test-finalizer"
 )
 
 func init() {
@@ -86,6 +87,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 			cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
 				AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: kubeconfigSecretName},
 				AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: passwordSecretName},
+				MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadatajsonSecretName},
 			}
 		},
 	)
@@ -718,7 +720,7 @@ func TestReconcileClusterClaim(t *testing.T) {
 					{
 						APIGroups:     []string{""},
 						Resources:     []string{"secrets"},
-						ResourceNames: []string{kubeconfigSecretName, passwordSecretName},
+						ResourceNames: []string{kubeconfigSecretName, passwordSecretName, metadatajsonSecretName},
 						Verbs:         []string{"get"},
 					},
 				}
@@ -832,7 +834,7 @@ func testRole() *rbacv1.Role {
 			{
 				APIGroups:     []string{""},
 				Resources:     []string{"secrets"},
-				ResourceNames: []string{kubeconfigSecretName, passwordSecretName},
+				ResourceNames: []string{kubeconfigSecretName, passwordSecretName, metadatajsonSecretName},
 				Verbs:         []string{"get"},
 			},
 		},

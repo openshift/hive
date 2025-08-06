@@ -47,6 +47,7 @@ current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 	adminPassword       = "foo"
+	metadataSecret      = "metadata-json-secret"
 
 	pullSecretSecret = "pull-secret"
 	credsSecret      = "aws-credentials"
@@ -274,6 +275,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			InfraID:                  testInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
+			MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadataSecret},
 		},
 	}
 

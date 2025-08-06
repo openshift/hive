@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	hiveassert "github.com/openshift/hive/pkg/test/assert"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func TestGenerateDeprovision(t *testing.T) {
 		dr, "someseviceaccount",
 		testHttpProxy, testHttpsProxy, testNoProxy,
 		nil,
-		map[string]string{}, []corev1.Toleration{})
+		controllerutils.SharedPodConfig{})
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)

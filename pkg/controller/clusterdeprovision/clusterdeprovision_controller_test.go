@@ -296,8 +296,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				Client:               mocks.fakeKubeClient,
 				scheme:               scheme,
 				deprovisionsDisabled: test.deprovisionsDisabled,
-				nodeSelector:         &map[string]string{},
-				tolerations:          &[]corev1.Toleration{},
+				sharedPodConfig:      &controllerutils.SharedPodConfig{},
 			}
 
 			// Save the list of actuators so that it can be restored at the end of this test
@@ -377,7 +376,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 // specified conditions.
 func testUninstallJob(conditions ...batchv1.JobCondition) *batchv1.Job {
 	uninstallJob, _ := install.GenerateUninstallerJobForDeprovision(testClusterDeprovision(),
-		"someserviceaccount", "", "", "", nil, map[string]string{}, []corev1.Toleration{})
+		"someserviceaccount", "", "", "", nil, controllerutils.SharedPodConfig{})
 	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
 	if err != nil {
 		panic("should never get error calculating job spec hash")

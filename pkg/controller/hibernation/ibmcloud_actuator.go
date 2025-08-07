@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"github.com/IBM/vpc-go-sdk/vpcv1"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -131,7 +132,11 @@ func getIBMCloudClient(cd *hivev1.ClusterDeployment, c client.Client, logger log
 	return ibmclient.NewClientFromSecret(secret)
 }
 
-func getIBMCloudClusterInstances(cd *hivev1.ClusterDeployment, c ibmclient.API, states sets.String, logger log.FieldLogger) ([]vpcv1.Instance, error) {
+// TODO: We are currently reusing AWS's instance state names. The AWS SDK v2 migration[1] made this more obvious by changing
+// the data type of those values to a custom typedef, requiring us to import an AWS library here in the IBMCloud actuator.
+// We should really separate those consts out, even if it means wholly duplicating the sets defined in the AWS actuator.
+// [1] https://issues.redhat.com/browse/HIVE-2849
+func getIBMCloudClusterInstances(cd *hivev1.ClusterDeployment, c ibmclient.API, states sets.Set[ec2types.InstanceStateName], logger log.FieldLogger) ([]vpcv1.Instance, error) {
 	infraID := cd.Spec.ClusterMetadata.InfraID
 	logger = logger.WithField("infraID", infraID)
 	logger.Debug("listing cluster instances")
@@ -143,7 +148,7 @@ func getIBMCloudClusterInstances(cd *hivev1.ClusterDeployment, c ibmclient.API, 
 	}
 	var result []vpcv1.Instance
 	for idx, i := range instances {
-		if states.Has(*i.Status) {
+		if states.Has(ec2types.InstanceStateName(*i.Status)) {
 			result = append(result, instances[idx])
 		}
 	}

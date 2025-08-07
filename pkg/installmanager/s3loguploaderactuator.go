@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 
 	"github.com/pkg/errors"
@@ -81,7 +81,7 @@ func (a *s3LogUploaderActuator) UploadLogs(clusterName string, clusterprovision 
 
 		logkey := fmt.Sprintf("%v/%v-%v", folder, clusterprovision.Name, stat.Name())
 
-		_, err = awsc.Upload(&s3manager.UploadInput{
+		_, err = awsc.Upload(&s3.PutObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(logkey),
 			Body:   file,

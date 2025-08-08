@@ -15,6 +15,7 @@
 		- [Handling Incompatible Cloud Provider](#handling-incompatible-cloud-provider)
 		- [Approving CSRs](#approving-csrs)
 		- [Resuming from a Hibernating State](#resuming-from-a-hibernating-state)
+	- [OpenStack Hibernation](#openstack-hibernation)
 
 # Hibernating Clusters
 
@@ -346,3 +347,21 @@ The unreachable controller tracks the reachability of a cluster and is responsib
 Once a cluster hibernates and stops responding, the unreachable controller sets the `Unreachable` condition's `Status` to `True`.
 
 Once the cluster resumes, the unreachable controller set the condition `False` and the hive controllers are free to resume syncing.
+
+## OpenStack Hibernation
+OpenStack hibernation deletes cluster instances while preserving the ability to restore them. Unlike other cloud providers, OpenStack lacks native hibernation, therefore an implementation based on snapshots is necessary.
+
+While OpenStack provides shelving functionality, replicating true hibernation behavior similar to other cloud providers is difficult and often not possible depending on the OpenStack deployment configuration. Hive's snapshot-based approach provides a universally compatible solution that works with any OpenStack setup.
+
+OpenStack hibernation creates snapshots of all instances, saves their complete configuration into a secret (CD namespace), and deletes the instances, completely freeing all project resources consumed by the cluster.
+
+Restoration recreates instances with identical attributes to their original state.
+
+Due to the specific nature of the snapshot based implementation, the hibernation and restoration process inherently requires more time to finish compared to other cloud providers.
+
+Once the ClusterPool is created and the cluster is claimed, the workflow is similar to other implementations:
+
+```bash
+$ oc patch cd $cd -n $cd_ns --type='merge' -p $'spec:\n powerState: Hibernating'
+$ oc patch cd $cd -n $cd_ns --type='merge' -p $'spec:\n powerState: Running'
+```

@@ -14,10 +14,10 @@ metadata:
       && !files.all.all(x, x.matches('^docs/|\\.md$|^(?:.*/)?(?:\\.gitignore|OWNERS|PROJECT|LICENSE)$'))
   creationTimestamp:
   labels:
-    appstudio.openshift.io/application: hive-operator
-    appstudio.openshift.io/component: hive
+    appstudio.openshift.io/application: release-mce-210
+    appstudio.openshift.io/component: hive-mce-210
     pipelines.appstudio.openshift.io/type: build
-  name: hive-on-pull-request
+  name: hive-mce-210-on-pull-request
   namespace: crt-redhat-acm-tenant
 spec:
   params:
@@ -26,7 +26,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hive-operator/hive:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hive-mce-210:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: build-platforms
@@ -631,7 +631,7 @@ spec:
         memory: 16Gi
     pipelineTaskName: build-images
   taskRunTemplate:
-    serviceAccountName: build-pipeline-hive
+    serviceAccountName: build-pipeline-hive-mce-210
   workspaces:
   - name: git-auth
     secret:

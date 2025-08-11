@@ -294,7 +294,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetByPathWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
+		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(assetPath), hLog, util.WithNamespaceOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -307,7 +307,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/controllers/hive_controllers_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if err := util.ApplyAssetWithGC(h, a, instance, hLog); err != nil {
+		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(a), hLog, util.WithGarbageCollection(instance)); err != nil {
 			hLog.WithField("asset", a).WithError(err).Error("error applying asset")
 			return err
 		}
@@ -320,7 +320,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
 
-		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, instance); err != nil {
+		if _, err := util.ApplyRuntimeObject(h, util.CRBFromAssetPath(crbAsset), hLog, util.CRBWithSubjectNSOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
@@ -341,7 +341,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if r.isOpenShift {
 		hLog.Info("deploying OpenShift specific assets")
 		for _, a := range openshiftSpecificAssets {
-			err = util.ApplyAssetWithGC(h, a, instance, hLog)
+			_, err = util.ApplyRuntimeObject(h, util.FromAssetPath(a), hLog, util.WithGarbageCollection(instance))
 			if err != nil {
 				return err
 			}
@@ -355,7 +355,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	hiveDeployment.Spec.Template.Spec.Tolerations = r.tolerations
 
 	hiveDeployment.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObjectWithGC(h, hiveDeployment, instance)
+	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveDeployment), hLog, util.WithGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
@@ -414,7 +414,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 			"ca.crt": additionalCA.Bytes(),
 		},
 	}
-	result, err := util.ApplyRuntimeObjectWithGC(h, caSecret, instance)
+	result, err := util.ApplyRuntimeObject(h, util.Passthrough(caSecret), hLog, util.WithGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying additional cert secret")
 		return err

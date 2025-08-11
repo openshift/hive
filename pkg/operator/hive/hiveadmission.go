@@ -85,7 +85,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if err := util.ApplyAssetByPathWithNSOverrideAndGC(h, assetPath, hiveNSName, instance); err != nil {
+		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(assetPath), hLog, util.WithNamespaceOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -97,7 +97,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		"config/hiveadmission/hiveadmission_rbac_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if err := util.ApplyAssetWithGC(h, a, instance, hLog); err != nil {
+		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(a), hLog, util.WithGarbageCollection(instance)); err != nil {
 			return err
 		}
 	}
@@ -107,7 +107,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		"config/hiveadmission/hiveadmission_rbac_role_binding.yaml",
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
-		if err := util.ApplyClusterRoleBindingAssetWithSubjectNSOverrideAndGC(h, crbAsset, hiveNSName, instance); err != nil {
+		if _, err := util.ApplyRuntimeObject(h, util.CRBFromAssetPath(crbAsset), hLog, util.CRBWithSubjectNSOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
@@ -193,14 +193,14 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	hiveAdmDeployment.Spec.Template.Spec.NodeSelector = r.nodeSelector
 	hiveAdmDeployment.Spec.Template.Spec.Tolerations = r.tolerations
 
-	result, err := util.ApplyRuntimeObjectWithGC(h, hiveAdmDeployment, instance)
+	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveAdmDeployment), hLog, util.WithGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
 	hLog.WithField("result", result).Info("hiveadmission deployment applied")
 
-	result, err = util.ApplyRuntimeObjectWithGC(h, apiService, instance)
+	result, err = util.ApplyRuntimeObject(h, util.Passthrough(apiService), hLog, util.WithGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying apiservice")
 		return err
@@ -208,7 +208,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	hLog.Infof("apiservice applied (%s)", result)
 
 	for _, webhook := range validatingWebhooks {
-		result, err = util.ApplyRuntimeObjectWithGC(h, webhook, instance)
+		result, err = util.ApplyRuntimeObject(h, util.Passthrough(webhook), hLog, util.WithGarbageCollection(instance))
 		if err != nil {
 			hLog.WithField("webhook", webhook.Name).WithError(err).Errorf("error applying validating webhook")
 			return err

@@ -33,6 +33,7 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
 	ofake "github.com/openshift/hive/pkg/client/fake"
 	"github.com/openshift/hive/pkg/constants"
@@ -1976,4 +1977,165 @@ func withClusterVersion(cd *hivev1.ClusterDeployment, version string) *hivev1.Cl
 	}
 	cd.Labels[constants.VersionLabel] = version
 	return cd
+}
+
+func TestEnsureEnoughReplicas_ConditionClearing(t *testing.T) {
+	tests := []struct {
+		name                   string
+		pool                   *hivev1.MachinePool
+		existingConditions     []hivev1.MachinePoolCondition
+		generatedMachineSets   []*machineapi.MachineSet
+		expectedConditionState corev1.ConditionStatus
+		expectedReason         string
+		expectedMessage        string
+	}{
+		{
+			name: "Reset NotEnoughReplicas condition when switching from autoscaling to fixed replicas",
+			pool: func() *hivev1.MachinePool {
+				mp := testMachinePool(testmp.WithReplicas(3)) // Fixed replicas, no autoscaling
+				return mp
+			}(),
+			existingConditions: []hivev1.MachinePoolCondition{
+				{
+					Type:    hivev1.NotEnoughReplicasMachinePoolCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  "MinReplicasTooSmall",
+					Message: "When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least 3",
+				},
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("test-worker-a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("test-worker-b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("test-worker-c", "worker", false, 1, 0, "us-east-1c"),
+			},
+			expectedConditionState: corev1.ConditionUnknown,
+			expectedReason:         hivev1.InitializedConditionReason,
+			expectedMessage:        "Condition Initialized",
+		},
+		{
+			name: "Set NotEnoughReplicas condition true for autoscaling with insufficient minReplicas",
+			pool: func() *hivev1.MachinePool {
+				mp := testMachinePool(testmp.WithAutoscaling(1, 5)) // Autoscaling with minReplicas < 3 failure domains
+				// Use Nutanix platform which doesn't allow zero autoscaling min replicas
+				mp.Spec.Platform = hivev1.MachinePoolPlatform{
+					Nutanix: &hivev1nutanix.MachinePool{
+						FailureDomains: []string{"fd1", "fd2", "fd3"},
+					},
+				}
+				return mp
+			}(),
+			existingConditions: []hivev1.MachinePoolCondition{},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("test-worker-a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("test-worker-b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("test-worker-c", "worker", false, 0, 0, "us-east-1c"),
+			},
+			expectedConditionState: corev1.ConditionTrue,
+			expectedReason:         "MinReplicasTooSmall",
+			expectedMessage:        "When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least 3",
+		},
+		{
+			name: "Clear NotEnoughReplicas condition for autoscaling with sufficient minReplicas",
+			pool: func() *hivev1.MachinePool {
+				mp := testMachinePool(testmp.WithAutoscaling(3, 10)) // Autoscaling with minReplicas >= 3 failure domains
+				return mp
+			}(),
+			existingConditions: []hivev1.MachinePoolCondition{
+				{
+					Type:    hivev1.NotEnoughReplicasMachinePoolCondition,
+					Status:  corev1.ConditionTrue,
+					Reason:  "MinReplicasTooSmall",
+					Message: "When auto-scaling, the MachinePool must have at least one replica for each MachineSet. The minReplicas must be at least 3",
+				},
+			},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("test-worker-a", "worker", false, 1, 0, "us-east-1a"),
+				testMachineSetWithAZ("test-worker-b", "worker", false, 1, 0, "us-east-1b"),
+				testMachineSetWithAZ("test-worker-c", "worker", false, 1, 0, "us-east-1c"),
+			},
+			expectedConditionState: corev1.ConditionFalse,
+			expectedReason:         "EnoughReplicas",
+			expectedMessage:        "The MachinePool has sufficient replicas for each MachineSet",
+		},
+		{
+			name: "Reset NotEnoughReplicas condition when no existing condition",
+			pool: func() *hivev1.MachinePool {
+				mp := testMachinePool(testmp.WithReplicas(3)) // Fixed replicas, no autoscaling
+				return mp
+			}(),
+			existingConditions: []hivev1.MachinePoolCondition{}, // No existing conditions
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("test-worker-a", "worker", false, 1, 0, "us-east-1a"),
+			},
+			expectedConditionState: corev1.ConditionUnknown,
+			expectedReason:         hivev1.InitializedConditionReason,
+			expectedMessage:        "Condition Initialized",
+		},
+		{
+			name: "Allow zero minReplicas for AWS platform autoscaling",
+			pool: func() *hivev1.MachinePool {
+				mp := testMachinePool(testmp.WithAutoscaling(0, 5)) // Autoscaling with minReplicas = 0
+				return mp
+			}(),
+			existingConditions: []hivev1.MachinePoolCondition{},
+			generatedMachineSets: []*machineapi.MachineSet{
+				testMachineSetWithAZ("test-worker-a", "worker", false, 0, 0, "us-east-1a"),
+				testMachineSetWithAZ("test-worker-b", "worker", false, 0, 0, "us-east-1b"),
+				testMachineSetWithAZ("test-worker-c", "worker", false, 0, 0, "us-east-1c"),
+			},
+			expectedConditionState: corev1.ConditionFalse,
+			expectedReason:         "EnoughReplicas",
+			expectedMessage:        "The MachinePool has sufficient replicas for each MachineSet",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			scheme := scheme.GetScheme()
+			test.pool.Status.Conditions = test.existingConditions
+
+			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
+			cd := testClusterDeployment()
+			// Use Nutanix cluster deployment for tests that need platforms that don't allow zero autoscaling min replicas
+			if test.name == "Set NotEnoughReplicas condition true for autoscaling with insufficient minReplicas" {
+				cd = func() *hivev1.ClusterDeployment {
+					cd := testClusterDeployment()
+					cd.Spec.Platform = hivev1.Platform{
+						Nutanix: &hivev1nutanix.Platform{},
+					}
+					return cd
+				}()
+			}
+
+			logger := log.WithField("controller", "machinepool_test")
+			r := &ReconcileMachinePool{
+				Client: fakeClient,
+				scheme: scheme,
+				logger: logger,
+			}
+
+			result, err := r.ensureEnoughReplicas(test.pool, test.generatedMachineSets, cd, logger)
+			require.NoError(t, err, "ensureEnoughReplicas should not return error")
+
+			// For insufficient replicas case, we expect a non-nil result to stop reconciliation
+			if test.expectedConditionState == corev1.ConditionTrue && test.expectedReason == "MinReplicasTooSmall" {
+				assert.NotNil(t, result, "ensureEnoughReplicas should return non-nil result for insufficient replicas")
+			} else {
+				assert.Nil(t, result, "ensureEnoughReplicas should return nil result for sufficient replicas")
+			}
+
+			// Refresh the pool to get updated conditions
+			updatedPool := &hivev1.MachinePool{}
+			err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(test.pool), updatedPool)
+			require.NoError(t, err, "should be able to get updated pool")
+
+			// Verify the condition state
+			cond := controllerutils.FindCondition(updatedPool.Status.Conditions, hivev1.NotEnoughReplicasMachinePoolCondition)
+			if assert.NotNil(t, cond, "NotEnoughReplicas condition should exist") {
+				assert.Equal(t, test.expectedConditionState, cond.Status, "condition status should match expected")
+				assert.Equal(t, test.expectedReason, cond.Reason, "condition reason should match expected")
+				assert.Equal(t, test.expectedMessage, cond.Message, "condition message should match expected")
+			}
+		})
+	}
 }

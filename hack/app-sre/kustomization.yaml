@@ -55,3 +55,10 @@ patchesStrategicMerge:
   - kind: ServiceAccount
     name: hive-operator
     namespace: hive
+- |-
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: hive-operator
+  imagePullSecrets:
+  - name: quay.io

@@ -9,9 +9,13 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	quotasets "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
+	usage "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/usage"
+	flavors "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	servers "github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	images "github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	openstackclient "github.com/openshift/hive/pkg/openstackclient"
+	networks "github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	ports "github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 )
 
 // MockClient is a mock of Client interface.
@@ -38,7 +42,7 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // CreateServerFromOpts mocks base method.
-func (m *MockClient) CreateServerFromOpts(ctx context.Context, opts *openstackclient.ServerCreateOpts) (*servers.Server, error) {
+func (m *MockClient) CreateServerFromOpts(ctx context.Context, opts *servers.CreateOpts) (*servers.Server, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateServerFromOpts", ctx, opts)
 	ret0, _ := ret[0].(*servers.Server)
@@ -67,6 +71,20 @@ func (mr *MockClientMockRecorder) CreateServerSnapshot(ctx, serverID, snapshotNa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateServerSnapshot", reflect.TypeOf((*MockClient)(nil).CreateServerSnapshot), ctx, serverID, snapshotName)
 }
 
+// DeleteImage mocks base method.
+func (m *MockClient) DeleteImage(ctx context.Context, imageID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteImage", ctx, imageID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteImage indicates an expected call of DeleteImage.
+func (mr *MockClientMockRecorder) DeleteImage(ctx, imageID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteImage", reflect.TypeOf((*MockClient)(nil).DeleteImage), ctx, imageID)
+}
+
 // DeleteServer mocks base method.
 func (m *MockClient) DeleteServer(ctx context.Context, serverID string) error {
 	m.ctrl.T.Helper()
@@ -82,10 +100,10 @@ func (mr *MockClientMockRecorder) DeleteServer(ctx, serverID interface{}) *gomoc
 }
 
 // GetComputeQuotas mocks base method.
-func (m *MockClient) GetComputeQuotas(ctx context.Context) (*openstackclient.ComputeQuotas, error) {
+func (m *MockClient) GetComputeQuotas(ctx context.Context) (*quotasets.QuotaSet, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetComputeQuotas", ctx)
-	ret0, _ := ret[0].(*openstackclient.ComputeQuotas)
+	ret0, _ := ret[0].(*quotasets.QuotaSet)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -97,10 +115,10 @@ func (mr *MockClientMockRecorder) GetComputeQuotas(ctx interface{}) *gomock.Call
 }
 
 // GetComputeUsage mocks base method.
-func (m *MockClient) GetComputeUsage(ctx context.Context) (*openstackclient.ComputeUsage, error) {
+func (m *MockClient) GetComputeUsage(ctx context.Context) (*usage.TenantUsage, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetComputeUsage", ctx)
-	ret0, _ := ret[0].(*openstackclient.ComputeUsage)
+	ret0, _ := ret[0].(*usage.TenantUsage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -112,10 +130,10 @@ func (mr *MockClientMockRecorder) GetComputeUsage(ctx interface{}) *gomock.Call 
 }
 
 // GetFlavorDetails mocks base method.
-func (m *MockClient) GetFlavorDetails(ctx context.Context, flavorID string) (*openstackclient.FlavorDetails, error) {
+func (m *MockClient) GetFlavorDetails(ctx context.Context, flavorID string) (*flavors.Flavor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFlavorDetails", ctx, flavorID)
-	ret0, _ := ret[0].(*openstackclient.FlavorDetails)
+	ret0, _ := ret[0].(*flavors.Flavor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -142,10 +160,10 @@ func (mr *MockClientMockRecorder) GetImage(ctx, imageID interface{}) *gomock.Cal
 }
 
 // GetNetworkByName mocks base method.
-func (m *MockClient) GetNetworkByName(ctx context.Context, networkName string) (*openstackclient.Network, error) {
+func (m *MockClient) GetNetworkByName(ctx context.Context, networkName string) (*networks.Network, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNetworkByName", ctx, networkName)
-	ret0, _ := ret[0].(*openstackclient.Network)
+	ret0, _ := ret[0].(*networks.Network)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -171,26 +189,41 @@ func (mr *MockClientMockRecorder) GetServer(ctx, serverID interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServer", reflect.TypeOf((*MockClient)(nil).GetServer), ctx, serverID)
 }
 
-// GetServerSecurityGroups mocks base method.
-func (m *MockClient) GetServerSecurityGroups(ctx context.Context, serverID string) ([]string, error) {
+// GetServerSecurityGroupNames mocks base method.
+func (m *MockClient) GetServerSecurityGroupNames(ctx context.Context, serverID string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetServerSecurityGroups", ctx, serverID)
+	ret := m.ctrl.Call(m, "GetServerSecurityGroupNames", ctx, serverID)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetServerSecurityGroups indicates an expected call of GetServerSecurityGroups.
-func (mr *MockClientMockRecorder) GetServerSecurityGroups(ctx, serverID interface{}) *gomock.Call {
+// GetServerSecurityGroupNames indicates an expected call of GetServerSecurityGroupNames.
+func (mr *MockClientMockRecorder) GetServerSecurityGroupNames(ctx, serverID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerSecurityGroups", reflect.TypeOf((*MockClient)(nil).GetServerSecurityGroups), ctx, serverID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerSecurityGroupNames", reflect.TypeOf((*MockClient)(nil).GetServerSecurityGroupNames), ctx, serverID)
+}
+
+// ListImages mocks base method.
+func (m *MockClient) ListImages(ctx context.Context, opts *images.ListOpts) ([]images.Image, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListImages", ctx, opts)
+	ret0, _ := ret[0].([]images.Image)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListImages indicates an expected call of ListImages.
+func (mr *MockClientMockRecorder) ListImages(ctx, opts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImages", reflect.TypeOf((*MockClient)(nil).ListImages), ctx, opts)
 }
 
 // ListPorts mocks base method.
-func (m *MockClient) ListPorts(ctx context.Context) ([]openstackclient.Port, error) {
+func (m *MockClient) ListPorts(ctx context.Context) ([]ports.Port, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListPorts", ctx)
-	ret0, _ := ret[0].([]openstackclient.Port)
+	ret0, _ := ret[0].([]ports.Port)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

@@ -8,8 +8,13 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/usage"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -47,15 +52,20 @@ func TestOpenStackStopMachines(t *testing.T) {
 		{
 			name:      "stop no running instances",
 			instances: map[string]int{},
+			setupClient: func(t *testing.T, c *mockopenstackclient.MockClient) {
+			},
 		},
 		{
 			name:      "stop running instances",
 			instances: map[string]int{"ACTIVE": 2},
 			setupClient: func(t *testing.T, c *mockopenstackclient.MockClient) {
+				// Expect cleanup of existing snapshots
+				c.EXPECT().ListImages(gomock.Any(), gomock.Any()).Return([]images.Image{}, nil).Times(1)
+
 				// Expect snapshot creation
 				c.EXPECT().CreateServerSnapshot(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return("snapshot-1", nil)
 
-				// Expect image status checks
+				// Expect image status checks for waiting
 				activeImg := &images.Image{}
 				activeImg.Status = "active"
 				c.EXPECT().GetImage(gomock.Any(), gomock.Any()).Return(activeImg, nil).AnyTimes()
@@ -63,25 +73,91 @@ func TestOpenStackStopMachines(t *testing.T) {
 				// Expect instance deletion
 				c.EXPECT().DeleteServer(gomock.Any(), gomock.Any()).Times(2).Return(nil)
 
-				// Network operations
+				// Network operations for saving configuration
 				setupOpenStackNetworkOps(c)
 
-				// OVERRIDE the default ListServers to simulate cleanup progression
+				// Server details for metadata extraction
+				c.EXPECT().GetServer(gomock.Any(), gomock.Any()).Return(&servers.Server{
+					ID:       "testinfra-ACTIVE-0",
+					Name:     "testinfra-ACTIVE-0",
+					Status:   "ACTIVE",
+					Flavor:   map[string]interface{}{"id": "flavor-1"},
+					Metadata: map[string]string{"openshiftClusterID": "testinfra"},
+				}, nil).AnyTimes()
+
+				// ListServers expectations for cleanup verification
 				gomock.InOrder(
-					// Initial calls: return instances
+					// First calls: find instances to hibernate
 					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{
-						{ID: "testinfra-ACTIVE-0", Name: "testinfra-ACTIVE-0", Status: "ACTIVE", Flavor: map[string]interface{}{"id": "flavor-1"}},
-						{ID: "testinfra-ACTIVE-1", Name: "testinfra-ACTIVE-1", Status: "ACTIVE", Flavor: map[string]interface{}{"id": "flavor-1"}},
-					}, nil).Times(2),
+						{ID: "testinfra-ACTIVE-0", Name: "testinfra-ACTIVE-0", Status: "ACTIVE"},
+						{ID: "testinfra-ACTIVE-1", Name: "testinfra-ACTIVE-1", Status: "ACTIVE"},
+					}, nil).Times(1), // Called by findInstancesByPrefix
 
-					// First cleanup poll: still there
+					// After deletion: verify cleanup (waitForInstanceCleanup)
 					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{
-						{ID: "testinfra-ACTIVE-0", Name: "testinfra-ACTIVE-0"},
-						{ID: "testinfra-ACTIVE-1", Name: "testinfra-ACTIVE-1"},
+						{ID: "testinfra-ACTIVE-0", Name: "testinfra-ACTIVE-0", Status: "DELETING"},
+						{ID: "testinfra-ACTIVE-1", Name: "testinfra-ACTIVE-1", Status: "DELETING"},
+					}, nil).Times(1), // First cleanup check - still deleting
+
+					// Final check: all gone
+					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{}, nil).Times(1),
+				)
+			},
+		},
+		{
+			name:      "stop running instances with existing snapshots to cleanup",
+			instances: map[string]int{"ACTIVE": 2},
+			setupClient: func(t *testing.T, c *mockopenstackclient.MockClient) {
+				// ===== FIX: Return snapshots that match our filter criteria =====
+				oldSnapshots := []images.Image{
+					{
+						ID:   "old-snap-1",
+						Name: "testinfra-master-0-hibernation-20240101",
+						Metadata: map[string]string{
+							"cluster_infra_id": "testinfra",
+							"hive_hibernation": "true",
+						},
+					},
+					{
+						ID:   "old-snap-2",
+						Name: "testinfra-worker-0-hibernation-20240101",
+						Metadata: map[string]string{
+							"cluster_infra_id": "testinfra",
+							"hive_hibernation": "true",
+						},
+					},
+				}
+				c.EXPECT().ListImages(gomock.Any(), gomock.Any()).Return(oldSnapshots, nil).Times(1)
+
+				c.EXPECT().DeleteImage(gomock.Any(), "old-snap-1").Return(nil).Times(1)
+				c.EXPECT().DeleteImage(gomock.Any(), "old-snap-2").Return(nil).Times(1)
+
+				// Continue with normal hibernation flow
+				c.EXPECT().CreateServerSnapshot(gomock.Any(), gomock.Any(), gomock.Any()).Times(2).Return("snapshot-1", nil)
+
+				// Add these missing expectations:
+				activeImg := &images.Image{}
+				activeImg.Status = "active"
+				c.EXPECT().GetImage(gomock.Any(), gomock.Any()).Return(activeImg, nil).AnyTimes()
+
+				c.EXPECT().DeleteServer(gomock.Any(), gomock.Any()).Times(2).Return(nil)
+
+				setupOpenStackNetworkOps(c)
+
+				c.EXPECT().GetServer(gomock.Any(), gomock.Any()).Return(&servers.Server{
+					ID:       "testinfra-ACTIVE-0",
+					Name:     "testinfra-ACTIVE-0",
+					Status:   "ACTIVE",
+					Flavor:   map[string]interface{}{"id": "flavor-1"},
+					Metadata: map[string]string{"openshiftClusterID": "testinfra"},
+				}, nil).AnyTimes()
+
+				gomock.InOrder(
+					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{
+						{ID: "testinfra-ACTIVE-0", Name: "testinfra-ACTIVE-0", Status: "ACTIVE"},
+						{ID: "testinfra-ACTIVE-1", Name: "testinfra-ACTIVE-1", Status: "ACTIVE"},
 					}, nil).Times(1),
-
-					// Subsequent cleanup polls: instances gone
-					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{}, nil).AnyTimes(),
+					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{}, nil).Times(1),
 				)
 			},
 		},
@@ -152,8 +228,6 @@ func TestOpenStackStartMachines(t *testing.T) {
 				activeImg.Status = "active"
 				c.EXPECT().GetImage(gomock.Any(), gomock.Any()).Return(activeImg, nil).AnyTimes()
 
-				// STEP 1: First few calls should return NO instances (so creation happens)
-				// STEP 2: After creation, return the created instances
 				gomock.InOrder(
 					// First call: no existing instances (for existing instance check)
 					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{}, nil).Times(1),
@@ -170,7 +244,7 @@ func TestOpenStackStartMachines(t *testing.T) {
 
 				// Expect server creation
 				c.EXPECT().CreateServerFromOpts(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(
-					func(ctx context.Context, opts *openstackclient.ServerCreateOpts) (*servers.Server, error) {
+					func(ctx context.Context, opts *servers.CreateOpts) (*servers.Server, error) {
 						return &servers.Server{
 							ID:     fmt.Sprintf("new-%s", opts.Name),
 							Name:   opts.Name,
@@ -181,6 +255,10 @@ func TestOpenStackStartMachines(t *testing.T) {
 				// Expect status checks for waiting
 				activeServer := &servers.Server{Status: "ACTIVE"}
 				c.EXPECT().GetServer(gomock.Any(), gomock.Any()).Return(activeServer, nil).AnyTimes()
+
+				// The hibernation config has 2 instances with snapshots
+				c.EXPECT().DeleteImage(gomock.Any(), "snapshot-1").Return(nil).Times(1)
+				c.EXPECT().DeleteImage(gomock.Any(), "snapshot-2").Return(nil).Times(1)
 			},
 		},
 		{
@@ -193,6 +271,45 @@ func TestOpenStackStartMachines(t *testing.T) {
 
 				// First call: no existing instances
 				c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{}, nil).Times(1)
+			},
+		},
+		{
+			name:       "start from hibernation - cleanup continues even if snapshot deletion fails",
+			instances:  map[string]int{}, // No existing instances
+			withSecret: true,
+			setupClient: func(t *testing.T, c *mockopenstackclient.MockClient) {
+				// Setup for successful restoration
+				setupOpenStackQuotaMocks(c)
+
+				activeImg := &images.Image{}
+				activeImg.Status = "active"
+				c.EXPECT().GetImage(gomock.Any(), gomock.Any()).Return(activeImg, nil).AnyTimes()
+
+				gomock.InOrder(
+					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{}, nil).Times(1),
+					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{}, nil).Times(1),
+					c.EXPECT().ListServers(gomock.Any(), gomock.Any()).Return([]servers.Server{
+						{ID: "new-testinfra-master-0", Name: "testinfra-master-0", Status: "ACTIVE"},
+						{ID: "new-testinfra-worker-0", Name: "testinfra-worker-0", Status: "ACTIVE"},
+					}, nil).AnyTimes(),
+				)
+
+				c.EXPECT().CreateServerFromOpts(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(
+					func(ctx context.Context, opts *servers.CreateOpts) (*servers.Server, error) {
+						return &servers.Server{
+							ID:     fmt.Sprintf("new-%s", opts.Name),
+							Name:   opts.Name,
+							Status: "BUILD",
+						}, nil
+					})
+
+				activeServer := &servers.Server{Status: "ACTIVE"}
+				c.EXPECT().GetServer(gomock.Any(), gomock.Any()).Return(activeServer, nil).AnyTimes()
+
+				// First snapshot deletes successfully
+				c.EXPECT().DeleteImage(gomock.Any(), "snapshot-1").Return(nil).Times(1)
+				// Second snapshot fails to delete (should not cause overall failure)
+				c.EXPECT().DeleteImage(gomock.Any(), "snapshot-2").Return(errors.New("snapshot in use")).Times(1)
 			},
 		},
 	}
@@ -228,6 +345,7 @@ func TestOpenStackStartMachines(t *testing.T) {
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "resource validation failed")
 			} else {
+				// Even if snapshot deletion fails, StartMachines should succeed
 				assert.Nil(t, err)
 			}
 		})
@@ -321,27 +439,36 @@ func setupOpenStackClientInstances(openstackClient *mockopenstackclient.MockClie
 
 func setupOpenStackNetworkOps(openstackClient *mockopenstackclient.MockClient) {
 	// Network operations
-	network := &openstackclient.Network{
-		ID:   "network-1",
-		Name: "testinfra-openshift",
+	network := &networks.Network{
+		ID:     "network-1",
+		Name:   "testinfra-openshift",
+		Status: "ACTIVE",
 	}
 	openstackClient.EXPECT().GetNetworkByName(gomock.Any(), "testinfra-openshift").Return(network, nil).AnyTimes()
 
 	// Port listing
-	ports := []openstackclient.Port{
+	ports := []ports.Port{
 		{ID: "port-1", Name: "testinfra-ACTIVE-0"},
 		{ID: "port-2", Name: "testinfra-ACTIVE-1"},
 	}
 	openstackClient.EXPECT().ListPorts(gomock.Any()).Return(ports, nil).AnyTimes()
 
 	// Security groups
-	openstackClient.EXPECT().GetServerSecurityGroups(gomock.Any(), gomock.Any()).Return([]string{"default"}, nil).AnyTimes()
+	openstackClient.EXPECT().GetServerSecurityGroupNames(gomock.Any(), gomock.Any()).Return([]string{"default"}, nil).AnyTimes()
+}
+
+func setupOpenStackClientWithSnapshotCleanup(openstackClient *mockopenstackclient.MockClient) {
+	// For ListImages (cleanup check)
+	openstackClient.EXPECT().ListImages(gomock.Any(), gomock.Any()).Return([]images.Image{}, nil).AnyTimes()
+
+	// For DeleteImage (cleanup action)
+	openstackClient.EXPECT().DeleteImage(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 }
 
 // Setup quota mocks with sufficient resources
 func setupOpenStackQuotaMocks(openstackClient *mockopenstackclient.MockClient) {
 	// Mock quotas - plenty of resources available
-	quotas := &openstackclient.ComputeQuotas{
+	quotas := &quotasets.QuotaSet{
 		Instances: 20,
 		Cores:     40,
 		RAM:       81920,
@@ -349,15 +476,11 @@ func setupOpenStackQuotaMocks(openstackClient *mockopenstackclient.MockClient) {
 	openstackClient.EXPECT().GetComputeQuotas(gomock.Any()).Return(quotas, nil).AnyTimes()
 
 	// Mock usage - minimal usage
-	usage := &openstackclient.ComputeUsage{
-		InstancesUsed: 0,
-		CoresUsed:     0,
-		RAMUsed:       0,
-	}
+	var usage *usage.TenantUsage = nil
 	openstackClient.EXPECT().GetComputeUsage(gomock.Any()).Return(usage, nil).AnyTimes()
 
 	// Mock flavor details for our test flavors
-	flavorDetails := &openstackclient.FlavorDetails{
+	flavorDetails := &flavors.Flavor{
 		ID:    "flavor-1",
 		Name:  "m1.small",
 		VCPUs: 2,
@@ -367,7 +490,7 @@ func setupOpenStackQuotaMocks(openstackClient *mockopenstackclient.MockClient) {
 	openstackClient.EXPECT().GetFlavorDetails(gomock.Any(), "flavor-1").Return(flavorDetails, nil).AnyTimes()
 
 	// Also mock flavor-2 for worker
-	flavorDetails2 := &openstackclient.FlavorDetails{
+	flavorDetails2 := &flavors.Flavor{
 		ID:    "flavor-2",
 		Name:  "m1.medium",
 		VCPUs: 4,
@@ -380,7 +503,7 @@ func setupOpenStackQuotaMocks(openstackClient *mockopenstackclient.MockClient) {
 // Setup quota mocks with insufficient resources
 func setupOpenStackQuotaMocksInsufficient(openstackClient *mockopenstackclient.MockClient) {
 	// Mock quotas - very limited resources
-	quotas := &openstackclient.ComputeQuotas{
+	quotas := &quotasets.QuotaSet{
 		Instances: 2,
 		Cores:     4,
 		RAM:       4096,
@@ -388,15 +511,15 @@ func setupOpenStackQuotaMocksInsufficient(openstackClient *mockopenstackclient.M
 	openstackClient.EXPECT().GetComputeQuotas(gomock.Any()).Return(quotas, nil).AnyTimes()
 
 	// Mock usage - most resources already used
-	usage := &openstackclient.ComputeUsage{
-		InstancesUsed: 1,
-		CoresUsed:     3,
-		RAMUsed:       3072,
+	usage := &usage.TenantUsage{
+		ServerUsages:       make([]usage.ServerUsage, 1), // 1 instance used
+		TotalVCPUsUsage:    3,
+		TotalMemoryMBUsage: 3072,
 	}
 	openstackClient.EXPECT().GetComputeUsage(gomock.Any()).Return(usage, nil).AnyTimes()
 
 	// Mock flavor details - will show insufficient resources
-	flavorDetails1 := &openstackclient.FlavorDetails{
+	flavorDetails1 := &flavors.Flavor{
 		ID:    "flavor-1",
 		Name:  "m1.small",
 		VCPUs: 2,
@@ -405,8 +528,7 @@ func setupOpenStackQuotaMocksInsufficient(openstackClient *mockopenstackclient.M
 	}
 	openstackClient.EXPECT().GetFlavorDetails(gomock.Any(), "flavor-1").Return(flavorDetails1, nil).AnyTimes()
 
-	// Also mock flavor-2 for worker
-	flavorDetails2 := &openstackclient.FlavorDetails{
+	flavorDetails2 := &flavors.Flavor{
 		ID:    "flavor-2",
 		Name:  "m1.medium",
 		VCPUs: 4,

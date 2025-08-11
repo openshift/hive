@@ -358,10 +358,3 @@ OpenStack hibernation creates snapshots of all instances, saves their complete c
 Restoration recreates instances with identical attributes to their original state.
 
 Due to the specific nature of the snapshot based implementation, the hibernation and restoration process inherently requires more time to finish compared to other cloud providers.
-
-Once the ClusterPool is created and the cluster is claimed, the workflow is similar to other implementations:
-
-```bash
-$ oc patch cd $cd -n $cd_ns --type='merge' -p $'spec:\n powerState: Hibernating'
-$ oc patch cd $cd -n $cd_ns --type='merge' -p $'spec:\n powerState: Running'
-```

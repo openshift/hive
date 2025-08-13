@@ -21,4 +21,8 @@ import (
 	_ "golang.org/x/lint/golint"
 	// Used to lint code
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+
+	// TODO: remove this patch with kube bump to 1.34, which will carry the fix (https://github.com/kubernetes/kubernetes/pull/132378)
+	// Work around for https://github.com/kubernetes/kubernetes/issues/132377
+	_ "k8s.io/code-generator/cmd/validation-gen"
 )

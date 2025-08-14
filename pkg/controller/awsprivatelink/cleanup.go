@@ -105,11 +105,11 @@ func (r *ReconcileAWSPrivateLink) cleanupPrivateLink(cd *hivev1.ClusterDeploymen
 		logger.WithError(err).Error("error cleaning up Hosted Zone")
 		return err
 	}
-	if err := r.cleanupVPCEndpoint(awsClient.hub, metadata, logger); err != nil {
+	if err := r.cleanupVPCEndpoints(awsClient.hub, metadata, logger); err != nil {
 		logger.WithError(err).Error("error cleaning up VPCEndpoint")
 		return err
 	}
-	if err := r.cleanupVPCEndpointService(awsClient.user, metadata, logger); err != nil {
+	if err := r.cleanupVPCEndpointServices(awsClient.user, metadata, logger); err != nil {
 		logger.WithError(err).Error("error cleaning up VPCEndpoint Service")
 		return err
 	}
@@ -201,7 +201,7 @@ func (r *ReconcileAWSPrivateLink) cleanupHostedZone(awsClient awsclient.Client,
 
 }
 
-func (r *ReconcileAWSPrivateLink) cleanupVPCEndpoint(awsClient awsclient.Client,
+func (r *ReconcileAWSPrivateLink) cleanupVPCEndpoints(awsClient awsclient.Client,
 	metadata *hivev1.ClusterMetadata,
 	logger log.FieldLogger) error {
 	idLog := logger.WithField("infraID", metadata.InfraID)
@@ -216,21 +216,27 @@ func (r *ReconcileAWSPrivateLink) cleanupVPCEndpoint(awsClient awsclient.Client,
 		return nil // no work
 	}
 
-	vpcEndpoint := resp.VpcEndpoints[0]
-	endpointLog := logger.WithField("vpcEndpointID", *vpcEndpoint.VpcEndpointId)
+	// Delete all VPC Endpoints found
+	var endpointIds []string
+	for _, vpcEndpoint := range resp.VpcEndpoints {
+		endpointIds = append(endpointIds, *vpcEndpoint.VpcEndpointId)
+	}
+
+	endpointLog := logger.WithField("vpcEndpointIDs", endpointIds)
+	endpointLog.WithField("numEndpoints", len(endpointIds)).Info("found VPC Endpoints to delete")
 
 	_, err = awsClient.DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{
-		VpcEndpointIds: aws.StringSlice([]string{*vpcEndpoint.VpcEndpointId}),
+		VpcEndpointIds: aws.StringSlice(endpointIds),
 	})
 	if err != nil && !awsErrCodeEquals(err, "InvalidVpcEndpointId.NotFound") {
-		endpointLog.WithError(err).Error("error deleting the VPC Endpoint")
+		endpointLog.WithError(err).Error("error deleting the VPC Endpoints")
 		return err
 	}
 
 	return nil
 }
 
-func (r *ReconcileAWSPrivateLink) cleanupVPCEndpointService(awsClient awsclient.Client,
+func (r *ReconcileAWSPrivateLink) cleanupVPCEndpointServices(awsClient awsclient.Client,
 	metadata *hivev1.ClusterMetadata,
 	logger log.FieldLogger) error {
 	idLog := logger.WithField("infraID", metadata.InfraID)
@@ -245,14 +251,20 @@ func (r *ReconcileAWSPrivateLink) cleanupVPCEndpointService(awsClient awsclient.
 		return nil // no work
 	}
 
-	service := resp.ServiceConfigurations[0]
-	serviceLog := logger.WithField("vpcEndpointServiceID", *service.ServiceId)
+	// Delete all VPC Endpoint Services found
+	var serviceIds []string
+	for _, service := range resp.ServiceConfigurations {
+		serviceIds = append(serviceIds, *service.ServiceId)
+	}
+
+	serviceLog := logger.WithField("vpcEndpointServiceIDs", serviceIds)
+	serviceLog.WithField("numEndpoints", len(serviceIds)).Info("found VPC Endpoints Services to delete")
 
 	_, err = awsClient.DeleteVpcEndpointServiceConfigurations(&ec2.DeleteVpcEndpointServiceConfigurationsInput{
-		ServiceIds: aws.StringSlice([]string{*service.ServiceId}),
+		ServiceIds: aws.StringSlice(serviceIds),
 	})
 	if err != nil && !awsErrCodeEquals(err, "InvalidVpcEndpointService.NotFound") {
-		serviceLog.WithError(err).Error("error deleting the VPC Endpoint Service")
+		serviceLog.WithError(err).Error("error deleting the VPC Endpoint Services")
 		return err
 	}
 

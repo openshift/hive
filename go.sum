@@ -785,8 +785,8 @@ github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f753
 github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4/go.mod h1:zCklcJwbnaNx46KvR38Rh86uZdow5gvub4ATcNDopTM=
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20240909043600-373ac49835bf h1:mfMmaD9+vZIZQq3MGXsS/AGHXekj4wIn3zc1Cs1EY8M=
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20240909043600-373ac49835bf/go.mod h1:2fZsjZ3QSPkoMUc8QntXfeBb8AnvW+WIYwwQX8vmgvQ=
-github.com/openshift/generic-admission-server v1.14.1-0.20250203204636-21579bd45f95 h1:Q8aJJZByWM5OP3nhqufRYxMy6qlBvJkGA2ii0Ksttzs=
-github.com/openshift/generic-admission-server v1.14.1-0.20250203204636-21579bd45f95/go.mod h1:9kXlVwaJd1fWlzDf8pzFQ1/FLLXe1Q1Wxq7s7dBEH/o=
+github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6 h1:+2D45NQ1B53nU0Lbsqa6rX9duCcO1df6U1HGCboijEQ=
+github.com/openshift/generic-admission-server v1.14.1-0.20250715141119-66c5d0a9c5e6/go.mod h1:5gqtfZSOJ7CWfrzPJ5c6B1Ju3r+W4UHIWXuav/+OGJQ=
 github.com/openshift/installer v1.4.19-ec5 h1:xiQ3D4DLf170cqfdp4Bo8uqVCyRkfQdjIC1DhXeOfpw=
 github.com/openshift/installer v1.4.19-ec5/go.mod h1:xTqIPA65EoaSpL5KZKOcxGcoh9HRs+aTdi3OUeedgKk=
 github.com/openshift/library-go v0.0.0-20250114132252-af5b21ebad2f h1:inJ2wNKevyuR+7VfBecMJ+HjEsVwbTtw0x3SoZZ24uI=

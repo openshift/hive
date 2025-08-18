@@ -2,35 +2,35 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Prerequisites](#prerequisites)
-  - [External tools](#external-tools)
-- [Build and run tests](#build-and-run-tests)
-- [Setting up the development environment](#setting-up-the-development-environment)
-  - [Cloning the repository](#cloning-the-repository)
-- [Obtaining a Cluster](#obtaining-a-cluster)
-  - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
-- [Deploying from Source](#deploying-from-source)
-  - [Full Container Build](#full-container-build)
-  - [Using public images](#using-public-images)
-  - [Running Code Locally](#running-code-locally)
-    - [hive-operator](#hive-operator)
-  - [hive-controllers](#hive-controllers)
-- [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
-- [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
-- [Using Serving Certificates](#using-serving-certificates)
-  - [Generating a Certificate](#generating-a-certificate)
-  - [Using Generated Certificate](#using-generated-certificate)
-- [Code editors and multi-module repositories](#code-editors-and-multi-module-repositories)
-- [Updating Hive APIs](#updating-hive-apis)
-- [Importing Hive APIs](#importing-hive-apis)
-- [Dependency management](#dependency-management)
-  - [Updating Dependencies](#updating-dependencies)
-  - [Re-creating vendor Directory](#re-creating-vendor-directory)
-  - [Updating the Kubernetes dependencies](#updating-the-kubernetes-dependencies)
-  - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
-- [Running the e2e test locally](#running-the-e2e-test-locally)
-- [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
-- [Hive Controllers Profiling](#hive-controllers-profiling)
+- [Developing Hive](#developing-hive)
+  - [Prerequisites](#prerequisites)
+    - [External tools](#external-tools)
+  - [Build and run tests](#build-and-run-tests)
+  - [Setting up the development environment](#setting-up-the-development-environment)
+    - [Cloning the repository](#cloning-the-repository)
+  - [Obtaining a Cluster](#obtaining-a-cluster)
+    - [Creating a Kubernetes In Docker (kind) Cluster](#creating-a-kubernetes-in-docker-kind-cluster)
+  - [Deploying from Source](#deploying-from-source)
+    - [Full Container Build](#full-container-build)
+    - [Running Code Locally](#running-code-locally)
+      - [hive-operator](#hive-operator)
+    - [hive-controllers](#hive-controllers)
+  - [Developing Hiveutil Install Manager](#developing-hiveutil-install-manager)
+  - [Enable Debug Logging In Hive Controllers](#enable-debug-logging-in-hive-controllers)
+  - [Using Serving Certificates](#using-serving-certificates)
+    - [Generating a Certificate](#generating-a-certificate)
+    - [Using Generated Certificate](#using-generated-certificate)
+  - [Code editors and multi-module repositories](#code-editors-and-multi-module-repositories)
+  - [Updating Hive APIs](#updating-hive-apis)
+  - [Importing Hive APIs](#importing-hive-apis)
+  - [Dependency management](#dependency-management)
+    - [Updating Dependencies](#updating-dependencies)
+    - [Re-creating vendor Directory](#re-creating-vendor-directory)
+    - [Updating the Kubernetes dependencies](#updating-the-kubernetes-dependencies)
+    - [Vendoring the OpenShift Installer](#vendoring-the-openshift-installer)
+  - [Running the e2e test locally](#running-the-e2e-test-locally)
+  - [Viewing Metrics with Prometheus](#viewing-metrics-with-prometheus)
+  - [Hive Controllers Profiling](#hive-controllers-profiling)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -155,34 +155,6 @@ NOTE: If you are running on Kubernetes or kind >= version 1.24, (not OpenShift),
 
 ```bash
 ./hack/create-service-account-secrets.sh
-```
-
-### Using public images
-
-If you cannot login to registry.ci.openshift.org, a temporary solution is to use
-public images during build and test. At the time of writing, the following public images
-do the trick.
-
-```shell
-export EL8_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.23
-export EL9_BUILD_IMAGE=registry.ci.openshift.org/openshift/release:golang-1.23
-export BASE_IMAGE=registry.ci.openshift.org/origin/4.16:base
-# NOTE: This produces images which are not FIPS-compliant.
-export GO="CGO_ENABLED=0 go"
-```
-
-You can now build the development image with the hiveutil binaries from your local system:
-
-```bash
-export IMG="quay.io/{username}/hive:latest}"
-make build image-hive docker-push deploy
-oc delete pods -n hive --all
-```
-
-NOTE: If you are running on Kubernetes or kind, (not OpenShift), you will also need to create certificates for hiveadmission after running make deploy for the first time:
-
-```bash
-./hack/hiveadmission-dev-cert.sh
 ```
 
 ### Running Code Locally

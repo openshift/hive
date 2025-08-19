@@ -681,7 +681,8 @@ func (r *ReconcileClusterDeployment) copyInstallLogSecret(destNamespace string, 
 
 	src := types.NamespacedName{Name: srcSecretName, Namespace: hiveNS}
 	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(r, src, dest, nil, nil)
+	_, err := controllerutils.CopySecret(r, src, dest, nil, nil)
+	return err
 }
 
 // NOTE: Ugly-but-simple way to mock os.ReadFile for test purposes.

@@ -774,6 +774,18 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{Requeue: true}, nil
 	}
 
+	cdLog.Debug("checking for hive private image pull secret...")
+	switch requeue, err := r.ensurePrivateImagePullSecret(cd, cdLog); {
+	case err != nil:
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error ensuring private image pull secret")
+		return reconcile.Result{}, err
+	case requeue:
+		cdLog.Debug("hive private image pull secret was out of date, requeueing...")
+		// The controller will not automatically requeue the cluster deployment
+		// since the controller is not watching for secrets. So, requeue manually.
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	// let's verify the release image before using it here.
 	if r.releaseImageVerifier != nil {
 		var releaseDigest string
@@ -2116,6 +2128,29 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 		cdLog.WithField("secretName", mergedSecretName).Info("Created the merged pull secret object successfully")
 	}
 	return true, nil
+}
+
+func (r *ReconcileClusterDeployment) ensurePrivateImagePullSecret(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
+	secretName := os.Getenv(constants.HivePrivateImagePullSecret)
+	if secretName == "" {
+		cdLog.Debug("Hive private image pull secret missing or empty, ignoring...")
+		return false, nil
+	}
+
+	srcNamespace := controllerutils.GetHiveNamespace()
+	destNamespace := cd.GetNamespace()
+
+	cdLog.
+		WithField("secretName", secretName).
+		WithField("sourceNamespace", srcNamespace).
+		WithField("targetNamespace", destNamespace).
+		WithField("targetCD", cd.Name).
+		Debug("Ensuring hive private image pull secret exists")
+
+	src := types.NamespacedName{Name: secretName, Namespace: srcNamespace}
+	dest := types.NamespacedName{Name: secretName, Namespace: destNamespace}
+
+	return controllerutils.CopySecret(r, src, dest, cd, r.scheme)
 }
 
 func configureTrustedCABundleConfigMap(cm *corev1.ConfigMap) bool {

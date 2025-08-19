@@ -3,6 +3,7 @@ package install
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -72,7 +73,8 @@ func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, en
 
 	src := types.NamespacedName{Name: spSecretName, Namespace: hiveNS}
 	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(client, src, dest, owner, scheme)
+	_, err := controllerutils.CopySecret(client, src, dest, owner, scheme)
+	return err
 }
 
 // AWSAssumeRoleConfig creates or updates a secret with an AWS credentials file containing:
@@ -413,8 +415,15 @@ func InstallerPodSpec(
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
-		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
+		ImagePullSecrets: []corev1.LocalObjectReference{
+			{Name: constants.GetMergedPullSecretName(cd)},
+		},
 	}
+
+	if hiveImagePullSecret := os.Getenv(constants.HivePrivateImagePullSecret); hiveImagePullSecret != "" {
+		podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: hiveImagePullSecret})
+	}
+
 	controllerutils.SetProxyEnvVars(podSpec, httpProxy, httpsProxy, noProxy)
 	return podSpec, nil
 }
@@ -442,7 +451,6 @@ func GenerateInstallerJob(
 	podSpec := provision.Spec.PodSpec
 	podSpec.NodeSelector = sharedPodConfig.NodeSelector
 	podSpec.Tolerations = sharedPodConfig.Tolerations
-	podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, sharedPodConfig.ImagePullSecrets...)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -493,7 +501,10 @@ func GenerateUninstallerJobForDeprovision(
 		ServiceAccountName: serviceAccountName,
 		NodeSelector:       sharedPodConfig.NodeSelector,
 		Tolerations:        sharedPodConfig.Tolerations,
-		ImagePullSecrets:   sharedPodConfig.ImagePullSecrets,
+	}
+
+	if hiveImagePullSecret := os.Getenv(constants.HivePrivateImagePullSecret); hiveImagePullSecret != "" {
+		podSpec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: hiveImagePullSecret}}
 	}
 
 	completions := int32(1)

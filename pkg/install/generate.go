@@ -72,7 +72,8 @@ func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, en
 
 	src := types.NamespacedName{Name: spSecretName, Namespace: hiveNS}
 	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(client, src, dest, owner, scheme)
+	_, err := controllerutils.CopySecret(client, src, dest, owner, scheme)
+	return err
 }
 
 // AWSAssumeRoleConfig creates or updates a secret with an AWS credentials file containing:

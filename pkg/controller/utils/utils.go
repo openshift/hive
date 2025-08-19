@@ -306,11 +306,11 @@ func EnsureRequeueAtLeastWithin(duration time.Duration, result reconcile.Result,
 	return reconcile.Result{RequeueAfter: duration, Requeue: true}, nil
 }
 
-// CopySecret copies the secret defined by src to dest.
-func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Object, scheme *runtime.Scheme) error {
+// CopySecret copies the secret defined by src to dest.  Returns true if an actual change was made.
+func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Object, scheme *runtime.Scheme) (bool, error) {
 	srcSecret := &corev1.Secret{}
 	if err := c.Get(context.Background(), src, srcSecret); err != nil {
-		return err
+		return false, err
 	}
 
 	destSecret := &corev1.Secret{}
@@ -327,23 +327,23 @@ func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Ob
 		}
 		if owner != nil {
 			if err := controllerutil.SetOwnerReference(owner, destSecret, scheme); err != nil {
-				return err
+				return false, err
 			}
 		}
 
-		return c.Create(context.Background(), destSecret)
+		return true, c.Create(context.Background(), destSecret)
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if reflect.DeepEqual(destSecret.Data, srcSecret.Data) && reflect.DeepEqual(destSecret.StringData, srcSecret.StringData) {
-		return nil // no work as the dest and source data matches.
+		return false, nil // no work as the dest and source data matches.
 	}
 
 	destSecret.Data = srcSecret.DeepCopy().Data
 	destSecret.StringData = srcSecret.DeepCopy().StringData
-	return c.Update(context.Background(), destSecret)
+	return true, c.Update(context.Background(), destSecret)
 }
 
 // BuildControllerLogger returns a logger for controllers with consistent fields.

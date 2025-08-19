@@ -21,7 +21,8 @@ const (
 	PlatformVSphere        = "vsphere"
 	PlatformNutanix        = "nutanix"
 
-	mergedPullSecretSuffix = "merged-pull-secret"
+	mergedPullSecretSuffix    = "merged-pull-secret"
+	hiveImagePullSecretSuffix = "hive-image-pull-secret"
 
 	// VeleroBackupEnvVar is the name of the environment variable used to tell the controller manager to enable velero backup integration.
 	VeleroBackupEnvVar = "HIVE_VELERO_BACKUP"
@@ -115,6 +116,9 @@ const (
 
 	// GlobalPullSecret is the environment variable for controllers to get the global pull secret
 	GlobalPullSecret = "GLOBAL_PULL_SECRET"
+
+	// HivePrivateImagePullSecret is the environment variable for controllers to get the pull secret for hive's own image
+	HivePrivateImagePullSecret = "HIVE_PRIVATE_IMAGE_PULL_SECRET"
 
 	// DefaultHiveNamespace is the default namespace where core hive components will run. It is used if the environment variable is not defined.
 	DefaultHiveNamespace = "hive"
@@ -565,4 +569,14 @@ const (
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment
 func GetMergedPullSecretName(cd *hivev1.ClusterDeployment) string {
 	return apihelpers.GetResourceName(cd.Name, mergedPullSecretSuffix)
+}
+
+// GetImagePullSecretName returns name for image pull secret name per cluster deployment
+func GetImagePullSecretName(cd *hivev1.ClusterDeployment) string {
+	return apihelpers.GetResourceName(cd.Name, hiveImagePullSecretSuffix)
+}
+
+// GetImagePullSecretNameForDeprovision returns name for image pull secret name per cluster deprovision
+func GetImagePullSecretNameForDeprovision(cd *hivev1.ClusterDeprovision) string {
+	return apihelpers.GetResourceName(cd.Name, hiveImagePullSecretSuffix)
 }

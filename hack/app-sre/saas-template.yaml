@@ -5784,6 +5784,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
+      contracts.hive.openshift.io/clusterinstall.config: '{"skipImageSetJob": "true"}'
       controller-gen.kubebuilder.io/version: v0.16.3
     labels:
       contracts.hive.openshift.io/clusterinstall: 'true'

@@ -8,13 +8,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
-	"github.com/openshift/hive/pkg/util/contracts"
 	"github.com/openshift/hive/pkg/util/scheme"
 
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -23,7 +21,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -152,7 +149,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, managedDomainsConfigMapInfo, hiveAdmContainer)
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, awsPrivateLinkConfigMapInfo, hiveAdmContainer)
 	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, privateLinkConfigMapInfo, hiveAdmContainer)
-	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(), hiveAdmContainer)
+	addConfigVolume(&hiveAdmDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(hLog), hiveAdmContainer)
 	addReleaseImageVerificationConfigMapEnv(hiveAdmContainer, instance)
 
 	scheme := scheme.GetScheme()
@@ -320,23 +317,6 @@ func (r *ReconcileHiveConfig) injectCerts(apiService *apiregistrationv1.APIServi
 
 	return nil
 }
-
-// allowedContracts is the list of operator whitelisted contracts that hive will accept
-// from CRDs.
-var allowedContracts = sets.NewString(
-	hivecontractsv1alpha1.ClusterInstallContractLabelKey,
-)
-
-// knowContracts is a list of contracts and their implementations that doesn't
-// require discovery using CRDs
-var knowContracts = contracts.SupportedContractImplementationsList{{
-	Name: hivecontractsv1alpha1.ClusterInstallContractName,
-	Supported: []contracts.ContractImplementation{{
-		Group:   "extensions.hive.openshift.io",
-		Version: "v1beta1",
-		Kind:    "AgentClusterInstall",
-	}},
-}}
 
 func addReleaseImageVerificationConfigMapEnv(container *corev1.Container, instance *hivev1.HiveConfig) {
 	if instance.Spec.ReleaseImageVerificationConfigMapRef == nil {

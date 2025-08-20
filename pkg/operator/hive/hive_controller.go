@@ -565,7 +565,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, namespacesToClean, confighash, managedDomainsConfigHash, fpConfigHash, mcConfigHash)
+	err = r.deployHive(hLog, h, instance, namespacesToClean, confighash, managedDomainsConfigHash, fpConfigHash, mcConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHive", err.Error())

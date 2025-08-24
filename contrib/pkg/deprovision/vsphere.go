@@ -3,6 +3,7 @@ package deprovision
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -90,13 +91,20 @@ func (o *vSphereOptions) Run() error {
 		return err
 	}
 
+	var vCenters []typesvsphere.VCenters
+	for _, vCenter := range strings.Split(o.vCenter, "::") {
+		vCenters = append(vCenters, typesvsphere.VCenters{
+			VCenter:  vCenter,
+			Username: o.username,
+			Password: o.password,
+		})
+	}
+
 	metadata := &types.ClusterMetadata{
 		InfraID: o.infraID,
 		ClusterPlatformMetadata: types.ClusterPlatformMetadata{
 			VSphere: &typesvsphere.Metadata{
-				VCenter:  o.vCenter,
-				Username: o.username,
-				Password: o.password,
+				VCenters: vCenters,
 			},
 		},
 	}

@@ -116,6 +116,9 @@ const (
 	// GlobalPullSecret is the environment variable for controllers to get the global pull secret
 	GlobalPullSecret = "GLOBAL_PULL_SECRET"
 
+	// HivePrivateImagePullSecret is the environment variable for controllers to get the pull secret for hive's own image
+	HivePrivateImagePullSecret = "HIVE_PRIVATE_IMAGE_PULL_SECRET"
+
 	// DefaultHiveNamespace is the default namespace where core hive components will run. It is used if the environment variable is not defined.
 	DefaultHiveNamespace = "hive"
 

@@ -271,6 +271,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 
 	r.includeGlobalPullSecret(hLog, instance, hiveContainer)
+	r.includeHivePrivateImagePullSecret(hLog, instance, hiveContainer)
 
 	if instance.Spec.MaintenanceMode != nil && *instance.Spec.MaintenanceMode {
 		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-controllers replicas to 0")
@@ -462,6 +463,19 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, inst
 		Value: instance.Spec.GlobalPullSecretRef.Name,
 	}
 	hiveContainer.Env = append(hiveContainer.Env, globalPullSecretEnvVar)
+}
+
+func (r *ReconcileHiveConfig) includeHivePrivateImagePullSecret(hLog log.FieldLogger, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
+	if instance.Spec.HiveImagePullSecretRef == nil || instance.Spec.HiveImagePullSecretRef.Name == "" {
+		hLog.Debug("HiveImagePullSecret is not provided in HiveConfig, it will not be deployed")
+		return
+	}
+
+	hiveImagePullSecretEnvVar := corev1.EnvVar{
+		Name:  constants.HivePrivateImagePullSecret,
+		Value: instance.Spec.HiveImagePullSecretRef.Name,
+	}
+	hiveContainer.Env = append(hiveContainer.Env, hiveImagePullSecretEnvVar)
 }
 
 func (r *ReconcileHiveConfig) runningOnOpenShift() (bool, error) {

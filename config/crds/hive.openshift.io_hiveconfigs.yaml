@@ -692,6 +692,25 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
+              hiveImagePullSecretRef:
+                description: |-
+                  HiveImagePullSecretRef is used to specify a pull secret that can be used to pull Hive's own image.
+                  If hive has been deployed from a private registry, cluster installations will not succeed unless
+                  this reference is specified. This secret must live in Hive's TargetNamespace.
+                  NOTE: This secret will be copied into the namespace of every ClusterDeployment, overwriting any secret
+                  with the same name.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               logLevel:
                 description: |-
                   LogLevel is the level of logging to use for the Hive controllers.

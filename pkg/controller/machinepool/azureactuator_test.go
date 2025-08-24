@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/golang/mock/gomock"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
@@ -19,6 +18,7 @@ import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
+	testlogger "github.com/openshift/hive/pkg/test/logger"
 )
 
 type providerSpecValidator func(t *testing.T, providerSpec *machineapi.AzureMachineProviderSpec)
@@ -33,6 +33,7 @@ func TestAzureActuator(t *testing.T) {
 		expectedImage               *machineapi.Image
 		extraProviderSpecValidation providerSpecValidator
 		expectedErr                 bool
+		expectedLogs                []string
 	}{
 		// < 4.12
 		{
@@ -178,7 +179,10 @@ func TestAzureActuator(t *testing.T) {
 				mockGetVMCapabilities(client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
 			},
-			expectedErr: true,
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName(""): 3, // Non-zoned deployment
+			},
+			expectedLogs: []string{"No availability zones detected for region. Using non-zoned deployment."},
 		},
 		{
 			name:              "default V1 image exists and instance supports V1 images",
@@ -378,7 +382,10 @@ func TestAzureActuator(t *testing.T) {
 				mockGetVMCapabilities(client, "V1,V2")
 				mockListImagesByResourceGroup(client, []compute.Image{testAzureImage(compute.HyperVGenerationTypesV1)})
 			},
-			expectedErr: true,
+			expectedMachineSetReplicas: map[string]int64{
+				generateAzureMachineSetName(""): 3, // Non-zoned deployment
+			},
+			expectedLogs: []string{"No availability zones detected for region. Using non-zoned deployment."},
 		},
 		{
 			name:              "default V1 image exists and instance supports V1 images (4.12+)",
@@ -495,12 +502,13 @@ func TestAzureActuator(t *testing.T) {
 
 			aClient := mockazure.NewMockClient(mockCtrl)
 
-			// set up mock expectations
 			test.mockAzureClient(mockCtrl, aClient)
+
+			logger, hook := testlogger.NewLoggerWithHook()
 
 			actuator := &AzureActuator{
 				client: aClient,
-				logger: log.WithField("actuator", "azureactuator"),
+				logger: logger.WithField("actuator", "azureactuator"),
 			}
 
 			generatedMachineSets, _, err := actuator.GenerateMachineSets(test.clusterDeployment, test.pool, actuator.logger)
@@ -510,6 +518,10 @@ func TestAzureActuator(t *testing.T) {
 			} else {
 				assert.NoError(t, err, "unexpected error for test case")
 				validateAzureMachineSets(t, generatedMachineSets, test.expectedMachineSetReplicas, test.expectedImage, test.extraProviderSpecValidation)
+			}
+
+			for _, expectedLog := range test.expectedLogs {
+				testlogger.AssertHookContainsMessage(t, hook, expectedLog)
 			}
 		})
 	}

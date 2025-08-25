@@ -13,6 +13,3 @@ ignore:
     'SNYK-GOLANG-K8SIOCLIENTGOTRANSPORT-7538822':
      - '* > k8s.io/client-go/transport':
         reason: 'Snyk mistakenly identifies v1.17.0-alpha.1 as newer than v0.29.7. client-go has a complicated history of versioning. Presumably, v1.20.0-alpha.1 referred to kubernetes-v1.20. kubernetes tags have since been prefaced by "kubernetes", whereas actual client-go versions resumed numbering from 0.x'
-    'SNYK-GOLANG-GITHUBCOMOPENSHIFTINSTALLERDATA-1070553':
-    - '* > github.com/openshift/installer/data':
-      reason: 'Snyk incorrectly flags this exposure because the semver of the tag we are referencing in go.mod sorts lower than the semver of the release branch in which the fix appeared several years ago.'

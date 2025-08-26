@@ -1626,7 +1626,7 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 	if readyCondition == nil || readyCondition.Status != corev1.ConditionTrue {
 		msg := "did not find timestamp for when dnszone became ready"
 		cdLog.WithField("dnszone", dnsZone.Name).Error(msg)
-		return false, fmt.Errorf(msg)
+		return false, errors.New(msg)
 	}
 
 	dnsDelayDuration := readyCondition.LastTransitionTime.Sub(cd.CreationTimestamp.Time)

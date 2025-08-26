@@ -1488,7 +1488,7 @@ func (m *InstallManager) initSSHAgent(sshKeyPaths []string) (func(), error) {
 		if string(line[0]) != "SSH_AUTH_SOCK" {
 			errMsg := "no SSH_AUTH_SOCK in ssh-agent output"
 			m.log.Error(errMsg)
-			return sshAgentCleanup, fmt.Errorf(errMsg)
+			return sshAgentCleanup, errors.New(errMsg)
 		}
 		sock = string(line[1])
 
@@ -1497,7 +1497,7 @@ func (m *InstallManager) initSSHAgent(sshKeyPaths []string) (func(), error) {
 		if string(line[0]) != "SSH_AGENT_PID" {
 			errMsg := "no SSH_AGENT_PID in ssh-agent output"
 			m.log.Error(errMsg)
-			return sshAgentCleanup, fmt.Errorf(errMsg)
+			return sshAgentCleanup, errors.New(errMsg)
 		}
 		pidStr := line[1]
 		pid, err := strconv.Atoi(string(pidStr))

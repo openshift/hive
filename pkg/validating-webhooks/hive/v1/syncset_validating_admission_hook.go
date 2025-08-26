@@ -195,7 +195,7 @@ func (a *SyncSetValidatingAdmissionHook) validateCreate(admissionSpec *admission
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
-		contextLogger.Infof(statusError.Message)
+		contextLogger.Info(statusError.Message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result:  &statusError,
@@ -243,7 +243,7 @@ func (a *SyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *admission
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
-		contextLogger.Infof(statusError.Message)
+		contextLogger.Info(statusError.Message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result:  &statusError,

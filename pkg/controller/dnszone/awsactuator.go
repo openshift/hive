@@ -514,17 +514,17 @@ func (a *AWSActuator) GetNameServers() ([]string, error) {
 	if len(resp.ResourceRecordSets) != 1 {
 		msg := fmt.Sprintf("unexpected number of recordsets returned: %d", len(resp.ResourceRecordSets))
 		logger.Error(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 	if aws.StringValue(resp.ResourceRecordSets[0].Type) != "NS" {
 		msg := "name server record not found"
 		logger.Error(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 	if aws.StringValue(resp.ResourceRecordSets[0].Name) != (a.dnsZone.Spec.Zone + ".") {
 		msg := fmt.Sprintf("name server record not found for domain %s", a.dnsZone.Spec.Zone)
 		logger.Error(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 	result := make([]string, len(resp.ResourceRecordSets[0].ResourceRecords))
 	for i, record := range resp.ResourceRecordSets[0].ResourceRecords {

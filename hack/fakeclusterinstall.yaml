@@ -1,0 +1,33 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterImageSet
+metadata:
+  name: hive-not-a-release-image
+spec:
+  releaseImage: RELEASE_IMAGE
+---
+apiVersion: hive.openshift.io/v1
+kind: ClusterDeployment
+metadata:
+  name: fci
+spec:
+  baseDomain: foo.bar.com
+  clusterName: fci
+  platform:
+    none: {}
+  clusterInstallRef:
+    group: hiveinternal.openshift.io
+    version: v1alpha1
+    kind: FakeClusterInstall
+    name: fci
+  pullSecretRef:
+    name: PULL_SECRET
+---
+apiVersion: hiveinternal.openshift.io/v1alpha1
+kind: FakeClusterInstall
+metadata:
+  name: fci
+spec:
+  clusterDeploymentRef:
+    name: fci
+  imageSetRef:
+    name: hive-not-a-release-image

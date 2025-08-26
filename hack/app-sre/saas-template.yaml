@@ -8598,6 +8598,13 @@ objects:
 
                             If it is not present, a default value will be used.'
                           type: string
+                        tagIDs:
+                          description: TagIDs is a list of up to 10 tags to add to
+                            the VMs that this machine set provisions in vSphere.
+                          items:
+                            type: string
+                          maxItems: 10
+                          type: array
                       required:
                       - coresPerSocket
                       - cpus

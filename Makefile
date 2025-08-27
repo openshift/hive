@@ -3,9 +3,9 @@ SHELL := /bin/bash
 all: vendor update test build
 
 # These images need to be synced with the default values in the Dockerfile.
-EL8_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
-EL9_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
-BASE_IMAGE ?= registry.ci.openshift.org/ocp/4.19:base-rhel9
+EL8_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
+EL9_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+BASE_IMAGE ?= registry.ci.openshift.org/ocp/4.20:base-rhel9
 
 # In openshift ci (Prow), we need to set $HOME to a writable directory else tests will fail
 # because they don't have permissions to create /.local or /.cache directories

@@ -40,8 +40,8 @@ spec:
   - name: build-args
     value:
     - CONTAINER_SUB_MANAGER_OFF=1
-    - EL8_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.23.2-202411290846.g6707acc.el8
-    - EL9_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.23.4
+    - EL8_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.4-202507171054.g35b6b0c.el8
+    - EL9_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.4-202507171054.g2f6f49f.el9
     - BASE_IMAGE=registry.redhat.io/rhel9-2-els/rhel:9.2
   - name: build-source-image
     value: 'true'

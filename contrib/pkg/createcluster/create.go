@@ -476,12 +476,12 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		if o.OpenStackAPIFloatingIP == "" {
 			msg := fmt.Sprintf("--openstack-api-floating-ip must be set when using --cloud=%q", cloudOpenStack)
 			o.log.Info(msg)
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 		if o.OpenStackCloud == "" {
 			msg := fmt.Sprintf("--openstack-cloud must be set when using --cloud=%q", cloudOpenStack)
 			o.log.Info(msg)
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 	}
 

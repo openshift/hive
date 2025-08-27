@@ -3064,7 +3064,7 @@ func (in *MachinePoolPlatform) DeepCopyInto(out *MachinePoolPlatform) {
 	if in.VSphere != nil {
 		in, out := &in.VSphere, &out.VSphere
 		*out = new(vsphere.MachinePool)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Ovirt != nil {
 		in, out := &in.Ovirt, &out.Ovirt

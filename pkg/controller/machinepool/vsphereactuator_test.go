@@ -75,6 +75,9 @@ func validateVSphereMachineSets(t *testing.T, mSets []*machineapi.MachineSet, ex
 			assert.Equal(t, int32(512), vsphereProvider.DiskGiB, "unexpected DiskGiB")
 			assert.Equal(t, "/vsphere-datacenter/vm/vsphere-folder", vsphereProvider.Workspace.Folder, "unexpected Folder")
 			assert.Equal(t, "/vsphere-datacenter/host/vsphere-cluster/Resources/vsphere-pool", vsphereProvider.Workspace.ResourcePool, "unexpected ResourcePool")
+			if assert.Len(t, vsphereProvider.TagIDs, 1, "missing tag IDs") {
+				assert.Equal(t, vsphereProvider.TagIDs[0], "vsphere-tag")
+			}
 		}
 	}
 }
@@ -90,6 +93,7 @@ func testVSpherePool() *hivev1.MachinePool {
 			OSDisk: hivev1vsphere.OSDisk{
 				DiskSizeGB: 512,
 			},
+			TagIDs: []string{"vsphere-tag"},
 		},
 	}
 	return p

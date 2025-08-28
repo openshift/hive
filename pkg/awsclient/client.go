@@ -565,7 +565,9 @@ type awsChinaEndpointResolver struct{}
 var _ route53.EndpointResolverV2 = &awsChinaEndpointResolver{}
 
 func (*awsChinaEndpointResolver) ResolveEndpoint(ctx context.Context, params route53.EndpointParameters) (smithyendpoints.Endpoint, error) {
-	if *params.Region != constants.AWSChinaRoute53Region {
+	// It may or may not be possible for params.Region to be nil, given we're defaulting it in the
+	// client config, but better safe.
+	if params.Region == nil || *params.Region != constants.AWSChinaRoute53Region {
 		return route53.NewDefaultEndpointResolverV2().ResolveEndpoint(ctx, params)
 	}
 	u, err := url.Parse("https://route53.amazonaws.com.cn")
@@ -581,7 +583,6 @@ func (*awsChinaEndpointResolver) ResolveEndpoint(ctx context.Context, params rou
 // If the Secret is nil, use the configuration from the envionment.
 func newConfigFromSecret(secret *corev1.Secret, region string) (*aws.Config, error) {
 	opts := []func(o *config.LoadOptions) error{
-		config.WithRegion(region),
 		config.WithAPIOptions([]func(*smithymiddleware.Stack) error{
 			middleware.AddUserAgentKeyValue("openshift.io hive", "v1"),
 		}),
@@ -610,7 +611,24 @@ func newConfigFromSecret(secret *corev1.Secret, region string) (*aws.Config, err
 		)
 	}
 
+	// Region specified by the caller takes precedence. Putting this here *should* override
+	// anything in the config file.
+	if region != "" {
+		opts = append(opts, config.WithRegion(region))
+	}
+
 	cfg, err := config.LoadDefaultConfig(context.TODO(), opts...)
+	if err != nil {
+		return &cfg, err
+	}
+
+	// Special handling for unspecified region, which no longer defaults like it did in v1
+	if cfg.Region == "" {
+		// The default that was _probably_ used by v1
+		opts = append(opts, config.WithRegion("us-east-1"))
+		// Aaaand we have to reload the whole config, because immutability
+		cfg, err = config.LoadDefaultConfig(context.TODO(), opts...)
+	}
 
 	return &cfg, err
 }

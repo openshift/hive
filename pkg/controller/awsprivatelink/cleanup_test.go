@@ -3,15 +3,16 @@ package awsprivatelink
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/awsclient/mock"
 	testcd "github.com/openshift/hive/pkg/test/clusterdeployment"
 	"github.com/openshift/hive/pkg/test/generic"
@@ -151,7 +152,7 @@ func TestCleanupVPCEndpoints(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpoints(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{},
+					VpcEndpoints: []ec2types.VpcEndpoint{},
 				}, nil)
 		},
 		expectedError: false,
@@ -161,10 +162,10 @@ func TestCleanupVPCEndpoints(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpoints(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{{VpcEndpointId: aws.String("vpce-12345")}},
+					VpcEndpoints: []ec2types.VpcEndpoint{{VpcEndpointId: aws.String("vpce-12345")}},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{
-				VpcEndpointIds: aws.StringSlice([]string{"vpce-12345"}),
+				VpcEndpointIds: []string{"vpce-12345"},
 			}).Return(&ec2.DeleteVpcEndpointsOutput{}, nil)
 		},
 		expectedError: false,
@@ -174,14 +175,14 @@ func TestCleanupVPCEndpoints(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpoints(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{
+					VpcEndpoints: []ec2types.VpcEndpoint{
 						{VpcEndpointId: aws.String("vpce-12345")},
 						{VpcEndpointId: aws.String("vpce-67890")},
 						{VpcEndpointId: aws.String("vpce-abcde")},
 					},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{
-				VpcEndpointIds: aws.StringSlice([]string{"vpce-12345", "vpce-67890", "vpce-abcde"}),
+				VpcEndpointIds: []string{"vpce-12345", "vpce-67890", "vpce-abcde"},
 			}).Return(&ec2.DeleteVpcEndpointsOutput{}, nil)
 		},
 		expectedError: false,
@@ -190,7 +191,7 @@ func TestCleanupVPCEndpoints(t *testing.T) {
 		metadata: &hivev1.ClusterMetadata{InfraID: "test-infra-123"},
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpoints(gomock.Any()).
-				Return(nil, awserr.New("InvalidParameter", "invalid parameter", nil))
+				Return(nil, awsclient.NewAPIError("InvalidParameter", "invalid parameter"))
 		},
 		expectedError: true,
 	}, {
@@ -199,10 +200,10 @@ func TestCleanupVPCEndpoints(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpoints(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{{VpcEndpointId: aws.String("vpce-12345")}},
+					VpcEndpoints: []ec2types.VpcEndpoint{{VpcEndpointId: aws.String("vpce-12345")}},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpoints(gomock.Any()).
-				Return(&ec2.DeleteVpcEndpointsOutput{}, awserr.New("InvalidVpcEndpointId.NotFound", "not found", nil))
+				Return(&ec2.DeleteVpcEndpointsOutput{}, awsclient.NewAPIError("InvalidVpcEndpointId.NotFound", "not found"))
 		},
 		expectedError: false,
 	}, {
@@ -211,10 +212,10 @@ func TestCleanupVPCEndpoints(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpoints(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{{VpcEndpointId: aws.String("vpce-12345")}},
+					VpcEndpoints: []ec2types.VpcEndpoint{{VpcEndpointId: aws.String("vpce-12345")}},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpoints(gomock.Any()).
-				Return(&ec2.DeleteVpcEndpointsOutput{}, awserr.New("InvalidParameter", "invalid parameter", nil))
+				Return(&ec2.DeleteVpcEndpointsOutput{}, awsclient.NewAPIError("InvalidParameter", "invalid parameter"))
 		},
 		expectedError: true,
 	}, {
@@ -264,7 +265,7 @@ func TestCleanupVPCEndpointServices(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-					ServiceConfigurations: []*ec2.ServiceConfiguration{},
+					ServiceConfigurations: []ec2types.ServiceConfiguration{},
 				}, nil)
 		},
 		expectedError: false,
@@ -274,10 +275,10 @@ func TestCleanupVPCEndpointServices(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-					ServiceConfigurations: []*ec2.ServiceConfiguration{{ServiceId: aws.String("vpce-svc-12345")}},
+					ServiceConfigurations: []ec2types.ServiceConfiguration{{ServiceId: aws.String("vpce-svc-12345")}},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpointServiceConfigurations(&ec2.DeleteVpcEndpointServiceConfigurationsInput{
-				ServiceIds: aws.StringSlice([]string{"vpce-svc-12345"}),
+				ServiceIds: []string{"vpce-svc-12345"},
 			}).Return(&ec2.DeleteVpcEndpointServiceConfigurationsOutput{}, nil)
 		},
 		expectedError: false,
@@ -287,14 +288,14 @@ func TestCleanupVPCEndpointServices(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-					ServiceConfigurations: []*ec2.ServiceConfiguration{
+					ServiceConfigurations: []ec2types.ServiceConfiguration{
 						{ServiceId: aws.String("vpce-svc-12345")},
 						{ServiceId: aws.String("vpce-svc-67890")},
 						{ServiceId: aws.String("vpce-svc-abcde")},
 					},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpointServiceConfigurations(&ec2.DeleteVpcEndpointServiceConfigurationsInput{
-				ServiceIds: aws.StringSlice([]string{"vpce-svc-12345", "vpce-svc-67890", "vpce-svc-abcde"}),
+				ServiceIds: []string{"vpce-svc-12345", "vpce-svc-67890", "vpce-svc-abcde"},
 			}).Return(&ec2.DeleteVpcEndpointServiceConfigurationsOutput{}, nil)
 		},
 		expectedError: false,
@@ -303,7 +304,7 @@ func TestCleanupVPCEndpointServices(t *testing.T) {
 		metadata: &hivev1.ClusterMetadata{InfraID: "test-infra-123"},
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
-				Return(nil, awserr.New("InvalidParameter", "invalid parameter", nil))
+				Return(nil, awsclient.NewAPIError("InvalidParameter", "invalid parameter"))
 		},
 		expectedError: true,
 	}, {
@@ -312,10 +313,10 @@ func TestCleanupVPCEndpointServices(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-					ServiceConfigurations: []*ec2.ServiceConfiguration{{ServiceId: aws.String("vpce-svc-12345")}},
+					ServiceConfigurations: []ec2types.ServiceConfiguration{{ServiceId: aws.String("vpce-svc-12345")}},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpointServiceConfigurations(gomock.Any()).
-				Return(&ec2.DeleteVpcEndpointServiceConfigurationsOutput{}, awserr.New("InvalidVpcEndpointService.NotFound", "not found", nil))
+				Return(&ec2.DeleteVpcEndpointServiceConfigurationsOutput{}, awsclient.NewAPIError("InvalidVpcEndpointService.NotFound", "not found"))
 		},
 		expectedError: false,
 	}, {
@@ -324,10 +325,10 @@ func TestCleanupVPCEndpointServices(t *testing.T) {
 		mockSetup: func(mockClient *mock.MockClient) {
 			mockClient.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-					ServiceConfigurations: []*ec2.ServiceConfiguration{{ServiceId: aws.String("vpce-svc-12345")}},
+					ServiceConfigurations: []ec2types.ServiceConfiguration{{ServiceId: aws.String("vpce-svc-12345")}},
 				}, nil)
 			mockClient.EXPECT().DeleteVpcEndpointServiceConfigurations(gomock.Any()).
-				Return(&ec2.DeleteVpcEndpointServiceConfigurationsOutput{}, awserr.New("InvalidParameter", "invalid parameter", nil))
+				Return(&ec2.DeleteVpcEndpointServiceConfigurationsOutput{}, awsclient.NewAPIError("InvalidParameter", "invalid parameter"))
 		},
 		expectedError: true,
 	}, {

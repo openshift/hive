@@ -12,7 +12,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 )
 

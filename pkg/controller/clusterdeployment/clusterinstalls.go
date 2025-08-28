@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,31 +22,21 @@ import (
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
-func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
-	ref := cd.Spec.ClusterInstallRef
+func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(cd *hivev1.ClusterDeployment, ci *hivecontractsv1alpha1.ClusterInstall, logger log.FieldLogger) (reconcile.Result, error) {
+	if ci == nil {
+		logger.Debug("clusterinstall is not found, so skipping")
+		return reconcile.Result{}, nil
+	}
+
+	ref := ci.GroupVersionKind()
 	gvk := schema.GroupVersionKind{
 		Group:   ref.Group,
 		Version: ref.Version,
 		Kind:    ref.Kind,
 	}
-	var updated bool
 
-	logger = logger.WithField("clusterinstall", ref.Name).WithField("gvk", gvk)
+	logger = logger.WithField("clusterinstall", ci.Name).WithField("gvk", gvk)
 	logger.Debug("reconciling existing clusterinstall")
-
-	ci := &hivecontractsv1alpha1.ClusterInstall{}
-	err := controllerutils.GetDuckType(context.TODO(), r.Client,
-		gvk,
-		types.NamespacedName{Namespace: cd.Namespace, Name: ref.Name},
-		ci)
-	if apierrors.IsNotFound(err) {
-		logger.Debug("cluster is not found, so skipping")
-		return reconcile.Result{}, nil
-	}
-	if err != nil {
-		logger.WithError(err).Error("failed to get the cluster install")
-		return reconcile.Result{}, err
-	}
 
 	specModified := false
 	statusModified := false
@@ -69,6 +58,7 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 		statusModified = true
 	}
 
+	var updated bool
 	conditions := cd.DeepCopy().Status.Conditions
 
 	// copy the required conditions
@@ -300,8 +290,14 @@ func (r *ReconcileClusterDeployment) reconcileExistingInstallingClusterInstall(c
 	return reconcile.Result{}, nil
 }
 
-func getClusterImageSetFromClusterInstall(client client.Client, cd *hivev1.ClusterDeployment) (string, error) {
+// Returns nil if there is no ClusterInstallRef; otherwise returns the ClusterInstall.
+// The error is non-nil if we can't retrieve or unmarshal it.
+func (r *ReconcileClusterDeployment) getClusterInstall(cd *hivev1.ClusterDeployment) (*hivecontractsv1alpha1.ClusterInstall, error) {
 	ref := cd.Spec.ClusterInstallRef
+	if ref == nil {
+		// Not a ClusterInstall setup
+		return nil, nil
+	}
 	gvk := schema.GroupVersionKind{
 		Group:   ref.Group,
 		Version: ref.Version,
@@ -309,14 +305,11 @@ func getClusterImageSetFromClusterInstall(client client.Client, cd *hivev1.Clust
 	}
 
 	ci := &hivecontractsv1alpha1.ClusterInstall{}
-	err := controllerutils.GetDuckType(context.TODO(), client,
+	err := controllerutils.GetDuckType(context.TODO(), r.Client,
 		gvk,
 		types.NamespacedName{Namespace: cd.Namespace, Name: ref.Name},
 		ci)
-	if err != nil {
-		return "", err
-	}
-	return ci.Spec.ImageSetRef.Name, nil
+	return ci, err
 }
 
 const clusterInstallIndexFieldName = "spec.clusterinstalls"

@@ -1,3 +1,5 @@
 metadata:
   labels:
     contracts.hive.openshift.io/clusterinstall: "true"
+  annotations:
+    contracts.hive.openshift.io/clusterinstall.config: '{"skipImageSetJob": "true"}'

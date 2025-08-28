@@ -60,11 +60,24 @@ type ClusterInstallList struct {
 	Items           []ClusterInstall `json:"items"`
 }
 
+type ClusterInstallConfigKey string
+
 const (
 	// ClusterInstallContractLabelKey is the label that must be set to "true" on the CRDs that
 	// implements the clusterinstall contract. Only these resources will be allowed to be
 	// used in Hive objects.
 	ClusterInstallContractLabelKey = "contracts.hive.openshift.io/" + ClusterInstallContractName
+
+	// ClusterInstallConfigAnnotationKey is an annotation that can be set on a CRD to provide
+	// configuration settings for a given ClusterInstall contract. The value must be a JSON string
+	// representing a map of strings keyed by ClusterInstallConfigKey. Valid keys are listed below.
+	ClusterInstallConfigAnnotationKey = "contracts.hive.openshift.io/" + ClusterInstallContractName + ".config"
+
+	// ClusterInstallConfigKeySkipImageSetJob, when set to a truthy string (e.g. "true"), tells
+	// hive not to resolve payload image references (installer, oc) from the release image
+	// specified via a {Concrete}ClusterInstall.Spec.ImageSetRef. ClusterDeployment status fields
+	// InstallerImage and CLIImage will be set to "<NONE>".
+	ClusterInstallConfigKeySkipImageSetJob ClusterInstallConfigKey = "skipImageSetJob"
 )
 
 func init() {

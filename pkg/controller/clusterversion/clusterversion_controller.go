@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	diff "github.com/google/go-cmp/cmp"
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -167,7 +168,13 @@ func (r *ReconcileClusterVersion) Reconcile(ctx context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
+	// This Update()s CD iff necessary
 	if err := r.updateClusterVersionMetadata(cd, clusterVersion, cdLog); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// This Update()s CD.Status iff necessary
+	if err := r.syncClusterVersionStatus(cd, clusterVersion, cdLog); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -236,6 +243,38 @@ func (r *ReconcileClusterVersion) updateClusterVersionMetadata(cd *hivev1.Cluste
 
 	if err := r.Update(context.TODO(), cd); err != nil {
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating cluster deployment metadata")
+		return err
+	}
+	return nil
+}
+
+func (r *ReconcileClusterVersion) syncClusterVersionStatus(cd *hivev1.ClusterDeployment, clusterVersion *openshiftapiv1.ClusterVersion, cdLog log.FieldLogger) error {
+	if populate, err := strconv.ParseBool(cd.Annotations[constants.SyncClusterVersionStatusAnnotation]); err == nil && populate {
+		logFields := log.Fields{}
+		if cd.Status.ClusterVersionStatus == nil {
+			logFields["reason"] = "previously unset"
+		} else {
+			delta := diff.Diff(*cd.Status.ClusterVersionStatus, clusterVersion.Status)
+			if delta == "" {
+				cdLog.Debug("clusterversion status has not changed, nothing to update")
+				return nil
+			}
+			logFields["reason"] = "changed"
+			logFields["diff"] = delta
+		}
+		cdLog.WithFields(logFields).Debug("updating clusterversion status")
+		cd.Status.ClusterVersionStatus = &clusterVersion.Status
+	} else {
+		// If this got switched off, clear the field so it doesn't go stale
+		if cd.Status.ClusterVersionStatus == nil {
+			return nil
+		}
+		cdLog.Debug("clearing clusterversion status")
+		cd.Status.ClusterVersionStatus = nil
+	}
+
+	if err := r.Status().Update(context.TODO(), cd); err != nil {
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "error updating cluster deployment's clusterVersionStatus")
 		return err
 	}
 	return nil

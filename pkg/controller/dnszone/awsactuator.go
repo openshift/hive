@@ -8,16 +8,18 @@ import (
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/arn"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/resourcegroupstaggingapi"
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
+	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
+	tagtypes "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"github.com/aws/smithy-go"
 
 	corev1 "k8s.io/api/core/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
@@ -38,10 +40,10 @@ type AWSActuator struct {
 	awsClient awsclient.Client
 
 	// hostedZone is the AWS object representing the hosted zone in route53
-	hostedZone *route53.HostedZone
+	hostedZone *route53types.HostedZone
 
 	// currentTags are the list of tags associated with the currentHostedZone
-	currentHostedZoneTags []*route53.Tag
+	currentHostedZoneTags []route53types.Tag
 
 	// The DNSZone that represents the desired state.
 	dnsZone *hivev1.DNSZone
@@ -93,14 +95,15 @@ func (a *AWSActuator) UpdateMetadata() error {
 func (a *AWSActuator) syncTags() error {
 	existingTags := a.currentHostedZoneTags
 	expected := a.expectedTags()
-	toAdd := []*route53.Tag{}
-	toDelete := make([]*route53.Tag, len(existingTags))
+	toAdd := []route53types.Tag{}
+	toDelete := make([]route53types.Tag, len(existingTags))
 	// Initially add all existing tags to the toDelete array
 	// As they're found in the expected array, remove them from
 	// the toDelete array
 	copy(toDelete, existingTags)
 
-	logger := a.logger.WithField("id", a.hostedZone.Id)
+	zid := strings.TrimPrefix(*a.hostedZone.Id, "/hostedzone/")
+	logger := a.logger.WithField("id", zid)
 	logger.WithField("current", tagsString(existingTags)).WithField("expected", tagsString(expected)).Debug("syncing tags")
 
 	for _, tag := range expected {
@@ -124,17 +127,17 @@ func (a *AWSActuator) syncTags() error {
 		return nil
 	}
 
-	keysToDelete := make([]*string, 0, len(toDelete))
+	keysToDelete := make([]string, 0, len(toDelete))
 	for _, tag := range toDelete {
 		logger.WithField("tag", tagString(tag)).Debug("tag will be deleted")
-		keysToDelete = append(keysToDelete, tag.Key)
+		keysToDelete = append(keysToDelete, *tag.Key)
 	}
 
 	// Only 10 tags can be added/removed at a time. Iterate until all tags are added/removed
 	index := 0
 	for len(toAdd) > index || len(keysToDelete) > index {
-		toAddSegment := []*route53.Tag{}
-		keysToDeleteSegment := []*string{}
+		toAddSegment := []route53types.Tag{}
+		keysToDeleteSegment := []string{}
 
 		if len(toAdd) > index {
 			toAddSegment = toAdd[index:min(index+10, len(toAdd))]
@@ -155,8 +158,8 @@ func (a *AWSActuator) syncTags() error {
 		_, err := a.awsClient.ChangeTagsForResource(&route53.ChangeTagsForResourceInput{
 			AddTags:       toAddSegment,
 			RemoveTagKeys: keysToDeleteSegment,
-			ResourceId:    a.hostedZone.Id,
-			ResourceType:  aws.String("hostedzone"),
+			ResourceId:    aws.String(zid),
+			ResourceType:  route53types.TagResourceTypeHostedzone,
 		})
 		if err != nil {
 			logger.WithError(err).Error("Cannot update tags for hosted zone")
@@ -217,11 +220,9 @@ func (a *AWSActuator) Refresh() error {
 		logger.Debug("Fetching hosted zone by ID")
 		resp, err := a.awsClient.GetHostedZone(&route53.GetHostedZoneInput{Id: aws.String(zoneID)})
 		if err != nil {
-			if awsErr, ok := err.(awserr.Error); ok {
-				if awsErr.Code() == route53.ErrCodeNoSuchHostedZone {
-					logger.Debug("Zone no longer exists")
-					continue
-				}
+			if awsclient.ErrCodeEquals(err, "NoSuchHostedZone") {
+				logger.Debug("Zone no longer exists")
+				continue
 			}
 			logger.WithError(err).Error("Cannot get hosted zone")
 			return err
@@ -259,21 +260,21 @@ func (a *AWSActuator) Refresh() error {
 
 func (a *AWSActuator) findZoneIDsByTag() ([]string, error) {
 	var ids []string
-	tagFilter := &resourcegroupstaggingapi.TagFilter{
+	tagFilter := tagtypes.TagFilter{
 		Key:    aws.String(hiveDNSZoneAWSTag),
-		Values: []*string{aws.String(fmt.Sprintf("%s/%s", a.dnsZone.Namespace, a.dnsZone.Name))},
+		Values: []string{fmt.Sprintf("%s/%s", a.dnsZone.Namespace, a.dnsZone.Name)},
 	}
-	filterString := fmt.Sprintf("%s=%s", aws.StringValue(tagFilter.Key), aws.StringValue(tagFilter.Values[0]))
+	filterString := fmt.Sprintf("%s=%s", *tagFilter.Key, tagFilter.Values[0])
 	a.logger.WithField("filter", filterString).Debug("Searching for zone by tag")
 	id := ""
 	err := a.awsClient.GetResourcesPages(&resourcegroupstaggingapi.GetResourcesInput{
-		ResourceTypeFilters: []*string{aws.String("route53:hostedzone")},
-		TagFilters:          []*resourcegroupstaggingapi.TagFilter{tagFilter},
+		ResourceTypeFilters: []string{"route53:hostedzone"},
+		TagFilters:          []tagtypes.TagFilter{tagFilter},
 	}, func(resp *resourcegroupstaggingapi.GetResourcesOutput, lastPage bool) bool {
 		for _, zone := range resp.ResourceTagMappingList {
-			logger := a.logger.WithField("arn", aws.StringValue(zone.ResourceARN))
+			logger := a.logger.WithField("arn", aws.ToString(zone.ResourceARN))
 			logger.Debug("Processing search result")
-			zoneARN, err := arn.Parse(aws.StringValue(zone.ResourceARN))
+			zoneARN, err := arn.Parse(aws.ToString(zone.ResourceARN))
 			if err != nil {
 				logger.WithError(err).Error("Failed to parse hostedzone ARN")
 				continue
@@ -292,8 +293,8 @@ func (a *AWSActuator) findZoneIDsByTag() ([]string, error) {
 	return ids, err
 }
 
-func (a *AWSActuator) expectedTags() []*route53.Tag {
-	tags := []*route53.Tag{
+func (a *AWSActuator) expectedTags() []route53types.Tag {
+	tags := []route53types.Tag{
 		{
 			Key:   aws.String(hiveDNSZoneAWSTag),
 			Value: aws.String(fmt.Sprintf("%s/%s", a.dnsZone.Namespace, a.dnsZone.Name)),
@@ -301,7 +302,7 @@ func (a *AWSActuator) expectedTags() []*route53.Tag {
 	}
 	if a.dnsZone.Spec.AWS != nil {
 		for _, tag := range a.dnsZone.Spec.AWS.AdditionalTags {
-			tags = append(tags, &route53.Tag{
+			tags = append(tags, route53types.Tag{
 				Key:   aws.String(tag.Key),
 				Value: aws.String(tag.Value),
 			})
@@ -311,12 +312,13 @@ func (a *AWSActuator) expectedTags() []*route53.Tag {
 	return tags
 }
 
-func (a *AWSActuator) existingTags(zoneID *string) ([]*route53.Tag, error) {
-	logger := a.logger.WithField("id", aws.StringValue(zoneID))
+func (a *AWSActuator) existingTags(zoneID *string) ([]route53types.Tag, error) {
+	zid := strings.TrimPrefix(*zoneID, "/hostedzone/")
+	logger := a.logger.WithField("id", zid)
 	logger.Debug("listing existing tags for zone")
 	resp, err := a.awsClient.ListTagsForResource(&route53.ListTagsForResourceInput{
-		ResourceId:   zoneID,
-		ResourceType: aws.String("hostedzone"),
+		ResourceId:   aws.String(zid),
+		ResourceType: route53types.TagResourceTypeHostedzone,
 	})
 	if err != nil {
 		logger.WithError(err).Error("cannot list tags for zone")
@@ -330,7 +332,7 @@ func (a *AWSActuator) existingTags(zoneID *string) ([]*route53.Tag, error) {
 func (a *AWSActuator) Create() error {
 	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone)
 	logger.Info("Creating route53 hostedzone")
-	var hostedZone *route53.HostedZone
+	var hostedZone *route53types.HostedZone
 	resp, err := a.awsClient.CreateHostedZone(&route53.CreateHostedZoneInput{
 		Name: aws.String(a.dnsZone.Spec.Zone),
 		// We use the UID of the HostedZone resource as the caller reference so that if
@@ -340,7 +342,7 @@ func (a *AWSActuator) Create() error {
 		CallerReference: aws.String(string(a.dnsZone.UID)),
 	})
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == route53.ErrCodeHostedZoneAlreadyExists {
+		if awsclient.ErrCodeEquals(err, "HostedZoneAlreadyExists") {
 			// If the zone was already created, we need to find its ID
 			logger.WithField("callerRef", a.dnsZone.UID).Debug("Hosted zone already exists, looking up by caller reference")
 			hostedZone, err = a.findZoneByCallerReference(a.dnsZone.Spec.Zone, string(a.dnsZone.UID))
@@ -357,7 +359,7 @@ func (a *AWSActuator) Create() error {
 		hostedZone = resp.HostedZone
 	}
 
-	logger = logger.WithField("id", aws.StringValue(hostedZone.Id))
+	logger = logger.WithField("id", aws.ToString(hostedZone.Id))
 	logger.Debug("Fetching zone tags")
 	existingTags, err := a.existingTags(hostedZone.Id)
 	if err != nil {
@@ -385,7 +387,7 @@ func (a *AWSActuator) Create() error {
 	return err
 }
 
-func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*route53.HostedZone, error) {
+func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*route53types.HostedZone, error) {
 	logger := a.logger.WithField("domain", domain).WithField("callerRef", callerRef)
 	logger.Debug("Searching for zone by domain and callerRef")
 	var nextZoneID *string
@@ -395,23 +397,23 @@ func (a *AWSActuator) findZoneByCallerReference(domain, callerRef string) (*rout
 		resp, err := a.awsClient.ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
 			DNSName:      nextName,
 			HostedZoneId: nextZoneID,
-			MaxItems:     aws.String("50"),
+			MaxItems:     aws.Int32(50),
 		})
 		if err != nil {
 			logger.WithError(err).Error("cannot list zones by name")
 			return nil, err
 		}
 		for _, zone := range resp.HostedZones {
-			if aws.StringValue(zone.CallerReference) == callerRef {
-				logger.WithField("id", aws.StringValue(zone.Id)).Debug("found hosted zone matching caller reference")
-				return zone, nil
+			if aws.ToString(zone.CallerReference) == callerRef {
+				logger.WithField("id", aws.ToString(zone.Id)).Debug("found hosted zone matching caller reference")
+				return &zone, nil
 			}
-			if aws.StringValue(zone.Name) != domain {
-				logger.WithField("zone", aws.StringValue(zone.Name)).Debug("reached zone with different domain name, aborting search")
+			if aws.ToString(zone.Name) != domain {
+				logger.WithField("zone", aws.ToString(zone.Name)).Debug("reached zone with different domain name, aborting search")
 				return nil, fmt.Errorf("hosted zone not found")
 			}
 		}
-		if !aws.BoolValue(resp.IsTruncated) {
+		if !resp.IsTruncated {
 			logger.Debug("reached end of results, did not find hosted zone")
 			return nil, fmt.Errorf("hosted zone not found")
 		}
@@ -426,7 +428,7 @@ func (a *AWSActuator) Delete() error {
 		return errors.New("hostedZone is unpopulated")
 	}
 
-	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone).WithField("id", aws.StringValue(a.hostedZone.Id))
+	logger := a.logger.WithField("zone", a.dnsZone.Spec.Zone).WithField("id", aws.ToString(a.hostedZone.Id))
 
 	logger.Info("Deleting route53 recordsets in hostedzone")
 	if err := DeleteAWSRecordSets(a.awsClient, a.dnsZone, logger); err != nil {
@@ -439,7 +441,7 @@ func (a *AWSActuator) Delete() error {
 	})
 	if err != nil {
 		logLevel := log.ErrorLevel
-		if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == route53.ErrCodeHostedZoneNotEmpty {
+		if awsclient.ErrCodeEquals(err, "HostedZoneNotEmpty") {
 			logLevel = log.InfoLevel
 		}
 		log.WithError(err).Log(logLevel, "Cannot delete hosted zone")
@@ -450,39 +452,38 @@ func (a *AWSActuator) Delete() error {
 // DeleteAWSRecordSets will clean up a DNS zone down to the minimum required record entries
 func DeleteAWSRecordSets(awsClient awsclient.Client, dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
 
-	maxItems := "100"
 	listInput := &route53.ListResourceRecordSetsInput{
 		HostedZoneId: dnsZone.Status.AWS.ZoneID,
-		MaxItems:     &maxItems,
+		MaxItems:     aws.Int32(100),
 	}
 	for {
 		listOutput, err := awsClient.ListResourceRecordSets(listInput)
 		if err != nil {
 			return err
 		}
-		var changes []*route53.Change
+		var changes []route53types.Change
 		for _, recordSet := range listOutput.ResourceRecordSets {
 			// Ignore the 2 recordsets that are created with the hosted zone and that cannot be deleted
-			if n, t := aws.StringValue(recordSet.Name), aws.StringValue(recordSet.Type); n == controllerutils.Dotted(dnsZone.Spec.Zone) && (t == route53.RRTypeNs || t == route53.RRTypeSoa) {
+			if n, t := aws.ToString(recordSet.Name), recordSet.Type; n == controllerutils.Dotted(dnsZone.Spec.Zone) && (t == route53types.RRTypeNs || t == route53types.RRTypeSoa) {
 				continue
 			}
 
-			logger.WithField("name", aws.StringValue(recordSet.Name)).WithField("type", aws.StringValue(recordSet.Type)).Info("recordset set for deletion")
-			changes = append(changes, &route53.Change{
-				Action:            aws.String(route53.ChangeActionDelete),
-				ResourceRecordSet: recordSet,
+			logger.WithField("name", aws.ToString(recordSet.Name)).WithField("type", recordSet.Type).Info("recordset set for deletion")
+			changes = append(changes, route53types.Change{
+				Action:            route53types.ChangeActionDelete,
+				ResourceRecordSet: &recordSet,
 			})
 		}
 		if len(changes) > 0 {
 			logger.WithField("count", len(changes)).Info("deleting recordsets")
 			if _, err := awsClient.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
-				ChangeBatch:  &route53.ChangeBatch{Changes: changes},
+				ChangeBatch:  &route53types.ChangeBatch{Changes: changes},
 				HostedZoneId: dnsZone.Status.AWS.ZoneID,
 			}); err != nil {
 				return err
 			}
 		}
-		if listOutput.IsTruncated == nil || !*listOutput.IsTruncated {
+		if !listOutput.IsTruncated {
 			break
 		}
 		listInput.StartRecordIdentifier = listOutput.NextRecordIdentifier
@@ -503,9 +504,9 @@ func (a *AWSActuator) GetNameServers() ([]string, error) {
 	logger.Info("Listing hosted zone NS records")
 	resp, err := a.awsClient.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 		HostedZoneId:    aws.String(*a.hostedZone.Id),
-		StartRecordType: aws.String("NS"),
+		StartRecordType: route53types.RRTypeNs,
 		StartRecordName: aws.String(a.dnsZone.Spec.Zone),
-		MaxItems:        aws.String("1"),
+		MaxItems:        aws.Int32(1),
 	})
 	if err != nil {
 		logger.WithError(err).Error("Error listing recordsets for zone")
@@ -516,19 +517,19 @@ func (a *AWSActuator) GetNameServers() ([]string, error) {
 		logger.Error(msg)
 		return nil, errors.New(msg)
 	}
-	if aws.StringValue(resp.ResourceRecordSets[0].Type) != "NS" {
+	if resp.ResourceRecordSets[0].Type != route53types.RRTypeNs {
 		msg := "name server record not found"
 		logger.Error(msg)
 		return nil, errors.New(msg)
 	}
-	if aws.StringValue(resp.ResourceRecordSets[0].Name) != (a.dnsZone.Spec.Zone + ".") {
+	if aws.ToString(resp.ResourceRecordSets[0].Name) != (a.dnsZone.Spec.Zone + ".") {
 		msg := fmt.Sprintf("name server record not found for domain %s", a.dnsZone.Spec.Zone)
 		logger.Error(msg)
 		return nil, errors.New(msg)
 	}
 	result := make([]string, len(resp.ResourceRecordSets[0].ResourceRecords))
 	for i, record := range resp.ResourceRecordSets[0].ResourceRecords {
-		result[i] = aws.StringValue(record.Value)
+		result[i] = aws.ToString(record.Value)
 	}
 	logger.WithField("nameservers", result).Info("found hosted zone name servers")
 	return result, nil
@@ -691,7 +692,8 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 	}
 
 	// handle AWS vs non-AWS specific errors
-	awsErr, ok := err.(awserr.Error)
+	var awsErr smithy.APIError
+	ok := errors.As(err, &awsErr)
 
 	// non-AWS err
 	if !ok {
@@ -702,21 +704,22 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 	}
 
 	// AWS err condition handling
-	if awsErr.Code() == "AccessDeniedException" || awsErr.Code() == "AccessDenied" {
-		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr.Message())
+	aec := awsErr.ErrorCode()
+	if aec == "AccessDeniedException" || aec == "AccessDenied" {
+		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr.ErrorMessage())
 	} else {
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()
 	}
 
-	if awsErr.Code() == "InvalidSignatureException" ||
-		awsErr.Code() == "UnrecognizedClientException" {
-		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToTrue(awsErr.Message())
+	if aec == "InvalidSignatureException" ||
+		aec == "UnrecognizedClientException" {
+		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToTrue(awsErr.ErrorMessage())
 	} else {
 		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
 	}
 
-	if awsErr.Code() == "OptInRequired" {
-		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToTrue(awsErr.Message())
+	if aec == "OptInRequired" {
+		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToTrue(awsErr.ErrorMessage())
 	} else {
 		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToFalse()
 	}
@@ -728,22 +731,16 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 	return accessDeniedCondsChanged || authenticationFailureCondsChanged || apiOptInCondsChanged || cloudErrorsCondsChanged
 }
 
-func tagEquals(a, b *route53.Tag) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return aws.StringValue(a.Key) == aws.StringValue(b.Key) &&
-		aws.StringValue(a.Value) == aws.StringValue(b.Value)
+func tagEquals(a, b route53types.Tag) bool {
+	return aws.ToString(a.Key) == aws.ToString(b.Key) &&
+		aws.ToString(a.Value) == aws.ToString(b.Value)
 }
 
-func tagString(tag *route53.Tag) string {
-	return fmt.Sprintf("%s=%s", aws.StringValue(tag.Key), aws.StringValue(tag.Value))
+func tagString(tag route53types.Tag) string {
+	return fmt.Sprintf("%s=%s", aws.ToString(tag.Key), aws.ToString(tag.Value))
 }
 
-func tagsString(tags []*route53.Tag) string {
+func tagsString(tags []route53types.Tag) string {
 	return strings.Join(func() []string {
 		result := []string{}
 		for _, tag := range tags {

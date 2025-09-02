@@ -3,14 +3,15 @@ package nameserver
 import (
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
 
@@ -62,7 +63,7 @@ func (q *awsQuery) CreateOrUpdate(rootDomain string, domain string, values sets.
 		return errors.New("no public hosted zone found for domain")
 	}
 	return errors.Wrap(
-		q.changeNameServers(awsClient, *zoneID, domain, values, route53.ChangeActionUpsert),
+		q.changeNameServers(awsClient, *zoneID, domain, values, route53types.ChangeActionUpsert),
 		"error creating the name server",
 	)
 }
@@ -83,16 +84,18 @@ func (q *awsQuery) Delete(rootDomain string, domain string, values sets.Set[stri
 	if len(values) != 0 {
 		// If values were provided for the name servers, attempt to perform a
 		// delete using those values.
-		err = q.changeNameServers(awsClient, *zoneID, domain, values, route53.ChangeActionDelete)
-		awsErr, ok := err.(awserr.Error)
-		if !ok || awsErr.Code() != route53.ErrCodeInvalidChangeBatch {
-			return errors.Wrap(err, "error deleting the name server")
-		}
-		if strings.HasSuffix(awsErr.Message(), "not found]") {
-			return nil
-		}
-		if !strings.HasSuffix(awsErr.Message(), "not match the current values]") {
-			return errors.Wrap(err, "error deleting the name server")
+		err = q.changeNameServers(awsClient, *zoneID, domain, values, route53types.ChangeActionDelete)
+		if err != nil {
+			erricb := route53types.InvalidChangeBatch{}
+			if !errors.As(err, erricb) {
+				return errors.Wrap(err, "error deleting the name server")
+			}
+			if strings.HasSuffix(*erricb.Message, "not found]") {
+				return nil
+			}
+			if !strings.HasSuffix(*erricb.Message, "not match the current values]") {
+				return errors.Wrap(err, "error deleting the name server")
+			}
 		}
 	}
 	// Since we do not have up-to-date values for the name servers, we need
@@ -105,18 +108,17 @@ func (q *awsQuery) Delete(rootDomain string, domain string, values sets.Set[stri
 		return nil
 	}
 	return errors.Wrap(
-		q.changeNameServers(awsClient, *zoneID, domain, values, route53.ChangeActionDelete),
+		q.changeNameServers(awsClient, *zoneID, domain, values, route53types.ChangeActionDelete),
 		"error deleting the name server with recently read values",
 	)
 }
 
 // queryZoneID queries AWS for the public hosted zone for the specified domain.
 func (q *awsQuery) queryZoneID(awsClient awsclient.Client, domain string) (*string, error) {
-	maxItems := "5"
 	domain = controllerutils.Dotted(domain)
 	listInput := &route53.ListHostedZonesByNameInput{
 		DNSName:  &domain,
-		MaxItems: &maxItems,
+		MaxItems: aws.Int32(5),
 	}
 	for {
 		listOutput, err := awsClient.ListHostedZonesByName(listInput)
@@ -124,15 +126,15 @@ func (q *awsQuery) queryZoneID(awsClient awsclient.Client, domain string) (*stri
 			return nil, err
 		}
 		for _, zone := range listOutput.HostedZones {
-			if zone == nil || zone.Name == nil || *zone.Name != domain {
+			if zone.Name == nil || *zone.Name != domain {
 				return nil, nil
 			}
-			if zone.Config == nil || zone.Config.PrivateZone == nil || *zone.Config.PrivateZone {
+			if zone.Config == nil || zone.Config.PrivateZone {
 				continue
 			}
 			return zone.Id, nil
 		}
-		if listOutput.IsTruncated == nil || !*listOutput.IsTruncated {
+		if !listOutput.IsTruncated {
 			return nil, nil
 		}
 		listInput.DNSName = listOutput.NextDNSName
@@ -143,10 +145,9 @@ func (q *awsQuery) queryZoneID(awsClient awsclient.Client, domain string) (*stri
 // queryNameServers queries AWS for the name servers in the specified hosted zone.
 func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID string) (map[string]sets.Set[string], error) {
 	nameServers := map[string]sets.Set[string]{}
-	maxItems := "100"
 	listInput := &route53.ListResourceRecordSetsInput{
 		HostedZoneId: &hostedZoneID,
-		MaxItems:     &maxItems,
+		MaxItems:     aws.Int32(100),
 	}
 	for {
 		listOutput, err := awsClient.ListResourceRecordSets(listInput)
@@ -157,7 +158,7 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 			if recordSet.Name == nil {
 				continue
 			}
-			if recordSet.Type == nil || *recordSet.Type != route53.RRTypeNs {
+			if recordSet.Type != route53types.RRTypeNs {
 				continue
 			}
 			values := sets.Set[string]{}
@@ -166,7 +167,7 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 			}
 			nameServers[controllerutils.Undotted(*recordSet.Name)] = values
 		}
-		if listOutput.IsTruncated == nil || !*listOutput.IsTruncated {
+		if !listOutput.IsTruncated {
 			return nameServers, nil
 		}
 		listInput.StartRecordIdentifier = listOutput.NextRecordIdentifier
@@ -177,13 +178,12 @@ func (q *awsQuery) queryNameServers(awsClient awsclient.Client, hostedZoneID str
 
 // queryNameServer queries AWS for the name servers in the specified hosted zone for the specified domain.
 func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID string, domain string) (sets.Set[string], error) {
-	maxItems := "1"
-	recordType := route53.RRTypeNs
+	recordType := route53types.RRTypeNs
 	listOutput, err := awsClient.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 		HostedZoneId:    &hostedZoneID,
-		MaxItems:        &maxItems,
+		MaxItems:        aws.Int32(1),
 		StartRecordName: &domain,
-		StartRecordType: &recordType,
+		StartRecordType: recordType,
 	})
 	if err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID stri
 	if controllerutils.Undotted(*recordSet.Name) != domain {
 		return nil, nil
 	}
-	if recordSet.Type == nil || *recordSet.Type != route53.RRTypeNs {
+	if recordSet.Type != route53types.RRTypeNs {
 		return nil, nil
 	}
 	values := sets.Set[string]{}
@@ -209,22 +209,22 @@ func (q *awsQuery) queryNameServer(awsClient awsclient.Client, hostedZoneID stri
 }
 
 // changeNameServers changes the name servers for the specified domain in the specified hosted zone.
-func (q *awsQuery) changeNameServers(awsClient awsclient.Client, hostedZoneID string, domain string, values sets.Set[string], action string) error {
-	recordType := route53.RRTypeNs
+func (q *awsQuery) changeNameServers(awsClient awsclient.Client, hostedZoneID string, domain string, values sets.Set[string], action route53types.ChangeAction) error {
+	recordType := route53types.RRTypeNs
 	ttl := int64(60)
-	records := make([]*route53.ResourceRecord, 0, len(values))
+	records := make([]route53types.ResourceRecord, 0, len(values))
 	for v := range values {
 		value := v
-		records = append(records, &route53.ResourceRecord{Value: &value})
+		records = append(records, route53types.ResourceRecord{Value: &value})
 	}
 	changeInput := &route53.ChangeResourceRecordSetsInput{
 		HostedZoneId: &hostedZoneID,
-		ChangeBatch: &route53.ChangeBatch{
-			Changes: []*route53.Change{{
-				Action: &action,
-				ResourceRecordSet: &route53.ResourceRecordSet{
+		ChangeBatch: &route53types.ChangeBatch{
+			Changes: []route53types.Change{{
+				Action: action,
+				ResourceRecordSet: &route53types.ResourceRecordSet{
 					Name:            &domain,
-					Type:            &recordType,
+					Type:            recordType,
 					TTL:             &ttl,
 					ResourceRecords: records,
 				},

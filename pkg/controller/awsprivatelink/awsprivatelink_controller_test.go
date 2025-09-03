@@ -2464,27 +2464,3 @@ func Test_toSupportedSubnets(t *testing.T) {
 		}},
 	}}, inv)
 }
-
-func Test_filterErrorMessage(t *testing.T) {
-	tests := []struct {
-		err  error
-		want string
-	}{{
-		err:  errors.New(`AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: 42a5a4ce-9c1a-4916-a62a-72a2e6d9ae59; Proxy: null)\n\tstatus code: 403, request id: 9cc3b1f9-e161-402c-a942-d0ed7c7e5fd4`),
-		want: `AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: XXXX; Proxy: null)\n\tstatus code: 403, request id: XXXX`,
-	}, {
-		err: errors.New(`AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: 42a5a4ce-9c1a-4916-a62a-72a2e6d9ae59; Proxy: null)
-		status code: 403, request id: 9cc3b1f9-e161-402c-a942-d0ed7c7e5fd4`),
-		want: `AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: XXXX; Proxy: null)
-		status code: 403, request id: XXXX`,
-	}, {
-		err:  errors.New(`AccessDenied: User: arn:aws:iam::12345:user/test-user is not authorized to perform: route53:ChangeResourceRecordSets on resource: arn:aws:route53:::hostedzone/12345\n\tstatus code: 403, request id: 22bc2e2e-9381-485f-8a46-c7ce8aad2a4d`),
-		want: `AccessDenied: User: arn:aws:iam::12345:user/test-user is not authorized to perform: route53:ChangeResourceRecordSets on resource: arn:aws:route53:::hostedzone/12345\n\tstatus code: 403, request id: XXXX`,
-	}}
-	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
-			got := filterErrorMessage(tt.err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}

@@ -8,7 +8,7 @@ var (
 	newlineTabRE           = regexp.MustCompile(`\n\t`)
 	certificateTimeErrorRE = regexp.MustCompile(`: current time \S+ is after \S+`)
 	// aws
-	awsRequestIDRE    = regexp.MustCompile(`(, )*(?i)(request id: )(?:[-[:xdigit:]]+)`)
+	awsRequestIDRE    = regexp.MustCompile(`(, )*(?i)(request ?id: )(?:[-[:xdigit:]]+)`)
 	awsNotAuthorized  = regexp.MustCompile(`(User: arn:aws:sts::)\S+(:assumed-role/[^/]+/)\S+( is not authorized to perform: \S+ on resource: arn:aws:iam::)[^:]+(:\S+)`)
 	awsEncodedMessage = regexp.MustCompile(`(Encoded authorization failure message: )[^,]+,`)
 	// azure

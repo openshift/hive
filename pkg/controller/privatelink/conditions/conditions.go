@@ -2,7 +2,6 @@ package conditions
 
 import (
 	"context"
-	"regexp"
 	"time"
 
 	"github.com/pkg/errors"
@@ -25,11 +24,6 @@ var clusterDeploymentPrivateLinkConditions = []hivev1.ClusterDeploymentCondition
 	hivev1.PrivateLinkReadyClusterDeploymentCondition,
 }
 
-func filterErrorMessage(err error) string {
-	skipRequestIDRE := regexp.MustCompile(`(request id|Request ID): ([-0-9a-f]+)`)
-	return skipRequestIDRE.ReplaceAllString(err.Error(), "${1}: XXXX")
-}
-
 func InitializeConditions(cd *hivev1.ClusterDeployment) ([]hivev1.ClusterDeploymentCondition, bool) {
 	return controllerutils.InitializeClusterDeploymentConditions(cd.Status.Conditions, clusterDeploymentPrivateLinkConditions)
 }
@@ -40,7 +34,7 @@ func SetErrCondition(client client.Client, cd *hivev1.ClusterDeployment, reason 
 	if errGet != nil {
 		return errors.Wrap(errGet, "failed to get cluster deployment")
 	}
-	message := filterErrorMessage(err)
+	message := controllerutils.ErrorScrub(err)
 	conditions, failedChanged := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		curr.Status.Conditions,
 		hivev1.PrivateLinkFailedClusterDeploymentCondition,

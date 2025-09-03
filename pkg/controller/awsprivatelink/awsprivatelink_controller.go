@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -395,7 +394,7 @@ func (r *ReconcileAWSPrivateLink) setErrCondition(cd *hivev1.ClusterDeployment,
 	if errGet != nil {
 		return errGet
 	}
-	message := filterErrorMessage(err)
+	message := controllerutils.ErrorScrub(err)
 	conditions, failedChanged := controllerutils.SetClusterDeploymentConditionWithChangeCheck(
 		curr.Status.Conditions,
 		hivev1.AWSPrivateLinkFailedClusterDeploymentCondition,
@@ -1316,11 +1315,6 @@ func ec2TagSpecification(metadata *hivev1.ClusterMetadata, resource ec2types.Res
 			Value: aws.String(metadata.InfraID + "-" + string(resource)),
 		}},
 	}
-}
-
-func filterErrorMessage(err error) string {
-	skipRequestIDRE := regexp.MustCompile(`(request id|Request ID): ([-0-9a-f]+)`)
-	return skipRequestIDRE.ReplaceAllString(err.Error(), "${1}: XXXX")
 }
 
 type awsClient struct {

@@ -695,6 +695,15 @@ func (r *ReconcileClusterPool) addClusters(
 		errs = append(errs, fmt.Errorf("%s: %w", credentialsSecretDependent, err))
 	}
 
+	// Get manifests if specified
+	manifests, err := r.getManifests(clp, logger)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("error getting manifests: %w", err))
+	}
+	if manifests != nil {
+		logger.WithField("manifestCount", len(manifests)).Info("retrieved manifests for cluster pool")
+	}
+
 	if clp.Spec.CustomizationRef != nil && clp.Spec.CustomizationRef.Name != "" {
 		custCDC := clp.Spec.CustomizationRef.Name
 		if cdcs.nonInventory == nil || cdcs.nonInventory.Name != custCDC {
@@ -713,7 +722,7 @@ func (r *ReconcileClusterPool) addClusters(
 	}
 
 	for i := 0; i < newClusterCount; i++ {
-		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, cdcs, logger)
+		cd, err := r.createCluster(clp, cloudBuilder, pullSecret, installConfigTemplate, poolVersion, cdcs, manifests, logger)
 		if err != nil {
 			return err
 		}
@@ -730,6 +739,7 @@ func (r *ReconcileClusterPool) createCluster(
 	installConfigTemplate string,
 	poolVersion string,
 	cdcs *cdcCollection,
+	manifests map[string][]byte,
 	logger log.FieldLogger,
 ) (*hivev1.ClusterDeployment, error) {
 	var err error
@@ -776,6 +786,12 @@ func (r *ReconcileClusterPool) createCluster(
 
 	if clp.Spec.HibernateAfter != nil {
 		builder.HibernateAfter = &clp.Spec.HibernateAfter.Duration
+	}
+
+	// Set manifests if provided
+	if manifests != nil {
+		logger.WithField("manifestCount", len(manifests)).Info("applying manifests to cluster deployment")
+		builder.InstallerManifests = manifests
 	}
 
 	objs, err := builder.Build()
@@ -1257,6 +1273,28 @@ func (r *ReconcileClusterPool) getPullSecret(pool *hivev1.ClusterPool, logger lo
 		return "", errors.New("pull secret does not contain .dockerconfigjson data")
 	}
 	return string(pullSecret), nil
+}
+
+func (r *ReconcileClusterPool) getManifests(pool *hivev1.ClusterPool, logger log.FieldLogger) (map[string][]byte, error) {
+	if pool.Spec.ManifestsSecretRef == nil {
+		logger.Debug("no manifests secret reference specified")
+		return nil, nil
+	}
+
+	logger.WithField("secretName", pool.Spec.ManifestsSecretRef.Name).Info("retrieving manifests from secret")
+	manifestsSecret := &corev1.Secret{}
+	err := r.Client.Get(
+		context.Background(),
+		types.NamespacedName{Namespace: pool.Namespace, Name: pool.Spec.ManifestsSecretRef.Name},
+		manifestsSecret,
+	)
+	if err != nil {
+		logger.WithError(err).Log(controllerutils.LogLevel(err), "error reading manifests secret")
+		return nil, err
+	}
+
+	logger.WithField("manifestCount", len(manifestsSecret.Data)).Info("successfully retrieved manifests from secret")
+	return manifestsSecret.Data, nil
 }
 
 func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logger log.FieldLogger) (clusterresource.CloudBuilder, error) {

@@ -3263,3 +3263,153 @@ func Test_isBroken(t *testing.T) {
 		})
 	}
 }
+
+func TestGetManifests(t *testing.T) {
+	scheme := scheme.GetScheme()
+	logger := log.NewEntry(log.New())
+
+	tests := []struct {
+		name        string
+		pool        *hivev1.ClusterPool
+		existing    []runtime.Object
+		expected    map[string][]byte
+		expectError bool
+	}{
+		{
+			name: "no manifests specified",
+			pool: testcp.FullBuilder(testNamespace, "test-pool", scheme).
+				Options(
+					testcp.ForAWS(credsSecretName, "us-east-1"),
+					testcp.WithBaseDomain("test-domain"),
+					testcp.WithImageSet(imageSetName),
+				).Build(),
+			existing:    []runtime.Object{},
+			expected:    nil,
+			expectError: false,
+		},
+		{
+			name: "manifests secret exists",
+			pool: testcp.FullBuilder(testNamespace, "test-pool", scheme).
+				Options(
+					testcp.ForAWS(credsSecretName, "us-east-1"),
+					testcp.WithBaseDomain("test-domain"),
+					testcp.WithImageSet(imageSetName),
+					testcp.WithManifestsSecretRef("test-manifests-secret"),
+				).Build(),
+			existing: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-manifests-secret",
+						Namespace: testNamespace,
+					},
+					Data: map[string][]byte{
+						"manifest1.yaml": []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test"),
+						"manifest2.yaml": []byte("apiVersion: v1\nkind: Secret\nmetadata:\n  name: test"),
+					},
+				},
+			},
+			expected: map[string][]byte{
+				"manifest1.yaml": []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test"),
+				"manifest2.yaml": []byte("apiVersion: v1\nkind: Secret\nmetadata:\n  name: test"),
+			},
+			expectError: false,
+		},
+		{
+			name: "manifests secret not found",
+			pool: testcp.FullBuilder(testNamespace, "test-pool", scheme).
+				Options(
+					testcp.ForAWS(credsSecretName, "us-east-1"),
+					testcp.WithBaseDomain("test-domain"),
+					testcp.WithImageSet(imageSetName),
+					testcp.WithManifestsSecretRef("missing-secret"),
+				).Build(),
+			existing:    []runtime.Object{},
+			expected:    nil,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := testfake.NewFakeClientBuilder().WithRuntimeObjects(tt.existing...).Build()
+			r := &ReconcileClusterPool{
+				Client: c,
+			}
+
+			result, err := r.getManifests(tt.pool, logger)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestClusterPoolWithManifests(t *testing.T) {
+	scheme := scheme.GetScheme()
+	logger := log.NewEntry(log.New())
+
+	poolBuilder := testcp.FullBuilder(testNamespace, testLeasePoolName, scheme).
+		GenericOptions(
+			testgeneric.WithFinalizer(finalizer),
+		).
+		Options(
+			testcp.ForAWS(credsSecretName, "us-east-1"),
+			testcp.WithBaseDomain("test-domain"),
+			testcp.WithImageSet(imageSetName),
+		)
+
+	tests := []struct {
+		name                  string
+		pool                  *hivev1.ClusterPool
+		existing              []runtime.Object
+		expectedTotalClusters int
+		expectedManifests     map[string][]byte
+		expectError           bool
+	}{
+		{
+			name: "clusterpool with manifests secret",
+			pool: poolBuilder.Build(
+				testcp.WithSize(1),
+				testcp.WithManifestsSecretRef("test-manifests-secret"),
+			),
+			existing: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-manifests-secret",
+						Namespace: testNamespace,
+					},
+					Data: map[string][]byte{
+						"manifest1.yaml": []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test"),
+					},
+				},
+			},
+			expectedManifests: map[string][]byte{
+				"manifest1.yaml": []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test"),
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := testfake.NewFakeClientBuilder().WithRuntimeObjects(tt.existing...).Build()
+			r := &ReconcileClusterPool{
+				Client: c,
+			}
+
+			// Test the getManifests function directly
+			result, err := r.getManifests(tt.pool, logger)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedManifests, result)
+			}
+		})
+	}
+}

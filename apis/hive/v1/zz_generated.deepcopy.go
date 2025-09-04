@@ -1596,6 +1596,11 @@ func (in *ClusterPoolSpec) DeepCopyInto(out *ClusterPoolSpec) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.ManifestsSecretRef != nil {
+		in, out := &in.ManifestsSecretRef, &out.ManifestsSecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	return
 }
 

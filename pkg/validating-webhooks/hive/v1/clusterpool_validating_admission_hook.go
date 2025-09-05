@@ -160,6 +160,11 @@ func (a *ClusterPoolValidatingAdmissionHook) validateCreate(admissionSpec *admis
 	// Add the new data to the contextLogger
 	contextLogger.Data["object.Name"] = newObject.Name
 
+	// Log if manifests are being validated
+	if newObject.Spec.ManifestsSecretRef != nil {
+		contextLogger.WithField("manifestsSecretRef", newObject.Spec.ManifestsSecretRef.Name).Info("validating cluster pool with manifests secret reference")
+	}
+
 	// TODO: Put Create Validation Here (or in openAPIV3Schema validation section of crd)
 
 	if len(newObject.Name) > validation.DNS1123LabelMaxLength {
@@ -233,6 +238,11 @@ func (a *ClusterPoolValidatingAdmissionHook) validateUpdate(admissionSpec *admis
 
 	// Add the new data to the contextLogger
 	contextLogger.Data["oldObject.Name"] = oldObject.Name
+
+	// Log if manifests are being validated
+	if newObject.Spec.ManifestsSecretRef != nil {
+		contextLogger.WithField("manifestsSecretRef", newObject.Spec.ManifestsSecretRef.Name).Info("validating cluster pool update with manifests secret reference")
+	}
 
 	allErrs := field.ErrorList{}
 	specPath := field.NewPath("spec")

@@ -5,6 +5,7 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
 	manager "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -782,4 +783,61 @@ func (m *MockClient) WaitUntilVpcPeeringConnectionExists(arg0 *ec2.DescribeVpcPe
 func (mr *MockClientMockRecorder) WaitUntilVpcPeeringConnectionExists(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitUntilVpcPeeringConnectionExists", reflect.TypeOf((*MockClient)(nil).WaitUntilVpcPeeringConnectionExists), arg0)
+}
+
+// MockIPaginator is a mock of IPaginator interface.
+type MockIPaginator[Out any, OptFn any] struct {
+	ctrl     *gomock.Controller
+	recorder *MockIPaginatorMockRecorder[Out, OptFn]
+}
+
+// MockIPaginatorMockRecorder is the mock recorder for MockIPaginator.
+type MockIPaginatorMockRecorder[Out any, OptFn any] struct {
+	mock *MockIPaginator[Out, OptFn]
+}
+
+// NewMockIPaginator creates a new mock instance.
+func NewMockIPaginator[Out any, OptFn any](ctrl *gomock.Controller) *MockIPaginator[Out, OptFn] {
+	mock := &MockIPaginator[Out, OptFn]{ctrl: ctrl}
+	mock.recorder = &MockIPaginatorMockRecorder[Out, OptFn]{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIPaginator[Out, OptFn]) EXPECT() *MockIPaginatorMockRecorder[Out, OptFn] {
+	return m.recorder
+}
+
+// HasMorePages mocks base method.
+func (m *MockIPaginator[Out, OptFn]) HasMorePages() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasMorePages")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasMorePages indicates an expected call of HasMorePages.
+func (mr *MockIPaginatorMockRecorder[Out, OptFn]) HasMorePages() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasMorePages", reflect.TypeOf((*MockIPaginator[Out, OptFn])(nil).HasMorePages))
+}
+
+// NextPage mocks base method.
+func (m *MockIPaginator[Out, OptFn]) NextPage(arg0 context.Context, arg1 ...OptFn) (*Out, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0}
+	for _, a := range arg1 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "NextPage", varargs...)
+	ret0, _ := ret[0].(*Out)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NextPage indicates an expected call of NextPage.
+func (mr *MockIPaginatorMockRecorder[Out, OptFn]) NextPage(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0}, arg1...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NextPage", reflect.TypeOf((*MockIPaginator[Out, OptFn])(nil).NextPage), varargs...)
 }

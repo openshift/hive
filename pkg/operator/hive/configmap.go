@@ -17,11 +17,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
+	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/hive/pkg/util/contracts"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type configMapInfo struct {
@@ -43,7 +45,7 @@ type configMapInfo struct {
 	// getData returns a *pointer* to an object to be marshalled into the getData field of the configmap
 	// under the nameKey key. If the pointer is nil, the getData field will be left empty. Ignored if
 	// setData is specified.
-	getData func(*hivev1.HiveConfig) (interface{}, error)
+	getData func(*hivev1.HiveConfig) (any, error)
 	// setData is for more complex uses, e.g. where multiple fields need to be set. The second parameter
 	// is a pointer to the ConfigMap.Data field; the function can fill it in however it sees fit. If
 	// specified, getData is ignored.
@@ -55,7 +57,7 @@ var managedDomainsConfigMapInfo = configMapInfo{
 	nameKey:   "managed-domains",
 	mountPath: "/data/config",
 	envVar:    constants.ManagedDomainsFileEnvVar,
-	getData: func(instance *hivev1.HiveConfig) (interface{}, error) {
+	getData: func(instance *hivev1.HiveConfig) (any, error) {
 		return &instance.Spec.ManagedDomains, nil
 	},
 }
@@ -88,7 +90,7 @@ var awsPrivateLinkConfigMapInfo = configMapInfo{
 	mountPath:            "/data/aws-private-link-config",
 	envVar:               constants.AWSPrivateLinkControllerConfigFileEnvVar,
 	volumeSourceOptional: true,
-	getData: func(instance *hivev1.HiveConfig) (interface{}, error) {
+	getData: func(instance *hivev1.HiveConfig) (any, error) {
 		return instance.Spec.AWSPrivateLink, nil
 	},
 }
@@ -99,7 +101,7 @@ var privateLinkConfigMapInfo = configMapInfo{
 	mountPath:            "/data/private-link-config",
 	envVar:               constants.PrivateLinkControllerConfigFileEnvVar,
 	volumeSourceOptional: true,
-	getData: func(instance *hivev1.HiveConfig) (interface{}, error) {
+	getData: func(instance *hivev1.HiveConfig) (any, error) {
 		return instance.Spec.PrivateLink, nil
 	},
 }
@@ -110,7 +112,7 @@ var failedProvisionConfigMapInfo = configMapInfo{
 	mountPath:            "/data/failed-provision-config",
 	envVar:               constants.FailedProvisionConfigFileEnvVar,
 	volumeSourceOptional: true,
-	getData: func(instance *hivev1.HiveConfig) (interface{}, error) {
+	getData: func(instance *hivev1.HiveConfig) (any, error) {
 		return &instance.Spec.FailedProvisionConfig, nil
 	},
 }
@@ -121,15 +123,33 @@ var metricsConfigConfigMapInfo = configMapInfo{
 	mountPath:            "/data/metrics-config",
 	envVar:               constants.MetricsConfigFileEnvVar,
 	volumeSourceOptional: true,
-	getData: func(instance *hivev1.HiveConfig) (interface{}, error) {
+	getData: func(instance *hivev1.HiveConfig) (any, error) {
 		return &instance.Spec.MetricsConfig, nil
 	},
 }
 
-func (r *ReconcileHiveConfig) supportedContractsConfigMapInfo() configMapInfo {
-	f := func(instance *hivev1.HiveConfig) (interface{}, error) {
+// allowedContracts is the list of operator whitelisted contracts that hive will accept
+// from CRDs.
+var allowedContracts = sets.NewString(
+	hivecontractsv1alpha1.ClusterInstallContractLabelKey,
+)
+
+// knownContracts is a list of contracts and their implementations that don't
+// require discovery using CRDs
+var knownContracts = contracts.SupportedContractImplementationsList{{
+	Name: hivecontractsv1alpha1.ClusterInstallContractName,
+	Supported: []contracts.ContractImplementation{{
+		Group:   "extensions.hive.openshift.io",
+		Version: "v1beta1",
+		Kind:    "AgentClusterInstall",
+		Config:  map[string]string{string(hivecontractsv1alpha1.ClusterInstallConfigKeySkipImageSetJob): "true"},
+	}},
+}}
+
+func (r *ReconcileHiveConfig) supportedContractsConfigMapInfo(hLog log.FieldLogger) configMapInfo {
+	f := func(instance *hivev1.HiveConfig) (any, error) {
 		supported := map[string][]contracts.ContractImplementation{}
-		for _, k := range knowContracts {
+		for _, k := range knownContracts {
 			supported[k.Name] = k.Supported
 		}
 
@@ -138,25 +158,38 @@ func (r *ReconcileHiveConfig) supportedContractsConfigMapInfo() configMapInfo {
 			return nil, errors.Wrap(err, "error getting crds for collect contract implementations")
 		}
 		for _, crd := range crdList.Items {
-			// collect all the possible implementations from this crd
-			var impls []contracts.ContractImplementation
-			for _, version := range crd.Spec.Versions {
-				impls = append(impls, contracts.ContractImplementation{
-					Group:   crd.Spec.Group,
-					Version: version.Name,
-					Kind:    crd.Spec.Names.Kind,
-				})
-			}
-
+			contract := ""
+			cfg := map[string]string{}
 			for label, val := range crd.ObjectMeta.Labels {
 				if strings.HasPrefix(label, "contracts.hive.openshift.io") &&
 					val == "true" &&
 					allowedContracts.Has(label) { // lets store impls for this contract
-					contract := strings.TrimPrefix(label, "contracts.hive.openshift.io/")
-					curr := supported[contract]
-					curr = append(curr, impls...)
-					supported[contract] = curr
+
+					contract = strings.TrimPrefix(label, "contracts.hive.openshift.io/")
+					cfgKey := label + ".config"
+					if cfgJson := crd.Annotations[cfgKey]; cfgJson != "" {
+						// Don't return the error, as that would allow any CRD to DoS hive-operator.
+						if err := json.Unmarshal(([]byte)(cfgJson), &cfg); err != nil {
+							hLog.WithField("configKey", cfgKey).WithField("configJSON", cfgJson).WithError(err).Error("failed to unmarshal contract config annotation; ignoring")
+						}
+					}
+					break
 				}
+			}
+			if contract != "" {
+				// collect all the possible implementations from this crd
+				var impls []contracts.ContractImplementation
+				for _, version := range crd.Spec.Versions {
+					impls = append(impls, contracts.ContractImplementation{
+						Group:   crd.Spec.Group,
+						Version: version.Name,
+						Kind:    crd.Spec.Names.Kind,
+						Config:  cfg,
+					})
+				}
+				curr := supported[contract]
+				curr = append(curr, impls...)
+				supported[contract] = curr
 			}
 		}
 

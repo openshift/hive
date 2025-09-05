@@ -3,6 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    contracts.hive.openshift.io/clusterinstall.config: '{"skipImageSetJob": "true"}'
   name: fakeclusterinstalls.hiveinternal.openshift.io
   labels:
     contracts.hive.openshift.io/clusterinstall: "true"

@@ -72,7 +72,8 @@ func CopyAWSServiceProviderSecret(client client.Client, destNamespace string, en
 
 	src := types.NamespacedName{Name: spSecretName, Namespace: hiveNS}
 	dest := types.NamespacedName{Name: destSecretName, Namespace: destNamespace}
-	return controllerutils.CopySecret(client, src, dest, owner, scheme)
+	_, err := controllerutils.CopySecret(client, src, dest, owner, scheme)
+	return err
 }
 
 // AWSAssumeRoleConfig creates or updates a secret with an AWS credentials file containing:
@@ -413,7 +414,10 @@ func InstallerPodSpec(
 		Containers:         containers,
 		Volumes:            volumes,
 		ServiceAccountName: serviceAccountName,
-		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
+		ImagePullSecrets: []corev1.LocalObjectReference{
+			{Name: constants.GetMergedPullSecretName(cd)},
+			{Name: constants.GetImagePullSecretName(cd)},
+		},
 	}
 	controllerutils.SetProxyEnvVars(podSpec, httpProxy, httpsProxy, noProxy)
 	return podSpec, nil
@@ -442,7 +446,6 @@ func GenerateInstallerJob(
 	podSpec := provision.Spec.PodSpec
 	podSpec.NodeSelector = sharedPodConfig.NodeSelector
 	podSpec.Tolerations = sharedPodConfig.Tolerations
-	podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, sharedPodConfig.ImagePullSecrets...)
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -493,7 +496,6 @@ func GenerateUninstallerJobForDeprovision(
 		ServiceAccountName: serviceAccountName,
 		NodeSelector:       sharedPodConfig.NodeSelector,
 		Tolerations:        sharedPodConfig.Tolerations,
-		ImagePullSecrets:   sharedPodConfig.ImagePullSecrets,
 	}
 
 	completions := int32(1)
@@ -717,6 +719,7 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 	job.Spec.Template.Spec.InitContainers = initContainers
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 }
 
 func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
@@ -751,6 +754,7 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 	}
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 
 }
 
@@ -782,6 +786,7 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 }
 
 func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
@@ -814,6 +819,7 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 }
 
 func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
@@ -839,6 +845,7 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 }
 
 func completeOvirtDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
@@ -865,6 +872,7 @@ func completeOvirtDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 }
 
 func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
@@ -890,6 +898,7 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 			},
 		},
 	}
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 }
 
 func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
@@ -916,4 +925,5 @@ func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *bat
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes
+	job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetImagePullSecretNameForDeprovision(req)})
 }

@@ -88,3 +88,7 @@ func applyDeploymentConfig(hiveConfig *hivev1.HiveConfig, deploymentName hivev1.
 		container.Resources = *dc.Resources
 	}
 }
+
+func hiveConfigHasValidImagePullSecretReference(config *hivev1.HiveConfig) bool {
+	return config.Spec.HiveImagePullSecretRef != nil && config.Spec.HiveImagePullSecretRef.Name != ""
+}

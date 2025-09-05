@@ -42,8 +42,6 @@ func GenerateImageSetJob(
 		},
 	}
 
-	imagePullSecrets := append(sharedPodConfig.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetMergedPullSecretName(cd)})
-
 	podSpec := corev1.PodSpec{
 		NodeSelector:  sharedPodConfig.NodeSelector,
 		Tolerations:   sharedPodConfig.Tolerations,
@@ -87,7 +85,10 @@ func GenerateImageSetJob(
 			},
 		},
 		ServiceAccountName: serviceAccountName,
-		ImagePullSecrets:   imagePullSecrets,
+		ImagePullSecrets: []corev1.LocalObjectReference{
+			{Name: constants.GetMergedPullSecretName(cd)},
+			{Name: constants.GetImagePullSecretName(cd)},
+		},
 	}
 
 	completions := int32(1)

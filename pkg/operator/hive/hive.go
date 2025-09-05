@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,13 @@ const (
 	// hiveConfigHashAnnotation is annotation on hivedeployment that contains
 	// the hash of the contents of the hive-controllers-config configmap
 	hiveConfigHashAnnotation = "hive.openshift.io/hiveconfig-hash"
+
+	// hiveImagePullSecretLabel is the key (the value will always be "true") for the label we add to
+	// the secret (named in HiveConfig.Spec.HiveImagePullSecretRef) that is copied into the target
+	// hive namespace (named in HiveConfig.Spec.TargetNamespace). We use this to identify secrets in
+	// namespaces that were *previously* the configured TargetNamespace so we can clean
+	// them up.
+	hiveImagePullSecretLabel = "hive.openshift.io/hive-image-pull-secret"
 )
 
 var (
@@ -79,6 +87,19 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 			// h.Delete already no-ops for IsNotFound
 			if err := h.Delete(apiVersion, kind, ns, lockName); err != nil {
 				return errors.Wrapf(err, "error deleting %s/%s from old target namespace %s", kind, lockName, ns)
+			}
+		}
+
+		secretList := &corev1.SecretList{}
+		if err := r.List(context.TODO(), secretList, ns, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=true", hiveImagePullSecretLabel)}); err != nil {
+			hLog.WithError(err).Error("error retrieving list of controller secrets")
+			return err
+		}
+		for _, secret := range secretList.Items {
+			hLog.Infof("Deleting %s/%s from old target namespace %s", secret.Kind, secret.Name, ns)
+			// h.Delete already no-ops for IsNotFound
+			if err := h.Delete(secret.APIVersion, secret.Kind, ns, secret.Name); err != nil {
+				return errors.Wrapf(err, "error deleting %s/%s from old target namespace %s", secret.Kind, secret.Name, ns)
 			}
 		}
 
@@ -272,6 +293,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 
 	r.includeGlobalPullSecret(hLog, instance, hiveContainer)
+	r.includeHivePrivateImagePullSecret(hLog, instance, hiveContainer)
 
 	if instance.Spec.MaintenanceMode != nil && *instance.Spec.MaintenanceMode {
 		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-controllers replicas to 0")
@@ -354,7 +376,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	// Apply shared pod config passed through from the operator deployment
 	hiveDeployment.Spec.Template.Spec.NodeSelector = r.sharedPodConfig.NodeSelector
 	hiveDeployment.Spec.Template.Spec.Tolerations = r.sharedPodConfig.Tolerations
-	hiveDeployment.Spec.Template.Spec.ImagePullSecrets = r.sharedPodConfig.ImagePullSecrets
+	if hiveConfigHasValidImagePullSecretReference(instance) {
+		hiveDeployment.Spec.Template.Spec.ImagePullSecrets = append(hiveDeployment.Spec.Template.Spec.ImagePullSecrets, *instance.Spec.HiveImagePullSecretRef)
+	}
 
 	hiveDeployment.Namespace = hiveNSName
 	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveDeployment), hLog, util.WithGarbageCollection(instance))
@@ -363,6 +387,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		return err
 	}
 	hLog.Infof("hive-controllers deployment applied (%s)", result)
+
+	if err := r.copyHiveImagePullSecret(hLog, h, instance); err != nil {
+		return err
+	}
 
 	hLog.Info("all hive components successfully reconciled")
 	return nil
@@ -409,7 +437,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 
 	caSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: GetHiveNamespace(instance),
+			Namespace: hiveNS,
 			Name:      hiveAdditionalCASecret,
 		},
 		Data: map[string][]byte{
@@ -463,6 +491,83 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, inst
 		Value: instance.Spec.GlobalPullSecretRef.Name,
 	}
 	hiveContainer.Env = append(hiveContainer.Env, globalPullSecretEnvVar)
+}
+
+func (r *ReconcileHiveConfig) includeHivePrivateImagePullSecret(hLog log.FieldLogger, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
+	if !hiveConfigHasValidImagePullSecretReference(instance) {
+		hLog.Debug("HiveImagePullSecret is not provided in HiveConfig, it will not be deployed")
+		return
+	}
+
+	hiveImagePullSecretEnvVar := corev1.EnvVar{
+		Name:  constants.HivePrivateImagePullSecret,
+		Value: instance.Spec.HiveImagePullSecretRef.Name,
+	}
+	hiveContainer.Env = append(hiveContainer.Env, hiveImagePullSecretEnvVar)
+}
+
+func (r *ReconcileHiveConfig) copyHiveImagePullSecret(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) error {
+	if !hiveConfigHasValidImagePullSecretReference(instance) {
+		hLog.Debug("HiveImagePullSecret is not provided in HiveConfig, it will not be copied")
+		return nil
+	}
+
+	srcNS := r.hiveOperatorNamespace
+	destNS := GetHiveNamespace(instance)
+	secretName := instance.Spec.HiveImagePullSecretRef.Name
+
+	if srcNS == destNS {
+		hLog.Debugf("hive operator and hive controllers live in the same NS '%s'", srcNS)
+		return nil
+	}
+
+	srcSecret := &corev1.Secret{}
+	err := r.Get(context.TODO(), types.NamespacedName{Namespace: srcNS, Name: secretName}, srcSecret)
+	if err != nil {
+		return err
+	}
+
+	destSecret := &corev1.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Namespace: destNS, Name: secretName}, destSecret)
+	if apierrors.IsNotFound(err) {
+		hLog.Debugf("target secret %s in NS %s doesn't exist, creating it", secretName, destNS)
+
+		destSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: destNS,
+				Labels: map[string]string{
+					hiveImagePullSecretLabel: "true",
+				},
+			},
+			Data:       srcSecret.DeepCopy().Data,
+			StringData: srcSecret.DeepCopy().StringData,
+			Type:       srcSecret.Type,
+		}
+
+		_, err = h.CreateRuntimeObject(destSecret, r.scheme)
+		return err
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if lvalue, present := destSecret.ObjectMeta.Labels[hiveImagePullSecretLabel]; present &&
+		lvalue == "true" &&
+		reflect.DeepEqual(destSecret.Data, srcSecret.Data) &&
+		reflect.DeepEqual(destSecret.StringData, srcSecret.StringData) {
+		hLog.Debugf("target secret %s in NS %s does exist, no update necessary", secretName, destNS)
+		return nil // no work as the dest and source data matches.
+	}
+
+	hLog.Debugf("target secret %s in NS %s does exist, updating it", secretName, destNS)
+	destSecret.Data = srcSecret.DeepCopy().Data
+	destSecret.StringData = srcSecret.DeepCopy().StringData
+	destSecret.ObjectMeta.Labels[hiveImagePullSecretLabel] = "true"
+
+	_, err = h.CreateOrUpdateRuntimeObject(destSecret, r.scheme)
+	return err
 }
 
 func (r *ReconcileHiveConfig) runningOnOpenShift() (bool, error) {

@@ -34,7 +34,7 @@ func TestGenerateDeprovision(t *testing.T) {
 		dr, "someseviceaccount",
 		testHttpProxy, testHttpsProxy, testNoProxy,
 		nil,
-		controllerutils.SharedPodConfig{})
+		controllerutils.SharedPodConfig{}, log.StandardLogger())
 	assert.Nil(t, err)
 	assert.NotNil(t, job)
 	hiveassert.AssertAllContainersHaveEnvVar(t, &job.Spec.Template.Spec, "HTTP_PROXY", testHttpProxy)

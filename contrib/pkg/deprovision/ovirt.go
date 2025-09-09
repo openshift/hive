@@ -20,8 +20,10 @@ type oVirtOptions struct {
 }
 
 // NewDeprovisionOvirtCommand is the entrypoint to create the oVirt deprovision subcommand
-func NewDeprovisionOvirtCommand() *cobra.Command {
-	opt := &oVirtOptions{}
+func NewDeprovisionOvirtCommand(logLevel string) *cobra.Command {
+	opt := &oVirtOptions{
+		logLevel: logLevel,
+	}
 	cmd := &cobra.Command{
 		Use:   "ovirt INFRAID",
 		Short: "Deprovision oVirt assets (as created by openshift-installer)",
@@ -39,7 +41,6 @@ func NewDeprovisionOvirtCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.clusterID, "ovirt-cluster-id", "", "oVirt cluster ID")
 	return cmd
 }

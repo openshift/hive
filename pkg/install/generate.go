@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apihelpers "github.com/openshift/hive/apis/helpers"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -487,6 +488,7 @@ func GenerateUninstallerJobForDeprovision(
 	serviceAccountName, httpProxy, httpsProxy, noProxy string,
 	extraEnvVars []corev1.EnvVar,
 	sharedPodConfig controllerutils.SharedPodConfig,
+	rLog log.FieldLogger,
 ) (*batchv1.Job, error) {
 
 	restartPolicy := corev1.RestartPolicyOnFailure
@@ -518,7 +520,7 @@ func GenerateUninstallerJobForDeprovision(
 	job.Spec = batchv1.JobSpec{
 		Completions:           &completions,
 		BackoffLimit:          &backoffLimit,
-		ActiveDeadlineSeconds: pointer.Int64Ptr(int64(deprovisionJobDeadline.Seconds())),
+		ActiveDeadlineSeconds: ptr.To(int64(deprovisionJobDeadline.Seconds())),
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: labels,
@@ -527,21 +529,39 @@ func GenerateUninstallerJobForDeprovision(
 		},
 	}
 
+	legacy, _ := strconv.ParseBool(req.Annotations[constants.LegacyDeprovisionAnnotation])
+	var args []string
+	if legacy {
+		rLog.
+			WithField(constants.LegacyDeprovisionAnnotation, req.Annotations[constants.LegacyDeprovisionAnnotation]).
+			Info("using legacy deprovision flow per annotation")
+	}
+	if req.Spec.MetadataJSONSecretRef == nil || req.Spec.MetadataJSONSecretRef.Name == "" {
+		legacy = true
+		rLog.Info("using legacy deprovision due to missing metadata.json Secret reference")
+	}
+	if !legacy {
+		args = []string{
+			"deprovision",
+			"--metadata-json-secret-name", req.Spec.MetadataJSONSecretRef.Name,
+		}
+	}
+
 	switch {
 	case req.Spec.Platform.AWS != nil:
-		completeAWSDeprovisionJob(req, job)
+		completeAWSDeprovisionJob(req, job, args)
 	case req.Spec.Platform.Azure != nil:
-		completeAzureDeprovisionJob(req, job)
+		completeAzureDeprovisionJob(req, job, args)
 	case req.Spec.Platform.GCP != nil:
-		completeGCPDeprovisionJob(req, job)
+		completeGCPDeprovisionJob(req, job, args)
 	case req.Spec.Platform.OpenStack != nil:
-		completeOpenStackDeprovisionJob(req, job)
+		completeOpenStackDeprovisionJob(req, job, args)
 	case req.Spec.Platform.VSphere != nil:
-		completeVSphereDeprovisionJob(req, job)
+		completeVSphereDeprovisionJob(req, job, args)
 	case req.Spec.Platform.IBMCloud != nil:
-		completeIBMCloudDeprovisionJob(req, job)
+		completeIBMCloudDeprovisionJob(req, job, args)
 	case req.Spec.Platform.Nutanix != nil:
-		completeNutanixCloudDeprovisionJob(req, job)
+		completeNutanixCloudDeprovisionJob(req, job, args)
 	default:
 		return nil, errors.New("deprovision requests currently not supported for platform")
 	}
@@ -647,7 +667,7 @@ func envAndVolumes(ns, credsVolName, credsDir, credsName, certsVolName, certsDir
 	return env, volumes, volumeMounts
 }
 
-func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job, args []string) {
 	credentialRef := req.Spec.Platform.AWS.CredentialsSecretRef.Name
 	if credentialRef == "" {
 		credentialRef = AWSAssumeRoleSecretName(req.Name)
@@ -656,29 +676,38 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 		req.Namespace,
 		"aws-creds", constants.AWSCredsMount, credentialRef,
 		"", "", "")
-	hostedZoneRole := ""
-	if req.Spec.Platform.AWS.HostedZoneRole != nil {
-		hostedZoneRole = *req.Spec.Platform.AWS.HostedZoneRole
+
+	// empty args implies legacy deprovision
+	legacy := len(args) == 0
+	if legacy {
+		hostedZoneRole := ""
+		if req.Spec.Platform.AWS.HostedZoneRole != nil {
+			hostedZoneRole = *req.Spec.Platform.AWS.HostedZoneRole
+		}
+		args = []string{
+			"aws-tag-deprovision",
+			"--region", req.Spec.Platform.AWS.Region,
+			"--hosted-zone-role", hostedZoneRole,
+		}
+		// BaseDomain should always be set in new code. This conditional is only in case we're
+		// reconciling an old ClusterDeprovision created before we added the cluster-domain arg. Such
+		// deprovisions will leak DNS entries if they came from shared-VPC clusters.
+		if req.Spec.BaseDomain != "" {
+			args = append(args, "--cluster-domain", req.Spec.ClusterName+"."+req.Spec.BaseDomain)
+		}
+
 	}
-	args := []string{
-		"aws-tag-deprovision",
+	args = append(args,
 		"--creds-dir", constants.AWSCredsMount,
 		"--loglevel", "debug",
-		"--region", req.Spec.Platform.AWS.Region,
-		"--hosted-zone-role", hostedZoneRole,
-	}
-	// LEGACY: BaseDomain should always be set in new code. This conditional is only in case we're
-	// reconciling an old ClusterDeprovision created before we added the cluster-domain arg. Such
-	// deprovisions will leak DNS entries if they came from shared-VPC clusters.
-	if req.Spec.BaseDomain != "" {
-		args = append(args, "--cluster-domain", req.Spec.ClusterName+"."+req.Spec.BaseDomain)
-	}
-
-	args = append(
-		args,
-		fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
-		fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s=owned", req.Spec.InfraID),
 	)
+	if legacy {
+		args = append(
+			args,
+			fmt.Sprintf("kubernetes.io/cluster/%s=owned", req.Spec.InfraID),
+			fmt.Sprintf("sigs.k8s.io/cluster-api-provider-aws/cluster/%s=owned", req.Spec.InfraID),
+		)
+	}
 
 	// Set up /output emptydir and copy hiveutil there for credential_process compatibility with provisioning
 	volumes = append(volumes, corev1.Volume{
@@ -724,11 +753,37 @@ func completeAWSDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 	job.Spec.Template.Spec.Volumes = volumes
 }
 
-func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job, args []string) {
 	env, volumes, volumeMounts := envAndVolumes(
 		req.Namespace,
 		"azure", constants.AzureCredentialsDir, req.Spec.Platform.Azure.CredentialsSecretRef.Name,
 		"", "", "")
+
+	// empty args implies legacy deprovision
+	legacy := len(args) == 0
+	if legacy {
+		args = []string{
+			"deprovision", "azure",
+		}
+	}
+	args = append(args,
+		"--loglevel", "debug",
+		"--creds-dir", constants.AzureCredentialsDir,
+	)
+	// TODO: Figure out if positional vs opt arg order matters. If not, consolidate this with the
+	// first `if legacy` above.
+	if legacy {
+		args = append(args, req.Spec.InfraID)
+		if req.Spec.Platform.Azure.CloudName != nil {
+			args = append(args, "--azure-cloud-name", req.Spec.Platform.Azure.CloudName.Name())
+		}
+		if req.Spec.Platform.Azure.ResourceGroupName != nil {
+			args = append(args, "--azure-resource-group-name", *req.Spec.Platform.Azure.ResourceGroupName)
+		}
+		if req.Spec.Platform.Azure.BaseDomainResourceGroupName != nil {
+			args = append(args, "--azure-base-domain-resource-group-name", *req.Spec.Platform.Azure.BaseDomainResourceGroupName)
+		}
+	}
 	containers := []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -736,37 +791,40 @@ func completeAzureDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Jo
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision", "azure",
-				req.Spec.InfraID,
-				"--loglevel", "debug",
-				"--creds-dir", constants.AzureCredentialsDir,
-			},
-			VolumeMounts: volumeMounts,
+			Args:            args,
+			VolumeMounts:    volumeMounts,
 		},
-	}
-	if req.Spec.Platform.Azure.CloudName != nil {
-		containers[0].Args = append(containers[0].Args, "--azure-cloud-name", req.Spec.Platform.Azure.CloudName.Name())
-	}
-	if req.Spec.Platform.Azure.ResourceGroupName != nil {
-		containers[0].Args = append(containers[0].Args, "--azure-resource-group-name", *req.Spec.Platform.Azure.ResourceGroupName)
-	}
-	if req.Spec.Platform.Azure.BaseDomainResourceGroupName != nil {
-		containers[0].Args = append(containers[0].Args, "--azure-base-domain-resource-group-name", *req.Spec.Platform.Azure.BaseDomainResourceGroupName)
 	}
 	job.Spec.Template.Spec.Containers = containers
 	job.Spec.Template.Spec.Volumes = volumes
 
 }
 
-func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job, args []string) {
 	env, volumes, volumeMounts := envAndVolumes(
 		req.Namespace,
 		"gcp", constants.GCPCredentialsDir, req.Spec.Platform.GCP.CredentialsSecretRef.Name,
 		"", "", "")
-	npid := ""
-	if req.Spec.Platform.GCP.NetworkProjectID != nil {
-		npid = *req.Spec.Platform.GCP.NetworkProjectID
+
+	// empty args implies legacy deprovision
+	legacy := len(args) == 0
+	if legacy {
+		npid := ""
+		if req.Spec.Platform.GCP.NetworkProjectID != nil {
+			npid = *req.Spec.Platform.GCP.NetworkProjectID
+		}
+		args = []string{
+			"deprovision", "gcp",
+			"--region", req.Spec.Platform.GCP.Region,
+			"--network-project-id", npid,
+		}
+	}
+	args = append(args,
+		"--loglevel", "debug",
+		"--creds-dir", constants.GCPCredentialsDir,
+	)
+	if legacy {
+		args = append(args, req.Spec.InfraID)
 	}
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
@@ -775,21 +833,14 @@ func completeGCPDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job)
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision", "gcp",
-				"--loglevel", "debug",
-				"--creds-dir", constants.GCPCredentialsDir,
-				"--region", req.Spec.Platform.GCP.Region,
-				"--network-project-id", npid,
-				req.Spec.InfraID,
-			},
-			VolumeMounts: volumeMounts,
+			Args:            args,
+			VolumeMounts:    volumeMounts,
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes
 }
 
-func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job, args []string) {
 	certRef := ""
 	if req.Spec.Platform.OpenStack.CertificatesSecretRef != nil {
 		// Can theoretically still be "", but that's okay.
@@ -800,12 +851,21 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 		"openstack", constants.OpenStackCredentialsDir, req.Spec.Platform.OpenStack.CredentialsSecretRef.Name,
 		"openstack-certificates", constants.OpenStackCertificatesDir, certRef)
 	cmd := []string{"/usr/bin/hiveutil"}
-	args := []string{
-		"deprovision", "openstack",
+
+	// empty args implies legacy deprovision
+	legacy := len(args) == 0
+	if legacy {
+		args = []string{
+			"deprovision", "openstack",
+			"--cloud", req.Spec.Platform.OpenStack.Cloud,
+		}
+	}
+	args = append(args,
 		"--loglevel", "debug",
 		"--creds-dir", constants.OpenStackCredentialsDir,
-		"--cloud", req.Spec.Platform.OpenStack.Cloud,
-		req.Spec.InfraID,
+	)
+	if legacy {
+		args = append(args, req.Spec.InfraID)
 	}
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
@@ -821,11 +881,27 @@ func completeOpenStackDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv
 	job.Spec.Template.Spec.Volumes = volumes
 }
 
-func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job, args []string) {
 	env, volumes, volumeMounts := envAndVolumes(
 		req.Namespace,
 		"vsphere-creds", constants.VSphereCredentialsDir, req.Spec.Platform.VSphere.CredentialsSecretRef.Name,
 		"vsphere-certificates", constants.VSphereCertificatesDir, req.Spec.Platform.VSphere.CertificatesSecretRef.Name)
+
+	// empty args implies legacy deprovision
+	legacy := len(args) == 0
+	if legacy {
+		args = []string{
+			"deprovision", "vsphere",
+			"--vsphere-vcenter", req.Spec.Platform.VSphere.VCenter,
+		}
+	}
+	args = append(args,
+		"--loglevel", "debug",
+		"--creds-dir", constants.VSphereCredentialsDir,
+	)
+	if legacy {
+		args = append(args, req.Spec.InfraID)
+	}
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -833,25 +909,30 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision", "vsphere",
-				"--vsphere-vcenter", req.Spec.Platform.VSphere.VCenter,
-				"--loglevel", "debug",
-				"--creds-dir", constants.VSphereCredentialsDir,
-				req.Spec.InfraID,
-			},
-			VolumeMounts: volumeMounts,
+			Args:            args,
+			VolumeMounts:    volumeMounts,
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes
 }
 
-func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job, args []string) {
 	env, _, _ := envAndVolumes(
 		req.Namespace,
 		"", "", req.Spec.Platform.IBMCloud.CredentialsSecretRef.Name,
 		"", "", "")
 
+	// empty args implies legacy deprovision
+	if len(args) == 0 {
+		args = []string{
+			"deprovision", "ibmcloud",
+			req.Spec.InfraID,
+			"--region", req.Spec.Platform.IBMCloud.Region,
+			"--base-domain", req.Spec.Platform.IBMCloud.BaseDomain,
+			"--cluster-name", req.Spec.ClusterName,
+		}
+	}
+	args = append(args, "--loglevel", "debug")
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -859,24 +940,27 @@ func completeIBMCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision", "ibmcloud",
-				req.Spec.InfraID,
-				"--region", req.Spec.Platform.IBMCloud.Region,
-				"--base-domain", req.Spec.Platform.IBMCloud.BaseDomain,
-				"--cluster-name", req.Spec.ClusterName,
-				"--loglevel", "debug",
-			},
+			Args:            args,
 		},
 	}
 }
 
-func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
+func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job, args []string) {
 	env, volumes, volumeMounts := envAndVolumes(
 		req.Namespace,
 		"nutanix-creds", "", req.Spec.Platform.Nutanix.CredentialsSecretRef.Name,
 		"nutanix-certificates", constants.NutanixCertificatesDir, req.Spec.Platform.Nutanix.CertificatesSecretRef.Name)
 
+	// empty args implies legacy deprovision
+	if len(args) == 0 {
+		args = []string{
+			"deprovision", "nutanix",
+			req.Spec.InfraID,
+			"--nutanix-pc-address", req.Spec.Platform.Nutanix.PrismCentral.Address,
+			"--nutanix-pc-port", strconv.Itoa(int(req.Spec.Platform.Nutanix.PrismCentral.Port)),
+		}
+	}
+	args = append(args, "--loglevel", "debug")
 	job.Spec.Template.Spec.Containers = []corev1.Container{
 		{
 			Name:            "deprovision",
@@ -884,14 +968,8 @@ func completeNutanixCloudDeprovisionJob(req *hivev1.ClusterDeprovision, job *bat
 			ImagePullPolicy: images.GetHiveImagePullPolicy(),
 			Env:             env,
 			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision", "nutanix",
-				req.Spec.InfraID,
-				"--nutanix-pc-address", req.Spec.Platform.Nutanix.PrismCentral.Address,
-				"--nutanix-pc-port", strconv.Itoa(int(req.Spec.Platform.Nutanix.PrismCentral.Port)),
-				"--loglevel", "debug",
-			},
-			VolumeMounts: volumeMounts,
+			Args:            args,
+			VolumeMounts:    volumeMounts,
 		},
 	}
 	job.Spec.Template.Spec.Volumes = volumes

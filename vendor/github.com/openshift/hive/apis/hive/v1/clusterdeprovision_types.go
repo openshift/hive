@@ -24,6 +24,10 @@ type ClusterDeprovisionSpec struct {
 	// BaseDomain is the DNS base domain.
 	BaseDomain string `json:"baseDomain,omitempty"`
 
+	// MetadataJSONSecretRef references the secret containing the metadata.json emitted by the
+	// installer, potentially scrubbed for sensitive data.
+	MetadataJSONSecretRef *corev1.LocalObjectReference `json:"metadataJSONSecretRef,omitempty"`
+
 	// Platform contains platform-specific configuration for a ClusterDeprovision
 	Platform ClusterDeprovisionPlatform `json:"platform,omitempty"`
 }

@@ -562,6 +562,12 @@ const (
 	// status section of the `clusterversion version` object from the spoke cluster into
 	// ClusterDeployment.Status.ClusterVersionStatus.
 	SyncClusterVersionStatusAnnotation = "hive.openshift.io/sync-clusterversion-status"
+
+	// LegacyDeprovisionAnnotation, if set to "true" on a ClusterDeployment, causes hive to revert to the legacy
+	// deprovision algorithm whereby individual cluster metadata fields are fed into the deprovision pod. This is
+	// provided as a workaround for speculative problems using the new algorithm whereby the metadata.json from
+	// the provisioning process is passed through directly to the destroyer.
+	LegacyDeprovisionAnnotation = "hive.openshift.io/legacy-deprovision"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

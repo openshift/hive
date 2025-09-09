@@ -1183,9 +1183,6 @@ func (r *ReconcileClusterDeployment) retrofitMetadataJSON(cd *hivev1.ClusterDepl
 			Cloud:      cd.Spec.Platform.OpenStack.Cloud,
 			Identifier: map[string]string{"openshiftClusterID": cdMetadata.InfraID},
 		}
-	case cd.Spec.Platform.Ovirt != nil:
-		// HIVE-2908: Remove this branch
-		panic("Ovirt is not supported!")
 	case cd.Spec.Platform.VSphere != nil:
 		iMetadata.VSphere = &vsphere.Metadata{
 			// Not required?
@@ -2216,7 +2213,13 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			BaseDomain:  cd.Spec.BaseDomain,
 		},
 	}
-	controllerutils.CopyLogAnnotation(cd, req)
+
+	if cd.Spec.ClusterMetadata != nil {
+		// May still be nil (though it shouldn't be)
+		req.Spec.MetadataJSONSecretRef = cd.Spec.ClusterMetadata.MetadataJSONSecretRef
+	}
+
+	controllerutils.CopyAnnotations(cd, req, constants.AdditionalLogFieldsAnnotation, constants.LegacyDeprovisionAnnotation)
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:

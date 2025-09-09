@@ -3370,6 +3370,28 @@ objects:
                     for a cluster. It is used for tagging/naming resources in cloud
                     providers.
                   type: string
+                metadataJSONSecretRef:
+                  description: 'MetaddataJSONSecretRef references the secret containing
+                    the metadata.json emitted by the
+
+                    installer, potentially scrubbed for sensitive data.'
+                  properties:
+                    name:
+                      default: ''
+                      description: 'Name of the referent.
+
+                        This field is effectively required, but due to backwards compatibility
+                        is
+
+                        allowed to be empty. Instances of this type with an empty
+                        value here are
+
+                        almost certainly wrong.
+
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
                 platform:
                   description: Platform contains platform-specific configuration for
                     a ClusterDeprovision

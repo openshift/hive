@@ -2227,7 +2227,13 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			BaseDomain:  cd.Spec.BaseDomain,
 		},
 	}
-	controllerutils.CopyLogAnnotation(cd, req)
+
+	if cd.Spec.ClusterMetadata != nil {
+		// May still be nil (though it shouldn't be)
+		req.Spec.MetadataJSONSecretRef = cd.Spec.ClusterMetadata.MetadataJSONSecretRef
+	}
+
+	controllerutils.CopyAnnotations(cd, req, constants.AdditionalLogFieldsAnnotation, constants.LegacyDeprovisionAnnotation)
 
 	switch {
 	case cd.Spec.Platform.AWS != nil:

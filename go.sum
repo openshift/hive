@@ -781,8 +781,6 @@ github.com/openshift/cloud-provider-vsphere v1.19.1-0.20240626105621-6464d0bb492
 github.com/openshift/cloud-provider-vsphere v1.19.1-0.20240626105621-6464d0bb4928/go.mod h1:eVEtCena8tmeeYDKwZlA2w+xBKzBHbQZ4CNHV8KL4ho=
 github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20240626103413-ddea9c7c0aca h1:HFFzJznFQVudyVSpMa+hZwXZpc0ZvFCIpiMNFdf21g8=
 github.com/openshift/cluster-api-actuator-pkg/testutils v0.0.0-20240626103413-ddea9c7c0aca/go.mod h1:osVq9/R6qKHBQxDP4cYTvkgXVBKOMs1SOfPLFfn0m7A=
-github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519 h1:foU7/s6DQczTFdZ/8H++pUC2Pzygqdz5ZgqUakksR5w=
-github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519/go.mod h1:C7unCUThP8eqT4xQfbvg3oIDn2S9TYtb0wbBoH/SR2U=
 github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4 h1:Xepsi7/s1kHkemmhyWDFV21dijgXZUcT0+8YWh6CbxU=
 github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4/go.mod h1:zCklcJwbnaNx46KvR38Rh86uZdow5gvub4ATcNDopTM=
 github.com/openshift/cluster-control-plane-machine-set-operator v0.0.0-20240909043600-373ac49835bf h1:mfMmaD9+vZIZQq3MGXsS/AGHXekj4wIn3zc1Cs1EY8M=

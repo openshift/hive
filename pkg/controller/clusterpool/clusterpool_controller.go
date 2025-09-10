@@ -303,7 +303,7 @@ func (r *ReconcileClusterPool) Reconcile(ctx context.Context, request reconcile.
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: clp}, logger)
 
 	if clp.Spec.RunningCount != clp.Spec.Size && poolAlwaysRunning(clp) {
-		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack, VShpere and Ovirt. Must set runningCount==size.")
+		return reconcile.Result{}, errors.New("Hibernation is not supported on Openstack and VSphere. Must set runningCount==size.")
 	}
 
 	// Initialize cluster pool conditions if not set
@@ -1096,7 +1096,7 @@ func poolReference(pool *hivev1.ClusterPool) hivev1.ClusterPoolReference {
 // poolAlwaysRunning returns true if the Platrform, cloud provider, machines can only be in running state
 func poolAlwaysRunning(pool *hivev1.ClusterPool) bool {
 	p := pool.Spec.Platform
-	return p.OpenStack != nil || p.Ovirt != nil || p.VSphere != nil
+	return p.OpenStack != nil || p.VSphere != nil
 }
 
 func (r *ReconcileClusterPool) getCredentialsSecret(pool *hivev1.ClusterPool, secretName string, logger log.FieldLogger) (*corev1.Secret, error) {
@@ -1334,28 +1334,6 @@ func (r *ReconcileClusterPool) createCloudBuilder(pool *hivev1.ClusterPool, logg
 		cloudBuilder.Network = platform.VSphere.Network
 
 		return cloudBuilder, nil
-	case platform.Ovirt != nil:
-		credsSecret, err := r.getCredentialsSecret(pool, platform.Ovirt.CredentialsSecretRef.Name, logger)
-		if err != nil {
-			return nil, err
-		}
-
-		certsSecret, err := r.getCredentialsSecret(pool, platform.Ovirt.CertificatesSecretRef.Name, logger)
-		if err != nil {
-			return nil, err
-		}
-
-		if _, ok := certsSecret.Data[".cacert"]; !ok {
-			return nil, err
-		}
-
-		cloudBuilder := clusterresource.NewOvirtCloudBuilderFromSecret(credsSecret)
-		cloudBuilder.StorageDomainID = platform.Ovirt.StorageDomainID
-		cloudBuilder.ClusterID = platform.Ovirt.ClusterID
-		cloudBuilder.NetworkName = platform.Ovirt.NetworkName
-
-		return cloudBuilder, nil
-
 	default:
 		logger.Info("unsupported platform")
 		return nil, errors.New("unsupported platform")

@@ -1826,10 +1826,6 @@ github.com/openshift/client-go/machine/listers/machine/v1beta1
 github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1
 github.com/openshift/cloud-credential-operator/pkg/aws
 github.com/openshift/cloud-credential-operator/pkg/version
-# github.com/openshift/cluster-api-provider-ovirt v0.1.1-0.20220323121149-e3f2850dd519
-## explicit; go 1.17
-github.com/openshift/cluster-api-provider-ovirt/pkg/apis
-github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1
 # github.com/openshift/cluster-autoscaler-operator v0.0.1-0.20250219201631-227f7537c3b4
 ## explicit; go 1.23.0
 github.com/openshift/cluster-autoscaler-operator/pkg/apis/autoscaling/v1
@@ -1860,7 +1856,6 @@ github.com/openshift/hive/apis/hive/v1/metricsconfig
 github.com/openshift/hive/apis/hive/v1/none
 github.com/openshift/hive/apis/hive/v1/nutanix
 github.com/openshift/hive/apis/hive/v1/openstack
-github.com/openshift/hive/apis/hive/v1/ovirt
 github.com/openshift/hive/apis/hive/v1/vsphere
 github.com/openshift/hive/apis/hivecontracts/v1alpha1
 github.com/openshift/hive/apis/hiveinternal/v1alpha1
@@ -1888,7 +1883,6 @@ github.com/openshift/installer/pkg/asset/machines/gcp
 github.com/openshift/installer/pkg/asset/machines/ibmcloud
 github.com/openshift/installer/pkg/asset/machines/nutanix
 github.com/openshift/installer/pkg/asset/machines/openstack
-github.com/openshift/installer/pkg/asset/machines/ovirt
 github.com/openshift/installer/pkg/asset/machines/vsphere
 github.com/openshift/installer/pkg/asset/manifests/capiutils
 github.com/openshift/installer/pkg/asset/manifests/gcp
@@ -1899,7 +1893,6 @@ github.com/openshift/installer/pkg/destroy/gcp
 github.com/openshift/installer/pkg/destroy/ibmcloud
 github.com/openshift/installer/pkg/destroy/nutanix
 github.com/openshift/installer/pkg/destroy/openstack
-github.com/openshift/installer/pkg/destroy/ovirt
 github.com/openshift/installer/pkg/destroy/providers
 github.com/openshift/installer/pkg/destroy/vsphere
 github.com/openshift/installer/pkg/hostcrypt

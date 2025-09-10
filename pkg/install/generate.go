@@ -240,10 +240,6 @@ func InstallerPodSpec(
 		// TODO: I don't think we actually use this dir. Can we get rid of it?
 		emptyDirs["vsphere-credentials"] = constants.VSphereCredentialsDir
 		emptyDirs["vsphere-certificates"] = constants.VSphereCertificatesDir
-	case cd.Spec.Platform.Ovirt != nil:
-		credentialRef, certificateRef = cd.Spec.Platform.Ovirt.CredentialsSecretRef.Name, cd.Spec.Platform.Ovirt.CertificatesSecretRef.Name
-		emptyDirs["ovirt-credentials"] = constants.OvirtCredentialsDir
-		emptyDirs["ovirt-certificates"] = constants.OvirtCertificatesDir
 	case cd.Spec.Platform.IBMCloud != nil:
 		credentialRef = cd.Spec.Platform.IBMCloud.CredentialsSecretRef.Name
 	case cd.Spec.Platform.BareMetal != nil:
@@ -531,8 +527,6 @@ func GenerateUninstallerJobForDeprovision(
 		completeOpenStackDeprovisionJob(req, job)
 	case req.Spec.Platform.VSphere != nil:
 		completeVSphereDeprovisionJob(req, job)
-	case req.Spec.Platform.Ovirt != nil:
-		completeOvirtDeprovisionJob(req, job)
 	case req.Spec.Platform.IBMCloud != nil:
 		completeIBMCloudDeprovisionJob(req, job)
 	case req.Spec.Platform.Nutanix != nil:
@@ -833,32 +827,6 @@ func completeVSphereDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.
 				"--vsphere-vcenter", req.Spec.Platform.VSphere.VCenter,
 				"--loglevel", "debug",
 				"--creds-dir", constants.VSphereCredentialsDir,
-				req.Spec.InfraID,
-			},
-			VolumeMounts: volumeMounts,
-		},
-	}
-	job.Spec.Template.Spec.Volumes = volumes
-}
-
-func completeOvirtDeprovisionJob(req *hivev1.ClusterDeprovision, job *batchv1.Job) {
-	env, volumes, volumeMounts := envAndVolumes(
-		req.Namespace,
-		"ovirt-credentials", constants.OvirtCredentialsDir, req.Spec.Platform.Ovirt.CredentialsSecretRef.Name,
-		"ovirt-certificates", constants.OvirtCertificatesDir, req.Spec.Platform.Ovirt.CertificatesSecretRef.Name)
-
-	job.Spec.Template.Spec.Containers = []corev1.Container{
-		{
-			Name:            "deprovision",
-			Image:           images.GetHiveImage(),
-			ImagePullPolicy: images.GetHiveImagePullPolicy(),
-			Env:             env,
-			Command:         []string{"/usr/bin/hiveutil"},
-			Args: []string{
-				"deprovision", "ovirt",
-				"--ovirt-cluster-id", req.Spec.Platform.Ovirt.ClusterID,
-				"--loglevel", "debug",
-				"--creds-dir", constants.OvirtCredentialsDir,
 				req.Spec.InfraID,
 			},
 			VolumeMounts: volumeMounts,

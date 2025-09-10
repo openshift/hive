@@ -14,7 +14,6 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/none"
 	"github.com/openshift/hive/apis/hive/v1/nutanix"
 	"github.com/openshift/hive/apis/hive/v1/openstack"
-	"github.com/openshift/hive/apis/hive/v1/ovirt"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
 )
 
@@ -666,9 +665,6 @@ type Platform struct {
 
 	// VSphere is the configuration used when installing on vSphere
 	VSphere *vsphere.Platform `json:"vsphere,omitempty"`
-
-	// Ovirt is the configuration used when installing on oVirt
-	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
 
 	// AgentBareMetal is the configuration used when performing an Assisted Agent based installation
 	// to bare metal.

@@ -50,6 +50,11 @@ func TestErrorScrubber(t *testing.T) {
 			expected: `failed to describe load balancer for the cluster: AccessDenied: User: arn:aws:sts::XXX:assumed-role/RH-Managed-OpenShift-Installer/XXX is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::XXX:role/ManagedOpenShift-Installer-Role, status code: 403`,
 		},
 		{
+			name:     "aws not authorized arn no resource",
+			input:    errors.New("failed to describe load balancer for the cluster: AccessDenied: User: arn:aws:sts::999999999:assumed-role/ManagedOpenShift-Installer-Role/9999999999999999999 is not authorized to perform: elasticloadbalancing:DescribeLoadBalancers with an explicit deny in an identity-based policy\n\tstatus code: 403, request id: be5fed4c-ba78-43a2-82b7-150bab2b10cc"),
+			expected: `failed to describe load balancer for the cluster: AccessDenied: User: arn:aws:sts::XXX:assumed-role/ManagedOpenShift-Installer-Role/XXX is not authorized to perform: elasticloadbalancing:DescribeLoadBalancers with an explicit deny in an identity-based policy, status code: 403`,
+		},
+		{
 			name:     "aws encoded msg",
 			input:    errors.New("failed to reconcile the VPC Endpoint Service: UnauthorizedOperation: You are not authorized to perform this operation. Encoded authorization failure message: CnWuhDtDU8FQVg9qYvdTV1sflohKgfEbSt7r5FKOlWASj-sZd_ThxMgw1vWPaA03t0q-4YxC3ixYib1CpgUy5OxR9rvuTQ24D_CvTl9ZwqTqdG7OZ49nzPRBuYkL6WYrh_m40GVqa7dyZnhdsFADPpGbFngWx6whQqOU83hpGcYUtFuWmuHlMAz8sPsQHviCHZ9WgIWoTS8Rqjpf2BQWKknnF7IVfkAlyhZJGoPNZ5RUxgphGniUfk0G_2mEY8VmVLwzhqAzbJE_GYednXtMfLX9ctEVd1G2c-2bW4lrQpvjxVaZ92oKXhtfkT5zEI_7sw4fa8yqrxfnE6n4XG2M2CqpaT2HphDc8LJpg7lZXhpCCkunG7wtCAiQvF4NwWqENxlCd_k-E_d1FaIEMaUSAoOUXcjJx8W-ObZy0qst64dQPg-kPNHbrnwMh4DGfppWEPaQgLBOa9LN3xkD-5r6fjT5yJWGcTiKYAKjBiW0KAiwULI11_8Ty9l-QY1OMaudbv_0drhKs766YsbTlMTBWZ37trRzMTWmdCCntilfAVjVHWpdNhNlGwvWPB8DMs38I4zONqCUhw8WVbJ0B-b9BgmkD0rpz9-uQ9i3yh8In-YrFgcXy6CgJpKqYnQjy2QhLwJvDLVgf4eckchR7TkDWkjjrXcQ-15aWOnhtUnyRU6MaPRpCwFCj9xigNmVOQfmK63YeoxT9a1SF7XeJA\n\tstatus code: 403, request id: XXX"),
 			expected: `failed to reconcile the VPC Endpoint Service: UnauthorizedOperation: You are not authorized to perform this operation. Encoded authorization failure message: XXX, status code: 403, request id: XXX`,

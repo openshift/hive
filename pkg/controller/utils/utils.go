@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -306,11 +307,11 @@ func EnsureRequeueAtLeastWithin(duration time.Duration, result reconcile.Result,
 	return reconcile.Result{RequeueAfter: duration, Requeue: true}, nil
 }
 
-// CopySecret copies the secret defined by src to dest.
-func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Object, scheme *runtime.Scheme) error {
+// CopySecret copies the secret defined by src to dest.  Returns true if an actual change was made.
+func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Object, scheme *runtime.Scheme) (bool, error) {
 	srcSecret := &corev1.Secret{}
 	if err := c.Get(context.Background(), src, srcSecret); err != nil {
-		return err
+		return false, err
 	}
 
 	destSecret := &corev1.Secret{}
@@ -327,23 +328,42 @@ func CopySecret(c client.Client, src, dest types.NamespacedName, owner metav1.Ob
 		}
 		if owner != nil {
 			if err := controllerutil.SetOwnerReference(owner, destSecret, scheme); err != nil {
-				return err
+				return false, err
 			}
 		}
 
-		return c.Create(context.Background(), destSecret)
-	}
-	if err != nil {
-		return err
+		return true, c.Create(context.Background(), destSecret)
+	} else if err != nil {
+		return false, err
 	}
 
+	// If the two secrets match...
 	if reflect.DeepEqual(destSecret.Data, srcSecret.Data) && reflect.DeepEqual(destSecret.StringData, srcSecret.StringData) {
-		return nil // no work as the dest and source data matches.
+		// and destination has no new owner...
+		if owner == nil {
+			// no work as the dest and source data matches, and no owner.
+			return false, nil
+		} else {
+			if slices.ContainsFunc(destSecret.OwnerReferences, func(ref metav1.OwnerReference) bool {
+				return ref.UID == owner.GetUID()
+			}) {
+				return false, nil // no work as the dest and source data matches and secret is owned
+			}
+		}
+
+		// We still need to register the new owner, down below:
+	} else {
+		destSecret.Data = srcSecret.DeepCopy().Data
+		destSecret.StringData = srcSecret.DeepCopy().StringData
 	}
 
-	destSecret.Data = srcSecret.DeepCopy().Data
-	destSecret.StringData = srcSecret.DeepCopy().StringData
-	return c.Update(context.Background(), destSecret)
+	// If we've made it this far, unconditionally set the owner ref
+	// (controllerutil handles deduplication etc)
+	if err := controllerutil.SetOwnerReference(owner, destSecret, scheme); err != nil {
+		return false, err
+	}
+
+	return true, c.Update(context.Background(), destSecret)
 }
 
 // BuildControllerLogger returns a logger for controllers with consistent fields.

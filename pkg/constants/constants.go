@@ -16,7 +16,6 @@ const (
 	PlatformIBMCloud       = "ibmcloud"
 	PlatformNone           = "none-platform"
 	PlatformOpenStack      = "openstack"
-	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
 	PlatformNutanix        = "nutanix"
@@ -364,18 +363,6 @@ const (
 	// MinorVersionUpgradeUnavailable is a label applied to ClusterDeployments to show concerns about upgrades to the
 	// next minor version. i.e 4.y -> 4.(y+1)
 	MinorVersionUpgradeUnavailable = "hive.openshift.io/minor-version-upgrade-unavailable"
-
-	// OvirtCredentialsDir is the directory containing Ovirt credentials files.
-	OvirtCredentialsDir = "/.ovirt"
-
-	// OvirtCertificatesDir is the directory containing Ovirt certificate files.
-	OvirtCertificatesDir = "/.ovirt-ca"
-
-	// OvirtCredentialsName is the name of the oVirt credentials file.
-	OvirtCredentialsName = "ovirt-config.yaml"
-
-	// OvirtConfigEnvVar is the environment variable specifying the oVirt config path
-	OvirtConfigEnvVar = "OVIRT_CONFIG"
 
 	// InstallLogsUploadProviderEnvVar is used to specify which object store provider is being used.
 	InstallLogsUploadProviderEnvVar = "HIVE_INSTALL_LOGS_UPLOAD_PROVIDER"

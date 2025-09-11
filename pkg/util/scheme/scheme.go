@@ -31,7 +31,6 @@ import (
 	crv1alpha1 "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 
-	ovirtprovider "github.com/openshift/cluster-api-provider-ovirt/pkg/apis"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
@@ -68,7 +67,6 @@ func init() {
 	monitoringv1.AddToScheme(hive_scheme)
 	oappsv1.Install(hive_scheme)
 	orbacv1.Install(hive_scheme)
-	ovirtprovider.AddToScheme(hive_scheme)
 	rbacv1.AddToScheme(hive_scheme)
 	routev1.AddToScheme(hive_scheme)
 	velerov1.AddToScheme(hive_scheme)

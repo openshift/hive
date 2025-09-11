@@ -32,7 +32,6 @@ spec:
     * Google Cloud Platform
     * IBM Cloud
     * Red Hat OpenStack
-    * oVirt
     * vSphere
 
     In the future Hive will support more cloud providers.

@@ -2024,12 +2024,6 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CertificatesSecretRef: cd.Spec.Platform.VSphere.CertificatesSecretRef,
 			VCenter:               cd.Spec.Platform.VSphere.VCenter,
 		}
-	case cd.Spec.Platform.Ovirt != nil:
-		req.Spec.Platform.Ovirt = &hivev1.OvirtClusterDeprovision{
-			CredentialsSecretRef:  cd.Spec.Platform.Ovirt.CredentialsSecretRef,
-			CertificatesSecretRef: cd.Spec.Platform.Ovirt.CertificatesSecretRef,
-			ClusterID:             cd.Spec.Platform.Ovirt.ClusterID,
-		}
 	case cd.Spec.Platform.IBMCloud != nil:
 		req.Spec.Platform.IBMCloud = &hivev1.IBMClusterDeprovision{
 			CredentialsSecretRef: cd.Spec.Platform.IBMCloud.CredentialsSecretRef,
@@ -2726,8 +2720,6 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformIBMCloud
 	case cd.Spec.Platform.None != nil:
 		return constants.PlatformNone
-	case cd.Spec.Platform.Ovirt != nil:
-		return constants.PlatformOvirt
 	case cd.Spec.Platform.Nutanix != nil:
 		return constants.PlatformNutanix
 	}

@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -714,6 +715,7 @@ type createdResourceInfo struct {
 	routeSelector      *metav1.LabelSelector
 	defaultCertificate string
 	httpErrorCodePages *configv1.ConfigMapNameReference
+	raw                map[string]any
 }
 type createdSyncSetInfo struct {
 	name           string
@@ -747,8 +749,7 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			created.resources = append(created.resources, cr)
 			continue
 		}
-		ic, ok := raw.Object.(*ingresscontroller.IngressController)
-		if ok {
+		if ic, ok := raw.Object.(*ingresscontroller.IngressController); ok {
 			cr := createdResourceInfo{
 				name:              ic.Name,
 				namespace:         ic.Namespace,
@@ -762,6 +763,32 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			}
 			if ic.Spec.DefaultCertificate != nil {
 				cr.defaultCertificate = ic.Spec.DefaultCertificate.Name
+			}
+			if uic, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ic); err == nil {
+				cr.raw = uic
+			}
+			created.resources = append(created.resources, cr)
+			continue
+		}
+		// Handle unstructured IngressController objects since we stripped some fields
+		if u, ok := raw.Object.(*unstructured.Unstructured); ok && u.GetKind() == "IngressController" {
+			cr := createdResourceInfo{
+				name:      u.GetName(),
+				namespace: u.GetNamespace(),
+				kind:      u.GetKind(),
+				raw:       u.Object,
+			}
+			var typed ingresscontroller.IngressController
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, &typed); err == nil {
+				cr.domain = typed.Spec.Domain
+				cr.namespaceSelector = typed.Spec.NamespaceSelector
+				cr.routeSelector = typed.Spec.RouteSelector
+				if !reflect.DeepEqual(typed.Spec.HttpErrorCodePages, configv1.ConfigMapNameReference{}) {
+					cr.httpErrorCodePages = &typed.Spec.HttpErrorCodePages
+				}
+				if typed.Spec.DefaultCertificate != nil {
+					cr.defaultCertificate = typed.Spec.DefaultCertificate.Name
+				}
 			}
 			created.resources = append(created.resources, cr)
 			continue
@@ -804,6 +831,23 @@ func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedS
 				assert.Equal(t, ic.routeSelector, resObj.routeSelector, "unexpected routeSelector on ingressController: %v", ic.name)
 				assert.Equal(t, ic.defaultCertificate, resObj.defaultCertificate, "unexpected DefaultCertificate on ingressController: %v", ic.name)
 				assert.Equal(t, ic.httpErrorCodePages, resObj.httpErrorCodePages, "unexpected HttpErrorCodePages field on ingressController: %v", ic.name)
+
+				// Make sure that only allowed keys are present in the IngressController spec
+				if resObj.raw != nil {
+					allowed := map[string]bool{
+						"domain":             true,
+						"namespaceSelector":  true,
+						"routeSelector":      true,
+						"defaultCertificate": true,
+						"httpErrorCodePages": true,
+					}
+					if spec, ok := resObj.raw["spec"].(map[string]any); ok {
+						for k := range spec {
+							assert.Truef(t, allowed[k], "unexpected spec key %q on ingressController: %v", k, ic.name)
+						}
+						assert.Equal(t, ic.httpErrorCodePages != nil, spec["httpErrorCodePages"] != nil, "mismatched field httpErrorCodePages on ingressController: %v", ic.name)
+					}
+				}
 			}
 		}
 		assert.True(t, found, "didn't find expected ingressController: %v", ic.name)

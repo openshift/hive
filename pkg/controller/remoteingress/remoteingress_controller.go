@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -252,7 +253,34 @@ func rawExtensionsFromClusterDeployment(rContext *reconcileContext) []runtime.Ra
 
 	for _, ingress := range rContext.clusterDeployment.Spec.Ingress {
 		ingressObj := createIngressController(rContext.clusterDeployment, ingress)
-		raw := runtime.RawExtension{Object: ingressObj}
+
+		// Remove status and prune spec to a strict allowlist of user-settable fields derived from ClusterDeployment.
+		// Keep httpErrorCodePages only when explicitly set in the ClusterDeployment.
+		// This prevents overwriting changes made by other controllers/users on the remote cluster with (empty) defaults.
+		var obj runtime.Object = ingressObj
+		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ingressObj)
+		if err == nil {
+			delete(unstructuredObj, "status")
+			if spec, ok := unstructuredObj["spec"].(map[string]any); ok {
+				allowed := map[string]bool{
+					"domain":             true,
+					"routeSelector":      true,
+					"namespaceSelector":  true,
+					"defaultCertificate": true,
+				}
+				if ingress.HttpErrorCodePages != nil {
+					allowed["httpErrorCodePages"] = true
+				}
+				for k := range spec {
+					if !allowed[k] {
+						delete(spec, k)
+					}
+				}
+			}
+			obj = &unstructured.Unstructured{Object: unstructuredObj}
+		}
+
+		raw := runtime.RawExtension{Object: obj}
 		rawList = append(rawList, raw)
 	}
 

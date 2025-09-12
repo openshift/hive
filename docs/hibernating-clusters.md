@@ -353,8 +353,10 @@ OpenStack hibernation deletes cluster instances while preserving the ability to 
 
 While OpenStack provides shelving functionality, replicating true hibernation behavior similar to other cloud providers is difficult and often not possible depending on the OpenStack deployment configuration. Hive's snapshot-based approach provides a universally compatible solution that works with any OpenStack setup.
 
-OpenStack hibernation creates snapshots of all instances, saves their complete configuration into a secret (CD namespace), and deletes the instances, completely freeing all project resources consumed by the cluster.
+OpenStack hibernation pauses the instances, creates snapshots of all instances, saves their complete configuration into a secret (CD namespace), and deletes the instances, completely freeing all project resources consumed by the cluster.
 
-Restoration recreates instances with identical attributes to their original state.
+Restoration recreates instances with identical attributes to their original state, including tags and metadata.
 
-Due to the specific nature of the snapshot based implementation, the hibernation and restoration process inherently requires more time to finish compared to other cloud providers.
+Due to the specific nature of the snapshot based implementation, the hibernation and restoration process inherently requires more time to finish compared to other cloud providers, approximately 10 minutes for each, creating the snapshots during hibernation and restoring the instances from the snapshots taking majority of the time.
+
+Instance snapshots (Images) do not take from the project's quota and are being cleaned up after each Hibernation cycle (worker snaphots can only be deleted once the worker instance dissappears)

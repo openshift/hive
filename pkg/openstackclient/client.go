@@ -4,18 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"gopkg.in/yaml.v2"
-
 	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/usage"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/utils/openstack/clientconfig"
+
+	"gopkg.in/yaml.v2"
+
 	"github.com/openshift/hive/pkg/constants"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,68 +35,20 @@ type Client interface {
 	ListImages(ctx context.Context, opts *images.ListOpts) ([]images.Image, error)
 	DeleteImage(ctx context.Context, imageID string) error
 
+	// Instance state management
+	PauseServer(ctx context.Context, serverID string) error
+	UnpauseServer(ctx context.Context, serverID string) error
+
 	// Networks
 	GetNetworkByName(ctx context.Context, networkName string) (*networks.Network, error)
 	ListPorts(ctx context.Context) ([]ports.Port, error)
 
+	// Tags
+	GetServerTags(ctx context.Context, serverID string) ([]string, error)
+	SetServerTags(ctx context.Context, serverID string, tags []string) error
+
 	// Security Group Names
 	GetServerSecurityGroupNames(ctx context.Context, serverID string) ([]string, error)
-
-	// Project resources
-	GetComputeQuotas(ctx context.Context) (*quotasets.QuotaSet, error)
-	GetComputeUsage(ctx context.Context) (*usage.TenantUsage, error)
-	GetFlavorDetails(ctx context.Context, flavorID string) (*flavors.Flavor, error)
-}
-
-type ResourceRequirements struct {
-	Instances int
-	VCPUs     int
-	RAM       int
-}
-
-type Credentials struct {
-	AuthURL            string `json:"auth_url"`
-	Username           string `json:"username,omitempty"`
-	Password           string `json:"password,omitempty"`
-	UserID             string `json:"user_id,omitempty"`
-	ProjectID          string `json:"project_id,omitempty"`
-	ProjectName        string `json:"project_name,omitempty"`
-	UserDomainName     string `json:"user_domain_name,omitempty"`
-	UserDomainID       string `json:"user_domain_id,omitempty"`
-	ProjectDomainName  string `json:"project_domain_name,omitempty"`
-	ProjectDomainID    string `json:"project_domain_id,omitempty"`
-	RegionName         string `json:"region_name,omitempty"`
-	Interface          string `json:"interface,omitempty"`
-	IdentityAPIVersion string `json:"identity_api_version,omitempty"`
-
-	TenantID   string `json:"tenant_id,omitempty"`
-	TenantName string `json:"tenant_name,omitempty"`
-	DomainID   string `json:"domain_id,omitempty"`
-	DomainName string `json:"domain_name,omitempty"`
-	Region     string `json:"region,omitempty"`
-}
-
-type CloudsYAML struct {
-	Clouds map[string]CloudConfig `yaml:"clouds"`
-}
-
-type CloudConfig struct {
-	Auth      CloudAuth `yaml:"auth"`
-	Region    string    `yaml:"region_name"`
-	Interface string    `yaml:"interface"`
-	Version   string    `yaml:"identity_api_version"`
-}
-
-type CloudAuth struct {
-	AuthURL           string `yaml:"auth_url"`
-	Username          string `yaml:"username"`
-	Password          string `yaml:"password"`
-	ProjectID         string `yaml:"project_id"`
-	ProjectName       string `yaml:"project_name"`
-	UserDomainName    string `yaml:"user_domain_name"`
-	ProjectDomainName string `yaml:"project_domain_name"`
-	UserDomainID      string `yaml:"user_domain_id"`
-	ProjectDomainID   string `yaml:"project_domain_id"`
 }
 
 type openstackClient struct {
@@ -106,8 +56,9 @@ type openstackClient struct {
 	computeClient *gophercloud.ServiceClient
 	imageClient   *gophercloud.ServiceClient
 	networkClient *gophercloud.ServiceClient
-	credentials   *Credentials
 }
+
+var _ Client = &openstackClient{}
 
 // Implementation of server methods
 func (c *openstackClient) ListServers(ctx context.Context, opts *servers.ListOpts) ([]servers.Server, error) {
@@ -127,6 +78,63 @@ func (c *openstackClient) GetServer(ctx context.Context, serverID string) (*serv
 
 func (c *openstackClient) DeleteServer(ctx context.Context, serverID string) error {
 	return servers.Delete(c.computeClient, serverID).ExtractErr()
+}
+
+// PauseServer pauses a server using the raw OpenStack API
+func (c *openstackClient) PauseServer(ctx context.Context, serverID string) error {
+	url := c.computeClient.ServiceURL("servers", serverID, "action")
+
+	reqBody := map[string]interface{}{
+		"pause": nil,
+	}
+
+	_, err := c.computeClient.Post(url, reqBody, nil, &gophercloud.RequestOpts{
+		OkCodes: []int{202},
+	})
+	return err
+}
+
+// UnpauseServer unpauses a server using the raw OpenStack API
+func (c *openstackClient) UnpauseServer(ctx context.Context, serverID string) error {
+	url := c.computeClient.ServiceURL("servers", serverID, "action")
+
+	reqBody := map[string]interface{}{
+		"unpause": nil,
+	}
+
+	_, err := c.computeClient.Post(url, reqBody, nil, &gophercloud.RequestOpts{
+		OkCodes: []int{202},
+	})
+	return err
+}
+
+func (c *openstackClient) GetServerTags(ctx context.Context, serverID string) ([]string, error) {
+	url := c.computeClient.ServiceURL("servers", serverID, "tags")
+
+	var result struct {
+		Tags []string `json:"tags"`
+	}
+
+	_, err := c.computeClient.Get(url, &result, nil)
+	if err != nil {
+		// Just return empty tags if the API call fails for any reason
+		return []string{}, nil
+	}
+
+	return result.Tags, nil
+}
+
+func (c *openstackClient) SetServerTags(ctx context.Context, serverID string, tags []string) error {
+	url := c.computeClient.ServiceURL("servers", serverID, "tags")
+
+	reqBody := map[string][]string{
+		"tags": tags,
+	}
+
+	_, err := c.computeClient.Put(url, reqBody, nil, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
+	})
+	return err
 }
 
 // Create a snapshot of the specified server
@@ -227,158 +235,65 @@ func (c *openstackClient) GetServerSecurityGroupNames(ctx context.Context, serve
 	return secGroupNames, nil
 }
 
-// Gets the compute quotas for the current project
-func (c *openstackClient) GetComputeQuotas(ctx context.Context) (*quotasets.QuotaSet, error) {
-	projectID := c.credentials.ProjectID
-	if projectID == "" {
-		projectID = c.credentials.TenantID
-	}
-	if projectID == "" {
-		return nil, fmt.Errorf("no project ID found in credentials")
-	}
-
-	quotaSet, err := quotasets.Get(c.computeClient, projectID).Extract()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get quota set: %w", err)
-	}
-
-	return quotaSet, nil
-}
-
-// Gets the current compute usage for the project
-func (c *openstackClient) GetComputeUsage(ctx context.Context) (*usage.TenantUsage, error) {
-	projectID := c.credentials.ProjectID
-	if projectID == "" {
-		projectID = c.credentials.TenantID
-	}
-	if projectID == "" {
-		return nil, fmt.Errorf("no project ID found in credentials")
-	}
-
-	// Get usage for current project
-	allPages, err := usage.SingleTenant(c.computeClient, projectID, usage.SingleTenantOpts{}).AllPages()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get compute usage pages: %w", err)
-	}
-
-	// Extract usage from pages
-	tenantUsage, err := usage.ExtractSingleTenant(allPages)
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract compute usage: %w", err)
-	}
-
-	// Note: tenantUsage can be nil - caller needs to handle this
-	return tenantUsage, nil
-}
-
-// Gets detailed information about a specific flavor
-func (c *openstackClient) GetFlavorDetails(ctx context.Context, flavorID string) (*flavors.Flavor, error) {
-	return flavors.Get(c.computeClient, flavorID).Extract()
-}
-
 // Create a client wrapper object for interacting with OpenStack.
 func NewClientFromSecret(secret *corev1.Secret) (Client, error) {
 	cloudsYaml, ok := secret.Data[constants.OpenStackCredentialsName]
 	if !ok {
 		return nil, fmt.Errorf("secret does not contain %q data", constants.OpenStackCredentialsName)
 	}
-	return newClientFromCloudsYAML(cloudsYaml)
-}
 
-// Creates a client from clouds.yaml data
-func newClientFromCloudsYAML(cloudsYamlData []byte) (Client, error) {
-	var clouds CloudsYAML
-	if err := yaml.Unmarshal(cloudsYamlData, &clouds); err != nil {
+	// Use upstream structs instead of custom ones
+	var clouds clientconfig.Clouds
+	if err := yaml.Unmarshal(cloudsYaml, &clouds); err != nil {
 		return nil, fmt.Errorf("failed to parse clouds.yaml: %w", err)
 	}
 
-	// Get the "openstack" cloud config
-	openstackCloud, ok := clouds.Clouds["openstack"]
-	if !ok {
-		return nil, fmt.Errorf("no 'openstack' cloud found in clouds.yaml")
+	// Get the first cloud (or specific cloud name)
+	var cloud *clientconfig.Cloud
+	for _, c := range clouds.Clouds {
+		cloud = &c
+		break
 	}
 
-	// Convert to Credentials struct
-	creds := &Credentials{
-		AuthURL:            openstackCloud.Auth.AuthURL,
-		Username:           openstackCloud.Auth.Username,
-		Password:           openstackCloud.Auth.Password,
-		ProjectID:          openstackCloud.Auth.ProjectID,
-		ProjectName:        openstackCloud.Auth.ProjectName,
-		UserDomainName:     openstackCloud.Auth.UserDomainName,
-		ProjectDomainName:  openstackCloud.Auth.ProjectDomainName,
-		UserDomainID:       openstackCloud.Auth.UserDomainID,
-		ProjectDomainID:    openstackCloud.Auth.ProjectDomainID,
-		RegionName:         openstackCloud.Region,
-		Interface:          openstackCloud.Interface,
-		IdentityAPIVersion: openstackCloud.Version,
+	if cloud == nil {
+		return nil, fmt.Errorf("no cloud configuration found in clouds.yaml")
 	}
 
-	return newClientFromStruct(creds)
-}
-
-// getRegion helper function
-func getRegion(creds *Credentials) string {
-	if creds.RegionName != "" {
-		return creds.RegionName
-	}
-	if creds.Region != "" {
-		return creds.Region
-	}
-	return "RegionOne"
-}
-
-func newClientFromStruct(creds *Credentials) (*openstackClient, error) {
-	// Validate required credentials
-	if creds.AuthURL == "" {
-		return nil, fmt.Errorf("missing auth_url in credentials")
+	authInfo := &clientconfig.AuthInfo{
+		AuthURL:           cloud.AuthInfo.AuthURL,
+		Username:          cloud.AuthInfo.Username,
+		Password:          cloud.AuthInfo.Password,
+		ProjectID:         cloud.AuthInfo.ProjectID,
+		ProjectName:       cloud.AuthInfo.ProjectName,
+		UserDomainName:    cloud.AuthInfo.UserDomainName,
+		ProjectDomainName: cloud.AuthInfo.ProjectDomainName,
 	}
 
-	// Authentication options
-	authOpts := gophercloud.AuthOptions{
-		IdentityEndpoint: creds.AuthURL,
-		Username:         creds.Username,
-		UserID:           creds.UserID,
-		Password:         creds.Password,
-		TenantID:         creds.ProjectID,
-		TenantName:       creds.ProjectName,
-		DomainName:       creds.UserDomainName,
-		DomainID:         creds.UserDomainID,
+	opts := &clientconfig.ClientOpts{
+		AuthInfo:     authInfo,
+		RegionName:   cloud.RegionName,
+		EndpointType: cloud.Interface,
 	}
 
-	// Authenticate and get provider client
-	provider, err := openstack.AuthenticatedClient(authOpts)
+	provider, err := clientconfig.AuthenticatedClient(opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to authenticate with OpenStack: %w", err)
+		return nil, fmt.Errorf("failed to create authenticated client: %w", err)
 	}
 
-	region := getRegion(creds)
-
-	interfaceType := gophercloud.AvailabilityPublic
-	switch creds.Interface {
-	case "internal":
-		interfaceType = gophercloud.AvailabilityInternal
-	case "admin":
-		interfaceType = gophercloud.AvailabilityAdmin
-	}
-
-	endpointOpts := gophercloud.EndpointOpts{
-		Region:       region,
-		Availability: interfaceType,
-	}
-
-	// Create service clients
-	computeClient, err := openstack.NewComputeV2(provider, endpointOpts)
+	computeClient, err := clientconfig.NewServiceClient("compute", opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compute client: %w", err)
 	}
 
-	imageClient, err := openstack.NewImageServiceV2(provider, endpointOpts)
+	// Specify microversion in order to allow instance tagging
+	computeClient.Microversion = "2.26"
+
+	imageClient, err := clientconfig.NewServiceClient("image", opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create image client: %w", err)
 	}
 
-	networkClient, err := openstack.NewNetworkV2(provider, endpointOpts)
+	networkClient, err := clientconfig.NewServiceClient("network", opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create network client: %w", err)
 	}
@@ -388,6 +303,5 @@ func newClientFromStruct(creds *Credentials) (*openstackClient, error) {
 		computeClient: computeClient,
 		imageClient:   imageClient,
 		networkClient: networkClient,
-		credentials:   creds,
 	}, nil
 }

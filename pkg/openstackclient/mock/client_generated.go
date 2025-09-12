@@ -9,9 +9,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	quotasets "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
-	usage "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/usage"
-	flavors "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	servers "github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	images "github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	networks "github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
@@ -99,51 +96,6 @@ func (mr *MockClientMockRecorder) DeleteServer(ctx, serverID interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServer", reflect.TypeOf((*MockClient)(nil).DeleteServer), ctx, serverID)
 }
 
-// GetComputeQuotas mocks base method.
-func (m *MockClient) GetComputeQuotas(ctx context.Context) (*quotasets.QuotaSet, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetComputeQuotas", ctx)
-	ret0, _ := ret[0].(*quotasets.QuotaSet)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetComputeQuotas indicates an expected call of GetComputeQuotas.
-func (mr *MockClientMockRecorder) GetComputeQuotas(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetComputeQuotas", reflect.TypeOf((*MockClient)(nil).GetComputeQuotas), ctx)
-}
-
-// GetComputeUsage mocks base method.
-func (m *MockClient) GetComputeUsage(ctx context.Context) (*usage.TenantUsage, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetComputeUsage", ctx)
-	ret0, _ := ret[0].(*usage.TenantUsage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetComputeUsage indicates an expected call of GetComputeUsage.
-func (mr *MockClientMockRecorder) GetComputeUsage(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetComputeUsage", reflect.TypeOf((*MockClient)(nil).GetComputeUsage), ctx)
-}
-
-// GetFlavorDetails mocks base method.
-func (m *MockClient) GetFlavorDetails(ctx context.Context, flavorID string) (*flavors.Flavor, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFlavorDetails", ctx, flavorID)
-	ret0, _ := ret[0].(*flavors.Flavor)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetFlavorDetails indicates an expected call of GetFlavorDetails.
-func (mr *MockClientMockRecorder) GetFlavorDetails(ctx, flavorID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFlavorDetails", reflect.TypeOf((*MockClient)(nil).GetFlavorDetails), ctx, flavorID)
-}
-
 // GetImage mocks base method.
 func (m *MockClient) GetImage(ctx context.Context, imageID string) (*images.Image, error) {
 	m.ctrl.T.Helper()
@@ -204,6 +156,21 @@ func (mr *MockClientMockRecorder) GetServerSecurityGroupNames(ctx, serverID inte
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerSecurityGroupNames", reflect.TypeOf((*MockClient)(nil).GetServerSecurityGroupNames), ctx, serverID)
 }
 
+// GetServerTags mocks base method.
+func (m *MockClient) GetServerTags(ctx context.Context, serverID string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServerTags", ctx, serverID)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServerTags indicates an expected call of GetServerTags.
+func (mr *MockClientMockRecorder) GetServerTags(ctx, serverID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerTags", reflect.TypeOf((*MockClient)(nil).GetServerTags), ctx, serverID)
+}
+
 // ListImages mocks base method.
 func (m *MockClient) ListImages(ctx context.Context, opts *images.ListOpts) ([]images.Image, error) {
 	m.ctrl.T.Helper()
@@ -247,4 +214,46 @@ func (m *MockClient) ListServers(ctx context.Context, opts *servers.ListOpts) ([
 func (mr *MockClientMockRecorder) ListServers(ctx, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServers", reflect.TypeOf((*MockClient)(nil).ListServers), ctx, opts)
+}
+
+// PauseServer mocks base method.
+func (m *MockClient) PauseServer(ctx context.Context, serverID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PauseServer", ctx, serverID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PauseServer indicates an expected call of PauseServer.
+func (mr *MockClientMockRecorder) PauseServer(ctx, serverID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PauseServer", reflect.TypeOf((*MockClient)(nil).PauseServer), ctx, serverID)
+}
+
+// SetServerTags mocks base method.
+func (m *MockClient) SetServerTags(ctx context.Context, serverID string, tags []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetServerTags", ctx, serverID, tags)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetServerTags indicates an expected call of SetServerTags.
+func (mr *MockClientMockRecorder) SetServerTags(ctx, serverID, tags interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetServerTags", reflect.TypeOf((*MockClient)(nil).SetServerTags), ctx, serverID, tags)
+}
+
+// UnpauseServer mocks base method.
+func (m *MockClient) UnpauseServer(ctx context.Context, serverID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnpauseServer", ctx, serverID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnpauseServer indicates an expected call of UnpauseServer.
+func (mr *MockClientMockRecorder) UnpauseServer(ctx, serverID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnpauseServer", reflect.TypeOf((*MockClient)(nil).UnpauseServer), ctx, serverID)
 }

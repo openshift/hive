@@ -34,3 +34,12 @@ config/apiserver/certificates/**
 *.swo
 *~
 /_output/
+
+# AI Context
+.claude
+.claude/settings.local.json
+.ai_testgen/.claude/
+.ai_testgen/temp_repos
+.ai_testgen/workflow_outputs/*
+!.ai_testgen/workflow_outputs/hive/
+!.ai_testgen/workflow_outputs/hive/**

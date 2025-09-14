@@ -1,0 +1,88 @@
+jira_analysis:
+  issue_key: "HIVE-2040"
+  title: "Add HttpErrorCodePages to CD.Spec.Ingress[]"
+  status: "Closed"
+  resolution: "Done"
+  priority: "Normal"
+  component: "hive"
+  issue_type: "Task"
+  
+  description_analysis:
+    core_requirement: "Add HttpErrorCodePages field to ClusterDeployment.Spec.Ingress[] API"
+    linked_issue: "https://github.com/openshift/hive/issues/1889"
+    implementation_status: "Already implemented - this is verification/testing work"
+    
+  qe_notes_analysis:
+    test_focus: "API field functionality and propagation through to IngressController"
+    test_scenarios:
+      - "Verify HttpErrorCodePages field is conveyed to ingresscontroller named 'default' in openshift-ingress-operator namespace when used"
+      - "Verify HttpErrorCodePages field is empty/missing in ingresscontroller when not used"
+    environment_assumptions: "QE engineer capabilities and standard OpenShift cluster environment"
+
+technical_requirements:
+  feature_scope:
+    api_changes:
+      - "HttpErrorCodePages field in ClusterDeployment.Spec.Ingress[]"
+      - "Field type: *configv1.ConfigMapNameReference"
+      - "Optional field with omitempty JSON tag"
+    
+    functionality:
+      - "Support custom HTTP error pages configuration in Hive ClusterDeployment"
+      - "Propagate HttpErrorCodePages from ClusterDeployment to target cluster IngressController"
+      - "Integration with openshift-ingress-operator namespace default IngressController"
+
+  implementation_details:
+    location: "apis/hive/v1/clusterdeployment_types.go"
+    controller: "remoteingress_controller.go"
+    processing_function: "createIngressController"
+    target_resource: "IngressController object in openshift-ingress-operator namespace"
+
+test_scope:
+  component_focus: "hive"
+  areas_to_test:
+    - "API field validation and serialization"
+    - "Controller propagation logic"
+    - "Target cluster IngressController configuration"
+    - "ConfigMap reference resolution"
+    
+  realistic_scenarios:
+    positive_tests:
+      - "Deploy ClusterDeployment with HttpErrorCodePages configured"
+      - "Verify IngressController receives HttpErrorCodePages configuration"
+      - "Validate ConfigMap reference is properly propagated"
+    
+    negative_tests:
+      - "Deploy ClusterDeployment without HttpErrorCodePages"
+      - "Verify IngressController has empty/missing HttpErrorCodePages"
+      - "Validate default behavior when field is not specified"
+    
+    edge_cases:
+      - "Invalid ConfigMap reference handling"
+      - "Non-existent ConfigMap reference behavior"
+
+user_scenarios:
+  primary_users: "OpenShift cluster administrators using Hive for cluster lifecycle management"
+  use_cases:
+    - "Configure custom HTTP error pages for clusters managed by Hive"
+    - "Standardize error page configuration across multiple clusters"
+    - "Manage error page content through ConfigMaps"
+
+validation_strategy:
+  verification_points:
+    - "HttpErrorCodePages field presence in ClusterDeployment API"
+    - "Correct propagation to target cluster IngressController"
+    - "ConfigMapNameReference structure and content"
+    - "Integration with openshift-ingress-operator"
+  
+  test_environment_requirements:
+    - "Hive operator installed and running"
+    - "Target OpenShift cluster for ClusterDeployment"
+    - "Access to openshift-ingress-operator namespace"
+    - "ConfigMap creation capabilities in target cluster"
+
+maturity_assessment:
+  issue_maturity: "mature"
+  implementation_status: "completed"
+  test_readiness: "ready_for_testing"
+  complexity_level: "medium"
+  test_automation_feasibility: "high"

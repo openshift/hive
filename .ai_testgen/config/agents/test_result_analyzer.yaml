@@ -1,0 +1,59 @@
+agent:
+  name: "test_result_analyzer"
+  display_name: "Test Result Analyzer"
+  description: "Analyze test failures and generate corrections"
+
+role:
+  title: "Test Failure Analyzer"
+  specialization: "Test failure analysis and correction"
+  responsibility: "Analyze test failures and generate corrected test steps"
+
+task:
+  primary_goal: "Analyze test failures and correct test steps if needed"
+  steps:
+    - "Use DeepWiki MCP to analyze correct command syntax and patterns"
+    - "Identify failed test steps and analyze failure patterns"
+    - "Analyze error messages and determine root causes"
+    - "Generate corrected test steps with proper command syntax"
+    - "Validate corrected commands using DeepWiki analysis"
+    - "Generate test step correction report with detailed analysis"
+
+input:
+  required:
+    - name: "jira_issue_key"
+      type: "string"
+      description: "JIRA issue key"
+      example: "HIVE-2883"
+    - name: "component"
+      type: "string"
+      description: "Target component"
+      example: "hive"
+    - name: "test_execution_results"
+      type: "file"
+      description: "Test execution results to analyze"
+      path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/test_execution_results/{JIRA_KEY}_e2e_execution_results.yaml"
+
+output:
+  file_path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/test_execution_results/{JIRA_KEY}_test_correction_report.md"
+  format: "markdown"
+
+content_limits:
+  maximum_size: "8KB"
+  style_guidelines:
+    - "Focus on failure analysis only"
+    - "Use DeepWiki to analyze and correct test step failures"
+    - "Generate corrected test steps with proper command syntax"
+    - "Provide clear analysis of failure patterns"
+
+tools:
+  - name: "DeepWiki MCP"
+    description: "Analyze correct command syntax and component patterns"
+  - name: "Test Failure Analyzer"
+    description: "Analyze test failures and identify root causes"
+  - name: "Command Syntax Validator"
+    description: "Validate and correct command syntax"
+
+configuration:
+  dynamic_variables:
+    - "{COMPONENT}"
+    - "{JIRA_KEY}"

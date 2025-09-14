@@ -1,0 +1,115 @@
+jira_analysis:
+  issue_key: "HIVE-2883"
+  component: "hive"
+  summary: "[FeatureGate] Hive-Support multiple NICs in Nutanix"
+  status: "Closed"
+  issue_type: "Feature"
+  priority: "Normal"
+  labels: ["QE-only"]
+
+  description_analysis:
+    primary_requirement: "Support multiple NICs in Nutanix clusters via Hive"
+    upstream_dependency: "Installer supports this feature in 4.18 (OCPSTRAT-1532)"
+    feature_nature: "FeatureGate implementation for multi-NIC Nutanix support"
+
+  linked_issues:
+    epic: "HIVE-2872 - Add Nutanix support - phase 2"
+    blocker: "OCPBUGS-59627 - Nutanix: Enable FeatureGate for MultiSubnet by default"
+    context: "Part of broader Nutanix support enhancement in phase 2"
+
+architecture_analysis:
+  component_understanding:
+    primary_component: "Hive ClusterDeployment with Nutanix platform"
+    user_interaction_model: "Administrators create ClusterDeployment CRs via YAML/CLI"
+    feature_scope: "Enable multiple network interfaces for Nutanix clusters"
+
+  technical_implementation:
+    feature_gate_requirement: "MultiSubnet feature gate must be enabled"
+    cluster_deployment_changes: "Support multiple subnetUUIDs in Nutanix platform spec"
+    networking_configuration: "Multiple NICs configuration in install-config.yaml"
+
+  user_workflow_mapping:
+    primary_workflow: "Cluster administrator provisions Nutanix cluster with multiple NICs"
+    trigger_action: "Creating ClusterDeployment with multi-NIC Nutanix configuration"
+    validation_points: "Cluster nodes have multiple network interfaces configured"
+
+  integration_points:
+    hive_components: ["ClusterDeployment controller", "Install manager", "Nutanix platform integration"]
+    openshift_installer: "Nutanix installer with MultiSubnet feature support"
+    nutanix_infrastructure: "Prism Central/Element with multiple subnet configuration"
+
+technical_requirements:
+  primary_functionality:
+    - name: "Multiple subnet configuration support"
+      description: "Hive must support specifying multiple subnetUUIDs for Nutanix clusters"
+      validation_approach: "Verify ClusterDeployment accepts multiple subnet configurations"
+
+    - name: "FeatureGate integration"
+      description: "Multi-NIC functionality requires proper FeatureGate configuration"
+      validation_approach: "Confirm MultiSubnet feature gate is properly enabled and functional"
+
+    - name: "Cluster node multi-NIC validation"
+      description: "Provisioned cluster nodes must have multiple network interfaces"
+      validation_approach: "Verify deployed nodes show multiple network interfaces in status"
+
+  validation_requirements:
+    quantitative_measures:
+      - metric: "Number of configured subnets"
+        threshold: "≥ 2 subnets successfully configured"
+        measurement: "Count subnetUUIDs in ClusterDeployment spec"
+
+      - metric: "Node network interface count"
+        threshold: "≥ 2 network interfaces per node"
+        measurement: "oc get nodes -o jsonpath for network interface count"
+
+      - metric: "Cluster installation success rate"
+        threshold: "100% successful installation with multi-NIC config"
+        measurement: "ClusterDeployment status.conditions[type=Provisioned].status=True"
+
+  error_scenarios:
+    - scenario: "Invalid subnet configuration"
+      trigger: "Provide non-existent or invalid subnetUUIDs"
+      expected_outcome: "Clear error message in ClusterDeployment status"
+
+    - scenario: "FeatureGate disabled"
+      trigger: "Attempt multi-NIC with FeatureGate disabled"
+      expected_outcome: "Installation falls back to single NIC or clear error"
+
+test_scope_definition:
+  primary_focus: "End-to-end cluster provisioning with multiple NICs"
+  secondary_focus: "Integration between Hive and Nutanix MultiSubnet feature"
+
+  user_scenarios:
+    happy_path:
+      - "Administrator provisions Nutanix cluster with 2 subnets via Hive"
+      - "Cluster nodes successfully configured with multiple network interfaces"
+      - "All cluster components functional with multi-NIC configuration"
+
+    edge_cases:
+      - "Maximum number of supported subnets configuration"
+      - "Mixed subnet types (different VLANs, security groups)"
+      - "Subnet availability validation during provisioning"
+
+    error_handling:
+      - "Invalid subnet UUID handling and error reporting"
+      - "Network connectivity issues during multi-NIC setup"
+      - "FeatureGate misconfiguration scenarios"
+
+  integration_testing:
+    hive_integration: "ClusterDeployment lifecycle with multi-NIC Nutanix config"
+    installer_integration: "Verify Hive properly passes multi-subnet config to installer"
+    nutanix_integration: "Validate proper Prism Central/Element interaction"
+
+testing_strategy:
+  approach: "End-to-end workflow testing focused on administrator operations"
+  scope: "Complete cluster lifecycle from ClusterDeployment creation to functional multi-NIC cluster"
+
+  validation_patterns:
+    - pattern: "State Validation (Pattern C)"
+      application: "Verify ClusterDeployment status and cluster node network configuration"
+
+    - pattern: "Stability Validation (Pattern A)"
+      application: "Ensure consistent multi-NIC configuration across cluster nodes"
+
+    - pattern: "Progression Validation (Pattern E)"
+      application: "Monitor cluster installation progress with multi-NIC configuration"

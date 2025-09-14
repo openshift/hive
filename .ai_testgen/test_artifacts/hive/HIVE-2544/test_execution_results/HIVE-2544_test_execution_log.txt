@@ -1,0 +1,168 @@
+started: (0/1/1) "[sig-hive] Cluster_Operator hive should NonHyperShiftHOST-NonPreRelease-Author:mihuang-Medium-HIVE-2544-Machinepool functionality in Azure regions without availability zone support [Serial]"
+
+  I0923 05:36:24.306227 80820 openshift-tests.go:202] Is kubernetes cluster: no, is external OIDC cluster: no
+  I0923 05:36:24.306363 80820 test_context.go:563] The --provider flag is not set. Continuing as if --provider=skeleton had been used.
+  I0923 05:36:24.432034 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get node -l node-role.kubernetes.io/worker -o=jsonpath={.items[*].metadata.name}'
+  [1758576980] openshift extended e2e - 1/1 specs I0923 05:36:25.880712 80820 clusters.go:324] it is not external oidc cluster
+  I0923 05:36:28.845253 80820 client.go:223] configPath is now "/var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/configfile4137928644"
+  I0923 05:36:28.845277 80820 client.go:503] The user is now "e2e-test-hive-gw8fs-user"
+  I0923 05:36:28.845286 80820 client.go:506] Creating project "e2e-test-hive-gw8fs"
+  I0923 05:36:29.269940 80820 client.go:515] Waiting on permissions in project "e2e-test-hive-gw8fs" ...
+  I0923 05:36:30.256670 80820 client.go:576] Waiting for ServiceAccount "default" to be provisioned...
+  I0923 05:36:30.606489 80820 client.go:576] Waiting for ServiceAccount "builder" to be provisioned...
+  I0923 05:36:30.954599 80820 client.go:576] Waiting for ServiceAccount "deployer" to be provisioned...
+  I0923 05:36:31.304194 80820 client.go:586] Waiting for RoleBinding "system:image-builders" to be provisioned...
+  I0923 05:36:31.797719 80820 client.go:586] Waiting for RoleBinding "system:deployers" to be provisioned...
+  I0923 05:36:32.288670 80820 client.go:586] Waiting for RoleBinding "system:image-pullers" to be provisioned...
+  I0923 05:36:32.777358 80820 client.go:617] Project "e2e-test-hive-gw8fs" has been fully provisioned.
+  I0923 05:36:32.777533 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get nodes -o=jsonpath={.items[*].status.nodeInfo.architecture}'
+  I0923 05:36:34.705510 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get infrastructure cluster -o=jsonpath={.status.platformStatus.type}'
+  I0923 05:36:38.610272 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-gw8fs --kubeconfig=/Users/mihuang/Downloads/kubeconfig process --ignore-unknown-parameters=true -f /var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/fixture-testdata-dir4045852829/test/extended/testdata/cluster_operator/hive/namespace.yaml -p NAME=hive'
+  I0923 05:36:39.488837 80820 hive_util.go:597] the file of resource is /tmp/e2e-test-hive-gw8fs-iaylreho-hive-resource-cfg.json
+  I0923 05:36:39.489099 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig apply -f /tmp/e2e-test-hive-gw8fs-iaylreho-hive-resource-cfg.json'
+  Warning: resource namespaces/hive is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by oc apply. oc apply should only be used on resources created declaratively by either oc create --save-config or oc apply. The missing annotation will be patched automatically.
+  namespace/hive configured
+  I0923 05:36:44.168352 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-gw8fs --kubeconfig=/Users/mihuang/Downloads/kubeconfig process --ignore-unknown-parameters=true -f /var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/fixture-testdata-dir4045852829/test/extended/testdata/cluster_operator/hive/operatorgroup.yaml -p NAME=hive-og NAMESPACE=hive'
+  I0923 05:36:45.028870 80820 hive_util.go:597] the file of resource is /tmp/e2e-test-hive-gw8fs-bp1ai2v0-hive-resource-cfg.json
+  I0923 05:36:45.029131 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig apply -f /tmp/e2e-test-hive-gw8fs-bp1ai2v0-hive-resource-cfg.json'
+  operatorgroup.operators.coreos.com/hive-og unchanged
+  I0923 05:36:47.098294 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get sub -n hive'
+  I0923 05:36:47.985030 80820 hive_util.go:693] hive subscription already exists.
+  I0923 05:36:47.985352 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get HiveConfig hive'
+  I0923 05:36:48.857227 80820 hive_util.go:734] hivconfig already exists.
+  I0923 05:36:48.857396 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get clusterversion -o=jsonpath={..status.desired.image}'
+  I0923 05:36:49.753553 80820 hive_util.go:1995] Spoke cluster uses OCP image = registry.build07.ci.openshift.org/ci-op-hfvgphq7/release@sha256:53d4d62507d3a1bab6d44ff7f694340d28d5a3ed75d7ab11075d19897ba1c748
+  I0923 05:36:50.001370 80820 client.go:1038] showInfo is true
+  I0923 05:36:50.001450 80820 client.go:1040] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get nodes -o=jsonpath={.items[0].metadata.labels['topology\.kubernetes\.io/region']}'
+  I0923 05:36:51.675148 80820 hive_util.go:2250] Found region = usgovtexas
+  I0923 05:36:51.675299 80820 client.go:1038] showInfo is true
+  I0923 05:36:51.675315 80820 client.go:1040] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get dns/cluster -o=jsonpath={.spec.baseDomain}'
+  I0923 05:36:52.560619 80820 hive_util.go:2220] Found base domain = qemag.azure.devcluster.openshift.com
+  I0923 05:36:52.560670 80820 hive_azure.go:60] Running on MAG
+  I0923 05:36:52.560795 80820 clusters.go:324] it is not external oidc cluster
+  I0923 05:36:54.165169 80820 client.go:223] configPath is now "/var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/configfile2889296267"
+  I0923 05:36:54.165202 80820 client.go:503] The user is now "e2e-test-hive-j2w4l-user"
+  I0923 05:36:54.165207 80820 client.go:506] Creating project "e2e-test-hive-j2w4l"
+  I0923 05:36:54.540273 80820 client.go:515] Waiting on permissions in project "e2e-test-hive-j2w4l" ...
+  I0923 05:36:55.530297 80820 client.go:576] Waiting for ServiceAccount "default" to be provisioned...
+  I0923 05:36:55.878647 80820 client.go:576] Waiting for ServiceAccount "builder" to be provisioned...
+  I0923 05:36:56.232493 80820 client.go:576] Waiting for ServiceAccount "deployer" to be provisioned...
+  I0923 05:36:56.584302 80820 client.go:586] Waiting for RoleBinding "system:image-builders" to be provisioned...
+  I0923 05:36:57.075001 80820 client.go:586] Waiting for RoleBinding "system:deployers" to be provisioned...
+  I0923 05:36:57.604330 80820 client.go:586] Waiting for RoleBinding "system:image-pullers" to be provisioned...
+  I0923 05:36:58.103104 80820 client.go:617] Project "e2e-test-hive-j2w4l" has been fully provisioned.
+  STEP: Config Azure Install-Config Secret... 09/23/25 05:36:58.103
+  STEP: Config Azure ClusterDeployment... 09/23/25 05:36:58.103
+  STEP: Create azure ClusterDeployment...e2e-test-hive-j2w4l 09/23/25 05:36:58.103
+  STEP: Create ClusterImageSet... 09/23/25 05:36:58.103
+  I0923 05:37:01.104774 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-j2w4l --kubeconfig=/Users/mihuang/Downloads/kubeconfig process --ignore-unknown-parameters=true -f /var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/fixture-testdata-dir4045852829/test/extended/testdata/cluster_operator/hive/clusterimageset.yaml -p NAME=cluster-hive2544-lr40-imageset RELEASEIMAGE=registry.build07.ci.openshift.org/ci-op-hfvgphq7/release@sha256:53d4d62507d3a1bab6d44ff7f694340d28d5a3ed75d7ab11075d19897ba1c748'
+  I0923 05:37:01.976942 80820 hive_util.go:597] the file of resource is /tmp/e2e-test-hive-j2w4l-o01k69jj-hive-resource-cfg.json
+  I0923 05:37:01.977135 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig apply -f /tmp/e2e-test-hive-j2w4l-o01k69jj-hive-resource-cfg.json'
+  clusterimageset.hive.openshift.io/cluster-hive2544-lr40-imageset created
+  STEP: Copy Azure platform credentials... 09/23/25 05:37:03.116
+  I0923 05:37:03.117457 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get secret/azure-credentials -n kube-system --template='{{.data.azure_client_id | base64decode}}''
+  I0923 05:37:03.987443 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get secret/azure-credentials -n kube-system --template='{{.data.azure_client_secret | base64decode}}''
+  I0923 05:37:04.850425 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get secret/azure-credentials -n kube-system --template='{{.data.azure_subscription_id | base64decode}}''
+  I0923 05:37:05.718180 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get secret/azure-credentials -n kube-system --template='{{.data.azure_tenant_id | base64decode}}''
+  I0923 05:37:06.591797 80820 hive_util.go:1429] 209 byte written to osServicePrincipal.json
+  I0923 05:37:06.591985 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-j2w4l --kubeconfig=/var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/configfile2889296267 create secret generic azure-credentials --from-file=/tmp/e2e-test-hive-j2w4l-creds/osServicePrincipal.json -n e2e-test-hive-j2w4l'
+  secret/azure-credentials created
+  STEP: Copy pull-secret... 09/23/25 05:37:07.499
+  I0923 05:37:07.501642 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig extract secret/pull-secret -n openshift-config --to=/tmp/e2e-test-hive-j2w4l-pull --confirm'
+  /tmp/e2e-test-hive-j2w4l-pull/.dockerconfigjson
+  I0923 05:37:08.600395 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-j2w4l --kubeconfig=/var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/configfile2889296267 create secret generic pull-secret --from-file=/tmp/e2e-test-hive-j2w4l-pull/.dockerconfigjson -n e2e-test-hive-j2w4l'
+  secret/pull-secret created
+  STEP: Create Azure Install-Config Secret... 09/23/25 05:37:09.683
+  I0923 05:37:12.685159 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-j2w4l --kubeconfig=/Users/mihuang/Downloads/kubeconfig process --ignore-unknown-parameters=true -f /var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/fixture-testdata-dir4045852829/test/extended/testdata/cluster_operator/hive/azure-install-config.yaml -p NAME1=cluster-hive2544-lr40-install-config NAMESPACE=e2e-test-hive-j2w4l BASEDOMAIN=qemag.azure.devcluster.openshift.com NAME2=cluster-hive2544-lr40 RESGROUP=os4-common AZURETYPE=AzureUSGovernmentCloud REGION=usgovtexas'
+  I0923 05:37:13.595285 80820 hive_util.go:597] the file of resource is /tmp/e2e-test-hive-j2w4l-mjdnzzyp-hive-resource-cfg.json
+  I0923 05:37:13.595445 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig apply -f /tmp/e2e-test-hive-j2w4l-mjdnzzyp-hive-resource-cfg.json'
+  secret/cluster-hive2544-lr40-install-config created
+  I0923 05:37:18.001077 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-j2w4l --kubeconfig=/Users/mihuang/Downloads/kubeconfig process --ignore-unknown-parameters=true -f /var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/fixture-testdata-dir4045852829/test/extended/testdata/cluster_operator/hive/clusterdeployment-azure.yaml -p FAKE=false COPYCLIDOMAIN= NAME=cluster-hive2544-lr40 NAMESPACE=e2e-test-hive-j2w4l BASEDOMAIN=qemag.azure.devcluster.openshift.com CLUSTERNAME=cluster-hive2544-lr40 PLATFORMTYPE=azure CREDREF=azure-credentials REGION=usgovtexas RESGROUP=os4-common AZURETYPE=AzureUSGovernmentCloud IMAGESETREF=cluster-hive2544-lr40-imageset INSTALLCONFIGSECRET=cluster-hive2544-lr40-install-config INSTALLERIMAGEOVERRIDE= PULLSECRETREF=pull-secret'
+  I0923 05:37:18.876669 80820 hive_util.go:597] the file of resource is /tmp/e2e-test-hive-j2w4l-valz56ad-hive-resource-cfg.json
+  I0923 05:37:18.876790 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig apply -f /tmp/e2e-test-hive-j2w4l-valz56ad-hive-resource-cfg.json'
+  clusterdeployment.hive.openshift.io/cluster-hive2544-lr40 created
+  STEP: Creating MachinePool for non-AZ region testing... 09/23/25 05:37:20.238
+  I0923 05:37:23.239420 80820 client.go:1013] Running 'oc --namespace=e2e-test-hive-j2w4l --kubeconfig=/Users/mihuang/Downloads/kubeconfig process --ignore-unknown-parameters=true -f /var/folders/20/qkvr5ldn5y9fp0thm0nsgy240000gn/T/fixture-testdata-dir4045852829/test/extended/testdata/cluster_operator/hive/machinepool-worker-azure.yaml -p CLUSTERNAME=cluster-hive2544-lr40 NAMESPACE=e2e-test-hive-j2w4l IOPS=0 AUTHENTICATION= SECUREBOOT=Disabled CUSTOMIZEDTAG=hive-qe-mp-tag'
+  I0923 05:37:24.105686 80820 hive_util.go:597] the file of resource is /tmp/e2e-test-hive-j2w4l-oe2qjfjx-hive-resource-cfg.json
+  I0923 05:37:24.105854 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig apply -f /tmp/e2e-test-hive-j2w4l-oe2qjfjx-hive-resource-cfg.json'
+  machinepool.hive.openshift.io/cluster-hive2544-lr40-worker created
+  STEP: Waiting for cluster installation... 09/23/25 05:37:25.487
+  I0923 05:40:25.487180 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 05:40:27.272198 80820 hive_util.go:1130] the queried resource:false
+  I0923 05:43:25.449883 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 05:43:27.209714 80820 hive_util.go:1130] the queried resource:false
+  I0923 05:46:25.440764 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 05:46:27.149677 80820 hive_util.go:1130] the queried resource:false
+  I0923 05:49:25.437435 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 05:49:26.885292 80820 hive_util.go:1130] the queried resource:false
+  I0923 05:52:25.434994 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 05:52:26.869670 80820 hive_util.go:1130] the queried resource:false
+  I0923 05:55:25.432202 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 05:55:26.862511 80820 hive_util.go:1130] the queried resource:false
+  I0923 05:58:25.429159 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 05:58:27.463245 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:01:25.454312 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:01:26.947790 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:04:25.452422 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:04:26.573187 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:07:25.451094 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:07:27.279953 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:10:25.447871 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:10:27.187203 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:13:25.445667 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:13:26.899999 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:16:25.495130 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:16:28.127099 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:19:25.494802 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:19:26.960331 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:22:25.494076 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:22:27.402913 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:25:25.492293 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:25:27.427729 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:28:25.492723 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:28:27.440136 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:31:25.508952 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:31:26.931400 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:34:25.510013 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:34:26.622590 80820 hive_util.go:1130] the queried resource:false
+  I0923 06:37:25.507685 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.installed}'
+  I0923 06:37:26.949067 80820 hive_util.go:1130] the queried resource:true
+  I0923 06:37:26.949317 80820 hive_util.go:1140] the output true contains one of the content true, expected
+  STEP: Waiting for MachinePool to be ready... 09/23/25 06:37:26.949
+  I0923 06:37:36.951167 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get MachinePool cluster-hive2544-lr40-worker -n e2e-test-hive-j2w4l -o=jsonpath={.status.replicas}'
+  I0923 06:37:37.857038 80820 hive_util.go:1130] the queried resource:3
+  I0923 06:37:37.857094 80820 hive_util.go:1140] the output 3 contains one of the content 3, expected
+  I0923 06:37:37.857519 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get cd cluster-hive2544-lr40 -n e2e-test-hive-j2w4l -o=jsonpath={.spec.clusterMetadata.adminKubeconfigSecretRef.name}'
+  I0923 06:37:38.952604 80820 hive_util.go:1501] Extract cluster cluster-hive2544-lr40 kubeconfig to /tmp/cluster-hive2544-lr40-0p9zs6a7
+  I0923 06:37:38.952855 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig extract secret/cluster-hive2544-lr40-0-nz4mm-admin-kubeconfig -n e2e-test-hive-j2w4l --to=/tmp/cluster-hive2544-lr40-0p9zs6a7 --confirm'
+  /tmp/cluster-hive2544-lr40-0p9zs6a7/kubeconfig
+  /tmp/cluster-hive2544-lr40-0p9zs6a7/raw-kubeconfig
+  STEP: Verifying MachineSet generation for non-AZ region... 09/23/25 06:37:40.065
+  I0923 06:37:40.066185 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get --kubeconfig=/tmp/cluster-hive2544-lr40-0p9zs6a7/kubeconfig MachineSet -n openshift-machine-api -l hive.openshift.io/machine-pool=worker -o=jsonpath={.items[*].metadata.name}'
+  STEP: Verifying MachineSet replicas are ready and available in non-AZ region... 09/23/25 06:37:43.29
+  I0923 06:37:53.291243 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get --kubeconfig=/tmp/cluster-hive2544-lr40-0p9zs6a7/kubeconfig MachineSet -n openshift-machine-api -l hive.openshift.io/machine-pool=worker -o=jsonpath={.items[0].spec.replicas} {.items[0].status.readyReplicas} {.items[0].status.availableReplicas}'
+  I0923 06:37:54.240831 80820 hive_util.go:1130] the queried resource:3 3 3
+  I0923 06:37:54.240917 80820 hive_util.go:1132] the output 3 3 3 matches one of the content 3 3 3, expected
+  I0923 06:37:54.241597 80820 hive_util.go:1154] Start to remove: {MachinePool e2e-test-hive-j2w4l cluster-hive2544-lr40-worker}
+  I0923 06:37:54.241769 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig delete MachinePool -n e2e-test-hive-j2w4l cluster-hive2544-lr40-worker --ignore-not-found'
+  I0923 06:37:55.706851 80820 hive_util.go:1154] Start to remove: {ClusterDeployment e2e-test-hive-j2w4l cluster-hive2544-lr40}
+  I0923 06:37:55.707238 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment -n e2e-test-hive-j2w4l cluster-hive2544-lr40 -o=jsonpath={.spec.installed}'
+  I0923 06:37:56.812083 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig delete ClusterDeployment -n e2e-test-hive-j2w4l cluster-hive2544-lr40 --ignore-not-found'
+  I0923 06:44:24.568588 80820 hive_util.go:1187] Wait ClusterDeployment delete done for cluster-hive2544-lr40
+  I0923 06:44:54.571459 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig get ClusterDeployment -A'
+  I0923 06:44:56.631333 80820 hive_util.go:1130] the queried resource:No resources found
+  I0923 06:44:56.631377 80820 hive_util.go:1144] the output No resources found does not contain the content cluster-hive2544-lr40, expected
+  I0923 06:44:56.631399 80820 hive_util.go:1154] Start to remove: {Secret e2e-test-hive-j2w4l cluster-hive2544-lr40-install-config}
+  I0923 06:44:56.631525 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig delete Secret -n e2e-test-hive-j2w4l cluster-hive2544-lr40-install-config --ignore-not-found'
+  I0923 06:44:57.817130 80820 hive_util.go:1154] Start to remove: {ClusterImageSet  cluster-hive2544-lr40-imageset}
+  I0923 06:44:57.817423 80820 client.go:1013] Running 'oc --kubeconfig=/Users/mihuang/Downloads/kubeconfig delete ClusterImageSet cluster-hive2544-lr40-imageset --ignore-not-found'
+  I0923 06:44:59.711441 80820 client.go:703] Deleted {user.openshift.io/v1, Resource=users  e2e-test-hive-gw8fs-user}, err: <nil>
+  I0923 06:44:59.972089 80820 client.go:703] Deleted {oauth.openshift.io/v1, Resource=oauthclients  e2e-client-e2e-test-hive-gw8fs}, err: <nil>
+  I0923 06:45:00.234051 80820 client.go:703] Deleted {oauth.openshift.io/v1, Resource=oauthaccesstokens  sha256~9R5Ll1R1PETqkhlYR3JCJbYrcCAeBIRz5EpeFXuftX0}, err: <nil>
+  I0923 06:45:00.495113 80820 client.go:703] Deleted {user.openshift.io/v1, Resource=users  e2e-test-hive-j2w4l-user}, err: <nil>
+  I0923 06:45:00.770388 80820 client.go:703] Deleted {oauth.openshift.io/v1, Resource=oauthclients  e2e-client-e2e-test-hive-j2w4l}, err: <nil>
+  I0923 06:45:01.044411 80820 client.go:703] Deleted {oauth.openshift.io/v1, Resource=oauthaccesstokens  sha256~WDPQKzLdcTV5SERKojm4Ddnrwm9_-qTjwqpY2fMBijE}, err: <nil>
+  • SUCCESS! 1h8m35.65481925s 
+passed: (1h8m42s) 2025-09-22T22:45:01 "[sig-hive] Cluster_Operator hive should NonHyperShiftHOST-NonPreRelease-Author:mihuang-Medium-HIVE-2544-Machinepool functionality in Azure regions without availability zone support [Serial]"
+
+1 pass, 0 skip (1h8m42s)

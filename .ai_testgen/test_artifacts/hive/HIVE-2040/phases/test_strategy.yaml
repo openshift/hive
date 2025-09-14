@@ -1,0 +1,169 @@
+test_strategy:
+  jira_issue_key: "HIVE-2040"
+  component: "hive"
+  feature_name: "HttpErrorCodePages in ClusterDeployment.Spec.Ingress[]"
+
+  architecture_analysis:
+    component_role:
+      primary: "RemoteClusterIngress Controller"
+      description: "Processes ClusterDeployment.Spec.Ingress[] and generates SyncSet resources for spoke clusters"
+      location: "pkg/controller/remoteingress/remoteingress_controller.go"
+
+    end_to_end_flow:
+      user_action: "User creates/updates ClusterDeployment with HttpErrorCodePages in Spec.Ingress[]"
+      system_flow:
+        1: "RemoteClusterIngress controller watches ClusterDeployment changes"
+        2: "Controller calls rawExtensionsFromClusterDeployment() to process ingress configs"
+        3: "createIngressController() function copies HttpErrorCodePages to IngressController spec"
+        4: "SyncSet resource created/updated with IngressController definition"
+        5: "Hive SyncSet controller propagates IngressController to spoke cluster"
+        6: "OpenShift Ingress Operator in spoke cluster processes IngressController"
+
+    workflow_focus: "End-to-end configuration propagation from management cluster to spoke cluster"
+
+    integration_dependencies:
+      hive_components:
+        - name: "RemoteClusterIngress Controller"
+          role: "Processes ClusterDeployment ingress configurations"
+          critical_function: "createIngressController() at line 336"
+        - name: "SyncSet Controller"
+          role: "Propagates resources to spoke clusters"
+          validation_point: "Ensures IngressController reaches spoke cluster"
+        - name: "ClusterDeployment API"
+          role: "Provides user interface for configuration"
+          validation_point: "Field availability and validation"
+
+      spoke_cluster_components:
+        - name: "IngressController Resource"
+          role: "Receives configuration via SyncSet"
+          validation_point: "HttpErrorCodePages field populated correctly"
+        - name: "OpenShift Ingress Operator"
+          role: "Processes IngressController configuration"
+          validation_point: "Accepts and applies HttpErrorCodePages"
+
+  test_approach:
+    testing_strategy: "Configuration propagation validation through real cluster scenarios"
+
+    primary_validation_method: "End-to-end workflow testing"
+    rationale: "Tests complete user value delivery from ClusterDeployment creation to functional spoke cluster configuration"
+
+    validation_layers:
+      1:
+        layer: "API Layer"
+        purpose: "Verify HttpErrorCodePages field availability and validation"
+        method: "ClusterDeployment resource creation and modification"
+
+      2:
+        layer: "Controller Layer"
+        purpose: "Verify configuration processing and SyncSet generation"
+        method: "SyncSet resource inspection and content validation"
+
+      3:
+        layer: "Propagation Layer"
+        purpose: "Verify configuration reaches spoke cluster"
+        method: "IngressController resource validation in spoke cluster"
+
+      4:
+        layer: "Integration Layer"
+        purpose: "Verify end-to-end functionality"
+        method: "Multiple ingress configuration scenarios"
+
+  test_scenarios:
+    core_scenarios:
+      1:
+        name: "Single Ingress with HttpErrorCodePages"
+        description: "Configure one ingress controller with custom error pages"
+        validation_focus: "Basic configuration propagation"
+        expected_outcome: "IngressController in spoke cluster has HttpErrorCodePages field populated"
+
+      2:
+        name: "Multiple Ingress with Different HttpErrorCodePages"
+        description: "Configure multiple ingress controllers with different error page configurations"
+        validation_focus: "Multi-controller configuration isolation"
+        expected_outcome: "Each IngressController has its respective HttpErrorCodePages configuration"
+
+      3:
+        name: "HttpErrorCodePages Configuration Update"
+        description: "Modify existing HttpErrorCodePages configuration"
+        validation_focus: "Configuration update propagation"
+        expected_outcome: "Updated configuration propagates to spoke cluster IngressController"
+
+    edge_scenarios:
+      1:
+        name: "Empty HttpErrorCodePages Configuration"
+        description: "Test behavior when HttpErrorCodePages is not specified"
+        validation_focus: "Default behavior preservation"
+        expected_outcome: "IngressController created without HttpErrorCodePages field"
+
+      2:
+        name: "Invalid ConfigMap Reference"
+        description: "Configure HttpErrorCodePages with non-existent ConfigMap"
+        validation_focus: "Error handling and validation"
+        expected_outcome: "Configuration accepted but appropriate error handling in spoke cluster"
+
+  validation_patterns:
+    pattern_type: "State Validation (Pattern C)"
+    rationale: "Validating correct configuration state propagation across system components"
+
+    implementation_approach:
+      1: "Query ClusterDeployment.Spec.Ingress[].HttpErrorCodePages (source configuration)"
+      2: "Query SyncSet resource content for IngressController definitions (intermediate state)"
+      3: "Query spoke cluster IngressController.Spec.HttpErrorCodePages (target state)"
+      4: "Compare values across all three states for consistency"
+
+    quantitative_validation:
+      - "ConfigMap name matches exactly between source and target"
+      - "Number of IngressController resources equals number of ClusterIngress configurations"
+      - "Configuration propagation completes within 120 seconds"
+      - "Reconciliation maintains configuration consistency across 3+ cycles"
+
+  test_execution_strategy:
+    test_environment: "Real OpenShift clusters (management + spoke)"
+    execution_method: "Kubernetes API-driven automation"
+
+    setup_requirements:
+      - "Hive-enabled management cluster"
+      - "Target spoke cluster or cluster provisioning capability"
+      - "ConfigMap resources with test content"
+      - "Appropriate RBAC permissions"
+
+    test_flow:
+      preparation:
+        - "Create test ConfigMaps with custom error page content"
+        - "Prepare ClusterDeployment resource templates"
+        - "Verify spoke cluster connectivity and health"
+
+      execution:
+        - "Create ClusterDeployment with HttpErrorCodePages configuration"
+        - "Monitor SyncSet generation and content"
+        - "Validate IngressController creation in spoke cluster"
+        - "Verify configuration accuracy and persistence"
+
+      validation:
+        - "Compare configuration values across all system layers"
+        - "Verify configuration persistence through reconciliation cycles"
+        - "Validate multiple ingress controller scenarios"
+
+      cleanup:
+        - "Remove test ClusterDeployment resources"
+        - "Clean up test ConfigMaps"
+        - "Verify proper resource cleanup"
+
+  success_criteria:
+    functional_success:
+      - "HttpErrorCodePages field available in ClusterDeployment.Spec.Ingress[]"
+      - "Configuration propagates correctly to spoke cluster IngressController"
+      - "Multiple ingress configurations work simultaneously"
+      - "Configuration updates propagate correctly"
+
+    quality_success:
+      - "No errors in Hive controller logs during configuration"
+      - "Configuration propagation completes within expected timeframes"
+      - "Proper error handling for invalid configurations"
+      - "Clean resource lifecycle management"
+
+    integration_success:
+      - "End-to-end workflow delivers user value"
+      - "Configuration persists across system reconciliation"
+      - "Compatible with existing ClusterDeployment workflows"
+      - "Spoke cluster IngressController remains healthy"

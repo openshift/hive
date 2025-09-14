@@ -1,0 +1,137 @@
+# Thinking Navigation System - Mandatory Framework for Test Case Generation
+
+## MANDATORY THINKING PHASES
+# All 4 phases must be completed before any technical analysis begins
+# Cannot proceed to technical implementation without completing this framework
+# All subsequent analysis must align with thinking framework outputs
+
+### PHASE 1: ECOSYSTEM CONTEXTUALIZATION (MANDATORY)
+purpose: "Transform feature-isolation thinking into ecosystem-aware understanding"
+critical_questions:
+  - "How does a real user encounter this issue in their daily operations?"
+  - "Is this component directly user-facing or part of a larger workflow?"
+  - "What user action would naturally trigger the creation/modification of affected resources?"
+  - "How does this component fit into the complete end-to-end system architecture?"
+
+mandatory_analysis:
+  user_interaction_mapping:
+    - "Map technical components mentioned in JIRA to actual user-facing operations"
+    - "Distinguish between internal system components and user-accessible APIs/resources"
+    - "Identify how users actually interact with this component - directly or through higher-level operations"
+    - "Question: What triggers the creation/modification of the affected resources in real scenarios?"
+
+  workflow_contextualization:
+    - "Define the complete end-to-end flow that would expose the reported issue"
+    - "Understand if this is a direct user action or part of a larger automated workflow"
+    - "Identify realistic user scenarios that would naturally expose this bug in production"
+    - "Map component dependencies and integration points within user workflows"
+
+success_criteria:
+  - "Clear understanding of how real users encounter this component in their daily operations"
+  - "Identification of authentic user interaction patterns that trigger the issue"
+  - "Complete mapping from technical component to user-facing workflow"
+
+### PHASE 2: USER REALITY IMMERSION (MANDATORY)
+purpose: "Ensure test scenarios reflect authentic user environments and operational contexts"
+critical_questions:
+  - "What is the realistic operational context where this issue manifests?"
+  - "What scale and complexity do real users operate at?"
+  - "What are the authentic environmental constraints and dependencies?"
+  - "How do users actually deploy, configure, and manage this in production?"
+
+mandatory_analysis:
+  operational_context:
+    - "Identify target user types: platform engineers, developers, operators, administrators"
+    - "Define realistic scale parameters: cluster count, resource volume, operational frequency"
+    - "Understand authentic deployment patterns and configuration management approaches"
+    - "Map real-world environmental constraints and infrastructure dependencies"
+
+  user_workflow_reality:
+    - "Analyze how users actually interact with the system in their daily operations"
+    - "Identify common operational patterns and standard configuration approaches"
+    - "Understand realistic error scenarios and recovery procedures users encounter"
+    - "Map authentic troubleshooting and validation procedures users perform"
+
+success_criteria:
+  - "Test scenarios that mirror authentic user operational environments"
+  - "Realistic scale and complexity parameters that match production usage"
+  - "Understanding of authentic user workflows and operational procedures"
+
+### PHASE 3: SYSTEMIC INTEGRATION ANALYSIS (MANDATORY)
+purpose: "Ensure comprehensive understanding of component interactions and system-wide impact"
+critical_questions:
+  - "How does this component integrate with other system components?"
+  - "What are the complete data flow and propagation mechanisms?"
+  - "How does configuration flow from user input to final system state?"
+  - "What are the failure propagation patterns and system dependencies?"
+
+mandatory_execution_requirement:
+  - "CRITICAL: Must execute Architecture Understanding framework from config/rules/test_case_rules/test_case_generation_rules.yaml"
+  - "CANNOT proceed without completing Data Source Selection strategy (DeepWiki + Local Codebase analysis)"
+  - "Must follow Recommended Strategy: Start with DeepWiki → Supplement with Local Codebase → Verify critical details"
+  - "Must complete Core Architecture Analysis: component role, end-to-end flow, workflow focus, dependencies"
+
+mandatory_analysis:
+  component_interaction_mapping:
+    - "Identify all components involved in the complete user workflow"
+    - "Map data flow and configuration propagation mechanisms"
+    - "Understand dependency chains and integration points"
+    - "Analyze failure propagation patterns and error handling mechanisms"
+
+  system_state_analysis:
+    - "Understand how user actions translate to system state changes"
+    - "Map configuration hierarchy and precedence rules"
+    - "Identify state consistency requirements across system components"
+    - "Analyze configuration lifecycle and update propagation mechanisms"
+
+success_criteria:
+  - "Complete understanding of multi-component interactions in user workflows"
+  - "Clear mapping of configuration and data flow through the entire system"
+  - "Identification of all system dependencies and integration points"
+  - "Deep architectural understanding that prevents component-isolation errors"
+
+### PHASE 4: END-TO-END VALUE DELIVERY VALIDATION (MANDATORY)
+purpose: "Ensure test validation demonstrates complete user value delivery and business outcomes"
+critical_questions:
+  - "How can we validate that the complete user workflow delivers the intended value?"
+  - "What quantitative measurements prove the user's desired outcome is achieved?"
+  - "How do we validate system integration from user action to final business result?"
+  - "What measurable criteria demonstrate successful end-to-end functionality?"
+
+mandatory_analysis:
+  value_delivery_validation:
+    - "Define quantitative measurements that prove user workflow completion"
+    - "Identify specific numerical thresholds for pass/fail criteria"
+    - "Map user actions to measurable business outcomes and technical results"
+    - "Design validation that proves end-to-end value delivery, not just component function"
+
+  integration_validation_strategy:
+    - "Design validation methods that test complete user workflow integration"
+    - "Ensure validation demonstrates system-wide consistency and functionality"
+    - "Include validation of configuration propagation through all system layers"
+    - "Validate that user-initiated operations achieve intended business outcomes"
+
+success_criteria:
+  - "Test validation that proves complete user workflow delivers intended value"
+  - "Quantitative measurements that demonstrate successful business outcome achievement"
+  - "Validation methods that test end-to-end system integration, not isolated components"
+
+## FRAMEWORK ENFORCEMENT RULES
+
+mandatory_completion:
+  - "All 4 phases must be completed in sequence before any technical analysis"
+  - "Cannot proceed to JIRA analysis, architecture investigation, or test design without completing thinking framework"
+  - "Each phase must produce concrete outputs that inform subsequent technical work"
+  - "All technical analysis must reference and align with thinking framework outputs"
+
+violation_prevention:
+  - "If any phase is skipped or incomplete, STOP and complete missing phases"
+  - "Technical analysis that contradicts thinking framework outputs must be revised"
+  - "Test scenarios that don't reflect user reality analysis must be redesigned"
+  - "Component-isolation approaches that ignore ecosystem context are prohibited"
+
+integration_requirements:
+  - "All subsequent analysis must reference specific outputs from thinking phases"
+  - "Technical implementation must demonstrate alignment with user reality immersion"
+  - "Test validation must prove end-to-end value delivery as defined in Phase 4"
+  - "Architecture analysis must incorporate systemic integration understanding from Phase 3"

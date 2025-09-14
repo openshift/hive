@@ -1,0 +1,72 @@
+# Technical Validation Rules
+# Purpose: Universal principles for converting ANY technical problem into testable validation
+
+## Universal Validation Principle
+For every technical problem statement, create measurable validation that proves the problem is resolved.
+
+## Core Questions Framework
+For ANY technical problem, answer these questions to create validation:
+
+### Question 1: What Changed?
+- "What specific behavior/state/output should be different after the fix?"
+- "What was the problematic behavior that should no longer occur?"
+
+### Question 2: How to Observe?
+- "What observable artifact can prove the change occurred?"
+- "What can be measured, counted, or compared to validate the fix?"
+
+### Question 3: What Threshold?
+- "What numerical/binary criterion defines success vs failure?"
+- "What comparison (before/after, expected/actual) proves the fix?"
+
+## Universal Validation Types
+
+### Type A: Stability Validation
+**When problem involves**: "changing/inconsistent/varying behavior"
+**Validation approach**: Measure consistency across time/iterations
+**Generic pattern**: Capture same measurement multiple times, verify identical results
+
+### Type B: Frequency Validation
+**When problem involves**: "too frequent/too many/excessive behavior"
+**Validation approach**: Count occurrences over time window
+**Generic pattern**: Measure rate/frequency, compare against threshold
+
+### Type C: State Validation
+**When problem involves**: "incorrect state/status/condition"
+**Validation approach**: Compare actual vs expected state
+**Generic pattern**: Query current state, verify matches expected criteria
+
+### Type D: Absence Validation
+**When problem involves**: "unwanted content/behavior/occurrence"
+**Validation approach**: Verify problematic element no longer exists
+**Generic pattern**: Search for problem indicator, confirm not found
+
+### Type E: Progression Validation
+**When problem involves**: "stuck/not progressing/not completing"
+**Validation approach**: Verify progression through expected states
+**Generic pattern**: Monitor state transitions, confirm progression occurs
+
+## Universal Implementation Strategy
+
+### Step 1: Problem Analysis
+- Extract the core technical assertion from problem description
+- Identify what specific behavior/output should change
+
+### Step 2: Observable Selection
+- Choose what can be measured/observed to prove the assertion
+- Select measurement method appropriate for the assertion type
+
+### Step 3: Criteria Definition
+- Define specific threshold/comparison for pass/fail
+- Ensure criteria is objective and measurable
+
+### Step 4: Integration Planning
+- Embed validation into realistic scenario that triggers the problem
+- Ensure validation proves fix effectiveness in user context
+
+## Meta-Rules (Apply to ALL technical problems)
+1. **Quantitative Over Qualitative**: Prefer numbers, counts, binary checks over subjective assessment
+2. **Observable Over Internal**: Test what can be observed, not internal implementation details
+3. **Reproducible**: Validation should give consistent results across runs
+4. **Contextual**: Validation should occur within realistic usage scenario
+5. **Decisive**: Clear pass/fail criteria, no ambiguous results

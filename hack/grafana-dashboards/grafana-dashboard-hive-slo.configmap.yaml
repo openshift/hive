@@ -28,6 +28,7 @@ data:
               "uid": "P5108662370F9C14C"
             },
             "enable": false,
+            "hide": false,
             "iconColor": "blue",
             "name": "Successful Hive Deployment",
             "target": {
@@ -60,9 +61,8 @@ data:
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
-      "id": null,
+      "id": 886089,
       "links": [],
-      "liveNow": false,
       "panels": [
         {
           "collapsed": false,
@@ -89,11 +89,13 @@ data:
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -102,6 +104,7 @@ data:
                   "tooltip": false,
                   "viz": false
                 },
+                "insertNulls": false,
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
                 "pointSize": 5,
@@ -123,8 +126,7 @@ data:
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -151,10 +153,12 @@ data:
               "showLegend": true
             },
             "tooltip": {
+              "hideZeros": false,
               "mode": "single",
               "sort": "none"
             }
           },
+          "pluginVersion": "11.6.3",
           "targets": [
             {
               "datasource": {
@@ -189,8 +193,7 @@ data:
                 "mode": "percentage",
                 "steps": [
                   {
-                    "color": "dark-red",
-                    "value": null
+                    "color": "dark-red"
                   },
                   {
                     "color": "orange",
@@ -214,6 +217,8 @@ data:
           },
           "id": 17,
           "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
             "orientation": "auto",
             "reduceOptions": {
               "calcs": [
@@ -223,9 +228,10 @@ data:
               "values": false
             },
             "showThresholdLabels": false,
-            "showThresholdMarkers": true
+            "showThresholdMarkers": true,
+            "sizing": "auto"
           },
-          "pluginVersion": "9.3.8",
+          "pluginVersion": "11.6.3",
           "targets": [
             {
               "datasource": {
@@ -267,11 +273,13 @@ data:
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -280,6 +288,7 @@ data:
                   "tooltip": false,
                   "viz": false
                 },
+                "insertNulls": false,
                 "lineInterpolation": "linear",
                 "lineWidth": 1,
                 "pointSize": 5,
@@ -301,8 +310,7 @@ data:
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -329,10 +337,12 @@ data:
               "showLegend": true
             },
             "tooltip": {
+              "hideZeros": false,
               "mode": "single",
               "sort": "none"
             }
           },
+          "pluginVersion": "11.6.3",
           "targets": [
             {
               "datasource": {
@@ -367,8 +377,7 @@ data:
                 "mode": "percentage",
                 "steps": [
                   {
-                    "color": "dark-red",
-                    "value": null
+                    "color": "dark-red"
                   },
                   {
                     "color": "orange",
@@ -392,6 +401,8 @@ data:
           },
           "id": 18,
           "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
             "orientation": "auto",
             "reduceOptions": {
               "calcs": [
@@ -401,9 +412,10 @@ data:
               "values": false
             },
             "showThresholdLabels": false,
-            "showThresholdMarkers": true
+            "showThresholdMarkers": true,
+            "sizing": "auto"
           },
-          "pluginVersion": "9.3.8",
+          "pluginVersion": "11.6.3",
           "targets": [
             {
               "datasource": {
@@ -747,43 +759,36 @@ data:
           "type": "row"
         }
       ],
-      "schemaVersion": 37,
-      "style": "dark",
+      "preload": false,
+      "refresh": "",
+      "schemaVersion": 41,
       "tags": [],
       "templating": {
         "list": [
           {
             "current": {
-              "selected": false,
               "text": "appsrep09ue1-prometheus",
-              "value": "appsrep09ue1-prometheus"
+              "value": "P7B77307D2CE073BC"
             },
-            "hide": 0,
             "includeAll": false,
-            "multi": false,
             "name": "datasource",
             "options": [],
             "query": "prometheus",
-            "queryValue": "",
             "refresh": 1,
             "regex": "^(?!.*cluster)(?=.*(hive|app-sre-prod-01|appsrep09ue1))(.*)$",
-            "skipUrlSync": false,
             "type": "datasource"
           },
           {
             "current": {
-              "selected": false,
-               "text": "production",
-               "value": "production"
+              "text": "production",
+              "value": "production"
             },
             "datasource": {
               "type": "prometheus",
               "uid": "${datasource}"
             },
             "definition": "label_values(appsre_env)",
-            "hide": 0,
             "includeAll": false,
-            "multi": false,
             "name": "env",
             "options": [],
             "query": {
@@ -792,8 +797,6 @@ data:
             },
             "refresh": 1,
             "regex": "",
-            "skipUrlSync": false,
-            "sort": 0,
             "type": "query"
           },
           {
@@ -801,11 +804,9 @@ data:
             "auto_count": 30,
             "auto_min": "10s",
             "current": {
-              "selected": false,
               "text": "30d",
               "value": "30d"
             },
-            "hide": 0,
             "name": "bucket",
             "options": [
               {
@@ -860,14 +861,11 @@ data:
               }
             ],
             "query": "1m,10m,30m,1h,6h,12h,1d,7d,14d,30d",
-            "queryValue": "",
             "refresh": 2,
-            "skipUrlSync": false,
             "type": "interval"
           },
           {
             "current": {
-              "selected": true,
               "text": "300",
               "value": "300"
             },
@@ -876,9 +874,7 @@ data:
               "uid": "${datasource}"
             },
             "definition": "label_values(le)",
-            "hide": 0,
             "includeAll": false,
-            "multi": false,
             "name": "hive_le",
             "options": [],
             "query": {
@@ -887,13 +883,11 @@ data:
             },
             "refresh": 1,
             "regex": "/^30$|^60$|^120$|^180$|^240$|^300$|^600$|^1200$|^1800$|^2700$|^3600/",
-            "skipUrlSync": false,
             "sort": 3,
             "type": "query"
           },
           {
             "current": {
-              "selected": true,
               "text": "3600",
               "value": "3600"
             },
@@ -903,9 +897,7 @@ data:
             },
             "definition": "label_values(le)",
             "description": "1800, 2400, 3000, 3600, 4500, 5400, 7200",
-            "hide": 0,
             "includeAll": false,
-            "multi": false,
             "name": "install_le",
             "options": [],
             "query": {
@@ -914,13 +906,11 @@ data:
             },
             "refresh": 1,
             "regex": "/^1800$|^2400$|^3000$|^3600$|^4500$|^5400$|^7200/",
-            "skipUrlSync": false,
             "sort": 3,
             "type": "query"
           },
           {
             "current": {
-              "selected": false,
               "text": "active",
               "value": "active"
             },
@@ -929,9 +919,7 @@ data:
               "uid": "${datasource}"
             },
             "definition": "label_values(shard_status)",
-            "hide": 0,
             "includeAll": false,
-            "multi": false,
             "name": "shard_status",
             "options": [],
             "query": {
@@ -940,36 +928,29 @@ data:
             },
             "refresh": 1,
             "regex": "",
-            "skipUrlSync": false,
-            "sort": 0,
             "type": "query"
           },
           {
             "current": {
-              "selected": false,
               "text": "0.98",
               "value": "0.98"
             },
-            "hide": 0,
             "name": "hive_delay_slo",
             "options": [
               {
                 "selected": true,
-                "text": "0.985",
-                "value": "0.985"
+                "text": "0.98",
+                "value": "0.98"
               }
             ],
-            "query": "0.985",
-            "skipUrlSync": false,
+            "query": "0.98",
             "type": "textbox"
           },
           {
             "current": {
-              "selected": true,
               "text": "0.985",
               "value": "0.985"
             },
-            "hide": 0,
             "name": "install_duration_slo",
             "options": [
               {
@@ -979,16 +960,13 @@ data:
               }
             ],
             "query": "0.985",
-            "skipUrlSync": false,
             "type": "textbox"
           },
           {
             "current": {
-              "selected": true,
               "text": "0.985",
               "value": "0.985"
             },
-            "hide": 0,
             "name": "combined_slo",
             "options": [
               {
@@ -998,18 +976,14 @@ data:
               }
             ],
             "query": "0.985",
-            "skipUrlSync": false,
             "type": "textbox"
           },
           {
             "current": {
-              "selected": true,
               "text": "0.99",
               "value": "0.99"
             },
-            "hide": 0,
             "includeAll": false,
-            "multi": false,
             "name": "percentile",
             "options": [
               {
@@ -1039,31 +1013,26 @@ data:
               }
             ],
             "query": "0.99,0.95,0.90,0.85,0.50",
-            "queryValue": "",
-            "skipUrlSync": false,
             "type": "custom"
           },
           {
             "current": {
-              "selected": false,
-              "text": "production",
-              "value": "production"
+              "text": "osd-integration-hivei01ue1",
+              "value": "osd-integration-hivei01ue1"
             },
             "datasource": {
               "type": "postgres",
               "uid": "P5108662370F9C14C"
             },
-            "definition": "select env_name from deployments where env_name in ('osd-stage-01','osd-stage-hives02ue1','osd-integration-hivei01ue1',\n'osd-production-hivep01ue1','osd-production-hivep02ue1','osd-production-hivep03uw1','osd-production-hivep04ew2',\n'osd-production-hivep05ue1','osd-production-hivep06uw2','osd-production-hivep07ue2')",
+            "definition": "select env_name from deployments",
             "hide": 2,
             "includeAll": false,
             "label": "Deployment Environment",
-            "multi": false,
             "name": "env_name",
             "options": [],
-            "query": "select env_name from deployments where env_name in ('osd-stage-01','osd-stage-hives02ue1','osd-integration-hivei01ue1',\n'osd-production-hivep01ue1','osd-production-hivep02ue1','osd-production-hivep03uw1','osd-production-hivep04ew2',\n'osd-production-hivep05ue1','osd-production-hivep06uw2','osd-production-hivep07ue2')",
+            "query": "select env_name from deployments",
             "refresh": 1,
-            "regex": "",
-            "skipUrlSync": false,
+            "regex": "/osd-stage-01|(?:osd-(?:stage|production|integration)-hive.*)/",
             "sort": 1,
             "type": "query"
           }
@@ -1077,8 +1046,7 @@ data:
       "timezone": "",
       "title": "Hive SLO",
       "uid": "r3dExJ24z",
-      "version": 31,
-      "weekStart": ""
+      "version": 1
     }
 kind: ConfigMap
 metadata:

@@ -1,0 +1,97 @@
+jira_issue:
+  key: "HIVE-2544"
+  summary: "[Hive/Azure/Azure Gov] Machinepool: Unable to generate machinesets in regions without availability zone support."
+  status: "Closed"
+  resolution: "Done"
+  component: "hive"
+  
+issue_analysis:
+  maturity: "resolved_bug"
+  complexity: "medium"
+  scope: "azure_machinepool_management"
+  environment: "azure_commercial_and_government"
+  
+technical_requirements:
+  primary_functionality:
+    - "Machinepool creation in Azure regions without availability zones"
+    - "Machineset generation regardless of availability zone support"
+    - "Azure Government cloud compatibility"
+  
+  components_under_test:
+    - "Hive machinepool controller"
+    - "Azure zone detection logic" 
+    - "Machineset generation process"
+    
+  affected_versions:
+    - "openshift-4.12.z"
+    - "openshift-4.13.z" 
+    - "openshift-4.14.z"
+    - "openshift-4.15.z"
+    - "openshift-4.16"
+    - "openshift-4.17"
+
+user_scenarios:
+  primary_scenario:
+    description: "Platform engineer creates machinepool in Azure region without availability zones"
+    priority: "high"
+    
+  validation_scenarios:
+    - "Verify machinesets are generated successfully"
+    - "Test Azure commercial regions without AZ support"
+    - "Test Azure Government regions without AZ support"
+    - "Ensure existing AZ-supported regions continue to work"
+    
+  error_handling:
+    - "Verify graceful handling of zero zones returned"
+    - "Validate appropriate error messages for configuration issues"
+
+test_scope:
+  in_scope:
+    - "Machinepool creation and validation"
+    - "Machineset generation process"
+    - "Azure and Azure Gov cloud environments"
+    - "Regions with and without availability zone support"
+    - "Error handling and logging"
+    
+  out_of_scope:
+    - "Other cloud providers (AWS, GCP)"
+    - "Cluster deployment process"
+    - "Network configuration"
+    - "Storage configuration"
+
+expected_behavior:
+  success_criteria:
+    - "Machinepool successfully creates machinesets in regions without AZ support"
+    - "No 'zero zones returned' errors occur"
+    - "Controller reconciles successfully"
+    - "Machinesets are properly configured for the target region"
+    
+  validation_methods:
+    - "Check machinepool status for successful reconciliation"
+    - "Verify machineset resources are created"
+    - "Validate controller logs show no errors"
+    - "Confirm cluster nodes are provisioned correctly"
+
+qe_capabilities:
+  environment_access:
+    - "Azure cloud subscription"
+    - "Azure Government cloud access"
+    - "Hive cluster management tools"
+    - "Access to multiple Azure regions"
+    
+  testing_tools:
+    - "kubectl/oc CLI"
+    - "Azure CLI"
+    - "Hive CLI tools"
+    - "OpenShift cluster access"
+
+risk_assessment:
+  high_risk_areas:
+    - "Azure Government cloud specific configurations"
+    - "Region-specific availability zone detection"
+    - "Backward compatibility with existing deployments"
+    
+  mitigation_strategies:
+    - "Test in multiple regions with different AZ support"
+    - "Validate both Azure commercial and government clouds"
+    - "Ensure regression testing covers existing functionality"

@@ -1,0 +1,126 @@
+agent:
+  name: "test-executor"
+  display_name: "Comprehensive Test Execution Agent"
+  description: "Execute both manual tests and E2E tests with comprehensive validation"
+
+role:
+  title: "Comprehensive Test Execution Specialist"
+  specialization: "Manual test execution and E2E test execution with validation"
+  responsibility: "Execute manual test shell scripts and E2E tests with comprehensive validation for {jira_issue_key}"
+
+task:
+  primary_goal: "Execute comprehensive test execution workflow including E2E tests"
+  subtasks:
+    - name: "Environment Validation"
+      description: "Validate test environment and cluster connectivity"
+      steps:
+        - "Load cluster configuration from environment variables or default paths"
+        - "Set KUBECONFIG environment variable to configured kubeconfig_path"
+        - "Check cluster availability and connectivity (oc, cluster access)"
+        - "Verify required tools are installed and accessible"
+        - "Validate cluster permissions and namespace access"
+        - "Test cluster connectivity with basic kubectl commands"
+    
+    - name: "E2E Test Execution"
+      description: "Execute E2E tests if available"
+      dependencies: ["Environment Validation"]
+      condition: "E2E test results exist OR committed E2E test code exists"
+      steps:
+        - "Check if E2E test results file exists: workflow_outputs/{COMPONENT}/{JIRA_KEY}/phases/{JIRA_KEY}_openshift_private_e2e_results.md"
+        - "If no results file, navigate to E2E repository `.ai_testgen/temp_repos/openshift-tests-private` and check git commit history for {JIRA_KEY} related commits"
+        - "If commits exist, check git status and current branch for any {JIRA_KEY} related changes"
+        - "Search for existing E2E test code in current repository using grep/find for {JIRA_KEY}"
+        - "Navigate to E2E repository directory or use current directory if tests are local"
+        - "Build and verify test environment by running 'make all' to ensure everything is properly compiled"
+        - "Run test case using: ./bin/extended-platform-tests run all --dry-run|grep "{JIRA_KEY}"|./bin/extended-platform-tests run --timeout 100m -f -" OR search local test files"
+        - "Execute specific test with proper error handling and timeout"
+        - "Monitor E2E test execution and capture results"
+        - "Capture E2E test output and error messages"
+        - "Record E2E test execution time and resource usage"
+        - "Capture test execution output and results"
+    
+    - name: "Test Result Analysis"
+      description: "Analyze test failures and generate corrections"
+      dependencies: ["E2E Test Execution"]
+      condition: "E2E test execution completed with failures"
+      steps:
+        - "Use DeepWiki MCP to analyze correct command syntax and patterns"
+        - "Identify failed test steps and analyze failure patterns"
+        - "Analyze error messages and determine root causes"
+        - "Generate corrected test steps with proper command syntax"
+        - "Validate corrected commands using DeepWiki analysis"
+        - "Generate test step correction report with detailed analysis"
+    
+    - name: "Report Generation"
+      description: "Generate comprehensive test execution reports"
+      dependencies: ["E2E Test Execution"]
+      steps:
+        - "Compile test execution results from all subtasks"
+        - "Generate comprehensive test execution report"
+        - "Save all results to appropriate output directories"
+
+input:
+  required:
+    - name: "jira_issue_key"
+      type: "string"
+      description: "JIRA issue key for test execution"
+      example: "HIVE-2883"
+    - name: "component"
+      type: "string"
+      description: "Target component (e.g., hive, cco, other)"
+      example: "hive"
+  optional:
+    - name: "e2e_test_results_input"
+      type: "file"
+      description: "E2E test generation results (if available)"
+      path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/phases/{JIRA_KEY}_e2e_test_results.md"
+
+output:
+  files:
+    - name: "{JIRA_KEY}_comprehensive_test_results.md"
+      path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/test_execution_results/{JIRA_KEY}_comprehensive_test_results.md"
+      format: "markdown"
+      description: "Comprehensive test execution results including manual and E2E tests"
+    - name: "{JIRA_KEY}_test_execution_log.txt"
+      path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/test_execution_results/{JIRA_KEY}_test_execution_log.txt"
+      format: "text"
+      description: "Detailed test execution log with timestamps and output"
+    - name: "{JIRA_KEY}_e2e_execution_results.yaml"
+      path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/test_execution_results/{JIRA_KEY}_e2e_execution_results.yaml"
+      format: "yaml"
+      description: "E2E test execution results with detailed output and timing"
+    - name: "{JIRA_KEY}_updated_e2e_test_results.md"
+      path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/phases/{JIRA_KEY}_e2e_test_results.md"
+      format: "markdown"
+      description: "Updated E2E test results with corrected patterns (if E2E tests failed)"
+    - name: "{JIRA_KEY}_test_correction_report.md"
+      path: "workflow_outputs/{COMPONENT}/{JIRA_KEY}/test_execution_results/{JIRA_KEY}_test_correction_report.md"
+      format: "markdown"
+      description: "Test step correction analysis and report (if corrections made)"
+
+tools:
+  - name: "Bash"
+    description: "Execute shell commands for environment validation and test execution"
+  - name: "DeepWiki MCP"
+    description: "Analyze correct command syntax and component patterns"
+  - name: "File operations"
+    description: "Read configuration files and write execution results"
+  - name: "WebFetch"
+    description: "Fetch additional context if needed"
+
+content_limits:
+  maximum_size: "20KB"
+  style_guidelines:
+    - "Execute all test phases directly without calling other agents"
+    - "Focus on comprehensive test execution and validation"
+    - "Ensure all test execution phases complete successfully"
+    - "Compile comprehensive test execution reports"
+    - "Handle both manual and E2E test execution seamlessly"
+
+configuration:
+  dynamic_variables:
+    - "{COMPONENT}"
+    - "{JIRA_KEY}"
+  template_replacement: true
+  template_enforcement: "strict"
+  execution_timeout: 3600  # 60 minutes for comprehensive test execution (including E2E tests)

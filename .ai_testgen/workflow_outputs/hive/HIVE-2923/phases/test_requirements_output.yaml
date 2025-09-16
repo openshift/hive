@@ -1,0 +1,97 @@
+jira_analysis:
+  issue_key: "HIVE-2923"
+  summary: "Scrub AWS RequestID from DNSZone \"DNSError\" status condition message (thrashing)"
+  component: "hive"
+  status: "Closed"
+  resolution: "Fixed"
+  priority: "10300"
+  fixed_version: "openshift-4.20"
+  
+  issue_maturity_assessment:
+    status: "RESOLVED"
+    maturity_level: "IMPLEMENTED"
+    testing_focus: "VALIDATION"
+    note: "Issue is resolved and fixed, focus on validating the fix works correctly"
+  
+  stakeholder_identification:
+    primary_stakeholder: "QE_VALIDATION"
+    user_type: "CLUSTER_ADMINISTRATORS"
+    note: "QE notes provided indicate this needs validation testing"
+  
+  dependency_understanding:
+    prerequisites: 
+      - "AWS environment with DNS zone management"
+      - "Hive cluster with DNS zone controller"
+      - "Ability to trigger AWS authentication errors"
+    technical_context: "AWS SDK v2 transition related fix for RequestID scrubbing"
+
+technical_requirements:
+  core_functionality:
+    - "AWS RequestID scrubbing from DNSZone error messages"
+    - "Prevention of controller thrashing due to changing RequestIDs"
+    - "Proper error message handling in DNSZone controller"
+  
+  component_scope:
+    primary_component: "DNSZone Controller"
+    affected_areas:
+      - "AWS actuator error handling"
+      - "DNSError status condition messages"
+      - "Error scrubbing utility functions"
+  
+  validation_requirements:
+    - "Verify RequestID (UUID) is removed from error messages"
+    - "Confirm controller does not thrash on repeated AWS errors"
+    - "Validate error message content is preserved (minus RequestID)"
+    - "Test with invalid AWS credentials to trigger errors"
+
+test_scenarios:
+  realistic_scenarios:
+    - name: "Invalid AWS Credentials Test"
+      description: "Test DNSZone behavior with improper AWS credentials"
+      feasibility: "HIGH"
+      qe_executable: true
+      value: "Validates the core fix functionality"
+    
+    - name: "RequestID Scrubbing Validation"
+      description: "Verify UUID patterns are removed from error messages"
+      feasibility: "HIGH" 
+      qe_executable: true
+      value: "Direct validation of the scrubbing mechanism"
+    
+    - name: "Controller Stability Test"
+      description: "Ensure controller doesn't thrash on repeated errors"
+      feasibility: "MEDIUM"
+      qe_executable: true
+      value: "Validates the anti-thrashing behavior"
+
+  filtered_out_scenarios:
+    - name: "AWS SDK v2 Migration Testing"
+      reason: "Development-level concern, not user-facing"
+    - name: "Regex Pattern Development"
+      reason: "Code-level implementation detail"
+    - name: "Production Alert Investigation" 
+      reason: "Operations-level, not QE testable"
+
+test_scope_definition:
+  in_scope:
+    - "DNSZone error message content validation"
+    - "AWS authentication error handling"
+    - "Controller behavior under error conditions"
+    - "Error scrubbing functionality verification"
+  
+  out_of_scope:
+    - "AWS infrastructure setup"
+    - "Hive cluster installation"
+    - "Production monitoring setup"
+    - "AWS SDK version testing"
+  
+  environment_assumptions:
+    - "Existing Hive cluster with DNS zone capability"
+    - "AWS environment access for testing"
+    - "Ability to configure invalid credentials for testing"
+    - "Standard QE testing tools and permissions"
+
+qe_notes_analysis:
+  reproduction_guidance: "Hand DNSZone improper credentials to reproduce the issue"
+  validation_criteria: "Prior to fix: UUID appears in status causing thrashing; After fix: UUID does not appear"
+  testing_approach: "Focus on credential-based error scenarios"

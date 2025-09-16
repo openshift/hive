@@ -77,10 +77,11 @@ RUN if [ -e "/activation-key/org" ]; then ln -s /etc/rhsm-host /run/secrets/rhsm
 # TODO: should this be the operator?
 ENTRYPOINT ["/opt/services/manager"]
 
-LABEL name="hive"
+LABEL name="multicluster-engine/hive-rhel9"
 LABEL summary="API driven OpenShift 4 cluster provisioning and management"
 LABEL description="Hive is an operator which runs as a service on top of Kubernetes/OpenShift. The Hive service can be used to provision and perform initial configuration of OpenShift clusters"
 LABEL io.k8s.description="Hive is an operator which runs as a service on top of Kubernetes/OpenShift. The Hive service can be used to provision and perform initial configuration of OpenShift clusters"
 LABEL io.k8s.display-name="hive-operator"
 LABEL io.openshift.tags="cluster,management,provision"
 LABEL com.redhat.component="hive-rhel9"
+LABEL cpe="cpe:/a:redhat:multicluster_engine:2.9::el9"

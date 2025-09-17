@@ -41,6 +41,14 @@ type HiveConfigSpec struct {
 	// +optional
 	GlobalPullSecretRef *corev1.LocalObjectReference `json:"globalPullSecretRef,omitempty"`
 
+	// HiveImagePullSecretRef is used to specify a pull secret that can be used to pull Hive's own image.
+	// If hive has been deployed from a private registry, cluster installations will not succeed unless
+	// this reference is specified. This secret must live in the same namespace as the Hive operator's deployment.
+	// NOTE: This secret will be copied into Hive's TargetNamespace (if it is different than the namespace
+	// that the Hive operator is deployed in), as well as the namespace of every ClusterDeployment.
+	// +optional
+	HiveImagePullSecretRef *corev1.LocalObjectReference `json:"hiveImagePullSecretRef,omitempty"`
+
 	// Backup specifies configuration for backup integration.
 	// If absent, backup integration will be disabled.
 	// +optional

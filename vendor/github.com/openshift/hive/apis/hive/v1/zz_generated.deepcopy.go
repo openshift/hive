@@ -2666,6 +2666,11 @@ func (in *HiveConfigSpec) DeepCopyInto(out *HiveConfigSpec) {
 		*out = new(corev1.LocalObjectReference)
 		**out = **in
 	}
+	if in.HiveImagePullSecretRef != nil {
+		in, out := &in.HiveImagePullSecretRef, &out.HiveImagePullSecretRef
+		*out = new(corev1.LocalObjectReference)
+		**out = **in
+	}
 	in.Backup.DeepCopyInto(&out.Backup)
 	in.FailedProvisionConfig.DeepCopyInto(&out.FailedProvisionConfig)
 	in.ServiceProviderCredentialsConfig.DeepCopyInto(&out.ServiceProviderCredentialsConfig)

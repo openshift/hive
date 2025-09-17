@@ -189,7 +189,9 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	// Apply shared pod config passed through from the operator deployment
 	hiveAdmDeployment.Spec.Template.Spec.NodeSelector = r.sharedPodConfig.NodeSelector
 	hiveAdmDeployment.Spec.Template.Spec.Tolerations = r.sharedPodConfig.Tolerations
-	hiveAdmDeployment.Spec.Template.Spec.ImagePullSecrets = r.sharedPodConfig.ImagePullSecrets
+	if ref := getImagePullSecretReference(instance); ref != nil {
+		hiveAdmDeployment.Spec.Template.Spec.ImagePullSecrets = append(hiveAdmDeployment.Spec.Template.Spec.ImagePullSecrets, *ref)
+	}
 
 	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveAdmDeployment), hLog, util.WithGarbageCollection(instance))
 	if err != nil {

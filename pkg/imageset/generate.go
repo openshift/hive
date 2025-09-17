@@ -1,6 +1,7 @@
 package imageset
 
 import (
+	"os"
 	"time"
 
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
@@ -41,8 +42,6 @@ func GenerateImageSetJob(
 			MountPath: "/common",
 		},
 	}
-
-	imagePullSecrets := append(sharedPodConfig.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetMergedPullSecretName(cd)})
 
 	podSpec := corev1.PodSpec{
 		NodeSelector:  sharedPodConfig.NodeSelector,
@@ -87,7 +86,13 @@ func GenerateImageSetJob(
 			},
 		},
 		ServiceAccountName: serviceAccountName,
-		ImagePullSecrets:   imagePullSecrets,
+		ImagePullSecrets: []corev1.LocalObjectReference{
+			{Name: constants.GetMergedPullSecretName(cd)},
+		},
+	}
+
+	if hiveImagePullSecret := os.Getenv(constants.HivePrivateImagePullSecret); hiveImagePullSecret != "" {
+		podSpec.ImagePullSecrets = append(podSpec.ImagePullSecrets, corev1.LocalObjectReference{Name: hiveImagePullSecret})
 	}
 
 	completions := int32(1)

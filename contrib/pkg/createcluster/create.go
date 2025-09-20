@@ -76,9 +76,6 @@ GOVC_USERNAME and GOVC_PASSWORD - Are used to determine your vSphere
 credentials.
 GOVC_TLS_CA_CERTS - Is used to provide CA certificates for communicating
 with the vSphere API.
-GOVC_NETWORK, GOVC_DATACENTER, GOVC_DATASTORE and GOVC_HOST (vCenter host)
-can be used as alternatives to the associated commandline argument.
-These are only relevant for creating a cluster on vSphere.
 
 IC_API_KEY - Used to determine your IBM Cloud API key. Required when
 using --cloud=ibmcloud.
@@ -199,14 +196,8 @@ type Options struct {
 	OpenStackIngressFloatingIP string
 
 	// VSphere
-	VSphereVCenter          string
-	VSphereDatacenter       string
-	VSphereDefaultDataStore string
-	VSphereFolder           string
-	VSphereCluster          string
 	VSphereAPIVIP           string
 	VSphereIngressVIP       string
-	VSphereNetwork          string
 	VSpherePlatformSpecJSON string
 	VSphereCACerts          string
 
@@ -257,7 +248,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resourc
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-ca-certs=/path/to/cert --vsphere-platform-spec-json="{<installer platform spec>}"`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -363,14 +354,8 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringVar(&opt.OpenStackIngressFloatingIP, "openstack-ingress-floating-ip", "", "Floating IP address to use for cluster's Ingress service")
 
 	// vSphere flags
-	flags.StringVar(&opt.VSphereVCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
-	flags.StringVar(&opt.VSphereDatacenter, "vsphere-datacenter", "", "Datacenter to use in the vCenter")
-	flags.StringVar(&opt.VSphereDefaultDataStore, "vsphere-default-datastore", "", "Default datastore to use for provisioning volumes")
-	flags.StringVar(&opt.VSphereFolder, "vsphere-folder", "", "Folder that will be used and/or created for virtual machines")
-	flags.StringVar(&opt.VSphereCluster, "vsphere-cluster", "", "Cluster virtual machines will be cloned into")
 	flags.StringVar(&opt.VSphereAPIVIP, "vsphere-api-vip", "", "Virtual IP address for the api endpoint")
 	flags.StringVar(&opt.VSphereIngressVIP, "vsphere-ingress-vip", "", "Virtual IP address for ingress application routing")
-	flags.StringVar(&opt.VSphereNetwork, "vsphere-network", "", "Name of the network to be used by the cluster")
 	flags.StringVar(&opt.VSpherePlatformSpecJSON, "vsphere-platform-spec-json", "", "Installer vsphere platform spec, encoded as JSON")
 	flags.StringVar(&opt.VSphereCACerts, "vsphere-ca-certs", "", "Path to vSphere CA certificate, multiple CA paths can be : delimited")
 
@@ -761,77 +746,23 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			caCerts = append(caCerts, caCert)
 		}
 
-		vSphereNetwork := os.Getenv(constants.VSphereNetworkEnvVar)
-		if o.VSphereNetwork != "" {
-			vSphereNetwork = o.VSphereNetwork
-		}
-
-		vSphereDatacenter := os.Getenv(constants.VSphereDataCenterEnvVar)
-		if o.VSphereDatacenter != "" {
-			vSphereDatacenter = o.VSphereDatacenter
-		}
-
-		vSphereDatastore := os.Getenv(constants.VSphereDataStoreEnvVar)
-		if o.VSphereDefaultDataStore != "" {
-			vSphereDatastore = o.VSphereDefaultDataStore
-		}
-
-		vSphereVCenter := os.Getenv(constants.VSphereVCenterEnvVar)
-		if o.VSphereVCenter != "" {
-			vSphereVCenter = o.VSphereVCenter
-		}
-
-		vSphereFolder := o.VSphereFolder
-		vSphereCluster := o.VSphereCluster
-		vSphereAPIVIP := o.VSphereAPIVIP
-		vSphereIngressVIP := o.VSphereIngressVIP
-
 		platformBytes := []byte(os.Getenv(constants.VSpherePlatformSpecJSONEnvVar))
 		if o.VSpherePlatformSpecJSON != "" {
 			platformBytes = []byte(o.VSpherePlatformSpecJSON)
 		}
-
-		if len(platformBytes) > 0 {
-			o.log.Info("using provided installer platform spec instead of other flags for vsphere (size: %v)", len(platformBytes))
-			platform := installervsphere.Platform{}
-			err = json.Unmarshal(platformBytes, &platform)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding platform %s: %w", o.VSpherePlatformSpecJSON, err)
-			}
-
-			vSphereVCenter = platform.VCenters[0].Server
-			vSphereDatacenter = platform.VCenters[0].Datacenters[0]
-			if vSphereDatacenter == "" {
-				vSphereDatacenter = platform.FailureDomains[0].Topology.Datacenter
-			}
-			vSphereDatastore = platform.FailureDomains[0].Topology.Datastore
-			vSphereFolder = platform.FailureDomains[0].Topology.Folder
-			vSphereCluster = platform.FailureDomains[0].Topology.ComputeCluster
-			vSphereNetwork = platform.FailureDomains[0].Topology.Networks[0]
+		platform := installervsphere.Platform{}
+		err = json.Unmarshal(platformBytes, &platform)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding platform %s: %w", o.VSpherePlatformSpecJSON, err)
 		}
 
-		if vSphereDatacenter == "" {
-			return nil, fmt.Errorf("must provide --vsphere-datacenter or set %s env var", constants.VSphereDataCenterEnvVar)
-		}
-		if vSphereDatastore == "" {
-			return nil, fmt.Errorf("must provide --vsphere-default-datastore or set %s env var", constants.VSphereDataStoreEnvVar)
-		}
-		if vSphereVCenter == "" {
-			return nil, fmt.Errorf("must provide --vsphere-vcenter or set %s env var", constants.VSphereVCenterEnvVar)
-		}
+		vSphereSpec := clusterresource.APIPlatformSpecFromInstallerPlatformSpecAndIPs(platform, o.VSphereAPIVIP, o.VSphereIngressVIP)
 
 		vsphereProvider := &clusterresource.VSphereCloudBuilder{
-			VCenter:          vSphereVCenter,
-			Username:         vsphereUsername,
-			Password:         vspherePassword,
-			Datacenter:       vSphereDatacenter,
-			DefaultDatastore: vSphereDatastore,
-			Folder:           vSphereFolder,
-			Cluster:          vSphereCluster,
-			APIVIP:           vSphereAPIVIP,
-			IngressVIP:       vSphereIngressVIP,
-			Network:          vSphereNetwork,
-			CACert:           bytes.Join(caCerts, []byte("\n")),
+			Username: vsphereUsername,
+			Password: vspherePassword,
+			CACert:   bytes.Join(caCerts, []byte("\n")),
+			VSphere:  vSphereSpec,
 		}
 		builder.CloudBuilder = vsphereProvider
 	case cloudIBM:

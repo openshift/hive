@@ -144,8 +144,18 @@ func TestGenerateMachineSets(t *testing.T) {
 			clusterDeployment: func() *hivev1.ClusterDeployment {
 				cd := testNutanixClusterDeployment()
 				cd.Spec.Platform.Nutanix.FailureDomains = []hivev1nutanix.FailureDomain{
-					{Name: "valid-domain-1"},
-					{Name: "valid-domain-2"},
+					{
+						Name: "valid-domain-1",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "uuid-1",
+						},
+					},
+					{
+						Name: "valid-domain-2",
+						PrismElement: hivev1nutanix.PrismElement{
+							UUID: "uuid-2",
+						},
+					},
 				}
 				return cd
 			}(),

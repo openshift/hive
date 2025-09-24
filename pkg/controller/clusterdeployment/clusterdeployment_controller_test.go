@@ -3589,8 +3589,7 @@ platform:
 					(schema.GroupVersionKind{Group: "hive.openshift.io", Version: "v1", Kind: "FakeClusterInstall"}).String(): {},
 				},
 				releaseImageVerifier: test.riVerifier,
-				nodeSelector:         &map[string]string{},
-				tolerations:          &[]corev1.Toleration{},
+				sharedPodConfig:      &controllerutils.SharedPodConfig{},
 			}
 
 			if test.reconcilerSetup != nil {
@@ -3667,8 +3666,7 @@ func TestClusterDeploymentReconcileResults(t *testing.T) {
 				logger:                        logger,
 				expectations:                  controllerExpectations,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-				nodeSelector:                  &map[string]string{},
-				tolerations:                   &[]corev1.Toleration{},
+				sharedPodConfig:               &controllerutils.SharedPodConfig{},
 			}
 
 			reconcileResult, err := rcd.Reconcile(context.TODO(), reconcile.Request{
@@ -3787,10 +3785,9 @@ func TestDeleteStaleProvisions(t *testing.T) {
 			}
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
-				Client:       fakeClient,
-				scheme:       scheme.GetScheme(),
-				nodeSelector: &map[string]string{},
-				tolerations:  &[]corev1.Toleration{},
+				Client:          fakeClient,
+				scheme:          scheme.GetScheme(),
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
 			}
 			rcd.deleteStaleProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteStaleProvisions"))
 			actualAttempts := []int{}
@@ -3841,10 +3838,9 @@ func TestDeleteOldFailedProvisions(t *testing.T) {
 			scheme := scheme.GetScheme()
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(provisions...).Build()
 			rcd := &ReconcileClusterDeployment{
-				Client:       fakeClient,
-				scheme:       scheme,
-				nodeSelector: &map[string]string{},
-				tolerations:  &[]corev1.Toleration{},
+				Client:          fakeClient,
+				scheme:          scheme,
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
 			}
 			rcd.deleteOldFailedProvisions(getProvisions(fakeClient), log.WithField("test", "TestDeleteOldFailedProvisions"))
 			assert.Len(t, getProvisions(fakeClient), tc.expectedNumberOfProvisionsAfterDeletion, "unexpected provisions kept")
@@ -4366,8 +4362,7 @@ func TestUpdatePullSecretInfo(t *testing.T) {
 				validateCredentialsForClusterDeployment: func(client.Client, *hivev1.ClusterDeployment, log.FieldLogger) (bool, error) {
 					return true, nil
 				},
-				nodeSelector: &map[string]string{},
-				tolerations:  &[]corev1.Toleration{},
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
 			}
 
 			_, err := rcd.Reconcile(context.TODO(), reconcile.Request{
@@ -4528,8 +4523,7 @@ func TestMergePullSecrets(t *testing.T) {
 				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-				nodeSelector:                  &map[string]string{},
-				tolerations:                   &[]corev1.Toleration{},
+				sharedPodConfig:               &controllerutils.SharedPodConfig{},
 			}
 
 			cd := getCDFromClient(rcd.Client)
@@ -4596,8 +4590,7 @@ func TestCopyInstallLogSecret(t *testing.T) {
 				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-				nodeSelector:                  &map[string]string{},
-				tolerations:                   &[]corev1.Toleration{},
+				sharedPodConfig:               &controllerutils.SharedPodConfig{},
 			}
 
 			for i, envVar := range test.existingEnvVars {
@@ -4780,8 +4773,7 @@ func TestEnsureManagedDNSZone(t *testing.T) {
 				scheme:                        scheme,
 				logger:                        log.WithField("controller", "clusterDeployment"),
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-				nodeSelector:                  &map[string]string{},
-				tolerations:                   &[]corev1.Toleration{},
+				sharedPodConfig:               &controllerutils.SharedPodConfig{},
 			}
 
 			// act
@@ -4985,10 +4977,9 @@ spacing problem!
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(filterNils(test.cd, test.icSecret)...).Build()
 			r := &ReconcileClusterDeployment{
-				Client:       fakeClient,
-				scheme:       scheme.GetScheme(),
-				nodeSelector: &map[string]string{},
-				tolerations:  &[]corev1.Toleration{},
+				Client:          fakeClient,
+				scheme:          scheme.GetScheme(),
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
 			}
 
 			if gotReturn := r.discoverAWSHostedZoneRole(test.cd, logger); gotReturn != test.wantReturn {
@@ -5242,8 +5233,7 @@ platform:
 				Client:                        fakeClient,
 				scheme:                        scheme,
 				remoteClusterAPIClientBuilder: func(*hivev1.ClusterDeployment) remoteclient.Builder { return mockRemoteClientBuilder },
-				nodeSelector:                  &map[string]string{},
-				tolerations:                   &[]corev1.Toleration{},
+				sharedPodConfig:               &controllerutils.SharedPodConfig{},
 			}
 
 			if gotReturn := r.discoverAzureResourceGroup(test.cd, logger); gotReturn != test.wantReturn {
@@ -5430,10 +5420,9 @@ spacing problem!
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(filterNils(test.cd, test.icSecret)...).Build()
 			r := &ReconcileClusterDeployment{
-				Client:       fakeClient,
-				scheme:       scheme.GetScheme(),
-				nodeSelector: &map[string]string{},
-				tolerations:  &[]corev1.Toleration{},
+				Client:          fakeClient,
+				scheme:          scheme.GetScheme(),
+				sharedPodConfig: &controllerutils.SharedPodConfig{},
 			}
 
 			if gotReturn := r.discoverGCPNetworkProjectID(test.cd, logger); gotReturn != test.wantReturn {

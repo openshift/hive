@@ -158,7 +158,7 @@ func (a *DNSZoneValidatingAdmissionHook) validateCreate(admissionSpec *admission
 	strErrs := dnsvalidation.IsDNS1123Subdomain(newObject.Spec.Zone)
 	if len(strErrs) != 0 {
 		message := fmt.Sprintf("Failed validation: %v", strings.Join(strErrs, ";"))
-		contextLogger.Infof(message)
+		contextLogger.Info(message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{

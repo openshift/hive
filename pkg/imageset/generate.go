@@ -24,7 +24,11 @@ const (
 
 // GenerateImageSetJob creates a job to determine the installer image for a ClusterImageSet
 // given a release image
-func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAccountName, httpProxy, httpsProxy, noProxy string, nodeSelector map[string]string, tolerations []corev1.Toleration) *batchv1.Job {
+func GenerateImageSetJob(
+	cd *hivev1.ClusterDeployment,
+	releaseImage, serviceAccountName, httpProxy, httpsProxy, noProxy string,
+	sharedPodConfig controllerutils.SharedPodConfig,
+) *batchv1.Job {
 	logger := log.WithFields(log.Fields{
 		"clusterdeployment": types.NamespacedName{Namespace: cd.Namespace, Name: cd.Name}.String(),
 	})
@@ -38,9 +42,11 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 		},
 	}
 
+	imagePullSecrets := append(sharedPodConfig.ImagePullSecrets, corev1.LocalObjectReference{Name: constants.GetMergedPullSecretName(cd)})
+
 	podSpec := corev1.PodSpec{
-		NodeSelector:  nodeSelector,
-		Tolerations:   tolerations,
+		NodeSelector:  sharedPodConfig.NodeSelector,
+		Tolerations:   sharedPodConfig.Tolerations,
 		RestartPolicy: corev1.RestartPolicyOnFailure,
 		InitContainers: []corev1.Container{
 			{
@@ -81,7 +87,7 @@ func GenerateImageSetJob(cd *hivev1.ClusterDeployment, releaseImage, serviceAcco
 			},
 		},
 		ServiceAccountName: serviceAccountName,
-		ImagePullSecrets:   []corev1.LocalObjectReference{{Name: constants.GetMergedPullSecretName(cd)}},
+		ImagePullSecrets:   imagePullSecrets,
 	}
 
 	completions := int32(1)

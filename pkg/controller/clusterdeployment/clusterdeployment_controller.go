@@ -46,12 +46,14 @@ import (
 	"github.com/openshift/hive/apis/hive/v1/aws"
 	"github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/apis/hive/v1/gcp"
+	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	hiveintv1alpha1 "github.com/openshift/hive/apis/hiveinternal/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/imageset"
 	"github.com/openshift/hive/pkg/remoteclient"
+	"github.com/openshift/hive/pkg/util/contracts"
 	k8slabels "github.com/openshift/hive/pkg/util/labels"
 )
 
@@ -164,6 +166,17 @@ func NewReconciler(mgr manager.Manager, logger log.FieldLogger, rateLimiter flow
 		r.releaseImageVerifier = verifier
 	} else {
 		logger.WithError(err).Error("Release Image verification failed to be configured")
+	}
+
+	supportContractsConfig, err := contracts.ReadSupportContractsFile()
+	if err == nil {
+		logger.Info("loaded supported contracts configuration")
+		r.supportedContractsConfig = supportContractsConfig
+	} else {
+		// TODO: Should this be fatal? The risk is that a poorly-behaved CRD could DoS hive.
+		// However, by the time we get here, the config should be valid, having passed through
+		// hive-operator. But we would want to be really sure about that.
+		logger.WithError(err).Error("Unable to read Supported Contract Implementations file")
 	}
 
 	return r
@@ -319,11 +332,12 @@ type ReconcileClusterDeployment struct {
 
 	protectedDelete bool
 
-	// nodeSelector is copied from the hive-controllers pod and must be included in any Jobs we create from here.
-	nodeSelector *map[string]string
+	// sharedPodConfig is copied from the hive-controllers pod and must be included in any Jobs we create from here.
+	sharedPodConfig *controllerutils.SharedPodConfig
 
-	// tolerations is copied from the hive-controllers pod and must be included in any Jobs we create from here.
-	tolerations *[]corev1.Toleration
+	// supportedContractsConfig holds the list and configurations of supported external contracts,
+	// such as ClusterInstall.
+	supportedContractsConfig contracts.SupportedContractImplementationsList
 }
 
 // Reconcile reads that state of the cluster for a ClusterDeployment object and makes changes based on the state read
@@ -331,16 +345,15 @@ type ReconcileClusterDeployment struct {
 func (r *ReconcileClusterDeployment) Reconcile(ctx context.Context, request reconcile.Request) (result reconcile.Result, returnErr error) {
 	cdLog := controllerutils.BuildControllerLogger(ControllerName, "clusterDeployment", request.NamespacedName)
 
-	// Discover scheduling settings from the controller. We would like to do this in NewReconciler,
+	// Discover settings from the controller. We would like to do this in NewReconciler,
 	// but we can't count on the cache having been started at that point.
-	if r.nodeSelector == nil || r.tolerations == nil {
-		thisPod, err := controllerutils.GetThisPod(r)
+	if r.sharedPodConfig == nil {
+		sharedPodConfig, err := controllerutils.ReadSharedConfigFromThisPod(r)
 		if err != nil {
-			cdLog.WithError(err).Error("Failed to retrieve the running pod")
+			cdLog.WithError(err).Error("error reading shared pod config")
 			return reconcile.Result{}, err
 		}
-		r.nodeSelector = &thisPod.Spec.NodeSelector
-		r.tolerations = &thisPod.Spec.Tolerations
+		r.sharedPodConfig = sharedPodConfig
 	}
 
 	cdLog.Info("reconciling cluster deployment")
@@ -752,7 +765,13 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, authError
 	}
 
-	imageSet, err := r.getClusterImageSet(cd, cdLog)
+	ci, err := r.getClusterInstall(cd)
+	if err != nil {
+		cdLog.WithError(err).Error("failed to retrieve ClusterInstall")
+		return reconcile.Result{}, err
+	}
+
+	imageSet, err := r.getClusterImageSet(cd, ci, cdLog)
 	if err != nil {
 		cdLog.WithError(err).Error("failed to get cluster image set for the clusterdeployment")
 		return reconcile.Result{}, err
@@ -899,8 +918,8 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		}
 
 		return r.reconcileInstallingClusterProvision(cd, releaseImage, cdLog)
-	case cd.Spec.ClusterInstallRef != nil:
-		return r.reconcileInstallingClusterInstall(cd, cdLog)
+	case ci != nil:
+		return r.reconcileInstallingClusterInstall(cd, ci, cdLog)
 	default:
 		return reconcile.Result{}, errors.New("invalid provisioning configuration")
 	}
@@ -925,8 +944,8 @@ func (r *ReconcileClusterDeployment) reconcileInstalledClusterProvision(cd *hive
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (reconcile.Result, error) {
-	ref := cd.Spec.ClusterInstallRef
+func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev1.ClusterDeployment, ci *hivecontractsv1alpha1.ClusterInstall, logger log.FieldLogger) (reconcile.Result, error) {
+	ref := ci.GroupVersionKind()
 	gvk := schema.GroupVersionKind{
 		Group:   ref.Group,
 		Version: ref.Version,
@@ -938,7 +957,7 @@ func (r *ReconcileClusterDeployment) reconcileInstallingClusterInstall(cd *hivev
 		return reconcile.Result{}, err
 	}
 
-	return r.reconcileExistingInstallingClusterInstall(cd, logger)
+	return r.reconcileExistingInstallingClusterInstall(cd, ci, logger)
 }
 
 func dnsZoneNotReadyMaybeTimedOut(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (string, string, time.Duration) {
@@ -999,7 +1018,7 @@ func (r *ReconcileClusterDeployment) getReleaseImage(cd *hivev1.ClusterDeploymen
 	return ""
 }
 
-func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
+func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeployment, ci *hivecontractsv1alpha1.ClusterInstall, cdLog log.FieldLogger) (*hivev1.ClusterImageSet, error) {
 	imageSetKey := types.NamespacedName{}
 
 	switch {
@@ -1008,12 +1027,9 @@ func (r *ReconcileClusterDeployment) getClusterImageSet(cd *hivev1.ClusterDeploy
 		if imageSetKey.Name == "" {
 			return nil, nil
 		}
-	case cd.Spec.ClusterInstallRef != nil:
-		isName, err := getClusterImageSetFromClusterInstall(r.Client, cd)
-		if err != nil {
-			return nil, err
-		}
-		imageSetKey.Name = isName
+	case ci != nil:
+		// TODO: Check for empty? Retaining existing flow for HIVE-2790.
+		imageSetKey.Name = ci.Spec.ImageSetRef.Name
 	default:
 		cdLog.Warning("clusterdeployment references no clusterimageset")
 		if err := r.setReqsMetConditionImageSetNotFound(cd, "unknown", true, cdLog); err != nil {
@@ -1055,22 +1071,62 @@ const (
 	imagesResolvedMsg    = "Images required for cluster deployment installations are resolved"
 )
 
+// skipImageSetJob answers whether we should avoid running the imageset job entirely.
+// At the moment only ClusterInstall impls can request this.
+func (r *ReconcileClusterDeployment) skipImageSetJob(cd *hivev1.ClusterDeployment) bool {
+	if len(r.supportedContractsConfig) == 0 {
+		return false
+	}
+
+	cir := cd.Spec.ClusterInstallRef
+	if cir == nil {
+		return false
+	}
+
+	impl := contracts.ContractImplementation{
+		Group:   cir.Group,
+		Version: cir.Version,
+		Kind:    cir.Kind,
+	}
+
+	if !r.supportedContractsConfig.IsSupported(hivecontractsv1alpha1.ClusterInstallContractName, impl) {
+		return false
+	}
+
+	skipStr, ok := r.supportedContractsConfig.GetConfig(
+		hivecontractsv1alpha1.ClusterInstallContractName,
+		impl)[string(hivecontractsv1alpha1.ClusterInstallConfigKeySkipImageSetJob)]
+	if !ok {
+		return false
+	}
+
+	skip, err := strconv.ParseBool(skipStr)
+
+	return err == nil && skip
+}
+
 func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDeployment, releaseImage string, cdLog log.FieldLogger) (*reconcile.Result, error) {
 	areImagesResolved := cd.Status.InstallerImage != nil && cd.Status.CLIImage != nil
+	skipImageSetJob := r.skipImageSetJob(cd)
 
 	// In minimal install mode, don't even run the image resolver pod -- just trust the InstallerImageOverride
-	if minimal, err := strconv.ParseBool(cd.Annotations[constants.MinimalInstallModeAnnotation]); err == nil && minimal {
+	if minimal, err := strconv.ParseBool(cd.Annotations[constants.MinimalInstallModeAnnotation]); (err == nil && minimal) || skipImageSetJob {
 		changed1, changed2 := false, false
 		if !areImagesResolved {
-			// "resolve" the images via installerImageOverride
-			installerImage := cd.Spec.Provisioning.InstallerImageOverride
-			if installerImage == "" {
-				return &reconcile.Result{}, r.updateCondition(
-					cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue,
-					"MinimalInstallModeWithoutImageOverride",
-					"InstallerImageOverride is required when using minimal-install-mode annotation", cdLog)
+			if skipImageSetJob {
+				cdLog.Info("skipping imageset job due to ClusterInstall.Spec.SkipImageSetJob")
+				cd.Status.InstallerImage = pointer.String("<NONE>")
+			} else {
+				// "resolve" the images via installerImageOverride
+				installerImage := cd.Spec.Provisioning.InstallerImageOverride
+				if installerImage == "" {
+					return &reconcile.Result{}, r.updateCondition(
+						cd, hivev1.InstallImagesNotResolvedCondition, corev1.ConditionTrue,
+						"MinimalInstallModeWithoutImageOverride",
+						"InstallerImageOverride is required when using minimal-install-mode annotation", cdLog)
+				}
+				cd.Status.InstallerImage = &installerImage
 			}
-			cd.Status.InstallerImage = &installerImage
 			cd.Status.CLIImage = pointer.String("<NONE>")
 			changed1 = true
 		}
@@ -1104,8 +1160,8 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 			os.Getenv("HTTP_PROXY"),
 			os.Getenv("HTTPS_PROXY"),
 			os.Getenv("NO_PROXY"),
-			*r.nodeSelector,
-			*r.tolerations)
+			*r.sharedPodConfig,
+		)
 
 		cdLog.WithField("derivedObject", job.Name).Debug("Setting labels on derived object")
 		job.Labels = k8slabels.AddLabel(job.Labels, constants.ClusterDeploymentNameLabel, cd.Name)
@@ -1630,7 +1686,7 @@ func (r *ReconcileClusterDeployment) setDNSDelayMetric(cd *hivev1.ClusterDeploym
 	if readyCondition == nil || readyCondition.Status != corev1.ConditionTrue {
 		msg := "did not find timestamp for when dnszone became ready"
 		cdLog.WithField("dnszone", dnsZone.Name).Error(msg)
-		return false, fmt.Errorf(msg)
+		return false, errors.New(msg)
 	}
 
 	dnsDelayDuration := readyCondition.LastTransitionTime.Sub(cd.CreationTimestamp.Time)
@@ -1967,12 +2023,6 @@ func generateDeprovision(cd *hivev1.ClusterDeployment) (*hivev1.ClusterDeprovisi
 			CredentialsSecretRef:  cd.Spec.Platform.VSphere.CredentialsSecretRef,
 			CertificatesSecretRef: cd.Spec.Platform.VSphere.CertificatesSecretRef,
 			VCenter:               cd.Spec.Platform.VSphere.VCenter,
-		}
-	case cd.Spec.Platform.Ovirt != nil:
-		req.Spec.Platform.Ovirt = &hivev1.OvirtClusterDeprovision{
-			CredentialsSecretRef:  cd.Spec.Platform.Ovirt.CredentialsSecretRef,
-			CertificatesSecretRef: cd.Spec.Platform.Ovirt.CertificatesSecretRef,
-			ClusterID:             cd.Spec.Platform.Ovirt.ClusterID,
 		}
 	case cd.Spec.Platform.IBMCloud != nil:
 		req.Spec.Platform.IBMCloud = &hivev1.IBMClusterDeprovision{
@@ -2670,8 +2720,6 @@ func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformIBMCloud
 	case cd.Spec.Platform.None != nil:
 		return constants.PlatformNone
-	case cd.Spec.Platform.Ovirt != nil:
-		return constants.PlatformOvirt
 	case cd.Spec.Platform.Nutanix != nil:
 		return constants.PlatformNutanix
 	}

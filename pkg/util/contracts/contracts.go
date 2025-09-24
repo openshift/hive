@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/openshift/hive/pkg/constants"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -17,9 +18,10 @@ type SupportedContractImplementations struct {
 
 // ContractImplementation is a resources that implements some contract
 type ContractImplementation struct {
-	Group   string `json:"group"`
-	Version string `json:"version"`
-	Kind    string `json:"kind"`
+	Group   string            `json:"group"`
+	Version string            `json:"version"`
+	Kind    string            `json:"kind"`
+	Config  map[string]string `json:"config,omitempty"`
 }
 
 // SupportedContractImplementationsList is a list of contracts and their supported
@@ -47,13 +49,26 @@ func (l SupportedContractImplementationsList) IsSupported(contract string, impl 
 	for _, c := range l {
 		if c.Name == contract {
 			for _, i := range c.Supported {
-				if i == impl {
+				if i.Group == impl.Group && i.Kind == impl.Kind && i.Version == impl.Version {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+func (l SupportedContractImplementationsList) GetConfig(contract string, impl ContractImplementation) map[string]string {
+	for _, c := range l {
+		if c.Name == contract {
+			for _, i := range c.Supported {
+				if i.Group == impl.Group && i.Kind == impl.Kind && i.Version == impl.Version {
+					return i.Config
+				}
+			}
+		}
+	}
+	return map[string]string{}
 }
 
 // ReadSupportContractsFile reads the configuration file and returns a

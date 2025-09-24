@@ -16,7 +16,6 @@ const (
 	PlatformIBMCloud       = "ibmcloud"
 	PlatformNone           = "none-platform"
 	PlatformOpenStack      = "openstack"
-	PlatformOvirt          = "ovirt"
 	PlatformUnknown        = "unknown"
 	PlatformVSphere        = "vsphere"
 	PlatformNutanix        = "nutanix"
@@ -365,18 +364,6 @@ const (
 	// next minor version. i.e 4.y -> 4.(y+1)
 	MinorVersionUpgradeUnavailable = "hive.openshift.io/minor-version-upgrade-unavailable"
 
-	// OvirtCredentialsDir is the directory containing Ovirt credentials files.
-	OvirtCredentialsDir = "/.ovirt"
-
-	// OvirtCertificatesDir is the directory containing Ovirt certificate files.
-	OvirtCertificatesDir = "/.ovirt-ca"
-
-	// OvirtCredentialsName is the name of the oVirt credentials file.
-	OvirtCredentialsName = "ovirt-config.yaml"
-
-	// OvirtConfigEnvVar is the environment variable specifying the oVirt config path
-	OvirtConfigEnvVar = "OVIRT_CONFIG"
-
 	// InstallLogsUploadProviderEnvVar is used to specify which object store provider is being used.
 	InstallLogsUploadProviderEnvVar = "HIVE_INSTALL_LOGS_UPLOAD_PROVIDER"
 
@@ -560,6 +547,11 @@ const (
 	// of the clusterversion controller, which syncs hive.openshift.io/version* labels. It is how we plumb
 	// HiveConfig.Spec.ClusterVersionPollInterval from hive-operator through to the clusterversion controller.
 	ClusterVersionPollIntervalEnvVar = "CLUSTERVERSION_POLL_INTERVAL"
+
+	// SyncClusterVersionStatusAnnotation, if set to "true" on a ClusterDeployment, causes hive to copy the entire
+	// status section of the `clusterversion version` object from the spoke cluster into
+	// ClusterDeployment.Status.ClusterVersionStatus.
+	SyncClusterVersionStatusAnnotation = "hive.openshift.io/sync-clusterversion-status"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

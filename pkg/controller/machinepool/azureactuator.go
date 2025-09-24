@@ -156,10 +156,13 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 			return nil, false, errors.Wrap(err, "compute pool not providing list of zones and failed to fetch list of zones")
 		}
 		if len(zones) == 0 {
-			return nil, false, fmt.Errorf("zero zones returned for region %s", cd.Spec.Platform.Azure.Region)
+			// No zones specified. Upstream will handle defaulting logic. Adding log here for visibility.
+			logger.WithField("region", cd.Spec.Platform.Azure.Region).Info("No availability zones detected for region. Using non-zoned deployment.")
+		} else {
+			computePool.Platform.Azure.Zones = zones
 		}
-		computePool.Platform.Azure.Zones = zones
 	}
+
 	// The imageID parameter is not used. The image is determined by the infraID.
 	const imageID = ""
 

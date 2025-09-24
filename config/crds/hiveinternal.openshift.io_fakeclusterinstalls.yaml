@@ -3,9 +3,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    contracts.hive.openshift.io/clusterinstall.config: '{"skipImageSetJob": "true"}'
+  name: fakeclusterinstalls.hiveinternal.openshift.io
   labels:
     contracts.hive.openshift.io/clusterinstall: "true"
-  name: fakeclusterinstalls.hiveinternal.openshift.io
 spec:
   group: hiveinternal.openshift.io
   names:
@@ -15,190 +16,169 @@ spec:
     singular: fakeclusterinstall
   scope: Namespaced
   versions:
-  - name: v1alpha1
-    schema:
-      openAPIV3Schema:
-        description: FakeClusterInstall represents a fake request to provision an
-          agent based cluster.
-        properties:
-          apiVersion:
-            description: |-
-              APIVersion defines the versioned schema of this representation of an object.
-              Servers should convert recognized schemas to the latest internal value, and
-              may reject unrecognized values.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
-            type: string
-          kind:
-            description: |-
-              Kind is a string value representing the REST resource this object represents.
-              Servers may infer this from the endpoint the client submits requests to.
-              Cannot be updated.
-              In CamelCase.
-              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: FakeClusterInstallSpec defines the desired state of the FakeClusterInstall.
-            properties:
-              clusterDeploymentRef:
-                description: ClusterDeploymentRef is a reference to the ClusterDeployment
-                  associated with this AgentClusterInstall.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              clusterMetadata:
-                description: ClusterMetadata contains metadata information about the
-                  installed cluster. It should be populated once the cluster install
-                  is completed. (it can be populated sooner if desired, but Hive will
-                  not copy back to ClusterDeployment until the Installed condition
-                  goes True.
-                properties:
-                  adminKubeconfigSecretRef:
-                    description: AdminKubeconfigSecretRef references the secret containing
-                      the admin kubeconfig for this cluster.
-                    properties:
-                      name:
-                        default: ""
-                        description: |-
-                          Name of the referent.
-                          This field is effectively required, but due to backwards compatibility is
-                          allowed to be empty. Instances of this type with an empty value here are
-                          almost certainly wrong.
-                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                        type: string
-                    type: object
-                    x-kubernetes-map-type: atomic
-                  adminPasswordSecretRef:
-                    description: AdminPasswordSecretRef references the secret containing
-                      the admin username/password which can be used to login to this
-                      cluster.
-                    properties:
-                      name:
-                        default: ""
-                        description: |-
-                          Name of the referent.
-                          This field is effectively required, but due to backwards compatibility is
-                          allowed to be empty. Instances of this type with an empty value here are
-                          almost certainly wrong.
-                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                        type: string
-                    type: object
-                    x-kubernetes-map-type: atomic
-                  clusterID:
-                    description: ClusterID is a globally unique identifier for this
-                      cluster generated during installation. Used for reporting metrics
-                      among other places.
-                    type: string
-                  infraID:
-                    description: InfraID is an identifier for this cluster generated
-                      during installation and used for tagging/naming resources in
-                      cloud providers.
-                    type: string
-                  platform:
-                    description: Platform holds platform-specific cluster metadata
-                    properties:
-                      aws:
-                        description: AWS holds AWS-specific cluster metadata
-                        properties:
-                          hostedZoneRole:
-                            description: |-
-                              HostedZoneRole is the role to assume when performing operations
-                              on a hosted zone owned by another account.
-                            type: string
-                        type: object
-                      azure:
-                        description: Azure holds azure-specific cluster metadata
-                        properties:
-                          resourceGroupName:
-                            description: ResourceGroupName is the name of the resource
-                              group in which the cluster resources were created.
-                            type: string
-                        required:
-                        - resourceGroupName
-                        type: object
-                      gcp:
-                        description: GCP holds GCP-specific cluster metadata
-                        properties:
-                          networkProjectID:
-                            description: NetworkProjectID is used for shared VPC setups
-                            type: string
-                        type: object
-                    type: object
-                required:
-                - adminKubeconfigSecretRef
-                - clusterID
-                - infraID
-                type: object
-              imageSetRef:
-                description: |-
-                  ImageSetRef is a reference to a ClusterImageSet. The release image specified in the ClusterImageSet will be used
-                  to install the cluster.
-                properties:
-                  name:
-                    description: Name is the name of the ClusterImageSet that this
-                      refers to
-                    type: string
-                required:
-                - name
-                type: object
-            required:
-            - clusterDeploymentRef
-            - imageSetRef
-            type: object
-          status:
-            description: FakeClusterInstallStatus defines the observed state of the
-              FakeClusterInstall.
-            properties:
-              conditions:
-                description: Conditions includes more detailed status for the cluster
-                  install.
-                items:
-                  description: ClusterInstallCondition contains details for the current
-                    condition of a cluster install.
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: FakeClusterInstall represents a fake request to provision an agent based cluster.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: FakeClusterInstallSpec defines the desired state of the FakeClusterInstall.
+              properties:
+                clusterDeploymentRef:
+                  description: ClusterDeploymentRef is a reference to the ClusterDeployment associated with this AgentClusterInstall.
                   properties:
-                    lastProbeTime:
-                      description: LastProbeTime is the last time we probed the condition.
-                      format: date-time
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                       type: string
-                    lastTransitionTime:
-                      description: LastTransitionTime is the last time the condition
-                        transitioned from one status to another.
-                      format: date-time
+                  type: object
+                  x-kubernetes-map-type: atomic
+                clusterMetadata:
+                  description: ClusterMetadata contains metadata information about the installed cluster. It should be populated once the cluster install is completed. (it can be populated sooner if desired, but Hive will not copy back to ClusterDeployment until the Installed condition goes True.
+                  properties:
+                    adminKubeconfigSecretRef:
+                      description: AdminKubeconfigSecretRef references the secret containing the admin kubeconfig for this cluster.
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    adminPasswordSecretRef:
+                      description: AdminPasswordSecretRef references the secret containing the admin username/password which can be used to login to this cluster.
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    clusterID:
+                      description: ClusterID is a globally unique identifier for this cluster generated during installation. Used for reporting metrics among other places.
                       type: string
-                    message:
-                      description: Message is a human-readable message indicating
-                        details about last transition.
+                    infraID:
+                      description: InfraID is an identifier for this cluster generated during installation and used for tagging/naming resources in cloud providers.
                       type: string
-                    reason:
-                      description: Reason is a unique, one-word, CamelCase reason
-                        for the condition's last transition.
-                      type: string
-                    status:
-                      description: Status is the status of the condition.
-                      type: string
-                    type:
-                      description: Type is the type of the condition.
+                    platform:
+                      description: Platform holds platform-specific cluster metadata
+                      properties:
+                        aws:
+                          description: AWS holds AWS-specific cluster metadata
+                          properties:
+                            hostedZoneRole:
+                              description: |-
+                                HostedZoneRole is the role to assume when performing operations
+                                on a hosted zone owned by another account.
+                              type: string
+                          type: object
+                        azure:
+                          description: Azure holds azure-specific cluster metadata
+                          properties:
+                            resourceGroupName:
+                              description: ResourceGroupName is the name of the resource group in which the cluster resources were created.
+                              type: string
+                          required:
+                            - resourceGroupName
+                          type: object
+                        gcp:
+                          description: GCP holds GCP-specific cluster metadata
+                          properties:
+                            networkProjectID:
+                              description: NetworkProjectID is used for shared VPC setups
+                              type: string
+                          type: object
+                      type: object
+                  required:
+                    - adminKubeconfigSecretRef
+                    - clusterID
+                    - infraID
+                  type: object
+                imageSetRef:
+                  description: |-
+                    ImageSetRef is a reference to a ClusterImageSet. The release image specified in the ClusterImageSet will be used
+                    to install the cluster.
+                  properties:
+                    name:
+                      description: Name is the name of the ClusterImageSet that this refers to
                       type: string
                   required:
-                  - status
-                  - type
+                    - name
                   type: object
-                type: array
-            type: object
-        required:
-        - spec
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
+              required:
+                - clusterDeploymentRef
+                - imageSetRef
+              type: object
+            status:
+              description: FakeClusterInstallStatus defines the observed state of the FakeClusterInstall.
+              properties:
+                conditions:
+                  description: Conditions includes more detailed status for the cluster install.
+                  items:
+                    description: ClusterInstallCondition contains details for the current condition of a cluster install.
+                    properties:
+                      lastProbeTime:
+                        description: LastProbeTime is the last time we probed the condition.
+                        format: date-time
+                        type: string
+                      lastTransitionTime:
+                        description: LastTransitionTime is the last time the condition transitioned from one status to another.
+                        format: date-time
+                        type: string
+                      message:
+                        description: Message is a human-readable message indicating details about last transition.
+                        type: string
+                      reason:
+                        description: Reason is a unique, one-word, CamelCase reason for the condition's last transition.
+                        type: string
+                      status:
+                        description: Status is the status of the condition.
+                        type: string
+                      type:
+                        description: Type is the type of the condition.
+                        type: string
+                    required:
+                      - status
+                      - type
+                    type: object
+                  type: array
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

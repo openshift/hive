@@ -1,4 +1,5 @@
 # OpenShift Hive
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/openshift/hive)
 
 API driven OpenShift 4 cluster provisioning and management.
 

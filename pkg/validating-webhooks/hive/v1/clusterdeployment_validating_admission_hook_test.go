@@ -22,7 +22,6 @@ import (
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
 	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
-	hivev1ovirt "github.com/openshift/hive/apis/hive/v1/ovirt"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 
@@ -152,17 +151,6 @@ func validNutanixClusterDeployment() *hivev1.ClusterDeployment {
 			Address: "some-prism-central.nutanix.com",
 			Port:    9440,
 		},
-	}
-	return cd
-}
-
-func validOvirtClusterDeployment() *hivev1.ClusterDeployment {
-	cd := clusterDeploymentTemplate()
-	cd.Spec.Platform.Ovirt = &hivev1ovirt.Platform{
-		ClusterID:             "fake-cluster-uuid",
-		CredentialsSecretRef:  corev1.LocalObjectReference{Name: "fake-creds-secret"},
-		CertificatesSecretRef: corev1.LocalObjectReference{Name: "fake-cert-secret"},
-		StorageDomainID:       "fake-storage-domain-uuid",
 	}
 	return cd
 }
@@ -1472,12 +1460,6 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		{
 			name:            "Nutanix create valid",
 			newObject:       validNutanixClusterDeployment(),
-			operation:       admissionv1beta1.Create,
-			expectedAllowed: true,
-		},
-		{
-			name:            "oVirt create valid",
-			newObject:       validOvirtClusterDeployment(),
 			operation:       admissionv1beta1.Create,
 			expectedAllowed: true,
 		},

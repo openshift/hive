@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/azureclient"
 	hivemetrics "github.com/openshift/hive/pkg/controller/metrics"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"

@@ -162,7 +162,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateCreate(admissionSpec *a
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
-		contextLogger.Infof(statusError.Message)
+		contextLogger.Info(statusError.Message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result:  &statusError,
@@ -209,7 +209,7 @@ func (a *SelectorSyncSetValidatingAdmissionHook) validateUpdate(admissionSpec *a
 
 	if len(allErrs) > 0 {
 		statusError := errors.NewInvalid(newObject.GroupVersionKind().GroupKind(), newObject.Name, allErrs).Status()
-		contextLogger.Infof(statusError.Message)
+		contextLogger.Info(statusError.Message)
 		return &admissionv1beta1.AdmissionResponse{
 			Allowed: false,
 			Result:  &statusError,

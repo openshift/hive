@@ -164,6 +164,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, privateLinkConfigMapInfo, hiveContainer)
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, failedProvisionConfigMapInfo, hiveContainer)
 	addConfigVolume(&hiveDeployment.Spec.Template.Spec, metricsConfigConfigMapInfo, hiveContainer)
+	addConfigVolume(&hiveDeployment.Spec.Template.Spec, r.supportedContractsConfigMapInfo(hLog), hiveContainer)
 
 	// This triggers the clusterdeployment controller to copy the secret into the CD's namespace.
 	// It would be neat if it did that purely based on the FailedProvisionConfig ConfigMap, to
@@ -350,9 +351,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		hLog.Warn("hive is not running on OpenShift, some optional assets will not be deployed")
 	}
 
-	// Apply nodeSelector and tolerations passed through from the operator deployment
-	hiveDeployment.Spec.Template.Spec.NodeSelector = r.nodeSelector
-	hiveDeployment.Spec.Template.Spec.Tolerations = r.tolerations
+	// Apply shared pod config passed through from the operator deployment
+	hiveDeployment.Spec.Template.Spec.NodeSelector = r.sharedPodConfig.NodeSelector
+	hiveDeployment.Spec.Template.Spec.Tolerations = r.sharedPodConfig.Tolerations
+	hiveDeployment.Spec.Template.Spec.ImagePullSecrets = r.sharedPodConfig.ImagePullSecrets
 
 	hiveDeployment.Namespace = hiveNSName
 	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveDeployment), hLog, util.WithGarbageCollection(instance))

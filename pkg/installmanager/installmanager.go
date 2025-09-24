@@ -47,7 +47,6 @@ import (
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
 	"github.com/openshift/installer/pkg/destroy/nutanix"
 	"github.com/openshift/installer/pkg/destroy/openstack"
-	"github.com/openshift/installer/pkg/destroy/ovirt"
 	"github.com/openshift/installer/pkg/destroy/providers"
 	"github.com/openshift/installer/pkg/destroy/vsphere"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -56,7 +55,6 @@ import (
 	installertypesibmcloud "github.com/openshift/installer/pkg/types/ibmcloud"
 	installertypesnutanix "github.com/openshift/installer/pkg/types/nutanix"
 	installertypesopenstack "github.com/openshift/installer/pkg/types/openstack"
-	installertypesovirt "github.com/openshift/installer/pkg/types/ovirt"
 	installertypesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 
 	jsoniter "github.com/json-iterator/go"
@@ -68,7 +66,6 @@ import (
 	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
 	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
 	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
-	ovirtutils "github.com/openshift/hive/contrib/pkg/utils/ovirt"
 	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
@@ -548,8 +545,6 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 		openstackutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.VSphere != nil:
 		vsphereutils.ConfigureCreds(m.DynamicClient)
-	case cd.Spec.Platform.Ovirt != nil:
-		ovirtutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.IBMCloud != nil:
 		ibmutils.ConfigureCreds(m.DynamicClient)
 	case cd.Spec.Platform.Nutanix != nil:
@@ -762,21 +757,6 @@ func cleanupFailedProvision(dynClient client.Client, cd *hivev1.ClusterDeploymen
 		}
 		var err error
 		uninstaller, err = vsphere.New(logger, metadata)
-		if err != nil {
-			return err
-		}
-	case cd.Spec.Platform.Ovirt != nil:
-		metadata := &installertypes.ClusterMetadata{
-			InfraID: infraID,
-			ClusterPlatformMetadata: installertypes.ClusterPlatformMetadata{
-				Ovirt: &installertypesovirt.Metadata{
-					ClusterID:      cd.Spec.Platform.Ovirt.ClusterID,
-					RemoveTemplate: true,
-				},
-			},
-		}
-		var err error
-		uninstaller, err = ovirt.New(logger, metadata)
 		if err != nil {
 			return err
 		}
@@ -1488,7 +1468,7 @@ func (m *InstallManager) initSSHAgent(sshKeyPaths []string) (func(), error) {
 		if string(line[0]) != "SSH_AUTH_SOCK" {
 			errMsg := "no SSH_AUTH_SOCK in ssh-agent output"
 			m.log.Error(errMsg)
-			return sshAgentCleanup, fmt.Errorf(errMsg)
+			return sshAgentCleanup, errors.New(errMsg)
 		}
 		sock = string(line[1])
 
@@ -1497,7 +1477,7 @@ func (m *InstallManager) initSSHAgent(sshKeyPaths []string) (func(), error) {
 		if string(line[0]) != "SSH_AGENT_PID" {
 			errMsg := "no SSH_AGENT_PID in ssh-agent output"
 			m.log.Error(errMsg)
-			return sshAgentCleanup, fmt.Errorf(errMsg)
+			return sshAgentCleanup, errors.New(errMsg)
 		}
 		pidStr := line[1]
 		pid, err := strconv.Atoi(string(pidStr))

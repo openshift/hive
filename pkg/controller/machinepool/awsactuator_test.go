@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -545,7 +546,7 @@ func TestAWSActuator(t *testing.T) {
 			}(),
 			masterMachine: testMachine("master0", "master"),
 			mockAWSClient: func(client *mockaws.MockClient) {
-				client.EXPECT().DescribeSubnets(gomock.Any()).Return(&ec2.DescribeSubnetsOutput{Subnets: []*ec2.Subnet{}}, errors.New("not found"))
+				client.EXPECT().DescribeSubnets(gomock.Any()).Return(&ec2.DescribeSubnetsOutput{Subnets: []ec2types.Subnet{}}, errors.New("not found"))
 			},
 			expectedErr: true,
 		},
@@ -812,14 +813,14 @@ func TestGetAWSAMIID(t *testing.T) {
 
 func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) *gomock.Call {
 	input := &ec2.DescribeAvailabilityZonesInput{
-		Filters: []*ec2.Filter{{
+		Filters: []ec2types.Filter{{
 			Name:   pointer.String("region-name"),
-			Values: []*string{pointer.String(testRegion)},
+			Values: []string{testRegion},
 		}},
 	}
-	availabilityZones := make([]*ec2.AvailabilityZone, len(zones))
+	availabilityZones := make([]ec2types.AvailabilityZone, len(zones))
 	for i := range zones {
-		availabilityZones[i] = &ec2.AvailabilityZone{
+		availabilityZones[i] = ec2types.AvailabilityZone{
 			ZoneName: &zones[i],
 		}
 	}
@@ -830,30 +831,26 @@ func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) *
 }
 
 func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubnetIDs []string, pubSubnetIDs []string, vpcID string) *gomock.Call {
-	idPointers := make([]*string, 0, len(privateSubnetIDs)+len(pubSubnetIDs))
-	for _, id := range privateSubnetIDs {
-		idPointers = append(idPointers, aws.String(id))
-	}
-	for _, id := range pubSubnetIDs {
-		idPointers = append(idPointers, aws.String(id))
-	}
+	ids := make([]string, 0, len(privateSubnetIDs)+len(pubSubnetIDs))
+	ids = append(ids, privateSubnetIDs...)
+	ids = append(ids, pubSubnetIDs...)
 	input := &ec2.DescribeSubnetsInput{
-		SubnetIds: idPointers,
+		SubnetIds: ids,
 	}
-	subnets := make([]*ec2.Subnet, len(privateSubnetIDs)+len(pubSubnetIDs))
+	subnets := make([]ec2types.Subnet, len(privateSubnetIDs)+len(pubSubnetIDs))
 	for i := range privateSubnetIDs {
-		subnets[i] = &ec2.Subnet{
+		subnets[i] = ec2types.Subnet{
 			SubnetId:         &privateSubnetIDs[i],
 			AvailabilityZone: &zones[i],
 			VpcId:            &vpcID,
 		}
 	}
 	for i := range pubSubnetIDs {
-		subnets[len(privateSubnetIDs)+i] = &ec2.Subnet{
+		subnets[len(privateSubnetIDs)+i] = ec2types.Subnet{
 			SubnetId:         &pubSubnetIDs[i],
 			AvailabilityZone: &zones[i],
 			VpcId:            &vpcID,
-			Tags: []*ec2.Tag{{
+			Tags: []ec2types.Tag{{
 				Key:   aws.String(tagNameSubnetPublicELB),
 				Value: aws.String("1"),
 			}},
@@ -866,21 +863,17 @@ func mockDescribeSubnets(client *mockaws.MockClient, zones []string, privateSubn
 }
 
 func mockDescribeMissingSubnets(client *mockaws.MockClient, subnetIDs []string) *gomock.Call {
-	idPointers := make([]*string, 0, len(subnetIDs))
-	for _, id := range subnetIDs {
-		idPointers = append(idPointers, aws.String(id))
-	}
 	input := &ec2.DescribeSubnetsInput{
-		SubnetIds: idPointers,
+		SubnetIds: subnetIDs,
 	}
 	return client.EXPECT().DescribeSubnets(input).Return(nil, fmt.Errorf("InvalidSubnets"))
 }
 
 func mockDescribeRouteTables(client *mockaws.MockClient, subnets map[string]bool, vpc string) *gomock.Call {
 	input := &ec2.DescribeRouteTablesInput{
-		Filters: []*ec2.Filter{{
+		Filters: []ec2types.Filter{{
 			Name:   aws.String("vpc-id"),
-			Values: []*string{aws.String(vpc)},
+			Values: []string{vpc},
 		}},
 	}
 
@@ -892,11 +885,11 @@ func mockDescribeRouteTables(client *mockaws.MockClient, subnets map[string]bool
 }
 
 // Takes a list of subnets with bool indicating if the corresponding subnet is public
-func constructRouteTables(subnets map[string]bool) (routeTablesOut []*ec2.RouteTable) {
+func constructRouteTables(subnets map[string]bool) (routeTablesOut []ec2types.RouteTable) {
 	routeTablesOut = append(routeTablesOut,
-		&ec2.RouteTable{
-			Associations: []*ec2.RouteTableAssociation{{Main: aws.Bool(true)}},
-			Routes: []*ec2.Route{{
+		ec2types.RouteTable{
+			Associations: []ec2types.RouteTableAssociation{{Main: aws.Bool(true)}},
+			Routes: []ec2types.Route{{
 				DestinationCidrBlock: aws.String("0.0.0.0/0"),
 				GatewayId:            aws.String("igw-main"),
 			}},
@@ -914,16 +907,16 @@ func constructRouteTables(subnets map[string]bool) (routeTablesOut []*ec2.RouteT
 	return
 }
 
-func constructRouteTable(subnetID string, public bool) *ec2.RouteTable {
+func constructRouteTable(subnetID string, public bool) ec2types.RouteTable {
 	var gatewayID string
 	if public {
 		gatewayID = "igw-" + subnetID[len(subnetID)-8:8]
 	} else {
 		gatewayID = "vgw-" + subnetID[len(subnetID)-8:8]
 	}
-	return &ec2.RouteTable{
-		Associations: []*ec2.RouteTableAssociation{{SubnetId: aws.String(subnetID)}},
-		Routes: []*ec2.Route{{
+	return ec2types.RouteTable{
+		Associations: []ec2types.RouteTableAssociation{{SubnetId: aws.String(subnetID)}},
+		Routes: []ec2types.Route{{
 			DestinationCidrBlock: aws.String("0.0.0.0/0"),
 			GatewayId:            aws.String(gatewayID),
 		}},

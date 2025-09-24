@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/openshift/hive/pkg/constants"
+	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/metrics"
 	"github.com/openshift/hive/pkg/operator/util"
 )
@@ -288,27 +289,30 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Lookup the hive-operator Deployment. We will assume hive components should all be
-	// using the same image, pull policy, node selector, and tolerations as the operator.
+	// Fetch some common configuration from the hive-operator. All hive components should all be
+	// using the same image, pull policy, and other common shared configurations.
 	operatorDeployment := &appsv1.Deployment{}
-	err = tempClient.Get(context.Background(),
+	if err = tempClient.Get(
+		context.Background(),
 		types.NamespacedName{Name: hiveOperatorDeploymentName, Namespace: hiveOperatorNS},
-		operatorDeployment)
-	if err == nil {
-		img := operatorDeployment.Spec.Template.Spec.Containers[0].Image
-		pullPolicy := operatorDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy
-		log.Debugf("loaded hive image from hive-operator deployment: %s (%s)", img, pullPolicy)
-		r.(*ReconcileHiveConfig).hiveImage = img
-		r.(*ReconcileHiveConfig).hiveImagePullPolicy = pullPolicy
-		nodeSelector := operatorDeployment.Spec.Template.Spec.NodeSelector
-		log.Debugf("loaded nodeSelector from hive-operator deployment: %v", nodeSelector)
-		r.(*ReconcileHiveConfig).nodeSelector = nodeSelector
-		tolerations := operatorDeployment.Spec.Template.Spec.Tolerations
-		log.Debugf("loaded tolerations from hive-operator deployment: %v", tolerations)
-		r.(*ReconcileHiveConfig).tolerations = tolerations
-	} else {
+		operatorDeployment,
+	); err != nil {
 		log.WithError(err).Fatal("unable to look up hive-operator Deployment")
 	}
+	img := operatorDeployment.Spec.Template.Spec.Containers[0].Image
+	pullPolicy := operatorDeployment.Spec.Template.Spec.Containers[0].ImagePullPolicy
+	log.Debugf("loaded hive image from hive-operator deployment: %s (%s)", img, pullPolicy)
+	r.(*ReconcileHiveConfig).hiveImage = img
+	r.(*ReconcileHiveConfig).hiveImagePullPolicy = pullPolicy
+
+	sharedPodConfig, err := controllerutils.ReadSharedConfigFromThisPod(tempClient)
+	if err != nil {
+		log.WithError(err).Fatal("unable to look up hive-operator Pod")
+	}
+	log.Debugf("loaded nodeSelector from hive-operator deployment: %v", sharedPodConfig.NodeSelector)
+	log.Debugf("loaded tolerations from hive-operator deployment: %v", sharedPodConfig.Tolerations)
+	log.Debugf("loaded imagePullSecrets from hive-operator deployment: %v", sharedPodConfig.ImagePullSecrets)
+	r.(*ReconcileHiveConfig).sharedPodConfig = sharedPodConfig
 
 	// TODO: Monitor CRDs but do not try to use an owner ref. (as they are global,
 	// and our config is namespaced)
@@ -332,8 +336,7 @@ type ReconcileHiveConfig struct {
 	hiveImage                            string
 	hiveOperatorNamespace                string
 	hiveImagePullPolicy                  corev1.PullPolicy
-	nodeSelector                         map[string]string
-	tolerations                          []corev1.Toleration
+	sharedPodConfig                      *controllerutils.SharedPodConfig
 	syncAggregatorCA                     bool
 	managedConfigCMLister                corev1listers.ConfigMapLister
 	ctrlr                                controller.Controller
@@ -536,7 +539,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	scConfigHash, err := r.deployConfigMap(hLog, h, instance, r.supportedContractsConfigMapInfo(), namespacesToClean)
+	scConfigHash, err := r.deployConfigMap(hLog, h, instance, r.supportedContractsConfigMapInfo(hLog), namespacesToClean)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying supported contracts configmap")
 		r.updateHiveConfigStatus(origHiveConfig, instance, hLog, false)
@@ -562,7 +565,7 @@ func (r *ReconcileHiveConfig) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	err = r.deployHive(hLog, h, instance, namespacesToClean, confighash, managedDomainsConfigHash, fpConfigHash, mcConfigHash)
+	err = r.deployHive(hLog, h, instance, namespacesToClean, confighash, managedDomainsConfigHash, fpConfigHash, mcConfigHash, scConfigHash)
 	if err != nil {
 		hLog.WithError(err).Error("error deploying Hive")
 		instance.Status.Conditions = util.SetHiveConfigCondition(instance.Status.Conditions, hivev1.HiveReadyCondition, corev1.ConditionFalse, "ErrorDeployingHive", err.Error())

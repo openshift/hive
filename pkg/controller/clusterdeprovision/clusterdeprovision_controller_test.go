@@ -2,10 +2,8 @@ package clusterdeprovision
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	awsclient "github.com/openshift/hive/pkg/awsclient"
+	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/install"
@@ -222,7 +220,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				}),
 			},
 			mockGetCallerIdentity:          true,
-			expectedGetCallerIdentityError: awserr.New("InvalidClientTokenId", "", fmt.Errorf("")),
+			expectedGetCallerIdentityError: awsclient.NewAPIError("InvalidClientTokenId", ""),
 			validate: func(t *testing.T, c client.Client) {
 				validateCondition(t, c, []hivev1.ClusterDeprovisionCondition{
 					{
@@ -296,8 +294,7 @@ func TestClusterDeprovisionReconcile(t *testing.T) {
 				Client:               mocks.fakeKubeClient,
 				scheme:               scheme,
 				deprovisionsDisabled: test.deprovisionsDisabled,
-				nodeSelector:         &map[string]string{},
-				tolerations:          &[]corev1.Toleration{},
+				sharedPodConfig:      &controllerutils.SharedPodConfig{},
 			}
 
 			// Save the list of actuators so that it can be restored at the end of this test
@@ -377,7 +374,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 // specified conditions.
 func testUninstallJob(conditions ...batchv1.JobCondition) *batchv1.Job {
 	uninstallJob, _ := install.GenerateUninstallerJobForDeprovision(testClusterDeprovision(),
-		"someserviceaccount", "", "", "", nil, map[string]string{}, []corev1.Toleration{})
+		"someserviceaccount", "", "", "", nil, controllerutils.SharedPodConfig{})
 	hash, err := controllerutils.CalculateJobSpecHash(uninstallJob)
 	if err != nil {
 		panic("should never get error calculating job spec hash")

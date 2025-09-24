@@ -27,7 +27,6 @@ import (
 	azurecredutil "github.com/openshift/hive/contrib/pkg/utils/azure"
 	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
-	ovirtutils "github.com/openshift/hive/contrib/pkg/utils/ovirt"
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/gcpclient"
@@ -96,7 +95,6 @@ const (
 	cloudGCP             = "gcp"
 	cloudIBM             = "ibmcloud"
 	cloudOpenStack       = "openstack"
-	cloudOVirt           = "ovirt"
 	cloudVSphere         = "vsphere"
 	cloudNutanix         = "nutanix"
 
@@ -116,7 +114,6 @@ var (
 		cloudGCP:       true,
 		cloudIBM:       true,
 		cloudOpenStack: true,
-		cloudOVirt:     true,
 		cloudVSphere:   true,
 		cloudNutanix:   true,
 	}
@@ -213,14 +210,6 @@ type Options struct {
 	VSpherePlatformSpecJSON string
 	VSphereCACerts          string
 
-	// Ovirt
-	OvirtClusterID       string
-	OvirtStorageDomainID string
-	OvirtNetworkName     string
-	OvirtAPIVIP          string
-	OvirtIngressVIP      string
-	OvirtCACerts         string
-
 	// IBM
 	IBMCISInstanceCRN string
 	IBMAccountID      string
@@ -268,8 +257,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=azure --azure-base-domain-resourc
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=gcp
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ibmcloud --region="us-east" --base-domain=ibm.hive.openshift.com --manifests=/manifests --credentials-mode-manual
 create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=openstack --openstack-api-floating-ip=192.168.1.2 --openstack-cloud=mycloud
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert
-create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=ovirt --ovirt-api-vip 192.168.1.2 --ovirt-dns-vip 192.168.1.3 --ovirt-ingress-vip 192.168.1.4 --ovirt-network-name ovirtmgmt --ovirt-storage-domain-id 00000000-e77a-456b-uuid --ovirt-cluster-id 00000000-8675-11ea-uuid --ovirt-ca-certs ~/.ovirt/ca`,
+create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.devcluster.com --vsphere-datacenter=dc1 --vsphere-default-datastore=nvme-ds1 --vsphere-api-vip=192.168.1.2 --vsphere-ingress-vip=192.168.1.3 --vsphere-cluster=devel --vsphere-network="VM Network" --vsphere-ca-certs=/path/to/cert`,
 		Short: "Creates a new Hive cluster deployment",
 		Long:  fmt.Sprintf(longDesc, defaultSSHPublicKeyFile, defaultPullSecretFile),
 		Args:  cobra.ExactArgs(1),
@@ -399,14 +387,6 @@ OpenShift Installer publishes all the services of the cluster like API server an
 	flags.StringSliceVar(&opt.NutanixSubnetUUIDs, constants.CliNutanixSubnetUUIDOpt, []string{}, "List of network subnets to be used by the cluster")
 	flags.StringVar(&opt.NutanixCACerts, constants.CliNutanixCACertsOpt, "", "Path to a PEM-encoded CA certificate file used to verify the Nutanix endpoint's TLS certificates")
 
-	// oVirt flags
-	flags.StringVar(&opt.OvirtClusterID, "ovirt-cluster-id", "", "The oVirt cluster id (uuid) under which all VMs will run")
-	flags.StringVar(&opt.OvirtStorageDomainID, "ovirt-storage-domain-id", "", "oVirt storage domain id (uuid) under which all VM disk would be created")
-	flags.StringVar(&opt.OvirtNetworkName, "ovirt-network-name", "ovirtmgmt", "oVirt network name")
-	flags.StringVar(&opt.OvirtAPIVIP, "ovirt-api-vip", "", "IP which will be served by bootstrap and then pivoted masters, using keepalived")
-	flags.StringVar(&opt.OvirtIngressVIP, "ovirt-ingress-vip", "", "External IP which routes to the default ingress controller")
-	flags.StringVar(&opt.OvirtCACerts, "ovirt-ca-certs", "", "Path to oVirt CA certificate, multiple CA paths can be : delimited")
-
 	// Additional CA Trust Bundle
 	flags.StringVar(&opt.AdditionalTrustBundle, "additional-trust-bundle", "", "Path to a CA Trust Bundle which will be added to the nodes trusted certificate store.")
 
@@ -476,12 +456,12 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		if o.OpenStackAPIFloatingIP == "" {
 			msg := fmt.Sprintf("--openstack-api-floating-ip must be set when using --cloud=%q", cloudOpenStack)
 			o.log.Info(msg)
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 		if o.OpenStackCloud == "" {
 			msg := fmt.Sprintf("--openstack-cloud must be set when using --cloud=%q", cloudOpenStack)
 			o.log.Info(msg)
-			return fmt.Errorf(msg)
+			return errors.New(msg)
 		}
 	}
 
@@ -854,32 +834,6 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			CACert:           bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = vsphereProvider
-	case cloudOVirt:
-		oVirtConfig, err := ovirtutils.GetCreds(o.CredsFile)
-		if err != nil {
-			return nil, err
-		}
-		if o.OvirtCACerts == "" {
-			return nil, errors.New("must provide --ovirt-ca-certs")
-		}
-		caCerts := [][]byte{}
-		for _, cert := range filepath.SplitList(o.OvirtCACerts) {
-			caCert, err := os.ReadFile(cert)
-			if err != nil {
-				return nil, fmt.Errorf("error reading %s: %w", cert, err)
-			}
-			caCerts = append(caCerts, caCert)
-		}
-		oVirtProvider := &clusterresource.OvirtCloudBuilder{
-			OvirtConfig:     oVirtConfig,
-			ClusterID:       o.OvirtClusterID,
-			StorageDomainID: o.OvirtStorageDomainID,
-			NetworkName:     o.OvirtNetworkName,
-			APIVIP:          o.OvirtAPIVIP,
-			IngressVIP:      o.OvirtIngressVIP,
-			CACert:          bytes.Join(caCerts, []byte("\n")),
-		}
-		builder.CloudBuilder = oVirtProvider
 	case cloudIBM:
 		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
 		if ibmCloudAPIKey == "" {

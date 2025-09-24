@@ -7,12 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/aws/aws-sdk-go/service/elbv2"
-	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	elbv2 "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
@@ -507,150 +509,151 @@ users:
 	}
 
 	mockDiscoverLB := func(m *mock.MockClient) string {
-		clusternlb := &elbv2.LoadBalancer{
+		clusternlb := elbv2types.LoadBalancer{
 			LoadBalancerArn: aws.String("aws:elb:12345:nlb-arn"),
-			State: &elbv2.LoadBalancerState{
-				Code: aws.String(elbv2.LoadBalancerStateEnumActive),
+			State: &elbv2types.LoadBalancerState{
+				Code: elbv2types.LoadBalancerStateEnumActive,
 			},
 		}
 		m.EXPECT().DescribeLoadBalancers(gomock.Any()).
 			Return(&elbv2.DescribeLoadBalancersOutput{
-				LoadBalancers: []*elbv2.LoadBalancer{clusternlb},
+				LoadBalancers: []elbv2types.LoadBalancer{clusternlb},
 			}, nil).AnyTimes()
 		return *clusternlb.LoadBalancerArn
 	}
 
-	mockCreateService := func(m *mock.MockClient, clusternlb string) *ec2.ServiceConfiguration {
-		service := &ec2.ServiceConfiguration{
+	mockCreateService := func(m *mock.MockClient, clusternlb string) *ec2types.ServiceConfiguration {
+		service := ec2types.ServiceConfiguration{
 			AcceptanceRequired:      aws.Bool(false),
 			ServiceId:               aws.String("vpce-svc-12345"),
 			ServiceName:             aws.String("vpce-svc-12345.vpc.amazon.com"),
-			ServiceState:            aws.String(ec2.ServiceStateAvailable),
-			NetworkLoadBalancerArns: aws.StringSlice([]string{clusternlb}),
-			AvailabilityZones:       aws.StringSlice([]string{"us-east-1b", "us-east-1c"}),
+			ServiceState:            ec2types.ServiceStateAvailable,
+			NetworkLoadBalancerArns: []string{clusternlb},
+			AvailabilityZones:       []string{"us-east-1b", "us-east-1c"},
 		}
 		m.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{}, nil)
 		m.EXPECT().CreateVpcEndpointServiceConfiguration(gomock.Any()).
 			Return(&ec2.CreateVpcEndpointServiceConfigurationOutput{
-				ServiceConfiguration: service,
+				ServiceConfiguration: &service,
 			}, nil)
 		m.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-				ServiceConfigurations: []*ec2.ServiceConfiguration{service},
+				ServiceConfigurations: []ec2types.ServiceConfiguration{service},
 			}, nil)
-		return service
+		return &service
 	}
-	mockServicePerms := func(m *mock.MockClient, service *ec2.ServiceConfiguration) {
+	mockServicePerms := func(m *mock.MockClient, service *ec2types.ServiceConfiguration) {
 		m.EXPECT().GetCallerIdentity(gomock.Any()).Return(&sts.GetCallerIdentityOutput{Arn: aws.String("aws:iam:12345:hub-user")}, nil)
 		m.EXPECT().DescribeVpcEndpointServicePermissions(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServicePermissionsOutput{}, nil)
 		m.EXPECT().ModifyVpcEndpointServicePermissions(&ec2.ModifyVpcEndpointServicePermissionsInput{
-			AddAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:hub-user"}),
+			AddAllowedPrincipals: []string{"aws:iam:12345:hub-user"},
 			ServiceId:            service.ServiceId,
 		}).Return(nil, nil)
 	}
-	mockExistingService := func(m *mock.MockClient, clusternlb string, modify func(*ec2.ServiceConfiguration)) *ec2.ServiceConfiguration {
-		service := &ec2.ServiceConfiguration{
+	mockExistingService := func(m *mock.MockClient, clusternlb string, modify func(*ec2types.ServiceConfiguration)) *ec2types.ServiceConfiguration {
+		service := ec2types.ServiceConfiguration{
 			AcceptanceRequired:      aws.Bool(false),
 			ServiceId:               aws.String("vpce-svc-12345"),
 			ServiceName:             aws.String("vpce-svc-12345.vpc.amazon.com"),
-			ServiceState:            aws.String(ec2.ServiceStateAvailable),
-			NetworkLoadBalancerArns: aws.StringSlice([]string{clusternlb}),
+			ServiceState:            ec2types.ServiceStateAvailable,
+			NetworkLoadBalancerArns: []string{clusternlb},
 		}
-		modify(service)
+		modify(&service)
 		m.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 			Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-				ServiceConfigurations: []*ec2.ServiceConfiguration{service},
+				ServiceConfigurations: []ec2types.ServiceConfiguration{service},
 			}, nil)
-		return service
+		return &service
 	}
 
-	mockCreateEndpoint := func(m *mock.MockClient, service *ec2.ServiceConfiguration) *ec2.VpcEndpoint {
+	mockCreateEndpoint := func(m *mock.MockClient, service *ec2types.ServiceConfiguration) *ec2types.VpcEndpoint {
 		m.EXPECT().DescribeVpcEndpoints(
 			&ec2.DescribeVpcEndpointsInput{
-				Filters: []*ec2.Filter{{
+				Filters: []ec2types.Filter{{
 					Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
-					Values: aws.StringSlice([]string{"test-cd-1234"}),
+					Values: []string{"test-cd-1234"},
 				}}}).
 			Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
 		m.EXPECT().DescribeVpcEndpointsPages(
 			&ec2.DescribeVpcEndpointsInput{
-				Filters: []*ec2.Filter{{
+				Filters: []ec2types.Filter{{
 					Name:   aws.String("vpc-id"),
-					Values: aws.StringSlice([]string{"vpc-1"}),
+					Values: []string{"vpc-1"},
 				}}}, gomock.Any()).
 			Do(func(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) {
 				describeVpcEndpointsOutput := &ec2.DescribeVpcEndpointsOutput{}
 				fn(describeVpcEndpointsOutput, true)
 			})
 		m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
-			ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
+			ServiceNames: []string{*service.ServiceName},
 		}).Return(&ec2.DescribeVpcEndpointServicesOutput{
-			ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
+			ServiceDetails: []ec2types.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
 		}, nil)
 
-		endpoint := &ec2.VpcEndpoint{
+		endpoint := ec2types.VpcEndpoint{
 			VpcEndpointId: aws.String("vpce-12345"),
 			VpcId:         aws.String("vpc-1"),
-			State:         aws.String("available"),
-			DnsEntries: []*ec2.DnsEntry{{
+			// Prove case insensitivity :eyeroll:
+			State: "available",
+			DnsEntries: []ec2types.DnsEntry{{
 				DnsName:      aws.String("vpce-12345-us-east-1.vpce-svc-12345.vpc.amazonaws.com"),
 				HostedZoneId: aws.String("HZ23456"),
 			}},
 		}
 		m.EXPECT().CreateVpcEndpoint(gomock.Any()).
-			Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: endpoint}, nil)
+			Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: &endpoint}, nil)
 		m.EXPECT().DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-			VpcEndpointIds: aws.StringSlice([]string{*endpoint.VpcEndpointId}),
+			VpcEndpointIds: []string{*endpoint.VpcEndpointId},
 		}).Return(&ec2.DescribeVpcEndpointsOutput{
-			VpcEndpoints: []*ec2.VpcEndpoint{endpoint},
+			VpcEndpoints: []ec2types.VpcEndpoint{endpoint},
 		}, nil)
-		return endpoint
+		return &endpoint
 	}
 
-	mockPHZ := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingHZ *route53.HostedZone) string {
+	mockPHZ := func(m *mock.MockClient, endpoint *ec2types.VpcEndpoint, apiDomain string, existingHZ *route53types.HostedZone) string {
 		lhzbnOut := &route53.ListHostedZonesByNameOutput{}
 		if existingHZ != nil {
-			lhzbnOut.HostedZones = []*route53.HostedZone{existingHZ}
+			lhzbnOut.HostedZones = []route53types.HostedZone{*existingHZ}
 		}
 		m.EXPECT().ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
 			DNSName:  aws.String(apiDomain + "."),
-			MaxItems: aws.String("1"),
+			MaxItems: aws.Int32(1),
 		}).Return(lhzbnOut, nil)
 		var hzID string
 		if existingHZ == nil {
 			hzID = "HZ12345"
 			m.EXPECT().CreateHostedZone(newCreateHostedZoneInputMatcher(&route53.CreateHostedZoneInput{
-				HostedZoneConfig: &route53.HostedZoneConfig{
-					PrivateZone: aws.Bool(true),
+				HostedZoneConfig: &route53types.HostedZoneConfig{
+					PrivateZone: true,
 				},
 				Name: aws.String(apiDomain),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				},
 			})).Return(&route53.CreateHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
 			}, nil)
 		} else {
-			hzID = aws.StringValue(existingHZ.Id)
+			hzID = aws.ToString(existingHZ.Id)
 		}
 
 		m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
-			ChangeBatch: &route53.ChangeBatch{
-				Changes: []*route53.Change{{
-					Action: aws.String("UPSERT"),
-					ResourceRecordSet: &route53.ResourceRecordSet{
-						AliasTarget: &route53.AliasTarget{
+			ChangeBatch: &route53types.ChangeBatch{
+				Changes: []route53types.Change{{
+					Action: route53types.ChangeActionUpsert,
+					ResourceRecordSet: &route53types.ResourceRecordSet{
+						AliasTarget: &route53types.AliasTarget{
 							DNSName:              endpoint.DnsEntries[0].DnsName,
-							EvaluateTargetHealth: aws.Bool(false),
+							EvaluateTargetHealth: false,
 							HostedZoneId:         endpoint.DnsEntries[0].HostedZoneId,
 						},
 						Name: aws.String(apiDomain),
-						Type: aws.String("A"),
+						Type: route53types.RRTypeA,
 					},
 				}},
 			},
@@ -659,46 +662,46 @@ users:
 		return hzID
 	}
 
-	mockPHZARecords := func(m *mock.MockClient, endpoint *ec2.VpcEndpoint, apiDomain string, existingHZ *route53.HostedZone, knownENIs map[string]string) string {
+	mockPHZARecords := func(m *mock.MockClient, endpoint *ec2types.VpcEndpoint, apiDomain string, existingHZ *route53types.HostedZone, knownENIs map[string]string) string {
 		byVPCOut := &route53.ListHostedZonesByNameOutput{}
 		if existingHZ != nil {
-			byVPCOut.HostedZones = []*route53.HostedZone{existingHZ}
+			byVPCOut.HostedZones = []route53types.HostedZone{*existingHZ}
 		}
 		m.EXPECT().ListHostedZonesByName(&route53.ListHostedZonesByNameInput{
-			MaxItems: aws.String("1"),
+			MaxItems: aws.Int32(1),
 			DNSName:  aws.String(apiDomain + "."),
 		}).Return(byVPCOut, nil)
 		var hzID string
 		if existingHZ == nil {
 			hzID = "HZ12345"
 			m.EXPECT().CreateHostedZone(newCreateHostedZoneInputMatcher(&route53.CreateHostedZoneInput{
-				HostedZoneConfig: &route53.HostedZoneConfig{
-					PrivateZone: aws.Bool(true),
+				HostedZoneConfig: &route53types.HostedZoneConfig{
+					PrivateZone: true,
 				},
 				Name: aws.String(apiDomain),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				},
 			})).Return(&route53.CreateHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
 			}, nil)
 		} else {
-			hzID = aws.StringValue(existingHZ.Id)
+			hzID = aws.ToString(existingHZ.Id)
 		}
 
 		eniReq := &ec2.DescribeNetworkInterfacesInput{
 			NetworkInterfaceIds: endpoint.NetworkInterfaceIds,
 		}
 		eniResp := &ec2.DescribeNetworkInterfacesOutput{}
-		var rr []*route53.ResourceRecord
-		for _, eni := range aws.StringValueSlice(eniReq.NetworkInterfaceIds) {
+		var rr []route53types.ResourceRecord
+		for _, eni := range eniReq.NetworkInterfaceIds {
 			ip, ok := knownENIs[eni]
 			if ok {
-				eniResp.NetworkInterfaces = append(eniResp.NetworkInterfaces, &ec2.NetworkInterface{PrivateIpAddress: aws.String(ip)})
-				rr = append(rr, &route53.ResourceRecord{Value: aws.String(ip)})
+				eniResp.NetworkInterfaces = append(eniResp.NetworkInterfaces, ec2types.NetworkInterface{PrivateIpAddress: aws.String(ip)})
+				rr = append(rr, route53types.ResourceRecord{Value: aws.String(ip)})
 			}
 		}
 		m.EXPECT().DescribeNetworkInterfaces(eniReq).Return(eniResp, nil)
@@ -707,12 +710,12 @@ users:
 			return *rr[i].Value < *rr[j].Value
 		})
 		m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
-			ChangeBatch: &route53.ChangeBatch{
-				Changes: []*route53.Change{{
-					Action: aws.String("UPSERT"),
-					ResourceRecordSet: &route53.ResourceRecordSet{
+			ChangeBatch: &route53types.ChangeBatch{
+				Changes: []route53types.Change{{
+					Action: route53types.ChangeActionUpsert,
+					ResourceRecordSet: &route53types.ResourceRecordSet{
 						Name:            aws.String(apiDomain),
-						Type:            aws.String("A"),
+						Type:            route53types.RRTypeA,
 						TTL:             aws.Int64(10),
 						ResourceRecords: rr,
 					},
@@ -832,13 +835,13 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			m.EXPECT().DescribeLoadBalancers(gomock.Any()).
-				Return(nil, awserr.New("AccessDenied", "not authorized to DescribeLoadBalancers", nil))
+				Return(nil, awsclient.NewAPIError("AccessDenied", "not authorized to DescribeLoadBalancers"))
 		},
 
 		hasFinalizer: true,
 		expectedConditions: getExpectedConditions(true, "DiscoveringNLBFailed",
-			"failed to describe load balancer for the cluster: AccessDenied: not authorized to DescribeLoadBalancers"),
-		err: "failed to describe load balancer for the cluster: AccessDenied: not authorized to DescribeLoadBalancers",
+			"failed to describe load balancer for the cluster: api error AccessDenied: not authorized to DescribeLoadBalancers"),
+		err: "failed to describe load balancer for the cluster: api error AccessDenied: not authorized to DescribeLoadBalancers",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb not found",
 
@@ -851,7 +854,7 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			m.EXPECT().DescribeLoadBalancers(gomock.Any()).
-				Return(nil, awserr.New("LoadBalancerNotFound", "Loadbalance could not be found", nil))
+				Return(nil, awsclient.NewAPIError("LoadBalancerNotFound", "Loadbalance could not be found"))
 		},
 		expectedConditions: []hivev1.ClusterDeploymentCondition{{
 			Status:  corev1.ConditionFalse,
@@ -876,7 +879,8 @@ users:
 			service := mockCreateService(m, clusternlb)
 			mockServicePerms(m, service)
 
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil,
+				awsclient.NewAPIError("AccessDenied", "not authorized to DescribeVpcEndpoints"))
 		},
 
 		hasFinalizer: true,
@@ -884,8 +888,8 @@ users:
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
-			"AccessDenied: not authorized to DescribeVpcEndpoints"),
-		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+			"api error AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: api error AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, acceptance required set to true, endpoint access denied",
 
@@ -898,7 +902,7 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			clusternlb := mockDiscoverLB(m)
-			service := mockExistingService(m, clusternlb, func(s *ec2.ServiceConfiguration) {
+			service := mockExistingService(m, clusternlb, func(s *ec2types.ServiceConfiguration) {
 				s.AcceptanceRequired = aws.Bool(true)
 			})
 
@@ -909,7 +913,8 @@ users:
 
 			mockServicePerms(m, service)
 
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil,
+				awsclient.NewAPIError("AccessDenied", "not authorized to DescribeVpcEndpoints"))
 		},
 
 		hasFinalizer: true,
@@ -917,8 +922,8 @@ users:
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
-			"AccessDenied: not authorized to DescribeVpcEndpoints"),
-		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+			"api error AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: api error AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, additional NLB added, endpoint access denied",
 
@@ -931,19 +936,20 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			clusternlb := mockDiscoverLB(m)
-			service := mockExistingService(m, clusternlb, func(s *ec2.ServiceConfiguration) {
-				s.NetworkLoadBalancerArns = aws.StringSlice([]string{clusternlb, "aws:elb:12345:not-cluster-nlb-arn"})
+			service := mockExistingService(m, clusternlb, func(s *ec2types.ServiceConfiguration) {
+				s.NetworkLoadBalancerArns = []string{clusternlb, "aws:elb:12345:not-cluster-nlb-arn"}
 			})
 
 			m.EXPECT().ModifyVpcEndpointServiceConfiguration(&ec2.ModifyVpcEndpointServiceConfigurationInput{
 				ServiceId:                     service.ServiceId,
 				AcceptanceRequired:            aws.Bool(false),
-				RemoveNetworkLoadBalancerArns: aws.StringSlice([]string{"aws:elb:12345:not-cluster-nlb-arn"}),
+				RemoveNetworkLoadBalancerArns: []string{"aws:elb:12345:not-cluster-nlb-arn"},
 			}).Return(&ec2.ModifyVpcEndpointServiceConfigurationOutput{}, nil)
 
 			mockServicePerms(m, service)
 
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil,
+				awsclient.NewAPIError("AccessDenied", "not authorized to DescribeVpcEndpoints"))
 		},
 
 		hasFinalizer: true,
@@ -951,8 +957,8 @@ users:
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
-			"AccessDenied: not authorized to DescribeVpcEndpoints"),
-		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+			"api error AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: api error AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change, endpoint access denied",
 
@@ -965,22 +971,23 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			clusternlb := mockDiscoverLB(m)
-			service := mockExistingService(m, clusternlb, func(s *ec2.ServiceConfiguration) {})
+			service := mockExistingService(m, clusternlb, func(s *ec2types.ServiceConfiguration) {})
 
 			m.EXPECT().GetCallerIdentity(gomock.Any()).Return(&sts.GetCallerIdentityOutput{Arn: aws.String("aws:iam:12345:hub-user")}, nil)
 			m.EXPECT().DescribeVpcEndpointServicePermissions(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServicePermissionsOutput{
-					AllowedPrincipals: []*ec2.AllowedPrincipal{{
+					AllowedPrincipals: []ec2types.AllowedPrincipal{{
 						Principal: aws.String("aws:iam:12345:some-that-should-not-be-allowed"),
 					}},
 				}, nil)
 			m.EXPECT().ModifyVpcEndpointServicePermissions(&ec2.ModifyVpcEndpointServicePermissionsInput{
-				AddAllowedPrincipals:    aws.StringSlice([]string{"aws:iam:12345:hub-user"}),
-				RemoveAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:some-that-should-not-be-allowed"}),
+				AddAllowedPrincipals:    []string{"aws:iam:12345:hub-user"},
+				RemoveAllowedPrincipals: []string{"aws:iam:12345:some-that-should-not-be-allowed"},
 				ServiceId:               service.ServiceId,
 			}).Return(nil, nil)
 
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil,
+				awsclient.NewAPIError("AccessDenied", "not authorized to DescribeVpcEndpoints"))
 		},
 
 		hasFinalizer: true,
@@ -988,8 +995,8 @@ users:
 			VPCEndpointService: hivev1aws.VPCEndpointService{Name: "vpce-svc-12345.vpc.amazon.com", ID: "vpce-svc-12345", DefaultAllowedPrincipal: aws.String("aws:iam:12345:hub-user")},
 		},
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
-			"AccessDenied: not authorized to DescribeVpcEndpoints"),
-		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+			"api error AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: api error AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change add additional allowed principals, endpoint access denied",
 
@@ -1022,21 +1029,22 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			clusternlb := mockDiscoverLB(m)
-			service := mockExistingService(m, clusternlb, func(s *ec2.ServiceConfiguration) {})
+			service := mockExistingService(m, clusternlb, func(s *ec2types.ServiceConfiguration) {})
 
 			m.EXPECT().GetCallerIdentity(gomock.Any()).Return(&sts.GetCallerIdentityOutput{Arn: aws.String("aws:iam:12345:hub-user")}, nil)
 			m.EXPECT().DescribeVpcEndpointServicePermissions(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServicePermissionsOutput{
-					AllowedPrincipals: []*ec2.AllowedPrincipal{{
+					AllowedPrincipals: []ec2types.AllowedPrincipal{{
 						Principal: aws.String("aws:iam:12345:some-that-should-not-be-allowed"),
 					}},
 				}, nil)
 			m.EXPECT().ModifyVpcEndpointServicePermissions(&ec2.ModifyVpcEndpointServicePermissionsInput{
-				AddAllowedPrincipals:    aws.StringSlice([]string{"aws:iam:12345:another-user", "aws:iam:12345:hub-user", "aws:iam:12345:some-user"}),
-				RemoveAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:some-that-should-not-be-allowed"}),
+				AddAllowedPrincipals:    []string{"aws:iam:12345:another-user", "aws:iam:12345:hub-user", "aws:iam:12345:some-user"},
+				RemoveAllowedPrincipals: []string{"aws:iam:12345:some-that-should-not-be-allowed"},
 				ServiceId:               service.ServiceId,
 			}).Return(nil, nil)
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil,
+				awsclient.NewAPIError("AccessDenied", "not authorized to DescribeVpcEndpoints"))
 		},
 
 		hasFinalizer: true,
@@ -1051,8 +1059,8 @@ users:
 		// AdditionalAllowedPrincipals are effected on the VPC Endpoint Service before we DescribeVpcEndpoints so fail to describe them
 		// to simplify the test.
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
-			"AccessDenied: not authorized to DescribeVpcEndpoints"),
-		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+			"api error AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: api error AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, previous service exists, permissions change remove additional allowed principals, endpoint access denied",
 
@@ -1089,22 +1097,23 @@ users:
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
 			clusternlb := mockDiscoverLB(m)
-			service := mockExistingService(m, clusternlb, func(s *ec2.ServiceConfiguration) {})
+			service := mockExistingService(m, clusternlb, func(s *ec2types.ServiceConfiguration) {})
 
 			m.EXPECT().GetCallerIdentity(gomock.Any()).Return(&sts.GetCallerIdentityOutput{Arn: aws.String("aws:iam:12345:hub-user")}, nil)
 			m.EXPECT().DescribeVpcEndpointServicePermissions(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServicePermissionsOutput{
-					AllowedPrincipals: []*ec2.AllowedPrincipal{
+					AllowedPrincipals: []ec2types.AllowedPrincipal{
 						{Principal: aws.String("aws:iam:12345:another-user")},
 						{Principal: aws.String("aws:iam:12345:hub-user")},
 						{Principal: aws.String("aws:iam:12345:some-user")},
 					},
 				}, nil)
 			m.EXPECT().ModifyVpcEndpointServicePermissions(&ec2.ModifyVpcEndpointServicePermissionsInput{
-				RemoveAllowedPrincipals: aws.StringSlice([]string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"}),
+				RemoveAllowedPrincipals: []string{"aws:iam:12345:another-user", "aws:iam:12345:some-user"},
 				ServiceId:               service.ServiceId,
 			}).Return(nil, nil)
-			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil, awserr.New("AccessDenied", "not authorized to DescribeVpcEndpoints", nil))
+			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).Return(nil,
+				awsclient.NewAPIError("AccessDenied", "not authorized to DescribeVpcEndpoints"))
 		},
 
 		hasFinalizer: true,
@@ -1119,8 +1128,8 @@ users:
 		// AdditionalAllowedPrincipals are effected on the VPC Endpoint Service before we DescribeVpcEndpoints so fail to describe them
 		// to simplify the test.
 		expectedConditions: getExpectedConditions(true, "VPCEndpointReconcileFailed",
-			"AccessDenied: not authorized to DescribeVpcEndpoints"),
-		err: "failed to reconcile the VPC Endpoint: AccessDenied: not authorized to DescribeVpcEndpoints",
+			"api error AccessDenied: not authorized to DescribeVpcEndpoints"),
+		err: "failed to reconcile the VPC Endpoint: api error AccessDenied: not authorized to DescribeVpcEndpoints",
 	}, {
 		name: "cd with privatelink enabled, provision started, nlb found, no previous service, no previous endpoint, no matching az",
 
@@ -1144,9 +1153,9 @@ users:
 			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
 			m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
-				ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
+				ServiceNames: []string{*service.ServiceName},
 			}).Return(&ec2.DescribeVpcEndpointServicesOutput{
-				ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
+				ServiceDetails: []ec2types.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
 			}, nil)
 		},
 
@@ -1210,27 +1219,27 @@ users:
 			// Query endpoints for the cluster. There are none, triggering the create path.
 			m.EXPECT().DescribeVpcEndpoints(
 				&ec2.DescribeVpcEndpointsInput{
-					Filters: []*ec2.Filter{{
+					Filters: []ec2types.Filter{{
 						Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
-						Values: aws.StringSlice([]string{"test-cd-1234"}),
+						Values: []string{"test-cd-1234"},
 					}}}).
 				Return(&ec2.DescribeVpcEndpointsOutput{}, nil)
 			m.EXPECT().DescribeVpcEndpointServices(&ec2.DescribeVpcEndpointServicesInput{
-				ServiceNames: aws.StringSlice([]string{*service.ServiceName}),
+				ServiceNames: []string{*service.ServiceName},
 			}).Return(&ec2.DescribeVpcEndpointServicesOutput{
-				ServiceDetails: []*ec2.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
+				ServiceDetails: []ec2types.ServiceDetail{{AvailabilityZones: service.AvailabilityZones}},
 			}, nil)
 
 			// Query all endpoints for the VPCs in the inventory. There are two in vpc-1 and one in vpc-2.
 			m.EXPECT().DescribeVpcEndpointsPages(
 				&ec2.DescribeVpcEndpointsInput{
-					Filters: []*ec2.Filter{{
+					Filters: []ec2types.Filter{{
 						Name:   aws.String("vpc-id"),
-						Values: aws.StringSlice([]string{"vpc-1", "vpc-2"}),
+						Values: []string{"vpc-1", "vpc-2"},
 					}}}, gomock.Any()).
 				Do(func(input *ec2.DescribeVpcEndpointsInput, fn func(*ec2.DescribeVpcEndpointsOutput, bool) bool) {
 					describeVpcEndpointsOutput := &ec2.DescribeVpcEndpointsOutput{
-						VpcEndpoints: []*ec2.VpcEndpoint{
+						VpcEndpoints: []ec2types.VpcEndpoint{
 							{
 								VpcEndpointId: aws.String("vpce-11"),
 								VpcId:         aws.String("vpc-1"),
@@ -1248,11 +1257,11 @@ users:
 					fn(describeVpcEndpointsOutput, true)
 				})
 
-			createdEndpoint := &ec2.VpcEndpoint{
+			createdEndpoint := &ec2types.VpcEndpoint{
 				VpcEndpointId: aws.String("vpce-22"),
 				VpcId:         aws.String("vpc-2"),
-				State:         aws.String("available"),
-				DnsEntries: []*ec2.DnsEntry{{
+				State:         ec2types.StateAvailable,
+				DnsEntries: []ec2types.DnsEntry{{
 					DnsName:      aws.String("vpce-22-us-east-1.vpce-svc-12345.vpc.amazonaws.com"),
 					HostedZoneId: aws.String("HZ22"),
 				}},
@@ -1264,23 +1273,23 @@ users:
 				Return(&ec2.CreateVpcEndpointOutput{VpcEndpoint: createdEndpoint}, nil)
 
 			m.EXPECT().DescribeVpcEndpoints(&ec2.DescribeVpcEndpointsInput{
-				VpcEndpointIds: aws.StringSlice([]string{*createdEndpoint.VpcEndpointId}),
+				VpcEndpointIds: []string{*createdEndpoint.VpcEndpointId},
 			}).Return(&ec2.DescribeVpcEndpointsOutput{
-				VpcEndpoints: []*ec2.VpcEndpoint{createdEndpoint},
+				VpcEndpoints: []ec2types.VpcEndpoint{*createdEndpoint},
 			}, nil)
 
-			hzID := mockPHZ(m, createdEndpoint, "api.test-cluster", &route53.HostedZone{
+			hzID := mockPHZ(m, createdEndpoint, "api.test-cluster", &route53types.HostedZone{
 				Id:   aws.String("HZ22"),
 				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     createdEndpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 
@@ -1342,26 +1351,27 @@ users:
 
 			m.EXPECT().DescribeVpcEndpoints(
 				&ec2.DescribeVpcEndpointsInput{
-					Filters: []*ec2.Filter{{
+					Filters: []ec2types.Filter{{
 						Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
-						Values: aws.StringSlice([]string{"test-cd-1234"}),
+						Values: []string{"test-cd-1234"},
 					}}}).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{
+					VpcEndpoints: []ec2types.VpcEndpoint{
 						{
 							// A bad one we should ignore
 							VpcEndpointId: aws.String("badvpce"),
-							State:         aws.String("expired"),
+							State:         ec2types.StateExpired,
 						},
 						{
 							// A good one we should ignore
 							VpcEndpointId: aws.String("goldenvpce"),
-							State:         aws.String("pendingAcceptance"),
+							State:         ec2types.StatePendingAcceptance,
 						},
 						{
 							// The previously configured one
 							VpcEndpointId: aws.String("vpce-12345"),
-							State:         aws.String("available"),
+							// Prove case insensitivity :eyeroll:
+							State: "available",
 						},
 					},
 				}, nil)
@@ -1394,9 +1404,9 @@ users:
 			service := mockCreateService(m, clusternlb)
 			mockServicePerms(m, service)
 
-			tagFilters := []*ec2.Filter{{
+			tagFilters := []ec2types.Filter{{
 				Name:   aws.String("tag:hive.openshift.io/private-link-access-for"),
-				Values: aws.StringSlice([]string{"test-cd-1234"}),
+				Values: []string{"test-cd-1234"},
 			}}
 			// First page empty (HIVE-2838)
 			m.EXPECT().DescribeVpcEndpoints(
@@ -1411,21 +1421,21 @@ users:
 					Filters:   tagFilters,
 					NextToken: aws.String("abc123")}).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{
+					VpcEndpoints: []ec2types.VpcEndpoint{
 						{
 							// The previously configured one
 							VpcEndpointId: aws.String("vpce-12345"),
-							State:         aws.String("rejected"),
+							State:         ec2types.StateRejected,
 						},
 						{
 							// A bad one we should ignore
 							VpcEndpointId: aws.String("badvpce"),
-							State:         aws.String("expired"),
+							State:         ec2types.StateExpired,
 						},
 						{
 							// A good one we should adopt
 							VpcEndpointId: aws.String("goldenvpce"),
-							State:         aws.String("pendingAcceptance"),
+							State:         ec2types.StatePendingAcceptance,
 						},
 					},
 				}, nil)
@@ -1457,12 +1467,12 @@ users:
 			hzID := mockPHZ(m, endpoint, "api.test-cluster", nil)
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 		},
@@ -1498,17 +1508,17 @@ users:
 				"eni-2": "ip-2",
 				"eni-3": "ip-3",
 			}
-			endpoint.NetworkInterfaceIds = aws.StringSlice([]string{"eni-2", "eni-1"})
+			endpoint.NetworkInterfaceIds = []string{"eni-2", "eni-1"}
 
 			hzID := mockPHZARecords(m, endpoint, "api.test-cluster", nil, knownENI)
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 		},
@@ -1538,18 +1548,18 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53types.HostedZone{
 				Id:   aws.String("HZ12345"),
 				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 		},
@@ -1585,20 +1595,20 @@ users:
 				"eni-2": "ip-2",
 				"eni-3": "ip-3",
 			}
-			endpoint.NetworkInterfaceIds = aws.StringSlice([]string{"eni-2", "eni-1"})
+			endpoint.NetworkInterfaceIds = []string{"eni-2", "eni-1"}
 
-			hzID := mockPHZARecords(m, endpoint, "api.test-cluster", &route53.HostedZone{
+			hzID := mockPHZARecords(m, endpoint, "api.test-cluster", &route53types.HostedZone{
 				Id:   aws.String("HZ12345"),
 				Name: aws.String("api.test-cluster."),
 			}, knownENI)
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 		},
@@ -1634,28 +1644,28 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53types.HostedZone{
 				Id:   aws.String("HZ12345"),
 				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 
 			m.EXPECT().AssociateVPCWithHostedZone(&route53.AssociateVPCWithHostedZoneInput{
 				HostedZoneId: aws.String("HZ12345"),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String("vpc-hive1"),
-					VPCRegion: aws.String("us-west-1"),
+					VPCRegion: route53types.VPCRegionUsWest1,
 				},
-			}).Return(nil, awserr.New("AccessDenied", "AssociateVPCWithHostedZone access denied", nil))
+			}).Return(nil, awsclient.NewAPIError("AccessDenied", "AssociateVPCWithHostedZone access denied"))
 		},
 
 		hasFinalizer: true,
@@ -1665,8 +1675,8 @@ users:
 			HostedZoneID:       "HZ12345",
 		},
 		expectedConditions: getExpectedConditions(true, "AssociatingVPCsToHostedZoneFailed",
-			"AccessDenied: AssociateVPCWithHostedZone access denied"),
-		err: "AccessDenied: AssociateVPCWithHostedZone access denied",
+			"api error AccessDenied: AssociateVPCWithHostedZone access denied"),
+		err: "api error AccessDenied: AssociateVPCWithHostedZone access denied",
 	}, {
 		name: "cd with privatelink enabled, no previous private link, associate vpcs",
 
@@ -1690,26 +1700,26 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53types.HostedZone{
 				Id:   aws.String("HZ12345"),
 				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 
 			m.EXPECT().AssociateVPCWithHostedZone(&route53.AssociateVPCWithHostedZoneInput{
 				HostedZoneId: aws.String("HZ12345"),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String("vpc-hive1"),
-					VPCRegion: aws.String("us-west-1"),
+					VPCRegion: route53types.VPCRegionUsWest1,
 				},
 			}).Return(nil, nil)
 		},
@@ -1745,36 +1755,36 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53types.HostedZone{
 				Id:   aws.String("HZ12345"),
 				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}, {
 					VPCId:     aws.String("vpc-hive1-removed"),
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 
 			m.EXPECT().AssociateVPCWithHostedZone(&route53.AssociateVPCWithHostedZoneInput{
 				HostedZoneId: aws.String("HZ12345"),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String("vpc-hive1"),
-					VPCRegion: aws.String("us-west-1"),
+					VPCRegion: route53types.VPCRegionUsWest1,
 				},
 			}).Return(nil, nil)
 			m.EXPECT().DisassociateVPCFromHostedZone(&route53.DisassociateVPCFromHostedZoneInput{
 				HostedZoneId: aws.String("HZ12345"),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String("vpc-hive1-removed"),
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				},
 			}).Return(nil, nil)
 		},
@@ -1813,40 +1823,40 @@ users:
 			mockServicePerms(m, service)
 			endpoint := mockCreateEndpoint(m, service)
 
-			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53.HostedZone{
+			hzID := mockPHZ(m, endpoint, "api.test-cluster", &route53types.HostedZone{
 				Id:   aws.String("HZ12345"),
 				Name: aws.String("api.test-cluster."),
 			})
 
 			m.EXPECT().GetHostedZone(gomock.Any()).Return(&route53.GetHostedZoneOutput{
-				HostedZone: &route53.HostedZone{
+				HostedZone: &route53types.HostedZone{
 					Id: aws.String(hzID),
 				},
-				VPCs: []*route53.VPC{{
+				VPCs: []route53types.VPC{{
 					VPCId:     endpoint.VpcId,
-					VPCRegion: aws.String("us-east-1"),
+					VPCRegion: route53types.VPCRegionUsEast1,
 				}},
 			}, nil)
 
 			m.EXPECT().CreateVPCAssociationAuthorization(&route53.CreateVPCAssociationAuthorizationInput{
 				HostedZoneId: aws.String("HZ12345"),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String("vpc-hive1"),
-					VPCRegion: aws.String("us-west-1"),
+					VPCRegion: route53types.VPCRegionUsWest1,
 				},
 			}).Return(nil, nil)
 			m.EXPECT().AssociateVPCWithHostedZone(&route53.AssociateVPCWithHostedZoneInput{
 				HostedZoneId: aws.String("HZ12345"),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String("vpc-hive1"),
-					VPCRegion: aws.String("us-west-1"),
+					VPCRegion: route53types.VPCRegionUsWest1,
 				},
 			}).Return(nil, nil)
 			m.EXPECT().DeleteVPCAssociationAuthorization(&route53.DeleteVPCAssociationAuthorizationInput{
 				HostedZoneId: aws.String("HZ12345"),
-				VPC: &route53.VPC{
+				VPC: &route53types.VPC{
 					VPCId:     aws.String("vpc-hive1"),
-					VPCRegion: aws.String("us-west-1"),
+					VPCRegion: route53types.VPCRegionUsWest1,
 				},
 			}).Return(nil, nil)
 		},
@@ -1888,28 +1898,28 @@ users:
 		},
 		inventory: validInventory,
 		configureAWSClient: func(m *mock.MockClient) {
-			rr := &route53.ResourceRecordSet{
-				Type: aws.String("A"),
+			rr := route53types.ResourceRecordSet{
+				Type: route53types.RRTypeA,
 				Name: aws.String("api.test-cluster"),
-				AliasTarget: &route53.AliasTarget{
+				AliasTarget: &route53types.AliasTarget{
 					DNSName: aws.String("vpc.."),
 				},
 			}
 			m.EXPECT().ListResourceRecordSets(&route53.ListResourceRecordSetsInput{
 				HostedZoneId: aws.String("HZ12345"),
 			}).Return(&route53.ListResourceRecordSetsOutput{
-				ResourceRecordSets: []*route53.ResourceRecordSet{{
-					Type: aws.String("NS"),
+				ResourceRecordSets: []route53types.ResourceRecordSet{{
+					Type: route53types.RRTypeNs,
 				}, {
-					Type: aws.String("SOA"),
+					Type: route53types.RRTypeSoa,
 				}, rr},
 			}, nil)
 			m.EXPECT().ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
 				HostedZoneId: aws.String("HZ12345"),
-				ChangeBatch: &route53.ChangeBatch{
-					Changes: []*route53.Change{{
-						Action:            aws.String("DELETE"),
-						ResourceRecordSet: rr,
+				ChangeBatch: &route53types.ChangeBatch{
+					Changes: []route53types.Change{{
+						Action:            route53types.ChangeActionDelete,
+						ResourceRecordSet: &rr,
 					}},
 				},
 			}).Return(nil, nil)
@@ -1917,29 +1927,29 @@ users:
 				Id: aws.String("HZ12345"),
 			}).Return(nil, nil)
 
-			endpoint := &ec2.VpcEndpoint{
+			endpoint := &ec2types.VpcEndpoint{
 				VpcEndpointId: aws.String("vpce-12345"),
 				VpcId:         aws.String("vpc-1"),
 			}
 			m.EXPECT().DescribeVpcEndpoints(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointsOutput{
-					VpcEndpoints: []*ec2.VpcEndpoint{{
+					VpcEndpoints: []ec2types.VpcEndpoint{{
 						VpcEndpointId: endpoint.VpcEndpointId,
 						VpcId:         endpoint.VpcId,
 					}},
 				}, nil).Times(1)
 			m.EXPECT().DeleteVpcEndpoints(&ec2.DeleteVpcEndpointsInput{
-				VpcEndpointIds: aws.StringSlice([]string{*endpoint.VpcEndpointId}),
+				VpcEndpointIds: []string{*endpoint.VpcEndpointId},
 			}).Return(nil, nil)
 
 			m.EXPECT().DescribeVpcEndpointServiceConfigurations(gomock.Any()).
 				Return(&ec2.DescribeVpcEndpointServiceConfigurationsOutput{
-					ServiceConfigurations: []*ec2.ServiceConfiguration{{
+					ServiceConfigurations: []ec2types.ServiceConfiguration{{
 						ServiceId: aws.String("vpce-svc-12345"),
 					}},
 				}, nil)
 			m.EXPECT().DeleteVpcEndpointServiceConfigurations(&ec2.DeleteVpcEndpointServiceConfigurationsInput{
-				ServiceIds: aws.StringSlice([]string{"vpce-svc-12345"}),
+				ServiceIds: []string{"vpce-svc-12345"},
 			}).Return(nil, nil)
 		},
 
@@ -2442,7 +2452,7 @@ func Test_toSupportedSubnets(t *testing.T) {
 		}},
 	}}
 
-	inv = filterVPCInventory(inv, toSupportedSubnets(sets.NewString("az3")))
+	inv = filterVPCInventory(inv, toSupportedSubnets(sets.New("az3")))
 	assert.Equal(t, []hivev1.AWSPrivateLinkInventory{{
 		AWSPrivateLinkVPC: hivev1.AWSPrivateLinkVPC{
 			VPCID:  "vpc-1",
@@ -2453,28 +2463,4 @@ func Test_toSupportedSubnets(t *testing.T) {
 			AvailabilityZone: "az3",
 		}},
 	}}, inv)
-}
-
-func Test_filterErrorMessage(t *testing.T) {
-	tests := []struct {
-		err  error
-		want string
-	}{{
-		err:  errors.New(`AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: 42a5a4ce-9c1a-4916-a62a-72a2e6d9ae59; Proxy: null)\n\tstatus code: 403, request id: 9cc3b1f9-e161-402c-a942-d0ed7c7e5fd4`),
-		want: `AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: XXXX; Proxy: null)\n\tstatus code: 403, request id: XXXX`,
-	}, {
-		err: errors.New(`AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: 42a5a4ce-9c1a-4916-a62a-72a2e6d9ae59; Proxy: null)
-		status code: 403, request id: 9cc3b1f9-e161-402c-a942-d0ed7c7e5fd4`),
-		want: `AccessDenied: Failed to verify the given VPC by calling ec2:DescribeVpcs: You are not authorized to perform this operation. (Service: AmazonEC2; Status Code: 403; Error Code: UnauthorizedOperation; Request ID: XXXX; Proxy: null)
-		status code: 403, request id: XXXX`,
-	}, {
-		err:  errors.New(`AccessDenied: User: arn:aws:iam::12345:user/test-user is not authorized to perform: route53:ChangeResourceRecordSets on resource: arn:aws:route53:::hostedzone/12345\n\tstatus code: 403, request id: 22bc2e2e-9381-485f-8a46-c7ce8aad2a4d`),
-		want: `AccessDenied: User: arn:aws:iam::12345:user/test-user is not authorized to perform: route53:ChangeResourceRecordSets on resource: arn:aws:route53:::hostedzone/12345\n\tstatus code: 403, request id: XXXX`,
-	}}
-	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
-			got := filterErrorMessage(tt.err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
 }

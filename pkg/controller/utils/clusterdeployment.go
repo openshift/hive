@@ -129,8 +129,6 @@ func CredentialsSecretName(cd *hivev1.ClusterDeployment) string {
 		return cd.Spec.Platform.Azure.CredentialsSecretRef.Name
 	case p.OpenStack != nil:
 		return cd.Spec.Platform.OpenStack.CredentialsSecretRef.Name
-	case p.Ovirt != nil:
-		return cd.Spec.Platform.Ovirt.CredentialsSecretRef.Name
 	case p.BareMetal != nil:
 		return ""
 	case p.AgentBareMetal != nil:

@@ -93,6 +93,7 @@ func (a *VSphereActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool
 							Networks:       []string{cd.Spec.Platform.VSphere.Network},
 							Template:       a.osImage,
 							ResourcePool:   pool.Spec.Platform.VSphere.ResourcePool,
+							TagIDs:         pool.Spec.Platform.VSphere.TagIDs,
 						},
 					},
 				},

@@ -89,7 +89,6 @@ var (
 		configv1.GCPServiceEndpointNameIAM,
 		configv1.GCPServiceEndpointNameServiceUsage,
 		configv1.GCPServiceEndpointNameStorage,
-		configv1.GCPServiceEndpointNameTagManager,
 	)
 )
 
@@ -131,9 +130,21 @@ func ValidatePlatform(p *gcp.Platform, fldPath *field.Path, ic *types.InstallCon
 		allErrs = append(allErrs, field.Required(fldPath.Child("network"), "must provide a VPC network when supplying subnets"))
 	}
 
+	if p.DNS != nil && p.DNS.PrivateZone != nil {
+		if p.NetworkProjectID == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dns").Child("privateZone"), "must provide a network project id when a private dns zone is specified"))
+		}
+		if p.DNS.PrivateZone.Name == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dns").Child("privateZone").Child("name"), "must provide a zone id when a private dns zone is specified"))
+		}
+	}
+
 	// check if configured userLabels are valid.
 	allErrs = append(allErrs, validateUserLabels(p.UserLabels, fldPath.Child("userLabels"))...)
-	allErrs = append(allErrs, validateServiceEndpoints(p.ServiceEndpoints, fldPath.Child("serviceEndpoints"))...)
+
+	if ic.Publish == types.InternalPublishingStrategy {
+		allErrs = append(allErrs, validateServiceEndpoints(p.ServiceEndpoints, fldPath.Child("serviceEndpoints"))...)
+	}
 
 	return allErrs
 }

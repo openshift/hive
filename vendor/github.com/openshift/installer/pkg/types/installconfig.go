@@ -63,7 +63,7 @@ var (
 )
 
 // PublishingStrategy is a strategy for how various endpoints for the cluster are exposed.
-// +kubebuilder:validation:Enum="";External;Internal
+// +kubebuilder:validation:Enum="";External;Internal;Mixed
 type PublishingStrategy string
 
 const (
@@ -157,6 +157,7 @@ type InstallConfig struct {
 	ImageDigestSources []ImageDigestSource `json:"imageDigestSources,omitempty"`
 
 	// Publish controls how the user facing endpoints of the cluster like the Kubernetes API, OpenShift routes etc. are exposed.
+	// A "Mixed" strategy only applies to the "azure" platform, and requires "operatorPublishingStrategy" to be configured.
 	// When no strategy is specified, the strategy is "External".
 	//
 	// +kubebuilder:default=External
@@ -619,45 +620,29 @@ func (c *InstallConfig) EnabledFeatureGates() featuregates.FeatureGate {
 	return fg
 }
 
-// ClusterAPIFeatureGateEnabled checks whether feature gates enabling
-// cluster api installs are enabled.
-func ClusterAPIFeatureGateEnabled(platform string, fgs featuregates.FeatureGate) bool {
-	// FeatureGateClusterAPIInstall enables for all platforms.
-	if fgs.Enabled(features.FeatureGateClusterAPIInstall) {
-		return true
-	}
-
-	// Check if CAPI install is enabled for individual platforms.
-	switch platform {
-	case aws.Name, azure.Name, gcp.Name, nutanix.Name, openstack.Name, powervs.Name, vsphere.Name, ibmcloud.Name:
-		return true
-	case azure.StackTerraformName, azure.StackCloud.Name():
-		return false
-	default:
-		return false
-	}
-}
-
-// MultiArchFeatureGateEnabled checks whether feature gate enabling multi-arch clusters is enabled.
-func MultiArchFeatureGateEnabled(platform string, fgs featuregates.FeatureGate) bool {
-	switch platform {
-	case aws.Name:
-		return fgs.Enabled(features.FeatureGateMultiArchInstallAWS)
-	case gcp.Name:
-		return fgs.Enabled(features.FeatureGateMultiArchInstallGCP)
-	default:
-		return false
-	}
-}
-
 // PublicAPI indicates whether the API load balancer should be public
 // by inspecting the cluster and operator publishing strategies.
 func (c *InstallConfig) PublicAPI() bool {
-	if c.Publish == ExternalPublishingStrategy {
+	// When no strategy is specified, the strategy defaults to "External".
+	if c.Publish == "" || c.Publish == ExternalPublishingStrategy {
 		return true
 	}
 
 	if op := c.OperatorPublishingStrategy; op != nil && strings.EqualFold(op.APIServer, "External") {
+		return true
+	}
+	return false
+}
+
+// PublicIngress indicates whether the Ingress load balancer should be public
+// by inspecting the cluster and operator publishing strategies.
+func (c *InstallConfig) PublicIngress() bool {
+	// When no strategy is specified, the strategy defaults to "External".
+	if c.Publish == "" || c.Publish == ExternalPublishingStrategy {
+		return true
+	}
+
+	if op := c.OperatorPublishingStrategy; op != nil && strings.EqualFold(op.Ingress, "External") {
 		return true
 	}
 	return false

@@ -53,7 +53,6 @@ type MachineConfigurationSpec struct {
 	// MachineConfig-based updates, such as drains, service reloads, etc. Specifying this will allow
 	// for less downtime when doing small configuration updates to the cluster. This configuration
 	// has no effect on cluster upgrades which will still incur node disruption where required.
-	// +openshift:enable:FeatureGate=NodeDisruptionPolicy
 	// +optional
 	NodeDisruptionPolicy NodeDisruptionPolicyConfig `json:"nodeDisruptionPolicy"`
 }
@@ -64,11 +63,10 @@ type MachineConfigurationStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
 	// conditions is a list of conditions and their status
-	// +patchMergeKey=type
-	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
 	// Previously there was a StaticPodOperatorStatus here for legacy reasons. Many of the fields within
 	// it are no longer relevant for the MachineConfiguration CRD's functions. The following remainder
@@ -95,7 +93,6 @@ type MachineConfigurationStatus struct {
 
 	// nodeDisruptionPolicyStatus status reflects what the latest cluster-validated policies are,
 	// and will be used by the Machine Config Daemon during future node updates.
-	// +openshift:enable:FeatureGate=NodeDisruptionPolicy
 	// +optional
 	NodeDisruptionPolicyStatus NodeDisruptionPolicyStatus `json:"nodeDisruptionPolicyStatus"`
 

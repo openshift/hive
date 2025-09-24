@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -67,6 +68,8 @@ func Validate(client API, ic *types.InstallConfig) error {
 	allErrs = append(allErrs, validateInstanceTypes(client, ic)...)
 	allErrs = append(allErrs, ValidateCredentialMode(client, ic)...)
 	allErrs = append(allErrs, validatePreexistingServiceAccount(client, ic)...)
+	allErrs = append(allErrs, ValidatePreExistingPublicDNS(client, ic)...)
+	allErrs = append(allErrs, ValidatePrivateDNSZone(client, ic)...)
 	allErrs = append(allErrs, validateServiceAccountPresent(client, ic)...)
 	allErrs = append(allErrs, validateMarketplaceImages(client, ic)...)
 	allErrs = append(allErrs, validatePlatformKMSKeys(client, ic, field.NewPath("platform").Child("gcp"))...)
@@ -110,8 +113,34 @@ func validateInstanceAndDiskType(fldPath *field.Path, diskType, instanceType, ar
 	return nil
 }
 
+func validateInstanceAndConfidentialCompute(fldPath *field.Path, instanceType string, onHostMaintenance gcp.OnHostMaintenanceType, confidentialCompute gcp.ConfidentialComputePolicy) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if confidentialCompute == gcp.ConfidentialComputePolicy(gcp.DisabledFeature) {
+		// Nothing to validate here
+		return allErrs
+	}
+
+	if onHostMaintenance != gcp.OnHostMaintenanceTerminate {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("onHostMaintenance"), onHostMaintenance, fmt.Sprintf("onHostMaintenace must be set to Terminate when confidentialCompute is %s", confidentialCompute)))
+	}
+
+	machineType, _, _ := strings.Cut(instanceType, "-")
+	machineSupportMatrixSelector := confidentialCompute
+	if confidentialCompute == gcp.ConfidentialComputePolicy(gcp.EnabledFeature) {
+		machineSupportMatrixSelector = gcp.ConfidentialComputePolicySEV
+	}
+	supportedMachineTypes, ok := gcp.ConfidentialComputePolicyToSupportedInstanceType[machineSupportMatrixSelector]
+	if !ok {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("confidentialCompute"), confidentialCompute, fmt.Sprintf("Unknown confidential computing technology %s", confidentialCompute)))
+	} else if !slices.Contains(supportedMachineTypes, machineType) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), instanceType, fmt.Sprintf("Machine type does not support a Confidential Compute value of %s. Machine types supporting %s: %s", confidentialCompute, confidentialCompute, strings.Join(supportedMachineTypes, ", "))))
+	}
+
+	return allErrs
+}
+
 // ValidateInstanceType ensures the instance type has sufficient Vcpu and Memory.
-func ValidateInstanceType(client API, fieldPath *field.Path, project, region string, zones []string, diskType string, instanceType string, req resourceRequirements, arch string) field.ErrorList {
+func ValidateInstanceType(client API, fieldPath *field.Path, project, region string, zones []string, diskType string, instanceType string, req resourceRequirements, arch string, onHostMaintenance string, confidentialCompute string) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	typeMeta, typeZones, err := client.GetMachineTypeWithZones(context.TODO(), project, region, instanceType)
@@ -125,6 +154,14 @@ func ValidateInstanceType(client API, fieldPath *field.Path, project, region str
 	if fieldErr := validateInstanceAndDiskType(fieldPath, diskType, instanceType, arch); fieldErr != nil {
 		return append(allErrs, fieldErr)
 	}
+
+	allErrs = append(allErrs,
+		validateInstanceAndConfidentialCompute(
+			fieldPath,
+			instanceType,
+			gcp.OnHostMaintenanceType(onHostMaintenance),
+			gcp.ConfidentialComputePolicy(confidentialCompute),
+		)...)
 
 	userZones := sets.New(zones...)
 	if len(userZones) == 0 {
@@ -183,6 +220,8 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 
 	defaultInstanceType := ""
 	defaultDiskType := gcp.PDSSD
+	defaultOnHostMaintenance := string(gcp.OnHostMaintenanceMigrate)
+	defaultConfidentialCompute := string(gcp.DisabledFeature)
 	defaultZones := []string{}
 
 	// Default requirements need to be sufficient to support Control Plane instances.
@@ -199,6 +238,14 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 			defaultDiskType = ic.GCP.DefaultMachinePlatform.DiskType
 		}
 
+		if ic.GCP.DefaultMachinePlatform.OnHostMaintenance != "" {
+			defaultOnHostMaintenance = ic.GCP.DefaultMachinePlatform.OnHostMaintenance
+		}
+
+		if ic.GCP.DefaultMachinePlatform.ConfidentialCompute != "" {
+			defaultConfidentialCompute = ic.GCP.DefaultMachinePlatform.ConfidentialCompute
+		}
+
 		if ic.GCP.DefaultMachinePlatform.InstanceType != "" {
 			allErrs = append(allErrs,
 				ValidateInstanceType(
@@ -211,6 +258,8 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 					ic.GCP.DefaultMachinePlatform.InstanceType,
 					defaultInstanceReq,
 					unknownArchitecture,
+					defaultOnHostMaintenance,
+					defaultConfidentialCompute,
 				)...)
 		}
 	}
@@ -219,6 +268,8 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 	instanceType := defaultInstanceType
 	arch := types.ArchitectureAMD64
 	cpDiskType := defaultDiskType
+	cpOnHostMaintenance := defaultOnHostMaintenance
+	cpConfidentialCompute := defaultConfidentialCompute
 	if ic.ControlPlane != nil {
 		arch = string(ic.ControlPlane.Architecture)
 		if instanceType == "" {
@@ -233,6 +284,12 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 			}
 			if ic.ControlPlane.Platform.GCP.DiskType != "" {
 				cpDiskType = ic.ControlPlane.Platform.GCP.DiskType
+			}
+			if ic.ControlPlane.Platform.GCP.OnHostMaintenance != "" {
+				cpOnHostMaintenance = ic.ControlPlane.Platform.GCP.OnHostMaintenance
+			}
+			if ic.ControlPlane.Platform.GCP.ConfidentialCompute != "" {
+				cpConfidentialCompute = ic.ControlPlane.Platform.GCP.ConfidentialCompute
 			}
 		}
 	}
@@ -256,6 +313,8 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 				instanceType,
 				controlPlaneReq,
 				arch,
+				cpOnHostMaintenance,
+				cpConfidentialCompute,
 			)...)
 	}
 
@@ -264,6 +323,8 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 		zones := defaultZones
 		instanceType := defaultInstanceType
 		diskType := defaultDiskType
+		onHostMaintenance := defaultOnHostMaintenance
+		confidentialCompute := defaultConfidentialCompute
 		if instanceType == "" {
 			instanceType = DefaultInstanceTypeForArch(compute.Architecture)
 		}
@@ -277,6 +338,12 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 			}
 			if len(compute.Platform.GCP.Zones) > 0 {
 				zones = compute.Platform.GCP.Zones
+			}
+			if compute.Platform.GCP.OnHostMaintenance != "" {
+				onHostMaintenance = compute.Platform.GCP.OnHostMaintenance
+			}
+			if compute.Platform.GCP.ConfidentialCompute != "" {
+				confidentialCompute = compute.Platform.GCP.ConfidentialCompute
 			}
 		}
 
@@ -295,6 +362,8 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 				instanceType,
 				computeReq,
 				string(arch),
+				onHostMaintenance,
+				confidentialCompute,
 			)...)
 	}
 
@@ -324,47 +393,84 @@ func validatePreexistingServiceAccount(client API, ic *types.InstallConfig) fiel
 // DNS zone for cluster's Kubernetes API. If a PublicDNSZone is provided, the provided
 // zone is verified against the BaseDomain. If no zone is provided, the base domain is
 // checked for any public zone that can be used.
-func ValidatePreExistingPublicDNS(client API, ic *types.InstallConfig) *field.Error {
+func ValidatePreExistingPublicDNS(client API, ic *types.InstallConfig) field.ErrorList {
 	// If this is an internal cluster, this check is not necessary
-	if ic.Publish == types.InternalPublishingStrategy {
+	if ic.Publish == types.InternalPublishingStrategy || ic.GCP.UserProvisionedDNS == dnstypes.UserProvisionedDNSEnabled {
 		return nil
 	}
+	allErrs := field.ErrorList{}
 
 	zone, err := client.GetDNSZone(context.TODO(), ic.Platform.GCP.ProjectID, ic.BaseDomain, true)
 	if err != nil {
 		if IsNotFound(err) {
-			return field.NotFound(field.NewPath("baseDomain"), fmt.Sprintf("Public DNS Zone (%s/%s)", ic.Platform.GCP.ProjectID, ic.BaseDomain))
+			return append(allErrs, field.NotFound(field.NewPath("baseDomain"), fmt.Sprintf("Public DNS Zone (%s/%s)", ic.Platform.GCP.ProjectID, ic.BaseDomain)))
 		}
-		return field.InternalError(field.NewPath("baseDomain"), err)
+		return append(allErrs, field.InternalError(field.NewPath("baseDomain"), err))
 	}
-	return checkRecordSets(client, ic, zone, []string{apiRecordType(ic)})
+
+	if err := checkRecordSets(client, ic, ic.Platform.GCP.ProjectID, zone, []string{apiRecordType(ic)}); err != nil {
+		allErrs = append(allErrs, err)
+	}
+	return allErrs
 }
 
 // ValidatePrivateDNSZone ensure no pre-existing DNS record exists in the private dns zone
 // matching the name that will be used for this installation.
-func ValidatePrivateDNSZone(client API, ic *types.InstallConfig) *field.Error {
+func ValidatePrivateDNSZone(client API, ic *types.InstallConfig) field.ErrorList {
 	if ic.GCP.Network == "" || ic.GCP.NetworkProjectID == "" {
 		return nil
 	}
+	allErrs := field.ErrorList{}
 
-	zone, err := client.GetDNSZone(context.TODO(), ic.GCP.ProjectID, ic.ClusterDomain(), false)
-	if err != nil {
-		logrus.Debug("No private DNS Zone found")
-		if IsNotFound(err) {
-			return field.NotFound(field.NewPath("baseDomain"), fmt.Sprintf("Private DNS Zone (%s/%s)", ic.Platform.GCP.ProjectID, ic.BaseDomain))
+	// The private zone does NOT need to exist. When the zone does exist it will be used, but when
+	// the zone does not exist one will be created with the specified zone name.
+	project := ic.GCP.ProjectID
+	zoneName := ""
+	icdns := ic.GCP.DNS
+	if icdns != nil && icdns.PrivateZone != nil {
+		if icdns.PrivateZone.ProjectID != "" {
+			project = icdns.PrivateZone.ProjectID
 		}
-		return field.InternalError(field.NewPath("baseDomain"), err)
+		zoneName = icdns.PrivateZone.Name
 	}
 
-	// Private Zone can be nil, check to see if it was found or not
-	if zone != nil {
-		return checkRecordSets(client, ic, zone, []string{apiRecordType(ic), apiIntRecordName(ic)})
+	// The base check will determine if any of the private zone exists with the specified base domain.
+	params := []gcp.DNSZoneParams{{Project: project, IsPublic: false, BaseDomain: ic.ClusterDomain()}}
+	if zoneName != "" {
+		// When a private dns zone is specified in the install-config then the test should
+		// determine if the private zone found is the only one matching the specified base domain.
+		params = append(params, gcp.DNSZoneParams{Project: project, IsPublic: false, BaseDomain: ic.ClusterDomain(), Name: zoneName})
 	}
-	return nil
+
+	for _, paramSet := range params {
+		zone, err := client.GetDNSZoneFromParams(context.TODO(), paramSet)
+		if err != nil {
+			if IsNotFound(err) {
+				// Ignore the not found error, because the zone will be created in this instance.
+				logrus.Debug("No private DNS Zone found")
+				continue
+			}
+			return append(allErrs, field.Invalid(field.NewPath("baseDomain"), ic.BaseDomain, err.Error()))
+		}
+
+		// Private Zone can be nil, check to see if it was found or not
+		if zone != nil {
+			if icdns != nil && icdns.PrivateZone != nil && zoneName != zone.Name {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("platform").Child("gcp").Child("dns").Child("privateZone").Child("name"),
+					zoneName,
+					fmt.Sprintf("found existing private zone %s in project %s with DNS name %s", zone.Name, project, zone.DnsName),
+				))
+			} else if err := checkRecordSets(client, ic, project, zone, []string{apiRecordType(ic), apiIntRecordName(ic)}); err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+	}
+	return allErrs
 }
 
-func checkRecordSets(client API, ic *types.InstallConfig, zone *dns.ManagedZone, records []string) *field.Error {
-	rrSets, err := client.GetRecordSets(context.TODO(), ic.GCP.ProjectID, zone.Name)
+func checkRecordSets(client API, ic *types.InstallConfig, project string, zone *dns.ManagedZone, records []string) *field.Error {
+	rrSets, err := client.GetRecordSets(context.TODO(), project, zone.Name)
 	if err != nil {
 		return field.InternalError(field.NewPath("baseDomain"), err)
 	}
@@ -376,7 +482,7 @@ func checkRecordSets(client API, ic *types.InstallConfig, zone *dns.ManagedZone,
 	preexistingRecords := sets.New[string](records...).Intersection(setOfReturnedRecords)
 
 	if preexistingRecords.Len() > 0 {
-		errMsg := fmt.Sprintf("record(s) %q already exists in DNS Zone (%s/%s) and might be in use by another cluster, please remove it to continue", sets.List(preexistingRecords), ic.GCP.ProjectID, zone.Name)
+		errMsg := fmt.Sprintf("record(s) %q already exists in DNS Zone (%s/%s) and might be in use by another cluster, please remove it to continue", sets.List(preexistingRecords), project, zone.Name)
 		return field.Invalid(field.NewPath("metadata", "name"), ic.ObjectMeta.Name, errMsg)
 	}
 	return nil
@@ -389,19 +495,6 @@ func ValidateForProvisioning(ic *types.InstallConfig) error {
 	}
 
 	allErrs := field.ErrorList{}
-
-	client, err := NewClient(context.TODO())
-	if err != nil {
-		return err
-	}
-
-	if err := ValidatePreExistingPublicDNS(client, ic); err != nil {
-		allErrs = append(allErrs, err)
-	}
-
-	if err := ValidatePrivateDNSZone(client, ic); err != nil {
-		allErrs = append(allErrs, err)
-	}
 
 	return allErrs.ToAggregate()
 }
@@ -738,7 +831,7 @@ func validatePlatformKMSKeys(client API, ic *types.InstallConfig, fieldPath *fie
 	cp := ic.ControlPlane
 	validatedControlPlaneKey := false
 	if cp != nil && cp.Platform.GCP != nil && cp.Platform.GCP.EncryptionKey != nil && cp.Platform.GCP.EncryptionKey.KMSKey != nil {
-		if _, err := client.GetKeyRing(context.TODO(), cp.Platform.GCP.OSDisk.EncryptionKey.KMSKey.KeyRing); err != nil {
+		if _, err := client.GetKeyRing(context.TODO(), cp.Platform.GCP.OSDisk.EncryptionKey.KMSKey); err != nil {
 			return append(allErrs, field.Invalid(fieldPath.Child("controlPlane").Child("encryptionKey").Child("kmsKey").Child("keyRing"),
 				cp.Platform.GCP.OSDisk.EncryptionKey.KMSKey.KeyRing,
 				err.Error(),
@@ -750,7 +843,7 @@ func validatePlatformKMSKeys(client API, ic *types.InstallConfig, fieldPath *fie
 	validatedComputeKeys := false
 	for _, mp := range ic.Compute {
 		if mp.Platform.GCP != nil && mp.Platform.GCP.EncryptionKey != nil && mp.Platform.GCP.EncryptionKey.KMSKey != nil {
-			if _, err := client.GetKeyRing(context.TODO(), mp.Platform.GCP.OSDisk.EncryptionKey.KMSKey.KeyRing); err != nil {
+			if _, err := client.GetKeyRing(context.TODO(), mp.Platform.GCP.OSDisk.EncryptionKey.KMSKey); err != nil {
 				allErrs = append(allErrs, field.Invalid(fieldPath.Child("compute").Child("encryptionKey").Child("kmsKey").Child("keyRing"),
 					mp.Platform.GCP.OSDisk.EncryptionKey.KMSKey.KeyRing,
 					err.Error(),
@@ -763,7 +856,7 @@ func validatePlatformKMSKeys(client API, ic *types.InstallConfig, fieldPath *fie
 
 	defaultMp := ic.GCP.DefaultMachinePlatform
 	if defaultMp != nil && defaultMp.EncryptionKey != nil && defaultMp.EncryptionKey.KMSKey != nil {
-		if _, err := client.GetKeyRing(context.TODO(), defaultMp.EncryptionKey.KMSKey.KeyRing); err != nil {
+		if _, err := client.GetKeyRing(context.TODO(), defaultMp.EncryptionKey.KMSKey); err != nil {
 			if validatedControlPlaneKey && (validatedComputeKeys && len(allErrs) == 0) {
 				logrus.Warn("defaultMachinePool.encryptionKey.KMSKey.KeyRing is not valid, but compute and control plane key rings are valid")
 			} else {

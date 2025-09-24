@@ -311,7 +311,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 	log.Debugf("loaded nodeSelector from hive-operator deployment: %v", sharedPodConfig.NodeSelector)
 	log.Debugf("loaded tolerations from hive-operator deployment: %v", sharedPodConfig.Tolerations)
-	log.Debugf("loaded imagePullSecrets from hive-operator deployment: %v", sharedPodConfig.ImagePullSecrets)
 	r.(*ReconcileHiveConfig).sharedPodConfig = sharedPodConfig
 
 	// TODO: Monitor CRDs but do not try to use an owner ref. (as they are global,

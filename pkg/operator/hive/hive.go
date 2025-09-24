@@ -6,6 +6,8 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -18,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	oappsv1 "github.com/openshift/api/apps/v1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -272,6 +275,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 
 	r.includeGlobalPullSecret(hLog, instance, hiveContainer)
+	r.includeHivePrivateImagePullSecret(hLog, instance, hiveContainer)
 
 	if instance.Spec.MaintenanceMode != nil && *instance.Spec.MaintenanceMode {
 		hLog.Warn("maintenanceMode enabled in HiveConfig, setting hive-controllers replicas to 0")
@@ -354,7 +358,9 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	// Apply shared pod config passed through from the operator deployment
 	hiveDeployment.Spec.Template.Spec.NodeSelector = r.sharedPodConfig.NodeSelector
 	hiveDeployment.Spec.Template.Spec.Tolerations = r.sharedPodConfig.Tolerations
-	hiveDeployment.Spec.Template.Spec.ImagePullSecrets = r.sharedPodConfig.ImagePullSecrets
+	if ref := getImagePullSecretReference(instance); ref != nil {
+		hiveDeployment.Spec.Template.Spec.ImagePullSecrets = append(hiveDeployment.Spec.Template.Spec.ImagePullSecrets, *ref)
+	}
 
 	hiveDeployment.Namespace = hiveNSName
 	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveDeployment), hLog, util.WithGarbageCollection(instance))
@@ -363,6 +369,10 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		return err
 	}
 	hLog.Infof("hive-controllers deployment applied (%s)", result)
+
+	if err := r.copyHiveImagePullSecret(hLog, h, instance); err != nil {
+		return err
+	}
 
 	hLog.Info("all hive components successfully reconciled")
 	return nil
@@ -409,7 +419,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 
 	caSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: GetHiveNamespace(instance),
+			Namespace: hiveNS,
 			Name:      hiveAdditionalCASecret,
 		},
 		Data: map[string][]byte{
@@ -463,6 +473,91 @@ func (r *ReconcileHiveConfig) includeGlobalPullSecret(hLog log.FieldLogger, inst
 		Value: instance.Spec.GlobalPullSecretRef.Name,
 	}
 	hiveContainer.Env = append(hiveContainer.Env, globalPullSecretEnvVar)
+}
+
+func (r *ReconcileHiveConfig) includeHivePrivateImagePullSecret(hLog log.FieldLogger, instance *hivev1.HiveConfig, hiveContainer *corev1.Container) {
+	ref := getImagePullSecretReference(instance)
+	if ref == nil {
+		hLog.Debug("HiveImagePullSecret is not provided in HiveConfig, it will not be deployed")
+		return
+	}
+
+	hiveImagePullSecretEnvVar := corev1.EnvVar{
+		Name:  constants.HivePrivateImagePullSecret,
+		Value: ref.Name,
+	}
+	hiveContainer.Env = append(hiveContainer.Env, hiveImagePullSecretEnvVar)
+}
+
+func (r *ReconcileHiveConfig) copyHiveImagePullSecret(hLog log.FieldLogger, h resource.Helper, instance *hivev1.HiveConfig) error {
+	ref := getImagePullSecretReference(instance)
+	if ref == nil {
+		hLog.Debug("HiveImagePullSecret is not provided in HiveConfig, it will not be copied")
+		return nil
+	}
+
+	srcNS := r.hiveOperatorNamespace
+	destNS := GetHiveNamespace(instance)
+	secretName := ref.Name
+
+	if srcNS == destNS {
+		hLog.WithField("namespace", srcNS).Debug("hive operator and hive controllers live in the same NS", srcNS)
+		return nil
+	}
+
+	srcSecret := &corev1.Secret{}
+	err := r.Get(context.TODO(), types.NamespacedName{Namespace: srcNS, Name: secretName}, srcSecret)
+	if err != nil {
+		return err
+	}
+
+	destSecret := &corev1.Secret{}
+	err = r.Get(context.TODO(), types.NamespacedName{Namespace: destNS, Name: secretName}, destSecret)
+
+	secretFound := true
+	if apierrors.IsNotFound(err) {
+		destSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: destNS,
+			},
+			Data: srcSecret.Data,
+			Type: srcSecret.Type,
+		}
+		secretFound = false
+	} else if err != nil {
+		return err
+	}
+
+	controllerSA := &corev1.ServiceAccount{}
+	if err := r.Get(context.TODO(), types.NamespacedName{Namespace: destNS, Name: "hive-controllers"}, controllerSA); err != nil {
+		hLog.WithError(err).Info("couldn't fetch hive-controllers service account, attempting to requeue...")
+		return err
+	}
+
+	if secretFound {
+		if reflect.DeepEqual(destSecret.Data, srcSecret.Data) {
+			if slices.ContainsFunc(destSecret.OwnerReferences, func(ref metav1.OwnerReference) bool {
+				return ref.UID == controllerSA.UID
+			}) {
+				hLog.WithField("name", secretName).WithField("namespace", destNS).Debug("target secret does exist, no update necessary")
+				return nil // no work as the dest and source data matches and secret is owned
+			}
+			hLog.WithField("name", secretName).WithField("namespace", destNS).Debug("target secret isn't owned, owning it")
+		} else {
+			destSecret.Data = srcSecret.Data
+			hLog.WithField("name", secretName).WithField("namespace", destNS).Debug("target secret is out of date, updating it")
+		}
+	} else {
+		hLog.WithField("name", secretName).WithField("namespace", destNS).Debug("target secret doesn't exist, creating it")
+	}
+
+	if err := controllerutil.SetOwnerReference(controllerSA, destSecret, r.scheme); err != nil {
+		return err
+	}
+
+	_, err = h.CreateOrUpdateRuntimeObject(destSecret, r.scheme)
+	return err
 }
 
 func (r *ReconcileHiveConfig) runningOnOpenShift() (bool, error) {

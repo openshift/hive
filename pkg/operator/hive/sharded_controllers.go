@@ -238,7 +238,9 @@ func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h
 	// Apply shared pod config passed through from the operator deployment
 	newStatefulSet.Spec.Template.Spec.NodeSelector = r.sharedPodConfig.NodeSelector
 	newStatefulSet.Spec.Template.Spec.Tolerations = r.sharedPodConfig.Tolerations
-	newStatefulSet.Spec.Template.Spec.ImagePullSecrets = r.sharedPodConfig.ImagePullSecrets
+	if ref := getImagePullSecretReference(hiveconfig); ref != nil {
+		newStatefulSet.Spec.Template.Spec.ImagePullSecrets = append(newStatefulSet.Spec.Template.Spec.ImagePullSecrets, *ref)
+	}
 
 	newStatefulSet.Namespace = hiveNSName
 	result, err := util.ApplyRuntimeObject(h, util.Passthrough(newStatefulSet), hLog, util.WithGarbageCollection(hiveconfig))

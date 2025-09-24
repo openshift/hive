@@ -10,12 +10,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// SharedPodConfig is initially created from the hive-operator pod and must be included in any Jobs or Pods
-// we create from downstream.
+// SharedPodConfig is initially determined from the hive-operator pod and must be included in any
+// Jobs or Pods we create downstream from there.
 type SharedPodConfig struct {
-	NodeSelector     map[string]string
-	Tolerations      []corev1.Toleration
-	ImagePullSecrets []corev1.LocalObjectReference
+	NodeSelector map[string]string
+	Tolerations  []corev1.Toleration
 }
 
 func ReadSharedConfigFromThisPod(cl client.Client) (*SharedPodConfig, error) {
@@ -25,9 +24,8 @@ func ReadSharedConfigFromThisPod(cl client.Client) (*SharedPodConfig, error) {
 	}
 
 	return &SharedPodConfig{
-		NodeSelector:     thisPod.Spec.NodeSelector,
-		Tolerations:      thisPod.Spec.Tolerations,
-		ImagePullSecrets: thisPod.Spec.ImagePullSecrets,
+		NodeSelector: thisPod.Spec.NodeSelector,
+		Tolerations:  thisPod.Spec.Tolerations,
 	}, nil
 }
 

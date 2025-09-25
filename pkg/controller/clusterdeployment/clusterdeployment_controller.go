@@ -618,6 +618,17 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		return reconcile.Result{}, r.Update(context.TODO(), cd)
 	}
 
+	switch requeue, err := r.ensurePrivateImagePullSecret(cd, cdLog); {
+	case err != nil:
+		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error ensuring private image pull secret")
+		return reconcile.Result{}, err
+	case requeue:
+		cdLog.Debug("hive private image pull secret was out of date, requeueing...")
+		// The controller will not automatically requeue the cluster deployment
+		// since the controller is not watching for secrets. So, requeue manually.
+		return reconcile.Result{Requeue: true}, nil
+	}
+
 	if cd.DeletionTimestamp != nil {
 		return r.syncDeletedClusterDeployment(cd, cdLog)
 	}
@@ -792,18 +803,6 @@ func (r *ReconcileClusterDeployment) reconcile(request reconcile.Request, cd *hi
 		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error updating the merged pull secret")
 		return reconcile.Result{}, err
 	case updated:
-		// The controller will not automatically requeue the cluster deployment
-		// since the controller is not watching for secrets. So, requeue manually.
-		return reconcile.Result{Requeue: true}, nil
-	}
-
-	cdLog.Debug("checking for hive private image pull secret...")
-	switch requeue, err := r.ensurePrivateImagePullSecret(cd, cdLog); {
-	case err != nil:
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "Error ensuring private image pull secret")
-		return reconcile.Result{}, err
-	case requeue:
-		cdLog.Debug("hive private image pull secret was out of date, requeueing...")
 		// The controller will not automatically requeue the cluster deployment
 		// since the controller is not watching for secrets. So, requeue manually.
 		return reconcile.Result{Requeue: true}, nil
@@ -2187,7 +2186,6 @@ func (r *ReconcileClusterDeployment) updatePullSecretInfo(pullSecret string, cd 
 func (r *ReconcileClusterDeployment) ensurePrivateImagePullSecret(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (bool, error) {
 	secretName := os.Getenv(constants.HivePrivateImagePullSecret)
 	if secretName == "" {
-		cdLog.Debug("Hive private image pull secret missing or empty, ignoring...")
 		return false, nil
 	}
 

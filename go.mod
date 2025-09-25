@@ -127,6 +127,7 @@ require (
 )
 
 require (
+	github.com/gophercloud/gophercloud v1.7.0
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.11 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.29.17

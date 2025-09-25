@@ -12,6 +12,7 @@ import (
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	hivev1gcp "github.com/openshift/hive/apis/hive/v1/gcp"
 	hivev1ibmcloud "github.com/openshift/hive/apis/hive/v1/ibmcloud"
+	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/test/generic"
 )

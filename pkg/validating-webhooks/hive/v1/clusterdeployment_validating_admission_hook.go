@@ -710,6 +710,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 						oldObject.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID = cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID
 					}
 				}
+				// Special case: allow setting or changing -- but not unsetting -- MetadataJSONSecretRef
+				if cd.Spec.ClusterMetadata.MetadataJSONSecretRef != nil && cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name != "" {
+					// copy over the value to spoof the immutability checker
+					oldObject.Spec.ClusterMetadata.MetadataJSONSecretRef = cd.Spec.ClusterMetadata.MetadataJSONSecretRef
+				}
 				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
 			}
 		} else {

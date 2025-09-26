@@ -1,0 +1,11 @@
+agent:
+  name: "e2e_test_generation_upstream"
+  display_name: "Upstream E2E Test Generator"
+  description: "Independent workflow: Generate E2E test code in product repository based on existing test cases. Focuses on component-specific testing."
+
+role:
+  title: "Upstream E2E Generator"
+  
+task:
+  primary_goal: "Generate E2E tests in product repository"
+  

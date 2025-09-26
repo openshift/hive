@@ -1,0 +1,76 @@
+issue:
+  key: "HIVE-2544"
+  title: "[Hive/Azure/Azure Gov] Machinepool: Unable to generate machinesets in regions without availability zone support."
+  component: "hive"
+  priority: "Major"
+  status: "Closed"
+  resolution: "Fixed"
+
+problem_analysis:
+  core_issue: "Machinepool cannot generate machinesets in Azure regions that don't support availability zones"
+  affected_platforms:
+    - "Azure Public Cloud"
+    - "Azure Government Cloud"
+  affected_versions:
+    - "openshift-4.12.z"
+    - "openshift-4.13.z"
+    - "openshift-4.14.z"
+    - "openshift-4.15.z"
+    - "openshift-4.16"
+    - "openshift-4.17"
+  error_symptoms:
+    - "Error: 'zero zones returned for region usgovtexas'"
+    - "Machinepool reconciler fails with zone lookup errors"
+    - "MachineSet generation blocked in non-AZ regions"
+
+technical_scope:
+  primary_functionality: "Azure MachinePool creation and management"
+  specific_areas:
+    - "MachinePool controller logic for Azure"
+    - "Zone detection and handling for Azure regions"
+    - "MachineSet generation in non-AZ environments"
+    - "Azure Government cloud compatibility"
+
+test_scope:
+  validation_areas:
+    - "MachinePool creation in Azure non-AZ regions"
+    - "MachineSet generation without zone configuration"
+    - "Azure Government cloud support"
+    - "Error handling for zone-related failures"
+    - "Cluster node provisioning verification"
+
+  test_scenarios:
+    - name: "Azure MachinePool Non-AZ Region Support"
+      description: "Validate MachinePool functionality in Azure regions without availability zones"
+      platforms: ["Azure", "Azure Government"]
+      regions: ["usgovtexas", "other non-AZ regions"]
+
+  excluded_scenarios:
+    - "Azure regions with availability zone support"
+    - "Non-Azure cloud providers"
+    - "Cluster installation scenarios"
+
+requirements:
+  functional:
+    - "MachinePool must create successfully in non-AZ Azure regions"
+    - "MachineSet generation must work without zone configurations"
+    - "Azure Government cloud regions must be supported"
+    - "Error messages must be clear when zone issues occur"
+
+  validation:
+    - "Verify MachinePool resource creation"
+    - "Confirm MachineSet generation and status"
+    - "Validate cluster node provisioning"
+    - "Check absence of zone-related errors"
+
+test_environment:
+  prerequisites:
+    - "Hive cluster deployed and operational"
+    - "Azure or Azure Government cloud credentials configured"
+    - "Target region without availability zone support"
+    - "Cluster installation completed successfully"
+
+  resources_needed:
+    - "Azure subscription with non-AZ region access"
+    - "Hive MachinePool CRD"
+    - "Azure Government cloud access (for gov testing)"

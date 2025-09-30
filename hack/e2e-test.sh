@@ -108,6 +108,7 @@ go run "${SRC_ROOT}/contrib/cmd/hiveutil/main.go" create-cluster "${CLUSTER_NAME
 	--install-once=true \
 	--uninstall-once=true \
 	--workers=2 \
+  -a hive.openshift.io/legacy-deprovision="true" \
 	${REGION_ARG} \
 	${INSTANCE_TYPE_ARG} \
 	${WORKER_INSTANCE_TYPE_ARG} \

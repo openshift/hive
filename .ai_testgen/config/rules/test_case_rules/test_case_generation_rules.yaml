@@ -1,0 +1,168 @@
+# Test Case Generation Rules - Universal Template
+
+## Critical Thinking Requirements (MANDATORY)
+- Always ask: "How does a real user encounter this issue?"
+- Question: "Is this component directly user-facing or part of a larger workflow?"
+- Distinguish between internal system components and user-accessible resources
+- Map technical components to actual user operations and workflows
+- Verify: "What user action would naturally trigger the creation/modification of affected resources?"
+
+## Architecture Understanding (MANDATORY)
+
+### **IMPORTANT: Data Source Selection**
+⚠️ **DeepWiki Limitation**: DeepWiki MCP has approximately **1 week data lag** - may not contain latest code changes
+📋 **Two Options Available**:
+1. **Option A - Local Codebase (RECOMMENDED for latest changes)**:
+   - Use Read, Glob, Grep tools to analyze local repository code
+   - Search for component implementations, API definitions, controllers
+   - Read relevant source files directly from local codebase
+   - **Pros**: Latest code, immediate access, no lag
+   - **Cons**: Requires manual exploration
+
+2. **Option B - DeepWiki MCP (RECOMMENDED for general architecture)**:
+   - Use DeepWiki MCP for overall system architecture understanding
+   - Good for established patterns, general workflows, documentation
+   - **Pros**: Structured knowledge, comprehensive analysis
+   - **Cons**: ~1 week data lag, may miss recent changes
+
+### **Recommended Strategy**:
+- **Start with DeepWiki** for general component architecture and patterns
+- **Supplement with Local Codebase** for specific implementation details
+- **Always verify critical details** against local code when JIRA issue is recent
+
+### **Core Architecture Analysis**:
+- Understand component's role in the overall system
+- Identify the complete end-to-end flow that would expose the reported issue
+- Determine if testing should focus on user workflows vs. direct resource manipulation
+- Understand component dependencies and integration points
+
+## Detailed Architecture Analysis Framework
+
+### **Implementation Analysis Methods**:
+
+#### **CRITICAL: Repository Context Understanding**
+⚠️ **Current Working Directory**: `.ai_testgen/` or `ai_testgen/`(AI test generation workspace WITHIN Hive repository)
+📁 **Analysis Target**: **Hive product source code** at `../` (parent directory - the Hive repository root)
+📝 **Test Generation Target**: `temp_repos/openshift-tests-private/` (private E2E test repository)
+
+**Key Distinction**:
+- **Product Code**: What we ANALYZE - Hive source code at `../` (we are INSIDE the Hive repository)
+- **Test Code**: Where we WRITE E2E tests (`openshift-tests-private`) - private test repository
+- **DeepWiki**: Alternative source for Hive architecture analysis (but local code is preferred)
+
+#### **MANDATORY: Hive Repository Context Check**
+```bash
+# Verify we are inside Hive product repository
+pwd  # Should be in ai_testgen/ or .ai_testgen/ subdirectory
+cat ../go.mod | head -1  # Should show "module github.com/openshift/hive"
+
+# Check Hive source code availability
+ls -la ../ | grep -E "(go\.mod|Makefile|pkg|cmd)" | head -5
+```
+
+#### **Analysis Strategy**:
+
+##### **Primary Strategy - Hive Local Repository Analysis**:
+**Technical Implementation Analysis**:
+- Navigate: `cd ../` (Hive repository root)
+- Search Hive code: `grep -r "FeatureName" ../pkg/ ../cmd/`
+- Find controllers: `find .. -name "*controller*" -type f`
+- Read relevant source files directly for latest implementation details from Hive codebase
+
+**Architecture Understanding Tasks**:
+- **Use local codebase** to understand component architecture and its role in the overall system
+- **Identify** how the JIRA component fits into user workflows and system interactions
+- **Determine** what user actions or system operations would naturally trigger the reported issue
+- **Question**: How do users actually interact with this component - directly or through higher-level operations?
+- **Question**: What triggers the creation/modification of the affected resources in real scenarios?
+- **Question**: Is this a direct user action or part of a larger automated workflow?
+- **Map** technical components mentioned in JIRA to actual user-facing operations and workflows
+- **Distinguish** between internal system components and user-accessible APIs/resources
+- **Identify** realistic user scenarios that would naturally expose this bug in production
+- **Define** end-to-end testing scope rather than isolated component testing
+
+##### **Option B - Local Product Repository NOT Available**:
+**Technical Implementation Analysis**:
+- **Primary**: Use DeepWiki MCP (analyzes same product code, ~1 week lag)
+- **Secondary**: Use JIRA links to GitHub for specific files
+
+**Architecture Understanding Tasks**:
+- **Use DeepWiki MCP** to understand component architecture and its role in the overall system
+- **Identify** how the JIRA component fits into user workflows and system interactions
+- **Determine** what user actions or system operations would naturally trigger the reported issue
+- **Question**: How do users actually interact with this component - directly or through higher-level operations?
+- **Question**: What triggers the creation/modification of the affected resources in real scenarios?
+- **Question**: Is this a direct user action or part of a larger automated workflow?
+- **Map** technical components mentioned in JIRA to actual user-facing operations and workflows
+- **Distinguish** between internal system components and user-accessible APIs/resources
+- **Identify** realistic user scenarios that would naturally expose this bug in production
+- **Define** end-to-end testing scope rather than isolated component testing
+
+
+## Universal Test Coverage Strategy
+- **Primary Focus**: End-to-end user workflows that naturally exercise the component
+- **Secondary**: Component integration scenarios within larger operations
+- **Happy Path**: Complete user workflow scenarios
+- **Edge Cases**: Boundary conditions in realistic usage
+- **Error Scenarios**: Failure handling in user-initiated operations
+- **Integration**: Multi-component workflows and dependencies
+- **Recovery Scenarios**: Test transition from any error state back to healthy state
+
+## Test Step Quality Framework
+- **Workflow-Driven**: Test complete user operations, not isolated component actions
+- **Realistic Scenarios**: Use authentic user interaction patterns
+- **Measurable Results**: Use specific, quantifiable expected results
+- **Executable Commands**: Provide exact commands that users would actually execute
+- **AVOID**: Direct manipulation of internal/auto-generated resources
+- **PREFER**: User-initiated operations that trigger component behavior
+
+## Universal Quantitative Validation Framework
+- **Every technical problem must have measurable validation**
+- **Define specific numerical thresholds** for pass/fail criteria
+- **Include time-based measurements** for any performance/behavior issues
+- **Use comparison validation** for any consistency problems
+- **Measure frequency/rate** for any excessive behavior issues
+- **Include progression validation** for any stuck/blocking issues
+
+## Platform-Agnostic Command Standards
+- **Environment-Appropriate**: Use platform-specific CLI tools (oc, kubectl, etc.)
+- **Realistic Naming**: Use environment-appropriate namespace and resource conventions
+- **Executable Commands**: Provide commands that work in actual deployment environments
+- **Resource Monitoring**: Include metadata tracking (resourceVersion, generation, timestamps)
+- **Log Analysis**: Use log patterns appropriate to the component being tested
+- **Pattern Matching**: Include validation patterns appropriate to the problem type
+
+## Universal Technical Validation Patterns
+Apply based on problem category:
+
+### Pattern A: Stability Validation
+**When to use**: Any "changing/inconsistent/varying behavior" problems
+**Method**: Capture same measurement multiple times, verify identical results
+**Implementation**: Compare values across time/iterations
+
+### Pattern B: Frequency Validation
+**When to use**: Any "too frequent/too many/excessive behavior" problems
+**Method**: Count occurrences over time window, compare against threshold
+**Implementation**: Measure rate/frequency with specific thresholds
+
+### Pattern C: State Validation
+**When to use**: Any "incorrect state/status/condition" problems
+**Method**: Compare actual vs expected state with specific criteria
+**Implementation**: Query current state, verify matches expected criteria
+
+### Pattern D: Absence Validation
+**When to use**: Any "unwanted content/behavior/occurrence" problems
+**Method**: Search for unwanted element, confirm not found
+**Implementation**: Pattern matching to verify problematic content is absent
+
+### Pattern E: Progression Validation
+**When to use**: Any "stuck/not progressing/not completing" problems
+**Method**: Monitor state transitions, confirm expected progression
+**Implementation**: Track state changes over time with timeouts
+
+## Validation Strategy Selection Guide
+- **Consistency Issues** → Use Pattern A (Stability Testing)
+- **Performance Issues** → Use Pattern B (Frequency Testing)
+- **Content Issues** → Use Pattern D (Absence Testing)
+- **Workflow Issues** → Use Pattern E (Progression Testing)
+- **Error Handling** → Use Pattern C (State Testing) + recovery validation

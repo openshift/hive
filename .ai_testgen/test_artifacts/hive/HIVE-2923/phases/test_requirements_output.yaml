@@ -1,0 +1,45 @@
+jira_analysis:
+  issue_key: "HIVE-2923"
+  summary: "Scrub AWS RequestID from DNSZone 'DNSError' status condition message (thrashing)"
+  component: "hive"
+  status: "RESOLVED/CLOSED"
+  fix_version: "openshift-4.20"
+  severity: "Major"
+
+technical_problem:
+  root_cause: "AWS RequestID (UUID) in DNSZone status condition message causes continuous CR updates and reconciliation thrashing"
+  affected_component: "DNSZone controller errorscrub functionality"
+  error_pattern: "RequestID regex assumes space between 'request' and 'id' but AWS SDK v2 format lacks this space"
+  impact: "High error rates, controller thrashing without backoff, excessive API calls"
+
+user_workflows:
+  primary_scenario: "ClusterDeployment creation with manageDNS=true and invalid AWS credentials"
+  trigger_conditions:
+    - "DNSZone creation with misconfigured AWS credentials"
+    - "AWS API errors containing RequestID in response"
+    - "Status condition updates with per-request UUID causing thrashing"
+
+test_scope:
+  focus_areas:
+    - "DNSZone status condition message scrubbing"
+    - "AWS RequestID removal from error messages"
+    - "Prevention of reconciliation thrashing"
+    - "Error message consistency across reconciliation cycles"
+
+validation_requirements:
+  quantitative_checks:
+    - "Verify RequestID UUID pattern is removed from status messages"
+    - "Confirm status condition message stability across multiple reconciliation cycles"
+    - "Validate no thrashing occurs with invalid AWS credentials"
+    - "Check error message contains sanitized content without sensitive identifiers"
+
+component_architecture:
+  controller: "DNSZone controller"
+  actuator: "AWSActuator"
+  utility: "controllerutils.ErrorScrub"
+  resources: "DNSZone CR, ClusterDeployment CR"
+
+error_scenarios:
+  - scenario: "Invalid AWS credentials provided to DNSZone"
+    expected_behavior: "Error message scrubbed of RequestID, no thrashing"
+    validation: "Status condition message remains consistent across reconciliation attempts"

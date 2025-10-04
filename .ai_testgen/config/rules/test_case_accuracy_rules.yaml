@@ -1,0 +1,118 @@
+# Test Case Validation Rules - Universal Template
+
+## Universal Validation Checks
+validation_checks:
+  - "Test covers the JIRA issue problem through realistic user scenarios"
+  - "Steps simulate actual user workflows, not direct resource manipulation"
+  - "Can be executed in normal test environment using standard user operations"
+  - "Expected results are specific and measurable with numerical thresholds"
+  - "Test scenario reflects how users would naturally encounter the issue"
+  - "MANDATORY: Every technical_analysis problem has corresponding quantitative validation"
+  - "Technical issues are verified through measurable metrics, not just functional behavior"
+  - "Commands use environment-appropriate CLI tools and conventions"
+  - "Includes recovery scenarios testing error-to-healthy state transitions"
+
+## Business Scenario Validation Framework
+business_scenario_validation:
+  critical_questions:
+    - "Does this test use the same interaction pattern as real users?"
+    - "Would a typical user perform these exact steps in production?"
+    - "Are we testing user-facing operations or internal system components?"
+    - "Does the test reproduce the issue through end-to-end workflows?"
+    - "Are the validation commands practical and executable in real environments?"
+
+## Universal Quality Rules
+quality_rules:
+  good_test_characteristics:
+    - "Reproduces the bug scenario through authentic user workflows"
+    - "Uses real user commands and standard operational procedures"
+    - "Tests complete end-to-end flows rather than isolated components"
+    - "Clear pass/fail criteria based on user-observable outcomes with specific thresholds"
+    - "Follows realistic user interaction patterns"
+    - "Includes quantitative measurements with numerical validation"
+    - "Uses platform-appropriate commands and environment conventions"
+    - "Validates both error scenarios AND recovery paths"
+
+  bad_test_characteristics:
+    - "Direct manipulation of internal/auto-generated resources"
+    - "Tests isolated components outside of user context"
+    - "Unrealistic user scenarios or artificial test setups"
+    - "Vague expected results not tied to user-observable behavior"
+    - "Skips the user workflow that would naturally trigger the issue"
+    - "Missing quantitative validation for technical problems"
+    - "Uses inappropriate CLI tools for the platform"
+    - "No recovery testing or incomplete error-to-healthy validation"
+
+## Workflow Validation Framework
+workflow_validation:
+  user_perspective:
+    check: "Does the test start from a user operation and follow the natural workflow?"
+    examples:
+      - "Good: User creates resource → Component processes → Issue manifests in user workflow"
+      - "Bad: Directly manipulate internal resource without user context"
+
+  end_to_end_validation:
+    check: "Does the test validate the complete user experience?"
+    result: "Must show impact on user operations, not just internal component state"
+
+## Simple Validation Checklist
+simple_validation:
+  primary_check: "Does the test reproduce the JIRA issue through realistic user scenarios?"
+  secondary_check: "Would a user naturally perform these steps in production?"
+  technical_check: "Does every technical_analysis problem have quantitative validation with measurable metrics?"
+  result: "Pass/Fail"
+
+## Universal Technical Validation Requirements
+technical_validation_requirements:
+  mandatory_elements:
+    - "Time-based measurements for performance/behavior issues"
+    - "Frequency counting for reconciliation/update problems"
+    - "Log pattern analysis for component behavior verification"
+    - "Resource state tracking for consistency issues"
+    - "Message/content consistency validation for error handling problems"
+    - "Metadata change tracking for component update frequency"
+    - "Comparison validation for message stability across operations"
+    - "Numerical thresholds for performance metrics"
+
+  quality_gates:
+    - "Each technical problem → specific measurement method"
+    - "Quantitative thresholds for pass/fail criteria"
+    - "Observable metrics that prove issue is fixed"
+    - "Component behavior validation through logs and resource state"
+    - "Recovery path validation from error state to healthy state"
+    - "Platform-appropriate command validation"
+
+## Platform-Agnostic Environment Standards
+environment_standards:
+  command_requirements:
+    - "Use platform-appropriate CLI tools (oc for OpenShift, kubectl for K8s, etc.)"
+    - "Use realistic namespace and resource naming conventions"
+    - "Include proper resource selectors and query syntax"
+    - "Provide commands that work in actual deployment environments"
+
+  universal_validation_patterns:
+    - "Metadata tracking: get resource -o jsonpath for resourceVersion/generation"
+    - "Status analysis: get resource -o jsonpath for status conditions"
+    - "Log analysis: platform-appropriate log retrieval commands"
+    - "Event monitoring: platform-appropriate event query commands"
+    - "Resource comparison: before/after state validation"
+
+## Universal Quantitative Validation Examples
+quantitative_validation_examples:
+  component_behavior:
+    - "Measure operation frequency over time window"
+    - "Compare resource metadata before/after to detect unwanted changes"
+    - "Count specific log entries to verify expected behavior patterns"
+    - "Time-based monitoring for status stability"
+
+  error_handling:
+    - "Content comparison across multiple operations"
+    - "Pattern matching to verify unwanted content removal"
+    - "State transition validation with specific timeouts"
+    - "Resource cleanup verification with quantitative checks"
+
+  recovery_validation:
+    - "Monitor transition from error state to healthy state"
+    - "Verify resource functionality after error recovery"
+    - "Validate cleanup of error-related artifacts"
+    - "Confirm normal operation resumption with metrics"

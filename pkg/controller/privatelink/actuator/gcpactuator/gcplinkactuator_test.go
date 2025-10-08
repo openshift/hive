@@ -283,7 +283,9 @@ func Test_Cleanup(t *testing.T) {
 }
 
 func Test_CleanupRequired(t *testing.T) {
-	gcpLinkActuator := &GCPLinkActuator{}
+	gcpLinkActuator := &GCPLinkActuator{
+		privateLinkEnabled: true,
+	}
 	cdBuilder := testcd.FullBuilder(testNameSpace, testClusterDeployment, scheme.GetScheme())
 
 	cases := []struct {

@@ -36,8 +36,9 @@ var _ actuator.Actuator = &AWSHubActuator{}
 
 type AWSHubActuator struct {
 	client *client.Client
-
 	config *hivev1.AWSPrivateLinkConfig
+
+	privateLinkEnabled bool
 
 	// testing purpose
 	awsClientFn awsClientFn
@@ -49,12 +50,16 @@ type AWSHubActuator struct {
 func NewAWSHubActuator(
 	client *client.Client,
 	config *hivev1.AWSPrivateLinkConfig,
+	privateLinkEnabled bool,
 	awsClientFn awsClientFn,
 	logger log.FieldLogger) (*AWSHubActuator, error) {
 
 	actuator := &AWSHubActuator{
-		client:      client,
-		config:      config,
+		client: client,
+		config: config,
+
+		privateLinkEnabled: privateLinkEnabled,
+
 		awsClientFn: awsClientFn,
 	}
 
@@ -105,7 +110,7 @@ func (a *AWSHubActuator) CleanupRequired(cd *hivev1.ClusterDeployment) bool {
 	// resources are not cleaned up. This is by design as the rest of the cloud resources are also not cleaned up.
 	if cd.DeletionTimestamp != nil &&
 		cd.Spec.PreserveOnDelete &&
-		cd.Spec.Platform.AWS.PrivateLink.Enabled {
+		a.privateLinkEnabled {
 		return false
 	}
 

@@ -127,12 +127,6 @@ func (r *PrivateLinkReconciler) Reconcile(ctx context.Context, request reconcile
 	}
 	logger = controllerutils.AddLogFields(controllerutils.MetaObjectLogTagger{Object: cd}, logger)
 
-	privateLink := &PrivateLink{
-		Client: r.Client,
-		cd:     cd,
-		logger: logger,
-	}
-
 	var privateLinkEnabled bool
 	var spokePlatformType configv1.PlatformType
 	switch {
@@ -144,6 +138,17 @@ func (r *PrivateLinkReconciler) Reconcile(ctx context.Context, request reconcile
 	default:
 		logger.Debug("controller cannot service the clusterdeployment, so skipping")
 		return reconcile.Result{}, nil
+	}
+
+	if !privateLinkEnabled && !controllerutils.HasFinalizer(cd, finalizer) {
+		logger.Debug("cluster deployment does not have private link enabled, so skipping")
+		return reconcile.Result{}, nil
+	}
+
+	privateLink := &PrivateLink{
+		Client: r.Client,
+		cd:     cd,
+		logger: logger,
 	}
 
 	privateLink.linkActuator, err = CreateActuator(r.Client, spokePlatformType, actuator.ActuatorTypeLink, cd, r.controllerconfig, logger)

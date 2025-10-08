@@ -30,8 +30,9 @@ var _ actuator.Actuator = &GCPLinkActuator{}
 
 type GCPLinkActuator struct {
 	client *client.Client
-
 	config *hivev1.GCPPrivateServiceConnectConfig
+
+	privateLinkEnabled bool
 
 	gcpClientHub   gcpclient.Client
 	gcpClientSpoke gcpclient.Client
@@ -41,12 +42,15 @@ func NewGCPLinkActuator(
 	client *client.Client,
 	config *hivev1.GCPPrivateServiceConnectConfig,
 	cd *hivev1.ClusterDeployment,
+	privateLinkEnabled bool,
 	gcpClientFn gcpClientFn,
 	logger log.FieldLogger) (*GCPLinkActuator, error) {
 
 	actuator := &GCPLinkActuator{
 		client: client,
 		config: config,
+
+		privateLinkEnabled: privateLinkEnabled,
 	}
 
 	if config == nil {
@@ -112,12 +116,12 @@ func (a *GCPLinkActuator) CleanupRequired(cd *hivev1.ClusterDeployment) bool {
 		return false
 	}
 
-	// There is nothing to do when deleting a ClusterDeployment with PreserveOnDelete and PrivateServiceConnect enabled.
+	// There is nothing to do when deleting a ClusterDeployment with PreserveOnDelete unless privatelink has been disabled.
 	// If a ClusterDeployment is deleted after a failed install with PreserveOnDelete set, the PrivateServiceConnect
 	// resources are not cleaned up. This is by design as the rest of the cloud resources are also not cleaned up.
 	if cd.DeletionTimestamp != nil &&
 		cd.Spec.PreserveOnDelete &&
-		cd.Spec.Platform.GCP.PrivateServiceConnect.Enabled {
+		a.privateLinkEnabled {
 		return false
 	}
 

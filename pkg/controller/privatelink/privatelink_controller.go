@@ -140,6 +140,14 @@ func (r *PrivateLinkReconciler) Reconcile(ctx context.Context, request reconcile
 		return reconcile.Result{}, nil
 	}
 
+	// Either privatelink was never enabled, or it was disabled and cleanup has already happened.
+	// We exit here to avoid creating actuators for clusters that are not using privatelink. The
+	// actuators fail on creation and throw errors in the logs if they are unable to create the
+	// necessary cloud clients, such as a hive config without privatelink configured.
+	// We can't check this with cleanupRequired() yet because that method requires the actuators to
+	// already exist. We also want to ensure we remove the finalizer, which happens later in the
+	// process. We can use the finalizer itself to determine if we can safely return here. If there
+	// are privatelink resources to be cleaned up, then the finalizer should exist.
 	if !privateLinkEnabled && !controllerutils.HasFinalizer(cd, finalizer) {
 		logger.Debug("cluster deployment does not have private link enabled, so skipping")
 		return reconcile.Result{}, nil
@@ -151,7 +159,7 @@ func (r *PrivateLinkReconciler) Reconcile(ctx context.Context, request reconcile
 		logger: logger,
 	}
 
-	privateLink.linkActuator, err = CreateActuator(r.Client, spokePlatformType, actuator.ActuatorTypeLink, cd, r.controllerconfig, logger)
+	privateLink.linkActuator, err = CreateActuator(r.Client, spokePlatformType, actuator.ActuatorTypeLink, cd, r.controllerconfig, privateLinkEnabled, logger)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "could not get link actuator")
 	}
@@ -161,7 +169,7 @@ func (r *PrivateLinkReconciler) Reconcile(ctx context.Context, request reconcile
 	// the hive service account does not have access. For now, we hard-code aws platform.
 	var hubPlatformType = configv1.AWSPlatformType
 
-	privateLink.hubActuator, err = CreateActuator(r.Client, hubPlatformType, actuator.ActuatorTypeHub, nil, r.controllerconfig, logger)
+	privateLink.hubActuator, err = CreateActuator(r.Client, hubPlatformType, actuator.ActuatorTypeHub, nil, r.controllerconfig, privateLinkEnabled, logger)
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "could not get hub actuator")
 	}
@@ -176,6 +184,7 @@ func CreateActuator(
 	actuatorType actuator.ActuatorType,
 	cd *hivev1.ClusterDeployment,
 	config *hivev1.PrivateLinkConfig,
+	privateLinkEnabled bool,
 	logger log.FieldLogger) (actuator.Actuator, error) {
 
 	switch platform {
@@ -186,7 +195,7 @@ func CreateActuator(
 		//	awsConfig = config.AWS
 		//}
 		if actuatorType == actuator.ActuatorTypeHub {
-			return awsactuator.NewAWSHubActuator(&client, awsConfig, nil, logger)
+			return awsactuator.NewAWSHubActuator(&client, awsConfig, privateLinkEnabled, nil, logger)
 		}
 	case configv1.GCPPlatformType:
 		var gcpConfig *hivev1.GCPPrivateServiceConnectConfig
@@ -194,7 +203,7 @@ func CreateActuator(
 			gcpConfig = config.GCP
 		}
 		if actuatorType == actuator.ActuatorTypeLink {
-			return gcpactuator.NewGCPLinkActuator(&client, gcpConfig, cd, nil, logger)
+			return gcpactuator.NewGCPLinkActuator(&client, gcpConfig, cd, privateLinkEnabled, nil, logger)
 		}
 	}
 	return nil, fmt.Errorf("unable to create privatelink actuator, invalid actuator type: %s/%s", platform, actuatorType)

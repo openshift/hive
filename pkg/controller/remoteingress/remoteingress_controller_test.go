@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -49,6 +51,7 @@ type SyncSetIngressEntry struct {
 	namespaceSelector  *metav1.LabelSelector
 	defaultCertificate string
 	httpErrorCodePages *configv1.ConfigMapNameReference
+	tuningOptions      *operatorv1.IngressControllerTuningOptions
 }
 
 func TestRemoteClusterIngressReconcile(t *testing.T) {
@@ -378,6 +381,31 @@ func TestRemoteClusterIngressReconcile(t *testing.T) {
 					name:               testDefaultIngressName,
 					domain:             testIngressDomain,
 					httpErrorCodePages: testHttpErrorCodePages("custom-configmap"),
+				},
+			},
+		},
+		{
+			name: "Test setting tuningOptions",
+			localObjects: func() []runtime.Object {
+				objects := []runtime.Object{}
+				cd := testClusterDeployment()
+				cd.Status.Conditions = append(cd.Status.Conditions, hivev1.ClusterDeploymentCondition{
+					Type:   hivev1.IngressCertificateNotFoundCondition,
+					Status: corev1.ConditionUnknown,
+				})
+				cd.Spec.Ingress[0].TuningOptions = &operatorv1.IngressControllerTuningOptions{
+					ReloadInterval: metav1.Duration{Duration: time.Minute},
+				}
+				objects = append(objects, cd)
+				return objects
+			}(),
+			expectedSyncSetIngressEntries: []SyncSetIngressEntry{
+				{
+					name:   testDefaultIngressName,
+					domain: testIngressDomain,
+					tuningOptions: &operatorv1.IngressControllerTuningOptions{
+						ReloadInterval: metav1.Duration{Duration: time.Minute},
+					},
 				},
 			},
 		},
@@ -714,6 +742,7 @@ type createdResourceInfo struct {
 	routeSelector      *metav1.LabelSelector
 	defaultCertificate string
 	httpErrorCodePages *configv1.ConfigMapNameReference
+	tuningOptions      *operatorv1.IngressControllerTuningOptions
 }
 type createdSyncSetInfo struct {
 	name           string
@@ -760,6 +789,9 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			if !reflect.DeepEqual(ic.Spec.HttpErrorCodePages, configv1.ConfigMapNameReference{}) {
 				cr.httpErrorCodePages = &ic.Spec.HttpErrorCodePages
 			}
+			if !reflect.DeepEqual(ic.Spec.TuningOptions, operatorv1.IngressControllerTuningOptions{}) {
+				cr.tuningOptions = &ic.Spec.TuningOptions
+			}
 			if ic.Spec.DefaultCertificate != nil {
 				cr.defaultCertificate = ic.Spec.DefaultCertificate.Name
 			}
@@ -804,6 +836,7 @@ func validateSyncSet(t *testing.T, existingSyncSet createdSyncSetInfo, expectedS
 				assert.Equal(t, ic.routeSelector, resObj.routeSelector, "unexpected routeSelector on ingressController: %v", ic.name)
 				assert.Equal(t, ic.defaultCertificate, resObj.defaultCertificate, "unexpected DefaultCertificate on ingressController: %v", ic.name)
 				assert.Equal(t, ic.httpErrorCodePages, resObj.httpErrorCodePages, "unexpected HttpErrorCodePages field on ingressController: %v", ic.name)
+				assert.Equal(t, ic.tuningOptions, resObj.tuningOptions, "unexpected TuningOptions field on ingressController: %v", ic.name)
 			}
 		}
 		assert.True(t, found, "didn't find expected ingressController: %v", ic.name)

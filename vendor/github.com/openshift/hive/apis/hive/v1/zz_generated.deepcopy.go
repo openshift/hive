@@ -7,6 +7,7 @@ package v1
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	agent "github.com/openshift/hive/apis/hive/v1/agent"
 	aws "github.com/openshift/hive/apis/hive/v1/aws"
 	azure "github.com/openshift/hive/apis/hive/v1/azure"
@@ -1260,6 +1261,11 @@ func (in *ClusterIngress) DeepCopyInto(out *ClusterIngress) {
 		in, out := &in.HttpErrorCodePages, &out.HttpErrorCodePages
 		*out = new(configv1.ConfigMapNameReference)
 		**out = **in
+	}
+	if in.TuningOptions != nil {
+		in, out := &in.TuningOptions, &out.TuningOptions
+		*out = new(operatorv1.IngressControllerTuningOptions)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

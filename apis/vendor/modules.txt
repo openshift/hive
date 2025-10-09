@@ -24,6 +24,7 @@ github.com/modern-go/reflect2
 github.com/openshift/api/config/v1
 github.com/openshift/api/machine/v1
 github.com/openshift/api/machine/v1beta1
+github.com/openshift/api/operator/v1
 # github.com/spf13/pflag v1.0.6
 ## explicit; go 1.12
 # github.com/x448/float16 v0.8.4
@@ -47,6 +48,7 @@ golang.org/x/text/unicode/norm
 gopkg.in/inf.v0
 # k8s.io/api v0.33.3
 ## explicit; go 1.24.0
+k8s.io/api/authorization/v1
 k8s.io/api/core/v1
 k8s.io/api/rbac/v1
 # k8s.io/apimachinery v0.33.3

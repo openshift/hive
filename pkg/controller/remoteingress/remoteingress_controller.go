@@ -368,6 +368,10 @@ func createIngressController(cd *hivev1.ClusterDeployment, ingress hivev1.Cluste
 		newIngress.Spec.HttpErrorCodePages = *ingress.HttpErrorCodePages
 	}
 
+	if ingress.TuningOptions != nil {
+		newIngress.Spec.TuningOptions = *ingress.TuningOptions
+	}
+
 	return &newIngress
 }
 

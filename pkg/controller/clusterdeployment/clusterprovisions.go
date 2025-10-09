@@ -281,7 +281,7 @@ func (r *ReconcileClusterDeployment) shouldRetryBasedOnFailureReason(prov *hivev
 	return false, nil
 }
 
-// setAWSHostedZoneRoleFromMetadata unmarshals `pm.Raw`, a representation of the installer ClusterMetadata type,
+// setAWSHostedZoneRoleFromMetadata unmarshals `pmjson`, a representation of the installer ClusterMetadata type,
 // and looks for the AWS HostedZoneRole therein. If found, the value is copied into the AWS platform-specific
 // section of `cm`, hive's representation of the cluster metadata. The `cd` is only used to validate that we're
 // operating on an AWS cluster.
@@ -317,7 +317,7 @@ func setAWSHostedZoneRoleFromMetadata(cd *hivev1.ClusterDeployment, cm *hivev1.C
 	cm.Platform.AWS.HostedZoneRole = &hzr
 }
 
-// setAzureResourceGroupFromMetadata unmarshals `pm.Raw`, a representation of the installer ClusterMetadata type,
+// setAzureResourceGroupFromMetadata unmarshals `pmjson`, a representation of the installer ClusterMetadata type,
 // and looks for the Azure ResourceGroupName therein. If found, the value is copied into the Azure platform-specific
 // section of `cm`, hive's representation of the cluster metadata. The `cd` is only used to validate that we're
 // operating on an Azure cluster.
@@ -410,8 +410,10 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		return reconcile.Result{}, err
 	}
 
-	// Save the cluster ID and infra ID from the provision so that we can
-	// clean up partial installs on the next provision attempt in case of failure.
+	// Save the metadata from the provision. This serves two purposes:
+	// - Day 2 operations, where we use things like infra ID and kubeconfig routinely.
+	// - Deprovision, including cleaning up partial installs on the next provision attempt in case
+	//   of provision failure.
 	if provision.Spec.InfraID != nil {
 		clusterMetadata := &hivev1.ClusterMetadata{}
 		clusterMetadata.InfraID = *provision.Spec.InfraID
@@ -424,15 +426,28 @@ func (r *ReconcileClusterDeployment) reconcileExistingProvision(cd *hivev1.Clust
 		if provision.Spec.AdminPasswordSecretRef != nil {
 			clusterMetadata.AdminPasswordSecretRef = provision.Spec.AdminPasswordSecretRef
 		}
+		// HIVE-2302: We shouldn't need these anymore, but we'll continue to populate them in case
+		// they're being consumed externally somehow.
 		setAWSHostedZoneRoleFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		setAzureResourceGroupFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
 		setGCPNetworkProjectIDFromMetadata(cd, clusterMetadata, provision.Spec.MetadataJSON, logger)
+
+		// HIVE-2302: Save the metadata.json in a Secret.
+		if len(provision.Spec.MetadataJSON) > 0 {
+			// NOTE: This is the one place we will check/update the metadata.json contents. That's
+			// because we hit this path on every install attempt, and things like the infraID and
+			// clusterID can (will) change on each attempt.
+			if err := r.ensureMetadataJSONSecret(cd, clusterMetadata, provision.Spec.MetadataJSON, true, logger); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+
 		if !reflect.DeepEqual(clusterMetadata, cd.Spec.ClusterMetadata) {
 			cd.Spec.ClusterMetadata = clusterMetadata
-			logger.Infof("Saving infra ID %q for cluster", cd.Spec.ClusterMetadata.InfraID)
+			logger.WithField("infraID", cd.Spec.ClusterMetadata.InfraID).Info("saving metadata for cluster")
 			err := r.Update(context.TODO(), cd)
 			if err != nil {
-				logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating clusterdeployment status with infra ID")
+				logger.WithError(err).Log(controllerutils.LogLevel(err), "error updating clusterdeployment with metadata")
 			}
 			return reconcile.Result{}, err
 		}

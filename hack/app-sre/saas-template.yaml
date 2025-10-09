@@ -7,7 +7,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: checkpoints.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -91,7 +91,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterclaims.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -288,7 +288,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterdeploymentcustomizations.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -589,7 +589,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterdeployments.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -3246,7 +3246,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterdeprovisions.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -3740,7 +3740,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterimagesets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -3812,7 +3812,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterpools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5145,7 +5145,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'false'
     name: clusterprovisions.hive.openshift.io
@@ -5394,7 +5394,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterrelocates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5534,7 +5534,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clusterstates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5657,7 +5657,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clustersyncleases.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -5720,7 +5720,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: clustersyncs.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -5995,7 +5995,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: dnszones.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6308,7 +6308,7 @@ objects:
   metadata:
     annotations:
       contracts.hive.openshift.io/clusterinstall.config: '{"skipImageSetJob": "true"}'
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'true'
     name: fakeclusterinstalls.hiveinternal.openshift.io
@@ -6541,7 +6541,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: hiveconfigs.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -8006,7 +8006,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: machinepoolnameleases.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -8082,7 +8082,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: machinepools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -9356,7 +9356,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: selectorsyncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -10182,7 +10182,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: selectorsyncsets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -10488,7 +10488,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: syncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -11283,7 +11283,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.16.3
+      controller-gen.kubebuilder.io/version: v0.18.0
     name: syncsets.hive.openshift.io
   spec:
     group: hive.openshift.io

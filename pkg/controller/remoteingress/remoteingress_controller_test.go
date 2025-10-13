@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -586,7 +587,10 @@ func syncSetFromClusterDeployment(cd *hivev1.ClusterDeployment) *hivev1.SyncSet 
 		clusterDeployment: cd,
 		certBundleSecrets: fakeSecretListForCertBundles(cd),
 	}
-	rawExtensions := rawExtensionsFromClusterDeployment(&rContext)
+	rawExtensions, err := rawExtensionsFromClusterDeployment(&rContext)
+	if err != nil {
+		panic(err)
+	}
 	sMappings := secretMappingsFromClusterDeployment(&rContext)
 	ssSpec := newSyncSetSpec(cd, rawExtensions, sMappings)
 	return &hivev1.SyncSet{
@@ -747,6 +751,16 @@ func (f *fakeKubeCLI) ApplyRuntimeObject(obj runtime.Object, scheme *runtime.Sch
 			created.resources = append(created.resources, cr)
 			continue
 		}
+
+		// Convert unstructured ICs to reified ICs
+		if uic, ok := raw.Object.(*unstructured.Unstructured); ok && uic.GetKind() == "IngressController" {
+			var ic ingresscontroller.IngressController
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(uic.Object, &ic); err != nil {
+				return "", err
+			}
+			raw = runtime.RawExtension{Object: &ic}
+		}
+
 		ic, ok := raw.Object.(*ingresscontroller.IngressController)
 		if ok {
 			cr := createdResourceInfo{

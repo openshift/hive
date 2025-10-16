@@ -16,6 +16,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -240,23 +241,39 @@ func GenerateRemoteIngressSyncSetName(clusterDeploymentName string) string {
 func (r *ReconcileRemoteClusterIngress) syncClusterIngress(rContext *reconcileContext) error {
 	rContext.logger.Info("reconciling ClusterIngress for cluster deployment")
 
-	rawList := rawExtensionsFromClusterDeployment(rContext)
+	rawList, err := rawExtensionsFromClusterDeployment(rContext)
+	if err != nil {
+		return err
+	}
 	secretMappings := secretMappingsFromClusterDeployment(rContext)
 	return r.syncSyncSet(rContext, rawList, secretMappings)
 }
 
 // rawExtensionsFromClusterDeployment will return the slice of runtime.RawExtension objects
 // (really the syncSet.Spec.Resources) to satisfy the ingress config for the clusterDeployment
-func rawExtensionsFromClusterDeployment(rContext *reconcileContext) []runtime.RawExtension {
+func rawExtensionsFromClusterDeployment(rContext *reconcileContext) ([]runtime.RawExtension, error) {
 	rawList := []runtime.RawExtension{}
 
 	for _, ingress := range rContext.clusterDeployment.Spec.Ingress {
 		ingressObj := createIngressController(rContext.clusterDeployment, ingress)
-		raw := runtime.RawExtension{Object: ingressObj}
+
+		// scrub the status field
+		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(ingressObj)
+		if err != nil {
+			return nil, err
+		}
+
+		delete(unstructuredObj, "status")
+
+		raw := runtime.RawExtension{
+			Object: &unstructured.Unstructured{
+				Object: unstructuredObj,
+			},
+		}
 		rawList = append(rawList, raw)
 	}
 
-	return rawList
+	return rawList, nil
 }
 
 // secretMappingsFromClusterDeployment will return the slice of hivev1.SecretMapping objects

@@ -56,7 +56,7 @@ func (o *openStackOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	openstackutils.ConfigureCreds(client)
+	openstackutils.ConfigureCreds(client, nil)
 
 	return nil
 }

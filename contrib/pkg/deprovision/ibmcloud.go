@@ -69,7 +69,7 @@ func (o *ibmCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string)
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	ibmutils.ConfigureCreds(client)
+	ibmutils.ConfigureCreds(client, nil)
 
 	// Create IBMCloud Client
 	ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)

@@ -60,7 +60,7 @@ func (o *vSphereOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	vsphereutils.ConfigureCreds(client)
+	vsphereutils.ConfigureCreds(client, nil)
 
 	return nil
 }

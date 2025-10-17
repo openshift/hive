@@ -74,7 +74,7 @@ func (opt *AzureOptions) completeAzureUninstaller(args []string) (providers.Dest
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get client")
 	}
-	azureutils.ConfigureCreds(client)
+	azureutils.ConfigureCreds(client, nil)
 
 	metadata := &types.ClusterMetadata{
 		InfraID: args[0],

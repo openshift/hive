@@ -7,7 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+	ini "gopkg.in/ini.v1"
+
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -18,10 +23,7 @@ import (
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 
-	log "github.com/sirupsen/logrus"
-	ini "gopkg.in/ini.v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	installertypes "github.com/openshift/installer/pkg/types"
 )
 
 const (
@@ -258,7 +260,7 @@ var awsConfigForbidCredentialProcess utils.ProjectToDirFileFilter = func(key str
 // ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE
 // and CREDS_SECRET_NAME and configures AWS credential environment variables and config files
 // accordingly.
-func ConfigureCreds(c client.Client) {
+func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata) {
 	credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME")
 	if credsSecret == nil {
 		return

@@ -60,7 +60,7 @@ func (o *gcpOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	gcputils.ConfigureCreds(client)
+	gcputils.ConfigureCreds(client, nil)
 
 	return nil
 }

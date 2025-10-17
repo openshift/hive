@@ -81,53 +81,7 @@ To run the generic destroyer, use the --metadata-json-secret-name parameter.`,
 				logger.Fatal("no platform configured in metadata.json")
 			}
 
-			// TODO: Make a registry or interface for this
-			var ConfigureCreds func(client.Client)
-			switch platform {
-			case aws.Name:
-				ConfigureCreds = awsutil.ConfigureCreds
-			case azure.Name:
-				ConfigureCreds = azureutil.ConfigureCreds
-			case gcp.Name:
-				ConfigureCreds = gcputil.ConfigureCreds
-			case ibmcloud.Name:
-				ConfigureCreds = ibmcloudutil.ConfigureCreds
-			case nutanix.Name:
-				// Snowflake! We need to inject the creds into the metadata.
-				// If env vars are unset, the destroyer will fail organically.
-				ConfigureCreds = func(c client.Client) {
-					nutanixutil.ConfigureCreds(c)
-					metadata.Nutanix.Username = os.Getenv(constants.NutanixUsernameEnvVar)
-					metadata.Nutanix.Password = os.Getenv(constants.NutanixPasswordEnvVar)
-				}
-			case openstack.Name:
-				ConfigureCreds = openstackutil.ConfigureCreds
-			case vsphere.Name:
-				// Snowflake! We need to (re)inject the creds into the metadata.
-				// (They were there originally, but we scrubbed them for security.)
-				// If env vars are unset, the destroyer will fail organically.
-				ConfigureCreds = func(c client.Client) {
-					vsphereutil.ConfigureCreds(c)
-					username, password := os.Getenv(constants.VSphereUsernameEnvVar), os.Getenv(constants.VSpherePasswordEnvVar)
-					// Accommodate both pre- and post-zonal formats
-					if metadata.VSphere.Username != "" {
-						metadata.VSphere.Username = username
-					}
-					if metadata.VSphere.Password != "" {
-						metadata.VSphere.Password = password
-					}
-					for i := range metadata.VSphere.VCenters {
-						if metadata.VSphere.VCenters[i].Username != "" {
-							metadata.VSphere.VCenters[i].Username = username
-						}
-						if metadata.VSphere.VCenters[i].Password != "" {
-							metadata.VSphere.VCenters[i].Password = password
-						}
-					}
-				}
-			}
-
-			ConfigureCreds(c)
+			ConfigureCreds[platform](c, metadata)
 
 			destroyerBuilder, ok := providers.Registry[platform]
 			if !ok {
@@ -161,4 +115,14 @@ To run the generic destroyer, use the --metadata-json-secret-name parameter.`,
 	cmd.AddCommand(NewDeprovisionvSphereCommand(logLevel))
 	cmd.AddCommand(NewDeprovisionNutanixCommand(logLevel))
 	return cmd
+}
+
+var ConfigureCreds = map[string]func(client.Client, *types.ClusterMetadata){
+	aws.Name:       awsutil.ConfigureCreds,
+	azure.Name:     azureutil.ConfigureCreds,
+	gcp.Name:       gcputil.ConfigureCreds,
+	ibmcloud.Name:  ibmcloudutil.ConfigureCreds,
+	nutanix.Name:   nutanixutil.ConfigureCreds,
+	openstack.Name: openstackutil.ConfigureCreds,
+	vsphere.Name:   vsphereutil.ConfigureCreds,
 }

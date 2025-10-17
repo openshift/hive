@@ -61,7 +61,7 @@ func (o *nutanixOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	nutanixutils.ConfigureCreds(client)
+	nutanixutils.ConfigureCreds(client, nil)
 
 	return nil
 }

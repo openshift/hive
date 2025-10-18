@@ -111,6 +111,7 @@ func newTestAWSHubActuator(t *testing.T, config *hivev1.AWSPrivateLinkConfig, cd
 	return NewAWSHubActuator(
 		&fakeClient,
 		config,
+		false,
 		func(_ client.Client, _ awsclient.Options) (awsclient.Client, error) {
 			return mockedAWSClient, nil
 		},
@@ -179,7 +180,9 @@ func Test_Cleanup(t *testing.T) {
 }
 
 func Test_CleanupRequired(t *testing.T) {
-	awsHubActuator := &AWSHubActuator{}
+	awsHubActuator := &AWSHubActuator{
+		privateLinkEnabled: true,
+	}
 	cdBuilder := testcd.FullBuilder(testNameSpace, testClusterDeployment, scheme.GetScheme())
 
 	cases := []struct {

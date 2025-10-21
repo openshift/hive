@@ -913,7 +913,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 					Type:    hivev1.InsufficientCredentialsCondition,
 					Status:  corev1.ConditionTrue,
 					Reason:  accessDeniedReason,
-					Message: "User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny",
+					Message: "api error AccessDeniedException: User: arn:aws:sts::XXX:assumed-role/RH-Managed-OpenShift-Installer/XXX is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::XXX:role/ManagedOpenShift-Installer-Role",
 				},
 			},
 		},
@@ -926,7 +926,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 					Type:    hivev1.AuthenticationFailureCondition,
 					Status:  corev1.ConditionTrue,
 					Reason:  authenticationFailedReason,
-					Message: "The security token included in the request is invalid.",
+					Message: "api error UnrecognizedClientException: The security token included in the request is invalid.",
 				},
 			},
 		},
@@ -939,7 +939,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 					Type:    hivev1.AuthenticationFailureCondition,
 					Status:  corev1.ConditionTrue,
 					Reason:  authenticationFailedReason,
-					Message: "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
+					Message: "api error InvalidSignatureException: The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.",
 				},
 			},
 		},
@@ -952,7 +952,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 					Type:    hivev1.APIOptInRequiredCondition,
 					Status:  corev1.ConditionTrue,
 					Reason:  apiOptInRequiredReason,
-					Message: "The AWS Access Key Id needs a subscription for the service.",
+					Message: "api error OptInRequired: The AWS Access Key Id needs a subscription for the service, status code: 403",
 				},
 			},
 		},
@@ -965,7 +965,7 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 					Type:    hivev1.GenericDNSErrorsCondition,
 					Status:  corev1.ConditionTrue,
 					Reason:  dnsCloudErrorReason,
-					Message: "ErrCodeKMSOptInRequired: The AWS Access Key Id needs a subscription for the service, status code: 403\ncaused by: some cloud error",
+					Message: "api error ErrCodeKMSOptInRequired: The AWS Access Key Id needs a subscription for the service, status code: 403",
 				},
 			},
 		},
@@ -1036,9 +1036,6 @@ func TestSetConditionsForErrorForAWS(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		if tc.name != "Set InsufficientCredentialsCondition on DNSZone for AccessDeniedException error" {
-			continue
-		}
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
 			mocks := setupDefaultMocks(t)
@@ -1078,6 +1075,7 @@ func assertDNSZoneConditions(t *testing.T, dnsZone *hivev1.DNSZone, expectedCond
 		if assert.NotNilf(t, condition, "did not find expected condition type: %v", expectedCond.Type) {
 			assert.Equal(t, expectedCond.Status, condition.Status, "condition found with unexpected status")
 			assert.Equal(t, expectedCond.Reason, condition.Reason, "condition found with unexpected reason")
+			assert.Equal(t, expectedCond.Message, condition.Message, "condition found with unexpected message")
 		}
 	}
 }
@@ -1090,7 +1088,7 @@ func testCloudError() error {
 
 func testAccessDeniedExceptionError() error {
 	accessDeniedErr := awsclient.NewAPIError("AccessDeniedException",
-		"User: arn:aws:iam::0123456789:user/testAdmin is not authorized to perform: tag:GetResources with an explicit deny")
+		"User: arn:aws:sts::644306948063:assumed-role/RH-Managed-OpenShift-Installer/aws-go-sdk-1760975062327619575 is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::676673797948:role/ManagedOpenShift-Installer-Role")
 	return accessDeniedErr
 }
 

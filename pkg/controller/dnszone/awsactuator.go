@@ -556,13 +556,13 @@ func (a *AWSActuator) setInsufficientCredentialsConditionToFalse() bool {
 	return accessDeniedCondsChanged
 }
 
-func (a *AWSActuator) setInsufficientCredentialsConditionToTrue(message string) bool {
+func (a *AWSActuator) setInsufficientCredentialsConditionToTrue(err error) bool {
 	accessDeniedConds, accessDeniedCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
 		a.dnsZone.Status.Conditions,
 		hivev1.InsufficientCredentialsCondition,
 		corev1.ConditionTrue,
 		accessDeniedReason,
-		message,
+		controllerutils.ErrorScrub(err),
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 
@@ -589,13 +589,13 @@ func (a *AWSActuator) setAPIOptInRequiredConditionToFalse() bool {
 	return apiOptInCondsChanged
 }
 
-func (a *AWSActuator) setAPIOptInRequiredConditionToTrue(message string) bool {
+func (a *AWSActuator) setAPIOptInRequiredConditionToTrue(err error) bool {
 	apiOptInConds, apiOptInCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
 		a.dnsZone.Status.Conditions,
 		hivev1.APIOptInRequiredCondition,
 		corev1.ConditionTrue,
 		apiOptInRequiredReason,
-		message,
+		controllerutils.ErrorScrub(err),
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 
@@ -622,14 +622,14 @@ func (a *AWSActuator) setAuthenticationFailureConditionToFalse() bool {
 	return authenticationFailureCondsChanged
 }
 
-func (a *AWSActuator) setAuthenticationFailureConditionToTrue(message string) bool {
+func (a *AWSActuator) setAuthenticationFailureConditionToTrue(err error) bool {
 	var authenticationFailureConds []hivev1.DNSZoneCondition
 	authenticationFailureConds, authenticationFailureCondsChanged := controllerutils.SetDNSZoneConditionWithChangeCheck(
 		a.dnsZone.Status.Conditions,
 		hivev1.AuthenticationFailureCondition,
 		corev1.ConditionTrue,
 		authenticationFailedReason,
-		message,
+		controllerutils.ErrorScrub(err),
 		controllerutils.UpdateConditionIfReasonOrMessageChange,
 	)
 
@@ -706,20 +706,20 @@ func (a *AWSActuator) SetConditionsForError(err error) bool {
 	// AWS err condition handling
 	aec := awsErr.ErrorCode()
 	if aec == "AccessDeniedException" || aec == "AccessDenied" {
-		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr.ErrorMessage())
+		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToTrue(awsErr)
 	} else {
 		accessDeniedCondsChanged = a.setInsufficientCredentialsConditionToFalse()
 	}
 
 	if aec == "InvalidSignatureException" ||
 		aec == "UnrecognizedClientException" {
-		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToTrue(awsErr.ErrorMessage())
+		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToTrue(awsErr)
 	} else {
 		authenticationFailureCondsChanged = a.setAuthenticationFailureConditionToFalse()
 	}
 
 	if aec == "OptInRequired" {
-		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToTrue(awsErr.ErrorMessage())
+		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToTrue(awsErr)
 	} else {
 		apiOptInCondsChanged = a.setAPIOptInRequiredConditionToFalse()
 	}

@@ -51,6 +51,9 @@ RUN if ! rpm -q libvirt-libs; then dnf install -y libvirt-libs && dnf clean all 
 # tar is needed to package must-gathers on install failure
 RUN if ! command -v tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
 
+# CVE-2023-39975
+RUN dnf upgrade -y krb5-libs krb5-devel && dnf clean all && rm -rf /var/cache/dnf/*
+
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/operator /opt/services/hive-operator

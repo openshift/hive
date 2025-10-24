@@ -155,6 +155,8 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 )
 
+require github.com/bombsimon/logrusr/v4 v4.1.0
+
 require (
 	4d63.com/gochecknoglobals v0.2.2 // indirect
 	cel.dev/expr v0.19.1 // indirect
@@ -514,3 +516,5 @@ replace golang.org/x/net => golang.org/x/net v0.38.0
 
 // From installer: This is to force capi back for the older provider version
 replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.19.3
+
+replace github.com/openshift/installer => github.com/dlom/installer v0.0.0-20251023182801-c056b7bdd6ca

@@ -25,8 +25,9 @@ github.com/openshift/api/config/v1
 github.com/openshift/api/machine/v1
 github.com/openshift/api/machine/v1beta1
 github.com/openshift/api/operator/v1
-# github.com/spf13/pflag v1.0.6
-## explicit; go 1.12
+# github.com/openshift/installer v1.4.19-ec5 => github.com/dlom/installer v0.0.0-20251023182801-c056b7bdd6ca
+## explicit; go 1.23.2
+github.com/openshift/installer/pkg/types/vsphere
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
@@ -106,3 +107,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml/goyaml.v2
 # golang.org/x/net => golang.org/x/net v0.38.0
+# github.com/openshift/installer => github.com/dlom/installer v0.0.0-20251023182801-c056b7bdd6ca

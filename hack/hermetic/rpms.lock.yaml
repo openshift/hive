@@ -1324,13 +1324,6 @@ arches:
     name: libpwquality
     evr: 1.4.4-8.el9
     sourcerpm: libpwquality-1.4.4-8.el9.src.rpm
-  - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/librtas-2.0.6-1.el9.ppc64le.rpm
-    repoid: rhel-9-for-ppc64le-baseos-rpms
-    size: 86335
-    checksum: sha256:64d105e7f8b9ee542efe65816ae77fb38988c00bef1e0cc5ea3e1a4e89fb7505
-    name: librtas
-    evr: 2.0.6-1.el9
-    sourcerpm: librtas-2.0.6-1.el9.src.rpm
   - url: https://cdn.redhat.com/content/dist/rhel9/9/ppc64le/baseos/os/Packages/l/libselinux-3.6-3.el9.ppc64le.rpm
     repoid: rhel-9-for-ppc64le-baseos-rpms
     size: 102114

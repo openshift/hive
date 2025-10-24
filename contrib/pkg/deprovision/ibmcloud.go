@@ -30,8 +30,10 @@ type ibmCloudDeprovisionOptions struct {
 }
 
 // NewDeprovisionIBMCloudCommand is the entrypoint to create the IBM Cloud deprovision subcommand
-func NewDeprovisionIBMCloudCommand() *cobra.Command {
-	opt := &ibmCloudDeprovisionOptions{}
+func NewDeprovisionIBMCloudCommand(logLevel string) *cobra.Command {
+	opt := &ibmCloudDeprovisionOptions{
+		logLevel: logLevel,
+	}
 	cmd := &cobra.Command{
 		Use:   "ibmcloud INFRAID --region=us-east --base-domain=BASE_DOMAIN --cluster-name=CLUSTERNAME",
 		Short: "Deprovision IBM Cloud assets (as created by openshift-installer)",
@@ -50,7 +52,6 @@ func NewDeprovisionIBMCloudCommand() *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 
 	// Required flags
 	flags.StringVar(&opt.baseDomain, "base-domain", "", "cluster's base domain")
@@ -68,7 +69,7 @@ func (o *ibmCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string)
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	ibmutils.ConfigureCreds(client)
+	ibmutils.ConfigureCreds(client, nil)
 
 	// Create IBMCloud Client
 	ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)

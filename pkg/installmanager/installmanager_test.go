@@ -217,7 +217,7 @@ func TestInstallManager(t *testing.T) {
 			}
 
 			if test.failedMetadataRead {
-				im.readClusterMetadata = func(*InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
+				im.readClusterMetadata = func(*InstallManager, *hivev1.ClusterDeployment) ([]byte, *installertypes.ClusterMetadata, error) {
 					return nil, nil, fmt.Errorf("failed to save metadata")
 				}
 			}

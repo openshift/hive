@@ -27,8 +27,10 @@ type vSphereOptions struct {
 }
 
 // NewDeprovisionvSphereCommand is the entrypoint to create the vSphere deprovision subcommand
-func NewDeprovisionvSphereCommand() *cobra.Command {
-	opt := &vSphereOptions{}
+func NewDeprovisionvSphereCommand(logLevel string) *cobra.Command {
+	opt := &vSphereOptions{
+		logLevel: logLevel,
+	}
 	cmd := &cobra.Command{
 		Use:   "vsphere INFRAID",
 		Short: "Deprovision vSphere assets (as created by openshift-installer)",
@@ -46,7 +48,6 @@ func NewDeprovisionvSphereCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.vCenter, "vsphere-vcenter", "", "Domain name or IP address of the vCenter")
 	return cmd
 }
@@ -59,7 +60,7 @@ func (o *vSphereOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	vsphereutils.ConfigureCreds(client)
+	vsphereutils.ConfigureCreds(client, nil)
 
 	return nil
 }

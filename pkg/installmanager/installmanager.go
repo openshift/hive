@@ -128,7 +128,7 @@ type InstallManager struct {
 	loadSecrets                      func(*InstallManager, *hivev1.ClusterDeployment)
 	cleanupFailedProvision           func(dynamicClient client.Client, cd *hivev1.ClusterDeployment, infraID string, logger log.FieldLogger) error
 	updateClusterProvision           func(*InstallManager, provisionMutation) error
-	readClusterMetadata              func(*InstallManager) ([]byte, *installertypes.ClusterMetadata, error)
+	readClusterMetadata              func(*InstallManager, *hivev1.ClusterDeployment) ([]byte, *installertypes.ClusterMetadata, error)
 	uploadAdminKubeconfig            func(*InstallManager) (*corev1.Secret, error)
 	uploadAdminPassword              func(*InstallManager) (*corev1.Secret, error)
 	loadAdminPassword                func(*InstallManager) (string, error)
@@ -428,7 +428,7 @@ func (m *InstallManager) Run() error {
 	// to extract the infra ID and upload it, this is a critical failure and we
 	// should restart. No cloud resources have been provisioned at this point.
 	m.log.Info("setting cluster metadata")
-	metadataBytes, metadata, err := m.readClusterMetadata(m)
+	metadataBytes, metadata, err := m.readClusterMetadata(m, cd)
 	if err != nil {
 		m.log.WithError(err).Error("error reading cluster metadata")
 		return errors.Wrap(err, "error reading cluster metadata")
@@ -536,19 +536,19 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 	// Configure credentials (including certs) appropriately according to the cloud provider
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		awsutils.ConfigureCreds(m.DynamicClient)
+		awsutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.Azure != nil:
-		azureutils.ConfigureCreds(m.DynamicClient)
+		azureutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.GCP != nil:
-		gcputils.ConfigureCreds(m.DynamicClient)
+		gcputils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.OpenStack != nil:
-		openstackutils.ConfigureCreds(m.DynamicClient)
+		openstackutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.VSphere != nil:
-		vsphereutils.ConfigureCreds(m.DynamicClient)
+		vsphereutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.IBMCloud != nil:
-		ibmutils.ConfigureCreds(m.DynamicClient)
+		ibmutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.Nutanix != nil:
-		nutanixutils.ConfigureCreds(m.DynamicClient)
+		nutanixutils.ConfigureCreds(m.DynamicClient, nil)
 	}
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.
@@ -1273,7 +1273,7 @@ func (m *InstallManager) tailFullInstallLog(scrubInstallLog bool) {
 	}
 }
 
-func readClusterMetadata(m *InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
+func readClusterMetadata(m *InstallManager, _ *hivev1.ClusterDeployment) ([]byte, *installertypes.ClusterMetadata, error) {
 	m.log.Infoln("extracting cluster ID and uploading cluster metadata")
 	fullMetadataPath := filepath.Join(m.WorkDir, metadataRelativePath)
 	if _, err := os.Stat(fullMetadataPath); os.IsNotExist(err) {

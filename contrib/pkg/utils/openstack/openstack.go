@@ -4,10 +4,11 @@ import (
 	"os"
 	"path/filepath"
 
+	installertypes "github.com/openshift/installer/pkg/types"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/client-go/util/homedir"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
@@ -37,7 +38,7 @@ func GetCreds(credsFile string) ([]byte, error) {
 
 // ConfigureCreds loads secrets designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE,
 // CREDS_SECRET_NAME, and CERTS_SECRET_NAME and configures OpenStack credential config files accordingly.
-func ConfigureCreds(c client.Client) {
+func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata) {
 	if credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME"); credsSecret != nil {
 		utils.ProjectToDir(credsSecret, constants.OpenStackCredentialsDir, nil)
 	}

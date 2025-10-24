@@ -42,7 +42,7 @@ spec:
     - CONTAINER_SUB_MANAGER_OFF=1
     - EL8_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.4-202507171054.g35b6b0c.el8
     - EL9_BUILD_IMAGE=brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.24.4-202507171054.g2f6f49f.el9
-    - BASE_IMAGE=registry.redhat.io/rhel9-2-els/rhel:9.2
+    - BASE_IMAGE=registry.redhat.io/rhel9-6-els/rhel:9.6
   - name: build-source-image
     value: 'true'
   - name: build-image-index

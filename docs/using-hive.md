@@ -480,7 +480,8 @@ networking:
   clusterNetwork:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
-  machineNetwork: 10.0.0.0/16
+  machineNetwork:
+  - cidr: 10.0.0.0/16
   networkType: OpenShiftSDN
   serviceNetwork:
   - 172.30.0.0/16

@@ -450,10 +450,11 @@ type: Opaque
 
 The OpenShift installer `InstallConfig` must be stored in a `secret` and referenced in the `ClusterDeployment`. This allows Hive to more easily support installing multiple versions of OpenShift.
 
-First, retrieve the pull secret that you created earlier:
+First, retrieve the public key for the SSH public key you created earlier, if
+you created one:
 
 ```sh
-pull_secret=$(oc get secret mycluster-pull-secret -o jsonpath='{.data.\.dockerconfigjson}' |
+ssh_public_key=$(oc get secret mycluster-ssh-key -o jsonpath='{.data.ssh-publickey}' |
     base64 -d)
 ```
 
@@ -491,15 +492,15 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: 10.0.0.0/16
-  networkType: OpenShiftSDN
+  networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
 platform:
   aws:
     region: us-east-1
-pullSecret: |-
-    $pull_secret
-sshKey: REDACTED
+pullSecret: mycluster-pull-secret
+# Remove the line below if you did not create an SSH key.
+sshKey: $ssh_public_key
 EOF
 ```
 

@@ -450,9 +450,18 @@ type: Opaque
 
 The OpenShift installer `InstallConfig` must be stored in a `secret` and referenced in the `ClusterDeployment`. This allows Hive to more easily support installing multiple versions of OpenShift.
 
-Example `install-config.yaml` for AWS:
+First, retrieve the pull secret that you created earlier:
 
-```yaml
+```sh
+pull_secret=$(oc get secret mycluster-pull-secret -o jsonpath='{.data.\.dockerconfigjson}' |
+    base64 -d)
+```
+
+Then create a file called `install-config.yaml` that will contain your
+`InstallConfig`. The example below provides an `InstallConfig` for AWS.
+
+```sh
+cat >./install-config.yaml <<-EOF
 apiVersion: v1
 baseDomain: hive.example.com
 compute:
@@ -488,9 +497,14 @@ networking:
 platform:
   aws:
     region: us-east-1
-pullSecret: REDACTED
+pullSecret: |-
+    $pull_secret
 sshKey: REDACTED
+EOF
 ```
+
+Finally, create a generic Kubernetes secret from the `InstallConfig` you just
+created:
 
 ```bash
 oc create secret generic mycluster-install-config --from-file=install-config.yaml=./install-config.yaml

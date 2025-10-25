@@ -159,6 +159,9 @@ type: Opaque
 #### Azure
 
 Create a `secret` containing your Azure service principal:
+```bash
+oc create secret generic mycluster-azure-creds --from-file=/<azure_credentials_file_path>/osServicePrincipal.json
+```
 
 ```yaml
 apiVersion: v1

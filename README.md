@@ -28,6 +28,8 @@ In the future Hive will support more cloud providers.
   * [Cluster Hibernation](./docs/hibernating-clusters.md)
   * [Cluster Pools](./docs/clusterpools.md)
   * [PrivateLink](./docs/privatelink.md)
+  * [AWS STS](./docs/aws-sts-provisioning.md)
+  * [Microsoft Entra Workload ID](./docs/microsoft_entra_workload_id.md)
 * [Hiveutil CLI](./docs/hiveutil.md)
 * [Scaling Hive](./docs/scaling-hive.md)
 * [Developing Hive](./docs/developing.md)

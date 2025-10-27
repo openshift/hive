@@ -450,7 +450,7 @@ type: Opaque
 
 The OpenShift installer `InstallConfig` must be stored in a `secret` and referenced in the `ClusterDeployment`. This allows Hive to more easily support installing multiple versions of OpenShift.
 
-First, retrieve the public key for the SSH public key you created earlier, if
+First, retrieve the public key for the SSH key pair you created earlier, if
 you created one:
 
 ```sh

@@ -454,8 +454,7 @@ First, retrieve the public key for the SSH public key you created earlier, if
 you created one:
 
 ```sh
-ssh_public_key=$(oc get secret mycluster-ssh-key -o jsonpath='{.data.ssh-publickey}' |
-    base64 -d)
+ssh_public_key=$(oc extract secret/mycluster-ssh-key --keys=ssh-publickey --to=-)
 ```
 
 Then create a file called `install-config.yaml` that will contain your

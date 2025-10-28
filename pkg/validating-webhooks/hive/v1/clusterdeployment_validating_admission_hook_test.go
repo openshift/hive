@@ -24,6 +24,7 @@ import (
 	hivev1openstack "github.com/openshift/hive/apis/hive/v1/openstack"
 	hivev1vsphere "github.com/openshift/hive/apis/hive/v1/vsphere"
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
+	installervsphere "github.com/openshift/installer/pkg/types/vsphere"
 
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/util/contracts"
@@ -131,14 +132,28 @@ func validOpenStackClusterDeployment() *hivev1.ClusterDeployment {
 func validVSphereClusterDeployment() *hivev1.ClusterDeployment {
 	cd := clusterDeploymentTemplate()
 	cd.Spec.Platform.VSphere = &hivev1vsphere.Platform{
-		VCenter:               "somevcenter.com",
 		CredentialsSecretRef:  corev1.LocalObjectReference{Name: "fake-creds-secret"},
 		CertificatesSecretRef: corev1.LocalObjectReference{Name: "fake-cert-secret"},
-		Datacenter:            "dc1",
-		DefaultDatastore:      "vmse-test",
-		Folder:                "/dc1/vm/test",
-		Cluster:               "test",
-		Network:               "Network",
+		Infrastructure: &installervsphere.Platform{
+			VCenters: []installervsphere.VCenter{
+				{
+					Server:      "somevcenter.com",
+					Datacenters: []string{"dc1"},
+				},
+			},
+			FailureDomains: []installervsphere.FailureDomain{
+				{
+					Server: "somevcenter.com",
+					Topology: installervsphere.Topology{
+						Datacenter:     "dc1",
+						Datastore:      "vmse-test",
+						Folder:         "/dc1/vm/test",
+						ComputeCluster: "test",
+						Networks:       []string{"Network"},
+					},
+				},
+			},
+		},
 	}
 	return cd
 }

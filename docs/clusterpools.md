@@ -7,6 +7,7 @@
 - [Managing admins for Cluster Pools](#managing-admins-for-cluster-pools)
 - [Install Config Template](#install-config-template)
 - [Updating Cluster Pools](#updating-cluster-pools)
+  - [Rotating Cloud Credentials](#rotating-cloud-credentials)
 - [Time-based scaling of Cluster Pool](#time-based-scaling-of-cluster-pool)
 - [ClusterPool Deletion](#clusterpool-deletion)
 - [Troubleshooting](#troubleshooting)
@@ -176,6 +177,92 @@ you can scale the pool to `size: 0` and back to the desired size.
 - Upgrading hive may trigger the slow refresh described above. This is a known artifact of the
   update detection mechanism, caused by changes in the ClusterPool CRD schema, even if no explicit
   changes are made.
+
+### Rotating Cloud Credentials
+When a ClusterPool creates a ClusterDeployment, it does so in a fresh namespace, along with the
+other artifacts necessary for provisioning and management.
+This includes a copy of the cloud credentials Secret (referenced by e.g.
+`ClusterPool.Spec.Platform.AWS.CredentialsSecretRef.Name` for AWS).
+When the ClusterPool's credential Secret is updated or replaced, existing CDs' Secrets are not
+affected.
+This must be accounted for when rotating cloud credentials.
+There are several options available:
+
+1. **Scale Down; Rotate; Scale Up**
+   1. Scale your ClusterPool to `size: 0`.
+      Existing clusters are deprovisioned (using the old credentials).
+   1. Wait for all claimed clusters to be released and deprovisioned.
+      These clusters are still relying on the old credentials.
+   1. Rotate the credentials via your cloud provider.
+   1. Edit your ClusterPool's creds Secret, replacing the old credentials with the new.
+   1. Scale your ClusterPool back to its original `size`.
+      New clusters are provisioned with the new credentials.
+
+   Pros:
+   - No special RBAC needed.
+     If you were tasked with rotating credentials, you probably have the RBAC to edit the credentials Secret in the ClusterPool's namespace.
+   - Old and new credentials never coexist in the cluster.
+
+   Cons:
+   - Disruptive.
+     The pool is devoid of ready clusters while the new batch is provisioning.
+   - Requires monitoring.
+     You need a way to know when all the claimed clusters with the old Secret are gone.
+
+1. **Replace ClusterPool's Secret and Wait**
+
+   As described [above](#updating-cluster-pools), hive will automatically replace pool clusters
+   when certain configuration changes are made to the ClusterPool manifest.
+   This includes changing the name of the credentials Secret -- e.g. editing
+   `ClusterPool.Spec.Platform.AWS.CredentialsSecretRef.Name` for AWS.
+   1. Create a new credential in the cloud provider.
+      (Do not disable/delete the old one yet!)
+   1. Create a new credentials Secret in your ClusterPool's namespace.
+   1. Edit your ClusterPool, modifying the credentials secret reference to point to the new Secret.
+      This will cause hive to start deleting existing clusters and replacing them with new ones.
+      **NOTE:** As previously mentioned, clusters are replaced one at a time.
+      It can thus be quite a while before all of the old clusters are gone.
+      You can speed up this process by scaling down and up.
+   1. Wait for all claimed clusters to be released and deprovisioned.
+      These clusters are still relying on the old credentials.
+   1. Once all old clusters have been deleted, delete the old credentials Secret.
+   1. Disable/delete the old credential in the cloud provider.
+
+   Pros:
+   - No special RBAC needed.
+     You must be able to manage Secrets in the ClusterPool namespace as well as the ClusterPool
+     itself.
+   - High availability.
+     The pool remains populated during the replacement process.
+     Old clusters can continue to satisfy incoming ClusterClaims.
+
+   Cons:
+   - Slow.
+   - Requires monitoring.
+     You need a way to know when all claimed *and* unclaimed clusters with the old Secret are gone.
+
+1. **Patch All Existing Secrets**
+   1. Create a new credential in the cloud provider.
+      (Do not disable/delete the old one yet!)
+   1. Edit your ClusterPool's creds Secret, replacing the old credentials with the new.
+      (Doing this first ensures any new clusters get the new creds, avoiding race conditions.)
+   1. Patch the credentials Secrets for all existing clusters belonging to this pool, both claimed
+      and unclaimed.
+      You may wish to use [refresh-clusterpool-creds.sh](../hack/refresh-clusterpool-creds.sh) for
+      this step.
+   1. Disable/delete the old credential in the cloud provider.
+
+   Pros:
+   - High availability.
+     No clusters are deprovisioned as a result of this process.
+   - Immediate.
+     No waiting for clusters to be replaced or for claimed clusters to be released.
+     Can be done synchronously.
+
+   Cons:
+   - Requires special RBAC.
+     The ClusterPool admin will usually not have permission to modify Secrets in arbitrary
+     namespaces.
 
 ## Time-based scaling of Cluster Pool
 

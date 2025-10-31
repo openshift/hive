@@ -23,8 +23,10 @@ type openStackOptions struct {
 }
 
 // NewDeprovisionOpenStackCommand is the entrypoint to create the OpenStack deprovision subcommand
-func NewDeprovisionOpenStackCommand() *cobra.Command {
-	opt := &openStackOptions{}
+func NewDeprovisionOpenStackCommand(logLevel string) *cobra.Command {
+	opt := &openStackOptions{
+		logLevel: logLevel,
+	}
 	cmd := &cobra.Command{
 		Use:   "openstack INFRAID --cloud=OS_CLOUD",
 		Short: "Deprovision OpenStack assets (as created by openshift-installer)",
@@ -42,7 +44,6 @@ func NewDeprovisionOpenStackCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.cloud, "cloud", "", "OpenStack cloud entry name from clouds.yaml for access/authentication")
 	return cmd
 }
@@ -55,7 +56,7 @@ func (o *openStackOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	openstackutils.ConfigureCreds(client)
+	openstackutils.ConfigureCreds(client, nil)
 
 	return nil
 }

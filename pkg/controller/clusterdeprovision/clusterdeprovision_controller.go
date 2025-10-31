@@ -304,6 +304,7 @@ func (r *ReconcileClusterDeprovision) Reconcile(ctx context.Context, request rec
 		os.Getenv("NO_PROXY"),
 		extraEnvVars,
 		*r.sharedPodConfig,
+		rLog,
 	)
 	if err != nil {
 		rLog.Errorf("error generating uninstaller job: %v", err)

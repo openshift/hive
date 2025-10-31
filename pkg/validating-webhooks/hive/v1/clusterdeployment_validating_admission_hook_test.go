@@ -1383,7 +1383,136 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			}(),
 			operation:       admissionv1beta1.Update,
 			expectedAllowed: false,
-		}, {
+		},
+		{
+			name: "Set MetadataJSONSecretRef: installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:               "an-infra-id",
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: "foo"},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Set MetadataJSONSecretRef: not installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:               "an-infra-id",
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: "foo"},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Set MetadataJSONSecretRef: while setting installed",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:               "an-infra-id",
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: "foo"},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Update MetadataJSONSecretRef",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:               "an-infra-id",
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: "foo"},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:               "an-infra-id",
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: "bar"},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "Unset MetadataJSONSecretRef",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:               "an-infra-id",
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: "foo"},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
+			name: "Unset MetadataJSONSecretRef.Name",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID:               "an-infra-id",
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: "foo"},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validGCPClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					MetadataJSONSecretRef: &corev1.LocalObjectReference{Name: ""},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
 			name: "Provisioning is missing",
 			newObject: func() *hivev1.ClusterDeployment {
 				cd := validAWSClusterDeployment()

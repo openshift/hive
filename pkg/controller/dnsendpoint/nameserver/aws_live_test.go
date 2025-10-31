@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -24,7 +23,6 @@ func TestLiveAWS(t *testing.T) {
 	if rootDomain == "" {
 		t.SkipNow()
 	}
-	rand.Seed(time.Now().UnixNano())
 	suite.Run(t, &LiveAWSTestSuite{rootDomain: rootDomain})
 }
 

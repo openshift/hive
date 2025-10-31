@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
 	"github.com/openshift/hive/pkg/constants"
+	ibmcreds "github.com/openshift/hive/pkg/creds/ibmcloud"
 	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/installer/pkg/destroy/ibmcloud"
 	"github.com/openshift/installer/pkg/types"
@@ -69,7 +69,7 @@ func (o *ibmCloudDeprovisionOptions) Complete(cmd *cobra.Command, args []string)
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	ibmutils.ConfigureCreds(client, nil)
+	ibmcreds.ConfigureCreds(client, nil)
 
 	// Create IBMCloud Client
 	ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)

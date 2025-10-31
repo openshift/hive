@@ -67,13 +67,13 @@ func TestGetEndpoint(t *testing.T) {
 				rootDomain: &rootDomainsInfo{
 					endpointsBySubdomain: endpointsBySubdomain{
 						domain: endpointState{
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 					},
 				},
 			},
 			expectRootDomain: true,
-			expectedValues:   sets.New[string]("test-value"),
+			expectedValues:   sets.New("test-value"),
 		},
 		{
 			name: "multiple namespace values",
@@ -81,13 +81,13 @@ func TestGetEndpoint(t *testing.T) {
 				rootDomain: &rootDomainsInfo{
 					endpointsBySubdomain: endpointsBySubdomain{
 						domain: endpointState{
-							nsValues: sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+							nsValues: sets.New("test-value-1", "test-value-2", "test-value-3"),
 						},
 					},
 				},
 			},
 			expectRootDomain: true,
-			expectedValues:   sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+			expectedValues:   sets.New("test-value-1", "test-value-2", "test-value-3"),
 		},
 		{
 			name: "many root domains and domains",
@@ -95,23 +95,23 @@ func TestGetEndpoint(t *testing.T) {
 				rootDomain: &rootDomainsInfo{
 					endpointsBySubdomain: endpointsBySubdomain{
 						domain: endpointState{
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 						"other.domain.com": endpointState{
-							nsValues: sets.New[string]("other-value"),
+							nsValues: sets.New("other-value"),
 						},
 					},
 				},
 				"other-domain": &rootDomainsInfo{
 					endpointsBySubdomain: endpointsBySubdomain{
 						"sub-domain.other-domain": endpointState{
-							nsValues: sets.New[string]("another-value"),
+							nsValues: sets.New("another-value"),
 						},
 					},
 				},
 			},
 			expectRootDomain: true,
-			expectedValues:   sets.New[string]("test-value"),
+			expectedValues:   sets.New("test-value"),
 		},
 	}
 	for _, tc := range cases {
@@ -131,7 +131,7 @@ func TestGetEndpoint(t *testing.T) {
 func TestAddEndpoint(t *testing.T) {
 	rootDomain := "domain.com"
 	domain := "test.domain.com"
-	values := sets.New[string]("test-value-1", "test-value-2", "test-value-3")
+	values := sets.New("test-value-1", "test-value-2", "test-value-3")
 	cases := []struct {
 		name                string
 		nameServers         rootDomainsMap
@@ -204,7 +204,7 @@ func TestAddEndpoint(t *testing.T) {
 								dz.Namespace = "other-namespace"
 								return dz
 							}(),
-							nsValues: sets.New[string]("other-value"),
+							nsValues: sets.New("other-value"),
 						},
 					},
 				},
@@ -322,7 +322,7 @@ func TestRemoveEndpoint(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						domain: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 					},
 				},
@@ -341,7 +341,7 @@ func TestRemoveEndpoint(t *testing.T) {
 						"other.domain.com": endpointState{},
 						domain: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 					},
 				},
@@ -522,7 +522,7 @@ func TestScrape(t *testing.T) {
 				mockQuery.EXPECT().Get("domain.com").
 					Return(
 						map[string]sets.Set[string]{
-							"test.domain.com": sets.New[string]("test-value"),
+							"test.domain.com": sets.New("test-value"),
 						},
 						nil,
 					)
@@ -533,7 +533,7 @@ func TestScrape(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						"test.domain.com": endpointState{
 							dnsZone:  nil,
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 					},
 				},
@@ -547,7 +547,7 @@ func TestScrape(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						"test.domain.com": endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("old-value"),
+							nsValues: sets.New("old-value"),
 						},
 					},
 				},
@@ -556,7 +556,7 @@ func TestScrape(t *testing.T) {
 				mockQuery.EXPECT().Get("domain.com").
 					Return(
 						map[string]sets.Set[string]{
-							"test.domain.com": sets.New[string]("test-value"),
+							"test.domain.com": sets.New("test-value"),
 						},
 						nil,
 					)
@@ -567,7 +567,7 @@ func TestScrape(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						"test.domain.com": endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 					},
 				},
@@ -582,7 +582,7 @@ func TestScrape(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						"test.domain.com": endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 					},
 				},
@@ -591,7 +591,7 @@ func TestScrape(t *testing.T) {
 				mockQuery.EXPECT().Get("domain.com").
 					Return(
 						map[string]sets.Set[string]{
-							"test.domain.com": sets.New[string]("test-value"),
+							"test.domain.com": sets.New("test-value"),
 						},
 						nil,
 					)
@@ -602,7 +602,7 @@ func TestScrape(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						"test.domain.com": endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value"),
+							nsValues: sets.New("test-value"),
 						},
 					},
 				},
@@ -616,19 +616,19 @@ func TestScrape(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						"changed-1.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-1"),
-							nsValues: sets.New[string]("old-value-1"),
+							nsValues: sets.New("old-value-1"),
 						},
 						"changed-2.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-2"),
-							nsValues: sets.New[string]("old-value-2"),
+							nsValues: sets.New("old-value-2"),
 						},
 						"changed-3.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-3"),
-							nsValues: sets.New[string]("old-value-3a", "old-value-3b"),
+							nsValues: sets.New("old-value-3a", "old-value-3b"),
 						},
 						"unchanged.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-unchanged"),
-							nsValues: sets.New[string]("test-value-4"),
+							nsValues: sets.New("test-value-4"),
 						},
 					},
 				},
@@ -637,11 +637,11 @@ func TestScrape(t *testing.T) {
 				mockQuery.EXPECT().Get("domain.com").
 					Return(
 						map[string]sets.Set[string]{
-							"changed-1.domain.com": sets.New[string]("test-value-1"),
-							"changed-2.domain.com": sets.New[string]("test-value-2a", "test-value-2b"),
-							"changed-3.domain.com": sets.New[string]("test-value-3"),
-							"unchanged.domain.com": sets.New[string]("test-value-4"),
-							"untracked.domain.com": sets.New[string]("test-value-5"),
+							"changed-1.domain.com": sets.New("test-value-1"),
+							"changed-2.domain.com": sets.New("test-value-2a", "test-value-2b"),
+							"changed-3.domain.com": sets.New("test-value-3"),
+							"unchanged.domain.com": sets.New("test-value-4"),
+							"untracked.domain.com": sets.New("test-value-5"),
 						},
 						nil,
 					)
@@ -652,23 +652,23 @@ func TestScrape(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						"changed-1.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-1"),
-							nsValues: sets.New[string]("test-value-1"),
+							nsValues: sets.New("test-value-1"),
 						},
 						"changed-2.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-2"),
-							nsValues: sets.New[string]("test-value-2a", "test-value-2b"),
+							nsValues: sets.New("test-value-2a", "test-value-2b"),
 						},
 						"changed-3.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-changed-3"),
-							nsValues: sets.New[string]("test-value-3"),
+							nsValues: sets.New("test-value-3"),
 						},
 						"unchanged.domain.com": endpointState{
 							dnsZone:  testDNSZoneWithNSName(testNamespace, "test-unchanged"),
-							nsValues: sets.New[string]("test-value-4"),
+							nsValues: sets.New("test-value-4"),
 						},
 						"untracked.domain.com": endpointState{
 							dnsZone:  nil,
-							nsValues: sets.New[string]("test-value-5"),
+							nsValues: sets.New("test-value-5"),
 						},
 					},
 				},

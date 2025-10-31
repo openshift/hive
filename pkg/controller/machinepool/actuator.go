@@ -20,3 +20,8 @@ type Actuator interface {
 	// to wait before we can proceed with reconciling. (e.g. obtaining a pool name lease)
 	GenerateMachineSets(*hivev1.ClusterDeployment, *hivev1.MachinePool, log.FieldLogger) (msets []*machineapi.MachineSet, proceed bool, genError error)
 }
+
+const (
+	// workerUserDataName is the name of a secret in the cluster used for obtaining user data from MCO.
+	workerUserDataName = "worker-user-data"
+)

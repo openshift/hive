@@ -67,7 +67,7 @@ func (r *ReconcileClusterProvision) resolveControllerRef(namespace string, contr
 }
 
 // When a job is created, update the expectations of the clusterprovision that owns the job.
-func (r *ReconcileClusterProvision) trackJobAdd(obj interface{}) {
+func (r *ReconcileClusterProvision) trackJobAdd(obj any) {
 	job := obj.(*batchv1.Job)
 	if job.DeletionTimestamp != nil {
 		// on a restart of the controller, it's possible a new object shows up in a state that

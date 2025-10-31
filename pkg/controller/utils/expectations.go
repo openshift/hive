@@ -52,7 +52,7 @@ const (
 // * Controllers that don't set expectations will get woken up for every matching controllee
 
 // ExpKeyFunc to parse out the key from a ControlleeExpectation
-var ExpKeyFunc = func(obj interface{}) (string, error) {
+var ExpKeyFunc = func(obj any) (string, error) {
 	if e, ok := obj.(*ControlleeExpectations); ok {
 		return e.key, nil
 	}

@@ -161,7 +161,7 @@ func Test_equalOnlyWhenFeatureGate(t *testing.T) {
 		obj          string
 		enabledGates []string
 		field        string
-		value        interface{}
+		value        any
 
 		err string
 	}{{

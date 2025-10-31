@@ -11,7 +11,6 @@ import (
 	hiveconstants "github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
-	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/hive/pkg/util/scheme"
 
@@ -20,6 +19,8 @@ import (
 	admregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
@@ -72,7 +73,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		for _, asset := range assetsToClean {
 			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
 			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := util.DeleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
+			if err := DeleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
 				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
 			}
 		}
@@ -82,7 +83,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(assetPath), hLog, util.WithNamespaceOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
+		if _, err := ApplyRuntimeObject(h, FromAssetPath(assetPath), hLog, WithNamespaceOverride(hiveNSName), WithGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -94,7 +95,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		"config/hiveadmission/hiveadmission_rbac_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(a), hLog, util.WithGarbageCollection(instance)); err != nil {
+		if _, err := ApplyRuntimeObject(h, FromAssetPath(a), hLog, WithGarbageCollection(instance)); err != nil {
 			return err
 		}
 	}
@@ -104,7 +105,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		"config/hiveadmission/hiveadmission_rbac_role_binding.yaml",
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
-		if _, err := util.ApplyRuntimeObject(h, util.CRBFromAssetPath(crbAsset), hLog, util.CRBWithSubjectNSOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
+		if _, err := ApplyRuntimeObject(h, CRBFromAssetPath(crbAsset), hLog, CRBWithSubjectNSOverride(hiveNSName), WithGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
@@ -156,14 +157,27 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 
 	validatingWebhooks := make([]*admregv1.ValidatingWebhookConfiguration, len(webhookAssets))
 	for i, yaml := range webhookAssets {
-		asset = assets.MustAsset(yaml)
-		wh := util.ReadValidatingWebhookConfigurationV1OrDie(asset, scheme)
+		requiredObj, err := runtime.Decode(
+			serializer.NewCodecFactory(scheme).
+				UniversalDecoder(admregv1.SchemeGroupVersion), assets.MustAsset(yaml))
+		if err != nil {
+			panic(err)
+		}
+
+		wh := requiredObj.(*admregv1.ValidatingWebhookConfiguration)
 		validatingWebhooks[i] = wh
 	}
 
 	hLog.Debug("reading apiservice")
-	asset = assets.MustAsset("config/hiveadmission/apiservice.yaml")
-	apiService := util.ReadAPIServiceV1Beta1OrDie(asset, scheme)
+
+	requiredObj, err := runtime.Decode(
+		serializer.NewCodecFactory(scheme).
+			UniversalDecoder(
+				apiregistrationv1.SchemeGroupVersion), assets.MustAsset("config/hiveadmission/apiservice.yaml"))
+	if err != nil {
+		panic(err)
+	}
+	apiService := requiredObj.(*apiregistrationv1.APIService)
 	apiService.Spec.Service.Namespace = hiveNSName
 
 	err = r.injectCerts(apiService, validatingWebhooks, nil, hiveNSName, hLog)
@@ -193,14 +207,14 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 		hiveAdmDeployment.Spec.Template.Spec.ImagePullSecrets = append(hiveAdmDeployment.Spec.Template.Spec.ImagePullSecrets, *ref)
 	}
 
-	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveAdmDeployment), hLog, util.WithGarbageCollection(instance))
+	result, err := ApplyRuntimeObject(h, Passthrough(hiveAdmDeployment), hLog, WithGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
 	}
 	hLog.WithField("result", result).Info("hiveadmission deployment applied")
 
-	result, err = util.ApplyRuntimeObject(h, util.Passthrough(apiService), hLog, util.WithGarbageCollection(instance))
+	result, err = ApplyRuntimeObject(h, Passthrough(apiService), hLog, WithGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying apiservice")
 		return err
@@ -208,7 +222,7 @@ func (r *ReconcileHiveConfig) deployHiveAdmission(hLog log.FieldLogger, h resour
 	hLog.Infof("apiservice applied (%s)", result)
 
 	for _, webhook := range validatingWebhooks {
-		result, err = util.ApplyRuntimeObject(h, util.Passthrough(webhook), hLog, util.WithGarbageCollection(instance))
+		result, err = ApplyRuntimeObject(h, Passthrough(webhook), hLog, WithGarbageCollection(instance))
 		if err != nil {
 			hLog.WithField("webhook", webhook.Name).WithError(err).Errorf("error applying validating webhook")
 			return err

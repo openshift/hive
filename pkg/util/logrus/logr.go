@@ -21,12 +21,12 @@ func NewLogr(logger log.FieldLogger) logr.Logger {
 func (lgr) Init(logr.RuntimeInfo) {}
 
 // Info implements logr.LogSink
-func (l lgr) Info(level int, msg string, keyAndValues ...interface{}) {
+func (l lgr) Info(level int, msg string, keyAndValues ...any) {
 	l.logger.WithFields(keyAndValuesToFields(keyAndValues...)).Debug(msg)
 }
 
 // Error implements logr.LogSink
-func (l lgr) Error(err error, msg string, keyAndValues ...interface{}) {
+func (l lgr) Error(err error, msg string, keyAndValues ...any) {
 	l.logger.WithError(err).WithFields(keyAndValuesToFields(keyAndValues...)).Error(msg)
 }
 
@@ -41,11 +41,11 @@ func (l lgr) WithName(name string) logr.LogSink {
 }
 
 // WithValues implements logr.LogSink
-func (l lgr) WithValues(keyAndValues ...interface{}) logr.LogSink {
+func (l lgr) WithValues(keyAndValues ...any) logr.LogSink {
 	return lgr{logger: l.logger.WithFields(keyAndValuesToFields(keyAndValues...))}
 }
 
-func keyAndValuesToFields(keyAndValues ...interface{}) log.Fields {
+func keyAndValuesToFields(keyAndValues ...any) log.Fields {
 	fields := log.Fields{}
 	for idx := 0; idx < len(keyAndValues); {
 		fields[keyAndValues[idx].(string)] = ""

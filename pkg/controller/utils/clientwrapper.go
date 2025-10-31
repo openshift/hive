@@ -158,7 +158,8 @@ func (cmt *ControllerMetricsTripper) RoundTrip(req *http.Request) (*http.Respons
 // to parse a resource from a path.
 func parsePath(path string) (string, error) {
 	tokens := strings.Split(path[1:], "/")
-	if tokens[0] == "api" {
+	switch tokens[0] {
+	case "api":
 		// Handle core resources:
 		if len(tokens) == 3 || len(tokens) == 4 {
 			return strings.Join([]string{"core", tokens[1], tokens[2]}, "/"), nil
@@ -167,7 +168,7 @@ func parsePath(path string) (string, error) {
 		if len(tokens) > 4 && tokens[2] == "namespaces" {
 			return strings.Join([]string{"core", tokens[1], tokens[4]}, "/"), nil
 		}
-	} else if tokens[0] == "apis" {
+	case "apis":
 		// Handle resources with apigroups:
 		if len(tokens) == 4 || len(tokens) == 5 {
 			return strings.Join([]string{tokens[1], tokens[2], tokens[3]}, "/"), nil

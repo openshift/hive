@@ -60,17 +60,11 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	contributils "github.com/openshift/hive/contrib/pkg/utils"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
-	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
-	ibmutils "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
-	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
-	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
-	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool"
 	"github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/creds"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/ibmclient"
 	"github.com/openshift/hive/pkg/resource"
@@ -538,22 +532,7 @@ func (m *InstallManager) Run() error {
 
 func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 	// Configure credentials (including certs) appropriately according to the cloud provider
-	switch {
-	case cd.Spec.Platform.AWS != nil:
-		awsutils.ConfigureCreds(m.DynamicClient, nil)
-	case cd.Spec.Platform.Azure != nil:
-		azureutils.ConfigureCreds(m.DynamicClient, nil)
-	case cd.Spec.Platform.GCP != nil:
-		gcputils.ConfigureCreds(m.DynamicClient, nil)
-	case cd.Spec.Platform.OpenStack != nil:
-		openstackutils.ConfigureCreds(m.DynamicClient, nil)
-	case cd.Spec.Platform.VSphere != nil:
-		vsphereutils.ConfigureCreds(m.DynamicClient, nil)
-	case cd.Spec.Platform.IBMCloud != nil:
-		ibmutils.ConfigureCreds(m.DynamicClient, nil)
-	case cd.Spec.Platform.Nutanix != nil:
-		nutanixutils.ConfigureCreds(m.DynamicClient, nil)
-	}
+	creds.ConfigureCreds[utils.GetClusterPlatform(cd)](m.DynamicClient, nil)
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.
 	contributils.ProjectToDir(contributils.LoadSecretOrDie(m.DynamicClient, "INSTALLCONFIG_SECRET_NAME"), "/installconfig", nil)
@@ -1090,7 +1069,7 @@ func patchWorkerMachineSetManifest(manifestBytes []byte, pool *hivev1.MachinePoo
 	}
 
 	securityGroupFilterValue := pool.Annotations[constants.ExtraWorkerSecurityGroupAnnotation]
-	var vpcIDFilterValue map[string]interface{} = map[string]interface{}{
+	var vpcIDFilterValue map[string]any = map[string]any{
 		"name":   "vpc-id",
 		"values": []string{vpcID},
 	}

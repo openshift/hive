@@ -12,8 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/utils/pointer"
 
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -250,9 +250,9 @@ func setupIBMCloudClientInstances(ibmCloudClient *mockibmclient.MockAPI, statuse
 	for status, count := range statuses {
 		for i := 0; i < count; i++ {
 			instances = append(instances, vpcv1.Instance{
-				Name:   pointer.String(fmt.Sprintf("%s-%d", status, i)),
-				ID:     pointer.String(fmt.Sprintf("%s-%d", status, i)),
-				Status: pointer.String(status),
+				Name:   ptr.To(fmt.Sprintf("%s-%d", status, i)),
+				ID:     ptr.To(fmt.Sprintf("%s-%d", status, i)),
+				Status: ptr.To(status),
 			})
 		}
 	}

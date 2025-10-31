@@ -13,8 +13,8 @@ import (
 	typesvsphere "github.com/openshift/installer/pkg/types/vsphere"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	vsphereutils "github.com/openshift/hive/contrib/pkg/utils/vsphere"
 	"github.com/openshift/hive/pkg/constants"
+	vspherecreds "github.com/openshift/hive/pkg/creds/vsphere"
 )
 
 // vSphereOptions is the set of options to deprovision an vSphere cluster
@@ -60,7 +60,7 @@ func (o *vSphereOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	vsphereutils.ConfigureCreds(client, nil)
+	vspherecreds.ConfigureCreds(client, nil)
 
 	return nil
 }

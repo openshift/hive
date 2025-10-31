@@ -49,7 +49,7 @@ func TestGCPGet(t *testing.T) {
 				)),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain": sets.New[string]("test-ns"),
+				"test-subdomain": sets.New("test-ns"),
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestGCPGet(t *testing.T) {
 				)),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain": sets.New[string]("test-ns"),
+				"test-subdomain": sets.New("test-ns"),
 			},
 		},
 		{
@@ -104,7 +104,7 @@ func TestGCPGet(t *testing.T) {
 				)),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain": sets.New[string]("test-ns"),
+				"test-subdomain": sets.New("test-ns"),
 			},
 		},
 		{
@@ -118,7 +118,7 @@ func TestGCPGet(t *testing.T) {
 				)),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain": sets.New[string]("test-ns-1", "test-ns-2", "test-ns-3"),
+				"test-subdomain": sets.New("test-ns-1", "test-ns-2", "test-ns-3"),
 			},
 		},
 		{
@@ -134,9 +134,9 @@ func TestGCPGet(t *testing.T) {
 				)),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain-1": sets.New[string]("test-ns-1"),
-				"test-subdomain-2": sets.New[string]("test-ns-2"),
-				"test-subdomain-3": sets.New[string]("test-ns-3"),
+				"test-subdomain-1": sets.New("test-ns-1"),
+				"test-subdomain-2": sets.New("test-ns-2"),
+				"test-subdomain-3": sets.New("test-ns-3"),
 			},
 		},
 		{
@@ -159,8 +159,8 @@ func TestGCPGet(t *testing.T) {
 				),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain-1": sets.New[string]("test-ns-1"),
-				"test-subdomain-2": sets.New[string]("test-ns-2"),
+				"test-subdomain-1": sets.New("test-ns-1"),
+				"test-subdomain-2": sets.New("test-ns-2"),
 			},
 		},
 	}

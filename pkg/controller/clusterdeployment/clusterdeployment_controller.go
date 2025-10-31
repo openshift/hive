@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -1382,7 +1382,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 		if !areImagesResolved {
 			if skipImageSetJob {
 				cdLog.Info("skipping imageset job due to ClusterInstall.Spec.SkipImageSetJob")
-				cd.Status.InstallerImage = pointer.String("<NONE>")
+				cd.Status.InstallerImage = ptr.To("<NONE>")
 			} else {
 				// "resolve" the images via installerImageOverride
 				installerImage := cd.Spec.Provisioning.InstallerImageOverride
@@ -1394,7 +1394,7 @@ func (r *ReconcileClusterDeployment) resolveInstallerImage(cd *hivev1.ClusterDep
 				}
 				cd.Status.InstallerImage = &installerImage
 			}
-			cd.Status.CLIImage = pointer.String("<NONE>")
+			cd.Status.CLIImage = ptr.To("<NONE>")
 			changed1 = true
 		}
 		cd.Status.Conditions, changed2 = controllerutils.SetClusterDeploymentConditionWithChangeCheck(
@@ -2721,7 +2721,7 @@ func addOwnershipToSecret(secret *corev1.Secret, cd *hivev1.ClusterDeployment, c
 		Kind:               cd.Kind,
 		Name:               cd.Name,
 		UID:                cd.UID,
-		BlockOwnerDeletion: pointer.Bool(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}
 
 	cdRefChanged := librarygocontroller.EnsureOwnerRef(secret, cdRef)

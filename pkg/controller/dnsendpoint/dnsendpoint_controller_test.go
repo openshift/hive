@@ -101,13 +101,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value-1", "test-value-2"),
+							nsValues: sets.New("test-value-1", "test-value-2"),
 						},
 					},
 				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.New[string]("test-value-1", "test-value-2", "test-value-3")).Return(nil)
+				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.New("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
 				rootDomain: &rootDomainsInfo{
@@ -115,7 +115,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+							nsValues: sets.New("test-value-1", "test-value-2", "test-value-3"),
 						},
 					},
 				},
@@ -137,7 +137,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+							nsValues: sets.New("test-value-1", "test-value-2", "test-value-3"),
 						},
 					},
 				},
@@ -148,7 +148,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+							nsValues: sets.New("test-value-1", "test-value-2", "test-value-3"),
 						},
 					},
 				},
@@ -170,13 +170,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("old-value"),
+							nsValues: sets.New("old-value"),
 						},
 					},
 				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.New[string]("test-value-1", "test-value-2", "test-value-3")).Return(nil)
+				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.New("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
 				rootDomain: &rootDomainsInfo{
@@ -184,7 +184,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+							nsValues: sets.New("test-value-1", "test-value-2", "test-value-3"),
 						},
 					},
 				},
@@ -206,13 +206,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+							nsValues: sets.New("test-value-1", "test-value-2", "test-value-3"),
 						},
 					},
 				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.New[string]("test-value-1", "test-value-2", "test-value-3")).Return(nil)
+				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.New("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
 				rootDomain: &rootDomainsInfo{
@@ -231,13 +231,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("old-value"),
+							nsValues: sets.New("old-value"),
 						},
 					},
 				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.New[string]("test-value-1", "test-value-2", "test-value-3")).
+				mockQuery.EXPECT().CreateOrUpdate(rootDomain, dnsName, sets.New("test-value-1", "test-value-2", "test-value-3")).
 					Return(errors.New("create error"))
 			},
 			expectErr: true,
@@ -247,7 +247,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("old-value"),
+							nsValues: sets.New("old-value"),
 						},
 					},
 				},
@@ -268,13 +268,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("old-value"),
+							nsValues: sets.New("old-value"),
 						},
 					},
 				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.New[string]("old-value")).
+				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.New("old-value")).
 					Return(errors.New("delete error"))
 			},
 			expectErr: true,
@@ -284,7 +284,7 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("old-value"),
+							nsValues: sets.New("old-value"),
 						},
 					},
 				},
@@ -368,13 +368,13 @@ func TestDNSEndpointReconcile(t *testing.T) {
 					endpointsBySubdomain: endpointsBySubdomain{
 						dnsName: endpointState{
 							dnsZone:  testDNSZone(),
-							nsValues: sets.New[string]("test-value-1", "test-value-2", "test-value-3"),
+							nsValues: sets.New("test-value-1", "test-value-2", "test-value-3"),
 						},
 					},
 				},
 			},
 			configureQuery: func(mockQuery *mock.MockQuery) {
-				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.New[string]("test-value-1", "test-value-2", "test-value-3")).Return(nil)
+				mockQuery.EXPECT().Delete(rootDomain, dnsName, sets.New("test-value-1", "test-value-2", "test-value-3")).Return(nil)
 			},
 			expectedNameServers: rootDomainsMap{
 				rootDomain: &rootDomainsInfo{
@@ -480,7 +480,7 @@ func validateConditions(t *testing.T, dnsZone *hivev1.DNSZone, conditions []cond
 }
 
 type fakeManager struct {
-	watchedDomains map[string]bool
+	watchedDomains sets.Set[string]
 }
 
 func (fm *fakeManager) Add(mgr manager.Runnable) error {
@@ -490,7 +490,7 @@ func (fm *fakeManager) Add(mgr manager.Runnable) error {
 	if ok {
 		// record which domains are being watched/scraped
 		for domainKey := range scraper.rootDomainsMap {
-			fm.watchedDomains[domainKey] = true
+			fm.watchedDomains.Insert(domainKey)
 		}
 	}
 	return nil
@@ -499,7 +499,7 @@ func (fm *fakeManager) Add(mgr manager.Runnable) error {
 func (*fakeManager) Elected() <-chan struct{} {
 	panic("not implemented")
 }
-func (*fakeManager) SetFields(interface{}) error {
+func (*fakeManager) SetFields(any) error {
 	panic("not implemented")
 }
 func (*fakeManager) AddMetricsExtraHandler(path string, handler http.Handler) error {
@@ -664,7 +664,7 @@ func TestMultiCloudDNSSetup(t *testing.T) {
 			// Run/set up reconciler
 			fakeClient := testfake.NewFakeClientBuilder().Build()
 			fakeMgr := &fakeManager{
-				watchedDomains: map[string]bool{},
+				watchedDomains: sets.New[string](),
 			}
 
 			reconciler, _, err := newReconciler(fakeMgr, fakeClient)
@@ -684,7 +684,7 @@ func TestMultiCloudDNSSetup(t *testing.T) {
 							}
 						}
 						assert.True(t, found, "failed to find scraper for domain %s", domain)
-						assert.True(t, fakeMgr.watchedDomains[domain], "failed to record domain %s as being watched", domain)
+						assert.True(t, fakeMgr.watchedDomains.Has(domain), "failed to record domain %s as being watched", domain)
 					}
 				}
 			}

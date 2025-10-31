@@ -853,7 +853,7 @@ func (r *ReconcileClusterDeployment) resolveControllerRef(namespace string, cont
 }
 
 // When a clusterprovision is created, update the expectations of the clusterdeployment that owns the clusterprovision.
-func (r *ReconcileClusterDeployment) trackClusterProvisionAdd(obj interface{}) {
+func (r *ReconcileClusterDeployment) trackClusterProvisionAdd(obj any) {
 	provision := obj.(*hivev1.ClusterProvision)
 	if provision.DeletionTimestamp != nil {
 		// on a restart of the controller, it's possible a new object shows up in a state that

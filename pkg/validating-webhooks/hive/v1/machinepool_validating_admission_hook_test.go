@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
@@ -59,7 +59,7 @@ func Test_MachinePoolAdmission_Validate_Kind(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder(t))
+			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -97,7 +97,7 @@ func Test_MachinePoolAdmission_Validate_Operation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder(t))
+			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -171,7 +171,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "zero replicas",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64(0)
+				pool.Spec.Replicas = ptr.To(int64(0))
 				return pool
 			}(),
 			expectAllowed: true,
@@ -180,7 +180,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "positive replicas",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64(1)
+				pool.Spec.Replicas = ptr.To(int64(1))
 				return pool
 			}(),
 			expectAllowed: true,
@@ -189,7 +189,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "negative replicas",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64(-1)
+				pool.Spec.Replicas = ptr.To(int64(-1))
 				return pool
 			}(),
 		},
@@ -197,7 +197,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 			name: "replicas and autoscaling",
 			provision: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64(1)
+				pool.Spec.Replicas = ptr.To(int64(1))
 				pool.Spec.Autoscaling = &hivev1.MachinePoolAutoscaling{}
 				return pool
 			}(),
@@ -493,7 +493,7 @@ func Test_MachinePoolAdmission_Validate_Create(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder(t))
+			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			rawProvision, err := json.Marshal(tc.provision)
 			if !assert.NoError(t, err, "unexpected error marshalling provision") {
@@ -550,7 +550,7 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 			old:  testMachinePool(),
 			new: func() *hivev1.MachinePool {
 				pool := testMachinePool()
-				pool.Spec.Replicas = pointer.Int64(5)
+				pool.Spec.Replicas = ptr.To(int64(5))
 				return pool
 			}(),
 			expectAllowed: true,
@@ -606,7 +606,7 @@ func Test_MachinePoolAdmission_Validate_Update(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder(t))
+			cut := NewMachinePoolValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			oldAsJSON, err := json.Marshal(tc.old)
 			if !assert.NoError(t, err, "unexpected error marshalling old provision") {

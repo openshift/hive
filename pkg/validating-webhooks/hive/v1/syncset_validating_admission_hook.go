@@ -26,14 +26,14 @@ const (
 	syncSetResource = "syncsets"
 )
 
-var invalidResourceGroupKinds = map[string]map[string]bool{
-	"authorization.openshift.io": {
-		"Role":                true,
-		"RoleBinding":         true,
-		"ClusterRole":         true,
-		"ClusterRoleBinding":  true,
-		"SubjectAccessReview": true,
-	},
+var invalidResourceGroupKinds = map[string]sets.Set[string]{
+	"authorization.openshift.io": sets.New(
+		"Role",
+		"RoleBinding",
+		"ClusterRole",
+		"ClusterRoleBinding",
+		"SubjectAccessReview",
+	),
 }
 
 // HIVE-2807: "" is defaulted to "strategic" in code.
@@ -294,7 +294,7 @@ func validateResource(resource runtime.RawExtension, fldPath *field.Path) field.
 		return allErrs
 	}
 
-	if invalidResourceGroupKinds[u.GroupVersionKind().Group][u.GetKind()] {
+	if invalidResourceGroupKinds[u.GroupVersionKind().Group].Has(u.GetKind()) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("APIVersion"), u.GetAPIVersion(), "must use kubernetes group for this resource kind"))
 	}
 

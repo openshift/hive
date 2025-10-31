@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	golog "log"
-	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -258,7 +257,6 @@ func main() {
 		log.WithField("pprof_host_port", pprofHostPort).Info("Enabling pprof")
 		log.Println(http.ListenAndServe(pprofHostPort, nil))
 	}()
-	rand.Seed(time.Now().UnixNano())
 	cmd := newRootCommand()
 	err := cmd.Execute()
 	if err != nil {

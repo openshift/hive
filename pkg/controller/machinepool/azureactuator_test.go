@@ -11,7 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
@@ -139,7 +139,7 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool: func() *hivev1.MachinePool {
 				p := testAzurePool()
-				p.Spec.Replicas = pointer.Int64(5)
+				p.Spec.Replicas = ptr.To(int64(5))
 				return p
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -342,7 +342,7 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment412(),
 			pool: func() *hivev1.MachinePool {
 				p := testAzurePool()
-				p.Spec.Replicas = pointer.Int64(5)
+				p.Spec.Replicas = ptr.To(int64(5))
 				return p
 			}(),
 			mockAzureClient: func(mockCtrl *gomock.Controller, client *mockazure.MockClient) {
@@ -556,10 +556,10 @@ func mockListResourceSKUs(mockCtrl *gomock.Controller, client *mockazure.MockCli
 	page.EXPECT().Values().Return(
 		[]compute.ResourceSku{
 			{
-				Name: pointer.String(testInstanceType),
+				Name: ptr.To(testInstanceType),
 				LocationInfo: &[]compute.ResourceSkuLocationInfo{
 					{
-						Location: pointer.String(testRegion),
+						Location: ptr.To(testRegion),
 						Zones:    &zones,
 					},
 				},
@@ -612,7 +612,7 @@ func testAzureClusterDeployment() *hivev1.ClusterDeployment {
 	}
 	cd.Spec.ClusterMetadata.Platform = &hivev1.ClusterPlatformMetadata{
 		Azure: &hivev1azure.Metadata{
-			ResourceGroupName: pointer.String("foo-12345-rg"),
+			ResourceGroupName: ptr.To("foo-12345-rg"),
 		},
 	}
 	return cd

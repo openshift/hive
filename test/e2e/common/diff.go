@@ -2,10 +2,11 @@ package common
 
 import (
 	"encoding/json"
-	"github.com/evanphx/json-patch"
+
+	jsonpatch "github.com/evanphx/json-patch"
 )
 
-func JSONDiff(a, b interface{}) ([]byte, error) {
+func JSONDiff(a, b any) ([]byte, error) {
 	jsonA, err := json.Marshal(a)
 	if err != nil {
 		return nil, err

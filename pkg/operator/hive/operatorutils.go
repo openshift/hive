@@ -46,7 +46,7 @@ type gvrNSName struct {
 	name      string
 }
 
-func computeHash(data interface{}, additionalHashes ...string) string {
+func computeHash(data any, additionalHashes ...string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(fmt.Sprintf("%v", data)))
 	for _, h := range additionalHashes {

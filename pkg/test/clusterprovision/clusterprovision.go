@@ -6,7 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -99,8 +99,8 @@ func WithStage(stage hivev1.ClusterProvisionStage) Option {
 func Successful(clusterID, infraID, kubeconfigSecretName, passwordSecretName string) Option {
 	return func(clusterProvision *hivev1.ClusterProvision) {
 		clusterProvision.Spec.Stage = hivev1.ClusterProvisionStageComplete
-		clusterProvision.Spec.ClusterID = pointer.String(clusterID)
-		clusterProvision.Spec.InfraID = pointer.String(infraID)
+		clusterProvision.Spec.ClusterID = ptr.To(clusterID)
+		clusterProvision.Spec.InfraID = ptr.To(infraID)
 		clusterProvision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: kubeconfigSecretName}
 		clusterProvision.Spec.AdminPasswordSecretRef = &corev1.LocalObjectReference{Name: passwordSecretName}
 	}

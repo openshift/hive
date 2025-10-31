@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
+	awscreds "github.com/openshift/hive/pkg/creds/aws"
 	"github.com/openshift/installer/pkg/destroy/aws"
 )
 
@@ -65,7 +65,7 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []s
 			"This is expected when in standalone mode. "+
 			"We expect to find your AWS credentials in one of the usual places.", err)
 	}
-	awsutils.ConfigureCreds(client, nil)
+	awscreds.ConfigureCreds(client, nil)
 
 	return nil
 }

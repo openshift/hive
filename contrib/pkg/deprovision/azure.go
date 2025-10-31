@@ -11,7 +11,7 @@ import (
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
+	azurecreds "github.com/openshift/hive/pkg/creds/azure"
 )
 
 // AzureOptions is the set of options to deprovision an Azure cluster
@@ -55,7 +55,7 @@ func NewDeprovisionAzureCommand(logLevel string) *cobra.Command {
 }
 
 func validate() error {
-	_, err := azureutils.GetCreds("")
+	_, err := azurecreds.GetCreds("")
 	if err != nil {
 		return errors.Wrap(err, "failed to get Azure credentials")
 	}
@@ -74,7 +74,7 @@ func (opt *AzureOptions) completeAzureUninstaller(args []string) (providers.Dest
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get client")
 	}
-	azureutils.ConfigureCreds(client, nil)
+	azurecreds.ConfigureCreds(client, nil)
 
 	metadata := &types.ClusterMetadata{
 		InfraID: args[0],

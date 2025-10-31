@@ -7,7 +7,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -27,7 +26,6 @@ func TestLiveGCP(t *testing.T) {
 	if rootDomain == "" {
 		t.SkipNow()
 	}
-	rand.Seed(time.Now().UnixNano())
 	suite.Run(t, &LiveGCPTestSuite{rootDomain: rootDomain})
 }
 

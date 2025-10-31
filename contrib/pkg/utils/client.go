@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/watch"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -24,7 +23,9 @@ func (w wwClient) Watch(ctx context.Context, obj client.ObjectList, opts ...clie
 
 // GetClient returns a new dynamic controller-runtime client.
 func GetClient(fieldManager string) (client.WithWatch, error) {
-	cfg, err := GetClientConfig()
+	cfg, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(), &clientcmd.ConfigOverrides{}).
+		ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -38,11 +39,4 @@ func GetClient(fieldManager string) (client.WithWatch, error) {
 		Client: client.WithFieldOwner(dynamicClient, fieldManager),
 		w:      dynamicClient,
 	}, nil
-}
-
-// GetClientConfig gets the config for the REST client.
-func GetClientConfig() (*restclient.Config, error) {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
-	return kubeconfig.ClientConfig()
 }

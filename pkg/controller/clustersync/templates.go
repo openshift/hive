@@ -60,9 +60,9 @@ func fromCDLabel(cd *hivev1.ClusterDeployment) func(string) string {
 // The template is executed with a `nil` data object -- i.e. templates referring to `.` ("dot")
 // will not work. This really exists only to support invoking functions in the template's FuncMap.
 // We expect `v` to be a descendant of an Unstructured.Object, and thus limited to types
-// string, float, int, bool, []interface{}, or map[string]interface{} (where the list/map
-// interface{} values are similarly limited, recursively).
-func applyTemplate(t *template.Template, v interface{}) (interface{}, error) {
+// string, float, int, bool, []any, or map[string]any (where the list/map
+// any values are similarly limited, recursively).
+func applyTemplate(t *template.Template, v any) (any, error) {
 	ival := reflect.ValueOf(v)
 	switch ival.Kind() {
 	case reflect.String:

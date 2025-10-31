@@ -17,7 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machinev1 "github.com/openshift/api/machine/v1beta1"
@@ -64,7 +64,7 @@ func TestScaleMachinePool(t *testing.T) {
 		logger.Infof("expected Machine name prefix: %s", machinePrefix)
 
 		logger.Info("scaling pool to 1 replicas")
-		pool.Spec.Replicas = pointer.Int64(1)
+		pool.Spec.Replicas = ptr.To(int64(1))
 		return c.Update(context.TODO(), pool)
 	})
 	require.NoError(t, err, "cannot update worker machine pool to reduce replicas")
@@ -81,7 +81,7 @@ func TestScaleMachinePool(t *testing.T) {
 		require.NotNilf(t, pool, "worker machine pool does not exist: %s", workerMachinePoolName)
 
 		logger.Info("scaling pool back to 3 replicas")
-		pool.Spec.Replicas = pointer.Int64(3)
+		pool.Spec.Replicas = ptr.To(int64(3))
 		return c.Update(context.TODO(), pool)
 	})
 	require.NoError(t, err, "cannot update worker machine pool to increase replicas")
@@ -111,7 +111,7 @@ func TestNewMachinePool(t *testing.T) {
 		Spec: hivev1.MachinePoolSpec{
 			ClusterDeploymentRef: corev1.LocalObjectReference{Name: cd.Name},
 			Name:                 infraMachinePoolName,
-			Replicas:             pointer.Int64(3),
+			Replicas:             ptr.To(int64(3)),
 			Labels: map[string]string{
 				"openshift.io/machine-type": infraMachinePoolName,
 			},
@@ -282,7 +282,8 @@ func TestAutoscalingMachinePool(t *testing.T) {
 
 	logger.Info("lowering autoscaler delay so scaling down happens faster")
 	clusterAutoscaler := &autoscalingv1.ClusterAutoscaler{}
-	for i := 0; i < 10; i++ {
+poll:
+	for range 10 {
 		switch err := rc.Get(context.Background(), client.ObjectKey{Name: "default"}, clusterAutoscaler); {
 		case apierrors.IsNotFound(err):
 			t.Log("waiting for Hive to create cluster autoscaler")
@@ -291,7 +292,7 @@ func TestAutoscalingMachinePool(t *testing.T) {
 			t.Fatalf("could not get the cluster autoscaler: %v", err)
 		default:
 			t.Log("found cluster autoscaler")
-			break
+			break poll
 		}
 	}
 	machineSetList := &machinev1.MachineSetList{}
@@ -308,10 +309,10 @@ func TestAutoscalingMachinePool(t *testing.T) {
 	if clusterAutoscaler.Spec.ScaleDown == nil {
 		clusterAutoscaler.Spec.ScaleDown = &autoscalingv1.ScaleDownConfig{}
 	}
-	clusterAutoscaler.Spec.ScaleDown.DelayAfterAdd = pointer.String("10s")
-	clusterAutoscaler.Spec.ScaleDown.DelayAfterDelete = pointer.String("10s")
-	clusterAutoscaler.Spec.ScaleDown.DelayAfterFailure = pointer.String("10s")
-	clusterAutoscaler.Spec.ScaleDown.UnneededTime = pointer.String("10s")
+	clusterAutoscaler.Spec.ScaleDown.DelayAfterAdd = ptr.To("10s")
+	clusterAutoscaler.Spec.ScaleDown.DelayAfterDelete = ptr.To("10s")
+	clusterAutoscaler.Spec.ScaleDown.DelayAfterFailure = ptr.To("10s")
+	clusterAutoscaler.Spec.ScaleDown.UnneededTime = ptr.To("10s")
 	err = rc.Update(context.Background(), clusterAutoscaler)
 	require.NoError(t, err, "could not update the cluster autoscaler")
 
@@ -326,7 +327,7 @@ func TestAutoscalingMachinePool(t *testing.T) {
 			Name:      "busybox",
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: pointer.Int32(100),
+			Replicas: ptr.To(int32(100)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"scaling-app": "busybox",
@@ -355,14 +356,14 @@ func TestAutoscalingMachinePool(t *testing.T) {
 							},
 						},
 						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: pointer.Bool(false),
+							AllowPrivilegeEscalation: ptr.To(false),
 							Capabilities: &corev1.Capabilities{
 								Drop: []corev1.Capability{"ALL"},
 							},
 						},
 					}},
 					SecurityContext: &corev1.PodSecurityContext{
-						RunAsNonRoot: pointer.Bool(true),
+						RunAsNonRoot: ptr.To(true),
 						SeccompProfile: &corev1.SeccompProfile{
 							Type: corev1.SeccompProfileTypeRuntimeDefault,
 						},
@@ -396,7 +397,7 @@ func TestAutoscalingMachinePool(t *testing.T) {
 		pool = common.GetMachinePool(c, cd, "worker")
 		require.NotNil(t, pool, "worker machine pool does not exist")
 
-		pool.Spec.Replicas = pointer.Int64(3)
+		pool.Spec.Replicas = ptr.To(int64(3))
 		pool.Spec.Autoscaling = nil
 		return c.Update(context.TODO(), pool)
 	})

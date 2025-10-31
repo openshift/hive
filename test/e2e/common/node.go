@@ -39,9 +39,9 @@ func WaitForNodes(cfg *rest.Config, testFunc func([]*corev1.Node) bool, timeOut 
 	}
 	informer.AddEventHandler(
 		&clientcache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { onUpdate() },
-			UpdateFunc: func(oldObj, newObj interface{}) { onUpdate() },
-			DeleteFunc: func(obj interface{}) { onUpdate() },
+			AddFunc:    func(obj any) { onUpdate() },
+			UpdateFunc: func(oldObj, newObj any) { onUpdate() },
+			DeleteFunc: func(obj any) { onUpdate() },
 		})
 
 	ctx, stop := context.WithCancel(context.Background())

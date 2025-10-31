@@ -205,6 +205,18 @@ func (a *ClusterDeploymentValidatingAdmissionHook) shouldValidate(admissionSpec 
 	return true
 }
 
+func creationHooksDisabled(o metav1.Object) bool {
+	v, ok := o.GetLabels()[constants.DisableCreationWebHookForDisasterRecovery]
+	if !ok {
+		return false
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false
+	}
+	return b
+}
+
 // validateCreate specifically validates create operations for ClusterDeployment objects.
 func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{

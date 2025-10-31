@@ -9,7 +9,8 @@ import (
 	"github.com/openshift/hive/pkg/ibmclient"
 	mockibm "github.com/openshift/hive/pkg/ibmclient/mock"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/utils/pointer"
+
+	"k8s.io/utils/ptr"
 )
 
 func TestGetCISInstanceCRN(t *testing.T) {
@@ -89,7 +90,7 @@ func TestGetAccountID(t *testing.T) {
 		{
 			name: "AccountID Found",
 			existingAPIKey: &iamidentityv1.APIKey{
-				AccountID: pointer.String("testaccountid"),
+				AccountID: ptr.To("testaccountid"),
 			},
 			expectErr: false,
 		},

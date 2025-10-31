@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
+	openstackcreds "github.com/openshift/hive/pkg/creds/openstack"
 	"github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/types"
 	typesopenstack "github.com/openshift/installer/pkg/types/openstack"
@@ -56,7 +56,7 @@ func (o *openStackOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	openstackutils.ConfigureCreds(client, nil)
+	openstackcreds.ConfigureCreds(client, nil)
 
 	return nil
 }

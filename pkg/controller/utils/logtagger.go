@@ -48,8 +48,8 @@ func (s StringLogTagger) GetAdditionalLogFieldsJSON() *string {
 
 var _ AdditionalLogFieldHavinThing = StringLogTagger{}
 
-func parseLogFields(jsonMap string) (map[string]interface{}, error) {
-	kvmap := map[string]interface{}{}
+func parseLogFields(jsonMap string) (map[string]any, error) {
+	kvmap := map[string]any{}
 	if err := json.Unmarshal([]byte(jsonMap), &kvmap); err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func parseLogFields(jsonMap string) (map[string]interface{}, error) {
 // no such fields are found, both returns are nil -- this is not considered an error. If
 // parsing succeeds, the first return is the unmarshaled map and the second return is nil. If
 // parsing fails, the map is nil and the error is bubbled up.
-func ExtractLogFields[O AdditionalLogFieldHavinThing](obj O) (map[string]interface{}, error) {
+func ExtractLogFields[O AdditionalLogFieldHavinThing](obj O) (map[string]any, error) {
 	addl_log_fields := obj.GetAdditionalLogFieldsJSON()
 	if addl_log_fields == nil {
 		return nil, nil

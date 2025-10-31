@@ -59,13 +59,13 @@ func GetResourceHelper(controllerName hivev1.ControllerName, logger log.FieldLog
 		logger.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
-	return resource.NewHelperFromRESTConfig(cfg, controllerName, logger)
+	return resource.NewHelper(logger, resource.FromRESTConfig(cfg), resource.WithControllerName(controllerName))
 }
 
 func DefaultNamespace() (string, error) {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
-	ns, _, err := kubeconfig.Namespace()
+	ns, _, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(), &clientcmd.ConfigOverrides{}).
+		Namespace()
 	return ns, err
 }
 

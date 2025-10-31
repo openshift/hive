@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -1151,7 +1151,7 @@ func (r *ReconcileMachinePool) syncClusterAutoscaler(
 			ScaleDown: &autoscalingv1.ScaleDownConfig{
 				Enabled: true,
 			},
-			BalanceSimilarNodeGroups: pointer.Bool(true),
+			BalanceSimilarNodeGroups: ptr.To(true),
 		},
 	}
 	if err := remoteClusterAPIClient.Create(context.Background(), defaultClusterAutoscaler); err != nil {

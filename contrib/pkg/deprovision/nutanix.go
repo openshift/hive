@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
 	"github.com/openshift/hive/pkg/constants"
+	nutanixcreds "github.com/openshift/hive/pkg/creds/nutanix"
 	"github.com/openshift/installer/pkg/destroy/nutanix"
 	"github.com/openshift/installer/pkg/types"
 	typesnutanix "github.com/openshift/installer/pkg/types/nutanix"
@@ -26,8 +26,10 @@ type nutanixOptions struct {
 	password string
 }
 
-func NewDeprovisionNutanixCommand() *cobra.Command {
-	opt := &nutanixOptions{}
+func NewDeprovisionNutanixCommand(logLevel string) *cobra.Command {
+	opt := &nutanixOptions{
+		logLevel: logLevel,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "nutanix INFRAID",
@@ -46,7 +48,6 @@ func NewDeprovisionNutanixCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.endpoint, constants.CliNutanixPcAddressOpt, "", "Domain name or IP address of the Nutanix Prism Central endpoint")
 	flags.StringVar(&opt.port, constants.CliNutanixPcPortOpt, "", "Port of the Nutanix Prism Central endpoint")
 	return cmd
@@ -60,7 +61,7 @@ func (o *nutanixOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	nutanixutils.ConfigureCreds(client)
+	nutanixcreds.ConfigureCreds(client, nil)
 
 	return nil
 }

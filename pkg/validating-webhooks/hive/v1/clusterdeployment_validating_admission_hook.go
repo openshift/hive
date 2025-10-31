@@ -205,6 +205,18 @@ func (a *ClusterDeploymentValidatingAdmissionHook) shouldValidate(admissionSpec 
 	return true
 }
 
+func creationHooksDisabled(o metav1.Object) bool {
+	v, ok := o.GetLabels()[constants.DisableCreationWebHookForDisasterRecovery]
+	if !ok {
+		return false
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false
+	}
+	return b
+}
+
 // validateCreate specifically validates create operations for ClusterDeployment objects.
 func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec *admissionv1beta1.AdmissionRequest) *admissionv1beta1.AdmissionResponse {
 	contextLogger := log.WithFields(log.Fields{
@@ -709,6 +721,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 						// copy over the value to spoof the immutability checker
 						oldObject.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID = cd.Spec.ClusterMetadata.Platform.GCP.NetworkProjectID
 					}
+				}
+				// Special case: allow setting or changing -- but not unsetting -- MetadataJSONSecretRef
+				if cd.Spec.ClusterMetadata.MetadataJSONSecretRef != nil && cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name != "" {
+					// copy over the value to spoof the immutability checker
+					oldObject.Spec.ClusterMetadata.MetadataJSONSecretRef = cd.Spec.ClusterMetadata.MetadataJSONSecretRef
 				}
 				allErrs = append(allErrs, apivalidation.ValidateImmutableField(cd.Spec.ClusterMetadata, oldObject.Spec.ClusterMetadata, specPath.Child("clusterMetadata"))...)
 			}

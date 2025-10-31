@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -58,7 +58,7 @@ func testClusterProvisionWithInfraIDSet() *hivev1.ClusterProvision {
 				Name: testDeploymentName,
 			},
 			Stage:   hivev1.ClusterProvisionStageProvisioning,
-			InfraID: pointer.String("dummy-infra-id"),
+			InfraID: ptr.To("dummy-infra-id"),
 		},
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -29,7 +28,6 @@ func TestLiveAzure(t *testing.T) {
 	if rootDomain == "" {
 		t.SkipNow()
 	}
-	rand.Seed(time.Now().UnixNano())
 	suite.Run(t, &LiveAzureTestSuite{
 		resourceGroupName: resourceGroupName,
 		rootDomain:        rootDomain,

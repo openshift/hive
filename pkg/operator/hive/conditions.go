@@ -1,4 +1,4 @@
-package util
+package hive
 
 import (
 	hivev1 "github.com/openshift/hive/apis/hive/v1"

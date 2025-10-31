@@ -46,7 +46,10 @@ func TestDestroyCluster(t *testing.T) {
 		logger.Warn("Cluster deployment did not finish installing")
 	}
 
-	fail := failTestFunc(t, logger)
+	fail := func(format string, args ...any) {
+		logger.Error(fmt.Sprintf(format, args...))
+		t.Fatalf(format, args...)
+	}
 
 	c := common.MustGetClient()
 	logger.Info("Deleting cluster deployment")
@@ -220,11 +223,4 @@ func waitForClusterDeploymentToGoAway(cd *hivev1.ClusterDeployment, cl client.Wi
 		return errors.Wrap(err, "failed to wait for cluster deployment to be deleted")
 	}
 	return nil
-}
-
-func failTestFunc(t *testing.T, logger *log.Entry) func(string, ...interface{}) {
-	return func(format string, args ...interface{}) {
-		log.Error(fmt.Sprintf(format, args...))
-		t.Fatalf(format, args...)
-	}
 }

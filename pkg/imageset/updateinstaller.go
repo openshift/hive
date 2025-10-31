@@ -264,10 +264,7 @@ func (o *UpdateInstallerImageOptions) setImageResolutionErrorCondition(cd *hivev
 }
 
 func getClient(kubeConfig *rest.Config, fieldManager string) (client.Client, error) {
-	scheme := scheme.GetScheme()
-
 	managerOptions := manager.Options{
-		Scheme:         scheme,
 		MapperProvider: apiutil.NewDynamicRESTMapper,
 	}
 	httpClient, err := rest.HTTPClientFor(kubeConfig)
@@ -279,7 +276,7 @@ func getClient(kubeConfig *rest.Config, fieldManager string) (client.Client, err
 		return nil, fmt.Errorf("failed to get API Group-Resources")
 	}
 	kubeClient, err := client.New(kubeConfig, client.Options{
-		Scheme: scheme,
+		Scheme: scheme.GetScheme(),
 		Mapper: mapper,
 	})
 	if err != nil {

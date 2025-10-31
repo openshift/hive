@@ -2,13 +2,10 @@ package installmanager
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
 	installertypes "github.com/openshift/installer/pkg/types"
 )
-
-const fakeMetadataFormatStr = `{"aws":{"identifier":[{"kubernetes.io/cluster/fake-infraid":"owned"},{"openshiftClusterID":"%s"}],"region":"us-east-1"},"clusterID":"%s","clusterName":"%s","infraID":"fake-infra-id"}`
 
 func fakeLoadAdminPassword(m *InstallManager) (string, error) {
 	m.log.Warn("loading fake admin password")
@@ -18,13 +15,15 @@ func fakeLoadAdminPassword(m *InstallManager) (string, error) {
 func fakeReadClusterMetadata(m *InstallManager) ([]byte, *installertypes.ClusterMetadata, error) {
 	m.log.Warn("returning fake cluster metadata")
 	clusterID := "fake-cluster-" + uuid.New().String()
-	metadataBytes := []byte(fmt.Sprintf(fakeMetadataFormatStr, clusterID, clusterID, m.ClusterProvision.Spec.ClusterDeploymentRef.Name))
 
-	// Extract and save the cluster ID, this step is critical and a failure here
-	// should abort the install. Note that this is run *before* we begin provisioning cloud
-	// resources.
-	md := &installertypes.ClusterMetadata{}
-	if err := json.Unmarshal(metadataBytes, md); err != nil {
+	// The caller cares that this contains ClusterID and InfraID.
+	// We'll replace this whole thing in a special code path before it's used for deprovision.
+	md := &installertypes.ClusterMetadata{
+		ClusterID: clusterID,
+		InfraID:   clusterID,
+	}
+	metadataBytes, err := json.Marshal(md)
+	if err != nil {
 		m.log.WithError(err).Error("error unmarshalling cluster metadata")
 		return nil, nil, err
 	}

@@ -30,7 +30,7 @@ func TestAzureGet(t *testing.T) {
 				azure.recordSetPage(azure.withRecordSets(azure.recordSet("test-subdomain", "NS", "test-ns"))),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain.test-domain": sets.New[string]("test-ns"),
+				"test-subdomain.test-domain": sets.New("test-ns"),
 			},
 		},
 		{
@@ -51,7 +51,7 @@ func TestAzureGet(t *testing.T) {
 				azure.recordSetPage(azure.withRecordSets(azure.recordSet("test-subdomain", "NS", "test-ns-1", "test-ns-2", "test-ns-3"))),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain.test-domain": sets.New[string]("test-ns-1", "test-ns-2", "test-ns-3"),
+				"test-subdomain.test-domain": sets.New("test-ns-1", "test-ns-2", "test-ns-3"),
 			},
 		},
 		{
@@ -64,9 +64,9 @@ func TestAzureGet(t *testing.T) {
 				)),
 			},
 			expectedNameServers: map[string]sets.Set[string]{
-				"test-subdomain-1.test-domain": sets.New[string]("test-ns-1"),
-				"test-subdomain-2.test-domain": sets.New[string]("test-ns-2"),
-				"test-subdomain-3.test-domain": sets.New[string]("test-ns-3"),
+				"test-subdomain-1.test-domain": sets.New("test-ns-1"),
+				"test-subdomain-2.test-domain": sets.New("test-ns-2"),
+				"test-subdomain-3.test-domain": sets.New("test-ns-3"),
 			},
 		},
 	}

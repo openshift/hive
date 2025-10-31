@@ -48,8 +48,8 @@ func (s StringLogTagger) GetAdditionalLogFieldsJSON() *string {
 
 var _ AdditionalLogFieldHavinThing = StringLogTagger{}
 
-func parseLogFields(jsonMap string) (map[string]interface{}, error) {
-	kvmap := map[string]interface{}{}
+func parseLogFields(jsonMap string) (map[string]any, error) {
+	kvmap := map[string]any{}
 	if err := json.Unmarshal([]byte(jsonMap), &kvmap); err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func parseLogFields(jsonMap string) (map[string]interface{}, error) {
 // no such fields are found, both returns are nil -- this is not considered an error. If
 // parsing succeeds, the first return is the unmarshaled map and the second return is nil. If
 // parsing fails, the map is nil and the error is bubbled up.
-func ExtractLogFields[O AdditionalLogFieldHavinThing](obj O) (map[string]interface{}, error) {
+func ExtractLogFields[O AdditionalLogFieldHavinThing](obj O) (map[string]any, error) {
 	addl_log_fields := obj.GetAdditionalLogFieldsJSON()
 	if addl_log_fields == nil {
 		return nil, nil
@@ -106,7 +106,7 @@ func AddLogFieldsEnvVar(from metav1.Object, to *batchv1.Job) {
 	}
 }
 
-func CopyLogAnnotation(from, to metav1.Object) bool {
+func CopyAnnotations(from, to metav1.Object, keys ...string) bool {
 	froma := from.GetAnnotations()
 	if froma == nil {
 		// Spoof empty so we can delete the annotation if it exists on `to`
@@ -119,15 +119,17 @@ func CopyLogAnnotation(from, to metav1.Object) bool {
 	}
 
 	changed := false
-	key := constants.AdditionalLogFieldsAnnotation
-	fromv, fromexists := froma[key]
-	tov, toexists := toa[key]
-	if fromexists && fromv != tov {
-		changed = true
-		toa[key] = fromv
-	} else if !fromexists && toexists {
-		changed = true
-		delete(toa, key)
+
+	for _, key := range keys {
+		fromv, fromexists := froma[key]
+		tov, toexists := toa[key]
+		if fromexists && fromv != tov {
+			changed = true
+			toa[key] = fromv
+		} else if !fromexists && toexists {
+			changed = true
+			delete(toa, key)
+		}
 	}
 
 	if changed {
@@ -135,4 +137,8 @@ func CopyLogAnnotation(from, to metav1.Object) bool {
 	}
 
 	return changed
+}
+
+func CopyLogAnnotation(from, to metav1.Object) bool {
+	return CopyAnnotations(from, to, constants.AdditionalLogFieldsAnnotation)
 }

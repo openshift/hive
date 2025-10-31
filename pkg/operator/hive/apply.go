@@ -1,4 +1,4 @@
-package util
+package hive
 
 import (
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"

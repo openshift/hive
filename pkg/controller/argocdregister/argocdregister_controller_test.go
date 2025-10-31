@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -47,6 +47,7 @@ current-context: admin
 `
 	adminPasswordSecret = "foo-lqmsh-admin-password"
 	adminPassword       = "foo"
+	metadataSecret      = "metadata-json-secret"
 
 	pullSecretSecret = "pull-secret"
 	credsSecret      = "aws-credentials"
@@ -274,6 +275,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			InfraID:                  testInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: adminKubeconfigSecret},
 			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: adminPasswordSecret},
+			MetadataJSONSecretRef:    &corev1.LocalObjectReference{Name: metadataSecret},
 		},
 	}
 
@@ -285,8 +287,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
 		APIURL:         "http://test-api.test.com",
-		InstallerImage: pointer.String("installer-image:latest"),
-		CLIImage:       pointer.String("cli:latest"),
+		InstallerImage: ptr.To("installer-image:latest"),
+		CLIImage:       ptr.To("cli:latest"),
 	}
 
 	return cd

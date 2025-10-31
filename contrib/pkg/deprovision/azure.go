@@ -11,7 +11,7 @@ import (
 	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
+	azurecreds "github.com/openshift/hive/pkg/creds/azure"
 )
 
 // AzureOptions is the set of options to deprovision an Azure cluster
@@ -23,8 +23,10 @@ type AzureOptions struct {
 }
 
 // NewDeprovisionAzureCommand is the entrypoint to create the azure deprovision subcommand
-func NewDeprovisionAzureCommand() *cobra.Command {
-	opt := &AzureOptions{}
+func NewDeprovisionAzureCommand(logLevel string) *cobra.Command {
+	opt := &AzureOptions{
+		logLevel: logLevel,
+	}
 	cmd := &cobra.Command{
 		Use:   "azure INFRAID [--azure-cloud-name CLOUDNAME] [--azure-resource-group-name RG] [--azure-base-domain-resource-group-name BDRG]",
 		Short: "Deprovision Azure assets (as created by openshift-installer)",
@@ -46,7 +48,6 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.cloudName, "azure-cloud-name", installertypesazure.PublicCloud.Name(), "The name of the Azure cloud environment used to configure the Azure SDK")
 	flags.StringVar(&opt.resourceGroupName, "azure-resource-group-name", "", "The name of the custom Azure resource group in which the cluster was created when not using the default installer-created resource group")
 	flags.StringVar(&opt.baseDomainResourceGroupName, "azure-base-domain-resource-group-name", "", "The name of the custom Azure resource group in which the cluster's DNS records were created when not using the default installer-created resource group or custom resource group")
@@ -54,7 +55,7 @@ func NewDeprovisionAzureCommand() *cobra.Command {
 }
 
 func validate() error {
-	_, err := azureutils.GetCreds("")
+	_, err := azurecreds.GetCreds("")
 	if err != nil {
 		return errors.Wrap(err, "failed to get Azure credentials")
 	}
@@ -73,7 +74,7 @@ func (opt *AzureOptions) completeAzureUninstaller(args []string) (providers.Dest
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get client")
 	}
-	azureutils.ConfigureCreds(client)
+	azurecreds.ConfigureCreds(client, nil)
 
 	metadata := &types.ClusterMetadata{
 		InfraID: args[0],

@@ -314,7 +314,7 @@ func (r *ReconcileBackup) calculateObjectsChecksumWithoutStatus(logger log.Field
 
 	for i, object := range objects {
 		var meta *metav1.ObjectMeta
-		var spec interface{}
+		var spec any
 
 		switch t := object.(type) {
 		case *hivev1.ClusterDeployment:

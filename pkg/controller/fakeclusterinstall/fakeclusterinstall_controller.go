@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -167,7 +167,7 @@ func (r *ReconcileClusterInstall) Reconcile(ctx context.Context, request reconci
 		Kind:               cd.Kind,
 		Name:               cd.Name,
 		UID:                cd.UID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}
 	cdRefChanged := librarygocontroller.EnsureOwnerRef(fci, cdRef)
 	if cdRefChanged {

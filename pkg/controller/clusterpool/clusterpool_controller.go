@@ -870,7 +870,7 @@ func (r *ReconcileClusterPool) createCluster(
 	return cd, nil
 }
 
-func isInstallConfigSecret(obj interface{}) *corev1.Secret {
+func isInstallConfigSecret(obj any) *corev1.Secret {
 	if secret, ok := obj.(*corev1.Secret); ok {
 		_, ok := secret.StringData["install-config.yaml"]
 		if ok {

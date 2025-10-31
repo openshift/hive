@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -294,12 +295,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				}
 			}
 
-			accumulator.setMetrics(metricClusterDeploymentsTotal,
-				metricClusterDeploymentsInstalledTotal,
-				metricClusterDeploymentsUninstalledTotal,
-				metricClusterDeploymentsDeprovisioningTotal,
-				metricClusterDeploymentsWithConditionTotal,
-				mcLog)
+			accumulator.setMetrics(metricClusterDeploymentsTotal, metricClusterDeploymentsInstalledTotal, metricClusterDeploymentsUninstalledTotal, metricClusterDeploymentsDeprovisioningTotal, metricClusterDeploymentsWithConditionTotal)
 
 			// Also add metrics only for clusters created in last 48h
 			accumulator, err = newClusterAccumulator("48h", []string{"0h", "1h", "2h", "8h", "24h"})
@@ -311,12 +307,7 @@ func (mc *Calculator) Start(ctx context.Context) error {
 				accumulator.processCluster(&cd)
 			}
 
-			accumulator.setMetrics(metricClusterDeploymentsTotal,
-				metricClusterDeploymentsInstalledTotal,
-				metricClusterDeploymentsUninstalledTotal,
-				metricClusterDeploymentsDeprovisioningTotal,
-				metricClusterDeploymentsWithConditionTotal,
-				mcLog)
+			accumulator.setMetrics(metricClusterDeploymentsTotal, metricClusterDeploymentsInstalledTotal, metricClusterDeploymentsUninstalledTotal, metricClusterDeploymentsDeprovisioningTotal, metricClusterDeploymentsWithConditionTotal)
 		}
 		mcLog.Debug("calculating metrics across all install jobs")
 
@@ -516,8 +507,7 @@ type clusterAccumulator struct {
 
 	// clusterTypesSet will contain every cluster type we encounter during processing.
 	// Used to zero out some values which may no longer exist when setting the final metrics.
-	// Maps cluster type to a meaningless bool.
-	clusterTypesSet map[string]bool
+	clusterTypesSet sets.Set[string]
 }
 
 const (
@@ -538,7 +528,7 @@ func newClusterAccumulator(ageFilter string, durationBuckets []string) (*cluster
 		deprovisioning:  map[string]map[string]int{},
 		uninstalled:     map[string]map[string]int{},
 		conditions:      map[hivev1.ClusterDeploymentConditionType]map[string]int{},
-		clusterTypesSet: map[string]bool{},
+		clusterTypesSet: sets.New[string](),
 	}
 	var err error
 	if ageFilter != infinity {
@@ -607,7 +597,7 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 	clusterType := GetLabelValue(cd, hivev1.HiveClusterTypeLabel)
 	powerState := GetPowerStateValue(cd.Status.PowerState)
 	ca.ensureClusterTypeBuckets(clusterType, powerState)
-	ca.clusterTypesSet[clusterType] = true
+	ca.clusterTypesSet.Insert(clusterType)
 
 	ca.total[powerState][clusterType]++
 
@@ -649,7 +639,7 @@ func (ca *clusterAccumulator) processCluster(cd *hivev1.ClusterDeployment) {
 	}
 }
 
-func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovisioning, conditions *prometheus.GaugeVec, mcLog log.FieldLogger) {
+func (ca *clusterAccumulator) setMetrics(total, installed, uninstalled, deprovisioning, conditions *prometheus.GaugeVec) {
 
 	for k, v := range ca.total {
 		for clusterType := range ca.clusterTypesSet {

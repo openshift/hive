@@ -13,7 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -184,7 +184,7 @@ func (rt *reconcileTest) run(t *testing.T) {
 		Kind:               "ClusterDeployment",
 		Name:               testCDName,
 		UID:                testCDUID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}
 	assert.Contains(t, clusterSync.OwnerReferences, expectedOwnerReferenceFromClusterSync, "expected owner reference from ClusterSync to ClusterDeployment")
 
@@ -193,7 +193,7 @@ func (rt *reconcileTest) run(t *testing.T) {
 		Kind:               "ClusterSync",
 		Name:               testClusterSyncName,
 		UID:                testClusterSyncUID,
-		BlockOwnerDeletion: pointer.BoolPtr(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}
 	assert.Contains(t, lease.OwnerReferences, expectedOwnerReferenceFromLease, "expected owner reference from ClusterSyncLease to ClusterSync")
 
@@ -1161,16 +1161,16 @@ func TestReconcileClusterSync_ResourcesToDeleteAreOrdered(t *testing.T) {
 		testSecretMapping("test-secret", "namespace-B", "name-A"),
 	}
 	permutation := 0
-	roa := make([]interface{}, len(resourcesToApply))
+	roa := make([]any, len(resourcesToApply))
 	for i, r := range resourcesToApply {
 		roa[i] = r
 	}
-	sm := make([]interface{}, len(secretMappings))
+	sm := make([]any, len(secretMappings))
 	for i, m := range secretMappings {
 		sm[i] = m
 	}
-	permute(roa, func(roa []interface{}) {
-		permute(sm, func(sm []interface{}) {
+	permute(roa, func(roa []any) {
+		permute(sm, func(sm []any) {
 			resourcesToApply = make([]hivev1.MetaRuntimeObject, len(roa))
 			for i, r := range roa {
 				resourcesToApply[i] = r.(hivev1.MetaRuntimeObject)
@@ -2295,7 +2295,7 @@ func buildSyncLease(t time.Time) *hiveintv1alpha1.ClusterSyncLease {
 				Kind:               "ClusterSync",
 				Name:               testClusterSyncName,
 				UID:                testClusterSyncUID,
-				BlockOwnerDeletion: pointer.BoolPtr(true),
+				BlockOwnerDeletion: ptr.To(true),
 			}},
 		},
 		Spec: hiveintv1alpha1.ClusterSyncLeaseSpec{
@@ -2369,7 +2369,7 @@ func newApplyMatcher(resource hivev1.MetaRuntimeObject) gomock.Matcher {
 	return &applyMatcher{resource: u}
 }
 
-func (m *applyMatcher) Matches(x interface{}) bool {
+func (m *applyMatcher) Matches(x any) bool {
 	rawData, ok := x.([]byte)
 	if !ok {
 		return false
@@ -2390,7 +2390,7 @@ func (m *applyMatcher) String() string {
 	)
 }
 
-func (m *applyMatcher) Got(got interface{}) string {
+func (m *applyMatcher) Got(got any) string {
 	switch t := got.(type) {
 	case []byte:
 		return string(t)
@@ -2422,7 +2422,7 @@ func newYamlApplyMatcher(t *testing.T, yamlString string) gomock.Matcher {
 
 // Matches implements gomock.Matcher for yamlApplyMatcher such that, when a mismatch occurs,
 // the delta is emitted as a JSON patch string, allowing quick and easy visualization.
-func (m *yamlApplyMatcher) Matches(x interface{}) bool {
+func (m *yamlApplyMatcher) Matches(x any) bool {
 	bytes, ok := x.([]byte)
 	assert.True(m.t, ok, "Unexpectedly got %T instead of []byte", x)
 	diff, err := jsonpatch.CreateMergePatch(m.want, bytes)
@@ -2436,7 +2436,7 @@ func (m *yamlApplyMatcher) String() string {
 	return string(m.want)
 }
 
-func (m *yamlApplyMatcher) Got(got interface{}) string {
+func (m *yamlApplyMatcher) Got(got any) string {
 	switch t := got.(type) {
 	case []byte:
 		return string(t)
@@ -2455,7 +2455,7 @@ func newByteMatcher(s string) gomock.Matcher {
 	return &byteMatcher{want: s}
 }
 
-func (m *byteMatcher) Matches(x interface{}) bool {
+func (m *byteMatcher) Matches(x any) bool {
 	return string(x.([]byte)) == m.want
 }
 
@@ -2463,11 +2463,11 @@ func (m *byteMatcher) String() string {
 	return m.want
 }
 
-func (m *byteMatcher) Got(got interface{}) string {
+func (m *byteMatcher) Got(got any) string {
 	return string(got.([]byte))
 }
 
-func permute(x []interface{}, foo func([]interface{})) {
+func permute(x []any, foo func([]any)) {
 	switch l := len(x); l {
 	case 0:
 	case 1:
@@ -2475,7 +2475,7 @@ func permute(x []interface{}, foo func([]interface{})) {
 	default:
 		for i := 0; i < l; i++ {
 			x[0], x[i] = x[i], x[0]
-			permute(x[1:], func(y []interface{}) {
+			permute(x[1:], func(y []any) {
 				foo(append(x[0:1], y...))
 			})
 			x[0], x[i] = x[i], x[0]

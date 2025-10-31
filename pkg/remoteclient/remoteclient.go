@@ -82,13 +82,13 @@ func ConnectToRemoteCluster(
 	localClient client.Client,
 	logger log.FieldLogger,
 ) (remoteClient client.Client, unreachable, requeue bool) {
-	var rawRemoteClient interface{}
+	var rawRemoteClient any
 	rawRemoteClient, unreachable, requeue = connectToRemoteCluster(
 		cd,
 		remoteClientBuilder,
 		localClient,
 		logger,
-		func(builder Builder) (interface{}, error) { return builder.Build() },
+		func(builder Builder) (any, error) { return builder.Build() },
 	)
 	if unreachable {
 		return
@@ -102,8 +102,8 @@ func connectToRemoteCluster(
 	remoteClientBuilder Builder,
 	localClient client.Client,
 	logger log.FieldLogger,
-	buildFunc func(builder Builder) (interface{}, error),
-) (remoteClient interface{}, unreachable, requeue bool) {
+	buildFunc func(builder Builder) (any, error),
+) (remoteClient any, unreachable, requeue bool) {
 	if u, _ := Unreachable(cd); u {
 		logger.Debug("skipping cluster with unreachable condition")
 		unreachable = true

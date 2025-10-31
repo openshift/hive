@@ -12,7 +12,7 @@ import (
 	typesgcp "github.com/openshift/installer/pkg/types/gcp"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	gcpcreds "github.com/openshift/hive/pkg/creds/gcp"
 	"github.com/openshift/hive/pkg/gcpclient"
 )
 
@@ -26,8 +26,10 @@ type gcpOptions struct {
 }
 
 // NewDeprovisionGCPCommand is the entrypoint to create the GCP deprovision subcommand
-func NewDeprovisionGCPCommand() *cobra.Command {
-	opt := &gcpOptions{}
+func NewDeprovisionGCPCommand(logLevel string) *cobra.Command {
+	opt := &gcpOptions{
+		logLevel: logLevel,
+	}
 	cmd := &cobra.Command{
 		Use:   "gcp INFRAID --region=REGION",
 		Short: "Deprovision GCP assets (as created by openshift-installer)",
@@ -45,7 +47,6 @@ func NewDeprovisionGCPCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.Flags()
-	flags.StringVar(&opt.logLevel, "loglevel", "info", "log level, one of: debug, info, warn, error, fatal, panic")
 	flags.StringVar(&opt.region, "region", "", "GCP region where the cluster is installed")
 	flags.StringVar(&opt.networkProjectID, "network-project-id", "", "For shared VPC setups")
 	return cmd
@@ -59,7 +60,7 @@ func (o *gcpOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	gcputils.ConfigureCreds(client)
+	gcpcreds.ConfigureCreds(client, nil)
 
 	return nil
 }
@@ -72,7 +73,7 @@ func (o *gcpOptions) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("missing region")
 	}
 
-	creds, err := gcputils.GetCreds("")
+	creds, err := gcpcreds.GetCreds("")
 	if err != nil {
 		return errors.Wrap(err, "failed to get GCP credentials")
 	}

@@ -35,7 +35,7 @@ func WaitForAPIService(c apiregv1client.ApiregistrationV1Interface, name string,
 	logger.Infof("Waiting for APIService")
 	stop := make(chan struct{})
 	done := make(chan struct{})
-	onObject := func(obj interface{}) {
+	onObject := func(obj any) {
 		apiService, ok := obj.(*apiregv1.APIService)
 		if !ok {
 			logger.Warningf("object not APIService: %v", obj)
@@ -46,17 +46,16 @@ func WaitForAPIService(c apiregv1client.ApiregistrationV1Interface, name string,
 		}
 	}
 	watchList := cache.NewListWatchFromClient(c.RESTClient(), "apiservices", "", fields.OneTermEqualSelector("metadata.name", name))
-	_, controller := cache.NewInformer(
-		watchList,
-		&apiregv1.APIService{},
-		0,
-		cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: watchList,
+		ObjectType:    &apiregv1.APIService{},
+		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: onObject,
-			UpdateFunc: func(oldObject, newObject interface{}) {
+			UpdateFunc: func(oldObject, newObject any) {
 				onObject(newObject)
 			},
 		},
-	)
+	})
 	go controller.Run(stop)
 	defer func() { stop <- struct{}{} }()
 

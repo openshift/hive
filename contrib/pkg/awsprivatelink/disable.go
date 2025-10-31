@@ -5,7 +5,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	operatorutils "github.com/openshift/hive/pkg/operator/hive"
 
 	corev1 "k8s.io/api/core/v1"
@@ -78,8 +77,8 @@ func (o *disableOptions) Run(cmd *cobra.Command, args []string) error {
 	if err := common.DynamicClient.List(
 		context.Background(),
 		hubAcctSecrets,
-		client.MatchingFields{"metadata.name": awsutils.PrivateLinkHubAcctCredsName},
-		client.MatchingLabels{awsutils.PrivateLinkHubAcctCredsLabel: "true"},
+		client.MatchingFields{"metadata.name": privateLinkHubAcctCredsName},
+		client.MatchingLabels{privateLinkHubAcctCredsLabel: "true"},
 		client.InNamespace(hiveNS),
 	); err != nil {
 		log.WithError(err).Error("Failed to list Hub account credentials Secrets")

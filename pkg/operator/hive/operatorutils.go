@@ -11,13 +11,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/dynamic"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	"github.com/openshift/hive/pkg/util/scheme"
 )
+
+var appsCodecs = serializer.NewCodecFactory(scheme.GetScheme())
 
 func GetHiveNamespace(config *hivev1.HiveConfig) string {
 	if config.Spec.TargetNamespace == "" {
@@ -46,7 +51,7 @@ type gvrNSName struct {
 	name      string
 }
 
-func computeHash(data interface{}, additionalHashes ...string) string {
+func computeHash(data any, additionalHashes ...string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(fmt.Sprintf("%v", data)))
 	for _, h := range additionalHashes {
@@ -94,4 +99,13 @@ func getImagePullSecretReference(config *hivev1.HiveConfig) *corev1.LocalObjectR
 		return config.Spec.HiveImagePullSecretRef
 	}
 	return nil
+}
+
+func readRuntimeObjectOrDie[T any](sgv schema.GroupVersion, objBytes []byte) T {
+	requiredObj, err := runtime.Decode(appsCodecs.UniversalDecoder(sgv), objBytes)
+	if err != nil {
+		panic(err)
+	}
+	return requiredObj.(T)
+
 }

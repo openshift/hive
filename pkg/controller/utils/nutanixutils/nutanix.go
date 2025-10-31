@@ -87,7 +87,7 @@ func convertFailureDomains[SourceFD any, TargetFD any, TargetPE any, SRR any](
 //   - []nutanixinstaller.PrismElement:  A slice of unique converted Installer PrismElements (nutanixinstaller.PrismElement).
 //   - []string:                       A slice of unique subnet UUIDs gathered from all Hive failure domains.
 func ConvertHiveFailureDomains(hiveFailureDomains []nutanix.FailureDomain) ([]nutanixinstaller.FailureDomain, []nutanixinstaller.PrismElement, []string) {
-	return convertFailureDomains[nutanix.FailureDomain, nutanixinstaller.FailureDomain, nutanixinstaller.PrismElement, nutanixinstaller.StorageResourceReference](
+	return convertFailureDomains(
 		hiveFailureDomains,
 		convertHiveToInstallerPrismElement,
 		convertHiveToInstallerStorageResource,
@@ -111,7 +111,7 @@ func ConvertHiveFailureDomains(hiveFailureDomains []nutanix.FailureDomain) ([]nu
 //   - []nutanix.PrismElement:     A slice of unique converted Hive PrismElements (nutanix.PrismElement).
 //   - []string:                  A slice of unique subnet UUIDs gathered from all Installer failure domains.
 func ConvertInstallerFailureDomains(installerFailureDomains []nutanixinstaller.FailureDomain) ([]nutanix.FailureDomain, []nutanix.PrismElement, []string) {
-	return convertFailureDomains[nutanixinstaller.FailureDomain, nutanix.FailureDomain, nutanix.PrismElement, nutanix.StorageResourceReference](
+	return convertFailureDomains(
 		installerFailureDomains,
 		convertInstallerToHivePrismElement,
 		convertInstallerToHiveStorageResource,

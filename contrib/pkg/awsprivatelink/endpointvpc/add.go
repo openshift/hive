@@ -12,7 +12,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 
 	log "github.com/sirupsen/logrus"
@@ -94,7 +93,7 @@ func (o *endpointVPCAddOptions) Complete(cmd *cobra.Command, args []string) erro
 		regions.Insert(associatedVpc.AWSPrivateLinkVPC.Region)
 	}
 	// Use the passed-in credsSecret if possible
-	awsClientsByRegion, err := awsutils.GetAWSClientsByRegion(common.CredsSecret, regions)
+	awsClientsByRegion, err := getAWSClientsByRegion(common.CredsSecret, regions)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to get AWS clients")
 	}
@@ -136,7 +135,7 @@ func (o *endpointVPCAddOptions) Validate(cmd *cobra.Command, args []string) erro
 
 func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 	// Get default SG of the endpoint VPC
-	endpointVPCDefaultSG, err := awsutils.GetDefaultSGOfVpc(o.endpointVpcClients, o.endpointVpcId)
+	endpointVPCDefaultSG, err := getDefaultSGOfVpc(o.endpointVpcClients, o.endpointVpcId)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to get default SG of the endpoint VPC")
 	}
@@ -192,7 +191,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 		}
 
 		// Update SGs
-		associatedVpcWorkerSG, err := awsutils.GetWorkerSGFromVpcId(associatedVpcClients, associatedVpcId)
+		associatedVpcWorkerSG, err := getWorkerSGFromVpcId(associatedVpcClients, associatedVpcId)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to get worker SG of the associated VPC")
 		}
@@ -203,7 +202,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 		// Associated VPC & endpoint VPC in the same region => allow ingress from SG of the peer
 		case associatedVpcRegion == o.endpointVpcRegion:
 			log.Info("Authorizing traffic from the associated VPC's worker SG to the endpoint VPC's default SG")
-			if _, err = awsutils.AuthorizeAllIngressFromSG(
+			if _, err = authorizeAllIngressFromSG(
 				o.endpointVpcClients,
 				aws.String(endpointVPCDefaultSG),
 				aws.String(associatedVpcWorkerSG),
@@ -218,7 +217,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 			}
 
 			log.Info("Authorizing traffic from the endpoint VPC's default SG to the associated VPC's worker SG")
-			if _, err = awsutils.AuthorizeAllIngressFromSG(
+			if _, err = authorizeAllIngressFromSG(
 				associatedVpcClients,
 				aws.String(associatedVpcWorkerSG),
 				aws.String(endpointVPCDefaultSG),
@@ -235,7 +234,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 		// Associated VPC & endpoint VPC in different regions => allow ingress from CIDR of the peer
 		default:
 			log.Info("Authorizing traffic from the associated VPC's CIDR block to the endpoint VPC's default SG")
-			if _, err = awsutils.AuthorizeAllIngressFromCIDR(
+			if _, err = authorizeAllIngressFromCIDR(
 				o.endpointVpcClients,
 				aws.String(endpointVPCDefaultSG),
 				associatedVpcCIDR,
@@ -250,7 +249,7 @@ func (o *endpointVPCAddOptions) Run(cmd *cobra.Command, args []string) error {
 			}
 
 			log.Info("Authorizing traffic from the endpoint VPC's CIDR block to the associated VPC's worker SG")
-			if _, err = awsutils.AuthorizeAllIngressFromCIDR(
+			if _, err = authorizeAllIngressFromCIDR(
 				associatedVpcClients,
 				aws.String(associatedVpcWorkerSG),
 				endpointVpcCIDR,
@@ -309,7 +308,7 @@ func (o *endpointVPCAddOptions) addEndpointVpcToHiveConfig() {
 		},
 		Subnets: endpointSubnets,
 	}
-	if idx, ok := awsutils.FindVpcInInventory(o.endpointVpcId, o.hiveConfig.Spec.AWSPrivateLink.EndpointVPCInventory); ok {
+	if idx, ok := findVpcInInventory(o.endpointVpcId, o.hiveConfig.Spec.AWSPrivateLink.EndpointVPCInventory); ok {
 		if reflect.DeepEqual(o.hiveConfig.Spec.AWSPrivateLink.EndpointVPCInventory[idx], endpointVpcToAdd) {
 			log.Warn("Endpoint VPC found in HiveConfig. HiveConfig unchanged.")
 			return

@@ -16,7 +16,6 @@ import (
 	"github.com/openshift/hive/pkg/controller/images"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
-	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -107,7 +106,7 @@ func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h
 		for _, a := range assetsToClean {
 			hLog.Infof("Deleting asset %s from old target namespace %s", a.path, ns)
 			// DeleteAsset*WithNSOverride already no-ops for IsNotFound
-			if err := util.DeleteAssetBytesWithNSOverride(h, a.processed, ns, hiveconfig); err != nil {
+			if err := deleteAssetBytesWithNSOverride(h, a.processed, ns, hiveconfig); err != nil {
 				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", a.path, ns)
 			}
 		}
@@ -115,7 +114,8 @@ func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h
 
 	hLog.Debug("reading statefulset")
 	// Safe to ignore error because we processed this asset above
-	newStatefulSet := controllerutils.ReadStatefulsetOrDie(ssAsset.processed)
+
+	newStatefulSet := readRuntimeObjectOrDie[*appsv1.StatefulSet](appsv1.SchemeGroupVersion, ssAsset.processed)
 	container, err := containerByName(&newStatefulSet.Spec.Template.Spec, string(c.name))
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, a := range namespacedAssets {
-		if _, err := util.ApplyRuntimeObject(h, util.FromBytes(a.processed), hLog, util.WithNamespaceOverride(hiveNSName), util.WithGarbageCollection(hiveconfig)); err != nil {
+		if _, err := applyRuntimeObject(h, fromBytes(a.processed), hLog, withNamespaceOverride(hiveNSName), withGarbageCollection(hiveconfig)); err != nil {
 			hLog.WithError(err).WithField("asset", a.path).Error("error applying object with namespace override")
 			return err
 		}
@@ -243,7 +243,7 @@ func (r *ReconcileHiveConfig) deployStatefulSet(c ssCfg, hLog log.FieldLogger, h
 	}
 
 	newStatefulSet.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObject(h, util.Passthrough(newStatefulSet), hLog, util.WithGarbageCollection(hiveconfig))
+	result, err := applyRuntimeObject(h, passthrough(newStatefulSet), hLog, withGarbageCollection(hiveconfig))
 	if err != nil {
 		hLog.WithError(err).Error("error applying statefulset")
 		return err

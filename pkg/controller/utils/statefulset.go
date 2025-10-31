@@ -11,31 +11,14 @@ import (
 	"strings"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	"github.com/openshift/hive/pkg/util/scheme"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
-
-var (
-	appsScheme = scheme.GetScheme()
-	appsCodecs = serializer.NewCodecFactory(appsScheme)
-)
-
-// ReadStatefulsetOrDie converts a statefulset asset into an actual instance of a statefulset.
-func ReadStatefulsetOrDie(objBytes []byte) *appsv1.StatefulSet {
-	requiredObj, err := runtime.Decode(appsCodecs.UniversalDecoder(appsv1.SchemeGroupVersion), objBytes)
-	if err != nil {
-		panic(err)
-	}
-	return requiredObj.(*appsv1.StatefulSet)
-}
 
 // CalculateStatefulSetSpecHash returns a hash of the statefulset.Spec.
 func CalculateStatefulSetSpecHash(statefulset *appsv1.StatefulSet) (string, error) {

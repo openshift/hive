@@ -5,27 +5,12 @@ import (
 	"log"
 	"os"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/openshift/installer/pkg/destroy/providers"
 	"github.com/openshift/installer/pkg/types"
-	"github.com/openshift/installer/pkg/types/aws"
-	"github.com/openshift/installer/pkg/types/azure"
-	"github.com/openshift/installer/pkg/types/gcp"
-	"github.com/openshift/installer/pkg/types/ibmcloud"
-	"github.com/openshift/installer/pkg/types/nutanix"
-	"github.com/openshift/installer/pkg/types/openstack"
-	"github.com/openshift/installer/pkg/types/vsphere"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	awsutil "github.com/openshift/hive/contrib/pkg/utils/aws"
-	azureutil "github.com/openshift/hive/contrib/pkg/utils/azure"
-	gcputil "github.com/openshift/hive/contrib/pkg/utils/gcp"
-	ibmcloudutil "github.com/openshift/hive/contrib/pkg/utils/ibmcloud"
-	nutanixutil "github.com/openshift/hive/contrib/pkg/utils/nutanix"
-	openstackutil "github.com/openshift/hive/contrib/pkg/utils/openstack"
-	vsphereutil "github.com/openshift/hive/contrib/pkg/utils/vsphere"
 	"github.com/openshift/hive/pkg/constants"
+	"github.com/openshift/hive/pkg/creds"
 
 	"github.com/spf13/cobra"
 )
@@ -81,7 +66,7 @@ To run the generic destroyer, use the --metadata-json-secret-name parameter.`,
 				logger.Fatal("no platform configured in metadata.json")
 			}
 
-			ConfigureCreds[platform](c, metadata)
+			creds.ConfigureCreds[platform](c, metadata)
 
 			destroyerBuilder, ok := providers.Registry[platform]
 			if !ok {
@@ -115,14 +100,4 @@ To run the generic destroyer, use the --metadata-json-secret-name parameter.`,
 	cmd.AddCommand(NewDeprovisionvSphereCommand(logLevel))
 	cmd.AddCommand(NewDeprovisionNutanixCommand(logLevel))
 	return cmd
-}
-
-var ConfigureCreds = map[string]func(client.Client, *types.ClusterMetadata){
-	aws.Name:       awsutil.ConfigureCreds,
-	azure.Name:     azureutil.ConfigureCreds,
-	gcp.Name:       gcputil.ConfigureCreds,
-	ibmcloud.Name:  ibmcloudutil.ConfigureCreds,
-	nutanix.Name:   nutanixutil.ConfigureCreds,
-	openstack.Name: openstackutil.ConfigureCreds,
-	vsphere.Name:   vsphereutil.ConfigureCreds,
 }

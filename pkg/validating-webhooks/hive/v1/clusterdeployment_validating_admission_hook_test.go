@@ -198,7 +198,7 @@ func validClusterDeploymentDifferentMutableValue() *hivev1.ClusterDeployment {
 
 func TestClusterDeploymentValidatingResource(t *testing.T) {
 	// Arrange
-	data := NewClusterDeploymentValidatingAdmissionHook(*createDecoder(t))
+	data := NewClusterDeploymentValidatingAdmissionHook(*createDecoder())
 	expectedPlural := schema.GroupVersionResource{
 		Group:    "admission.hive.openshift.io",
 		Version:  "v1",
@@ -216,7 +216,7 @@ func TestClusterDeploymentValidatingResource(t *testing.T) {
 
 func TestClusterDeploymentInitialize(t *testing.T) {
 	// Arrange
-	data := NewClusterDeploymentValidatingAdmissionHook(*createDecoder(t))
+	data := NewClusterDeploymentValidatingAdmissionHook(*createDecoder())
 
 	// Act
 	err := data.Initialize(nil, nil)
@@ -1790,7 +1790,7 @@ func TestClusterDeploymentValidate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Arrange
 			data := ClusterDeploymentValidatingAdmissionHook{
-				decoder:             *createDecoder(t),
+				decoder:             *createDecoder(),
 				validManagedDomains: validTestManagedDomains,
 				fs: &featureSet{
 					FeatureGatesEnabled: &hivev1.FeatureGatesEnabled{
@@ -1882,6 +1882,6 @@ func TestNewClusterDeploymentValidatingAdmissionHook(t *testing.T) {
 		t.Fatalf("unexpected: %v", err)
 	}
 	os.Setenv(constants.ManagedDomainsFileEnvVar, tempFile.Name())
-	webhook := NewClusterDeploymentValidatingAdmissionHook(*createDecoder(t))
+	webhook := NewClusterDeploymentValidatingAdmissionHook(*createDecoder())
 	assert.Equal(t, webhook.validManagedDomains, expectedDomains, "valid domains must match expected")
 }

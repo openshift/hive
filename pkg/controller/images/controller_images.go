@@ -40,13 +40,6 @@ func GetHiveImagePullPolicy() corev1.PullPolicy {
 	return corev1.PullPolicy(envVarOrDefault(HiveImagePullPolicyEnvVar, string(corev1.PullAlways)))
 }
 
-// GetHiveClusterProvisionImagePullPolicy returns the policy to use when pulling the hive image
-// for the ClusterProvision pod.
-// Either the one specified in the environment variable or the hardcoded default.
-func GetHiveClusterProvisionImagePullPolicy() corev1.PullPolicy {
-	return corev1.PullPolicy(envVarOrDefault(HiveClusterProvisionImagePullPolicyEnvVar, string(corev1.PullIfNotPresent)))
-}
-
 func envVarOrDefault(envVar string, defaultValue string) string {
 	value, ok := os.LookupEnv(envVar)
 	if ok {

@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
 
@@ -83,7 +83,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone1"): 3,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -101,7 +101,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone3"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -120,7 +120,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone3"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -155,7 +155,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedSubnetIDInMachineSet: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -169,7 +169,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedErr: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -193,7 +193,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "SubnetsNotFound",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -218,7 +218,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "MoreThanOneSubnetForZone",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -254,7 +254,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "NotEnoughSubnetsForZones",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -275,7 +275,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "WrongNumberOfSubnets",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -296,7 +296,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "WrongNumberOfSubnets",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -331,7 +331,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedSubnetIDInMachineSet: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -366,7 +366,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedSubnetIDInMachineSet: true,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -383,7 +383,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedEC2MetadataAuth: "Optional",
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -400,7 +400,7 @@ func TestAWSActuator(t *testing.T) {
 			},
 			expectedKMSKey: fakeKMSKeyARN,
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -428,7 +428,7 @@ func TestAWSActuator(t *testing.T) {
 				Reason: "ConfigurationSupported",
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: baseUserTagsFromCD,
 		},
@@ -512,7 +512,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectExtraSG:    true,
 			expectedUserTags: baseUserTagsFromCD,
@@ -582,7 +582,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedSGIDs:    []string{"sg-one", "sg-two"},
 			expectedUserTags: baseUserTagsFromCD,
@@ -640,7 +640,7 @@ func TestAWSActuator(t *testing.T) {
 				generateAWSMachineSetName("zone2"): 1,
 			},
 			expectedAMI: &machineapi.AWSResourceReference{
-				ID: pointer.String(testAMI),
+				ID: ptr.To(testAMI),
 			},
 			expectedUserTags: map[string]string{
 				"pool-label":            "pool-value",
@@ -814,7 +814,7 @@ func TestGetAWSAMIID(t *testing.T) {
 func mockDescribeAvailabilityZones(client *mockaws.MockClient, zones []string) *gomock.Call {
 	input := &ec2.DescribeAvailabilityZonesInput{
 		Filters: []ec2types.Filter{{
-			Name:   pointer.String("region-name"),
+			Name:   ptr.To("region-name"),
 			Values: []string{testRegion},
 		}},
 	}

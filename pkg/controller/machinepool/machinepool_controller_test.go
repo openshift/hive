@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -1039,7 +1039,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSetWithAZ("foo-12345-worker-us-east-1c", "worker", true, 1, 0, "us-east-1c"),
 				func() runtime.Object {
 					a := testClusterAutoscaler("1")
-					a.Spec.BalanceSimilarNodeGroups = pointer.Bool(false)
+					a.Spec.BalanceSimilarNodeGroups = ptr.To(false)
 					return a
 				}(),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
@@ -1063,7 +1063,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			},
 			expectedRemoteClusterAutoscalers: func() []autoscalingv1.ClusterAutoscaler {
 				a := testClusterAutoscaler("1")
-				a.Spec.BalanceSimilarNodeGroups = pointer.Bool(false)
+				a.Spec.BalanceSimilarNodeGroups = ptr.To(false)
 				return []autoscalingv1.ClusterAutoscaler{*a}
 			}(),
 		},
@@ -1670,8 +1670,8 @@ func Test_summarizeMachinesError(t *testing.T) {
 			testMachineSetMachine("machine-1", "worker", testName),
 			func() *machineapi.Machine {
 				m := testMachineSetMachine("machine-2", "worker", testName)
-				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.String("GoneNotComingBack"))
-				m.Status.ErrorMessage = pointer.String("The machine is not found")
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(ptr.To("GoneNotComingBack"))
+				m.Status.ErrorMessage = ptr.To("The machine is not found")
 				return m
 			}(),
 			testMachineSetMachine("machine-3", "worker", testName),
@@ -1686,14 +1686,14 @@ func Test_summarizeMachinesError(t *testing.T) {
 			testMachineSetMachine("machine-1", "worker", testName),
 			func() *machineapi.Machine {
 				m := testMachineSetMachine("machine-2", "worker", testName)
-				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.String("GoneNotComingBack"))
-				m.Status.ErrorMessage = pointer.String("The machine is not found")
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(ptr.To("GoneNotComingBack"))
+				m.Status.ErrorMessage = ptr.To("The machine is not found")
 				return m
 			}(),
 			func() *machineapi.Machine {
 				m := testMachineSetMachine("machine-3", "worker", testName)
-				m.Status.ErrorReason = (*machineapi.MachineStatusError)(pointer.String("InsufficientResources"))
-				m.Status.ErrorMessage = pointer.String("No available quota")
+				m.Status.ErrorReason = (*machineapi.MachineStatusError)(ptr.To("InsufficientResources"))
+				m.Status.ErrorMessage = ptr.To("No available quota")
 				return m
 			}(),
 			testMachineSet(testName, "worker", false, 3, 0),
@@ -1912,7 +1912,7 @@ func testClusterAutoscaler(resourceVersion string) *autoscalingv1.ClusterAutosca
 			ScaleDown: &autoscalingv1.ScaleDownConfig{
 				Enabled: true,
 			},
-			BalanceSimilarNodeGroups: pointer.Bool(true),
+			BalanceSimilarNodeGroups: ptr.To(true),
 		},
 	}
 }

@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -271,7 +271,7 @@ func withClusterMetadataResourceGroupName(rg string) Option {
 		if cd.Spec.ClusterMetadata.Platform.Azure == nil {
 			cd.Spec.ClusterMetadata.Platform.Azure = &hivev1azure.Metadata{}
 		}
-		cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = pointer.String(rg)
+		cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName = ptr.To(rg)
 	}
 }
 
@@ -290,12 +290,12 @@ func setupAzureClientInstances(client *mockazureclient.MockClient, instances map
 			name := fmt.Sprintf("%s-%d", state, i)
 			instanceViewStatus := []compute.InstanceViewStatus{
 				{
-					Code: pointer.String("PowerState/" + state),
+					Code: ptr.To("PowerState/" + state),
 				},
 			}
 			vms = append(vms, compute.VirtualMachine{
-				Name: pointer.String(name),
-				ID:   pointer.String(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", azureTestSubscription, rgname, name)),
+				Name: ptr.To(name),
+				ID:   ptr.To(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", azureTestSubscription, rgname, name)),
 				VirtualMachineProperties: &compute.VirtualMachineProperties{
 					InstanceView: &compute.VirtualMachineInstanceView{
 						Statuses: &instanceViewStatus,

@@ -5,7 +5,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
@@ -153,7 +152,7 @@ func WithAnnotations(annotations map[string]string) Option {
 
 func WithReplicas(replicas int64) Option {
 	return func(mp *hivev1.MachinePool) {
-		mp.Spec.Replicas = pointer.Int64(replicas)
+		mp.Spec.Replicas = ptr.To(replicas)
 	}
 }
 

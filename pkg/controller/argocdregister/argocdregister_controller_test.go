@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -287,8 +287,8 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 
 	cd.Status = hivev1.ClusterDeploymentStatus{
 		APIURL:         "http://test-api.test.com",
-		InstallerImage: pointer.String("installer-image:latest"),
-		CLIImage:       pointer.String("cli:latest"),
+		InstallerImage: ptr.To("installer-image:latest"),
+		CLIImage:       ptr.To("cli:latest"),
 	}
 
 	return cd

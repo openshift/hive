@@ -39,7 +39,7 @@ func TestIBMCloudActuator(t *testing.T) {
 			clusterDeployment: testIBMCloudClusterDeployment(),
 			pool:              testIBMCloudPool(),
 			mockIBMClient: func(client *mockibm.MockAPI) {
-				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
+				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"})
 			},
 			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "1"): 1,
@@ -66,7 +66,7 @@ func TestIBMCloudActuator(t *testing.T) {
 			clusterDeployment: testIBMCloudClusterDeployment(),
 			pool:              testIBMCloudPool(),
 			mockIBMClient: func(client *mockibm.MockAPI) {
-				mockGetVPCZonesForRegion(client, []string{}, testRegion)
+				mockGetVPCZonesForRegion(client, []string{})
 			},
 			expectedErr: true,
 		},
@@ -81,7 +81,7 @@ func TestIBMCloudActuator(t *testing.T) {
 				return p
 			}(),
 			mockIBMClient: func(client *mockibm.MockAPI) {
-				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
+				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"})
 			},
 			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "1"): 1,
@@ -105,7 +105,7 @@ func TestIBMCloudActuator(t *testing.T) {
 				return p
 			}(),
 			mockIBMClient: func(client *mockibm.MockAPI) {
-				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"}, testRegion)
+				mockGetVPCZonesForRegion(client, []string{"test-region-1", "test-region-2", "test-region-3"})
 			},
 			expectedMachineSetReplicas: map[string]int32{
 				generateIBMCloudMachineSetName("worker", "1"): 1,
@@ -195,6 +195,6 @@ func generateIBMCloudMachineSetName(leaseChar, zone string) string {
 	return fmt.Sprintf("%s-%s-%s", testInfraID, leaseChar, zone)
 }
 
-func mockGetVPCZonesForRegion(ibmClient *mockibm.MockAPI, zones []string, region string) {
+func mockGetVPCZonesForRegion(ibmClient *mockibm.MockAPI, zones []string) {
 	ibmClient.EXPECT().GetVPCZonesForRegion(gomock.Any(), testRegion).Return(zones, nil).Times(1)
 }

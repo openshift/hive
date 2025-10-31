@@ -10,12 +10,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/awsclient"
 	"github.com/openshift/hive/pkg/azureclient"
 	dns "github.com/openshift/hive/pkg/controller/dnszone"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
+	azurecreds "github.com/openshift/hive/pkg/creds/azure"
+	gcpcreds "github.com/openshift/hive/pkg/creds/gcp"
 	"github.com/openshift/hive/pkg/gcpclient"
 )
 
@@ -79,7 +79,7 @@ func cleanupAzureDNSZone(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error 
 	logger = logger.WithField("dnsZoneID", dnsZone.Spec.Zone)
 	logger.Info("cleaning up DNSZone")
 
-	creds, err := azureutils.GetCreds("")
+	creds, err := azurecreds.GetCreds("")
 	if err != nil {
 		logger.WithError(err).Error("failed to get Azure creds")
 		return err
@@ -111,7 +111,7 @@ func cleanupGCPDNSZone(dnsZone *hivev1.DNSZone, logger log.FieldLogger) error {
 	logger = logger.WithField("zoneName", *dnsZone.Status.GCP.ZoneName)
 	logger.Info("cleaning up DNSZone")
 
-	creds, err := gcputils.GetCreds("")
+	creds, err := gcpcreds.GetCreds("")
 	if err != nil {
 		logger.WithError(err).Error("failed to get GCP creds")
 		return err

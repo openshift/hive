@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -18,17 +17,18 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/printers"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	"github.com/openshift/hive/contrib/pkg/utils"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
-	azurecredutil "github.com/openshift/hive/contrib/pkg/utils/azure"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
-	openstackutils "github.com/openshift/hive/contrib/pkg/utils/openstack"
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
+	awscreds "github.com/openshift/hive/pkg/creds/aws"
+	azurecreds "github.com/openshift/hive/pkg/creds/azure"
+	gcpcreds "github.com/openshift/hive/pkg/creds/gcp"
+	openstackcreds "github.com/openshift/hive/pkg/creds/openstack"
 	"github.com/openshift/hive/pkg/gcpclient"
 	"github.com/openshift/hive/pkg/util/scheme"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -90,13 +90,6 @@ https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4-stable/latest
 `
 const (
 	hiveutilCreatedLabel = "hive.openshift.io/hiveutil-created"
-	cloudAWS             = "aws"
-	cloudAzure           = "azure"
-	cloudGCP             = "gcp"
-	cloudIBM             = "ibmcloud"
-	cloudOpenStack       = "openstack"
-	cloudVSphere         = "vsphere"
-	cloudNutanix         = "nutanix"
 
 	testFailureManifest = `apiVersion: v1
 kind: NotARealSecret
@@ -108,18 +101,18 @@ type: TestFailResource
 )
 
 var (
-	validClouds = map[string]bool{
-		cloudAWS:       true,
-		cloudAzure:     true,
-		cloudGCP:       true,
-		cloudIBM:       true,
-		cloudOpenStack: true,
-		cloudVSphere:   true,
-		cloudNutanix:   true,
-	}
-	manualCCOModeClouds = map[string]bool{
-		cloudIBM: true,
-	}
+	validClouds = sets.New(
+		constants.PlatformAWS,
+		constants.PlatformAzure,
+		constants.PlatformGCP,
+		constants.PlatformIBMCloud,
+		constants.PlatformOpenStack,
+		constants.PlatformVSphere,
+		constants.PlatformNutanix,
+	)
+	manualCCOModeClouds = sets.New(
+		constants.PlatformIBMCloud,
+	)
 )
 
 // Options is the set of options to generate and apply a new cluster deployment
@@ -277,23 +270,8 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.
 		},
 	}
 
-	clouds := []string{}
-	for cloud, valid := range validClouds {
-		if valid {
-			clouds = append(clouds, cloud)
-		}
-	}
-	sort.Strings(clouds)
-
-	manualModeClouds := []string{}
-	for cloud, manual := range manualCCOModeClouds {
-		if manual {
-			manualModeClouds = append(manualModeClouds, cloud)
-		}
-	}
-
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, fmt.Sprintf("Cloud provider: %s", strings.Join(clouds, "|")))
+	flags.StringVar(&opt.Cloud, "cloud", constants.PlatformAWS, fmt.Sprintf("Cloud provider: %s", strings.Join(sets.List(validClouds), "|")))
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster deployment in")
 	flags.StringVar(&opt.SSHPrivateKeyFile, "ssh-private-key-file", "", "file name containing private key contents")
 	flags.StringVar(&opt.SSHPublicKeyFile, "ssh-public-key-file", defaultSSHPublicKeyFile, "file name of SSH public key for cluster")
@@ -306,7 +284,7 @@ create-cluster CLUSTER_DEPLOYMENT_NAME --cloud=vsphere --vsphere-vcenter=vmware.
 	flags.StringVar(&opt.BoundServiceAccountSigningKeyFile, "bound-service-account-signing-key-file", "", "Private service account signing key (often created with ccoutil create key-pair)")
 	flags.BoolVar(&opt.CredentialsModeManual, "credentials-mode-manual", false, fmt.Sprintf(`Configure the Cloud Credential Operator in the target cluster to Manual mode.
 Implies the use of --manifests to inject custom Secrets for all CredentialsRequests in the cluster.
-This option is redundant (but permitted) for following clouds, which always use manual mode: %s`, strings.Join(manualModeClouds, "|")))
+This option is redundant (but permitted) for following clouds, which always use manual mode: %s`, strings.Join(sets.List(manualCCOModeClouds), "|")))
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.ClusterImageSet, "image-set", "", "Cluster image set to use for this cluster deployment")
 	flags.StringVar(&opt.ReleaseImage, "release-image", "", "Release image to use for installing this cluster deployment")
@@ -404,13 +382,13 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 
 	if o.Region == "" {
 		switch o.Cloud {
-		case cloudAWS:
+		case constants.PlatformAWS:
 			o.Region = "us-east-1"
-		case cloudAzure:
+		case constants.PlatformAzure:
 			o.Region = "centralus"
-		case cloudGCP:
+		case constants.PlatformGCP:
 			o.Region = "us-east1"
-		case cloudIBM:
+		case constants.PlatformIBMCloud:
 			o.Region = "us-east"
 		}
 	}
@@ -423,7 +401,7 @@ func (o *Options) Complete(cmd *cobra.Command, args []string) error {
 		o.HibernateAfterDur = &dur
 	}
 
-	if manualCloud := manualCCOModeClouds[o.Cloud]; manualCloud && !o.CredentialsModeManual {
+	if manualCCOModeClouds.Has(o.Cloud) && !o.CredentialsModeManual {
 		o.CredentialsModeManual = true
 		o.log.Infof("Using Manual credentials mode for cloud=%s", o.Cloud)
 	}
@@ -448,20 +426,20 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		o.log.Info("If specifying a serving certificate, specify a valid serving certificate key")
 		return fmt.Errorf("invalid serving cert")
 	}
-	if !validClouds[o.Cloud] {
+	if !validClouds.Has(o.Cloud) {
 		cmd.Usage()
 		o.log.Infof("Unsupported cloud: %s", o.Cloud)
 		return fmt.Errorf("unsupported cloud: %s", o.Cloud)
 	}
 
-	if o.Cloud == cloudOpenStack {
+	if o.Cloud == constants.PlatformOpenStack {
 		if o.OpenStackAPIFloatingIP == "" {
-			msg := fmt.Sprintf("--openstack-api-floating-ip must be set when using --cloud=%q", cloudOpenStack)
+			msg := fmt.Sprintf("--openstack-api-floating-ip must be set when using --cloud=%q", constants.PlatformOpenStack)
 			o.log.Info(msg)
 			return errors.New(msg)
 		}
 		if o.OpenStackCloud == "" {
-			msg := fmt.Sprintf("--openstack-cloud must be set when using --cloud=%q", cloudOpenStack)
+			msg := fmt.Sprintf("--openstack-cloud must be set when using --cloud=%q", constants.PlatformOpenStack)
 			o.log.Info(msg)
 			return errors.New(msg)
 		}
@@ -471,12 +449,12 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 		return fmt.Errorf("Manual credentials mode requires --manifests containing custom Secrets with manually provisioned credentials")
 	}
 
-	if o.AWSPrivateLink && o.Cloud != cloudAWS {
-		return fmt.Errorf("--aws-private-link can only be enabled when using --cloud=%q", cloudAWS)
+	if o.AWSPrivateLink && o.Cloud != constants.PlatformAWS {
+		return fmt.Errorf("--aws-private-link can only be enabled when using --cloud=%q", constants.PlatformAWS)
 	}
 
-	if o.PrivateLink && o.Cloud != cloudAWS && o.Cloud != cloudGCP {
-		return fmt.Errorf("--private-link can only be enabled when using --cloud={%q,%q}", cloudAWS, cloudGCP)
+	if o.PrivateLink && o.Cloud != constants.PlatformAWS && o.Cloud != constants.PlatformGCP {
+		return fmt.Errorf("--private-link can only be enabled when using --cloud={%q,%q}", constants.PlatformAWS, constants.PlatformGCP)
 	}
 
 	if o.Adopt {
@@ -506,7 +484,7 @@ func (o *Options) Validate(cmd *cobra.Command) error {
 
 	if o.Region != "" {
 		switch c := o.Cloud; c {
-		case cloudAWS, cloudAzure, cloudGCP, cloudIBM:
+		case constants.PlatformAWS, constants.PlatformAzure, constants.PlatformGCP, constants.PlatformIBMCloud:
 		default:
 			return fmt.Errorf("cannot specify --region when using --cloud=%q", c)
 		}
@@ -672,9 +650,9 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 	}
 
 	switch o.Cloud {
-	case cloudAWS:
+	case constants.PlatformAWS:
 		defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
-		accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
+		accessKeyID, secretAccessKey, err := awscreds.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
 		if err != nil {
 			return nil, err
 		}
@@ -700,8 +678,8 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			PrivateLink:        o.PrivateLink || o.AWSPrivateLink,
 		}
 		builder.CloudBuilder = awsProvider
-	case cloudAzure:
-		creds, err := azurecredutil.GetCreds(o.CredsFile)
+	case constants.PlatformAzure:
+		creds, err := azurecreds.GetCreds(o.CredsFile)
 		if err != nil {
 			o.log.WithError(err).Error("Failed to read in Azure credentials")
 			return nil, err
@@ -715,8 +693,8 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			ResourceGroupName:           o.AzureResourceGroupName,
 		}
 		builder.CloudBuilder = azureProvider
-	case cloudGCP:
-		creds, err := gcputils.GetCreds(o.CredsFile)
+	case constants.PlatformGCP:
+		creds, err := gcpcreds.GetCreds(o.CredsFile)
 		if err != nil {
 			return nil, err
 		}
@@ -734,8 +712,8 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			DiscardLocalSsdOnHibernate: o.discardLocalSsdOnHibernate,
 		}
 		builder.CloudBuilder = gcpProvider
-	case cloudOpenStack:
-		cloudsYAMLContent, err := openstackutils.GetCreds(o.CredsFile)
+	case constants.PlatformOpenStack:
+		cloudsYAMLContent, err := openstackcreds.GetCreds(o.CredsFile)
 		if err != nil {
 			return nil, err
 		}
@@ -749,7 +727,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			IngressFloatingIP: o.OpenStackIngressFloatingIP,
 		}
 		builder.CloudBuilder = openStackProvider
-	case cloudVSphere:
+	case constants.PlatformVSphere:
 		vsphereUsername := os.Getenv(constants.VSphereUsernameEnvVar)
 		if vsphereUsername == "" {
 			return nil, fmt.Errorf("no %s env var set, cannot proceed", constants.VSphereUsernameEnvVar)
@@ -849,10 +827,10 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			CACert:           bytes.Join(caCerts, []byte("\n")),
 		}
 		builder.CloudBuilder = vsphereProvider
-	case cloudIBM:
+	case constants.PlatformIBMCloud:
 		ibmCloudAPIKey := os.Getenv(constants.IBMCloudAPIKeyEnvVar)
 		if ibmCloudAPIKey == "" {
-			return nil, fmt.Errorf("%s env var is required when using --cloud=%q", constants.IBMCloudAPIKeyEnvVar, cloudIBM)
+			return nil, fmt.Errorf("%s env var is required when using --cloud=%q", constants.IBMCloudAPIKeyEnvVar, constants.PlatformIBMCloud)
 		}
 		ibmCloudProvider := &clusterresource.IBMCloudBuilder{
 			APIKey:       ibmCloudAPIKey,
@@ -860,7 +838,7 @@ func (o *Options) GenerateObjects() ([]runtime.Object, error) {
 			InstanceType: o.IBMInstanceType,
 		}
 		builder.CloudBuilder = ibmCloudProvider
-	case cloudNutanix:
+	case constants.PlatformNutanix:
 		builder.CloudBuilder, err = o.getNutanixCloudBuilder()
 		if err != nil {
 			return nil, err
@@ -1028,7 +1006,7 @@ func (o *Options) generateSampleSyncSets() []runtime.Object {
 	var syncsets []runtime.Object
 	for i := range [10]int{} {
 		syncsets = append(syncsets, sampleSyncSet(fmt.Sprintf("%s-sample-syncset%d", o.Name, i), o.Namespace, o.Name))
-		syncsets = append(syncsets, sampleSelectorSyncSet(fmt.Sprintf("sample-selector-syncset%d", i), o.Name))
+		syncsets = append(syncsets, sampleSelectorSyncSet(fmt.Sprintf("sample-selector-syncset%d", i)))
 	}
 	return syncsets
 }
@@ -1061,7 +1039,7 @@ func sampleSyncSet(name, namespace, cdName string) *hivev1.SyncSet {
 	}
 }
 
-func sampleSelectorSyncSet(name, cdName string) *hivev1.SelectorSyncSet {
+func sampleSelectorSyncSet(name string) *hivev1.SelectorSyncSet {
 	return &hivev1.SelectorSyncSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "SelectorSyncSet",

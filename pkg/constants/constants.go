@@ -378,7 +378,7 @@ const (
 	InstallLogsUploadProviderEnvVar = "HIVE_INSTALL_LOGS_UPLOAD_PROVIDER"
 
 	// InstallLogsUploadProviderAWS is used to specify that AWS is the cloud provider to upload logs to.
-	InstallLogsUploadProviderAWS = "aws"
+	InstallLogsUploadProviderAWS = PlatformAWS
 
 	// InstallLogsCredentialsSecretRefEnvVar is the environment variable specifying what secret to use for storing logs.
 	InstallLogsCredentialsSecretRefEnvVar = "HIVE_INSTALL_LOGS_CREDENTIALS_SECRET"

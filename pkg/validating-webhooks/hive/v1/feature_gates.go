@@ -48,7 +48,7 @@ func existsOnlyWhenFeatureGate(fs *featureSet, obj *unstructured.Unstructured, f
 // equalOnlyWhenFeatureGate ensures that the fieldPath specified in the obj is equal to the expected value when
 // the featureGate is enabled.
 // NOTE: the path to the field cannot include array / slice.
-func equalOnlyWhenFeatureGate(fs *featureSet, obj *unstructured.Unstructured, fieldPath string, featureGate string, expected interface{}) field.ErrorList {
+func equalOnlyWhenFeatureGate(fs *featureSet, obj *unstructured.Unstructured, fieldPath string, featureGate string, expected any) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	p := strings.Split(fieldPath, ".")

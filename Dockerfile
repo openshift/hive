@@ -1,7 +1,7 @@
 ARG CONTAINER_SUB_MANAGER_OFF=0
 ARG EL8_BUILD_IMAGE=${EL8_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20}
 ARG EL9_BUILD_IMAGE=${EL9_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20}
-ARG BASE_IMAGE=${BASE_IMAGE:-registry.ci.openshift.org/ocp/4.20:base-rhel9}
+ARG BASE_IMAGE=${BASE_IMAGE:-registry.access.redhat.com/ubi9/ubi-minimal:9.6}
 
 FROM ${EL8_BUILD_IMAGE} as builder_rhel8
 ARG GO=${GO:-go}
@@ -37,19 +37,20 @@ RUN make build-hiveadmission build-manager build-operator && \
 FROM ${BASE_IMAGE}
 ARG CONTAINER_SUB_MANAGER_OFF
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
+ARG DNF=microdnf
 
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 
 ##
 # ssh-agent required for gathering logs in some situations:
-RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients && ${DNF} clean all && rm -rf /var/cache/${DNF}/*; fi
 
 # libvirt libraries required for running bare metal installer.
-RUN if ! rpm -q libvirt-libs; then dnf install -y libvirt-libs && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q libvirt-libs; then ${DNF} install -y libvirt-libs && ${DNF} clean all && rm -rf /var/cache/${DNF}/*; fi
 
 # tar is needed to package must-gathers on install failure
-RUN if ! command -v tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! command -v tar; then ${DNF} install -y tar && ${DNF} clean all && rm -rf /var/cache/${DNF}/*; fi
 
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/

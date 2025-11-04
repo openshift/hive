@@ -4,10 +4,11 @@ import (
 	"os"
 	"path/filepath"
 
+	installertypes "github.com/openshift/installer/pkg/types"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/client-go/util/homedir"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
@@ -31,7 +32,7 @@ func GetCreds(credsFile string) ([]byte, error) {
 // ConfigureCreds loads a secret designated by the environment variables CLUSTERDEPLOYMENT_NAMESPACE
 // and CREDS_SECRET_NAME and configures Azure credential environment variables and config files
 // accordingly.
-func ConfigureCreds(c client.Client) {
+func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata) {
 	credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME")
 	if credsSecret == nil {
 		return

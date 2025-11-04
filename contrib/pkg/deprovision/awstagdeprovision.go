@@ -13,7 +13,6 @@ import (
 )
 
 // NewDeprovisionAWSWithTagsCommand is the entrypoint to create the 'aws-tag-deprovision' subcommand
-// TODO: Port to a sub-command of deprovision.
 func NewDeprovisionAWSWithTagsCommand() *cobra.Command {
 	opt := &aws.ClusterUninstaller{}
 	var credsDir string
@@ -66,7 +65,7 @@ func completeAWSUninstaller(o *aws.ClusterUninstaller, logLevel string, args []s
 			"This is expected when in standalone mode. "+
 			"We expect to find your AWS credentials in one of the usual places.", err)
 	}
-	awsutils.ConfigureCreds(client)
+	awsutils.ConfigureCreds(client, nil)
 
 	return nil
 }

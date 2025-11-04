@@ -104,6 +104,10 @@ type Builder struct {
 	// Required when adopting pre-existing clusters.
 	AdoptInfraID string
 
+	// AdoptMetadataJSON is the contents of a metadata.json file typically obtained from
+	// openshift-install. Optional but recommended when adopting pre-existing clusters.
+	AdoptMetadataJSON []byte
+
 	// AdoptAdminUsername is the admin username for an adopted cluster, typically written to disk
 	// after openshift-install create-cluster. This field is optional when adopting.
 	AdoptAdminUsername string
@@ -181,7 +185,7 @@ func (o *Builder) Validate() error {
 			return fmt.Errorf("either both AdoptAdminPassword and AdoptAdminUsername must be set, or neither")
 		}
 	} else {
-		if len(o.AdoptAdminKubeconfig) > 0 || o.AdoptInfraID != "" || o.AdoptClusterID != "" || o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "" {
+		if len(o.AdoptAdminKubeconfig) > 0 || o.AdoptInfraID != "" || o.AdoptClusterID != "" || len(o.AdoptMetadataJSON) > 0 || o.AdoptAdminUsername != "" || o.AdoptAdminPassword != "" {
 			return fmt.Errorf("cannot set adoption fields if Adopt is false")
 		}
 	}
@@ -267,6 +271,9 @@ func (o *Builder) Build() ([]runtime.Object, error) {
 		if o.AdoptAdminUsername != "" {
 			allObjects = append(allObjects, o.generateAdoptedAdminPasswordSecret())
 		}
+		if len(o.AdoptMetadataJSON) > 0 {
+			allObjects = append(allObjects, o.generateMetadataJSONSecret())
+		}
 	}
 
 	return allObjects, nil
@@ -340,6 +347,11 @@ func (o *Builder) generateClusterDeployment() *hivev1.ClusterDeployment {
 			ClusterID:                o.AdoptClusterID,
 			InfraID:                  o.AdoptInfraID,
 			AdminKubeconfigSecretRef: corev1.LocalObjectReference{Name: o.getAdoptAdminKubeconfigSecretName()},
+		}
+		if len(o.AdoptMetadataJSON) > 0 {
+			cd.Spec.ClusterMetadata.MetadataJSONSecretRef = &corev1.LocalObjectReference{
+				Name: o.getAdoptMetadataJSONSecretName(),
+			}
 		}
 		cd.Spec.Installed = true
 		if o.AdoptAdminUsername != "" {
@@ -610,6 +622,22 @@ func (o *Builder) generateAdminKubeconfigSecret() *corev1.Secret {
 	}
 }
 
+func (o *Builder) generateMetadataJSONSecret() *corev1.Secret {
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      o.getAdoptMetadataJSONSecretName(),
+			Namespace: o.Namespace,
+		},
+		Data: map[string][]byte{
+			constants.MetadataJSONSecretKey: o.AdoptMetadataJSON,
+		},
+	}
+}
+
 func (o *Builder) generateInstallerManifestsSecret() *corev1.Secret {
 	return &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -657,6 +685,10 @@ func (o *Builder) getServingCertSecretName() string {
 }
 
 func (o *Builder) getAdoptAdminKubeconfigSecretName() string {
+	return fmt.Sprintf("%s-adopted-admin-kubeconfig", o.Name)
+}
+
+func (o *Builder) getAdoptMetadataJSONSecretName() string {
 	return fmt.Sprintf("%s-adopted-admin-kubeconfig", o.Name)
 }
 

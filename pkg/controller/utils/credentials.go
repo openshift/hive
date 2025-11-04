@@ -29,7 +29,7 @@ import (
 func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev1.ClusterDeployment, logger log.FieldLogger) (bool, error) {
 	secret := &corev1.Secret{}
 
-	switch getClusterPlatform(cd) {
+	switch GetClusterPlatform(cd) {
 	case constants.PlatformVSphere:
 		secretKey := types.NamespacedName{Name: cd.Spec.Platform.VSphere.CredentialsSecretRef.Name, Namespace: cd.Namespace}
 		if err := kubeClient.Get(context.TODO(), secretKey, secret); err != nil {
@@ -134,8 +134,8 @@ func validateVSphereCredentials(vcenter, username, password string, rootCAFiles 
 	return true, nil
 }
 
-// getClusterPlatform returns the platform of a given ClusterDeployment
-func getClusterPlatform(cd *hivev1.ClusterDeployment) string {
+// GetClusterPlatform returns the platform of a given ClusterDeployment
+func GetClusterPlatform(cd *hivev1.ClusterDeployment) string {
 	switch {
 	case cd.Spec.Platform.AWS != nil:
 		return constants.PlatformAWS

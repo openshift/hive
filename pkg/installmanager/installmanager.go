@@ -433,6 +433,10 @@ func (m *InstallManager) Run() error {
 		m.log.WithError(err).Error("error reading cluster metadata")
 		return errors.Wrap(err, "error reading cluster metadata")
 	}
+	// Should be redundant/unreachable, but for future-proofing...
+	if len(metadataBytes) == 0 {
+		return errors.New("invalid (zero length) metadata.json")
+	}
 	scrubbedMetadataBytes, err := scrubMetadataJSON(metadataBytes)
 	if err != nil {
 		m.log.WithError(err).Error("error cleaning up metadata")
@@ -536,19 +540,19 @@ func loadSecrets(m *InstallManager, cd *hivev1.ClusterDeployment) {
 	// Configure credentials (including certs) appropriately according to the cloud provider
 	switch {
 	case cd.Spec.Platform.AWS != nil:
-		awsutils.ConfigureCreds(m.DynamicClient)
+		awsutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.Azure != nil:
-		azureutils.ConfigureCreds(m.DynamicClient)
+		azureutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.GCP != nil:
-		gcputils.ConfigureCreds(m.DynamicClient)
+		gcputils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.OpenStack != nil:
-		openstackutils.ConfigureCreds(m.DynamicClient)
+		openstackutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.VSphere != nil:
-		vsphereutils.ConfigureCreds(m.DynamicClient)
+		vsphereutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.IBMCloud != nil:
-		ibmutils.ConfigureCreds(m.DynamicClient)
+		ibmutils.ConfigureCreds(m.DynamicClient, nil)
 	case cd.Spec.Platform.Nutanix != nil:
-		nutanixutils.ConfigureCreds(m.DynamicClient)
+		nutanixutils.ConfigureCreds(m.DynamicClient, nil)
 	}
 
 	// Load up the install config and pull secret. These env vars are required; else we'll panic.

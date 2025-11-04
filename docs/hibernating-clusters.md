@@ -346,7 +346,7 @@ The unreachable controller tracks the reachability of a cluster and is responsib
 
 Once a cluster hibernates and stops responding, the unreachable controller sets the `Unreachable` condition's `Status` to `True`.
 
-Once the cluster resumes, the unreachable controller set the condition `False` and the hive controllers are free to resume syncing.
+Once the cluster resumes, the unreachable controller sets the condition `False` and the hive controllers are free to resume syncing.
 
 ## OpenStack Hibernation
 OpenStack hibernation deletes cluster instances while preserving the ability to restore them. Unlike other cloud providers, OpenStack lacks native hibernation, therefore an implementation based on snapshots is necessary.

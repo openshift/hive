@@ -1,12 +1,12 @@
 package statefulset
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/test/generic"
-	appsv1 "k8s.io/api/apps/v1"
 )
 
 // Option defines a function signature for any function that wants to be passed into Build
@@ -86,7 +86,7 @@ func WithNamespace(namespace string) Option {
 // WithReplicas sets the spec.Replicas field when building an object with Build.
 func WithReplicas(replicas int32) Option {
 	return func(statefulset *appsv1.StatefulSet) {
-		statefulset.Spec.Replicas = pointer.Int32Ptr(replicas)
+		statefulset.Spec.Replicas = ptr.To(replicas)
 	}
 }
 

@@ -14,7 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/pkg/constants"
@@ -411,7 +411,7 @@ func (o *Builder) generateInstallConfigSecret() (*corev1.Secret, error) {
 		},
 		ControlPlane: &installertypes.MachinePool{
 			Name:     "master",
-			Replicas: pointer.Int64Ptr(3),
+			Replicas: ptr.To(int64(3)),
 		},
 		Compute: []installertypes.MachinePool{
 			{
@@ -538,7 +538,7 @@ func (o *Builder) generateMachinePool() *hivev1.MachinePool {
 				Name: o.Name,
 			},
 			Name:     "worker",
-			Replicas: pointer.Int64Ptr(o.WorkerNodesCount),
+			Replicas: ptr.To(o.WorkerNodesCount),
 		},
 	}
 	o.CloudBuilder.addMachinePoolPlatform(o, mp)

@@ -108,7 +108,7 @@ func (r *ReconcileMachinePool) resolveControllerRef(namespace string, controller
 }
 
 // When a lease is created, update the expectations of the machinepool that owns the lease.
-func (r *ReconcileMachinePool) trackLeaseAdd(obj interface{}) {
+func (r *ReconcileMachinePool) trackLeaseAdd(obj any) {
 	r.logger.Debug("tracking lease add")
 	lease := obj.(*hivev1.MachinePoolNameLease)
 	if lease.DeletionTimestamp != nil {

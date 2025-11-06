@@ -173,7 +173,7 @@ func GetControllerConfig(client client.Client, controllerName hivev1.ControllerN
 // MergeJsons will merge the global and local pull secret and return it
 func MergeJsons(globalPullSecret string, localPullSecret string, cdLog log.FieldLogger) (string, error) {
 
-	type dockerConfig map[string]interface{}
+	type dockerConfig map[string]any
 	type dockerConfigJSON struct {
 		Auths dockerConfig `json:"auths"`
 	}
@@ -205,7 +205,7 @@ func MergeJsons(globalPullSecret string, localPullSecret string, cdLog log.Field
 }
 
 // GetChecksumOfObject returns the md5sum hash of the object passed in.
-func GetChecksumOfObject(object interface{}) (string, error) {
+func GetChecksumOfObject(object any) (string, error) {
 	b, err := json.Marshal(object)
 	if err != nil {
 		return "", err
@@ -214,7 +214,7 @@ func GetChecksumOfObject(object interface{}) (string, error) {
 }
 
 // GetChecksumOfObjects returns the md5sum hash of the objects passed in.
-func GetChecksumOfObjects(objects ...interface{}) (string, error) {
+func GetChecksumOfObjects(objects ...any) (string, error) {
 	return GetChecksumOfObject(objects)
 }
 

@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -716,10 +717,10 @@ func testSecretForCertificateBundle(cb hivev1.CertificateBundleSpec) corev1.Secr
 
 func addCertificateBundlesForIngressList(cd *hivev1.ClusterDeployment) []hivev1.CertificateBundleSpec {
 	certBundles := []hivev1.CertificateBundleSpec{}
-	certBundleAlreadyProcessed := map[string]bool{}
+	certBundleAlreadyProcessed := sets.New[string]()
 
 	for _, ingress := range cd.Spec.Ingress {
-		if certBundleAlreadyProcessed[ingress.ServingCertificate] {
+		if certBundleAlreadyProcessed.Has(ingress.ServingCertificate) {
 			continue
 		}
 		cb := hivev1.CertificateBundleSpec{
@@ -731,7 +732,7 @@ func addCertificateBundlesForIngressList(cd *hivev1.ClusterDeployment) []hivev1.
 
 		certBundles = append(certBundles, cb)
 		// no need to make multiple certbundle entries for the same certbundle
-		certBundleAlreadyProcessed[ingress.ServingCertificate] = true
+		certBundleAlreadyProcessed.Insert(ingress.ServingCertificate)
 	}
 
 	return certBundles

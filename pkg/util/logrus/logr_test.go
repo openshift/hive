@@ -12,22 +12,22 @@ import (
 
 func Test_keyAndValuesToFields(t *testing.T) {
 	cases := []struct {
-		input  []interface{}
+		input  []any
 		output log.Fields
 	}{{
 		input:  nil,
 		output: log.Fields{},
 	}, {
-		input:  []interface{}{},
+		input:  []any{},
 		output: log.Fields{},
 	}, {
-		input:  []interface{}{"key1", "value1", "key2", 1, "key3", 3.0, "key4", []int{1, 2}},
+		input:  []any{"key1", "value1", "key2", 1, "key3", 3.0, "key4", []int{1, 2}},
 		output: log.Fields{"key1": "value1", "key2": 1, "key3": 3.0, "key4": []int{1, 2}},
 	}, {
-		input:  []interface{}{"key1"},
+		input:  []any{"key1"},
 		output: log.Fields{"key1": ""},
 	}, {
-		input:  []interface{}{"key1", "value1", "key2"},
+		input:  []any{"key1", "value1", "key2"},
 		output: log.Fields{"key1": "value1", "key2": ""},
 	}}
 	for _, test := range cases {

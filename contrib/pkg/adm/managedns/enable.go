@@ -27,11 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
-	hiveutils "github.com/openshift/hive/contrib/pkg/utils"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
-	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
+	"github.com/openshift/hive/contrib/pkg/utils"
 	"github.com/openshift/hive/pkg/constants"
+	awscreds "github.com/openshift/hive/pkg/creds/aws"
+	azurecreds "github.com/openshift/hive/pkg/creds/azure"
+	gcpcreds "github.com/openshift/hive/pkg/creds/gcp"
 	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
@@ -46,9 +46,6 @@ managed domains, create a credentials secret for your cloud provider, and link i
 the ExternalDNS section of HiveConfig.
 `
 const (
-	cloudAWS                = "aws"
-	cloudGCP                = "gcp"
-	cloudAzure              = "azure"
 	hiveAdmissionDeployment = "hiveadmission"
 	hiveConfigName          = "hive"
 	waitTime                = time.Minute * 2
@@ -95,7 +92,7 @@ func NewEnableManageDNSCommand() *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|gcp|azure)")
+	flags.StringVar(&opt.Cloud, "cloud", constants.PlatformAWS, "Cloud provider: aws(default)|gcp|azure)")
 	flags.StringVar(&opt.CredsFile, "creds-file", "", "Cloud credentials file (defaults vary depending on cloud)")
 	flags.StringVar(&opt.AzureResourceGroup, "azure-resource-group-name", "os4-common", "Azure Resource Group (Only applicable if --cloud azure)")
 	return cmd
@@ -127,8 +124,7 @@ func (o *Options) Run(args []string) error {
 	// Update the current HiveConfig, which should always exist as the operator will
 	// create a default one once run.
 	hc := &hivev1.HiveConfig{}
-	o.hiveClient.Get(context.TODO(), types.NamespacedName{Name: hiveConfigName}, hc)
-	if err != nil {
+	if err := o.hiveClient.Get(context.TODO(), types.NamespacedName{Name: hiveConfigName}, hc); err != nil {
 		log.WithError(err).Fatal("error looking up HiveConfig 'hive'")
 	}
 
@@ -139,7 +135,7 @@ func (o *Options) Run(args []string) error {
 	var credsSecret *corev1.Secret
 
 	switch o.Cloud {
-	case cloudAWS:
+	case constants.PlatformAWS:
 		// Apply a secret for credentials to manage the root domain:
 		credsSecret, err = o.generateAWSCredentialsSecret()
 		if err != nil {
@@ -148,7 +144,7 @@ func (o *Options) Run(args []string) error {
 		dnsConf.AWS = &hivev1.ManageDNSAWSConfig{
 			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret.Name},
 		}
-	case cloudGCP:
+	case constants.PlatformGCP:
 		// Apply a secret for credentials to manage the root domain:
 		credsSecret, err = o.generateGCPCredentialsSecret()
 		if err != nil {
@@ -157,7 +153,7 @@ func (o *Options) Run(args []string) error {
 		dnsConf.GCP = &hivev1.ManageDNSGCPConfig{
 			CredentialsSecretRef: corev1.LocalObjectReference{Name: credsSecret.Name},
 		}
-	case cloudAzure:
+	case constants.PlatformAzure:
 		credsSecret, err = o.generateAzureCredentialsSecret()
 		if err != nil {
 			log.WithError(err).Fatal("error generating manageDNS credentials secret")
@@ -313,7 +309,7 @@ func (o *Options) waitForHiveConfigToBeProcessed() error {
 
 func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {
 	defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
-	accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
+	accessKeyID, secretAccessKey, err := awscreds.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +330,7 @@ func (o *Options) generateAWSCredentialsSecret() (*corev1.Secret, error) {
 }
 
 func (o *Options) generateGCPCredentialsSecret() (*corev1.Secret, error) {
-	saFileContents, err := gcputils.GetCreds(o.CredsFile)
+	saFileContents, err := gcpcreds.GetCreds(o.CredsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +350,7 @@ func (o *Options) generateGCPCredentialsSecret() (*corev1.Secret, error) {
 }
 
 func (o *Options) generateAzureCredentialsSecret() (*corev1.Secret, error) {
-	spFileContents, err := azureutils.GetCreds(o.CredsFile)
+	spFileContents, err := azurecreds.GetCreds(o.CredsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -379,12 +375,15 @@ func (o *Options) getResourceHelper() (resource.Helper, error) {
 		log.WithError(err).Error("Cannot get client config")
 		return nil, err
 	}
-	return resource.NewHelperFromRESTConfig(cfg, "util-managedns-enable", log.WithField("command", "adm manage-dns enable"))
+	return resource.NewHelper(
+		log.WithField("command", "adm manage-dns enable"),
+		resource.FromRESTConfig(cfg),
+		resource.WithControllerName("util-managedns-enable"))
 }
 
 func (o *Options) setupLocalClients() error {
 	log.Debug("creating cluster client config")
-	hiveClient, err := hiveutils.GetClient("hiveutil-managedns-enable")
+	hiveClient, err := utils.GetClient("hiveutil-managedns-enable")
 	if err != nil {
 		log.WithError(err).Error("failed to create a hive config client")
 		return err

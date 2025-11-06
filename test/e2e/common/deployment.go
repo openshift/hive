@@ -36,7 +36,7 @@ func WaitForDeployment(c kclient.Interface, namespace, name string, testFunc fun
 	logger.Infof("Waiting for deployment")
 	stop := make(chan struct{})
 	done := make(chan struct{})
-	onObject := func(obj interface{}) {
+	onObject := func(obj any) {
 		deployment, ok := obj.(*appsv1.Deployment)
 		if !ok {
 			logger.Warningf("object not deployment: %v", obj)
@@ -47,17 +47,16 @@ func WaitForDeployment(c kclient.Interface, namespace, name string, testFunc fun
 		}
 	}
 	watchList := cache.NewListWatchFromClient(c.AppsV1().RESTClient(), "deployments", namespace, fields.OneTermEqualSelector("metadata.name", name))
-	_, controller := cache.NewInformer(
-		watchList,
-		&appsv1.Deployment{},
-		0,
-		cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: watchList,
+		ObjectType:    &appsv1.Deployment{},
+		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: onObject,
-			UpdateFunc: func(oldObject, newObject interface{}) {
+			UpdateFunc: func(oldObject, newObject any) {
 				onObject(newObject)
 			},
 		},
-	)
+	})
 	go controller.Run(stop)
 	defer func() { stop <- struct{}{} }()
 

@@ -1329,9 +1329,10 @@ func getHibernatingAndRunningConditions(cd *hivev1.ClusterDeployment) (*hivev1.C
 	var hibCond *hivev1.ClusterDeploymentCondition
 	var runCond *hivev1.ClusterDeploymentCondition
 	for i := range cd.Status.Conditions {
-		if cd.Status.Conditions[i].Type == hivev1.ClusterHibernatingCondition {
+		switch cd.Status.Conditions[i].Type {
+		case hivev1.ClusterHibernatingCondition:
 			hibCond = &cd.Status.Conditions[i]
-		} else if cd.Status.Conditions[i].Type == hivev1.ClusterReadyCondition {
+		case hivev1.ClusterReadyCondition:
 			runCond = &cd.Status.Conditions[i]
 		}
 	}

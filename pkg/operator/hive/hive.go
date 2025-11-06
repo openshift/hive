@@ -30,7 +30,6 @@ import (
 	"github.com/openshift/hive/pkg/controller/images"
 	"github.com/openshift/hive/pkg/controller/utils"
 	"github.com/openshift/hive/pkg/operator/assets"
-	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 )
 
@@ -65,7 +64,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		for _, asset := range assetsToClean {
 			hLog.Infof("Deleting asset %s from old target namespace %s", asset, ns)
 			// DeleteAssetWithNSOverride already no-ops for IsNotFound
-			if err := util.DeleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
+			if err := deleteAssetByPathWithNSOverride(h, asset, ns, instance); err != nil {
 				return errors.Wrapf(err, "error deleting asset %s from old target namespace %s", asset, ns)
 			}
 		}
@@ -299,7 +298,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 
 	// Load namespaced assets, decode them, set to our target namespace, and apply:
 	for _, assetPath := range namespacedAssets {
-		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(assetPath), hLog, util.WithNamespaceOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
+		if _, err := applyRuntimeObject(h, fromAssetPath(assetPath), hLog, withNamespaceOverride(hiveNSName), withGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying object with namespace override")
 			return err
 		}
@@ -312,7 +311,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 		"config/controllers/hive_controllers_role.yaml",
 	}
 	for _, a := range applyAssets {
-		if _, err := util.ApplyRuntimeObject(h, util.FromAssetPath(a), hLog, util.WithGarbageCollection(instance)); err != nil {
+		if _, err := applyRuntimeObject(h, fromAssetPath(a), hLog, withGarbageCollection(instance)); err != nil {
 			hLog.WithField("asset", a).WithError(err).Error("error applying asset")
 			return err
 		}
@@ -325,7 +324,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 	for _, crbAsset := range clusterRoleBindingAssets {
 
-		if _, err := util.ApplyRuntimeObject(h, util.CRBFromAssetPath(crbAsset), hLog, util.CRBWithSubjectNSOverride(hiveNSName), util.WithGarbageCollection(instance)); err != nil {
+		if _, err := applyRuntimeObject(h, crbFromAssetPath(crbAsset), hLog, crbWithSubjectNSOverride(hiveNSName), withGarbageCollection(instance)); err != nil {
 			hLog.WithError(err).Error("error applying ClusterRoleBinding with namespace override")
 			return err
 		}
@@ -346,7 +345,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	if r.isOpenShift {
 		hLog.Info("deploying OpenShift specific assets")
 		for _, a := range openshiftSpecificAssets {
-			_, err = util.ApplyRuntimeObject(h, util.FromAssetPath(a), hLog, util.WithGarbageCollection(instance))
+			_, err = applyRuntimeObject(h, fromAssetPath(a), hLog, withGarbageCollection(instance))
 			if err != nil {
 				return err
 			}
@@ -363,7 +362,7 @@ func (r *ReconcileHiveConfig) deployHive(hLog log.FieldLogger, h resource.Helper
 	}
 
 	hiveDeployment.Namespace = hiveNSName
-	result, err := util.ApplyRuntimeObject(h, util.Passthrough(hiveDeployment), hLog, util.WithGarbageCollection(instance))
+	result, err := applyRuntimeObject(h, passthrough(hiveDeployment), hLog, withGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying deployment")
 		return err
@@ -426,7 +425,7 @@ func (r *ReconcileHiveConfig) includeAdditionalCAs(hLog log.FieldLogger, h resou
 			"ca.crt": additionalCA.Bytes(),
 		},
 	}
-	result, err := util.ApplyRuntimeObject(h, util.Passthrough(caSecret), hLog, util.WithGarbageCollection(instance))
+	result, err := applyRuntimeObject(h, passthrough(caSecret), hLog, withGarbageCollection(instance))
 	if err != nil {
 		hLog.WithError(err).Error("error applying additional cert secret")
 		return err

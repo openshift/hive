@@ -9,7 +9,6 @@ import (
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/hive/pkg/awsclient"
 
 	log "github.com/sirupsen/logrus"
@@ -78,7 +77,7 @@ func (o *endpointVPCRemoveOptions) Complete(cmd *cobra.Command, args []string) e
 	}
 
 	// Get endpoint VPC and AWS clients for it
-	endpointVpcIdx, ok := awsutils.FindVpcInInventory(o.endpointVpcId, o.hiveConfig.Spec.AWSPrivateLink.EndpointVPCInventory)
+	endpointVpcIdx, ok := findVpcInInventory(o.endpointVpcId, o.hiveConfig.Spec.AWSPrivateLink.EndpointVPCInventory)
 	if !ok {
 		log.Fatalf("Endpoint VPC %v not found in HiveConfig.spec.awsPrivateLink.endpointVPCInventory. "+
 			"Please call `hiveutil privatelink endpointvpc add ...` to add it first", o.endpointVpcId)
@@ -94,7 +93,7 @@ func (o *endpointVPCRemoveOptions) Complete(cmd *cobra.Command, args []string) e
 	for _, associatedVpc := range o.associatedVpcs {
 		regions.Insert(associatedVpc.AWSPrivateLinkVPC.Region)
 	}
-	awsClientsByRegion, err := awsutils.GetAWSClientsByRegion(common.CredsSecret, regions)
+	awsClientsByRegion, err := getAWSClientsByRegion(common.CredsSecret, regions)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to get AWS clients")
 	}
@@ -111,7 +110,7 @@ func (o *endpointVPCRemoveOptions) Validate(cmd *cobra.Command, args []string) e
 
 func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error {
 	// Get default SG of the endpoint VPC
-	endpointVPCDefaultSG, err := awsutils.GetDefaultSGOfVpc(o.endpointVpcClients, o.endpointVpcId)
+	endpointVPCDefaultSG, err := getDefaultSGOfVpc(o.endpointVpcClients, o.endpointVpcId)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to get default SG of the endpoint VPC")
 	}
@@ -124,12 +123,12 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 		associatedVpcId := associatedVpc.AWSPrivateLinkVPC.VPCID
 		log.Infof("Removing networking elements between associated VPC %v and endpoint VPC %v", associatedVpcId, o.endpointVpcId)
 
-		associatedVpcCIDR, err := awsutils.GetCIDRFromVpcId(associatedVpcClients, associatedVpcId)
+		associatedVpcCIDR, err := getCIDRFromVpcId(associatedVpcClients, associatedVpcId)
 		if err != nil {
 			log.Fatal("Failed to get CIDR of associated VPC")
 		}
 		log.Debugf("Found associated VPC CIDR = %v", associatedVpcCIDR)
-		endpointVpcCIDR, err := awsutils.GetCIDRFromVpcId(o.endpointVpcClients, o.endpointVpcId)
+		endpointVpcCIDR, err := getCIDRFromVpcId(o.endpointVpcClients, o.endpointVpcId)
 		if err != nil {
 			log.Fatal("Failed to get CIDR of endpoint VPC")
 		}
@@ -166,7 +165,7 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 		}
 
 		// Update SGs
-		associatedVpcWorkerSG, err := awsutils.GetWorkerSGFromVpcId(associatedVpcClients, associatedVpcId)
+		associatedVpcWorkerSG, err := getWorkerSGFromVpcId(associatedVpcClients, associatedVpcId)
 		if err != nil {
 			log.WithError(err).Fatal("Failed to get worker SG of the associated Hive cluster")
 		}
@@ -177,7 +176,7 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 		// Associated VPC & endpoint VPC in the same region => revoke ingress from SG of the peer
 		case associatedVpcRegion == o.endpointVpcRegion:
 			log.Info("Revoking access from the endpoint VPC's default SG to the associated VPC's worker SG")
-			if _, err = awsutils.RevokeAllIngressFromSG(
+			if _, err = revokeAllIngressFromSG(
 				associatedVpcClients,
 				aws.String(associatedVpcWorkerSG),
 				aws.String(endpointVPCDefaultSG),
@@ -191,7 +190,7 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 			}
 
 			log.Info("Revoking access from the associated VPC's worker SG to the endpoint VPC's default SG")
-			if _, err = awsutils.RevokeAllIngressFromSG(
+			if _, err = revokeAllIngressFromSG(
 				o.endpointVpcClients,
 				aws.String(endpointVPCDefaultSG),
 				aws.String(associatedVpcWorkerSG),
@@ -207,7 +206,7 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 		// Associated VPC & endpoint VPC in different regions => revoke ingress from CIDR of the peer
 		default:
 			log.Info("Revoking access from the endpoint VPC's CIDR block to the associated VPC's worker SG")
-			if _, err = awsutils.RevokeAllIngressFromCIDR(
+			if _, err = revokeAllIngressFromCIDR(
 				associatedVpcClients,
 				aws.String(associatedVpcWorkerSG),
 				aws.String(endpointVpcCIDR),
@@ -221,7 +220,7 @@ func (o *endpointVPCRemoveOptions) Run(cmd *cobra.Command, args []string) error 
 			}
 
 			log.Info("Revoking access from the associated VPC's CIDR block to the endpoint VPC's default SG")
-			if _, err = awsutils.RevokeAllIngressFromCIDR(
+			if _, err = revokeAllIngressFromCIDR(
 				o.endpointVpcClients,
 				aws.String(endpointVPCDefaultSG),
 				aws.String(associatedVpcCIDR),

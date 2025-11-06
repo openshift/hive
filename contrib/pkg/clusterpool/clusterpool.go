@@ -15,23 +15,21 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/homedir"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/utils"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
-	azureutils "github.com/openshift/hive/contrib/pkg/utils/azure"
-	gcputils "github.com/openshift/hive/contrib/pkg/utils/gcp"
 	"github.com/openshift/hive/pkg/clusterresource"
+	"github.com/openshift/hive/pkg/constants"
+	awscreds "github.com/openshift/hive/pkg/creds/aws"
+	azurecreds "github.com/openshift/hive/pkg/creds/azure"
+	gcpcreds "github.com/openshift/hive/pkg/creds/gcp"
 	"github.com/openshift/hive/pkg/util/scheme"
 )
 
 const (
-	cloudAWS   = "aws"
-	cloudAzure = "azure"
-	cloudGCP   = "gcp"
-
 	longDesc = `
 OVERVIEW
 The hiveutil clusterpool create-pool command generates and applies the
@@ -56,11 +54,11 @@ used.
 )
 
 var (
-	validClouds = map[string]bool{
-		cloudAWS:   true,
-		cloudAzure: true,
-		cloudGCP:   true,
-	}
+	validClouds = sets.New(
+		constants.PlatformAWS,
+		constants.PlatformAzure,
+		constants.PlatformGCP,
+	)
 )
 
 type ClusterPoolOptions struct {
@@ -124,7 +122,7 @@ create-pool CLUSTER_POOL_NAME --cloud=gcp`,
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&opt.Cloud, "cloud", cloudAWS, "Cloud provider: aws(default)|azure|gcp)")
+	flags.StringVar(&opt.Cloud, "cloud", constants.PlatformAWS, "Cloud provider: aws(default)|azure|gcp)")
 	flags.StringVarP(&opt.Namespace, "namespace", "n", "", "Namespace to create cluster pool in")
 	flags.StringVar(&opt.BaseDomain, "base-domain", "new-installer.openshift.com", "Base domain for the cluster pool")
 	flags.StringVar(&opt.PullSecret, "pull-secret", "", "Pull secret for cluster pool. Takes precedence over pull-secret-file.")
@@ -149,11 +147,11 @@ func (o *ClusterPoolOptions) complete(args []string) error {
 
 	if o.Region == "" {
 		switch o.Cloud {
-		case cloudAWS:
+		case constants.PlatformAWS:
 			o.Region = "us-east-1"
-		case cloudAzure:
+		case constants.PlatformAzure:
 			o.Region = "centralus"
-		case cloudGCP:
+		case constants.PlatformGCP:
 			o.Region = "us-east1"
 		}
 	}
@@ -203,7 +201,7 @@ func (o *ClusterPoolOptions) validate(cmd *cobra.Command) error {
 		return fmt.Errorf("must specify only one of image set, release image or release image source")
 	}
 
-	if !validClouds[o.Cloud] {
+	if !validClouds.Has(o.Cloud) {
 		cmd.Usage()
 		return fmt.Errorf("unsupported cloud: %s", o.Cloud)
 	}
@@ -269,7 +267,7 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 	}
 
 	var awsBuilder *clusterresource.AWSCloudBuilder
-	if o.Cloud == cloudAWS {
+	if o.Cloud == constants.PlatformAWS {
 		awsBuilder = &clusterresource.AWSCloudBuilder{
 			Region: o.Region,
 			// TODO: CLI option for this
@@ -280,9 +278,9 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 
 	if o.createCloudSecret {
 		switch o.Cloud {
-		case cloudAWS:
+		case constants.PlatformAWS:
 			defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
-			accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
+			accessKeyID, secretAccessKey, err := awscreds.GetAWSCreds(o.CredsFile, defaultCredsFilePath)
 			if err != nil {
 				o.log.WithError(err).Error("Failed to get AWS credentials")
 				return nil, err
@@ -290,8 +288,8 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 			// Update AWS cloud builder with creds
 			awsBuilder.AccessKeyID = accessKeyID
 			awsBuilder.SecretAccessKey = secretAccessKey
-		case cloudAzure:
-			creds, err := azureutils.GetCreds(o.CredsFile)
+		case constants.PlatformAzure:
+			creds, err := azurecreds.GetCreds(o.CredsFile)
 			if err != nil {
 				o.log.WithError(err).Error("Failed to read in Azure credentials")
 				return nil, err
@@ -301,8 +299,8 @@ func (o *ClusterPoolOptions) generateObjects() ([]runtime.Object, error) {
 				BaseDomainResourceGroupName: o.AzureBaseDomainResourceGroupName,
 				Region:                      o.Region,
 			}
-		case cloudGCP:
-			creds, err := gcputils.GetCreds(o.CredsFile)
+		case constants.PlatformGCP:
+			creds, err := gcpcreds.GetCreds(o.CredsFile)
 			if err != nil {
 				o.log.WithError(err).Error("Failed to get GCP credentials")
 				return nil, err

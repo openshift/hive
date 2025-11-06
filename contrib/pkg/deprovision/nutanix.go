@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/hive/contrib/pkg/utils"
-	nutanixutils "github.com/openshift/hive/contrib/pkg/utils/nutanix"
 	"github.com/openshift/hive/pkg/constants"
+	nutanixcreds "github.com/openshift/hive/pkg/creds/nutanix"
 	"github.com/openshift/installer/pkg/destroy/nutanix"
 	"github.com/openshift/installer/pkg/types"
 	typesnutanix "github.com/openshift/installer/pkg/types/nutanix"
@@ -61,7 +61,7 @@ func (o *nutanixOptions) Complete(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to get client")
 	}
-	nutanixutils.ConfigureCreds(client, nil)
+	nutanixcreds.ConfigureCreds(client, nil)
 
 	return nil
 }

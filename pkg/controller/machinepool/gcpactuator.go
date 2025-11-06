@@ -13,7 +13,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineapi "github.com/openshift/api/machine/v1beta1"
@@ -383,7 +384,7 @@ func (a *GCPActuator) obtainLease(pool *hivev1.MachinePool, cd *hivev1.ClusterDe
 					Kind:       "MachinePool",
 					Name:       pool.Name,
 					UID:        pool.UID,
-					Controller: pointer.Bool(true),
+					Controller: ptr.To(true),
 				},
 			},
 		},
@@ -434,14 +435,14 @@ func (a *GCPActuator) findAvailableLeaseChars(cd *hivev1.ClusterDeployment, leas
 }
 
 func requireLeases(remoteMachineSets []machineapi.MachineSet, logger log.FieldLogger) bool {
-	poolNames := make(map[string]bool)
+	poolNames := sets.New[string]()
 	for _, ms := range remoteMachineSets {
 		nameParts := strings.Split(ms.Name, "-")
 		if len(nameParts) < 3 {
 			continue
 		}
 		poolName := nameParts[len(nameParts)-2]
-		poolNames[poolName] = true
+		poolNames.Insert(poolName)
 	}
 	// If there are machinesets with a pool name of "w" and no machinesets with a pool name of "worker", then assume
 	// that the "w" pool is the worker pool created by the installer. If the installer-created "w" worker pool still
@@ -450,7 +451,7 @@ func requireLeases(remoteMachineSets []machineapi.MachineSet, logger log.FieldLo
 	// installer-created worker pool when there are Hive-managed pools that are not using leases. Hive will block
 	// through validation MachinePools with a pool name of "w", but the user could still create such machinesets on
 	// the cluster manually.
-	if poolNames["w"] && !poolNames["worker"] {
+	if poolNames.Has("w") && !poolNames.Has("worker") {
 		logger.Debug("leases are required since there is a \"w\" machine pool in the cluster that is likely the installer-created worker pool")
 		return true
 	}

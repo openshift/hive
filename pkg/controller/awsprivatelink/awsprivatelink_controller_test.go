@@ -446,7 +446,7 @@ type createVpcEndpointInputMatcher struct {
 	vpcId string
 }
 
-func (m createVpcEndpointInputMatcher) Matches(o interface{}) bool {
+func (m createVpcEndpointInputMatcher) Matches(o any) bool {
 	i, ok := o.(*ec2.CreateVpcEndpointInput)
 	if !ok {
 		return false
@@ -2173,7 +2173,7 @@ func (m createHostedZoneInputMatcher) String() string {
 	return "matches CreateHostedZoneInput devoid of CallerReference"
 }
 
-func (m createHostedZoneInputMatcher) Matches(x interface{}) bool {
+func (m createHostedZoneInputMatcher) Matches(x any) bool {
 	xT, ok := x.(*route53.CreateHostedZoneInput)
 	if !ok {
 		return false

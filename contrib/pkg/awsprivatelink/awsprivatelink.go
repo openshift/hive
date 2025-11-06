@@ -17,6 +17,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	// privateLinkHubAcctCredsName is the name of the AWS PrivateLink Hub account credentials Secret
+	// created by the "hiveutil awsprivatelink enable" command
+	privateLinkHubAcctCredsName = "awsprivatelink-hub-acct-creds"
+
+	// privateLinkHubAcctCredsLabel is added to the AWS PrivateLink Hub account credentials Secret
+	// created by the "hiveutil awsprivatelink enable" command and
+	// referenced by HiveConfig.spec.awsPrivateLink.credentialsSecretRef.
+	privateLinkHubAcctCredsLabel = "hive.openshift.io/awsprivatelink-hub-acct-credentials"
+)
+
 var (
 	logLevelDebug  bool
 	credsSecretRef string

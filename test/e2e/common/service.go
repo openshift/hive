@@ -17,7 +17,7 @@ func WaitForService(c kclient.Interface, namespace, name string, testFunc func(*
 	logger.Infof("Waiting for service")
 	stop := make(chan struct{})
 	done := make(chan struct{})
-	onObject := func(obj interface{}) {
+	onObject := func(obj any) {
 		service, ok := obj.(*corev1.Service)
 		if !ok {
 			logger.Warningf("object not service: %v", obj)
@@ -28,17 +28,16 @@ func WaitForService(c kclient.Interface, namespace, name string, testFunc func(*
 		}
 	}
 	watchList := cache.NewListWatchFromClient(c.CoreV1().RESTClient(), "services", namespace, fields.OneTermEqualSelector("metadata.name", name))
-	_, controller := cache.NewInformer(
-		watchList,
-		&corev1.Service{},
-		0,
-		cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: watchList,
+		ObjectType:    &corev1.Service{},
+		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: onObject,
-			UpdateFunc: func(oldObject, newObject interface{}) {
+			UpdateFunc: func(oldObject, newObject any) {
 				onObject(newObject)
 			},
 		},
-	)
+	})
 	go controller.Run(stop)
 	defer func() { stop <- struct{}{} }()
 

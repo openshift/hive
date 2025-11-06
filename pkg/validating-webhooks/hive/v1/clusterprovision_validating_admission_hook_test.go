@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 )
@@ -54,7 +54,7 @@ func Test_ClusterProvisionAdmission_Validate_Kind(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -92,7 +92,7 @@ func Test_ClusterProvisionAdmission_Validate_Operation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			request := &admissionv1beta1.AdmissionRequest{
 				Resource: metav1.GroupVersionResource{
@@ -233,7 +233,7 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 			name: "prev cluster ID set for pre-installed",
 			provision: func() *hivev1.ClusterProvision {
 				p := testPreInstalledClusterProvision()
-				p.Spec.PrevClusterID = pointer.String("test-cluster-id")
+				p.Spec.PrevClusterID = ptr.To("test-cluster-id")
 				return p
 			}(),
 		},
@@ -241,14 +241,14 @@ func Test_ClusterProvisionAdmission_Validate_Create(t *testing.T) {
 			name: "prev infra ID set for pre-installed",
 			provision: func() *hivev1.ClusterProvision {
 				p := testPreInstalledClusterProvision()
-				p.Spec.PrevInfraID = pointer.String("test-infra-id")
+				p.Spec.PrevInfraID = ptr.To("test-infra-id")
 				return p
 			}(),
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			rawProvision, err := json.Marshal(tc.provision)
 			if !assert.NoError(t, err, "unexpected error marshalling provision") {
@@ -329,7 +329,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.ClusterID = pointer.String("new-cluster-id")
+				p.Spec.ClusterID = ptr.To("new-cluster-id")
 				return p
 			}(),
 			expectAllowed: true,
@@ -339,7 +339,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.ClusterID = pointer.String("new-cluster-id")
+				p.Spec.ClusterID = ptr.To("new-cluster-id")
 				return p
 			}(),
 		},
@@ -348,7 +348,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.InfraID = pointer.String("new-infra-id")
+				p.Spec.InfraID = ptr.To("new-infra-id")
 				return p
 			}(),
 			expectAllowed: true,
@@ -358,7 +358,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.InfraID = pointer.String("new-infra-id")
+				p.Spec.InfraID = ptr.To("new-infra-id")
 				return p
 			}(),
 		},
@@ -367,7 +367,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.InstallLog = pointer.String("new-install-log")
+				p.Spec.InstallLog = ptr.To("new-install-log")
 				return p
 			}(),
 			expectAllowed: true,
@@ -377,7 +377,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.InstallLog = pointer.String("new-install-log")
+				p.Spec.InstallLog = ptr.To("new-install-log")
 				return p
 			}(),
 			expectAllowed: true,
@@ -445,7 +445,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.PrevClusterID = pointer.String("new-prev-cluster-id")
+				p.Spec.PrevClusterID = ptr.To("new-prev-cluster-id")
 				return p
 			}(),
 		},
@@ -454,7 +454,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.PrevClusterID = pointer.String("new-prev-cluster-id")
+				p.Spec.PrevClusterID = ptr.To("new-prev-cluster-id")
 				return p
 			}(),
 		},
@@ -463,7 +463,7 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testClusterProvision()
-				p.Spec.PrevInfraID = pointer.String("new-prev-infra-id")
+				p.Spec.PrevInfraID = ptr.To("new-prev-infra-id")
 				return p
 			}(),
 		},
@@ -472,14 +472,14 @@ func Test_ClusterProvisionAdmission_Validate_Update(t *testing.T) {
 			old:  testCompletedClusterProvision(),
 			new: func() *hivev1.ClusterProvision {
 				p := testCompletedClusterProvision()
-				p.Spec.PrevInfraID = pointer.String("new-prev-infra-id")
+				p.Spec.PrevInfraID = ptr.To("new-prev-infra-id")
 				return p
 			}(),
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
+			cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder())
 			cut.Initialize(nil, nil)
 			oldAsJSON, err := json.Marshal(tc.old)
 			if !assert.NoError(t, err, "unexpected error marshalling old provision") {
@@ -532,7 +532,7 @@ func Test_ClusterProvisionAdmission_Validate_Update_StageTransition(t *testing.T
 			t.Run(
 				fmt.Sprintf("%s to %s", oldStage, newStage),
 				func(t *testing.T) {
-					cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder(t))
+					cut := NewClusterProvisionValidatingAdmissionHook(*createDecoder())
 					cut.Initialize(nil, nil)
 					oldProvision := testCompletedClusterProvision()
 					oldProvision.Spec.Stage = oldStage
@@ -589,8 +589,8 @@ func testClusterProvision() *hivev1.ClusterProvision {
 			},
 			Attempt:       0,
 			Stage:         hivev1.ClusterProvisionStageInitializing,
-			PrevClusterID: pointer.String("test-prev-cluster-id"),
-			PrevInfraID:   pointer.String("test-prev-infra-id"),
+			PrevClusterID: ptr.To("test-prev-cluster-id"),
+			PrevInfraID:   ptr.To("test-prev-infra-id"),
 		},
 	}
 }
@@ -598,14 +598,14 @@ func testClusterProvision() *hivev1.ClusterProvision {
 func testCompletedClusterProvision() *hivev1.ClusterProvision {
 	provision := testClusterProvision()
 	provision.Spec.Stage = hivev1.ClusterProvisionStageComplete
-	provision.Spec.ClusterID = pointer.String("test-cluster-id")
-	provision.Spec.InfraID = pointer.String("test-infra-id")
-	provision.Spec.InstallLog = pointer.String("test-install-log")
+	provision.Spec.ClusterID = ptr.To("test-cluster-id")
+	provision.Spec.InfraID = ptr.To("test-infra-id")
+	provision.Spec.InstallLog = ptr.To("test-install-log")
 	provision.Spec.MetadataJSON = []byte("\"test-metadata\"")
 	provision.Spec.AdminKubeconfigSecretRef = &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"}
 	provision.Spec.AdminPasswordSecretRef = &corev1.LocalObjectReference{Name: "test-admin-password"}
-	provision.Spec.PrevClusterID = pointer.String("test-prev-cluster-id")
-	provision.Spec.PrevInfraID = pointer.String("test-prev-infra-id")
+	provision.Spec.PrevClusterID = ptr.To("test-prev-cluster-id")
+	provision.Spec.PrevInfraID = ptr.To("test-prev-infra-id")
 	return provision
 }
 
@@ -619,8 +619,8 @@ func testPreInstalledClusterProvision() *hivev1.ClusterProvision {
 				Name: "test-deployment",
 			},
 			Stage:                    hivev1.ClusterProvisionStageComplete,
-			ClusterID:                pointer.String("test-prev-cluster-id"),
-			InfraID:                  pointer.String("test-prev-infra-id"),
+			ClusterID:                ptr.To("test-prev-cluster-id"),
+			InfraID:                  ptr.To("test-prev-infra-id"),
 			AdminKubeconfigSecretRef: &corev1.LocalObjectReference{Name: "test-admin-kubeconfig"},
 			AdminPasswordSecretRef:   &corev1.LocalObjectReference{Name: "test-admin-password"},
 		},

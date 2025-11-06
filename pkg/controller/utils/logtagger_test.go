@@ -21,7 +21,7 @@ func TestAddLogFields(t *testing.T) {
 	tests := []struct {
 		name        string
 		annotations map[string]string
-		want        map[string]interface{}
+		want        map[string]any
 	}{
 		{
 			name: "no annotations",
@@ -41,12 +41,12 @@ func TestAddLogFields(t *testing.T) {
 		{
 			name:        "empty json",
 			annotations: map[string]string{alfa: `{}`},
-			want:        map[string]interface{}{"component": "hive"},
+			want:        map[string]any{"component": "hive"},
 		},
 		{
 			name:        "one field",
 			annotations: map[string]string{alfa: `{"foo": "bar"}`},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"foo":       "bar",
 				"component": "hive",
 			},
@@ -54,7 +54,7 @@ func TestAddLogFields(t *testing.T) {
 		{
 			name:        "multiple fields",
 			annotations: map[string]string{alfa: `{"foo": "bar", "HELLO": "WORLD"}`},
-			want: map[string]interface{}{
+			want: map[string]any{
 				"foo":       "bar",
 				"HELLO":     "WORLD",
 				"component": "hive",
@@ -64,8 +64,8 @@ func TestAddLogFields(t *testing.T) {
 			name: "complex value",
 			// logrus.WithFields happily accepts this (and marshals to a string when emitting)
 			annotations: map[string]string{alfa: `{"foo": {"bar": "baz"}}`},
-			want: map[string]interface{}{
-				"foo":       map[string]interface{}{"bar": "baz"},
+			want: map[string]any{
+				"foo":       map[string]any{"bar": "baz"},
 				"component": "hive",
 			},
 		},

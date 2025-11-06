@@ -4073,14 +4073,14 @@ func testEmptyFakeClusterInstall(name string) *unstructured.Unstructured {
 	})
 	fake.SetNamespace(testNamespace)
 	fake.SetName(name)
-	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]interface{}{}, "spec")
-	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]interface{}{}, "status")
+	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]any{}, "spec")
+	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]any{}, "status")
 	return fake
 }
 
 func testFakeClusterInstall(name string) *unstructured.Unstructured {
 	fake := testEmptyFakeClusterInstall(name)
-	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]interface{}{
+	unstructured.SetNestedField(fake.UnstructuredContent(), map[string]any{
 		"name": testClusterImageSetName,
 	}, "spec", "imageSetRef")
 	return fake
@@ -4089,9 +4089,9 @@ func testFakeClusterInstall(name string) *unstructured.Unstructured {
 func testFakeClusterInstallWithConditions(name string, conditions []hivev1.ClusterInstallCondition) *unstructured.Unstructured {
 	fake := testFakeClusterInstall(name)
 
-	value := []interface{}{}
+	value := []any{}
 	for _, c := range conditions {
-		value = append(value, map[string]interface{}{
+		value = append(value, map[string]any{
 			"type":    string(c.Type),
 			"status":  string(c.Status),
 			"reason":  c.Reason,
@@ -4106,22 +4106,22 @@ func testFakeClusterInstallWithConditions(name string, conditions []hivev1.Clust
 func testFakeClusterInstallWithClusterMetadata(name string, metadata hivev1.ClusterMetadata) *unstructured.Unstructured {
 	fake := testFakeClusterInstall(name)
 
-	value := map[string]interface{}{
+	value := map[string]any{
 		"clusterID": metadata.ClusterID,
 		"infraID":   metadata.InfraID,
-		"adminKubeconfigSecretRef": map[string]interface{}{
+		"adminKubeconfigSecretRef": map[string]any{
 			"name": metadata.AdminKubeconfigSecretRef.Name,
 		},
 	}
 
 	if metadata.AdminPasswordSecretRef != nil {
-		value["adminPasswordSecretRef"] = map[string]interface{}{
+		value["adminPasswordSecretRef"] = map[string]any{
 			"name": metadata.AdminPasswordSecretRef.Name,
 		}
 	}
 
 	if metadata.MetadataJSONSecretRef != nil {
-		value["metadataJSONSecretRef"] = map[string]interface{}{
+		value["metadataJSONSecretRef"] = map[string]any{
 			"name": metadata.MetadataJSONSecretRef.Name,
 		}
 	}

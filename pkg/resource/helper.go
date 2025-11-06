@@ -50,6 +50,34 @@ type helper struct {
 	openAPISchema  openapi.Resources
 }
 
+type HelperOpt func(*helper)
+
+func FromRESTConfig(restConfig *rest.Config) HelperOpt {
+	return func(h *helper) {
+		h.restConfig = restConfig
+		h.getFactory = h.getRESTConfigFactory
+	}
+}
+
+func FromKubeconfig(kubeconfig []byte) HelperOpt {
+	return func(h *helper) {
+		h.kubeconfig = kubeconfig
+		h.getFactory = h.getKubeconfigFactory
+	}
+}
+
+func WithMetrics() HelperOpt {
+	return func(h *helper) {
+		h.metricsEnabled = true
+	}
+}
+
+func WithControllerName(cn hivev1.ControllerName) HelperOpt {
+	return func(h *helper) {
+		h.controllerName = cn
+	}
+}
+
 // cacheOpenAPISchema builds the very expensive OpenAPISchema (>3s commonly) once, and stores
 // the resulting schema on the helper for re-use, particularly in Apply when run many times against
 // one cluster.
@@ -65,46 +93,20 @@ func (r *helper) cacheOpenAPISchema() error {
 	return nil
 }
 
-// NewHelperFromRESTConfig returns a new object that allows apply and patch operations
-func NewHelperFromRESTConfig(restConfig *rest.Config, controllerName hivev1.ControllerName, logger log.FieldLogger) (Helper, error) {
-	r := &helper{
-		logger:         logger,
-		cacheDir:       getCacheDir(logger),
-		restConfig:     restConfig,
-		controllerName: controllerName,
-	}
-	r.getFactory = r.getRESTConfigFactory
-	err := r.cacheOpenAPISchema()
-	return r, err
-}
-
-// NewHelperWithMetricsFromRESTConfig returns a new object that allows apply and patch operations, with metrics tracking enabled.
-func NewHelperWithMetricsFromRESTConfig(restConfig *rest.Config, controllerName hivev1.ControllerName, logger log.FieldLogger) (Helper, error) {
-	r := &helper{
-		logger:         logger,
-		metricsEnabled: true,
-		controllerName: controllerName,
-		cacheDir:       getCacheDir(logger),
-		restConfig:     restConfig,
-	}
-	r.getFactory = r.getRESTConfigFactory
-	err := r.cacheOpenAPISchema()
-	return r, err
-}
-
 // NewHelper returns a new object that allows apply and patch operations
-func NewHelper(kubeconfig []byte, logger log.FieldLogger) (Helper, error) {
+func NewHelper(logger log.FieldLogger, opts ...HelperOpt) (Helper, error) {
 	r := &helper{
-		logger:     logger,
-		cacheDir:   getCacheDir(logger),
-		kubeconfig: kubeconfig,
+		logger:   logger,
+		cacheDir: getCacheDir(),
 	}
-	r.getFactory = r.getKubeconfigFactory
+	for _, o := range opts {
+		o(r)
+	}
 	err := r.cacheOpenAPISchema()
 	return r, err
 }
 
-func getCacheDir(logger log.FieldLogger) string {
+func getCacheDir() string {
 	if envCacheDir := os.Getenv(cacheDirEnvKey); len(envCacheDir) > 0 {
 		return envCacheDir
 	}

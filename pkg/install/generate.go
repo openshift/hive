@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	apihelpers "github.com/openshift/hive/apis/helpers"
@@ -456,9 +455,9 @@ func GenerateInstallerJob(
 			Labels:    labels,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit:          pointer.Int32Ptr(0),
-			Completions:           pointer.Int32Ptr(1),
-			ActiveDeadlineSeconds: pointer.Int64Ptr(int64(provisionJobDeadline.Seconds())),
+			BackoffLimit:          ptr.To(int32(0)),
+			Completions:           ptr.To(int32(1)),
+			ActiveDeadlineSeconds: ptr.To(int64(provisionJobDeadline.Seconds())),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,

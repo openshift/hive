@@ -13,8 +13,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	"github.com/openshift/hive/contrib/pkg/awsprivatelink/common"
-	awsutils "github.com/openshift/hive/contrib/pkg/utils/aws"
 	"github.com/openshift/hive/pkg/awsclient"
+	awscreds "github.com/openshift/hive/pkg/creds/aws"
 	operatorutils "github.com/openshift/hive/pkg/operator/hive"
 
 	log "github.com/sirupsen/logrus"
@@ -147,11 +147,11 @@ func (o *enableOptions) Run(cmd *cobra.Command, args []string) error {
 
 	switch err = common.DynamicClient.Create(context.Background(), credsSecretInHiveNS); {
 	case err == nil:
-		log.Infof("Secret/%s created in namespace %s", awsutils.PrivateLinkHubAcctCredsName, hiveNS)
+		log.Infof("Secret/%s created in namespace %s", privateLinkHubAcctCredsName, hiveNS)
 	case apierrors.IsAlreadyExists(err):
-		log.Warnf("Secret/%s already exists in namespace %s", awsutils.PrivateLinkHubAcctCredsName, hiveNS)
+		log.Warnf("Secret/%s already exists in namespace %s", privateLinkHubAcctCredsName, hiveNS)
 	default:
-		log.WithError(err).Fatalf("Failed to create Secret/%s in namespace %s", awsutils.PrivateLinkHubAcctCredsName, hiveNS)
+		log.WithError(err).Fatalf("Failed to create Secret/%s in namespace %s", privateLinkHubAcctCredsName, hiveNS)
 	}
 
 	// Update HiveConfig
@@ -194,11 +194,11 @@ func (o *enableOptions) getOrCopyCredsSecret(source *corev1.Secret, namespace st
 			APIVersion: corev1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      awsutils.PrivateLinkHubAcctCredsName,
+			Name:      privateLinkHubAcctCredsName,
 			Namespace: namespace,
 			// Secrets without this label (e.g., the ones created and configured manually) won't be deleted
 			// when calling "hiveutil awsprivatelink disable".
-			Labels: map[string]string{awsutils.PrivateLinkHubAcctCredsLabel: "true"},
+			Labels: map[string]string{privateLinkHubAcctCredsLabel: "true"},
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
@@ -210,7 +210,7 @@ func (o *enableOptions) getOrCopyCredsSecret(source *corev1.Secret, namespace st
 	// Get creds from environment
 	default:
 		defaultCredsFilePath := filepath.Join(o.homeDir, ".aws", "credentials")
-		accessKeyID, secretAccessKey, err := awsutils.GetAWSCreds("", defaultCredsFilePath)
+		accessKeyID, secretAccessKey, err := awscreds.GetAWSCreds("", defaultCredsFilePath)
 		if err != nil {
 			return nil, err
 		}

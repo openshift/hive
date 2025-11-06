@@ -47,7 +47,7 @@ func (h *clusterDeploymentEventHandler) Create(ctx context.Context, e event.Type
 }
 
 // When a ClusterDeployment is created, update the expectations of the ClusterPool that owns the ClusterDeployment.
-func (h *clusterDeploymentEventHandler) trackClusterDeploymentAdd(obj interface{}) {
+func (h *clusterDeploymentEventHandler) trackClusterDeploymentAdd(obj any) {
 	cd := obj.(*hivev1.ClusterDeployment)
 	if cd.DeletionTimestamp != nil {
 		// on a restart of the controller, it's possible a new object shows up in a state that

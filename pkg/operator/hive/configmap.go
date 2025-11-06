@@ -20,7 +20,6 @@ import (
 	hivecontractsv1alpha1 "github.com/openshift/hive/apis/hivecontracts/v1alpha1"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/utils"
-	"github.com/openshift/hive/pkg/operator/util"
 	"github.com/openshift/hive/pkg/resource"
 	"github.com/openshift/hive/pkg/util/contracts"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -340,7 +339,7 @@ func (r *ReconcileHiveConfig) deployConfigMap(hLog log.FieldLogger, h resource.H
 		}
 	}
 
-	result, err := util.ApplyRuntimeObject(h, util.Passthrough(cm), hLog, util.WithGarbageCollection(instance))
+	result, err := applyRuntimeObject(h, passthrough(cm), hLog, withGarbageCollection(instance))
 	if err != nil {
 		cmLog.WithError(err).Error("error applying configmap")
 		return "", err

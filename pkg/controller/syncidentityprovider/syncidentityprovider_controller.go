@@ -81,13 +81,13 @@ func AddToManager(mgr manager.Manager, r reconcile.Reconciler, concurrentReconci
 	reconciler := r.(*ReconcileSyncIdentityProviders)
 
 	// Watch for changes to SyncIdentityProvider
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.SyncIdentityProvider{}, handler.TypedEnqueueRequestsFromMapFunc[*hivev1.SyncIdentityProvider](reconciler.syncIdentityProviderWatchHandler)))
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.SyncIdentityProvider{}, handler.TypedEnqueueRequestsFromMapFunc(reconciler.syncIdentityProviderWatchHandler)))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to SelectorSyncIdentityProvider
-	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.SelectorSyncIdentityProvider{}, handler.TypedEnqueueRequestsFromMapFunc[*hivev1.SelectorSyncIdentityProvider](reconciler.selectorSyncIdentityProviderWatchHandler)))
+	err = c.Watch(source.Kind(mgr.GetCache(), &hivev1.SelectorSyncIdentityProvider{}, handler.TypedEnqueueRequestsFromMapFunc(reconciler.selectorSyncIdentityProviderWatchHandler)))
 	if err != nil {
 		return err
 	}

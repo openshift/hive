@@ -38,6 +38,9 @@ FROM ${BASE_IMAGE}
 ARG CONTAINER_SUB_MANAGER_OFF
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
 
+# CVE-2023-6597
+RUN dnf upgrade -y python3
+
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 

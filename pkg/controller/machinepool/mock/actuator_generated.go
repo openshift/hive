@@ -7,10 +7,10 @@ package mock
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
 	v1beta1 "github.com/openshift/api/machine/v1beta1"
 	v1 "github.com/openshift/hive/apis/hive/v1"
 	logrus "github.com/sirupsen/logrus"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockActuator is a mock of Actuator interface.

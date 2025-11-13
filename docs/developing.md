@@ -46,7 +46,7 @@
 
 - [kustomize](https://github.com/kubernetes-sigs/kustomize#kustomize)
 - [imagebuilder](https://github.com/openshift/imagebuilder)
-- [mockgen](https://github.com/golang/mock)
+- [mockgen](https://github.com/uber-go/mock)
 
 ## Build and run tests
 

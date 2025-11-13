@@ -7,8 +7,8 @@ package mock
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
 	gcpclient "github.com/openshift/hive/pkg/gcpclient"
+	gomock "go.uber.org/mock/gomock"
 	compute "google.golang.org/api/compute/v1"
 	dns "google.golang.org/api/dns/v1"
 )

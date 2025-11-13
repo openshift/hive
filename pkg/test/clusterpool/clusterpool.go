@@ -222,3 +222,11 @@ func WithCustomizationRef(cdcName string) Option {
 		}
 	}
 }
+
+func WithManifestsSecretRef(secretName string) Option {
+	return func(clusterPool *hivev1.ClusterPool) {
+		clusterPool.Spec.ManifestsSecretRef = &corev1.LocalObjectReference{
+			Name: secretName,
+		}
+	}
+}

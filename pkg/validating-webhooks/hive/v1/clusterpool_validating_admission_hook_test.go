@@ -222,6 +222,27 @@ func TestClusterPoolValidate(t *testing.T) {
 			operation:       admissionv1beta1.Delete,
 			expectedAllowed: true,
 		},
+		{
+			name: "valid create with manifests secret",
+			newObject: func() *hivev1.ClusterPool {
+				cp := validAWSClusterPool()
+				cp.Spec.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "test-manifests-secret"}
+				return cp
+			}(),
+			operation:       admissionv1beta1.Create,
+			expectedAllowed: true,
+		},
+		{
+			name:      "valid update with manifests secret",
+			oldObject: validAWSClusterPool(),
+			newObject: func() *hivev1.ClusterPool {
+				cp := validAWSClusterPool()
+				cp.Spec.ManifestsSecretRef = &corev1.LocalObjectReference{Name: "test-manifests-secret"}
+				return cp
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
 	}
 
 	for _, tc := range cases {

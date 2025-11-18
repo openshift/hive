@@ -141,16 +141,18 @@ func GetClusterPlatform(cd *hivev1.ClusterDeployment) string {
 		return constants.PlatformAWS
 	case cd.Spec.Platform.Azure != nil:
 		return constants.PlatformAzure
+	case cd.Spec.Platform.BareMetal != nil:
+		return constants.PlatformBaremetal
 	case cd.Spec.Platform.GCP != nil:
 		return constants.PlatformGCP
+	case cd.Spec.Platform.IBMCloud != nil:
+		return constants.PlatformIBMCloud
+	case cd.Spec.Platform.Nutanix != nil:
+		return constants.PlatformNutanix
 	case cd.Spec.Platform.OpenStack != nil:
 		return constants.PlatformOpenStack
 	case cd.Spec.Platform.VSphere != nil:
 		return constants.PlatformVSphere
-	case cd.Spec.Platform.BareMetal != nil:
-		return constants.PlatformBaremetal
-	case cd.Spec.Platform.Nutanix != nil:
-		return constants.PlatformNutanix
 	}
 	return constants.PlatformUnknown
 }

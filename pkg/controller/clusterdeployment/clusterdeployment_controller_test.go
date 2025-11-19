@@ -30,7 +30,6 @@ import (
 	testfake "github.com/openshift/hive/pkg/test/fake"
 	"github.com/openshift/hive/pkg/util/scheme"
 
-	"github.com/golang/mock/gomock"
 	configv1 "github.com/openshift/api/config/v1"
 	routev1 "github.com/openshift/api/route/v1"
 	librarygocontroller "github.com/openshift/library-go/pkg/controller"
@@ -40,6 +39,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/openpgp"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"

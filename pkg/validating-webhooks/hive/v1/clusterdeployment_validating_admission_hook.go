@@ -687,6 +687,11 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateUpdate(admissionSpec 
 	if cd.Spec.Installed {
 		if cd.Spec.ClusterMetadata != nil {
 			if oldObject.Spec.Installed {
+				// Special case: allow adding -- but not removing -- the entire Platform section
+				if oldObject.Spec.ClusterMetadata.Platform == nil && cd.Spec.ClusterMetadata.Platform != nil {
+					// copy over the value to spoof the immutability checker
+					oldObject.Spec.ClusterMetadata.Platform = cd.Spec.ClusterMetadata.Platform
+				}
 				if cd.Spec.ClusterMetadata.Platform != nil {
 					// Special case: allow setting or changing -- but not unsetting -- Azure resource group name.
 					if cd.Spec.ClusterMetadata.Platform.Azure != nil && cd.Spec.ClusterMetadata.Platform.Azure.ResourceGroupName != nil {

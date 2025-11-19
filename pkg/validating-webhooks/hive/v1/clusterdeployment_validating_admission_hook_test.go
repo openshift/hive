@@ -806,6 +806,58 @@ func TestClusterDeploymentValidate(t *testing.T) {
 			expectedAllowed: false,
 		},
 		{
+			name: "AWS add entire platform section to installed cluster",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					// Platform section not set
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{},
+					},
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: true,
+		},
+		{
+			name: "AWS remove entire platform section",
+			oldObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					Platform: &hivev1.ClusterPlatformMetadata{
+						AWS: &hivev1aws.Metadata{
+							HostedZoneRole: ptr.To("my-hzr"),
+						},
+					},
+				}
+				return cd
+			}(),
+			newObject: func() *hivev1.ClusterDeployment {
+				cd := validAWSClusterDeployment()
+				cd.Spec.Installed = true
+				cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+					InfraID: "an-infra-id",
+					// Platform section removed
+				}
+				return cd
+			}(),
+			operation:       admissionv1beta1.Update,
+			expectedAllowed: false,
+		},
+		{
 			name:            "Azure create valid",
 			newObject:       validAzureClusterDeployment(),
 			operation:       admissionv1beta1.Create,

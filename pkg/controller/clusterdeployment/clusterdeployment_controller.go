@@ -1606,13 +1606,17 @@ func (r *ReconcileClusterDeployment) setReqsMetConditionImageSetNotFound(cd *hiv
 // the correct APIURL and WebConsoleURL, and then set them in the Status. Typically only called if these Status fields
 // are unset.
 func (r *ReconcileClusterDeployment) setClusterStatusURLs(cd *hivev1.ClusterDeployment, cdLog log.FieldLogger) (reconcile.Result, error) {
+	updateCD := false
 	server, err := remoteclient.InitialURL(r.Client, cd)
 	if err != nil {
 		cdLog.WithError(err).Error("could not get API URL from kubeconfig")
 		return reconcile.Result{}, err
 	}
 	cdLog.Debugf("found cluster API URL in kubeconfig: %s", server)
-	cd.Status.APIURL = server
+	if cd.Status.APIURL != server {
+		cd.Status.APIURL = server
+		updateCD = true
+	}
 
 	remoteClient, unreachable, requeue := remoteclient.ConnectToRemoteCluster(
 		cd,
@@ -1624,24 +1628,42 @@ func (r *ReconcileClusterDeployment) setClusterStatusURLs(cd *hivev1.ClusterDepl
 		return reconcile.Result{Requeue: requeue}, nil
 	}
 
+	var requeueAfter time.Duration
 	routeObject := &routev1.Route{}
 	if err := remoteClient.Get(
 		context.Background(),
 		client.ObjectKey{Namespace: "openshift-console", Name: "console"},
 		routeObject,
-	); err != nil {
-		cdLog.WithError(err).Info("error fetching remote route object")
-		return reconcile.Result{Requeue: true}, nil
+	); err == nil {
+		cdLog.Debugf("read remote route object: %s", routeObject)
+		url := "https://" + routeObject.Spec.Host
+		if cd.Status.WebConsoleURL != url {
+			cd.Status.WebConsoleURL = url
+			updateCD = true
+		}
+	} else {
+		if apierrors.IsNotFound(err) {
+			// ACM-20933: If the cluster doesn't, and will never, have a console route,
+			// we don't want to hot loop looking for one. However, we don't want to give
+			// up completely, as the absence could be transient.
+			// This status field is currently not used by hive, so we, at least, can
+			// afford for it to be missing for "a while".
+			requeueAfter = 10 * time.Minute
+			cdLog.WithField("requeueAfter", requeueAfter).Info("remote route object not found -- will requeue with explicit delay")
+			// We'll carry on updating to set the API URL if necessary.
+		} else {
+			// Any other error warrants an "immediate" (subject to backoff) requeue
+			return reconcile.Result{}, errors.Wrap(err, "error fetching remote route object")
+		}
 	}
-	cdLog.Debugf("read remote route object: %s", routeObject)
-	cd.Status.WebConsoleURL = "https://" + routeObject.Spec.Host
 
-	if err := r.Status().Update(context.TODO(), cd); err != nil {
-		cdLog.WithError(err).Log(controllerutils.LogLevel(err), "could not set cluster status URLs")
-		return reconcile.Result{Requeue: true}, nil
+	if updateCD {
+		if err := r.Status().Update(context.TODO(), cd); err != nil {
+			return reconcile.Result{}, errors.Wrap(err, "could not set cluster status URLs")
+		}
 	}
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{RequeueAfter: requeueAfter}, nil
 }
 
 // ensureManagedDNSZoneDeleted is a safety check to ensure that the child managed DNSZone

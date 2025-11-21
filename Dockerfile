@@ -1,7 +1,7 @@
 ARG CONTAINER_SUB_MANAGER_OFF=0
 ARG EL8_BUILD_IMAGE=${EL8_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20}
 ARG EL9_BUILD_IMAGE=${EL9_BUILD_IMAGE:-registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20}
-ARG BASE_IMAGE=${BASE_IMAGE:-registry.ci.openshift.org/ocp/4.20:base-rhel9}
+ARG BASE_IMAGE=${BASE_IMAGE:-registry.access.redhat.com/ubi9/ubi-minimal:latest}
 
 FROM ${EL8_BUILD_IMAGE} as builder_rhel8
 ARG GO=${GO:-go}
@@ -37,10 +37,7 @@ RUN make build-hiveadmission build-manager build-operator && \
 FROM ${BASE_IMAGE}
 ARG CONTAINER_SUB_MANAGER_OFF
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
-ARG DNF=dnf
-
-# CVE-2023-6597
-RUN ${DNF} upgrade -y python3
+ARG DNF=${DNF:-microdnf}
 
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 

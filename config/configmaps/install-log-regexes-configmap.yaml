@@ -46,6 +46,11 @@ data:
       - "InvalidSubnet: Not enough IP space available in"
       installFailingReason: AWSSubnetInsufficientIPSpace
       installFailingMessage: Insufficient IP space available in subnet
+    - name: AWSIAMRoleTagLimitExceeded
+      searchRegexStrings:
+      - "could not tag \".*\" instance role: LimitExceeded: The number of tags has reached the maximum limit"
+      installFailingReason: AWSIAMRoleTagLimitExceeded
+      installFailingMessage: AWS IAM Role exceeds the maximum number of tags allowed (50)
     - name: AWSSubnetTagLimitExceeded
       searchRegexStrings:
       - "could not add tags to subnets: TagLimitExceeded"

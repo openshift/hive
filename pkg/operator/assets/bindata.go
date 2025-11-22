@@ -1890,9 +1890,14 @@ data:
       installFailingMessage: GCP Precondition Failed
     - name: GCPQuotaSSDTotalGBExceeded
       searchRegexStrings:
-      - "Quota \'SSD_TOTAL_GB\' exceeded"
+      - "Quota 'SSD_TOTAL_GB' exceeded"
       installFailingReason: GCPQuotaSSDTotalGBExceeded
       installFailingMessage: GCP quota SSD_TOTAL_GB exceeded
+    - name: GCPQuotaCPUSAllRegionsExceeded
+      searchRegexStrings:
+      - "Quota 'CPUS_ALL_REGIONS' exceeded"
+      installFailingReason: GCPQuotaCPUSAllRegionsExceeded
+      installFailingMessage: GCP quota CPUS_ALL_REGIONS exceeded
     - name: GCPComputeQuota
       searchRegexStrings:
       - "compute\\.googleapis\\.com/cpus is not available in [a-z0-9-]* because the required number of resources \\([0-9]*\\) is more than"

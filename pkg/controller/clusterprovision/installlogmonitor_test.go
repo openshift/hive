@@ -28,6 +28,7 @@ const (
 	gcpInvalidProjectIDLog                  = "blahblah\ntime=\"2020-11-13T16:05:07Z\" level=fatal msg=\"failed to fetch Master Machines: failed to load asset \"Install Config\": platform.gcp.project: Invalid value: \"o-6b20f250\": invalid project ID\nblahblah"
 	gcpSSDQuotaLog                          = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error: Error waiting for instance to create: Quota 'SSD_TOTAL_GB' exceeded. Limit: 500.0 in region asia-northeast2.\nblahblah"
 	gcpCPUQuotaLog                          = "level=fatal msg=failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Quota Check\": error(MissingQuota): compute.googleapis.com/cpus is not available in us-east1 because the required number of resources (20) is more than remaining quota of 16"
+	gcpCPUSAllRegionsQuotaLog               = "\"Error creating an instance\" err=\"googleapi: Error 403: QUOTA_EXCEEDED - Quota 'CPUS_ALL_REGIONS' exceeded.  Limit: 20.0 globally.\""
 	gcpServiceAccountQuotaLog               = "level=fatal msg=failed to fetch Cluster: failed to fetch dependency of \"Cluster\": failed to generate asset \"Platform Quota Check\": error(MissingQuota): iam.googleapis.com/quota/service-account-count is not available in global because the required number of resources (5) is more than remaining quota of 0"
 	kubeAPIWaitTimeoutLog                   = "blahblah\ntime=\"2021-01-03T07:04:44Z\" level=fatal msg=\"waiting for Kubernetes API: context deadline exceeded\""
 	natGatewayLimitExceeded                 = "blahblah\ntime=\"2021-01-06T03:35:44Z\" level=error msg=\"Error creating NAT Gateway: NatGatewayLimitExceeded: The maximum number of NAT Gateways has been reached.\""
@@ -371,6 +372,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "GCP compute quota",
 			log:            ptr.To(gcpCPUQuotaLog),
 			expectedReason: "GCPComputeQuotaExceeded",
+		},
+		{
+			name:           "GCP CPUS_ALL_REGIONS quota",
+			log:            ptr.To(string(gcpCPUSAllRegionsQuotaLog)),
+			expectedReason: "GCPQuotaCPUSAllRegionsExceeded",
 		},
 		{
 			name:           "GCP service account quota",

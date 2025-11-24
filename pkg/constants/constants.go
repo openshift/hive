@@ -568,6 +568,11 @@ const (
 	// provided as a workaround for speculative problems using the new algorithm whereby the metadata.json from
 	// the provisioning process is passed through directly to the destroyer.
 	LegacyDeprovisionAnnotation = "hive.openshift.io/legacy-deprovision"
+
+	// SkipPlatformAuthCheckAnnotation, if set to "true" on a ClusterDeployment, causes hive to skip attempting
+	// to log into the cloud platform before invoking the installer (which itself must do so). The AuthenticationFailure
+	// status condition will always be set to False (the "good" value).
+	SkipPlatformAuthCheckAnnotation = "hive.openshift.io/skip-platform-auth-check"
 )
 
 // GetMergedPullSecretName returns name for merged pull secret name per cluster deployment

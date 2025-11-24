@@ -2646,6 +2646,11 @@ func (r *ReconcileClusterDeployment) deleteOldFailedProvisions(provs []*hivev1.C
 
 // validatePlatformCreds ensure the platform/cloud credentials are at least good enough to authenticate with
 func (r *ReconcileClusterDeployment) validatePlatformCreds(cd *hivev1.ClusterDeployment, logger log.FieldLogger) (bool, error) {
+	if skip, err := strconv.ParseBool(cd.Annotations[constants.SkipPlatformAuthCheckAnnotation]); err == nil && skip {
+		logger.Info("Skipping preflight platform auth check per annotation")
+		return true, nil
+	}
+
 	return r.validateCredentialsForClusterDeployment(r.Client, cd, logger)
 }
 

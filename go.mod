@@ -52,10 +52,10 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.14.3
 	github.com/vmware/govmomi v0.47.1
-	golang.org/x/crypto v0.43.0
+	golang.org/x/crypto v0.45.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-	golang.org/x/mod v0.28.0
-	golang.org/x/net v0.45.0 // indirect
+	golang.org/x/mod v0.29.0
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.27.0
 	golang.org/x/time v0.9.0
 	google.golang.org/api v0.220.0
@@ -387,11 +387,11 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/term v0.36.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
-	golang.org/x/tools v0.37.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/tools v0.38.0 // indirect
 	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 	golang.org/x/tools/godoc v0.1.0-deprecated // indirect

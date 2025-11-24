@@ -30,14 +30,14 @@ github.com/openshift/api/operator/v1
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
-# golang.org/x/net v0.45.0 => golang.org/x/net v0.38.0
+# golang.org/x/net v0.47.0 => golang.org/x/net v0.38.0
 ## explicit; go 1.23.0
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
-# golang.org/x/text v0.30.0
+# golang.org/x/text v0.31.0
 ## explicit; go 1.24.0
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform

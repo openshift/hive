@@ -69,6 +69,7 @@ const (
 	ingressOperatorDegraded                 = "Cluster operator authentication Degraded is True with OAuthServerRouteEndpointAccessibleController_SyncError\nCluster operator ingress Degraded is True with IngressDegraded"
 	awsSubnetInsufficientIPSpace            = "IngressControllerUnavailable: One or more status conditions indicate unavailable: LoadBalancerReady=False (SyncLoadBalancerFailed: The service-controller component is reporting SyncLoadBalancerFailed events like: Error syncing load balancer: failed to ensure load balancer: InvalidSubnet: Not enough IP space available in subnet-08dcf1a15b3330b1d. ELB requires at least 8 free IP addresses in each subnet.\\n\\tstatus code: 400, request id: ac141e76-b455-4082-8ff3-556107921222\\nThe kube-controller-manager logs may contain more details.)\""
 	awsSubnetTagLimitExceeded               = "could not add tags to subnets: TagLimitExceeded: The resultant tag set must not have more than 50 user tags."
+	awsIamRoleTagLimitExceeded              = "failed to fetch Cluster: failed to generate asset \"Cluster\": could not tag \"ManagedOpenShift-ControlPlane-Role\" instance role: LimitExceeded: The number of tags has reached the maximum limit"
 	installConfigAuthFail                   = `failed to fetch Master Machines: failed to load asset "Install Config": failed to create install config: failed to create a network client: Authentication failed`
 	installConfigBadCACert                  = `failed to fetch Master Machines: failed to load asset "Install Config": failed to create install config: failed to create a network client: Error parsing CA Cert from /etc/pki/ca-trust/extracted/pem/tls-ca-bundle1111.pem`
 )
@@ -90,6 +91,11 @@ func TestParseInstallLog(t *testing.T) {
 			name:           "AWSSubnetTagLimitExceeded",
 			log:            ptr.To(awsSubnetTagLimitExceeded),
 			expectedReason: "AWSSubnetTagLimitExceeded",
+		},
+		{
+			name:           "AWSIAMRoleTagLimitExceeded",
+			log:            ptr.To(awsIamRoleTagLimitExceeded),
+			expectedReason: "AWSIAMRoleTagLimitExceeded",
 		},
 		{
 			name:           "IngressOperatorDegraded",

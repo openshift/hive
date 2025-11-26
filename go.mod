@@ -51,7 +51,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.14.3
-	github.com/vmware/govmomi v0.47.1
+	github.com/vmware/govmomi v0.51.0
 	golang.org/x/crypto v0.45.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mod v0.29.0

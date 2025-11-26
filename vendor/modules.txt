@@ -2252,8 +2252,8 @@ github.com/uudashr/iface/unused
 # github.com/vincent-petithory/dataurl v1.0.0
 ## explicit
 github.com/vincent-petithory/dataurl
-# github.com/vmware/govmomi v0.47.1
-## explicit; go 1.21
+# github.com/vmware/govmomi v0.51.0
+## explicit; go 1.23.0
 github.com/vmware/govmomi
 github.com/vmware/govmomi/cns
 github.com/vmware/govmomi/cns/methods

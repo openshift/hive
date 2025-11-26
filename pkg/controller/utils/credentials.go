@@ -61,8 +61,8 @@ func ValidateCredentialsForClusterDeployment(kubeClient client.Client, cd *hivev
 		}
 
 		return validateVSphereCredentials(cd.Spec.Platform.VSphere.VCenter,
-			string(secret.Data[constants.UsernameSecretKey]),
-			string(secret.Data[constants.PasswordSecretKey]),
+			strings.TrimSpace(string(secret.Data[constants.UsernameSecretKey])),
+			strings.TrimSpace(string(secret.Data[constants.PasswordSecretKey])),
 			rootCAFiles,
 			logger)
 	default:

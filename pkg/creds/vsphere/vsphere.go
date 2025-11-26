@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"os"
+	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -26,10 +27,11 @@ func ConfigureCreds(c client.Client, metadata *installertypes.ClusterMetadata) {
 	}
 	if credsSecret := utils.LoadSecretOrDie(c, "CREDS_SECRET_NAME"); credsSecret != nil {
 		var username, password string
-		if username = string(credsSecret.Data[constants.UsernameSecretKey]); username != "" {
+		// Trim whitespace from credentials to handle cross-platform line endings
+		if username = strings.TrimSpace(string(credsSecret.Data[constants.UsernameSecretKey])); username != "" {
 			os.Setenv(constants.VSphereUsernameEnvVar, username)
 		}
-		if password = string(credsSecret.Data[constants.PasswordSecretKey]); password != "" {
+		if password = strings.TrimSpace(string(credsSecret.Data[constants.PasswordSecretKey])); password != "" {
 			os.Setenv(constants.VSpherePasswordEnvVar, password)
 		}
 		// Snowflake! We need to (re)inject the creds into the metadata.

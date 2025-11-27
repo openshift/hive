@@ -44,12 +44,12 @@ Sample output:
 
 ```bash
 $ oc get pods -n hive
-NAME                                READY   STATUS    RESTARTS   AGE
-hive-clustersync-0                  1/1     Running   0          16m
-hive-controllers-6fcbf74864-hdn27   1/1     Running   0          17m
-hive-operator-7b877b996b-ndlpj      1/1     Running   0          17m
-hiveadmission-7969fd9dd-l24jb       1/1     Running   0          17m
-hiveadmission-7969fd9dd-pl2ml       1/1     Running   0          17m
+hive-clustersync-0                  1/1     Running   0          34s
+hive-controllers-5d67988cc8-97r5p   1/1     Running   0          35s
+hive-machinepool-0                  1/1     Running   0          34s
+hive-operator-5c7fdd6df8-jrxvt      1/1     Running   0          3m30s
+hiveadmission-5bf565bd7-nqq9h       1/1     Running   0          32s
+hiveadmission-5bf565bd7-tkf4c       1/1     Running   0          32s
 ```
 
 # Next Step

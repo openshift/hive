@@ -1,6 +1,6 @@
 # Provisioning AWS STS Clusters
 
-It is possible to use Hive to provision clusters configured to use Amazon's Security Token Service, where cluster components use short lived credentials that are rotated frequently, and the cluster does not have an admin level AWS credential. This feature was added to the in-cluster OpenShift components in 4.7, see documentation [here](https://docs.openshift.com/container-platform/4.7/authentication/managing_cloud_provider_credentials/cco-mode-sts.html).
+It is possible to use Hive to provision clusters configured to use Amazon's Security Token Service, where cluster components use short lived credentials that are rotated frequently, and the cluster does not have an admin level AWS credential. This feature was added to the in-cluster OpenShift components in 4.20, see documentation [here](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/authentication_and_authorization/managing-cloud-provider-credentials#cco-short-term-creds).
 
 At present Hive does not automate the STS setup, rather we assume the user configures STS components manually and provides information to Hive. The following instructions refer to the `ccoctl` tool. This tool can be extracted from the OpenShift release image. See steps below.
 
@@ -31,7 +31,7 @@ chmod u+x ccoctl
 
 ## Setup STS Infrastructure
 
-Create AWS resources using the [ccoctl](ccoctl.md#steps-create) tool (you will need aws credentials with sufficient permissions). The command below will generate public/private ServiceAccount signing keys, create the S3 bucket (with public read-only access), upload the OIDC config into the bucket, set up an IAM Identity Provider that trusts that bucket configuration, and create IAM Roles for each AWS CredentialsRequest extracted above. It will also dump the files needed by the installer in the `_output` directory. Installation secret manifests will be found within `_output/manifests`.
+Create AWS resources using the ccoctl tool (you will need aws credentials with sufficient permissions). The command below will generate public/private ServiceAccount signing keys, create the S3 bucket (with public read-only access), upload the OIDC config into the bucket, set up an IAM Identity Provider that trusts that bucket configuration, and create IAM Roles for each AWS CredentialsRequest extracted above. It will also dump the files needed by the installer in the `_output` directory. Installation secret manifests will be found within `_output/manifests`.
 ```
 ./ccoctl aws create-all --name <aws_infra_name> --region <aws_region> --credentials-requests-dir ./credrequests --output-dir _output/
 ```
@@ -54,3 +54,10 @@ Create a ClusterDeployment normally with the following changes:
   1. In your ClusterDeployment set `spec.boundServiceAccountSigningKeySecretRef.name` to point to the Secret created above (`bound-service-account-signing-key`).
   1. In your ClusterDeployment set `spec.provisioning.manifestsSecretRef` to point to the Secret created above (`cluster-manifests`).
   1. Create your ClusterDeployment + InstallConfig to provision your STS cluster.
+
+## Note: Cleanup AWS resources after uninstalling the cluster
+Make sure you clean up the following resources after you uninstall your cluster. To delete resources created by ccoctl, run
+```bash
+$ ./ccoctl aws delete --name=<name> --region=<aws-region>
+```
+where name is the name used to tag and account any cloud resources that were created, and region is the aws region in which cloud resources were created.

@@ -68,7 +68,7 @@ For other platforms/clouds (OpenStack and VSphere), there is presently no native
 
 ### Pull Secret
 
-OpenShift installation requires a pull secret obtained from try.openshift.com. You can specify an individual pull secret for each cluster Hive creates, or you can use a global pull secret that will be used by all of the clusters Hive creates.
+OpenShift installation requires a pull secret obtained from https://console.redhat.com/openshift/install/pull-secret. You can specify an individual pull secret for each cluster Hive creates, or you can use a global pull secret that will be used by all of the clusters Hive creates.
 
 ```bash
 oc create secret generic mycluster-pull-secret --from-file=.dockerconfigjson=/path/to/pull-secret --type=kubernetes.io/dockerconfigjson --namespace mynamespace

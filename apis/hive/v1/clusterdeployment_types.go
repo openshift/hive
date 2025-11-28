@@ -134,6 +134,7 @@ type ClusterDeploymentSpec struct {
 	ControlPlaneConfig ControlPlaneConfigSpec `json:"controlPlaneConfig,omitempty"`
 
 	// Ingress allows defining desired clusteringress/shards to be configured on the cluster.
+	// +kubebuilder:validation:MaxItems=16
 	// +optional
 	Ingress []ClusterIngress `json:"ingress,omitempty"`
 

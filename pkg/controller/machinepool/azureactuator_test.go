@@ -200,7 +200,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -219,7 +219,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -238,7 +238,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345-gen2",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{
@@ -257,7 +257,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345-gen2",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{
@@ -403,7 +403,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -422,7 +422,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -441,7 +441,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{
@@ -460,7 +460,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{

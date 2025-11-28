@@ -3353,6 +3353,50 @@ platform:
 			},
 		},
 		{
+			name: "clusterinstallref vivifies Platform section in metadata",
+			existing: []runtime.Object{
+				func() *hivev1.ClusterDeployment {
+					cd := testClusterDeploymentWithInitializedConditions(testClusterInstallRefClusterDeployment("test-fake"))
+					cd.Spec.Installed = true
+					cd.Spec.ClusterMetadata = &hivev1.ClusterMetadata{
+						InfraID:   testInfraID,
+						ClusterID: testClusterID,
+						AdminKubeconfigSecretRef: corev1.LocalObjectReference{
+							Name: adminKubeconfigSecret,
+						},
+						AdminPasswordSecretRef: &corev1.LocalObjectReference{
+							Name: adminPasswordSecret,
+						},
+						// Platform section not set - typical for ClusterInstall
+					}
+					return cd
+				}(),
+				testFakeClusterInstallWithConditions("test-fake", []hivev1.ClusterInstallCondition{{
+					Type:   hivev1.ClusterInstallCompleted,
+					Status: corev1.ConditionTrue,
+				}, {
+					Type:   hivev1.ClusterInstallStopped,
+					Status: corev1.ConditionTrue,
+					Reason: "InstallComplete",
+				}}),
+				testClusterImageSet(),
+				testSecret(corev1.SecretTypeDockerConfigJson, pullSecretSecret, corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeDockerConfigJson, constants.GetMergedPullSecretName(testClusterDeployment()), corev1.DockerConfigJsonKey, "{}"),
+				testSecret(corev1.SecretTypeOpaque, adminKubeconfigSecret, "kubeconfig", adminKubeconfig),
+				testSecret(corev1.SecretTypeOpaque, adminPasswordSecret, "password", adminPassword),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cd := getCD(c)
+				require.NotNil(t, cd, "could not get ClusterDeployment")
+				require.NotNil(t, cd.Spec.ClusterMetadata, "ClusterMetadata should be set")
+				require.NotNil(t, cd.Spec.ClusterMetadata.Platform, "Platform section should be vivified")
+				// Verify metadata.json Secret was created with vivified Platform section
+				require.NotNil(t, cd.Spec.ClusterMetadata.MetadataJSONSecretRef, "MetadataJSONSecretRef should be set")
+				mdSecret := getSecret(t, c, cd.Spec.ClusterMetadata.MetadataJSONSecretRef.Name)
+				require.NotNil(t, mdSecret, "metadata.json Secret should exist")
+			},
+		},
+		{
 			name: "clusterinstallref exists, completed but not stopped",
 			existing: []runtime.Object{
 				testClusterDeploymentWithInitializedConditions(testClusterInstallRefClusterDeployment("test-fake")),

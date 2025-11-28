@@ -14,9 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	capg "sigs.k8s.io/cluster-api-provider-gcp/api/v1beta1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck //CORS-3563
 
-	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/asset"
 	"github.com/openshift/installer/pkg/asset/installconfig"
 	gcpic "github.com/openshift/installer/pkg/asset/installconfig/gcp"
@@ -50,7 +49,7 @@ func GenerateClusterAssets(installConfig *installconfig.InstallConfig, clusterID
 	if installConfig.Config.GCP.ControlPlaneSubnet != "" {
 		controlPlaneSubnetName = installConfig.Config.GCP.ControlPlaneSubnet
 
-		controlPlaneSubnet, err := getSubnet(context.TODO(), networkProject, installConfig.Config.GCP.Region, controlPlaneSubnetName)
+		controlPlaneSubnet, err := getSubnet(context.TODO(), networkProject, installConfig.Config.GCP.Region, controlPlaneSubnetName, installConfig.Config.GCP.Endpoint)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get control plane subnet: %w", err)
 		}
@@ -70,7 +69,7 @@ func GenerateClusterAssets(installConfig *installconfig.InstallConfig, clusterID
 	if installConfig.Config.GCP.ComputeSubnet != "" {
 		computeSubnetName = installConfig.Config.GCP.ComputeSubnet
 
-		computeSubnet, err := getSubnet(context.TODO(), networkProject, installConfig.Config.GCP.Region, computeSubnetName)
+		computeSubnet, err := getSubnet(context.TODO(), networkProject, installConfig.Config.GCP.Region, computeSubnetName, installConfig.Config.GCP.Endpoint)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get compute subnet: %w", err)
 		}
@@ -134,6 +133,11 @@ func GenerateClusterAssets(installConfig *installconfig.InstallConfig, clusterID
 		capgLoadBalancerType = capg.Internal
 	}
 
+	firewallRulesManagementPolicy := capg.RulesManagementManaged
+	if installConfig.Config.GCP.FirewallRulesManagement == gcp.UnmanagedFirewallRules {
+		firewallRulesManagementPolicy = capg.RulesManagementUnmanaged
+	}
+
 	gcpCluster := &capg.GCPCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clusterID.InfraID,
@@ -149,6 +153,9 @@ func GenerateClusterAssets(installConfig *installconfig.InstallConfig, clusterID
 				Name:                  ptr.To(networkName),
 				Subnets:               subnets,
 				AutoCreateSubnetworks: ptr.To(autoCreateSubnets),
+				Firewall: capg.FirewallSpec{
+					DefaultRulesManagement: firewallRulesManagementPolicy,
+				},
 			},
 			AdditionalLabels: labels,
 			FailureDomains:   findFailureDomains(installConfig),
@@ -157,10 +164,18 @@ func GenerateClusterAssets(installConfig *installconfig.InstallConfig, clusterID
 				LoadBalancerType:                  ptr.To(capgLoadBalancerType),
 			},
 			ResourceManagerTags: GetTagsFromInstallConfig(installConfig),
-			ServiceEndpoints:    getServiceEndpointsFromInstallConfig(installConfig),
 		},
 	}
 	gcpCluster.SetGroupVersionKind(capg.GroupVersion.WithKind("GCPCluster"))
+
+	if endpoint := installConfig.Config.GCP.Endpoint; gcp.ShouldUseEndpointForInstaller(endpoint) {
+		gcpCluster.Spec.ServiceEndpoints = &capg.ServiceEndpoints{
+			ComputeServiceEndpoint:         fmt.Sprintf("https://compute-%s.p.googleapis.com/compute/v1/", endpoint.Name),
+			ContainerServiceEndpoint:       fmt.Sprintf("https://container-%s.p.googleapis.com/container/v1/", endpoint.Name),
+			IAMServiceEndpoint:             fmt.Sprintf("https://iam-%s.p.googleapis.com/", endpoint.Name),
+			ResourceManagerServiceEndpoint: fmt.Sprintf("https://cloudresourcemanager-%s.p.googleapis.com/", endpoint.Name),
+		}
+	}
 
 	// Set the network project during shared vpc installs
 	if installConfig.Config.GCP.NetworkProjectID != "" {
@@ -228,16 +243,15 @@ func findFailureDomains(installConfig *installconfig.InstallConfig) []string {
 
 // getSubnet will find a subnet in a project by the name. The matching subnet structure will be returned if
 // one is found.
-func getSubnet(ctx context.Context, project, region, subnetName string) (*compute.Subnetwork, error) {
+func getSubnet(ctx context.Context, project, region, subnetName string, endpoint *gcp.PSCEndpoint) (*compute.Subnetwork, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*1)
 	defer cancel()
 
-	ssn, err := gcpic.GetSession(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
+	opts := []option.ClientOption{}
+	if gcp.ShouldUseEndpointForInstaller(endpoint) {
+		opts = append(opts, gcpic.CreateEndpointOption(endpoint.Name, gcpic.ServiceNameGCPCompute))
 	}
-
-	computeService, err := compute.NewService(ctx, option.WithCredentials(ssn.Credentials))
+	computeService, err := gcpic.GetComputeService(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create compute service: %w", err)
 	}
@@ -265,23 +279,4 @@ func GetTagsFromInstallConfig(installConfig *installconfig.InstallConfig) []capg
 	}
 
 	return tags
-}
-
-// getServiceEndpointsFromInstallConfig gets the service endpoints for CAPG use.
-func getServiceEndpointsFromInstallConfig(installConfig *installconfig.InstallConfig) *capg.ServiceEndpoints {
-	capgServiceEndpoints := &capg.ServiceEndpoints{}
-
-	for _, endpoint := range installConfig.Config.GCP.ServiceEndpoints {
-		switch endpoint.Name {
-		case configv1.GCPServiceEndpointNameCompute:
-			capgServiceEndpoints.ComputeServiceEndpoint = endpoint.URL
-		case configv1.GCPServiceEndpointNameContainer:
-			capgServiceEndpoints.ContainerServiceEndpoint = endpoint.URL
-		case configv1.GCPServiceEndpointNameIAM:
-			capgServiceEndpoints.IAMServiceEndpoint = endpoint.URL
-		case configv1.GCPServiceEndpointNameCloudResource:
-			capgServiceEndpoints.ResourceManagerServiceEndpoint = endpoint.URL
-		}
-	}
-	return capgServiceEndpoints
 }

@@ -15,7 +15,9 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	capiazure "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
 
+	installconfig "github.com/openshift/installer/pkg/asset/installconfig"
 	icazure "github.com/openshift/installer/pkg/asset/installconfig/azure"
 	installazure "github.com/openshift/installer/pkg/asset/machines/azure"
 	installertypes "github.com/openshift/installer/pkg/types"
@@ -83,11 +85,17 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 				ResourceGroupName:        rg,
 				NetworkResourceGroupName: pool.Spec.Platform.Azure.NetworkResourceGroupName,
 				VirtualNetwork:           pool.Spec.Platform.Azure.VirtualNetwork,
-				ComputeSubnet:            pool.Spec.Platform.Azure.ComputeSubnet,
 				// This will be defaulted by the installer if empty
 				OutboundType: installertypesazure.OutboundType(pool.Spec.Platform.Azure.OutboundType),
 			},
 		},
+	}
+
+	if pool.Spec.Platform.Azure.ComputeSubnet != "" {
+		ic.Platform.Azure.Subnets = []installertypesazure.SubnetSpec{{
+			Name: pool.Spec.Platform.Azure.ComputeSubnet,
+			Role: capiazure.SubnetNode,
+		}}
 	}
 
 	computePool := baseMachinePool(pool)
@@ -166,20 +174,15 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 	// The imageID parameter is not used. The image is determined by the infraID.
 	const imageID = ""
 
-	useImageGallery, err := shouldUseImageGallery(cd)
-	if err != nil {
-		return nil, false, err
-	}
-
 	installerMachineSets, err := installazure.MachineSets(
 		cd.Spec.ClusterMetadata.InfraID,
-		ic,
+		installconfig.MakeAsset(ic),
 		computePool,
 		imageID,
 		workerRole,
 		workerUserDataName,
 		capabilities,
-		useImageGallery,
+		[]string{},
 		session,
 		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
 	)

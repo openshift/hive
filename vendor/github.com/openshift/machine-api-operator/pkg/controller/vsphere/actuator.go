@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/component-base/featuregate"
+
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
@@ -27,33 +29,33 @@ const (
 
 // Actuator is responsible for performing machine reconciliation.
 type Actuator struct {
-	client                     runtimeclient.Client
-	apiReader                  runtimeclient.Reader
-	eventRecorder              record.EventRecorder
-	TaskIDCache                map[string]string
-	StaticIPFeatureGateEnabled bool
-	openshiftConfigNamespace   string
+	client                   runtimeclient.Client
+	apiReader                runtimeclient.Reader
+	eventRecorder            record.EventRecorder
+	TaskIDCache              map[string]string
+	FeatureGates             featuregate.MutableFeatureGate
+	openshiftConfigNamespace string
 }
 
 // ActuatorParams holds parameter information for Actuator.
 type ActuatorParams struct {
-	Client                     runtimeclient.Client
-	APIReader                  runtimeclient.Reader
-	EventRecorder              record.EventRecorder
-	TaskIDCache                map[string]string
-	StaticIPFeatureGateEnabled bool
-	OpenshiftConfigNamespace   string
+	Client                   runtimeclient.Client
+	APIReader                runtimeclient.Reader
+	EventRecorder            record.EventRecorder
+	TaskIDCache              map[string]string
+	FeatureGates             featuregate.MutableFeatureGate
+	OpenshiftConfigNamespace string
 }
 
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		client:                     params.Client,
-		apiReader:                  params.APIReader,
-		eventRecorder:              params.EventRecorder,
-		TaskIDCache:                params.TaskIDCache,
-		StaticIPFeatureGateEnabled: params.StaticIPFeatureGateEnabled,
-		openshiftConfigNamespace:   params.OpenshiftConfigNamespace,
+		client:                   params.Client,
+		apiReader:                params.APIReader,
+		eventRecorder:            params.EventRecorder,
+		TaskIDCache:              params.TaskIDCache,
+		FeatureGates:             params.FeatureGates,
+		openshiftConfigNamespace: params.OpenshiftConfigNamespace,
 	}
 }
 
@@ -72,12 +74,12 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 	klog.Infof("%s: actuator creating machine", machine.GetName())
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:                    ctx,
-		client:                     a.client,
-		machine:                    machine,
-		apiReader:                  a.apiReader,
-		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
-		openshiftConfigNameSpace:   a.openshiftConfigNamespace,
+		Context:                  ctx,
+		client:                   a.client,
+		machine:                  machine,
+		apiReader:                a.apiReader,
+		featureGates:             a.FeatureGates,
+		openshiftConfigNameSpace: a.openshiftConfigNamespace,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -116,12 +118,12 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1.Machine) (bool, error) {
 	klog.Infof("%s: actuator checking if machine exists", machine.GetName())
 	scope, err := newMachineScope(machineScopeParams{
-		Context:                    ctx,
-		client:                     a.client,
-		machine:                    machine,
-		apiReader:                  a.apiReader,
-		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
-		openshiftConfigNameSpace:   a.openshiftConfigNamespace,
+		Context:                  ctx,
+		client:                   a.client,
+		machine:                  machine,
+		apiReader:                a.apiReader,
+		featureGates:             a.FeatureGates,
+		openshiftConfigNameSpace: a.openshiftConfigNamespace,
 	})
 	if err != nil {
 		return false, fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -135,12 +137,12 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 	delete(a.TaskIDCache, machine.Name)
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:                    ctx,
-		client:                     a.client,
-		machine:                    machine,
-		apiReader:                  a.apiReader,
-		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
-		openshiftConfigNameSpace:   a.openshiftConfigNamespace,
+		Context:                  ctx,
+		client:                   a.client,
+		machine:                  machine,
+		apiReader:                a.apiReader,
+		featureGates:             a.FeatureGates,
+		openshiftConfigNameSpace: a.openshiftConfigNamespace,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)
@@ -177,12 +179,12 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1.Machine) error
 	delete(a.TaskIDCache, machine.Name)
 
 	scope, err := newMachineScope(machineScopeParams{
-		Context:                    ctx,
-		client:                     a.client,
-		machine:                    machine,
-		apiReader:                  a.apiReader,
-		StaticIPFeatureGateEnabled: a.StaticIPFeatureGateEnabled,
-		openshiftConfigNameSpace:   a.openshiftConfigNamespace,
+		Context:                  ctx,
+		client:                   a.client,
+		machine:                  machine,
+		apiReader:                a.apiReader,
+		featureGates:             a.FeatureGates,
+		openshiftConfigNameSpace: a.openshiftConfigNamespace,
 	})
 	if err != nil {
 		fmtErr := fmt.Errorf(scopeFailFmt, machine.GetName(), err)

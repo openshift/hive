@@ -3,8 +3,6 @@ package aws
 import (
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/types/dns"
 )
@@ -78,12 +76,6 @@ type Platform struct {
 	// platform configuration.
 	// +optional
 	DefaultMachinePlatform *MachinePool `json:"defaultMachinePlatform,omitempty"`
-
-	// The field is deprecated. ExperimentalPropagateUserTags is an experimental
-	// flag that directs in-cluster operators to include the specified
-	// user tags in the tags of the AWS resources that the operators create.
-	// +optional
-	ExperimentalPropagateUserTag *bool `json:"experimentalPropagateUserTags,omitempty"`
 
 	// PropagateUserTags is a flag that directs in-cluster operators
 	// to include the specified user tags in the tags of the
@@ -231,19 +223,6 @@ const (
 	// load balancer that serves the Kubernetes API server.
 	ControlPlaneInternalLBSubnetRole SubnetRoleType = "ControlPlaneInternalLB"
 )
-
-// IsSecretRegion returns true if the region is part of either the ISO or ISOB partitions.
-func IsSecretRegion(region string) bool {
-	partition, ok := endpoints.PartitionForRegion(endpoints.DefaultPartitions(), region)
-	if !ok {
-		return false
-	}
-	switch partition.ID() {
-	case endpoints.AwsIsoPartitionID, endpoints.AwsIsoBPartitionID:
-		return true
-	}
-	return false
-}
 
 // IsPublicOnlySubnetsEnabled returns whether the public-only subnets feature has been enabled via env var.
 func IsPublicOnlySubnetsEnabled() bool {

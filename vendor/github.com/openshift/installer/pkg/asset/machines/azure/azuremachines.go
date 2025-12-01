@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck //CORS-3563
 
 	"github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/installer/pkg/asset"
@@ -26,15 +26,17 @@ const (
 
 // MachineInput defines the inputs needed to generate a machine asset.
 type MachineInput struct {
-	Subnet          string
-	Role            string
-	UserDataSecret  string
-	HyperVGen       string
-	UseImageGallery bool
-	Private         bool
-	UserTags        map[string]string
-	Platform        *aztypes.Platform
-	Pool            *types.MachinePool
+	Subnet         string
+	Role           string
+	UserDataSecret string
+	HyperVGen      string
+	StorageSuffix  string
+	Environment    aztypes.CloudEnvironment
+	Private        bool
+	UserTags       map[string]string
+	Platform       *aztypes.Platform
+	Pool           *types.MachinePool
+	RHCOS          string
 }
 
 // GenerateMachines returns manifests and runtime objects to provision the control plane (including bootstrap, if applicable) nodes using CAPI.
@@ -58,40 +60,7 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 	if err != nil {
 		return nil, fmt.Errorf("failed to create machineapi.TagSpecifications from UserTags: %w", err)
 	}
-
-	var image *capz.Image
-	osImage := mpool.OSImage
-	galleryName := strings.ReplaceAll(clusterID, "-", "_")
-
-	switch {
-	case osImage.Publisher != "":
-		image = &capz.Image{
-			Marketplace: &capz.AzureMarketplaceImage{
-				ImagePlan: capz.ImagePlan{
-					Publisher: osImage.Publisher,
-					Offer:     osImage.Offer,
-					SKU:       osImage.SKU,
-				},
-				Version:         osImage.Version,
-				ThirdPartyImage: osImage.Plan != aztypes.ImageNoPurchasePlan,
-			},
-		}
-	case in.UseImageGallery:
-		// image gallery names cannot have dashes
-		id := clusterID
-		if in.HyperVGen == "V2" {
-			id += genV2Suffix
-		}
-		imageID := fmt.Sprintf("/resourceGroups/%s/providers/Microsoft.Compute/galleries/gallery_%s/images/%s/versions/latest", resourceGroup, galleryName, id)
-		image = &capz.Image{ID: &imageID}
-	default:
-		imageID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/galleries/gallery_%s/images/%s", subscriptionID, resourceGroup, galleryName, clusterID)
-		if in.HyperVGen == "V2" && in.Platform.CloudName != aztypes.StackCloud {
-			imageID += genV2Suffix
-		}
-		image = &capz.Image{ID: &imageID}
-	}
-
+	image := capzImage(mpool.OSImage, in.Environment, in.HyperVGen, resourceGroup, subscriptionID, clusterID, in.RHCOS)
 	// Set up OSDisk
 	osDisk := capz.OSDisk{
 		OSType:     "Linux",
@@ -147,6 +116,18 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 	for i, id := range mpool.Identity.UserAssignedIdentities {
 		userAssignedIdentities[i] = capz.UserAssignedIdentity{ProviderID: id.ProviderID()}
 	}
+
+	// If identity type is UserAssigned, but no identities are provided, the installer
+	// will create one. Populate the manifest with a reference to that identity.
+	if mpool.Identity.Type == capz.VMIdentityUserAssigned && len(userAssignedIdentities) == 0 {
+		userAssignedIdentities = []capz.UserAssignedIdentity{
+			{
+				ProviderID: fmt.Sprintf("/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s-identity", subscriptionID, resourceGroup, clusterID),
+			},
+		}
+	}
+
+	storageAccountName := aztypes.GetStorageAccountName(clusterID)
 
 	defaultDiag := &capz.Diagnostics{
 		Boot: &capz.BootDiagnostics{
@@ -212,8 +193,26 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 				Identity:               mpool.Identity.Type,
 				UserAssignedIdentities: userAssignedIdentities,
 				Diagnostics:            controlPlaneDiag,
+				DataDisks:              mpool.DataDisks,
 			},
 		}
+
+		if len(zone) == 0 {
+			// FailureDomain must be nil (not empty) to trigger availability set.
+			azureMachine.Spec.FailureDomain = nil
+		}
+
+		if in.Platform.CloudName == aztypes.StackCloud {
+			azureMachine.Spec.Diagnostics = &capz.Diagnostics{
+				Boot: &capz.BootDiagnostics{
+					StorageAccountType: capz.UserManagedDiagnosticsStorage,
+					UserManaged: &capz.UserManagedBootDiagnostics{
+						StorageAccountURI: fmt.Sprintf("https://%s.blob.%s", storageAccountName, in.StorageSuffix),
+					},
+				},
+			}
+		}
+
 		azureMachine.SetGroupVersionKind(capz.GroupVersion.WithKind("AzureMachine"))
 		result = append(result, &asset.RuntimeFile{
 			File:   asset.File{Filename: fmt.Sprintf("10_inframachine_%s.yaml", azureMachine.Name)},
@@ -271,6 +270,23 @@ func GenerateMachines(clusterID, resourceGroup, subscriptionID string, session *
 			UserAssignedIdentities:     userAssignedIdentities,
 		},
 	}
+
+	if len(mpool.Zones[0]) == 0 {
+		// FailureDomain must be nil (not empty) to trigger availability set.
+		bootstrapAzureMachine.Spec.FailureDomain = nil
+	}
+
+	if in.Platform.CloudName == aztypes.StackCloud {
+		bootstrapAzureMachine.Spec.Diagnostics = &capz.Diagnostics{
+			Boot: &capz.BootDiagnostics{
+				StorageAccountType: capz.UserManagedDiagnosticsStorage,
+				UserManaged: &capz.UserManagedBootDiagnostics{
+					StorageAccountURI: fmt.Sprintf("https://%s.blob.%s", storageAccountName, in.StorageSuffix),
+				},
+			},
+		}
+	}
+
 	bootstrapAzureMachine.SetGroupVersionKind(capz.GroupVersion.WithKind("AzureMachine"))
 
 	result = append(result, &asset.RuntimeFile{
@@ -336,4 +352,47 @@ func bootDiagStorageURIBuilder(diag *aztypes.BootDiagnostics, storageEndpointSuf
 		return fmt.Sprintf(storageAccountURI, diag.StorageAccountName, storageEndpointSuffix)
 	}
 	return ""
+}
+
+func capzImage(osImage aztypes.OSImage, azEnv aztypes.CloudEnvironment, gen, rg, sub, infraID, rhcosImg string) *capz.Image {
+	switch {
+	case osImage.Publisher != "":
+		return &capz.Image{
+			Marketplace: &capz.AzureMarketplaceImage{
+				ImagePlan: capz.ImagePlan{
+					Publisher: osImage.Publisher,
+					Offer:     osImage.Offer,
+					SKU:       osImage.SKU,
+				},
+				Version:         osImage.Version,
+				ThirdPartyImage: osImage.Plan != aztypes.ImageNoPurchasePlan,
+			},
+		}
+	case azEnv == aztypes.StackCloud:
+		// AzureStack is the only use for managed images & supports only Gen1 VMs:
+		// https://learn.microsoft.com/en-us/azure-stack/user/azure-stack-vm-considerations?view=azs-2501&tabs=az1%2Caz2#vm-differences
+		imageID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/images/%s", sub, rg, infraID)
+		return &capz.Image{ID: &imageID}
+	case strings.Count(rhcosImg, ":") == 3: // Marketplace Image URN contains 3 colons
+		rhcosMktImg := strings.Split(rhcosImg, ":")
+		return &capz.Image{
+			Marketplace: &capz.AzureMarketplaceImage{
+				ImagePlan: capz.ImagePlan{
+					Publisher: rhcosMktImg[0],
+					Offer:     rhcosMktImg[1],
+					SKU:       rhcosMktImg[2],
+				},
+				Version:         rhcosMktImg[3],
+				ThirdPartyImage: false,
+			},
+		}
+	default: // Installer-created image gallery, should only be OKD.
+		// image gallery names cannot have dashes
+		galleryName := strings.ReplaceAll(infraID, "-", "_")
+		imageID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/galleries/gallery_%s/images/%s", sub, rg, galleryName, infraID)
+		if gen == "V2" {
+			imageID += genV2Suffix
+		}
+		return &capz.Image{ID: &imageID}
+	}
 }

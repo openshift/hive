@@ -17,10 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/cluster-api-provider-azure/feature"
-	capifeature "sigs.k8s.io/cluster-api/feature"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -28,34 +27,30 @@ import (
 
 // SetupWebhookWithManager sets up and registers the webhook with the manager.
 func (r *AzureManagedClusterTemplate) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	w := new(azureManagedClusterTemplateWebhook)
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
+		WithValidator(w).
 		Complete()
 }
 
 // +kubebuilder:webhook:verbs=update,path=/validate-infrastructure-cluster-x-k8s-io-v1beta1-azuremanagedclustertemplate,mutating=false,failurePolicy=fail,groups=infrastructure.cluster.x-k8s.io,resources=azuremanagedclustertemplates,versions=v1beta1,name=validation.azuremanagedclustertemplates.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1;v1beta1
 
-var _ webhook.Validator = &AzureManagedClusterTemplate{}
+type azureManagedClusterTemplateWebhook struct{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
-func (r *AzureManagedClusterTemplate) ValidateCreate() (admission.Warnings, error) {
-	// NOTE: AzureManagedClusterTemplate relies upon MachinePools, which is behind a feature gate flag.
-	// The webhook must prevent creating new objects in case the feature flag is disabled.
-	if !feature.Gates.Enabled(capifeature.MachinePool) {
-		return nil, field.Forbidden(
-			field.NewPath("spec"),
-			"cannot be set if the Cluster API 'MachinePool' feature flag is not enabled",
-		)
-	}
+var _ webhook.CustomValidator = &azureManagedClusterTemplateWebhook{}
+
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type.
+func (r *azureManagedClusterTemplateWebhook) ValidateCreate(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
-func (r *AzureManagedClusterTemplate) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
+// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type.
+func (r *azureManagedClusterTemplateWebhook) ValidateUpdate(_ context.Context, _, _ runtime.Object) (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
-func (r *AzureManagedClusterTemplate) ValidateDelete() (admission.Warnings, error) {
+// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type.
+func (r *azureManagedClusterTemplateWebhook) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
 	return nil, nil
 }

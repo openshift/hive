@@ -16,6 +16,7 @@ import (
 	icnutanix "github.com/openshift/installer/pkg/asset/installconfig/nutanix"
 	icopenstack "github.com/openshift/installer/pkg/asset/installconfig/openstack"
 	icovirt "github.com/openshift/installer/pkg/asset/installconfig/ovirt"
+	icpowervc "github.com/openshift/installer/pkg/asset/installconfig/powervc"
 	icpowervs "github.com/openshift/installer/pkg/asset/installconfig/powervs"
 	icvsphere "github.com/openshift/installer/pkg/asset/installconfig/vsphere"
 	"github.com/openshift/installer/pkg/types"
@@ -98,6 +99,7 @@ func (a *InstallConfig) Generate(ctx context.Context, parents asset.Parents) err
 	a.Config.BareMetal = platform.BareMetal
 	a.Config.Ovirt = platform.Ovirt
 	a.Config.PowerVS = platform.PowerVS
+	a.Config.PowerVC = platform.PowerVC
 	a.Config.Nutanix = platform.Nutanix
 
 	defaults.SetInstallConfigDefaults(a.Config)
@@ -118,6 +120,22 @@ func (a *InstallConfig) Load(f asset.FileFetcher) (found bool, err error) {
 	return found, err
 }
 
+// finishGCP will set default values in the install config that require api calls rather than static checks.
+func (a *InstallConfig) finishGCP() error {
+	if endpoint := a.Config.Platform.GCP.Endpoint; endpoint != nil && endpoint.ClusterUseOnly == nil {
+		client, err := icgcp.NewClient(context.TODO(), nil)
+		if err != nil {
+			return err
+		}
+		defaultClusterUseOnly := true
+		if _, err := client.GetRegions(context.TODO(), a.Config.Platform.GCP.ProjectID); err != nil {
+			defaultClusterUseOnly = false
+		}
+		a.Config.Platform.GCP.Endpoint.ClusterUseOnly = &defaultClusterUseOnly
+	}
+	return nil
+}
+
 // finishAWS set defaults for AWS Platform before the config validation.
 func (a *InstallConfig) finishAWS() error {
 	// Set the Default Edge Compute pool when the subnets in AWS Local Zones are defined,
@@ -131,7 +149,7 @@ func (a *InstallConfig) finishAWS() error {
 		if totalEdgeSubnets == 0 {
 			return nil
 		}
-		if edgePool := defaults.CreateEdgeMachinePoolDefaults(a.Config.Compute, a.Config.Platform.Name(), totalEdgeSubnets); edgePool != nil {
+		if edgePool := defaults.CreateEdgeMachinePoolDefaults(a.Config.Compute, &a.Config.Platform, totalEdgeSubnets); edgePool != nil {
 			a.Config.Compute = append(a.Config.Compute, *edgePool)
 		}
 	}
@@ -146,7 +164,12 @@ func (a *InstallConfig) finish(ctx context.Context, filename string) error {
 		}
 	}
 	if a.Config.Azure != nil {
-		a.Azure = icazure.NewMetadata(a.Config.Azure.CloudName, a.Config.Azure.ARMEndpoint)
+		a.Azure = icazure.NewMetadata(a.Config.Azure, a.Config.ControlPlane, &a.Config.Compute[0])
+	}
+	if a.Config.GCP != nil {
+		if err := a.finishGCP(); err != nil {
+			return err
+		}
 	}
 	if a.Config.IBMCloud != nil {
 		a.IBMCloud = icibmcloud.NewMetadata(a.Config)
@@ -180,19 +203,14 @@ func (a *InstallConfig) finish(ctx context.Context, filename string) error {
 // that have already been checked by validation.ValidateInstallConfig().
 func (a *InstallConfig) platformValidation(ctx context.Context) error {
 	if a.Config.Platform.Azure != nil {
-		if a.Config.Platform.Azure.IsARO() {
-			// ARO performs platform validation in the Resource Provider before
-			// the Installer is called
-			return nil
-		}
 		client, err := a.Azure.Client()
 		if err != nil {
 			return err
 		}
-		return icazure.Validate(client, a.Config)
+		return icazure.Validate(client, a.Azure, a.Config)
 	}
 	if a.Config.Platform.GCP != nil {
-		client, err := icgcp.NewClient(ctx)
+		client, err := icgcp.NewClient(ctx, a.Config.GCP.Endpoint)
 		if err != nil {
 			return err
 		}
@@ -218,6 +236,13 @@ func (a *InstallConfig) platformValidation(ctx context.Context) error {
 	}
 	if a.Config.Platform.Ovirt != nil {
 		return icovirt.Validate(a.Config)
+	}
+	// Since PowerVC is a thin platform, allow it to fall through so that it can also test the OpenStack case.
+	if a.Config.Platform.PowerVC != nil {
+		err := icpowervc.Validate(a.Config)
+		if err != nil {
+			return err
+		}
 	}
 	if a.Config.Platform.OpenStack != nil {
 		return icopenstack.Validate(ctx, a.Config)

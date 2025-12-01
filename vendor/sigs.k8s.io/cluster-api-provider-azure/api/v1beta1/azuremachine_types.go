@@ -20,8 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/errors"
+	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 )
 
 const (
@@ -44,8 +43,8 @@ type AzureMachineSpec struct {
 	FailureDomain *string `json:"failureDomain,omitempty"`
 
 	// Image is used to provide details of an image to use during VM creation.
-	// If image details are omitted the image will default the Azure Marketplace "capi" offer,
-	// which is based on Ubuntu.
+	// If image details are omitted, the default is to use an Azure Compute Gallery Image
+	// from CAPZ's community gallery.
 	// +kubebuilder:validation:nullable
 	// +optional
 	Image *Image `json:"image,omitempty"`
@@ -138,6 +137,11 @@ type AzureMachineSpec struct {
 	// +optional
 	DisableExtensionOperations *bool `json:"disableExtensionOperations,omitempty"`
 
+	// DisableVMBootstrapExtension specifies whether the VM bootstrap extension should be disabled on the virtual machine.
+	// Use this setting if you want to disable only the bootstrapping extension and not all extensions.
+	// +optional
+	DisableVMBootstrapExtension *bool `json:"disableVMBootstrapExtension,omitempty"`
+
 	// VMExtensions specifies a list of extensions to be added to the virtual machine.
 	// +optional
 	VMExtensions []VMExtension `json:"vmExtensions,omitempty"`
@@ -219,7 +223,7 @@ type AzureMachineStatus struct {
 	// can be added as events to the Machine object and/or logged in the
 	// controller's output.
 	// +optional
-	FailureReason *errors.MachineStatusError `json:"failureReason,omitempty"`
+	FailureReason *string `json:"failureReason,omitempty"`
 
 	// ErrorMessage will be set in the event that there is a terminal problem
 	// reconciling the Machine and will contain a more verbose string suitable
@@ -242,7 +246,7 @@ type AzureMachineStatus struct {
 
 	// Conditions defines current service state of the AzureMachine.
 	// +optional
-	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+	Conditions clusterv1beta1.Conditions `json:"conditions,omitempty"`
 
 	// LongRunningOperationStates saves the states for Azure long-running operations so they can be continued on the
 	// next reconciliation loop.
@@ -293,12 +297,12 @@ type AzureMachineList struct {
 }
 
 // GetConditions returns the list of conditions for an AzureMachine API object.
-func (m *AzureMachine) GetConditions() clusterv1.Conditions {
+func (m *AzureMachine) GetConditions() clusterv1beta1.Conditions {
 	return m.Status.Conditions
 }
 
 // SetConditions will set the given conditions on an AzureMachine object.
-func (m *AzureMachine) SetConditions(conditions clusterv1.Conditions) {
+func (m *AzureMachine) SetConditions(conditions clusterv1beta1.Conditions) {
 	m.Status.Conditions = conditions
 }
 

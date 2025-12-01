@@ -58,21 +58,22 @@ func New() *analysis.Analyzer {
 	n := newPerfSprint()
 	r := &analysis.Analyzer{
 		Name:     "perfsprint",
+		URL:      "https://github.com/catenacyber/perfsprint",
 		Doc:      "Checks that fmt.Sprintf can be replaced with a faster alternative.",
 		Run:      n.run,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
-	r.Flags.BoolVar(&n.intFormat.enabled, "integer-format", true, "enable/disable optimization of integer formatting")
-	r.Flags.BoolVar(&n.intFormat.intConv, "int-conversion", true, "optimizes even if it requires an int or uint type cast")
-	r.Flags.BoolVar(&n.errFormat.enabled, "error-format", true, "enable/disable optimization of error formatting")
-	r.Flags.BoolVar(&n.errFormat.errError, "err-error", false, "optimizes into err.Error() even if it is only equivalent for non-nil errors")
-	r.Flags.BoolVar(&n.errFormat.errorf, "errorf", true, "optimizes fmt.Errorf")
-	r.Flags.BoolVar(&n.boolFormat, "bool-format", true, "enable/disable optimization of bool formatting")
-	r.Flags.BoolVar(&n.hexFormat, "hex-format", true, "enable/disable optimization of hex formatting")
-	r.Flags.BoolVar(&n.strFormat.enabled, "string-format", true, "enable/disable optimization of string formatting")
-	r.Flags.BoolVar(&n.strFormat.sprintf1, "sprintf1", true, "optimizes fmt.Sprintf with only one argument")
-	r.Flags.BoolVar(&n.strFormat.strconcat, "strconcat", true, "optimizes into strings concatenation")
-	r.Flags.BoolVar(&n.fiximports, "fiximports", true, "fix needed imports from other fixes")
+	r.Flags.BoolVar(&n.intFormat.enabled, "integer-format", n.intFormat.enabled, "enable/disable optimization of integer formatting")
+	r.Flags.BoolVar(&n.intFormat.intConv, "int-conversion", n.intFormat.intConv, "optimizes even if it requires an int or uint type cast")
+	r.Flags.BoolVar(&n.errFormat.enabled, "error-format", n.errFormat.enabled, "enable/disable optimization of error formatting")
+	r.Flags.BoolVar(&n.errFormat.errError, "err-error", n.errFormat.errError, "optimizes into err.Error() even if it is only equivalent for non-nil errors")
+	r.Flags.BoolVar(&n.errFormat.errorf, "errorf", n.errFormat.errorf, "optimizes fmt.Errorf")
+	r.Flags.BoolVar(&n.boolFormat, "bool-format", n.boolFormat, "enable/disable optimization of bool formatting")
+	r.Flags.BoolVar(&n.hexFormat, "hex-format", n.hexFormat, "enable/disable optimization of hex formatting")
+	r.Flags.BoolVar(&n.strFormat.enabled, "string-format", n.strFormat.enabled, "enable/disable optimization of string formatting")
+	r.Flags.BoolVar(&n.strFormat.sprintf1, "sprintf1", n.strFormat.sprintf1, "optimizes fmt.Sprintf with only one argument")
+	r.Flags.BoolVar(&n.strFormat.strconcat, "strconcat", n.strFormat.strconcat, "optimizes into strings concatenation")
+	r.Flags.BoolVar(&n.fiximports, "fiximports", n.fiximports, "fix needed imports from other fixes")
 
 	return r
 }

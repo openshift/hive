@@ -234,11 +234,11 @@ func (p providerConfig) Diff(other ProviderConfig) ([]string, error) {
 
 	switch p.platformType {
 	case configv1.AWSPlatformType:
-		return deep.Equal(p.aws.providerConfig, other.AWS().providerConfig), nil
+		return p.aws.Diff(other.AWS().providerConfig), nil
 	case configv1.AzurePlatformType:
-		return deep.Equal(p.azure.providerConfig, other.Azure().providerConfig), nil
+		return p.azure.Diff(other.Azure().providerConfig), nil
 	case configv1.GCPPlatformType:
-		return deep.Equal(p.gcp.providerConfig, other.GCP().providerConfig), nil
+		return p.gcp.Diff(other.GCP().providerConfig), nil
 	case configv1.NutanixPlatformType:
 		return deep.Equal(p.nutanix.providerConfig, other.Nutanix().providerConfig), nil
 	case configv1.OpenStackPlatformType:
@@ -439,22 +439,6 @@ func ExtractFailureDomainFromMachine(logger logr.Logger, machine machinev1beta1.
 	}
 
 	return providerConfig.ExtractFailureDomain(), nil
-}
-
-// ExtractFailureDomainsFromMachineSets creates list of FailureDomains extracted from the provided list of machineSets.
-func ExtractFailureDomainsFromMachineSets(logger logr.Logger, machineSets []machinev1beta1.MachineSet, infrastructure *configv1.Infrastructure) ([]failuredomain.FailureDomain, error) {
-	machineSetFailureDomains := failuredomain.NewSet()
-
-	for _, machineSet := range machineSets {
-		providerconfig, err := NewProviderConfigFromMachineSpec(logger, machineSet.Spec.Template.Spec, infrastructure)
-		if err != nil {
-			return nil, fmt.Errorf("error getting failure domain from machineSet %s: %w", machineSet.Name, err)
-		}
-
-		machineSetFailureDomains.Insert(providerconfig.ExtractFailureDomain())
-	}
-
-	return machineSetFailureDomains.List(), nil
 }
 
 // checkForUnknownFieldsInProviderSpecAndUnmarshal tries to unmarshal content into a platform specific provider spec

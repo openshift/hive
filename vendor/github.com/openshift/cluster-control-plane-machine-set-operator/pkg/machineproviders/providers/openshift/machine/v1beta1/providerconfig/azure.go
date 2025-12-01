@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/go-test/deep"
 	v1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -83,4 +84,18 @@ func newAzureProviderConfig(logger logr.Logger, raw *runtime.RawExtension) (Prov
 	}
 
 	return config, nil
+}
+
+// Diff compares two Azure provider configs and returns a list of differences,
+// excluding the image field from comparison.
+func (a AzureProviderConfig) Diff(other machinev1beta1.AzureMachineProviderSpec) []string {
+	// Create copies of the configs and zero out image fields for comparison
+	// Image fields are irrelevant for comparison of existing machines because they
+	// have already pivoted to the RHCOS version described by the release image.
+	config1 := a.providerConfig
+	config2 := other
+	config1.Image = machinev1beta1.Image{}
+	config2.Image = machinev1beta1.Image{}
+
+	return deep.Equal(config1, config2)
 }

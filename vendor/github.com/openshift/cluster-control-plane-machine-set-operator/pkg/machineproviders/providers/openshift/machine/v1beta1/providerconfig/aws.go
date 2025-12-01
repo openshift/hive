@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/go-test/deep"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -156,4 +157,18 @@ func convertAWSResourceReferenceV1ToV1Beta1(referenceV1 *machinev1.AWSResourceRe
 	}
 
 	return referenceV1Beta1
+}
+
+// Diff compares two AWS provider configs and returns a list of differences,
+// excluding the AMI field from comparison.
+func (a AWSProviderConfig) Diff(other machinev1beta1.AWSMachineProviderConfig) []string {
+	// Create copies of the configs and zero out AMI fields for comparison
+	// AMI fields are irrelevant for comparison of existing machines because they
+	// have already pivoted to the RHCOS version described by the release image.
+	config1 := a.providerConfig
+	config2 := other
+	config1.AMI = machinev1beta1.AWSResourceReference{}
+	config2.AMI = machinev1beta1.AWSResourceReference{}
+
+	return deep.Equal(config1, config2)
 }

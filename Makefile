@@ -5,7 +5,7 @@ all: vendor update test build
 # These images need to be synced with the default values in the Dockerfile.
 EL8_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
 EL9_BUILD_IMAGE ?= registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-BASE_IMAGE ?= registry.ci.openshift.org/ocp/4.20:base-rhel9
+BASE_IMAGE ?= registry.access.redhat.com/ubi9/ubi-minimal:9.6
 
 # In openshift ci (Prow), we need to set $HOME to a writable directory else tests will fail
 # because they don't have permissions to create /.local or /.cache directories
@@ -322,7 +322,7 @@ podman-dev-build:
 
 podman-operatorhub-build:
 	podman build --tag ${IMG} ${GOCACHE_VOL_ARG} \
-		--build-arg=BASE_IMAGE=quay.io/centos/centos:stream9 \
+		--build-arg=BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:9.6 \
 		--build-arg=BUILD_IMAGE_CUSTOMIZATION=./hack/ubi-build-deps.sh \
 		--build-arg=EL8_BUILD_IMAGE=registry.access.redhat.com/ubi8/ubi:8.10 \
 		--build-arg=EL9_BUILD_IMAGE=registry.access.redhat.com/ubi9:9.5 \

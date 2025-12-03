@@ -1112,10 +1112,9 @@ func (r *ReconcileClusterDeployment) retrofitMetadataJSON(cd *hivev1.ClusterDepl
 	if cdMetadata == nil {
 		return nil, errors.New("ClusterMetadata should not be nil -- this is a bug!")
 	}
-	// Necessary for retrofitting fake cluster metadata.json, BUT we have to be careful not to do
-	// it for ClusterInstallz, which may not populate a Platform section at all, lest we run afoul
-	// of our webhook -- see ACM-26271.
-	if controllerutils.IsFakeCluster(cd) && cdMetadata.Platform == nil {
+	// Vivify the Platform section if needed. It's okay if it ends up empty for some cluster types
+	// (e.g., ClusterInstall-based clusters).
+	if cdMetadata.Platform == nil {
 		cdMetadata.Platform = &hivev1.ClusterPlatformMetadata{}
 	}
 	iMetadata := installertypes.ClusterMetadata{

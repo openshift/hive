@@ -187,7 +187,7 @@ func TestClusterPoolValidate(t *testing.T) {
 				return cd
 			}(),
 			operation:       admissionv1beta1.Create,
-			expectedAllowed: false,
+			expectedAllowed: true,
 		},
 		{
 			name: "create with two cloud platforms",

@@ -37,22 +37,23 @@ RUN make build-hiveadmission build-manager build-operator && \
 FROM ${BASE_IMAGE}
 ARG CONTAINER_SUB_MANAGER_OFF
 ENV SMDEV_CONTAINER_OFF=${CONTAINER_SUB_MANAGER_OFF}
+ARG DNF=dnf
 
 # CVE-2023-6597
-RUN dnf upgrade -y python3
+RUN ${DNF} upgrade -y python3
 
 RUN if [ -e "/activation-key/org" ]; then unlink /etc/rhsm-host; subscription-manager register --force --org $(cat "/activation-key/org") --activationkey $(cat "/activation-key/activationkey"); fi
 
 
 ##
 # ssh-agent required for gathering logs in some situations:
-RUN if ! rpm -q openssh-clients; then dnf install -y openssh-clients && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q openssh-clients; then ${DNF} install -y openssh-clients && ${DNF} clean all && rm -rf /var/cache/dnf/*; fi
 
 # libvirt libraries required for running bare metal installer.
-RUN if ! rpm -q libvirt-libs; then dnf install -y libvirt-libs && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! rpm -q libvirt-libs; then ${DNF} install -y libvirt-libs && ${DNF} clean all && rm -rf /var/cache/dnf/*; fi
 
 # tar is needed to package must-gathers on install failure
-RUN if ! command -v tar; then dnf install -y tar && dnf clean all && rm -rf /var/cache/dnf/*; fi
+RUN if ! command -v tar; then ${DNF} install -y tar && ${DNF} clean all && rm -rf /var/cache/dnf/*; fi
 
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/manager /opt/services/
 COPY --from=builder_rhel9 /go/src/github.com/openshift/hive/bin/hiveadmission /opt/services/

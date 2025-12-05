@@ -183,6 +183,7 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		session,
 		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
 	)
+	logger.WithField("machines", installerMachineSets).Error("FIND ME: here are your machines bro")
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
 }
 

@@ -1232,7 +1232,7 @@ apiVersion: hive.openshift.io/v1
 kind: ClusterDeployment
 metadata:
   name: my-gcp-cluster
-  namespace: hive
+  namespace: mynamespace
 spec:
   baseDomain: gcp.example.com
   clusterMetadata:
@@ -1240,6 +1240,8 @@ spec:
       name: my-gcp-cluster-admin-kubeconfig
     clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
     infraID: my-gcp-cluster-wsvdn
+    metadataJSONSecretRef:
+      name: my-gcp-cluster-metadata-json
   clusterName: my-gcp-cluster
   installed: true
   platform:
@@ -1250,6 +1252,11 @@ spec:
   pullSecretRef:
     name: pull-secret
 ```
+
+Note for `metadataJSONSecretRef`:
+1. If the referenced Secret is available -- e.g. if the cluster was previously managed by hive -- simply copy it in.
+1. If you have the original metadata.json file -- e.g. if the cluster was provisioned directly via openshift-install -- create the Secret from it: `oc create secret generic my-gcp-cluster-metadata-json -n mynamespace --from-file=metadata.json=/tmp/metadata.json`
+1. Otherwise, you may need to compose the file by hand. See the samples below.
 
 If the cluster you are looking to adopt is on AWS and leverages Privatelink, you'll also need to include that setting under `spec.platform.aws` to ensure the VPC Endpoint Service for the cluster is tracked in the ClusterDeployment.
 
@@ -1263,30 +1270,74 @@ If the cluster you are looking to adopt is on AWS and leverages Privatelink, you
       region: us-east-1
 ```
 
-If the cluster you are looking to adopt is on AWS and uses a shared VPC, you will also need to include the name of the hosted zone role in `spec.clusterMetadata.platform.aws.hostedZoneRole`.
+metadata.json sample for GCP cluster
 
-```yaml
-  clusterMetadata:
-    adminKubeconfigSecretRef:
-      name: my-gcp-cluster-admin-kubeconfig
-    clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
-    infraID: my-gcp-cluster-wsvdn
-    platform:
-      aws:
-        hostedZoneRole: account-b-zone-role
+```
+{
+  "clusterName": "my-gcp-cluster",
+  "clusterID": "61010205-c91d-44c9-8394-3e1790bd76f3",
+  "infraID": "my-gcp-cluster-wsvdn",
+  "gcp": {
+    "region": "us-east1",
+    "projectID": "projectID for the cluster",
+    "networkProjectID": "networkProjectID for the cluster",
+    "privateZoneDomain": "privateZoneDomain like <clusterName>.<baseDomain>",
+    "privateZoneProjectID": "privateZoneProjectID for the cluster"
+  },
+  "featureSet": "",
+  "customFeatureSet": null
+}
 ```
 
-If the cluster you are looking to adopt is on GCP and uses a shared VPC, you will also need to include the name of the network project ID in `spec.clusterMetadata.platform.gcp.networkProjectID`.
+Note: networkProjectID is optional and shall be included if the cluster you are looking to adopt is on GCP and uses a shared VPC
 
-```yaml
-  clusterMetadata:
-    adminKubeconfigSecretRef:
-      name: my-gcp-cluster-admin-kubeconfig
-    clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
-    infraID: my-gcp-cluster-wsvdn
-    platform:
-      gcp:
-        networkProjectID: some@project.id
+metadata.json sample for AWS cluster
+
+```
+{
+  "clusterName": "my-aws-cluster",
+  "clusterID": "61010205-c91d-44c9-8394-3e1790bd76f3",
+  "infraID": "my-aws-cluster-wsvdn",
+  "aws": {
+    "region": "us-east-1",
+    "identifier": [
+      {
+        "kubernetes.io/cluster/<infraID>": "owned"
+      },
+      {
+        "openshiftClusterID": "<clusterID>"
+      },
+      {
+        "sigs.k8s.io/cluster-api-provider-aws/cluster/<infraID>": "owned"
+      }
+    ],
+    "clusterDomain": "<clusterName>.<baseDomain>",
+    "hostedZoneRole": "arn:aws:iam::641733028092:role/<clusterName>-shared-role"
+  },
+  "featureSet": "",
+  "customFeatureSet": null
+}
+```
+
+Note: hostedZoneRole is optional and shall be included if the cluster you are looking to adopt is on AWS and uses a shared VPC
+
+metadata.json sample for Azure cluster
+
+```
+{
+  "clusterName": "my-azure-cluster",
+  "clusterID": "61010205-c91d-44c9-8394-3e1790bd76f3",
+  "infraID": "my-azure-cluster-wsvdn",
+  "azure": {
+    "armEndpoint": "",
+    "cloudName": "AzurePublicCloud",
+    "region": "centralus",
+    "resourceGroupName": "",
+    "baseDomainResourceGroupName": "baseDomainResourceGroupName for the cluster"
+  },
+  "featureSet": "",
+  "customFeatureSet": null
+}
 ```
 
 ### Adopting with hiveutil
@@ -1294,7 +1345,7 @@ If the cluster you are looking to adopt is on GCP and uses a shared VPC, you wil
 [hiveutil](hiveutil.md) is a development focused CLI tool which can be built from the hive repo. To adopt a cluster specify the following flags:
 
 ```bash
-bin/hiveutil create-cluster --namespace=namespace-to-adopt-into --base-domain=example.com mycluster --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=[INFRAID] --adopt-cluster-id=[CLUSTERID]
+bin/hiveutil create-cluster --namespace=namespace-to-adopt-into --base-domain=example.com mycluster --adopt --adopt-admin-kubeconfig=/path/to/cluster/admin/kubeconfig --adopt-infra-id=[INFRAID] --adopt-cluster-id=[CLUSTERID] --adopt-metadata-json=/path/to/metadata.json
 ```
 
 ### Transferring ownership

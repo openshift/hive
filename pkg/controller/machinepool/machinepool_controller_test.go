@@ -1929,7 +1929,7 @@ func testClusterDeployment() *hivev1.ClusterDeployment {
 			Finalizers: []string{hivev1.FinalizerDeprovision},
 			UID:        types.UID("1234"),
 			Labels: map[string]string{
-				constants.VersionLabel: "4.4.0",
+				constants.VersionLabel: "4.14.0",
 			},
 		},
 		Spec: hivev1.ClusterDeploymentSpec{

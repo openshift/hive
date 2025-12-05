@@ -7,7 +7,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: checkpoints.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -91,7 +91,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterclaims.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -288,7 +288,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterdeploymentcustomizations.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -589,7 +589,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterdeployments.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -1335,6 +1335,69 @@ objects:
                               \ to change over time."
                             pattern: "^(0|([0-9]+(\\.[0-9]+)?(ns|us|\xB5s|\u03BCs|ms|s|m|h))+)$"
                             type: string
+                          httpKeepAliveTimeout:
+                            description: 'httpKeepAliveTimeout defines the maximum
+                              allowed time to wait for
+
+                              a new HTTP request to appear on a connection from the
+                              client to the router.
+
+
+                              This field expects an unsigned duration string of a
+                              decimal number, with optional
+
+                              fraction and a unit suffix, e.g. "300ms", "1.5s" or
+                              "2m45s".
+
+                              Valid time units are "ms", "s", "m".
+
+                              The allowed range is from 1 millisecond to 15 minutes.
+
+
+                              When omitted, this means the user has no opinion and
+                              the platform is left
+
+                              to choose a reasonable default. This default is subject
+                              to change over time.
+
+                              The current default is 300s.
+
+
+                              Low values (tens of milliseconds or less) can cause
+                              clients to close and reopen connections
+
+                              for each request, leading to reduced connection sharing.
+
+                              For HTTP/2, special care should be taken with low values.
+
+                              A few seconds is a reasonable starting point to avoid
+                              holding idle connections open
+
+                              while still allowing subsequent requests to reuse the
+                              connection.
+
+
+                              High values (minutes or more) favor connection reuse
+                              but may cause idle
+
+                              connections to linger longer.'
+                            maxLength: 16
+                            minLength: 1
+                            type: string
+                            x-kubernetes-validations:
+                            - message: httpKeepAliveTimeout must be a valid duration
+                                string composed of an unsigned integer value, optionally
+                                followed by a decimal fraction and a unit suffix (ms,
+                                s, m)
+                              rule: self.matches('^([0-9]+(\\.[0-9]+)?(ms|s|m))+$')
+                            - message: httpKeepAliveTimeout must be less than or equal
+                                to 15 minutes
+                              rule: '!self.matches(''^([0-9]+(\\.[0-9]+)?(ms|s|m))+$'')
+                                || duration(self) <= duration(''15m'')'
+                            - message: httpKeepAliveTimeout must be greater than or
+                                equal to 1 millisecond
+                              rule: '!self.matches(''^([0-9]+(\\.[0-9]+)?(ms|s|m))+$'')
+                                || duration(self) >= duration(''1ms'')'
                           maxConnections:
                             description: 'maxConnections defines the maximum number
                               of simultaneous
@@ -1548,6 +1611,7 @@ objects:
                     - domain
                     - name
                     type: object
+                  maxItems: 16
                   type: array
                 installAttemptsLimit:
                   description: InstallAttemptsLimit is the maximum number of times
@@ -2432,8 +2496,10 @@ objects:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be
-                              a C_IDENTIFIER.
+                            description: 'Name of the environment variable.
+
+                              May consist of any printable ASCII characters except
+                              ''=''.'
                             type: string
                           value:
                             description: 'Variable references $(VAR_NAME) are expanded
@@ -2509,6 +2575,58 @@ objects:
                                     type: string
                                 required:
                                 - fieldPath
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              fileKeyRef:
+                                description: 'FileKeyRef selects a key of the env
+                                  file.
+
+                                  Requires the EnvFiles feature gate to be enabled.'
+                                properties:
+                                  key:
+                                    description: 'The key within the env file. An
+                                      invalid key will prevent the pod from starting.
+
+                                      The keys defined within a source may consist
+                                      of any printable ASCII characters except ''=''.
+
+                                      During Alpha stage of the EnvFiles feature gate,
+                                      the key size is limited to 128 characters.'
+                                    type: string
+                                  optional:
+                                    default: false
+                                    description: 'Specify whether the file or its
+                                      key must be defined. If the file or key
+
+                                      does not exist, then the env var is not published.
+
+                                      If optional is set to true and the specified
+                                      key does not exist,
+
+                                      the environment variable will not be set in
+                                      the Pod''s containers.
+
+
+                                      If optional is set to false and the specified
+                                      key does not exist,
+
+                                      an error will be returned during Pod creation.'
+                                    type: boolean
+                                  path:
+                                    description: 'The path within the volume from
+                                      which to select the file.
+
+                                      Must be relative and may not contain the ''..''
+                                      path or start with ''..''.'
+                                    type: string
+                                  volumeName:
+                                    description: The name of the volume mount containing
+                                      the env file.
+                                    type: string
+                                required:
+                                - key
+                                - path
+                                - volumeName
                                 type: object
                                 x-kubernetes-map-type: atomic
                               resourceFieldRef:
@@ -3352,7 +3470,7 @@ objects:
                               For example, it may menition an Upgradeable=False or
                               missing signature
 
-                              that was overriden via desiredUpdate.force, or an update
+                              that was overridden via desiredUpdate.force, or an update
                               that was
 
                               initiated despite not being in the availableUpdates
@@ -3629,7 +3747,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterdeprovisions.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4145,7 +4263,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterimagesets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4217,7 +4335,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterpools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -4479,7 +4597,9 @@ objects:
                       in a Container.
                     properties:
                       name:
-                        description: Name of the environment variable. Must be a C_IDENTIFIER.
+                        description: 'Name of the environment variable.
+
+                          May consist of any printable ASCII characters except ''=''.'
                         type: string
                       value:
                         description: 'Variable references $(VAR_NAME) are expanded
@@ -4554,6 +4674,57 @@ objects:
                                 type: string
                             required:
                             - fieldPath
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          fileKeyRef:
+                            description: 'FileKeyRef selects a key of the env file.
+
+                              Requires the EnvFiles feature gate to be enabled.'
+                            properties:
+                              key:
+                                description: 'The key within the env file. An invalid
+                                  key will prevent the pod from starting.
+
+                                  The keys defined within a source may consist of
+                                  any printable ASCII characters except ''=''.
+
+                                  During Alpha stage of the EnvFiles feature gate,
+                                  the key size is limited to 128 characters.'
+                                type: string
+                              optional:
+                                default: false
+                                description: 'Specify whether the file or its key
+                                  must be defined. If the file or key
+
+                                  does not exist, then the env var is not published.
+
+                                  If optional is set to true and the specified key
+                                  does not exist,
+
+                                  the environment variable will not be set in the
+                                  Pod''s containers.
+
+
+                                  If optional is set to false and the specified key
+                                  does not exist,
+
+                                  an error will be returned during Pod creation.'
+                                type: boolean
+                              path:
+                                description: 'The path within the volume from which
+                                  to select the file.
+
+                                  Must be relative and may not contain the ''..''
+                                  path or start with ''..''.'
+                                type: string
+                              volumeName:
+                                description: The name of the volume mount containing
+                                  the env file.
+                                type: string
+                            required:
+                            - key
+                            - path
+                            - volumeName
                             type: object
                             x-kubernetes-map-type: atomic
                           resourceFieldRef:
@@ -5550,7 +5721,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'false'
     name: clusterprovisions.hive.openshift.io
@@ -5799,7 +5970,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterrelocates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -5939,7 +6110,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clusterstates.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6062,7 +6233,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clustersyncleases.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -6125,7 +6296,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: clustersyncs.hiveinternal.openshift.io
   spec:
     group: hiveinternal.openshift.io
@@ -6400,7 +6571,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: dnszones.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -6713,7 +6884,7 @@ objects:
   metadata:
     annotations:
       contracts.hive.openshift.io/clusterinstall.config: '{"skipImageSetJob": "true"}'
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     labels:
       contracts.hive.openshift.io/clusterinstall: 'true'
     name: fakeclusterinstalls.hiveinternal.openshift.io
@@ -6988,7 +7159,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: hiveconfigs.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -7359,8 +7530,7 @@ objects:
                                       that are used by this container.
 
 
-                                      This is an alpha field and requires enabling
-                                      the
+                                      This field depends on the
 
                                       DynamicResourceAllocation feature gate.
 
@@ -7523,7 +7693,7 @@ objects:
                                 that are used by this container.
 
 
-                                This is an alpha field and requires enabling the
+                                This field depends on the
 
                                 DynamicResourceAllocation feature gate.
 
@@ -7637,7 +7807,7 @@ objects:
                               that are used by this container.
 
 
-                              This is an alpha field and requires enabling the
+                              This field depends on the
 
                               DynamicResourceAllocation feature gate.
 
@@ -8453,7 +8623,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: machinepoolnameleases.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -8529,7 +8699,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: machinepools.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -8801,6 +8971,56 @@ objects:
                       description: Azure is the configuration used when installing
                         on Azure.
                       properties:
+                        bootDiagnostics:
+                          description: 'BootDiagnostics has the value for the storage
+                            account URI where the
+
+                            machine log information of the control plane is sent to.
+
+                            Defaults to managed for control plane if no value is mentioned.'
+                          properties:
+                            resourceGroup:
+                              description: 'ResourceGroup specifies the name of the
+                                resource group where the
+
+                                storage account to be used for diagnostics storage
+                                is present.
+
+                                Only used if the type is set to UserManaged.'
+                              type: string
+                            storageAccountName:
+                              description: 'StorageAccountName specifies the storage
+                                account where the diagnostics
+
+                                logs need to be stored.
+
+                                Only used if the type is set to UserManaged.'
+                              type: string
+                            type:
+                              allOf:
+                              - enum:
+                                - Managed
+                                - UserManaged
+                                - Disabled
+                              - enum:
+                                - Disabled
+                                - Managed
+                                - UserManaged
+                              description: 'Type specifies the boot diagnostics type
+                                for the machines created.
+
+                                Defaults as disabled for compute nodes and as managed
+                                for control plane
+
+                                nodes.
+
+                                Values allowed are Disabled, Managed and UserManaged.'
+                              type: string
+                          required:
+                          - resourceGroup
+                          - storageAccountName
+                          - type
+                          type: object
                         computeSubnet:
                           description: 'ComputeSubnet specifies an existing subnet
                             for use by compute nodes.
@@ -8808,6 +9028,170 @@ objects:
                             If omitted, the default (${infraID}-worker-subnet) will
                             be used.'
                           type: string
+                        dataDisks:
+                          description: DataDisk specifies the parameters that are
+                            used to add one or more data disks to the machine.
+                          items:
+                            description: DataDisk specifies the parameters that are
+                              used to add one or more data disks to the machine.
+                            properties:
+                              cachingType:
+                                description: CachingType specifies the caching requirements.
+                                enum:
+                                - None
+                                - ReadOnly
+                                - ReadWrite
+                                type: string
+                              diskSizeGB:
+                                description: DiskSizeGB is the size in GB to assign
+                                  to the data disk.
+                                format: int32
+                                type: integer
+                              lun:
+                                description: 'Lun Specifies the logical unit number
+                                  of the data disk. This value is used to identify
+                                  data disks within the VM and therefore must be unique
+                                  for each data disk attached to a VM.
+
+                                  The value must be between 0 and 63.'
+                                format: int32
+                                type: integer
+                              managedDisk:
+                                description: ManagedDisk specifies the Managed Disk
+                                  parameters for the data disk.
+                                properties:
+                                  diskEncryptionSet:
+                                    description: DiskEncryptionSet specifies the customer-managed
+                                      disk encryption set resource id for the managed
+                                      disk.
+                                    properties:
+                                      id:
+                                        description: ID defines resourceID for diskEncryptionSet
+                                          resource. It must be in the same subscription
+                                        type: string
+                                    type: object
+                                  securityProfile:
+                                    description: SecurityProfile specifies the security
+                                      profile for the managed disk.
+                                    properties:
+                                      diskEncryptionSet:
+                                        description: 'DiskEncryptionSet specifies
+                                          the customer-managed disk encryption set
+                                          resource id for the
+
+                                          managed disk that is used for Customer Managed
+                                          Key encrypted ConfidentialVM OS Disk and
+
+                                          VMGuest blob.'
+                                        properties:
+                                          id:
+                                            description: ID defines resourceID for
+                                              diskEncryptionSet resource. It must
+                                              be in the same subscription
+                                            type: string
+                                        type: object
+                                      securityEncryptionType:
+                                        description: 'SecurityEncryptionType specifies
+                                          the encryption type of the managed disk.
+
+                                          It is set to DiskWithVMGuestState to encrypt
+                                          the managed disk along with the VMGuestState
+
+                                          blob, and to VMGuestStateOnly to encrypt
+                                          the VMGuestState blob only.
+
+                                          When set to VMGuestStateOnly, VirtualizedTrustedPlatformModule
+                                          should be set to Enabled.
+
+                                          When set to DiskWithVMGuestState, EncryptionAtHost
+                                          should be disabled, SecureBoot and
+
+                                          VirtualizedTrustedPlatformModule should
+                                          be set to Enabled.
+
+                                          It can be set only for Confidential VMs.'
+                                        enum:
+                                        - VMGuestStateOnly
+                                        - DiskWithVMGuestState
+                                        type: string
+                                    type: object
+                                  storageAccountType:
+                                    type: string
+                                type: object
+                              nameSuffix:
+                                description: 'NameSuffix is the suffix to be appended
+                                  to the machine name to generate the disk name.
+
+                                  Each disk name will be in format <machineName>_<nameSuffix>.'
+                                type: string
+                            required:
+                            - diskSizeGB
+                            - nameSuffix
+                            type: object
+                          type: array
+                        encryptionAtHost:
+                          description: EncryptionAtHost enables encryption at the
+                            VM host.
+                          type: boolean
+                        identity:
+                          default: UserAssigned
+                          description: 'Identity is the type of identity used for
+                            the virtual machine.
+
+                            The type ''UserAssigned'' is a standalone Azure resource
+                            provided by the user
+
+                            and assigned to the VM.
+
+                            The default identity is a user-assigned identity, generated
+                            by the installer.
+
+                            This default is expected to change in future releases.'
+                          properties:
+                            type:
+                              description: Type specifies the type of identity to
+                                be used.
+                              enum:
+                              - None
+                              - UserAssigned
+                              type: string
+                            userAssignedIdentities:
+                              description: 'UserAssignedIdentities is a list of identities
+                                to be attached to a node.
+
+                                Only one user-assigned identity may be supplied.
+
+                                Supplying more than one user-assigned identity is
+                                an experimental feature
+
+                                which may be enabled with the MachineAPIMigration
+                                feature gate.'
+                              items:
+                                description: UserAssignedIdentity contains the fields
+                                  that comprise a user-assigned identity.
+                                properties:
+                                  name:
+                                    description: Name is the name of the user-assigned
+                                      identity to be assigned to the node.
+                                    type: string
+                                  resourceGroup:
+                                    description: ResourceGroup is the resource group
+                                      that contains the user-assigned identity.
+                                    type: string
+                                  subscription:
+                                    description: Subscription is the subscription
+                                      that contains the user-assigned identity.
+                                    type: string
+                                required:
+                                - name
+                                - resourceGroup
+                                - subscription
+                                type: object
+                              type: array
+                          required:
+                          - type
+                          - userAssignedIdentities
+                          type: object
                         networkResourceGroupName:
                           description: 'NetworkResourceGroupName specifies the network
                             resource group that contains an existing VNet.
@@ -8840,6 +9224,7 @@ objects:
                               required:
                               - name
                               - resourceGroup
+                              - subscriptionId
                               type: object
                             diskSizeGB:
                               description: DiskSizeGB defines the size of disk in
@@ -8859,6 +9244,62 @@ objects:
                               - Premium_LRS
                               - StandardSSD_LRS
                               type: string
+                            securityProfile:
+                              description: SecurityProfile specifies the security
+                                profile for the managed disk.
+                              properties:
+                                diskEncryptionSet:
+                                  description: 'DiskEncryptionSet specifies the customer
+                                    managed disk encryption set resource id for the
+
+                                    managed disk that is used for Customer Managed
+                                    Key encrypted ConfidentialVM OS Disk and
+
+                                    VMGuestState blob.'
+                                  properties:
+                                    name:
+                                      description: Name is the name of the disk encryption
+                                        set.
+                                      type: string
+                                    resourceGroup:
+                                      description: 'ResourceGroup defines the Azure
+                                        resource group used by the disk
+
+                                        encryption set.'
+                                      type: string
+                                    subscriptionId:
+                                      description: 'SubscriptionID defines the Azure
+                                        subscription the disk encryption
+
+                                        set is in.'
+                                      type: string
+                                  required:
+                                  - name
+                                  - resourceGroup
+                                  - subscriptionId
+                                  type: object
+                                securityEncryptionType:
+                                  description: 'SecurityEncryptionType specifies the
+                                    encryption type of the managed disk.
+
+                                    It is set to DiskWithVMGuestState to encrypt the
+                                    managed disk along with the VMGuestState
+
+                                    blob, and to VMGuestStateOnly to encrypt the VMGuestState
+                                    blob only.
+
+                                    When set to VMGuestStateOnly, the VTpmEnabled
+                                    should be set to true.
+
+                                    When set to DiskWithVMGuestState, both SecureBootEnabled
+                                    and VTpmEnabled should be set to true.
+
+                                    It can be set only for Confidential VMs.'
+                                  enum:
+                                  - VMGuestStateOnly
+                                  - DiskWithVMGuestState
+                                  type: string
+                              type: object
                           required:
                           - diskSizeGB
                           type: object
@@ -8867,6 +9308,14 @@ objects:
                           properties:
                             offer:
                               description: Offer is the offer of the image.
+                              type: string
+                            plan:
+                              description: 'Plan is the purchase plan of the image.
+
+                                If omitted, it defaults to "WithPurchasePlan".'
+                              enum:
+                              - WithPurchasePlan
+                              - NoPurchasePlan
                               type: string
                             publisher:
                               description: Publisher is the publisher of the image.
@@ -8886,11 +9335,161 @@ objects:
                         outboundType:
                           description: OutboundType is a strategy for how egress from
                             cluster is achieved. When not specified default is "Loadbalancer".
+                          enum:
+                          - ''
+                          - Loadbalancer
+                          - NATGatewaySingleZone
+                          - NATGatewayMultiZone
+                          - UserDefinedRouting
                           type: string
+                        settings:
+                          description: 'Settings specify the security type and the
+                            UEFI settings of the virtual machine. This field can
+
+                            be set for Confidential VMs and Trusted Launch for VMs.'
+                          properties:
+                            confidentialVM:
+                              description: 'ConfidentialVM specifies the security
+                                configuration of the virtual machine.
+
+                                For more information regarding Confidential VMs, please
+                                refer to:
+
+                                https://learn.microsoft.com/azure/confidential-computing/confidential-vm-overview'
+                              properties:
+                                uefiSettings:
+                                  description: UEFISettings specifies the security
+                                    settings like secure boot and vTPM used while
+                                    creating the virtual machine.
+                                  properties:
+                                    secureBoot:
+                                      description: 'SecureBoot specifies whether secure
+                                        boot should be enabled on the virtual machine.
+
+                                        Secure Boot verifies the digital signature
+                                        of all boot components and halts the boot
+                                        process if
+
+                                        signature verification fails.
+
+                                        If omitted, the platform chooses a default,
+                                        which is subject to change over time, currently
+                                        that default is disabled.'
+                                      enum:
+                                      - Enabled
+                                      - Disabled
+                                      type: string
+                                    virtualizedTrustedPlatformModule:
+                                      description: 'VirtualizedTrustedPlatformModule
+                                        specifies whether vTPM should be enabled on
+                                        the virtual machine.
+
+                                        When enabled the virtualized trusted platform
+                                        module measurements are used to create a known
+                                        good boot integrity policy baseline.
+
+                                        The integrity policy baseline is used for
+                                        comparison with measurements from subsequent
+                                        VM boots to determine if anything has changed.
+
+                                        This is required to be set to enabled if the
+                                        SecurityEncryptionType is defined.
+
+                                        If omitted, the platform chooses a default,
+                                        which is subject to change over time, currently
+                                        that default is disabled.'
+                                      enum:
+                                      - Enabled
+                                      - Disabled
+                                      type: string
+                                  type: object
+                              required:
+                              - uefiSettings
+                              type: object
+                            securityType:
+                              description: 'SecurityType specifies the SecurityType
+                                of the virtual machine. It has to be set to any specified
+                                value to
+
+                                enable secure boot and vTPM. The default behavior
+                                is: secure boot and vTPM will not be enabled unless
+                                this property is set.'
+                              enum:
+                              - ConfidentialVM
+                              - TrustedLaunch
+                              type: string
+                            trustedLaunch:
+                              description: 'TrustedLaunch specifies the security configuration
+                                of the virtual machine.
+
+                                For more information regarding TrustedLaunch for VMs,
+                                please refer to:
+
+                                https://learn.microsoft.com/azure/virtual-machines/trusted-launch'
+                              properties:
+                                uefiSettings:
+                                  description: UEFISettings specifies the security
+                                    settings like secure boot and vTPM used while
+                                    creating the virtual machine.
+                                  properties:
+                                    secureBoot:
+                                      description: 'SecureBoot specifies whether secure
+                                        boot should be enabled on the virtual machine.
+
+                                        Secure Boot verifies the digital signature
+                                        of all boot components and halts the boot
+                                        process if
+
+                                        signature verification fails.
+
+                                        If omitted, the platform chooses a default,
+                                        which is subject to change over time, currently
+                                        that default is disabled.'
+                                      enum:
+                                      - Enabled
+                                      - Disabled
+                                      type: string
+                                    virtualizedTrustedPlatformModule:
+                                      description: 'VirtualizedTrustedPlatformModule
+                                        specifies whether vTPM should be enabled on
+                                        the virtual machine.
+
+                                        When enabled the virtualized trusted platform
+                                        module measurements are used to create a known
+                                        good boot integrity policy baseline.
+
+                                        The integrity policy baseline is used for
+                                        comparison with measurements from subsequent
+                                        VM boots to determine if anything has changed.
+
+                                        This is required to be set to enabled if the
+                                        SecurityEncryptionType is defined.
+
+                                        If omitted, the platform chooses a default,
+                                        which is subject to change over time, currently
+                                        that default is disabled.'
+                                      enum:
+                                      - Enabled
+                                      - Disabled
+                                      type: string
+                                  type: object
+                              required:
+                              - uefiSettings
+                              type: object
+                          required:
+                          - securityType
+                          type: object
                         type:
                           description: 'InstanceType defines the azure instance type.
 
                             eg. Standard_DS_V2'
+                          type: string
+                        ultraSSDCapability:
+                          description: ultraSSDCapability defines if the instance
+                            should use Ultra SSD disks.
+                          enum:
+                          - Enabled
+                          - Disabled
                           type: string
                         virtualNetwork:
                           description: 'VirtualNetwork specifies the name of an existing
@@ -8920,9 +9519,6 @@ objects:
                           items:
                             type: string
                           type: array
-                      required:
-                      - osDisk
-                      - type
                       type: object
                     gcp:
                       description: GCP is the configuration used when installing on
@@ -9608,10 +10204,8 @@ objects:
                         description: Required. The taint key to be applied to a node.
                         type: string
                       timeAdded:
-                        description: 'TimeAdded represents the time at which the taint
+                        description: TimeAdded represents the time at which the taint
                           was added.
-
-                          It is only written for NoExecute taints.'
                         format: date-time
                         type: string
                       value:
@@ -9803,7 +10397,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: selectorsyncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -10629,7 +11223,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: selectorsyncsets.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -10935,7 +11529,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: syncidentityproviders.hive.openshift.io
   spec:
     group: hive.openshift.io
@@ -11730,7 +12324,7 @@ objects:
   kind: CustomResourceDefinition
   metadata:
     annotations:
-      controller-gen.kubebuilder.io/version: v0.18.0
+      controller-gen.kubebuilder.io/version: v0.19.0
     name: syncsets.hive.openshift.io
   spec:
     group: hive.openshift.io

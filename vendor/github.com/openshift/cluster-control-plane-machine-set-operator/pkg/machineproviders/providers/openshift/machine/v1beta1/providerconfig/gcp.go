@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/go-test/deep"
 	v1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -76,4 +77,24 @@ func newGCPProviderConfig(logger logr.Logger, raw *runtime.RawExtension) (Provid
 	}
 
 	return config, nil
+}
+
+// Diff compares two GCP provider configs and returns a list of differences,
+// excluding the Disks.image fields from comparison.
+func (g GCPProviderConfig) Diff(other machinev1beta1.GCPMachineProviderSpec) []string {
+	// Create copies of the configs and zero out Disks.image fields for comparison
+	// Disks.image fields are irrelevant for comparison of existing machines because they
+	// have already pivoted to the RHCOS version described by the release image.
+	config1 := g.providerConfig
+	config2 := other
+
+	for idx := range config1.Disks {
+		config1.Disks[idx].Image = ""
+	}
+
+	for idx := range config2.Disks {
+		config2.Disks[idx].Image = ""
+	}
+
+	return deep.Equal(config1, config2)
 }

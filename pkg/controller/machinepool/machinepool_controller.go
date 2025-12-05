@@ -1348,7 +1348,7 @@ func (r *ReconcileMachinePool) createActuator(
 		); err != nil {
 			return nil, err
 		}
-		return NewAzureActuator(creds, cd.Spec.Platform.Azure.CloudName.Name(), logger)
+		return NewAzureActuator(creds, cd.Spec.Platform.Azure.CloudName.Name(), masterMachine, logger)
 	case cd.Spec.Platform.GCP != nil:
 		creds := &corev1.Secret{}
 		if err := r.Get(

@@ -30,6 +30,7 @@ import (
 	"github.com/openshift/hive/pkg/clusterresource"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/test/e2e/common"
+	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 )
 
 const (
@@ -140,9 +141,11 @@ func TestNewMachinePool(t *testing.T) {
 	case p.Azure != nil:
 		infraMachinePool.Spec.Platform = hivev1.MachinePoolPlatform{
 			Azure: &hivev1azure.MachinePool{
-				InstanceType: "Standard_D4s_v3",
-				OSDisk: hivev1azure.OSDisk{
-					DiskSizeGB: 128,
+				MachinePool: installertypesazure.MachinePool{
+					InstanceType: "Standard_D4s_v3",
+					OSDisk: installertypesazure.OSDisk{
+						DiskSizeGB: 128,
+					},
 				},
 			},
 		}

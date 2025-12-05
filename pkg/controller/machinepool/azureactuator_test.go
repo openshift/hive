@@ -19,6 +19,7 @@ import (
 	hivev1azure "github.com/openshift/hive/apis/hive/v1/azure"
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
 	testlogger "github.com/openshift/hive/pkg/test/logger"
+	installertypesazure "github.com/openshift/installer/pkg/types/azure"
 )
 
 type providerSpecValidator func(t *testing.T, providerSpec *machineapi.AzureMachineProviderSpec)
@@ -200,7 +201,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -219,7 +220,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -238,7 +239,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345-gen2",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{
@@ -257,7 +258,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/images/foo-12345-gen2",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{
@@ -265,7 +266,7 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment(),
 			pool: func() *hivev1.MachinePool {
 				mp := testAzurePool()
-				mp.Spec.Platform.Azure.OSImage = &hivev1azure.OSImage{
+				mp.Spec.Platform.Azure.OSImage = hivev1azure.OSImage{
 					Publisher: "testpublisher",
 					Offer:     "testoffer",
 					SKU:       "testsku",
@@ -403,7 +404,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -422,7 +423,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V1 image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345",
 			},
 		},
 		{
@@ -441,7 +442,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{
@@ -460,7 +461,7 @@ func TestAzureActuator(t *testing.T) {
 			},
 			// V2 ("-gen2") image is chosen for machinepool
 			expectedImage: &machineapi.Image{
-				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2/versions/latest",
+				ResourceID: "/resourceGroups/foo-12345-rg/providers/Microsoft.Compute/galleries/gallery_foo_12345/images/foo-12345-gen2",
 			},
 		},
 		{
@@ -468,7 +469,7 @@ func TestAzureActuator(t *testing.T) {
 			clusterDeployment: testAzureClusterDeployment412(),
 			pool: func() *hivev1.MachinePool {
 				mp := testAzurePool()
-				mp.Spec.Platform.Azure.OSImage = &hivev1azure.OSImage{
+				mp.Spec.Platform.Azure.OSImage = hivev1azure.OSImage{
 					Publisher: "testpublisher",
 					Offer:     "testoffer",
 					SKU:       "testsku",
@@ -590,10 +591,12 @@ func testAzurePool() *hivev1.MachinePool {
 	p := testMachinePool()
 	p.Spec.Platform = hivev1.MachinePoolPlatform{
 		Azure: &hivev1azure.MachinePool{
-			InstanceType: testInstanceType,
-			OSDisk: hivev1azure.OSDisk{
-				DiskSizeGB: 120,
-				DiskType:   hivev1azure.DefaultDiskType,
+			MachinePool: installertypesazure.MachinePool{
+				InstanceType: testInstanceType,
+				OSDisk: installertypesazure.OSDisk{
+					DiskSizeGB: 120,
+					DiskType:   hivev1azure.DefaultDiskType,
+				},
 			},
 		},
 	}

@@ -11,12 +11,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	v1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machineapi "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/installer/pkg/asset/installconfig/aws"
 	"github.com/openshift/installer/pkg/types"
-	"github.com/openshift/installer/pkg/types/aws"
+	awstypes "github.com/openshift/installer/pkg/types/aws"
 )
 
 type machineProviderInput struct {
@@ -29,16 +31,17 @@ type machineProviderInput struct {
 	role             string
 	userDataSecret   string
 	instanceProfile  string
-	root             *aws.EC2RootVolume
-	imds             aws.EC2Metadata
+	root             *awstypes.EC2RootVolume
+	imds             awstypes.EC2Metadata
 	userTags         map[string]string
 	publicSubnet     bool
 	securityGroupIDs []string
+	cpuOptions       *awstypes.CPUOptions
 }
 
 // Machines returns a list of machines for a machinepool.
-func Machines(clusterID string, region string, subnets map[string]string, pool *types.MachinePool, role, userDataSecret string, userTags map[string]string, publicSubnet bool) ([]machineapi.Machine, *machinev1.ControlPlaneMachineSet, error) {
-	if poolPlatform := pool.Platform.Name(); poolPlatform != aws.Name {
+func Machines(clusterID string, region string, subnets aws.SubnetsByZone, pool *types.MachinePool, role, userDataSecret string, userTags map[string]string, publicSubnet bool) ([]machineapi.Machine, *machinev1.ControlPlaneMachineSet, error) {
+	if poolPlatform := pool.Platform.Name(); poolPlatform != awstypes.Name {
 		return nil, nil, fmt.Errorf("non-AWS machine-pool: %q", poolPlatform)
 	}
 	mpool := pool.Platform.AWS
@@ -64,7 +67,7 @@ func Machines(clusterID string, region string, subnets map[string]string, pool *
 		provider, err := provider(&machineProviderInput{
 			clusterID:        clusterID,
 			region:           region,
-			subnet:           subnet,
+			subnet:           subnet.ID,
 			instanceType:     mpool.InstanceType,
 			osImage:          mpool.AMIID,
 			zone:             zone,
@@ -76,6 +79,7 @@ func Machines(clusterID string, region string, subnets map[string]string, pool *
 			userTags:         userTags,
 			publicSubnet:     publicSubnet,
 			securityGroupIDs: pool.Platform.AWS.AdditionalSecurityGroupIDs,
+			cpuOptions:       mpool.CPUOptions,
 		})
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to create provider")
@@ -117,7 +121,7 @@ func Machines(clusterID string, region string, subnets map[string]string, pool *
 				AvailabilityZone: zone,
 			},
 		}
-		if subnet == "" {
+		if subnet.ID == "" {
 			domain.Subnet.Type = machinev1.AWSFiltersReferenceType
 			subnetFilterValue := fmt.Sprintf("%s-subnet-private-%s", clusterID, zone)
 			if publicSubnet {
@@ -131,7 +135,7 @@ func Machines(clusterID string, region string, subnets map[string]string, pool *
 			}
 		} else {
 			domain.Subnet.Type = machinev1.AWSIDReferenceType
-			domain.Subnet.ID = pointer.String(subnet)
+			domain.Subnet.ID = pointer.String(subnet.ID)
 		}
 		failureDomains = append(failureDomains, domain)
 	}
@@ -238,11 +242,12 @@ func provider(in *machineProviderInput) (*machineapi.AWSMachineProviderConfig, e
 		BlockDevices: []machineapi.BlockDeviceMappingSpec{
 			{
 				EBS: &machineapi.EBSBlockDeviceSpec{
-					VolumeType: pointer.String(in.root.Type),
-					VolumeSize: pointer.Int64(int64(in.root.Size)),
-					Iops:       pointer.Int64(int64(in.root.IOPS)),
-					Encrypted:  pointer.Bool(true),
-					KMSKey:     machineapi.AWSResourceReference{ARN: pointer.String(in.root.KMSKeyARN)},
+					VolumeType:    pointer.String(in.root.Type),
+					VolumeSize:    pointer.Int64(int64(in.root.Size)),
+					Iops:          pointer.Int64(int64(in.root.IOPS)),
+					ThroughputMib: pointer.Int32(int32(in.root.Throughput)),
+					Encrypted:     pointer.Bool(true),
+					KMSKey:        machineapi.AWSResourceReference{ARN: pointer.String(in.root.KMSKeyARN)},
 				},
 			},
 		},
@@ -288,6 +293,16 @@ func provider(in *machineProviderInput) (*machineapi.AWSMachineProviderConfig, e
 
 	if in.imds.Authentication != "" {
 		config.MetadataServiceOptions.Authentication = machineapi.MetadataServiceAuthentication(in.imds.Authentication)
+	}
+
+	if in.cpuOptions != nil {
+		cpuOptions := machineapi.CPUOptions{}
+
+		if in.cpuOptions.ConfidentialCompute != nil {
+			cpuOptions.ConfidentialCompute = ptr.To(machineapi.AWSConfidentialComputePolicy(*in.cpuOptions.ConfidentialCompute))
+		}
+
+		config.CPUOptions = &cpuOptions
 	}
 
 	return config, nil

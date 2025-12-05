@@ -356,11 +356,6 @@ func suggestedFixForClear(callExpr *ast.CallExpr) (analysis.SuggestedFix, error)
 }
 
 func suggestedFixForKeysOrValues(callExpr *ast.CallExpr) (analysis.SuggestedFix, error) {
-	var name string
-	if ident, ok := callExpr.Args[0].(*ast.Ident); ok {
-		name = ident.Name
-	}
-
 	s := &ast.CallExpr{
 		Fun: &ast.SelectorExpr{
 			X:   &ast.Ident{Name: "slices"},
@@ -375,10 +370,8 @@ func suggestedFixForKeysOrValues(callExpr *ast.CallExpr) (analysis.SuggestedFix,
 					},
 					&ast.BasicLit{Kind: token.INT, Value: "0"},
 					&ast.CallExpr{
-						Fun: &ast.Ident{Name: "len"},
-						Args: []ast.Expr{
-							&ast.Ident{Name: name},
-						},
+						Fun:  &ast.Ident{Name: "len"},
+						Args: callExpr.Args,
 					},
 				},
 			},

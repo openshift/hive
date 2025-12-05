@@ -43,7 +43,6 @@ const (
 baseDomain: template.domain
 metadata:
   name: template-cluster-name
-  creationTimestamp: null
 compute:
 - hyperthreading: Enabled
   name: worker
@@ -398,7 +397,6 @@ func TestBuildClusterResources(t *testing.T) {
 
 				updatedYaml := fakeMinimalInstallConfigYaml + fmt.Sprintf(`baseDomain: %s
 metadata:
-  creationTimestamp: null
   name: %s`, baseDomain, clusterName)
 
 				assert.YAMLEq(t, updatedYaml, installConfigSecret.StringData["install-config.yaml"])

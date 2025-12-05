@@ -1240,6 +1240,8 @@ spec:
       name: my-gcp-cluster-admin-kubeconfig
     clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
     infraID: my-gcp-cluster-wsvdn
+    metadataJSONSecretRef:
+      name: my-gcp-cluster-metadata-json
   clusterName: my-gcp-cluster
   installed: true
   platform:
@@ -1250,6 +1252,8 @@ spec:
   pullSecretRef:
     name: pull-secret
 ```
+
+Note: my-gcp-cluster-metadata-json is the optional and shall be applicable only if the cluster is already managed by hive and my-gcp-cluster-metadata-json already exists in the original ClusterDeployment yaml.
 
 If the cluster you are looking to adopt is on AWS and leverages Privatelink, you'll also need to include that setting under `spec.platform.aws` to ensure the VPC Endpoint Service for the cluster is tracked in the ClusterDeployment.
 
@@ -1263,20 +1267,20 @@ If the cluster you are looking to adopt is on AWS and leverages Privatelink, you
       region: us-east-1
 ```
 
-If the cluster you are looking to adopt is on AWS and uses a shared VPC, you will also need to include the name of the hosted zone role in `spec.clusterMetadata.platform.aws.hostedZoneRole`.
+If my-aws-cluster-metadata-json doesn't exist and the cluster you are looking to adopt is on AWS and uses a shared VPC, you will also need to include the name of the hosted zone role in `spec.clusterMetadata.platform.aws.hostedZoneRole`.
 
 ```yaml
   clusterMetadata:
     adminKubeconfigSecretRef:
-      name: my-gcp-cluster-admin-kubeconfig
+      name: my-aws-cluster-admin-kubeconfig
     clusterID: 61010205-c91d-44c9-8394-3e1790bd76f3
-    infraID: my-gcp-cluster-wsvdn
+    infraID: my-aws-cluster-wsvdn
     platform:
       aws:
         hostedZoneRole: account-b-zone-role
 ```
 
-If the cluster you are looking to adopt is on GCP and uses a shared VPC, you will also need to include the name of the network project ID in `spec.clusterMetadata.platform.gcp.networkProjectID`.
+If my-gcp-cluster-metadata-json doesn't exist and the cluster you are looking to adopt is on GCP and uses a shared VPC, you will also need to include the name of the network project ID in `spec.clusterMetadata.platform.gcp.networkProjectID`.
 
 ```yaml
   clusterMetadata:

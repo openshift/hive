@@ -60,6 +60,7 @@ in-cluster. This may improve in the future for some clouds.
   * Azure
   * GCP
   * OpenStack (with [inventory](enhancements/clusterpool-inventory.md))
+  * vSphere (with [inventory](enhancements/clusterpool-inventory.md))
 
 ## Sample Cluster Pool
 

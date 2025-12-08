@@ -318,7 +318,8 @@ func (a *ClusterDeploymentValidatingAdmissionHook) validateCreate(admissionSpec 
 		}
 	}
 
-	allErrs = append(allErrs, validateClusterPlatform(specPath.Child("platform"), cd.Spec.Platform)...)
+	allErrs = append(allErrs, validateClusterPlatform(specPath, cd)...)
+
 	allErrs = append(allErrs, validateCanManageDNSForClusterPlatform(specPath, cd.Spec)...)
 
 	if cd.Spec.Platform.AWS != nil {
@@ -470,7 +471,9 @@ func validatefeatureGates(decoder admission.Decoder, admissionSpec *admissionv1b
 	return nil
 }
 
-func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.ErrorList {
+// validatePlatformConfiguration validates platform-specific fields.
+// Shared by ClusterDeployment and ClusterPool validation.
+func validatePlatformConfiguration(path *field.Path, platform hivev1.Platform) field.ErrorList {
 	allErrs := field.ErrorList{}
 	numberOfPlatforms := 0
 	if aws := platform.AWS; aws != nil {
@@ -495,9 +498,7 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		if azure.Region == "" {
 			allErrs = append(allErrs, field.Required(azurePath.Child("region"), "must specify Azure region"))
 		}
-		if azure.BaseDomainResourceGroupName == "" {
-			allErrs = append(allErrs, field.Required(azurePath.Child("baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain"))
-		}
+		// Note: baseDomainResourceGroupName validation is ClusterDeployment-specific, handled in validateClusterPlatform
 	}
 	if gcp := platform.GCP; gcp != nil {
 		numberOfPlatforms++
@@ -582,6 +583,29 @@ func validateClusterPlatform(path *field.Path, platform hivev1.Platform) field.E
 		allErrs = append(allErrs, field.Invalid(path, platform, "must specify only a single platform"))
 	}
 	return allErrs
+}
+
+// validateClusterPlatform validates platform configuration for ClusterDeployment.
+// Performs common platform validation and adds ClusterDeployment-specific checks
+// (e.g., Azure baseDomainResourceGroupName when manageDNS is enabled).
+func validateClusterPlatform(specPath *field.Path, cd *hivev1.ClusterDeployment) field.ErrorList {
+	platformPath := specPath.Child("platform")
+	allErrs := validatePlatformConfiguration(platformPath, cd.Spec.Platform)
+
+	if cd.Spec.Platform.Azure != nil && cd.Spec.ManageDNS {
+		if cd.Spec.Platform.Azure.BaseDomainResourceGroupName == "" {
+			allErrs = append(allErrs, field.Required(platformPath.Child("azure", "baseDomainResourceGroupName"), "must specify the Azure resource group for the base domain when manageDNS is true"))
+		}
+	}
+
+	return allErrs
+}
+
+// validateClusterPoolPlatform validates platform configuration for ClusterPool.
+// Only performs common platform validation as ClusterPool lacks ClusterDeployment-specific fields.
+func validateClusterPoolPlatform(specPath *field.Path, cp *hivev1.ClusterPool) field.ErrorList {
+	platformPath := specPath.Child("platform")
+	return validatePlatformConfiguration(platformPath, cp.Spec.Platform)
 }
 
 func validateCanManageDNSForClusterPlatform(specPath *field.Path, spec hivev1.ClusterDeploymentSpec) field.ErrorList {

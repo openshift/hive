@@ -2,11 +2,10 @@ package machinepool
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/blang/semver/v4"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -27,8 +26,6 @@ import (
 	"github.com/openshift/hive/pkg/azureclient"
 	controllerutils "github.com/openshift/hive/pkg/controller/utils"
 )
-
-var versionsSupportingAzureImageGallery = semver.MustParseRange(">=4.12.0")
 
 // AzureActuator encapsulates the pieces necessary to be able to generate
 // a list of MachineSets to sync to the remote cluster.
@@ -186,7 +183,27 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		session,
 		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
 	)
+
+	for _, i := range installerMachineSets {
+		p := i.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec).DeepCopy()
+		if len(p.Image.ResourceID) > 0 {
+			p.Image.ResourceID = p.Image.ResourceID + "/versions/latest"
+		}
+		i.Spec.Template.Spec.ProviderSpec.Value.Object = p
+	}
+
+	pretty := prettifyMSets(installerMachineSets)
+	a.logger.WithField("pretty", pretty).Error("FIND ME: here are your machines bro")
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
+}
+
+func prettifyMSets(msets []*machineapi.MachineSet) string {
+	var providerSpecs []*machineapi.AzureMachineProviderSpec
+	for _, i := range msets {
+		p := i.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)
+		providerSpecs = append(providerSpecs, p)
+	}
+	return spew.Sdump(providerSpecs)
 }
 
 func (a *AzureActuator) getZones(region string, instanceType string) ([]string, error) {
@@ -235,18 +252,4 @@ func (a *AzureActuator) gen2ImageExists(resourceGroupName string) (bool, error) 
 		}
 	}
 	return false, nil
-}
-
-func shouldUseImageGallery(cd *hivev1.ClusterDeployment) (bool, error) {
-	versionString, err := getClusterVersion(cd)
-	if err != nil {
-		return true, fmt.Errorf("failed to get cluster semver: %w", err)
-	}
-
-	version, err := semver.ParseTolerant(versionString)
-	if err != nil {
-		return true, fmt.Errorf("failed to parse cluster semver: %w", err)
-	}
-
-	return versionsSupportingAzureImageGallery(version), nil
 }

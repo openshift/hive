@@ -9,6 +9,20 @@
 # a "yum repolist" to refresh available repos
 #
 
+[ubi-9-for-$basearch-baseos-rpms]
+name = Red Hat Universal Base Image 9 (RPMs) - BaseOS
+baseurl = https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/os
+enabled = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck = 1
+
+[ubi-9-for-$basearch-appstream-rpms]
+name = Red Hat Universal Base Image 9 (RPMs) - AppStream
+baseurl = https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/appstream/os
+enabled = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck = 1
+
 [rhel-9-for-$basearch-baseos-eus-rpms]
 name = Red Hat Enterprise Linux 9 for $basearch - BaseOS - Extended Update Support (RPMs)
 baseurl = https://cdn.redhat.com/content/eus/rhel9/9.6/$basearch/baseos/os
@@ -17,8 +31,8 @@ gpgcheck = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 sslverify = 1
 sslcacert = /etc/rhsm/ca/redhat-uep.pem
-sslclientkey = /etc/pki/entitlement/6968121214801895763-key.pem
-sslclientcert = /etc/pki/entitlement/6968121214801895763.pem
+sslclientkey = /etc/pki/entitlement/8683845599944482170-key.pem
+sslclientcert = /etc/pki/entitlement/8683845599944482170.pem
 sslverifystatus = 1
 metadata_expire = 86400
 enabled_metadata = 1
@@ -31,8 +45,8 @@ gpgcheck = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 sslverify = 1
 sslcacert = /etc/rhsm/ca/redhat-uep.pem
-sslclientkey = /etc/pki/entitlement/6968121214801895763-key.pem
-sslclientcert = /etc/pki/entitlement/6968121214801895763.pem
+sslclientkey = /etc/pki/entitlement/8683845599944482170-key.pem
+sslclientcert = /etc/pki/entitlement/8683845599944482170.pem
 sslverifystatus = 1
 metadata_expire = 86400
 enabled_metadata = 1

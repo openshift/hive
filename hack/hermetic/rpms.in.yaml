@@ -1,7 +1,7 @@
 contentOrigin:
   repofiles:
     - ./redhat.repo
-packages: [openssh-clients, libvirt-libs, tar, krb5-libs, krb5-devel] # this should be kept in sync with the Dockerfile
+packages: [openssh-clients, libvirt-libs, tar] # this should be kept in sync with the Dockerfile
 arches:
   - x86_64
   - ppc64le

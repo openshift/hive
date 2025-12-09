@@ -10,9 +10,8 @@ import (
 
 	mockaws "github.com/openshift/hive/pkg/awsclient/mock"
 	mockazure "github.com/openshift/hive/pkg/azureclient/mock"
-	ofake "github.com/openshift/hive/pkg/client/fake"
 	mockgcp "github.com/openshift/hive/pkg/gcpclient/mock"
-	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/test/fake"
 )
 
 type mocks struct {
@@ -25,8 +24,8 @@ type mocks struct {
 
 // setupDefaultMocks is an easy way to setup all of the default mocks
 func setupDefaultMocks(t *testing.T, failDelete bool, initObjs ...runtime.Object) *mocks {
-	oFakeClient := ofake.FakeClientWithCustomErrors{
-		Client: testfake.NewFakeClientBuilder().WithRuntimeObjects(initObjs...).Build(),
+	oFakeClient := fake.FakeClientWithCustomErrors{
+		Client: fake.NewFakeClientBuilder().WithRuntimeObjects(initObjs...).Build(),
 	}
 	if failDelete {
 		// There's only one Delete() call in the reconcile flow. Mock it to error if requested.

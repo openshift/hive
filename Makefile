@@ -220,7 +220,6 @@ deploy: ensure-kustomize install
 
 # NOTE: Keep the paths checked below in sync with those passed to the generators in `hack/update-codegen.sh`
 verify-codegen: update-codegen
-	git diff --exit-code pkg/client
 	git diff --exit-code apis
 verify: verify-codegen
 

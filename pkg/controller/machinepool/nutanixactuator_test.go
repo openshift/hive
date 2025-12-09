@@ -10,14 +10,15 @@ import (
 	machineapi "github.com/openshift/api/machine/v1beta1"
 	hivev1 "github.com/openshift/hive/apis/hive/v1"
 	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
-	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/test/fake"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func getMasterMachineWithImage(t assert.TestingT) *machineapi.Machine {
@@ -43,7 +44,7 @@ func getMasterMachineWithImage(t assert.TestingT) *machineapi.Machine {
 }
 
 func TestNewNutanixActuator(t *testing.T) {
-	fakeClient := testfake.NewFakeClientBuilder().Build()
+	fakeClient := fake.NewFakeClientBuilder().Build()
 	actuator, err := NewNutanixActuator(fakeClient, getMasterMachineWithImage(t))
 	assert.NoError(t, err, "unexpected error creating NutanixActuator")
 	assert.NotNil(t, actuator, "expected a valid NutanixActuator instance")
@@ -243,7 +244,7 @@ func TestGenerateMachineSets(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("actuator", "nutanixactuator_test")
-			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
+			fakeClient := fake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
 
 			actuator, err := NewNutanixActuator(fakeClient, getMasterMachineWithImage(t))
 			require.NoError(t, err, "unexpected error creating NutanixActuator")
@@ -342,6 +343,7 @@ func TestGetRHCOSImageNameFromMasterMachine(t *testing.T) {
 	})
 }
 
+// TODO: Fold this functionality into FakeClientWithCustomErrors
 type erroringStatusWriter struct {
 	client.StatusWriter
 }
@@ -360,12 +362,7 @@ func (f *fakeClientWithStatusError) Status() client.StatusWriter {
 }
 
 func TestNutanixActuator_GenerateMachineSets_DataDiskFailure_StatusUpdateFails(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, hivev1.AddToScheme(scheme))
-	require.NoError(t, machineapi.AddToScheme(scheme))
-	require.NoError(t, machinev1.AddToScheme(scheme))
-
-	baseClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	baseClient := fake.NewFakeClientBuilder().Build()
 	clientWithError := &fakeClientWithStatusError{
 		Client:       baseClient,
 		statusWriter: &erroringStatusWriter{baseClient.Status()},
@@ -401,12 +398,7 @@ func TestNutanixActuator_GenerateMachineSets_DataDiskFailure_StatusUpdateFails(t
 }
 
 func TestNutanixActuator_GenerateMachineSets_MissingRHCOSImage_StatusUpdateFails(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, hivev1.AddToScheme(scheme))
-	require.NoError(t, machineapi.AddToScheme(scheme))
-	require.NoError(t, machinev1.AddToScheme(scheme))
-
-	baseClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	baseClient := fake.NewFakeClientBuilder().Build()
 	clientWithError := &fakeClientWithStatusError{
 		Client:       baseClient,
 		statusWriter: &erroringStatusWriter{baseClient.Status()},
@@ -557,7 +549,7 @@ func TestNutanixActuator_AutoscalingGeneratesMachineSets(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger := log.WithField("actuator", "nutanixactuator_test")
-			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
+			fakeClient := fake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
 
 			actuator, err := NewNutanixActuator(fakeClient, getMasterMachineWithImage(t))
 			require.NoError(t, err, "unexpected error creating NutanixActuator")

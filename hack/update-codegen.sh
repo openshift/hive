@@ -20,10 +20,3 @@ kube::codegen::gen_helpers \
 # the gen_helpers function clobbers the vendor folder, so we have to restore it
 git restore "${HIVE_ROOT}/apis/vendor"
 popd
-
-# NOTE (28 June 2024): This is currently a no-op, as there is nothing to generate in pkg/client
-pushd "${HIVE_ROOT}"
-kube::codegen::gen_helpers \
-  --boilerplate "${HIVE_ROOT}/hack/boilerplate.go.txt" \
-  "${HIVE_ROOT}/pkg/client"
-popd

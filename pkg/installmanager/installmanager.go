@@ -351,6 +351,11 @@ func (m *InstallManager) Run() error {
 	}
 	m.log.Infof("copied %s to %s", m.InstallConfigMountPath, destInstallConfigPath)
 
+	//install-config.yaml backup for check
+	if err := os.WriteFile("/tmp/install-config.yaml", icData, 0644); err != nil {
+		m.log.WithError(err).Error("error writing the install-config.yaml backup")
+	}
+
 	if cd.Spec.Provisioning != nil && len(cd.Spec.Provisioning.SSHKnownHosts) > 0 {
 		err = m.writeSSHKnownHosts(getHomeDir(), cd.Spec.Provisioning.SSHKnownHosts)
 		if err != nil {

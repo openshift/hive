@@ -35,12 +35,11 @@ import (
 	hivev1aws "github.com/openshift/hive/apis/hive/v1/aws"
 	hivev1nutanix "github.com/openshift/hive/apis/hive/v1/nutanix"
 	"github.com/openshift/hive/apis/hive/v1/vsphere"
-	ofake "github.com/openshift/hive/pkg/client/fake"
 	"github.com/openshift/hive/pkg/constants"
 	"github.com/openshift/hive/pkg/controller/machinepool/mock"
 	"github.com/openshift/hive/pkg/remoteclient"
 	remoteclientmock "github.com/openshift/hive/pkg/remoteclient/mock"
-	testfake "github.com/openshift/hive/pkg/test/fake"
+	"github.com/openshift/hive/pkg/test/fake"
 	testmp "github.com/openshift/hive/pkg/test/machinepool"
 	teststatefulset "github.com/openshift/hive/pkg/test/statefulset"
 )
@@ -120,7 +119,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 		clusterDeployment      *hivev1.ClusterDeployment
 		machinePool            *hivev1.MachinePool
 		remoteExisting         []runtime.Object
-		configureRemoteClient  func(*ofake.FakeClientWithCustomErrors)
+		configureRemoteClient  func(*fake.FakeClientWithCustomErrors)
 		generatedMachineSets   []*machineapi.MachineSet
 		generateMachineSetsErr error
 		actuatorDoNotProceed   bool
@@ -889,7 +888,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineAutoscaler("foo-12345-worker-us-east-1b", "1", 1, 2),
 				testMachineAutoscaler("foo-12345-worker-us-east-1c", "1", 1, 1),
 			},
-			configureRemoteClient: func(fakeClient *ofake.FakeClientWithCustomErrors) {
+			configureRemoteClient: func(fakeClient *fake.FakeClientWithCustomErrors) {
 				// ...and when we try to delete one, boom.
 				fakeClient.DeleteBehavior = []error{fmt.Errorf("foo bar baz")}
 			},
@@ -911,7 +910,7 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 				testMachineSetWithAZ("foo-12345-worker-us-east-1a", "worker", true, 1, 0, "us-east-1a"),
 				testMachineAutoscaler("foo-12345-worker-us-east-1a", "1", 1, 2),
 			},
-			configureRemoteClient: func(fakeClient *ofake.FakeClientWithCustomErrors) {
+			configureRemoteClient: func(fakeClient *fake.FakeClientWithCustomErrors) {
 				// The first List() is for MachineAutoscalers. Fail the second, for ClusterAutoscalers
 				fakeClient.ListBehavior = []error{nil, fmt.Errorf("foo bar baz")}
 			},
@@ -1368,14 +1367,14 @@ func TestRemoteMachineSetReconcile(t *testing.T) {
 			if test.machinePool != nil {
 				localExisting = append(localExisting, test.machinePool)
 			}
-			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(localExisting...).Build()
+			fakeClient := fake.NewFakeClientBuilder().WithRuntimeObjects(localExisting...).Build()
 			infra := &configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "cluster",
 				},
 			}
-			remoteFakeClient := ofake.FakeClientWithCustomErrors{
-				Client: testfake.NewFakeClientBuilder().WithRuntimeObjects(append(test.remoteExisting, infra)...).Build(),
+			remoteFakeClient := fake.FakeClientWithCustomErrors{
+				Client: fake.NewFakeClientBuilder().WithRuntimeObjects(append(test.remoteExisting, infra)...).Build(),
 			}
 			if test.configureRemoteClient != nil {
 				test.configureRemoteClient(&remoteFakeClient)
@@ -1706,7 +1705,7 @@ Machine machine-3 failed (InsufficientResources): No available quota,
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			fake := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			fake := fake.NewFakeClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			ms := &machineapi.MachineSet{}
 			err := fake.Get(context.TODO(), types.NamespacedName{Namespace: machineAPINamespace, Name: testName}, ms)
@@ -2094,7 +2093,7 @@ func TestEnsureEnoughReplicas_ConditionClearing(t *testing.T) {
 			scheme := scheme.GetScheme()
 			test.pool.Status.Conditions = test.existingConditions
 
-			fakeClient := testfake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
+			fakeClient := fake.NewFakeClientBuilder().WithRuntimeObjects(test.pool).Build()
 			cd := testClusterDeployment()
 			// Use Nutanix cluster deployment for tests that need platforms that don't allow zero autoscaling min replicas
 			if test.name == "Set NotEnoughReplicas condition true for autoscaling with insufficient minReplicas" {

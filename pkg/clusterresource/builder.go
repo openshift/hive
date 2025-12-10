@@ -689,7 +689,7 @@ func (o *Builder) getAdoptAdminKubeconfigSecretName() string {
 }
 
 func (o *Builder) getAdoptMetadataJSONSecretName() string {
-	return fmt.Sprintf("%s-adopted-admin-kubeconfig", o.Name)
+	return fmt.Sprintf("%s-adopted-metadata-json", o.Name)
 }
 
 // TODO: handle long cluster names.

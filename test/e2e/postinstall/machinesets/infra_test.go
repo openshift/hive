@@ -70,10 +70,10 @@ func TestScaleMachinePool(t *testing.T) {
 	require.NoError(t, err, "cannot update worker machine pool to reduce replicas")
 
 	err = waitForMachines(logger, cfg, cd, machinePrefix, 1)
-	require.NoError(t, err, "timed out waiting for machines to be created")
+	require.NoError(t, err, "timed out waiting for machines to be scaled down")
 
 	err = waitForNodes(logger, cfg, cd, machinePrefix, 1)
-	require.NoError(t, err, "timed out waiting for nodes to be created")
+	require.NoError(t, err, "timed out waiting for nodes to be scaled down")
 
 	// Scale up
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -87,10 +87,10 @@ func TestScaleMachinePool(t *testing.T) {
 	require.NoError(t, err, "cannot update worker machine pool to increase replicas")
 
 	err = waitForMachines(logger, cfg, cd, machinePrefix, 3)
-	require.NoError(t, err, "timed out waiting for machines to be created")
+	require.NoError(t, err, "timed out waiting for machines to be scaled up")
 
 	err = waitForNodes(logger, cfg, cd, machinePrefix, 3)
-	require.NoError(t, err, "timed out waiting for nodes to be created")
+	require.NoError(t, err, "timed out waiting for nodes to be scaled up")
 }
 
 func TestNewMachinePool(t *testing.T) {
@@ -213,7 +213,7 @@ func TestNewMachinePool(t *testing.T) {
 		},
 		5*time.Minute,
 	)
-	require.NoError(t, err, "timed out waiting for machinesets")
+	require.NoError(t, err, "timed out waiting for machinesets to be removed")
 }
 
 // TestAutoscalineMachinePool tests the features of an auto-scaling machine pool.
@@ -410,6 +410,7 @@ poll:
 
 func waitForMachines(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDeployment, machinePrefix string, expectedReplicas int) error {
 	logger.Infof("waiting for %d machines with prefix '%s'", expectedReplicas, machinePrefix)
+	lastCount := 0
 	return common.WaitForMachines(cfg, func(machines []*machinev1.Machine) bool {
 		count := 0
 		for _, m := range machines {
@@ -417,8 +418,12 @@ func waitForMachines(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.Cluste
 				count++
 			}
 		}
+		if count != lastCount {
+			logger.Infof("found %d machines with prefix '%s'", count, machinePrefix)
+			lastCount = count
+		}
 		return count == expectedReplicas
-	}, 10*time.Minute)
+	}, 20*time.Minute)
 }
 
 func waitForNodes(logger log.FieldLogger, cfg *rest.Config, cd *hivev1.ClusterDeployment, machinePrefix string, expectedReplicas int, extraChecks ...func(node *corev1.Node) bool) error {

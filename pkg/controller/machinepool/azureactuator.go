@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -183,7 +184,18 @@ func (a *AzureActuator) GenerateMachineSets(cd *hivev1.ClusterDeployment, pool *
 		session,
 		// TODO: support adding userTags? https://issues.redhat.com/browse/HIVE-2143
 	)
+	pretty := prettifyMSets(installerMachineSets)
+	a.logger.WithField("pretty", pretty).Error("FIND ME: here are your machines bro")
 	return installerMachineSets, err == nil, errors.Wrap(err, "failed to generate machinesets")
+}
+
+func prettifyMSets(msets []*machineapi.MachineSet) string {
+	var providerSpecs []*machineapi.AzureMachineProviderSpec
+	for _, i := range msets {
+		p := i.Spec.Template.Spec.ProviderSpec.Value.Object.(*machineapi.AzureMachineProviderSpec)
+		providerSpecs = append(providerSpecs, p)
+	}
+	return spew.Sdump(providerSpecs)
 }
 
 func (a *AzureActuator) getZones(region string, instanceType string) ([]string, error) {
